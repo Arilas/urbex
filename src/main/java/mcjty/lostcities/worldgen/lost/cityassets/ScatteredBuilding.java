@@ -12,16 +12,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class Scattered implements ILostCityAsset {
+public class ScatteredBuilding implements ILostCityAsset {
 
     private final ResourceLocation name;
     private final List<String> buildings;
     private final String multibuilding;
-    private final Scattered.TerrainHeight terrainheight;
-    private final Scattered.TerrainFix terrainfix;
+    private final ScatteredBuilding.TerrainHeight terrainheight;
+    private final ScatteredBuilding.TerrainFix terrainfix;
     private final int heightoffset;
 
-    public Scattered(ScatteredRE object) {
+    public ScatteredBuilding(ScatteredRE object) {
         name = object.getRegistryName();
         this.buildings = object.getBuildings();
         this.multibuilding = object.getMultibuilding();
@@ -62,7 +62,7 @@ public class Scattered implements ILostCityAsset {
         return name;
     }
 
-    public static enum TerrainHeight implements StringRepresentable {
+    public enum TerrainHeight implements StringRepresentable {
         LOWEST("lowest"),
         AVERAGE("average"),
         HIGHEST("highest"),
@@ -92,7 +92,7 @@ public class Scattered implements ILostCityAsset {
         }
     }
 
-    public static enum TerrainFix implements StringRepresentable {
+    public enum TerrainFix implements StringRepresentable {
         NONE("none"),               // Do nothing with the terrain
         CLEAR("clear"),             // Clear from generation point upwards
         REPEATSLICE("repeatslice")  // Repeat the bottom slice downwards until it hits a solid block
