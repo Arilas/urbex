@@ -5,6 +5,7 @@ Upcoming:
 - Slightly reduced multibuilding chances
 - Slightly reduced scattered building chances
 - Added a new 'settings' block to the world style. Currently only contains the new 'railwayavoidance' with as two options: 'ignore' and 'block_railway' ('ignore' is currently default). With 'block_railway' railways will not generate if a building has a lot of cellars and it would intersect the railway. i.e. buildings have priority over railways
+- Because server configs work completely different on 1.21 we had to change the way that Lost Cities works. Basically you have to edit lostcities-server.toml. There you can edit the 'selectedProfile' value and that will be used as default for single player worlds as well as for servers.
 
 1.21-8.2.2:
 - Now also avoid pillager outposts with the avoidStructures option

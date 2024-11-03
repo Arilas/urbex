@@ -4,9 +4,12 @@ import com.google.common.collect.Lists;
 import mcjty.lostcities.LostCities;
 import mcjty.lostcities.config.LostCityProfile;
 import mcjty.lostcities.config.ProfileSetup;
+import mcjty.lostcities.data.LostData;
+import mcjty.lostcities.worldgen.lost.regassets.data.Selectors;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
@@ -59,14 +62,14 @@ public class Config {
     }
 
     // @todo BAD
-    public static void registerLostCityDimension(ResourceKey<Level> type, String profile) {
-        String profileForDimension = getProfileForDimension(type);
+    public static void registerLostCityDimension(ServerLevel level, ResourceKey<Level> type, String profile) {
+        String profileForDimension = getProfileForDimension(level, type);
         if (profileForDimension == null) {
             dimensionProfileCache.put(type, profile);
         }
     }
 
-    public static String getProfileForDimension(ResourceKey<Level> type) {
+    public static String getProfileForDimension(ServerLevel level, ResourceKey<Level> type) {
         if (dimensionProfileCache == null) {
             dimensionProfileCache = new HashMap<>();
             for (String dp : DIMENSION_PROFILES.get()) {
@@ -84,26 +87,27 @@ public class Config {
                     }
                 }
             }
-            String selectedProfile = Config.SELECTED_PROFILE.get();
-            if ("<CHECK>".equals(selectedProfile)) {
-                if (Config.profileFromClient != null && !Config.profileFromClient.isEmpty()) {
-                    Config.SELECTED_PROFILE.set(Config.profileFromClient);
-                    if (Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty()) {
-                        Config.SELECTED_CUSTOM_JSON.set(Config.jsonFromClient);
-                    } else {
-                        Config.SELECTED_CUSTOM_JSON.set("");
-                    }
-                    selectedProfile = Config.profileFromClient;
-                } else {
-                    Config.SELECTED_PROFILE.set("");
-                    selectedProfile = "";
+
+            LostData data = LostData.getData(level);
+            String selectedProfile = "";
+            String selectedJson = "";
+            if (Config.profileFromClient != null && !Config.profileFromClient.isEmpty()) {
+                if (Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty()) {
+                    selectedJson = Config.jsonFromClient;
                 }
+                selectedProfile = Config.profileFromClient;
+                // Remember the profile selected by the client in SavedData
+                data.setProfile(selectedProfile, selectedJson);
+            } else {
+                // Check if SavedData has a profile selected
+                selectedProfile = data.getSelectedProfile();
+                selectedJson = data.getSelectedJson();
             }
+
             if (!selectedProfile.isEmpty()) {
                 dimensionProfileCache.put(Level.OVERWORLD, selectedProfile);
-                String json = Config.SELECTED_CUSTOM_JSON.get();
-                if (json != null && !json.isEmpty()) {
-                    LostCityProfile profile = new LostCityProfile("customized", json);
+                if (!selectedJson.isEmpty()) {
+                    LostCityProfile profile = new LostCityProfile("customized", selectedJson);
                     if (!ProfileSetup.STANDARD_PROFILES.containsKey("customized")) {
                         ProfileSetup.STANDARD_PROFILES.put("customized", new LostCityProfile("customized", false));
                     }
@@ -111,7 +115,7 @@ public class Config {
                 }
             }
 
-            String profile = getProfileForDimension(Level.OVERWORLD);
+            String profile = getProfileForDimension(level, Level.OVERWORLD);
             if (profile != null && !profile.isEmpty()) {
                 if (ProfileSetup.STANDARD_PROFILES.get(profile).GENERATE_NETHER) {
                     dimensionProfileCache.put(Level.NETHER, "cavern");
@@ -147,7 +151,7 @@ public class Config {
                 .comment("Block to put underneath a bed so that it qualifies as a teleporter bed")
                 .define("specialBedBlock", "minecraft:diamond_block");
 
-        SELECTED_PROFILE = SERVER_BUILDER.define("selectedProfile", "<CHECK>"); // Default is dummy value that tells the system to check in profileFromClient
+        SELECTED_PROFILE = SERVER_BUILDER.define("selectedProfile", "");
         SELECTED_CUSTOM_JSON = SERVER_BUILDER.define("selectedCustomJson", "");
         TODO_QUEUE_SIZE = SERVER_BUILDER.comment("The size of the todo queues for the lost city generator").defineInRange("todoQueueSize", 20, 1, 100000);
         FORCE_SAPLING_GROWTH = SERVER_BUILDER.comment("If this is true then saplings will grow into trees during generation. This is more expensive").define("forceSaplingGrowth", true);

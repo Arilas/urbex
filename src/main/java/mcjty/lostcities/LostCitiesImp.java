@@ -9,6 +9,7 @@ import mcjty.lostcities.worldgen.IDimensionInfo;
 import mcjty.lostcities.worldgen.lost.BuildingInfo;
 import mcjty.lostcities.worldgen.lost.cityassets.AssetRegistries;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 
@@ -39,8 +40,8 @@ public class LostCitiesImp implements ILostCities {
     }
 
     @Override
-    public void registerDimension(ResourceKey<Level> key, String profile) {
-        Config.registerLostCityDimension(key, profile);
+    public void registerDimension(ServerLevel level, ResourceKey<Level> key, String profile) {
+        Config.registerLostCityDimension(level, key, profile);
     }
 
     @Override

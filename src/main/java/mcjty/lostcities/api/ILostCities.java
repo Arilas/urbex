@@ -1,6 +1,7 @@
 package mcjty.lostcities.api;
 
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 
 import javax.annotation.Nullable;
@@ -38,7 +39,7 @@ public interface ILostCities {
      * You need to do this again after loading your world. Preferably in the chunkGenerator
      * (for example in buildSurface)
      */
-    void registerDimension(ResourceKey<Level> key, String profile);
+    void registerDimension(ServerLevel level, ResourceKey<Level> key, String profile);
 
     /**
      * Call this client-side(!) before a world is created. It allows you to set the profile for the overworld
