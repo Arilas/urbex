@@ -308,17 +308,19 @@ public class LostCityTerrainFeature {
             if (CitySphere.isCitySphereCenter(coord, provider)) {
                 CitySphereSettings settings = provider.getWorldStyle().getCitysphereSettings();
                 if (settings != null && settings.getCenterpart() != null) {
-                    BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), settings.getCenterpart());
-                    int offset = settings.getCenterPartOffset();
-                    int partY = switch (settings.getCenterPartOrigin()) {
-                        case FIXED -> 0;
-                        case CENTER -> CitySphere.getCitySphere(coord, provider).getCenterPos().getY();
-                        case FIRSTFLOOR -> info.getCityGroundLevel();
-                        case GROUND -> info.groundLevel;
-                        case TOP -> getTopLevel(info);
-                    };
-                    partY += offset;
-                    generatePart(info, part, Transform.ROTATE_NONE, 0, partY, 0, HardAirSetting.WATERLEVEL);
+                    BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), settings.getCenterpart());
+                    if (part != null) {
+                        int offset = settings.getCenterPartOffset();
+                        int partY = switch (settings.getCenterPartOrigin()) {
+                            case FIXED -> 0;
+                            case CENTER -> CitySphere.getCitySphere(coord, provider).getCenterPos().getY();
+                            case FIRSTFLOOR -> info.getCityGroundLevel();
+                            case GROUND -> info.groundLevel;
+                            case TOP -> getTopLevel(info);
+                        };
+                        partY += offset;
+                        generatePart(info, part, Transform.ROTATE_NONE, 0, partY, 0, HardAirSetting.WATERLEVEL);
+                    }
                 }
             }
         }
@@ -954,16 +956,18 @@ public class LostCityTerrainFeature {
         Direction stairDirection = info.getActualStairDirection();
         if (stairDirection != null) {
             BuildingPart stairs = info.stairType;
-            Transform transform;
-            int oy = info.getCityGroundLevel() + 1;
-            transform = switch (stairDirection) {
-                case XMIN -> Transform.ROTATE_NONE;
-                case XMAX -> Transform.ROTATE_180;
-                case ZMIN -> Transform.ROTATE_90;
-                case ZMAX -> Transform.ROTATE_270;
-            };
+            if (stairs != null) {
+                Transform transform;
+                int oy = info.getCityGroundLevel() + 1;
+                transform = switch (stairDirection) {
+                    case XMIN -> Transform.ROTATE_NONE;
+                    case XMAX -> Transform.ROTATE_180;
+                    case ZMIN -> Transform.ROTATE_90;
+                    case ZMAX -> Transform.ROTATE_270;
+                };
 
-            generatePart(info, stairs, transform, 0, oy, 0, HardAirSetting.AIR);
+                generatePart(info, stairs, transform, 0, oy, 0, HardAirSetting.AIR);
+            }
         }
     }
 
@@ -1222,7 +1226,9 @@ public class LostCityTerrainFeature {
                 } else {
                     part = info.fountainType;
                 }
-                generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
+                if (part != null) {
+                    generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
+                }
             }
 
             generateRandomVegetation(info, height);
@@ -1559,8 +1565,10 @@ public class LostCityTerrainFeature {
 
     private void generateFullStreetSection(BuildingInfo info, int height) {
         StreetParts parts = info.getCityStyle().getStreetParts();
-        BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getRandomPart(parts.full()));
-        generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.VOID);
+        BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.full()));
+        if (part != null) {
+            generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.VOID);
+        }
     }
 
     private void generateNormalStreetSection(BuildingInfo info, int height) {
@@ -1572,9 +1580,9 @@ public class LostCityTerrainFeature {
         int cnt = (xmin ? 1 : 0) + (xmax ? 1 : 0) + (zmin ? 1 : 0) + (zmax ? 1 : 0);
         Transform transform = Transform.ROTATE_NONE;
         BuildingPart part = switch (cnt) {
-            case 0 -> AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getRandomPart(parts.none()));
+            case 0 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.none()));
             case 1 -> {
-                BuildingPart p = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getRandomPart(parts.end()));
+                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.end()));
                 if (xmin) {
                 } else if (xmax) {
                     transform = Transform.ROTATE_180;
@@ -1587,7 +1595,7 @@ public class LostCityTerrainFeature {
             }
             case 2 -> {
                 if (xmin == xmax || zmin == zmax) {
-                    BuildingPart p = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getRandomPart(parts.straight()));
+                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.straight()));
                     if (xmin) {
                     } else if (xmax) {
                         transform = Transform.ROTATE_180;
@@ -1598,7 +1606,7 @@ public class LostCityTerrainFeature {
                     }
                     yield p;
                 } else {
-                    BuildingPart p = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getRandomPart(parts.bend()));
+                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.bend()));
                     if (xmin && zmin) {
                     } else if (xmin && zmax) {
                         transform = Transform.ROTATE_270;
@@ -1611,7 +1619,7 @@ public class LostCityTerrainFeature {
                 }
             }
             case 3 -> {
-                BuildingPart p = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getRandomPart(parts.t()));
+                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.t()));
                 if (!xmin) {
                     transform = Transform.ROTATE_90;
                 } else if (!xmax) {
@@ -1621,10 +1629,12 @@ public class LostCityTerrainFeature {
                 }
                 yield p;
             }
-            case 4 -> AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getRandomPart(parts.all()));
+            case 4 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.all()));
             default -> throw new RuntimeException("Not possible!");
         };
+        if (part != null) {
         generatePart(info, part, transform, 0, height, 0, HardAirSetting.VOID);
+        }
     }
 
     private boolean borderNeedsConnectionToAdjacentChunk(BuildingInfo info, int x, int z) {
@@ -1633,15 +1643,17 @@ public class LostCityTerrainFeature {
                 BuildingInfo adjacent = direction.get(info);
                 if (adjacent.getActualStairDirection() == direction.getOpposite()) {
                     BuildingPart stairType = adjacent.stairType;
-                    Integer z1 = stairType.getMetaInteger(ILostCities.META_Z_1);
-                    Integer z2 = stairType.getMetaInteger(ILostCities.META_Z_2);
-                    Transform transform = direction.getOpposite().getRotation();
-                    int xx1 = transform.rotateX(15, z1);
-                    int zz1 = transform.rotateZ(15, z1);
-                    int xx2 = transform.rotateX(15, z2);
-                    int zz2 = transform.rotateZ(15, z2);
-                    if (x >= Math.min(xx1, xx2) && x <= Math.max(xx1, xx2) && z >= Math.min(zz1, zz2) && z <= Math.max(zz1, zz2)) {
-                        return true;
+                    if (stairType != null) {
+                        Integer z1 = stairType.getMetaInteger(ILostCities.META_Z_1);
+                        Integer z2 = stairType.getMetaInteger(ILostCities.META_Z_2);
+                        Transform transform = direction.getOpposite().getRotation();
+                        int xx1 = transform.rotateX(15, z1);
+                        int zz1 = transform.rotateZ(15, z1);
+                        int xx2 = transform.rotateX(15, z2);
+                        int zz2 = transform.rotateZ(15, z2);
+                        if (x >= Math.min(xx1, xx2) && x <= Math.max(xx1, xx2) && z >= Math.min(zz1, zz2) && z <= Math.max(zz1, zz2)) {
+                            return true;
+                        }
                     }
                 }
                 if (adjacent.hasBridge(provider, direction.getOrientation()) != null) {

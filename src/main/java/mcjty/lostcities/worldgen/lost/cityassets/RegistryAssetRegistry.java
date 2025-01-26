@@ -1,5 +1,6 @@
 package mcjty.lostcities.worldgen.lost.cityassets;
 
+import mcjty.lostcities.LostCities;
 import mcjty.lostcities.api.ILostCityAsset;
 import mcjty.lostcities.api.ILostCityAssetRegistry;
 import mcjty.lostcities.worldgen.lost.regassets.IAsset;
@@ -10,6 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.CommonLevelAccessor;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -47,6 +49,19 @@ public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILost
             throw new RuntimeException("Can't find '" + name + "' in " + registryKey.registry() + "!");
         }
         return result;
+    }
+
+    @Nullable
+    public T getOrWarn(CommonLevelAccessor level, String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return null;
+        }
+        T rc = get(level, DataTools.fromName(name));
+        if (rc == null) {
+            // Warning
+            LostCities.LOGGER.warn("Cannot find '" + name + "' in " + registryKey.registry() + "!");
+        }
+        return rc;
     }
 
     @Override

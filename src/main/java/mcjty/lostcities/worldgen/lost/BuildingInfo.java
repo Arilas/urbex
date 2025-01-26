@@ -753,11 +753,11 @@ public class BuildingInfo implements ILostChunkInfo {
                 streetType = StreetType.NORMAL;
             }
             if (rand.nextFloat() < profile.FOUNTAIN_CHANCE) {
-                fountainType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), cs.getRandomFountain(rand));
+                fountainType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomFountain(rand));
             } else {
                 fountainType = null;
             }
-            parkType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), cs.getRandomPark(rand));
+            parkType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand));
             float cityFactor = City.getCityFactor(coord, provider, profile);
 
             int maxfloors = getMaxfloors(cs);
@@ -814,7 +814,7 @@ public class BuildingInfo implements ILostChunkInfo {
 
             doorBlock = getRandomDoor(rand);
             bridgeType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), cs.getRandomBridge(rand));
-            stairType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), cs.getRandomStair(rand));
+            stairType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomStair(rand));
             stairPriority = rand.nextFloat();
             createPalette(rand);
             float r = rand.nextFloat();
@@ -892,7 +892,7 @@ public class BuildingInfo implements ILostChunkInfo {
 
         if (rand.nextFloat() < profile.RAILWAY_DUNGEON_CHANCE) {
             if (!hasBuilding || (Railway.RAILWAY_LEVEL_OFFSET < (cityLevel - cellars))) {
-                railDungeon = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getCityStyle().getRandomRailDungeon(rand));
+                railDungeon = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomRailDungeon(rand));
             } else {
                 railDungeon = null;
             }
@@ -901,7 +901,7 @@ public class BuildingInfo implements ILostChunkInfo {
         }
 
         if (rand.nextFloat() < profile.BUILDING_FRONTCHANCE) {
-            frontType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), getCityStyle().getRandomFront(rand));
+            frontType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomFront(rand));
         } else {
             frontType = null;
         }
