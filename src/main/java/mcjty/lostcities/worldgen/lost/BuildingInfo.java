@@ -565,7 +565,8 @@ public class BuildingInfo implements ILostChunkInfo {
     }
 
     public static boolean hasRailwayAtSurface(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
-        return Railway.getRailChunkType(coord, provider, profile).getType().isSurface();
+        RailChunkType type = Railway.getRailChunkType(coord, provider, profile).getType();
+        return type.isSurface() || type.isStation();
     }
 
     public Railway.RailChunkInfo getRailInfo() {
