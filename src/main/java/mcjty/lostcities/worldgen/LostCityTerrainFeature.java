@@ -696,7 +696,8 @@ public class LostCityTerrainFeature {
                         float minheight = minh0 + (minh1 - minh0) * (15.0f - z) / 15.0f;
                         maxTouchedY = moveUp(x, z, (int) minheight, info.waterLevel > info.groundLevel);
                     }
-                    if (maxTouchedY != Short.MIN_VALUE) {
+                    if (maxTouchedY != Short.MIN_VALUE && x == 8 && z == 8) {
+                        // Only adjust heightmap for center value
                         heightmapH = Math.max(heightmapH, maxTouchedY);
                     }
                 }

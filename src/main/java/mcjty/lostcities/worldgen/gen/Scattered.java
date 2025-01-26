@@ -47,7 +47,7 @@ public class Scattered {
 
         QualityRandom scatteredRandom = new QualityRandom(provider.getSeed() + ax * 5564338337L + az * 25564337621L);
 
-        if (scatteredRandom.nextFloat() < scatteredSettings.getChance()) {
+        if (scatteredRandom.nextFloat() >= (scatteredSettings.getChance() * provider.getProfile().SCATTERED_CHANCE_MULTIPLIER)) {
             // No scattered structure in this area
             return;
         }
@@ -104,17 +104,19 @@ public class Scattered {
                     }
                 }
                 ChunkHeightmap hm = feature.getHeightmap(coord, provider.getWorld());
+                int height = hm.getHeight();
+                hm.calculateAccurateHeight(provider.getWorld(), x, z);
                 if (!reference.isAllowVoid()) {
                     if (!(feature.profile.isDefault() || feature.profile.isCavern())) {
                         // We are in a world that can have void chunks. Check if this chunk is a void chunk
-                        if (hm.getHeight() <= feature.provider.getWorld().getMinBuildHeight() + 3) {
+                        if (height <= feature.provider.getWorld().getMinBuildHeight() + 3) {
                             return;
                         }
                     }
                 }
-                minheight = Math.min(minheight, hm.getHeight());
-                maxheight = Math.max(maxheight, hm.getHeight());
-                avgheight += hm.getHeight();
+                minheight = Math.min(minheight, hm.getMinHeight());
+                maxheight = Math.max(maxheight, hm.getMaxHeight());
+                avgheight += height;
             }
         }
         // Check the height difference

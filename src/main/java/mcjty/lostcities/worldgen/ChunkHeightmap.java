@@ -1,6 +1,11 @@
 package mcjty.lostcities.worldgen;
 
 import mcjty.lostcities.config.LandscapeType;
+import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkGenerator;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.RandomState;
 
 /**
  * A heightmap for a chunk
@@ -9,6 +14,10 @@ public class ChunkHeightmap {
     private int height;
     private final LandscapeType type;
     private final int groundLevel;
+
+    // Only valid when 'calculateAccurateHeight()' is called
+    private int minHeight;
+    private int maxHeight;
 
     public ChunkHeightmap(LandscapeType type, int groundLevel) {
         this.groundLevel = groundLevel;
@@ -44,5 +53,28 @@ public class ChunkHeightmap {
 
     public void setHeight(int height) {
         this.height = height;
+    }
+
+    public void calculateAccurateHeight(WorldGenLevel region, int chunkX, int chunkZ) {
+        ServerChunkCache chunkProvider = region.getLevel().getChunkSource();
+        ChunkGenerator generator = chunkProvider.getGenerator();
+        int cx = chunkX << 4;
+        int cz = chunkZ << 4;
+        RandomState randomState = chunkProvider.randomState();
+        // Average of height and 4 other points
+        int height0 = generator.getBaseHeight(cx + 2, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height1 = generator.getBaseHeight(cx + 2, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height2 = generator.getBaseHeight(cx + 14, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height3 = generator.getBaseHeight(cx + 14, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        minHeight = Math.min(height, Math.min(height0, Math.min(height1, Math.min(height2, height3))));
+        maxHeight = Math.max(height, Math.max(height0, Math.max(height1, Math.max(height2, height3))));
+    }
+
+    public int getMinHeight() {
+        return minHeight;
+    }
+
+    public int getMaxHeight() {
+        return maxHeight;
     }
 }

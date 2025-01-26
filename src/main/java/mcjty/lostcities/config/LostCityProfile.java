@@ -44,6 +44,8 @@ public class LostCityProfile implements ILostCityProfile {
     public int THICKNESS_OF_RANDOM_LEAFBLOCKS = 2;
     public boolean AVOID_FOLIAGE = false;
 
+    public float SCATTERED_CHANCE_MULTIPLIER = 1.0f;
+
     public boolean RUBBLELAYER = true;
     public float RUBBLE_DIRT_SCALE = 3.0f;
     public float RUBBLE_LEAVE_SCALE = 6.0f;
@@ -274,6 +276,8 @@ public class LostCityProfile implements ILostCityProfile {
         SPAWN_SPHERE = cfg.getString("spawnSphere", LostCityProfile.CATEGORY_LOSTCITY, SPAWN_SPHERE, "When this is set the player will always spawn in the given predefined sphere. If you use <in> the player will always spawn in a random sphere. If you use <out> the player will always spawn outside a sphere");
         SPAWN_NOT_IN_BUILDING = cfg.getBoolean("spawnNotInBuilding", LostCityProfile.CATEGORY_LOSTCITY, SPAWN_NOT_IN_BUILDING, "If this is true the player will not spawn in a building. This can be used in combination with the other spawn settings");
         FORCE_SPAWN_IN_BUILDING = cfg.getBoolean("forceSpawnInBuilding", LostCityProfile.CATEGORY_LOSTCITY, FORCE_SPAWN_IN_BUILDING, "If this is true the player will spawn in a building. This can be used in combination with the other spawn settings");
+
+        SCATTERED_CHANCE_MULTIPLIER = cfg.getFloat("scatteredChanceMultiplier", LostCityProfile.CATEGORY_LOSTCITY, SCATTERED_CHANCE_MULTIPLIER, 0.0f, 100.0f, "Multiplier for the chance a scattered building will generate. With 0 all scattered buildings are disabled");
 
         TERRAIN_FIX_LOWER_MIN_OFFSET = cfg.getInt("terrainFixLowerMinOffset", LostCityProfile.CATEGORY_LOSTCITY, TERRAIN_FIX_LOWER_MIN_OFFSET, -40, 40, "To fix terrain adjacent to cities, this is the minimum offset (relative to city base level) for the lower mesh used to potentially raise the terrain");
         TERRAIN_FIX_LOWER_MAX_OFFSET = cfg.getInt("terrainFixLowerMaxOffset", LostCityProfile.CATEGORY_LOSTCITY, TERRAIN_FIX_LOWER_MAX_OFFSET, -40, 40, "To fix terrain adjacent to cities, this is the maximum offset (relative to city base level) for the lower mesh used to potentially raise the terrain");

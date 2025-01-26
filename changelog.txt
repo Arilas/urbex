@@ -3,6 +3,9 @@ Upcoming:
 - New 'biosphere_caves' landscape type and profile to combine a cavern type world with spheres (for usage with Lost Worlds)
 - Fixed city level calculations for the new 'cavespheres' landscape type
 - Fixed a problem where some type of station could override multibuilding chunks
+- Chances of scattered buildings were reversed. A chance of 0 would make it generate all the time. Warning! This will change how rare scattered buildings are! You might want to adjust your world style for this
+- Added new 'scatteredChanceMultiplier' profile option to control the chance of scattered buildings. This value is multiplied with the normal chance
+- Scattered building placement checking is now more accurate. Mostly with regards to the 'maxheightdiff' option which now actually works for single chunk buildings
 
 1.21-8.2.5:
 - Fixed maxfloors not being honored completely. It was possible for buildings to go to maxfloors+1
