@@ -193,7 +193,8 @@ public class GuiLCConfig extends Screen {
 
     private void initBuildings(int left) {
         start("Buildings");
-        addFloat(left,"lostcity.buildingChance").label("Buildings:"); nl();
+        addFloat(left,"lostcity.buildingChance").label("Buildings:");
+        nl();
         nl();
         addInt(left, "lostcity.buildingMinFloors").label("Floors:");
         addInt(left + 55, "lostcity.buildingMaxFloors");
@@ -203,6 +204,9 @@ public class GuiLCConfig extends Screen {
         nl();
         addInt(left, "lostcity.buildingMinCellars").label("Cellars:");
         addInt(left + 55, "lostcity.buildingMaxCellars");
+        nl();
+        nl();
+        addFloat(left,"lostcity.scatteredChanceMultiplier").label("Scattered Chance:");
     }
 
     private void initTransport(int left) {

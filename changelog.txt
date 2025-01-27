@@ -5,6 +5,7 @@ Upcoming:
 - Fixed a problem where some type of station could override multibuilding chunks
 - Chances of scattered buildings were reversed. A chance of 0 would make it generate all the time. Warning! This will change how rare scattered buildings are! You might want to adjust your world style for this
 - Added new 'scatteredChanceMultiplier' profile option to control the chance of scattered buildings. This value is multiplied with the normal chance
+- The new 'scatteredChanceMultiplier' profile option can now also be set from the in-game Lost City configuration screen
 - Scattered building placement checking is now more accurate. Mostly with regards to the 'maxheightdiff' option which now actually works for single chunk buildings
 - It is no longer required to specify fountains, parks, front types, rail dungeons, or stairs in the city style. If they are missing then no fountains or parks will be generated
 
