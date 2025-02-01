@@ -1,8 +1,10 @@
 package mcjty.lostcities.worldgen.lost.regassets.data;
 
+import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,9 +24,10 @@ public class ConditionPart extends ConditionTest {
                     Codec.INT.optionalFieldOf("floor").forGetter(l -> Optional.ofNullable(l.getFloor())),
                     Codec.INT.optionalFieldOf("chunkx").forGetter(l -> Optional.ofNullable(l.getChunkx())),
                     Codec.INT.optionalFieldOf("chunkz").forGetter(l -> Optional.ofNullable(l.getChunkz())),
-                    Codec.STRING.optionalFieldOf("inpart").forGetter(l -> Optional.ofNullable(l.getInpart())),
-                    Codec.STRING.optionalFieldOf("inbuilding").forGetter(l -> Optional.ofNullable(l.getInbuilding())),
-                    Codec.STRING.optionalFieldOf("inbiome").forGetter(l -> Optional.ofNullable(l.getInbiome())),
+                    LIST_OR_STRING_CODEC.optionalFieldOf("belowpart").forGetter(l -> convertSetOrString(l.getBelowPart())),
+                    LIST_OR_STRING_CODEC.optionalFieldOf("inpart").forGetter(l -> convertSetOrString(l.getInpart())),
+                    LIST_OR_STRING_CODEC.optionalFieldOf("inbuilding").forGetter(l -> convertSetOrString(l.getInbuilding())),
+                    LIST_OR_STRING_CODEC.optionalFieldOf("inbiome").forGetter(l -> convertSetOrString(l.getInbiome())),
                     Codec.STRING.optionalFieldOf("range").forGetter(l -> Optional.ofNullable(l.getRange()))
             ).apply(instance, ConditionPart::new));
     private final float factor;
@@ -47,11 +50,13 @@ public class ConditionPart extends ConditionTest {
                          Optional<Integer> floor,
                          Optional<Integer> chunkx,
                          Optional<Integer> chunkz,
-                         Optional<String> inpart,
-                         Optional<String> inbuilding,
-                         Optional<String> inbiome,
+                         Optional<Either<List<String>,String>> belowpart,
+                         Optional<Either<List<String>,String>> inpart,
+                         Optional<Either<List<String>,String>> inbuilding,
+                         Optional<Either<List<String>,String>> inbiome,
                          Optional<String> range) {
-        super(top, ground, cellar, isbuilding, issphere, floor, chunkx, chunkz, inpart, inbuilding, inbiome, range);
+        super(top, ground, cellar, isbuilding, issphere, floor, chunkx, chunkz, convertSetOrString(belowpart), convertSetOrString(inpart),
+                convertSetOrString(inbuilding), convertSetOrString(inbiome), range);
         this.factor = factor;
         this.value = value;
     }

@@ -7,6 +7,7 @@ import mcjty.lostcities.worldgen.lost.regassets.data.ConditionTest;
 import net.minecraft.resources.ResourceLocation;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.Set;
 import java.util.function.Predicate;
 
 public abstract class ConditionContext {
@@ -15,15 +16,17 @@ public abstract class ConditionContext {
     private final int floorsBelowGround;    // 0 means nothing below ground
     private final int floorsAboveGround;    // 1 means 1 floor above ground
     private final String part;
+    private final String belowPart;
     private final String building;
     private final ChunkCoord coord;
 
-    public ConditionContext(int level, int floor, int floorsBelowGround, int floorsAboveGround, String part, String building, ChunkCoord coord) {
+    public ConditionContext(int level, int floor, int floorsBelowGround, int floorsAboveGround, String part, String belowPart, String building, ChunkCoord coord) {
         this.level = level;
         this.floor = floor;
         this.floorsBelowGround = floorsBelowGround;
         this.floorsAboveGround = floorsAboveGround;
         this.part = part;
+        this.belowPart = belowPart;
         this.building = building;
         this.coord = coord;
     }
@@ -77,17 +80,21 @@ public abstract class ConditionContext {
             int chunkZ = element.getChunkz();
             test = combine(test, context -> chunkZ == context.getChunkZ());
         }
+        if (element.getBelowPart() != null) {
+            Set<String> belowPart = element.getBelowPart();
+            test = combine(test, context -> belowPart.contains(context.getPart()));
+        }
         if (element.getInpart() != null) {
-            String part = element.getInpart();
-            test = combine(test, context -> part.equals(context.getPart()));
+            Set<String> part = element.getInpart();
+            test = combine(test, context -> part.contains(context.getPart()));
         }
         if (element.getInbuilding() != null) {
-            String building = element.getInbuilding();
-            test = combine(test, context -> building.equals(context.getBuilding()));
+            Set<String> building = element.getInbuilding();
+            test = combine(test, context -> building.contains(context.getBuilding()));
         }
         if (element.getInbiome() != null) {
-            String biome = element.getInbiome();
-            test = combine(test, context -> biome.equals(context.getBiome().toString()));
+            Set<String> biome = element.getInbiome();
+            test = combine(test, context -> biome.contains(context.getBiome().toString()));
         }
         if (element.getCellar() != null) {
             boolean cellar = element.getCellar();

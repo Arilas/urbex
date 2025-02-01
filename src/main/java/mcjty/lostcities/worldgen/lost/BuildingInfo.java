@@ -631,8 +631,9 @@ public class BuildingInfo implements ILostChunkInfo {
 
         Random rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed());
 
+        String belowPart = "<none>";
         for (int i = 0; i <= floors + cellars; i++) {
-            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", building.getName(), coord) {
+            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, building.getName(), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -651,6 +652,7 @@ public class BuildingInfo implements ILostChunkInfo {
             };
             String randomPart = building.getRandomPart(rand, conditionContext);
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
+            belowPart = randomPart;
             randomPart = building.getRandomPart2(rand, conditionContext);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // null is legal
         }
@@ -844,9 +846,10 @@ public class BuildingInfo implements ILostChunkInfo {
 
         connectionAtX = new boolean[floors + cellars + 1];
         connectionAtZ = new boolean[floors + cellars + 1];
+        String belowPart = "<none>";
         Building building = (Building) getBuilding();
         for (int i = 0; i <= floors + cellars; i++) {
-            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", building.getName(), coord) {
+            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, building.getName(), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -867,6 +870,7 @@ public class BuildingInfo implements ILostChunkInfo {
             if (randomPart == null) {
                 throw new RuntimeException("Misconfiguration! Floor were generated for a building where no part condition matches!");
             }
+            belowPart = randomPart;
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
             randomPart = building.getRandomPart2(rand, conditionContext);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // null is legal

@@ -1,6 +1,11 @@
 package mcjty.lostcities.worldgen.lost.regassets.data;
 
+import com.mojang.datafixers.util.Either;
+import com.mojang.serialization.Codec;
+
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Represents a condition
@@ -14,10 +19,13 @@ public class ConditionTest {
     private final Integer floor;
     private final Integer chunkx;
     private final Integer chunkz;
-    private final String inpart;
-    private final String inbuilding;
-    private final String inbiome;
+    private final Set<String> belowPart;
+    private final Set<String> inpart;
+    private final Set<String> inbuilding;
+    private final Set<String> inbiome;
     private final String range;
+
+    public static final Codec<Either<List<String>, String>> LIST_OR_STRING_CODEC = Codec.either(Codec.list(Codec.STRING), Codec.STRING);
 
     public Boolean getTop() {
         return top;
@@ -51,15 +59,19 @@ public class ConditionTest {
         return chunkz;
     }
 
-    public String getInpart() {
+    public Set<String> getBelowPart() {
+        return belowPart;
+    }
+
+    public Set<String> getInpart() {
         return inpart;
     }
 
-    public String getInbuilding() {
+    public Set<String> getInbuilding() {
         return inbuilding;
     }
 
-    public String getInbiome() {
+    public Set<String> getInbiome() {
         return inbiome;
     }
 
@@ -76,9 +88,10 @@ public class ConditionTest {
             Optional<Integer> floor,
             Optional<Integer> chunkx,
             Optional<Integer> chunkz,
-            Optional<String> inpart,
-            Optional<String> inbuilding,
-            Optional<String> inbiome,
+            Optional<Set<String>> belowPart,
+            Optional<Set<String>> inpart,
+            Optional<Set<String>> inbuilding,
+            Optional<Set<String>> inbiome,
             Optional<String> range) {
         this.top = top.orElse(null);
         this.ground = ground.orElse(null);
@@ -88,9 +101,25 @@ public class ConditionTest {
         this.floor = floor.orElse(null);
         this.chunkx = chunkx.orElse(null);
         this.chunkz = chunkz.orElse(null);
+        this.belowPart = belowPart.orElse(null);
         this.inpart = inpart.orElse(null);
         this.inbuilding = inbuilding.orElse(null);
         this.inbiome = inbiome.orElse(null);
         this.range = range.orElse(null);
+    }
+
+    protected static Optional<Either<List<String>, String>> convertSetOrString(Set<String> set) {
+        if (set == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(Either.left(List.copyOf(set)));
+        }
+    }
+
+    protected static Optional<Set<String>> convertSetOrString(Optional<Either<List<String>, String>> either) {
+        if (either.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(either.get().map(l -> Set.copyOf(l), s -> Set.of(s)));
     }
 }

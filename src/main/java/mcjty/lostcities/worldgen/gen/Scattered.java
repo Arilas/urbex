@@ -221,8 +221,9 @@ public class Scattered {
         } else {
             floors = minfloors + rand.nextInt(maxfloors - minfloors + 1);
         }
+        String belowFloor = "<none>";
         for (int f = 0; f < floors; f++) {
-            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, "<none>", building.getName(), info.coord) {
+            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, "<none>", belowFloor, building.getName(), info.coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -244,6 +245,7 @@ public class Scattered {
             BlockState liquid = feature.liquid;
             String randomPart = building.getRandomPart(rand, conditionContext);
             BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
+            belowFloor = randomPart;
             randomPart = building.getRandomPart2(rand, conditionContext);
             BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // Null is legal
 
