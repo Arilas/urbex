@@ -10,6 +10,7 @@ Upcoming:
 - It is no longer required to specify fountains, parks, front types, rail dungeons, or stairs in the city style. If they are missing then no fountains or parks will be generated
 - The 'inpart', 'inbuilding', and 'inbiome' conditions for parts, spawners, ... now support lists in addition to a single value
 - New 'belowpart' condition which checks if the floor below this one is a certain part. This can be used to make sure that a certain part only generates on top of another part. This also supports lists
+- Problem with scattered parts with multiple floors where the height for the subsequent floors was not correctly calculated
 
 1.21-8.2.5:
 - Fixed maxfloors not being honored completely. It was possible for buildings to go to maxfloors+1

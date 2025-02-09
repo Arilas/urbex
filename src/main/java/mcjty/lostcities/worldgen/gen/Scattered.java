@@ -281,7 +281,7 @@ public class Scattered {
                 }
             }
 
-            height += feature.generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+            height = feature.generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
             if (part2 != null) {
                 feature.generatePart(info, part2, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
             }
