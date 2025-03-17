@@ -221,6 +221,7 @@ public class Scattered {
         } else {
             floors = minfloors + rand.nextInt(maxfloors - minfloors + 1);
         }
+        // TODO top condition is wrong due to floor calculation being different
         String belowFloor = "<none>";
         for (int f = 0; f < floors; f++) {
             ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, "<none>", belowFloor, building.getName(), info.coord) {
