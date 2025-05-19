@@ -48,6 +48,8 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.neoforge.common.NeoForge;
@@ -873,7 +875,8 @@ public class LostCityTerrainFeature {
         int cx = chunkX << 4;
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
-        int height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+//        int height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
         heightmap.update(height);
     }
 
