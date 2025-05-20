@@ -2,28 +2,23 @@ package mcjty.lostcities.worldgen;
 
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.LevelHeightAccessor;
-import net.minecraft.world.level.NoiseColumn;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.*;
-import net.minecraft.world.level.levelgen.blending.Blender;
-import org.apache.commons.lang3.mutable.MutableObject;
 
-import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.OptionalInt;
-import java.util.function.Predicate;
 
 public class HeightGenOpt {
 
-    public static int getBaseHeight(NoiseBasedChunkGenerator generator, int x, int z, Heightmap.Types type, LevelHeightAccessor level, RandomState rnd) {
-        return iterateNoiseColumn(generator, generator.generatorSettings().value(), level, rnd, x, z, null, type.isOpaque()).orElse(level.getMinBuildHeight());
+    public static int getBaseHeight(NoiseBasedChunkGenerator generator, int x, int z, LevelHeightAccessor level, RandomState rnd) {
+        return iterateNoiseColumn(generator.generatorSettings().value(), level, rnd, x, z).orElse(level.getMinBuildHeight());
     }
 
-    private static Aquifer.FluidPicker fluidPicker;
+    private static NoiseChunkOpt.FluidPickerV fluidPicker;
 
-    private static OptionalInt iterateNoiseColumn(NoiseBasedChunkGenerator generator, NoiseGeneratorSettings noise, LevelHeightAccessor pLevel, RandomState pRandom, int pX, int pZ, @Nullable MutableObject<NoiseColumn> pColumn, @Nullable Predicate<BlockState> pStoppingState) {
+    private static OptionalInt iterateNoiseColumn(NoiseGeneratorSettings noise, LevelHeightAccessor pLevel, RandomState pRandom, int pX, int pZ) {
         NoiseSettings settings = noise.noiseSettings().clampToHeightAccessor(pLevel);
         int cellH = settings.getCellHeight();
         int minY = settings.minY();
@@ -32,14 +27,6 @@ public class HeightGenOpt {
         if (cellHeight <= 0) {
             return OptionalInt.empty();
         } else {
-            BlockState[] states;
-            if (pColumn == null) {
-                states = null;
-            } else {
-                states = new BlockState[settings.height()];
-                pColumn.setValue(new NoiseColumn(minY, states));
-            }
-
             int cellWidth = settings.getCellWidth();
             int cellPX = Math.floorDiv(pX, cellWidth);
             int cellPZ = Math.floorDiv(pZ, cellWidth);
@@ -51,7 +38,7 @@ public class HeightGenOpt {
             double zFactor = (double)cellOZ / (double)cellWidth;
             fluidPicker = createFluidPicker(noise);
 //            NoiseChunk $$22 = new NoiseChunk(1, pRandom, $$18, $$19, $$6, BeardifierMarker.INSTANCE, noise, (Aquifer.FluidPicker)generator.globalFluidPicker.get(), Blender.empty());
-            NoiseChunk chunk = new NoiseChunk(1, pRandom, cellX, cellZ, settings, BeardifierMarker.INSTANCE, noise, fluidPicker, Blender.empty());
+            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, BeardifierMarker.INSTANCE, noise, fluidPicker);
             chunk.initializeForFirstCellX();
             chunk.advanceCellX(0);
 
@@ -66,12 +53,8 @@ public class HeightGenOpt {
                     chunk.updateForZ(pZ, zFactor);
                     BlockState stateI = chunk.getInterpolatedState();
                     BlockState state = stateI == null ? noise.defaultBlock() : stateI;
-                    if (states != null) {
-                        int idx = y * cellH + y2;
-                        states[idx] = state;
-                    }
 
-                    if (pStoppingState != null && pStoppingState.test(state)) {
+                    if (state.blocksMotion()) {
                         chunk.stopInterpolation();
                         return OptionalInt.of(cellEndBlockY + 1);
                     }
@@ -83,7 +66,7 @@ public class HeightGenOpt {
         }
     }
 
-    protected static enum BeardifierMarker implements DensityFunctions.BeardifierOrMarker {
+    protected enum BeardifierMarker implements DensityFunctions.BeardifierOrMarker {
         INSTANCE;
 
         private BeardifierMarker() {
@@ -106,11 +89,11 @@ public class HeightGenOpt {
         }
     }
 
-    public static Aquifer.FluidPicker createFluidPicker(NoiseGeneratorSettings pSettings) {
-        Aquifer.FluidStatus $$1 = new Aquifer.FluidStatus(-54, Blocks.LAVA.defaultBlockState());
+    public static NoiseChunkOpt.FluidPickerV createFluidPicker(NoiseGeneratorSettings pSettings) {
+        NoiseChunkOpt.FluidStatusV $$1 = new NoiseChunkOpt.FluidStatusV(-54, Blocks.LAVA.defaultBlockState());
         int $$2 = pSettings.seaLevel();
-        Aquifer.FluidStatus $$3 = new Aquifer.FluidStatus($$2, pSettings.defaultFluid());
-        Aquifer.FluidStatus $$4 = new Aquifer.FluidStatus(DimensionType.MIN_Y * 2, Blocks.AIR.defaultBlockState());
+        NoiseChunkOpt.FluidStatusV $$3 = new NoiseChunkOpt.FluidStatusV($$2, pSettings.defaultFluid());
+        NoiseChunkOpt.FluidStatusV $$4 = new NoiseChunkOpt.FluidStatusV(DimensionType.MIN_Y * 2, Blocks.AIR.defaultBlockState());
         return (p_224274_, p_224275_, p_224276_) -> p_224275_ < Math.min(-54, $$2) ? $$1 : $$3;
     }
 

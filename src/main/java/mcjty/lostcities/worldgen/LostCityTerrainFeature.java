@@ -876,7 +876,7 @@ public class LostCityTerrainFeature {
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
 //        int height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        int height = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
         heightmap.update(height);
     }
 
