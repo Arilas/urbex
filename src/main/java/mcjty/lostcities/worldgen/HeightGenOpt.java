@@ -90,11 +90,10 @@ public class HeightGenOpt {
     }
 
     public static NoiseChunkOpt.FluidPickerV createFluidPicker(NoiseGeneratorSettings pSettings) {
-        NoiseChunkOpt.FluidStatusV $$1 = new NoiseChunkOpt.FluidStatusV(-54, Blocks.LAVA.defaultBlockState());
-        int $$2 = pSettings.seaLevel();
-        NoiseChunkOpt.FluidStatusV $$3 = new NoiseChunkOpt.FluidStatusV($$2, pSettings.defaultFluid());
-        NoiseChunkOpt.FluidStatusV $$4 = new NoiseChunkOpt.FluidStatusV(DimensionType.MIN_Y * 2, Blocks.AIR.defaultBlockState());
-        return (p_224274_, p_224275_, p_224276_) -> p_224275_ < Math.min(-54, $$2) ? $$1 : $$3;
+        NoiseChunkOpt.FluidStatusV lava = new NoiseChunkOpt.FluidStatusV(-54, Blocks.LAVA.defaultBlockState());
+        int sea = pSettings.seaLevel();
+        NoiseChunkOpt.FluidStatusV def = new NoiseChunkOpt.FluidStatusV(sea, pSettings.defaultFluid());
+        return (x, y, z) -> y < Math.min(-54, sea) ? lava : def;
     }
 
 

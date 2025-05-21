@@ -195,9 +195,9 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
          this.inCellZ = 0;
          ++this.arrayInterpolationCounter;
 
-         for(NoiseChunkOpt.NoiseInterpolator noisechunk$noiseinterpolator : this.interpolators) {
-            double[] adouble = (pIsSlice0 ? noisechunk$noiseinterpolator.slice0 : noisechunk$noiseinterpolator.slice1)[i];
-            noisechunk$noiseinterpolator.fillArray(adouble, this.sliceFillingContextProvider);
+         for(NoiseChunkOpt.NoiseInterpolator interpolator : this.interpolators) {
+            double[] adouble = (pIsSlice0 ? interpolator.slice0 : interpolator.slice1)[i];
+            interpolator.fillArray(adouble, this.sliceFillingContextProvider);
          }
       }
 
