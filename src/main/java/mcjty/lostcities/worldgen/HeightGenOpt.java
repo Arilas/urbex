@@ -1,24 +1,28 @@
 package mcjty.lostcities.worldgen;
 
+import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.Mth;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.*;
+import net.minecraft.world.level.levelgen.blending.Blender;
 
 import java.util.Arrays;
 import java.util.OptionalInt;
 
 public class HeightGenOpt {
 
-    public static int getBaseHeight(NoiseBasedChunkGenerator generator, int x, int z, LevelHeightAccessor level, RandomState rnd) {
-        return iterateNoiseColumn(generator.generatorSettings().value(), level, rnd, x, z).orElse(level.getMinBuildHeight());
+    public static int getBaseHeight(NoiseBasedChunkGenerator generator, ChunkPos pos, int x, int z, WorldGenLevel level, RandomState rnd) {
+        return iterateNoiseColumn(generator.generatorSettings().value(), pos, level, rnd, x, z).orElse(level.getMinBuildHeight());
     }
 
     private static NoiseChunkOpt.FluidPickerV fluidPicker;
 
-    private static OptionalInt iterateNoiseColumn(NoiseGeneratorSettings noise, LevelHeightAccessor pLevel, RandomState pRandom, int pX, int pZ) {
+    private static OptionalInt iterateNoiseColumn(NoiseGeneratorSettings noise, ChunkPos pos, WorldGenLevel pLevel, RandomState pRandom, int pX, int pZ) {
         NoiseSettings settings = noise.noiseSettings().clampToHeightAccessor(pLevel);
         int cellH = settings.getCellHeight();
         int minY = settings.minY();
@@ -38,7 +42,17 @@ public class HeightGenOpt {
             double zFactor = (double)cellOZ / (double)cellWidth;
             fluidPicker = createFluidPicker(noise);
 //            NoiseChunk $$22 = new NoiseChunk(1, pRandom, $$18, $$19, $$6, BeardifierMarker.INSTANCE, noise, (Aquifer.FluidPicker)generator.globalFluidPicker.get(), Blender.empty());
-            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, BeardifierMarker.INSTANCE, noise, fluidPicker);
+            Blender blender = Blender.empty();
+            if (pLevel instanceof WorldGenRegion region) {
+                blender = Blender.of(region);
+            }
+            BeardifierMarker beardifier = BeardifierMarker.INSTANCE;
+
+
+//            Beardifier.forStructuresInChunk(pLevel.getLevel().structureManager(), pos);
+
+
+            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, beardifier, noise, fluidPicker, blender);
             chunk.initializeForFirstCellX();
             chunk.advanceCellX(0);
 

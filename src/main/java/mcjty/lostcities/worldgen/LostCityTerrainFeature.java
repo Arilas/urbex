@@ -32,10 +32,7 @@ import net.minecraft.tags.BiomeTags;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.StructureTags;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.SpawnData;
-import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.*;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -875,9 +872,12 @@ public class LostCityTerrainFeature {
         int cx = chunkX << 4;
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
-//        int height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        int height = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
-        heightmap.update(height);
+        int height1 = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, new ChunkPos(chunkX, chunkZ), cx + 8, cz + 8, region, randomState);
+        if (Math.abs(height1 - height2) > 4) {
+            System.out.println("height1 / height2 = " + height1 + " / height2 = " + height2 + ", at position " + (cx + 8) + ", " + (cz + 8));
+        }
+        heightmap.update(height1);
     }
 
     private void doCityChunk(BuildingInfo info, ChunkHeightmap heightmap) {
