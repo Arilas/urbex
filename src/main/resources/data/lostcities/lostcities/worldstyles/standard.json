@@ -1,7 +1,8 @@
 {
   "outsidestyle": "outside",
   "settings": {
-    "railwayavoidance": "ignore"
+    "railwayavoidance": "ignore",
+    "railpartheight6": 1
   },
   "multisettings": {
     "areasize": 10,

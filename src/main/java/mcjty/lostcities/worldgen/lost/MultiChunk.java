@@ -169,6 +169,7 @@ public class MultiChunk {
 
     private boolean canPlaceBuilding(ChunkCoord topleft, IDimensionInfo provider, LostCityProfile profile, CityStyle buildingCityStyle, MultiBuilding building,
                                      int cityLevel, int maxCellars, int x, int z) {
+        int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
         int correctStyle = 0;
         for (int xx = 0 ; xx < building.getDimX() ; xx++) {
             for (int zz = 0 ; zz < building.getDimZ() ; zz++) {
@@ -188,7 +189,7 @@ public class MultiChunk {
                 }
                 if (type != RailChunkType.NONE) {
                     int level = railChunkInfo.getLevel();
-                    int max = Math.min(cityLevel - level - 1, maxCellars);
+                    int max = Math.min(cityLevel - level - partlevel, maxCellars);
                     if (max < maxCellars) {
                         return false;
                     }

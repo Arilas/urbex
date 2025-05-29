@@ -804,7 +804,8 @@ public class BuildingInfo implements ILostChunkInfo {
                     maxUnder = getMaxHighwayLevel();
                 }
 
-                fb = Math.min(cityLevel - maxUnder - 1, fb);
+                int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
+                fb = Math.min(cityLevel - maxUnder - partlevel, fb);
                 if (fb < 0) {
                     fb = 0;
                 }

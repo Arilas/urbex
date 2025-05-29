@@ -6,7 +6,7 @@ import net.minecraft.util.StringRepresentable;
 
 import java.util.Optional;
 
-public record WorldSettings(RailwayAvoidance railwayAvoidance) {
+public record WorldSettings(RailwayAvoidance railwayAvoidance, int railPartHeight6) {
 
     public enum RailwayAvoidance implements StringRepresentable {
         IGNORE("ignore"),
@@ -26,10 +26,11 @@ public record WorldSettings(RailwayAvoidance railwayAvoidance) {
 
     public static final Codec<WorldSettings> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    StringRepresentable.fromEnum(RailwayAvoidance::values).fieldOf("railwayavoidance").forGetter(l -> l.railwayAvoidance)
+                    StringRepresentable.fromEnum(RailwayAvoidance::values).fieldOf("railwayavoidance").forGetter(l -> l.railwayAvoidance),
+                    Codec.INT.optionalFieldOf("railpartheight6", 1).forGetter(l -> l.railPartHeight6)
             ).apply(instance, WorldSettings::new));
 
-    public static final WorldSettings DEFAULT = new WorldSettings(RailwayAvoidance.IGNORE);
+    public static final WorldSettings DEFAULT = new WorldSettings(RailwayAvoidance.IGNORE, 1);
 
     public Optional<WorldSettings> get() {
         if (this == DEFAULT) {
