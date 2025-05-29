@@ -835,7 +835,8 @@ public class BuildingInfo implements ILostChunkInfo {
             Railway.RailChunkInfo railInfo = getRailInfo();
             if (railInfo != Railway.RailChunkInfo.NOTHING) {
                 int lowestLevel = cityLevel - cellars;
-                if (lowestLevel <= railInfo.getLevel()) {
+                int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
+                if (lowestLevel <= railInfo.getLevel() + partlevel - 1) {
                     // There is a collision
                     Railway.removeRailChunkType(coord);
                 }
