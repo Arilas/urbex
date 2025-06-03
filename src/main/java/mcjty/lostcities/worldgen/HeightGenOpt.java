@@ -43,9 +43,9 @@ public class HeightGenOpt {
             fluidPicker = createFluidPicker(noise);
 //            NoiseChunk $$22 = new NoiseChunk(1, pRandom, $$18, $$19, $$6, BeardifierMarker.INSTANCE, noise, (Aquifer.FluidPicker)generator.globalFluidPicker.get(), Blender.empty());
             Blender blender = Blender.empty();
-            if (pLevel instanceof WorldGenRegion region) {
-                blender = Blender.of(region);
-            }
+//            if (pLevel instanceof WorldGenRegion region) {
+//                blender = Blender.of(region);
+//            }
             BeardifierMarker beardifier = BeardifierMarker.INSTANCE;
 
 

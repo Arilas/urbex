@@ -128,6 +128,9 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       builder.add((p_209217_) -> {
          return this.aquifer.computeSubstance(p_209217_, densityfunction.compute(p_209217_));
       });
+      if (pNoiseGeneratorSettings.oreVeinsEnabled()) {
+         builder.add(OreVeinifier.create(noiserouter1.veinToggle(), noiserouter1.veinRidged(), noiserouter1.veinGap(), pRandom.oreRandom()));
+      }
 
       this.blockStateRule = new MaterialRuleList(builder.build());
       this.initialDensityNoJaggedness = noiserouter1.initialDensityWithoutJaggedness();
@@ -1140,6 +1143,75 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
 
       default DensityFunction mapAll(DensityFunction.Visitor p_224070_) {
          return p_224070_.apply(new Marker(this.type(), this.wrapped().mapAll(p_224070_)));
+      }
+   }
+
+   public final class OreVeinifier {
+      private static final float VEININESS_THRESHOLD = 0.4F;
+      private static final int EDGE_ROUNDOFF_BEGIN = 20;
+      private static final double MAX_EDGE_ROUNDOFF = 0.2;
+      private static final float VEIN_SOLIDNESS = 0.7F;
+      private static final float MIN_RICHNESS = 0.1F;
+      private static final float MAX_RICHNESS = 0.3F;
+      private static final float MAX_RICHNESS_THRESHOLD = 0.6F;
+      private static final float CHANCE_OF_RAW_ORE_BLOCK = 0.02F;
+      private static final float SKIP_ORE_IF_GAP_NOISE_IS_BELOW = -0.3F;
+
+      private OreVeinifier() {
+      }
+
+      protected static BlockStateFiller create(DensityFunction pVeinToggle, DensityFunction pVeinRidged, DensityFunction pVeinGap, PositionalRandomFactory pRandom) {
+         BlockState $$4 = null;
+         return (p_209666_) -> {
+            double $$6 = pVeinToggle.compute(p_209666_);
+            int $$7 = p_209666_.blockY();
+            OreVeinifier.VeinType $$8 = $$6 > (double)0.0F ? OreVeinifier.VeinType.COPPER : OreVeinifier.VeinType.IRON;
+            double $$9 = Math.abs($$6);
+            int $$10 = $$8.maxY - $$7;
+            int $$11 = $$7 - $$8.minY;
+            if ($$11 >= 0 && $$10 >= 0) {
+               int $$12 = Math.min($$10, $$11);
+               double $$13 = Mth.clampedMap((double)$$12, (double)0.0F, (double)20.0F, -0.2, (double)0.0F);
+               if ($$9 + $$13 < (double)0.4F) {
+                  return $$4;
+               } else {
+                  RandomSource $$14 = pRandom.at(p_209666_.blockX(), $$7, p_209666_.blockZ());
+                  if ($$14.nextFloat() > 0.7F) {
+                     return $$4;
+                  } else if (pVeinRidged.compute(p_209666_) >= (double)0.0F) {
+                     return $$4;
+                  } else {
+                     double $$15 = Mth.clampedMap($$9, (double)0.4F, (double)0.6F, (double)0.1F, (double)0.3F);
+                     if ((double)$$14.nextFloat() < $$15 && pVeinGap.compute(p_209666_) > (double)-0.3F) {
+                        return $$14.nextFloat() < 0.02F ? $$8.rawOreBlock : $$8.ore;
+                     } else {
+                        return $$8.filler;
+                     }
+                  }
+               }
+            } else {
+               return $$4;
+            }
+         };
+      }
+
+      protected static enum VeinType {
+         COPPER(Blocks.COPPER_ORE.defaultBlockState(), Blocks.RAW_COPPER_BLOCK.defaultBlockState(), Blocks.GRANITE.defaultBlockState(), 0, 50),
+         IRON(Blocks.DEEPSLATE_IRON_ORE.defaultBlockState(), Blocks.RAW_IRON_BLOCK.defaultBlockState(), Blocks.TUFF.defaultBlockState(), -60, -8);
+
+         final BlockState ore;
+         final BlockState rawOreBlock;
+         final BlockState filler;
+         protected final int minY;
+         protected final int maxY;
+
+         private VeinType(BlockState pOre, BlockState pRawOreBlock, BlockState pFiller, int pMinY, int pMaxY) {
+            this.ore = pOre;
+            this.rawOreBlock = pRawOreBlock;
+            this.filler = pFiller;
+            this.minY = pMinY;
+            this.maxY = pMaxY;
+         }
       }
    }
 }
