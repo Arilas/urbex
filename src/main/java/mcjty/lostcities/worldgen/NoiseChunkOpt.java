@@ -125,8 +125,8 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
 
       ImmutableList.Builder<NoiseChunkOpt.BlockStateFiller> builder = ImmutableList.builder();
       DensityFunction densityfunction = DensityFunctions.cacheAllInCell(DensityFunctions.add(noiserouter1.finalDensity(), BeardifierMarker.INSTANCE)).mapAll(this::wrap);
-      builder.add((p_209217_) -> {
-         return this.aquifer.computeSubstance(p_209217_, densityfunction.compute(p_209217_));
+      builder.add((context) -> {
+         return this.aquifer.computeSubstance(context, densityfunction.compute(context));
       });
       if (pNoiseGeneratorSettings.oreVeinsEnabled()) {
          builder.add(OreVeinifier.create(noiserouter1.veinToggle(), noiserouter1.veinRidged(), noiserouter1.veinGap(), pRandom.oreRandom()));

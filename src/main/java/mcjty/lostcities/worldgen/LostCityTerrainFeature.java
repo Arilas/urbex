@@ -873,11 +873,11 @@ public class LostCityTerrainFeature {
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
         int height1 = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        int height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, new ChunkPos(chunkX, chunkZ), cx + 8, cz + 8, region, randomState);
+        int height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
         if (Math.abs(height1 - height2) > 4) {
-            generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-            HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, new ChunkPos(chunkX, chunkZ), cx + 8, cz + 8, region, randomState);
             System.out.println("height1 / height2 = " + height1 + " / height2 = " + height2 + ", at position " + (cx + 8) + ", " + (cz + 8));
+            generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+            HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
         }
         heightmap.update(height1);
     }

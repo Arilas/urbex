@@ -16,13 +16,13 @@ import java.util.OptionalInt;
 
 public class HeightGenOpt {
 
-    public static int getBaseHeight(NoiseBasedChunkGenerator generator, ChunkPos pos, int x, int z, WorldGenLevel level, RandomState rnd) {
-        return iterateNoiseColumn(generator.generatorSettings().value(), pos, level, rnd, x, z).orElse(level.getMinBuildHeight());
+    public static int getBaseHeight(NoiseBasedChunkGenerator generator, int x, int z, WorldGenLevel level, RandomState rnd) {
+        return iterateNoiseColumn(generator.generatorSettings().value(), level, rnd, x, z).orElse(level.getMinBuildHeight());
     }
 
     private static NoiseChunkOpt.FluidPickerV fluidPicker;
 
-    private static OptionalInt iterateNoiseColumn(NoiseGeneratorSettings noise, ChunkPos pos, WorldGenLevel pLevel, RandomState pRandom, int pX, int pZ) {
+    private static OptionalInt iterateNoiseColumn(NoiseGeneratorSettings noise, WorldGenLevel pLevel, RandomState pRandom, int pX, int pZ) {
         NoiseSettings settings = noise.noiseSettings().clampToHeightAccessor(pLevel);
         int cellH = settings.getCellHeight();
         int minY = settings.minY();
