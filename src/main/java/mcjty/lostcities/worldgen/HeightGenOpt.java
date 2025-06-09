@@ -1,13 +1,8 @@
 package mcjty.lostcities.worldgen;
 
-import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.Mth;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.WorldGenLevel;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.*;
 import net.minecraft.world.level.levelgen.blending.Blender;
 
@@ -20,7 +15,7 @@ public class HeightGenOpt {
         return iterateNoiseColumn(generator.generatorSettings().value(), level, rnd, x, z).orElse(level.getMinBuildHeight());
     }
 
-    private static NoiseChunkOpt.FluidPickerV fluidPicker;
+//    private static NoiseChunkOpt.FluidPickerV fluidPicker;
 
     private static OptionalInt iterateNoiseColumn(NoiseGeneratorSettings noise, WorldGenLevel pLevel, RandomState pRandom, int pX, int pZ) {
         NoiseSettings settings = noise.noiseSettings().clampToHeightAccessor(pLevel);
@@ -40,7 +35,9 @@ public class HeightGenOpt {
             int cellZ = cellPZ * cellWidth;
             double xFactor = (double)cellOX / (double)cellWidth;
             double zFactor = (double)cellOZ / (double)cellWidth;
-            fluidPicker = createFluidPicker(noise);
+//            fluidPicker = createFluidPicker(noise);
+            NoiseChunkOpt.FluidStatusV def = new NoiseChunkOpt.FluidStatusV(noise.seaLevel(), noise.defaultFluid());
+
 //            NoiseChunk $$22 = new NoiseChunk(1, pRandom, $$18, $$19, $$6, BeardifierMarker.INSTANCE, noise, (Aquifer.FluidPicker)generator.globalFluidPicker.get(), Blender.empty());
             Blender blender = Blender.empty();
 //            if (pLevel instanceof WorldGenRegion region) {
@@ -52,7 +49,7 @@ public class HeightGenOpt {
 //            Beardifier.forStructuresInChunk(pLevel.getLevel().structureManager(), pos);
 
 
-            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, beardifier, noise, fluidPicker, blender);
+            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, beardifier, noise, def, blender);
             chunk.initializeForFirstCellX();
             chunk.advanceCellX(0);
 
@@ -102,14 +99,5 @@ public class HeightGenOpt {
             return (double)0.0F;
         }
     }
-
-    public static NoiseChunkOpt.FluidPickerV createFluidPicker(NoiseGeneratorSettings pSettings) {
-        NoiseChunkOpt.FluidStatusV lava = new NoiseChunkOpt.FluidStatusV(-54, Blocks.LAVA.defaultBlockState());
-        int sea = pSettings.seaLevel();
-        NoiseChunkOpt.FluidStatusV def = new NoiseChunkOpt.FluidStatusV(sea, pSettings.defaultFluid());
-        return (x, y, z) -> y < Math.min(-54, sea) ? lava : def;
-    }
-
-
 
 }

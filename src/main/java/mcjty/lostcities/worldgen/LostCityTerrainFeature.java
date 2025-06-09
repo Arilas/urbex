@@ -261,6 +261,7 @@ public class LostCityTerrainFeature {
 
         LevelAccessor oldRegion = driver.getRegion();
         ChunkAccess oldChunk = driver.getPrimer();
+
         driver.setPrimer(region, chunk);
 
         int chunkX = chunk.getPos().x;
@@ -269,6 +270,9 @@ public class LostCityTerrainFeature {
         ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
 
         ChunkHeightmap heightmap = getHeightmap(coord, provider.getWorld());
+        if (heightmap != null) {
+            return;
+        }
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
 
         // @todo this setup is not very clean
@@ -872,6 +876,10 @@ public class LostCityTerrainFeature {
         int cx = chunkX << 4;
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
+        if ((cx + 8) == 488 && (cz + 8) == -104) {
+            System.out.println("LostCityTerrainFeature.generateHeightmap");
+        }
+
         int height1 = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
         int height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
         if (Math.abs(height1 - height2) > 4) {

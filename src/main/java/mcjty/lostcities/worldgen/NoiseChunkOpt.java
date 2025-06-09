@@ -3,6 +3,7 @@ package mcjty.lostcities.worldgen;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.core.BlockPos;
@@ -12,7 +13,6 @@ import net.minecraft.server.level.ColumnPos;
 import net.minecraft.util.KeyDispatchDataCodec;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
-import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.OverworldBiomeBuilder;
 import net.minecraft.world.level.block.Blocks;
@@ -47,7 +47,9 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
    private final Aquifer aquifer;
    private final DensityFunction initialDensityNoJaggedness;
    private final NoiseChunkOpt.BlockStateFiller blockStateRule;
-   private final Blender blender;
+//   private final Blender blender;
+//   private final FlatCache blendAlpha;
+//   private final FlatCache blendOffset;
    private final DensityFunctions.BeardifierOrMarker beardifier;
    private long lastBlendingDataPos = ChunkPos.INVALID_CHUNK_POS;
    private Blender.BlendingOutput lastBlendingOutput = new Blender.BlendingOutput(1.0D, 0.0D);
@@ -65,29 +67,32 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
    long interpolationCounter;
    long arrayInterpolationCounter;
    int arrayIndex;
-   private final DensityFunction.ContextProvider sliceFillingContextProvider = new DensityFunction.ContextProvider() {
-      public DensityFunction.FunctionContext forIndex(int p_209253_) {
-         NoiseChunkOpt.this.cellStartBlockY = (p_209253_ + NoiseChunkOpt.this.cellNoiseMinY) * NoiseChunkOpt.this.cellHeight;
-         ++NoiseChunkOpt.this.interpolationCounter;
-         NoiseChunkOpt.this.inCellY = 0;
-         NoiseChunkOpt.this.arrayIndex = p_209253_;
-         return NoiseChunkOpt.this;
-      }
-
-      public void fillAllDirectly(double[] p_209255_, DensityFunction p_209256_) {
-         for(int i2 = 0; i2 < NoiseChunkOpt.this.cellCountY + 1; ++i2) {
-            NoiseChunkOpt.this.cellStartBlockY = (i2 + NoiseChunkOpt.this.cellNoiseMinY) * NoiseChunkOpt.this.cellHeight;
-            ++NoiseChunkOpt.this.interpolationCounter;
-            NoiseChunkOpt.this.inCellY = 0;
-            NoiseChunkOpt.this.arrayIndex = i2;
-            p_209255_[i2] = p_209256_.compute(NoiseChunkOpt.this);
-         }
-
-      }
-   };
+   private final DensityFunction.ContextProvider sliceFillingContextProvider;
 
    // YES
-   public NoiseChunkOpt(int pCellCountXZ, RandomState pRandom, int pFirstNoiseX, int pFirstNoiseZ, NoiseSettings pNoiseSettings, DensityFunctions.BeardifierOrMarker pBeardifier, NoiseGeneratorSettings pNoiseGeneratorSettings, FluidPickerV pFluidPicker, Blender pBlendifier) {
+   public NoiseChunkOpt(int pCellCountXZ, RandomState pRandom, int pFirstNoiseX, int pFirstNoiseZ, NoiseSettings pNoiseSettings, DensityFunctions.BeardifierOrMarker pBeardifier, NoiseGeneratorSettings pNoiseGeneratorSettings, NoiseChunkOpt.FluidStatusV fluidStatus, Blender pBlendifier) {
+      this.lastBlendingDataPos = ChunkPos.INVALID_CHUNK_POS;
+      this.lastBlendingOutput = new Blender.BlendingOutput((double)1.0F, (double)0.0F);
+      sliceFillingContextProvider = new DensityFunction.ContextProvider() {
+         public DensityFunction.FunctionContext forIndex(int p_209253_) {
+            NoiseChunkOpt.this.cellStartBlockY = (p_209253_ + NoiseChunkOpt.this.cellNoiseMinY) * NoiseChunkOpt.this.cellHeight;
+            ++NoiseChunkOpt.this.interpolationCounter;
+            NoiseChunkOpt.this.inCellY = 0;
+            NoiseChunkOpt.this.arrayIndex = p_209253_;
+            return NoiseChunkOpt.this;
+         }
+
+         public void fillAllDirectly(double[] p_209255_, DensityFunction p_209256_) {
+            for(int i2 = 0; i2 < NoiseChunkOpt.this.cellCountY + 1; ++i2) {
+               NoiseChunkOpt.this.cellStartBlockY = (i2 + NoiseChunkOpt.this.cellNoiseMinY) * NoiseChunkOpt.this.cellHeight;
+               ++NoiseChunkOpt.this.interpolationCounter;
+               NoiseChunkOpt.this.inCellY = 0;
+               NoiseChunkOpt.this.arrayIndex = i2;
+               p_209255_[i2] = p_209256_.compute(NoiseChunkOpt.this);
+            }
+
+         }
+      };
       this.noiseSettings = pNoiseSettings;
       this.cellWidth = pNoiseSettings.getCellWidth();
       this.cellHeight = pNoiseSettings.getCellHeight();
@@ -101,8 +106,23 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       this.firstNoiseX = QuartPos.fromBlock(pFirstNoiseX);
       this.firstNoiseZ = QuartPos.fromBlock(pFirstNoiseZ);
       this.noiseSizeXZ = QuartPos.fromBlock(pCellCountXZ * this.cellWidth);
-      this.blender = pBlendifier;
+//      this.blender = pBlendifier;
       this.beardifier = pBeardifier;
+//      this.blendAlpha = new FlatCache(new BlendAlpha(), false);
+//      this.blendOffset = new FlatCache(new BlendOffset(), false);
+
+//      for(int $$9 = 0; $$9 <= this.noiseSizeXZ; ++$$9) {
+//         int $$10 = this.firstNoiseX + $$9;
+//         int $$11 = QuartPos.toBlock($$10);
+//
+//         for(int $$12 = 0; $$12 <= this.noiseSizeXZ; ++$$12) {
+//            int $$13 = this.firstNoiseZ + $$12;
+//            int $$14 = QuartPos.toBlock($$13);
+//            Blender.BlendingOutput $$15 = blender.blendOffsetAndFactor($$11, $$14);
+//            this.blendAlpha.values[$$9][$$12] = $$15.alpha();
+//            this.blendOffset.values[$$9][$$12] = $$15.blendingOffset();
+//         }
+//      }
 
       NoiseRouter noiserouter = pRandom.router();
       NoiseRouter noiserouter1 = noiserouter.mapAll(this::wrap);
@@ -110,7 +130,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
          this.aquifer = new Aquifer() {
             @Nullable
             public BlockState computeSubstance(DensityFunction.FunctionContext p_208172_, double p_208173_) {
-               return p_208173_ > 0.0D ? null : pFluidPicker.computeFluid(p_208172_.blockX(), p_208172_.blockY(), p_208172_.blockZ()).at(p_208172_.blockY());
+               return p_208173_ > 0.0D ? null : fluidStatus.at(p_208172_.blockY());
             }
 
             public boolean shouldScheduleFluidUpdate() {
@@ -120,7 +140,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       } else {
          int k1 = SectionPos.blockToSectionCoord(pFirstNoiseX);
          int l1 = SectionPos.blockToSectionCoord(pFirstNoiseZ);
-         this.aquifer = new NoiseBasedAquifer(this, new ChunkPos(k1, l1), noiserouter1, pRandom.aquiferRandom(), pNoiseSettings.minY(), pNoiseSettings.height(), pFluidPicker);
+         this.aquifer = new NoiseBasedAquifer(this, new ChunkPos(k1, l1), noiserouter1, pRandom.aquiferRandom(), pNoiseSettings.minY(), pNoiseSettings.height(), fluidStatus);
       }
 
       ImmutableList.Builder<NoiseChunkOpt.BlockStateFiller> builder = ImmutableList.builder();
@@ -128,9 +148,9 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       builder.add((context) -> {
          return this.aquifer.computeSubstance(context, densityfunction.compute(context));
       });
-      if (pNoiseGeneratorSettings.oreVeinsEnabled()) {
-         builder.add(OreVeinifier.create(noiserouter1.veinToggle(), noiserouter1.veinRidged(), noiserouter1.veinGap(), pRandom.oreRandom()));
-      }
+//      if (pNoiseGeneratorSettings.oreVeinsEnabled()) {
+//         builder.add(OreVeinifier.create(noiserouter1.veinToggle(), noiserouter1.veinRidged(), noiserouter1.veinGap(), pRandom.oreRandom()));
+//      }
 
       this.blockStateRule = new MaterialRuleList(builder.build());
       this.initialDensityNoJaggedness = noiserouter1.initialDensityWithoutJaggedness();
@@ -180,7 +200,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
 
    @Override
    public Blender getBlender() {
-      return this.blender;
+      return Blender.empty();
    }
 
    public @NotNull NoiseChunkOpt forIndex(int pArrayIndex) {
@@ -320,7 +340,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
    }
 
    private DensityFunction wrapNew(DensityFunction p_209234_) {
-      if (p_209234_ instanceof Marker) {
+      if (p_209234_ instanceof Marker || p_209234_ instanceof Marker) {
          Marker densityfunctions$marker = (Marker)p_209234_;
          Object object;
          switch (densityfunctions$marker.type()) {
@@ -345,6 +365,16 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
 
          return (DensityFunction)object;
       } else {
+//         if (this.blender != Blender.empty()) {
+//            if (p_209234_ == BlendAlphaFunc.INSTANCE) {
+//               return this.blendAlpha;
+//            }
+//
+//            if (p_209234_ == BlendOffsetFunc.INSTANCE) {
+//               return this.blendOffset;
+//            }
+//         }
+
          if (p_209234_ == BeardifierMarker.INSTANCE) {
             return this.beardifier;
          } else if (p_209234_ instanceof DensityFunctions.HolderHolder) {
@@ -376,7 +406,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       }
    }
 
-   static class Cache2D implements MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+   static class Cache2D implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
       private final DensityFunction function;
       private long lastPos2D = ChunkPos.INVALID_CHUNK_POS;
       private double lastValue;
@@ -413,7 +443,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       }
    }
 
-   class CacheAllInCell implements MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+   class CacheAllInCell implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
       final DensityFunction noiseFiller;
       final double[] values;
 
@@ -449,7 +479,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       }
    }
 
-   class CacheOnce implements MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+   class CacheOnce implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
       private final DensityFunction function;
       private long lastCounter;
       private long lastArrayCounter;
@@ -500,7 +530,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       }
    }
 
-   class FlatCache implements MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+   class FlatCache implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
       private final DensityFunction noiseFiller;
       final double[][] values;
 
@@ -556,7 +586,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       }
    }
 
-   public class NoiseInterpolator implements MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+   public class NoiseInterpolator implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
       double[][] slice0;
       double[][] slice1;
       private final DensityFunction noiseFiller;
@@ -715,7 +745,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       private final PositionalRandomFactory positionalRandomFactory;
       protected final FluidStatusV[] aquiferCache;
       protected final long[] aquiferLocationCache;
-      private final FluidPickerV globalFluidPicker;
+      private final NoiseChunkOpt.FluidStatusV fluidStatus;
       private final DensityFunction erosion;
       private final DensityFunction depth;
       protected boolean shouldScheduleFluidUpdate;
@@ -726,7 +756,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       protected final int gridSizeZ;
       private static final int[][] SURFACE_SAMPLING_OFFSETS_IN_CHUNKS = new int[][]{{0, 0}, {-2, -1}, {-1, -1}, {0, -1}, {1, -1}, {-3, 0}, {-2, 0}, {-1, 0}, {1, 0}, {-2, 1}, {-1, 1}, {0, 1}, {1, 1}};
 
-      NoiseBasedAquifer(NoiseChunkOpt pNoiseChunk, ChunkPos pChunkPos, NoiseRouter pNoiseRouter, PositionalRandomFactory pPositionalRandomFactory, int pMinY, int pHeight, FluidPickerV pGlobalFluidPicker) {
+      NoiseBasedAquifer(NoiseChunkOpt pNoiseChunk, ChunkPos pChunkPos, NoiseRouter pNoiseRouter, PositionalRandomFactory pPositionalRandomFactory, int pMinY, int pHeight, NoiseChunkOpt.FluidStatusV fluidStatus) {
          this.noiseChunk = pNoiseChunk;
          this.barrierNoise = pNoiseRouter.barrierNoise();
          this.fluidLevelFloodednessNoise = pNoiseRouter.fluidLevelFloodednessNoise();
@@ -736,7 +766,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
          this.depth = pNoiseRouter.depth();
          this.positionalRandomFactory = pPositionalRandomFactory;
          this.minGridX = this.gridX(pChunkPos.getMinBlockX()) - 1;
-         this.globalFluidPicker = pGlobalFluidPicker;
+         this.fluidStatus = fluidStatus;
          int i = this.gridX(pChunkPos.getMaxBlockX()) + 1;
          this.gridSizeX = i - this.minGridX + 1;
          this.minGridY = this.gridY(pMinY) - 1;
@@ -770,101 +800,95 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
             this.shouldScheduleFluidUpdate = false;
             return null;
          } else {
-            FluidStatusV aquifer$fluidstatus = this.globalFluidPicker.computeFluid(i, j, k);
-            if (aquifer$fluidstatus.at(j).is(Blocks.LAVA)) {
-               this.shouldScheduleFluidUpdate = false;
-               return Blocks.LAVA.defaultBlockState();
-            } else {
-               int l = Math.floorDiv(i - 5, 16);
-               int i1 = Math.floorDiv(j + 1, 12);
-               int j1 = Math.floorDiv(k - 5, 16);
-               int k1 = Integer.MAX_VALUE;
-               int l1 = Integer.MAX_VALUE;
-               int i2 = Integer.MAX_VALUE;
-               long j2 = 0L;
-               long k2 = 0L;
-               long l2 = 0L;
+            int l = Math.floorDiv(i - 5, 16);
+            int i1 = Math.floorDiv(j + 1, 12);
+            int j1 = Math.floorDiv(k - 5, 16);
+            int k1 = Integer.MAX_VALUE;
+            int l1 = Integer.MAX_VALUE;
+            int i2 = Integer.MAX_VALUE;
+            long packedPos = 0L;
+            long k2 = 0L;
+            long l2 = 0L;
 
-               for(int i3 = 0; i3 <= 1; ++i3) {
-                  for(int j3 = -1; j3 <= 1; ++j3) {
-                     for(int k3 = 0; k3 <= 1; ++k3) {
-                        int l3 = l + i3;
-                        int i4 = i1 + j3;
-                        int j4 = j1 + k3;
-                        int k4 = this.getIndex(l3, i4, j4);
-                        long i5 = this.aquiferLocationCache[k4];
-                        long l4;
-                        if (i5 != Long.MAX_VALUE) {
-                           l4 = i5;
-                        } else {
-                           RandomSource randomsource = this.positionalRandomFactory.at(l3, i4, j4);
-                           l4 = BlockPos.asLong(l3 * 16 + randomsource.nextInt(10), i4 * 12 + randomsource.nextInt(9), j4 * 16 + randomsource.nextInt(10));
-                           this.aquiferLocationCache[k4] = l4;
-                        }
+            for (int i3 = 0; i3 <= 1; ++i3) {
+               for (int j3 = -1; j3 <= 1; ++j3) {
+                  for (int k3 = 0; k3 <= 1; ++k3) {
+                     int l3 = l + i3;
+                     int i4 = i1 + j3;
+                     int j4 = j1 + k3;
+                     int cacheIdx = this.getIndex(l3, i4, j4);
+                     long pp5 = this.aquiferLocationCache[cacheIdx];
+                     long pp4;
+                     if (pp5 != Long.MAX_VALUE) {
+                        pp4 = pp5;
+                     } else {
+                        RandomSource randomsource = this.positionalRandomFactory.at(l3, i4, j4);
+                        pp4 = BlockPos.asLong(l3 * 16 + randomsource.nextInt(10), i4 * 12 + randomsource.nextInt(9), j4 * 16 + randomsource.nextInt(10));
+                        this.aquiferLocationCache[cacheIdx] = pp4;
+                     }
 
-                        int i6 = BlockPos.getX(l4) - i;
-                        int j5 = BlockPos.getY(l4) - j;
-                        int k5 = BlockPos.getZ(l4) - k;
-                        int l5 = i6 * i6 + j5 * j5 + k5 * k5;
-                        if (k1 >= l5) {
-                           l2 = k2;
-                           k2 = j2;
-                           j2 = l4;
-                           i2 = l1;
-                           l1 = k1;
-                           k1 = l5;
-                        } else if (l1 >= l5) {
-                           l2 = k2;
-                           k2 = l4;
-                           i2 = l1;
-                           l1 = l5;
-                        } else if (i2 >= l5) {
-                           l2 = l4;
-                           i2 = l5;
-                        }
+                     int x4 = BlockPos.getX(pp4) - i;
+                     int y4 = BlockPos.getY(pp4) - j;
+                     int z4 = BlockPos.getZ(pp4) - k;
+                     int sq4 = x4 * x4 + y4 * y4 + z4 * z4;
+                     if (k1 >= sq4) {
+                        l2 = k2;
+                        k2 = packedPos;
+                        packedPos = pp4;
+                        i2 = l1;
+                        l1 = k1;
+                        k1 = sq4;
+                     } else if (l1 >= sq4) {
+                        l2 = k2;
+                        k2 = pp4;
+                        i2 = l1;
+                        l1 = sq4;
+                     } else if (i2 >= sq4) {
+                        l2 = pp4;
+                        i2 = sq4;
                      }
                   }
                }
+            }
 
-               FluidStatusV aquifer$fluidstatus1 = this.getAquiferStatus(j2);
-               double d1 = similarity(k1, l1);
-               BlockState blockstate = aquifer$fluidstatus1.at(j);
-               if (d1 <= 0.0D) {
-                  this.shouldScheduleFluidUpdate = d1 >= FLOWING_UPDATE_SIMULARITY;
-                  return blockstate;
-               } else if (blockstate.is(Blocks.WATER) && this.globalFluidPicker.computeFluid(i, j - 1, k).at(j - 1).is(Blocks.LAVA)) {
+            FluidStatusV aquifer$fluidstatus1 = this.getAquiferStatus(packedPos);
+            double d1 = similarity(k1, l1);
+            BlockState blockstate = aquifer$fluidstatus1.at(j);
+            if (d1 <= 0.0D) {
+               this.shouldScheduleFluidUpdate = d1 >= FLOWING_UPDATE_SIMULARITY;
+               return blockstate;
+            } else if (blockstate.is(Blocks.WATER) && this.fluidStatus.at(j - 1).is(Blocks.LAVA)) {
+               this.shouldScheduleFluidUpdate = true;
+               return blockstate;
+            } else {
+               MutableDouble mutabledouble = new MutableDouble(Double.NaN);
+               FluidStatusV aquifer$fluidstatus2 = this.getAquiferStatus(k2);
+               double d2 = d1 * this.calculatePressure(pContext, mutabledouble, aquifer$fluidstatus1, aquifer$fluidstatus2);
+               if (pSubstance + d2 > 0.0D) {
+                  this.shouldScheduleFluidUpdate = false;
+                  return null;
+               } else {
+                  FluidStatusV aquifer$fluidstatus3 = this.getAquiferStatus(l2);
+                  double d0 = similarity(k1, i2);
+                  if (d0 > 0.0D) {
+                     double d3 = d1 * d0 * this.calculatePressure(pContext, mutabledouble, aquifer$fluidstatus1, aquifer$fluidstatus3);
+                     if (pSubstance + d3 > 0.0D) {
+                        this.shouldScheduleFluidUpdate = false;
+                        return null;
+                     }
+                  }
+
+                  double d4 = similarity(l1, i2);
+                  if (d4 > 0.0D) {
+                     double d5 = d1 * d4 * this.calculatePressure(pContext, mutabledouble, aquifer$fluidstatus2, aquifer$fluidstatus3);
+                     if (pSubstance + d5 > 0.0D) {
+                        this.shouldScheduleFluidUpdate = false;
+                        return null;
+                     }
+                  }
+
                   this.shouldScheduleFluidUpdate = true;
                   return blockstate;
-               } else {
-                  MutableDouble mutabledouble = new MutableDouble(Double.NaN);
-                  FluidStatusV aquifer$fluidstatus2 = this.getAquiferStatus(k2);
-                  double d2 = d1 * this.calculatePressure(pContext, mutabledouble, aquifer$fluidstatus1, aquifer$fluidstatus2);
-                  if (pSubstance + d2 > 0.0D) {
-                     this.shouldScheduleFluidUpdate = false;
-                     return null;
-                  } else {
-                     FluidStatusV aquifer$fluidstatus3 = this.getAquiferStatus(l2);
-                     double d0 = similarity(k1, i2);
-                     if (d0 > 0.0D) {
-                        double d3 = d1 * d0 * this.calculatePressure(pContext, mutabledouble, aquifer$fluidstatus1, aquifer$fluidstatus3);
-                        if (pSubstance + d3 > 0.0D) {
-                           this.shouldScheduleFluidUpdate = false;
-                           return null;
-                        }
-                     }
-
-                     double d4 = similarity(l1, i2);
-                     if (d4 > 0.0D) {
-                        double d5 = d1 * d4 * this.calculatePressure(pContext, mutabledouble, aquifer$fluidstatus2, aquifer$fluidstatus3);
-                        if (pSubstance + d5 > 0.0D) {
-                           this.shouldScheduleFluidUpdate = false;
-                           return null;
-                        }
-                     }
-
-                     this.shouldScheduleFluidUpdate = true;
-                     return blockstate;
-                  }
                }
             }
          }
@@ -978,7 +1002,6 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       }
 
       private FluidStatusV computeFluid(int pX, int pY, int pZ) {
-         FluidStatusV aquifer$fluidstatus = this.globalFluidPicker.computeFluid(pX, pY, pZ);
          int i = Integer.MAX_VALUE;
          int j = pY + 12;
          int k = pY - 12;
@@ -991,19 +1014,18 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
             int k1 = j1 + 8;
             boolean flag1 = aint[0] == 0 && aint[1] == 0;
             if (flag1 && k > k1) {
-               return aquifer$fluidstatus;
+               return this.fluidStatus;
             }
 
             boolean flag2 = j > k1;
             if (flag2 || flag1) {
-               FluidStatusV aquifer$fluidstatus1 = this.globalFluidPicker.computeFluid(l, k1, i1);
-               if (!aquifer$fluidstatus1.at(k1).isAir()) {
+               if (!this.fluidStatus.at(k1).isAir()) {
                   if (flag1) {
                      flag = true;
                   }
 
                   if (flag2) {
-                     return aquifer$fluidstatus1;
+                     return this.fluidStatus;
                   }
                }
             }
@@ -1011,8 +1033,8 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
             i = Math.min(i, j1);
          }
 
-         int l1 = this.computeSurfaceLevel(pX, pY, pZ, aquifer$fluidstatus, i, flag);
-         return new FluidStatusV(l1, this.computeFluidType(pX, pY, pZ, aquifer$fluidstatus, l1));
+         int l1 = this.computeSurfaceLevel(pX, pY, pZ, this.fluidStatus, i, flag);
+         return new FluidStatusV(l1, this.computeFluidType(pX, pY, pZ, this.fluidStatus, l1));
       }
 
       private int computeSurfaceLevel(int pX, int pY, int pZ, FluidStatusV pFluidStatus, int pMaxSurfaceLevel, boolean p_223915_) {
@@ -1077,73 +1099,12 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
       }
    }
 
-   protected static record Marker(Marker.Type type, DensityFunction wrapped) implements MarkerOrMarked {
-      public double compute(DensityFunction.FunctionContext pContext) {
-         return this.wrapped.compute(pContext);
-      }
-
-      public void fillArray(double[] pArray, DensityFunction.ContextProvider pContextProvider) {
-         this.wrapped.fillArray(pArray, pContextProvider);
-      }
-
-      public double minValue() {
-         return this.wrapped.minValue();
-      }
-
-      public double maxValue() {
-         return this.wrapped.maxValue();
-      }
-
-      public Marker.Type type() {
-         return this.type;
-      }
-
-      public DensityFunction wrapped() {
-         return this.wrapped;
-      }
-
-      static enum Type implements StringRepresentable {
-         Interpolated("interpolated"),
-         FlatCache("flat_cache"),
-         Cache2D("cache_2d"),
-         CacheOnce("cache_once"),
-         CacheAllInCell("cache_all_in_cell");
-
-         private final String name;
-         final KeyDispatchDataCodec<MarkerOrMarked> codec = singleFunctionArgumentCodec((p_208740_) -> {
-            return new Marker(this, p_208740_);
-         }, MarkerOrMarked::wrapped);
-
-         private Type(String pName) {
-            this.name = pName;
-         }
-
-         public String getSerializedName() {
-            return this.name;
-         }
-      }
-   }
-
    static <A, O> KeyDispatchDataCodec<O> singleArgumentCodec(Codec<A> pCodec, Function<A, O> pFromFunction, Function<O, A> pToFunction) {
       return KeyDispatchDataCodec.of(pCodec.fieldOf("argument").xmap(pFromFunction, pToFunction));
    }
 
    static <O> KeyDispatchDataCodec<O> singleFunctionArgumentCodec(Function<DensityFunction, O> pFromFunction, Function<O, DensityFunction> pToFunction) {
       return singleArgumentCodec(DensityFunction.HOLDER_HELPER_CODEC, pFromFunction, pToFunction);
-   }
-
-   public interface MarkerOrMarked extends DensityFunction {
-      Marker.Type type();
-
-      DensityFunction wrapped();
-
-      default KeyDispatchDataCodec<? extends DensityFunction> codec() {
-         return this.type().codec;
-      }
-
-      default DensityFunction mapAll(DensityFunction.Visitor p_224070_) {
-         return p_224070_.apply(new Marker(this.type(), this.wrapped().mapAll(p_224070_)));
-      }
    }
 
    public final class OreVeinifier {
@@ -1214,5 +1175,130 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
          }
       }
    }
+
+   class BlendAlpha implements NoiseChunkDensityFunction {
+      BlendAlpha() {
+      }
+
+      public DensityFunction wrapped() {
+         return BlendAlphaFunc.INSTANCE;
+      }
+
+      public DensityFunction mapAll(DensityFunction.Visitor p_224365_) {
+         return this.wrapped().mapAll(p_224365_);
+      }
+
+      public double compute(DensityFunction.FunctionContext p_209264_) {
+         return NoiseChunkOpt.this.getOrComputeBlendingOutput(p_209264_.blockX(), p_209264_.blockZ()).alpha();
+      }
+
+      public void fillArray(double[] p_209266_, DensityFunction.ContextProvider p_209267_) {
+         p_209267_.fillAllDirectly(p_209266_, this);
+      }
+
+      public double minValue() {
+         return (double)0.0F;
+      }
+
+      public double maxValue() {
+         return (double)1.0F;
+      }
+
+      public KeyDispatchDataCodec<? extends DensityFunction> codec() {
+         return BlendAlphaFunc.CODEC;
+      }
+   }
+
+   class BlendOffset implements NoiseChunkDensityFunction {
+      BlendOffset() {
+      }
+
+      public DensityFunction wrapped() {
+         return BlendOffsetFunc.INSTANCE;
+      }
+
+      public DensityFunction mapAll(DensityFunction.Visitor p_224368_) {
+         return this.wrapped().mapAll(p_224368_);
+      }
+
+      public double compute(DensityFunction.FunctionContext p_209276_) {
+         return NoiseChunkOpt.this.getOrComputeBlendingOutput(p_209276_.blockX(), p_209276_.blockZ()).blendingOffset();
+      }
+
+      public void fillArray(double[] p_209278_, DensityFunction.ContextProvider p_209279_) {
+         p_209279_.fillAllDirectly(p_209278_, this);
+      }
+
+      public double minValue() {
+         return Double.NEGATIVE_INFINITY;
+      }
+
+      public double maxValue() {
+         return Double.POSITIVE_INFINITY;
+      }
+
+      public KeyDispatchDataCodec<? extends DensityFunction> codec() {
+         return BlendOffsetFunc.CODEC;
+      }
+   }
+
+   protected static enum BlendAlphaFunc implements DensityFunction.SimpleFunction {
+      INSTANCE;
+
+      public static final KeyDispatchDataCodec<DensityFunction> CODEC = KeyDispatchDataCodec.of(MapCodec.unit(INSTANCE));
+
+      private BlendAlphaFunc() {
+      }
+
+      public double compute(DensityFunction.FunctionContext p_208536_) {
+         return (double)1.0F;
+      }
+
+      public void fillArray(double[] p_208538_, DensityFunction.ContextProvider p_208539_) {
+         Arrays.fill(p_208538_, (double)1.0F);
+      }
+
+      public double minValue() {
+         return (double)1.0F;
+      }
+
+      public double maxValue() {
+         return (double)1.0F;
+      }
+
+      public KeyDispatchDataCodec<? extends DensityFunction> codec() {
+         return CODEC;
+      }
+   }
+
+   protected static enum BlendOffsetFunc implements DensityFunction.SimpleFunction {
+      INSTANCE;
+
+      public static final KeyDispatchDataCodec<DensityFunction> CODEC = KeyDispatchDataCodec.of(MapCodec.unit(INSTANCE));
+
+      private BlendOffsetFunc() {
+      }
+
+      public double compute(DensityFunction.FunctionContext p_208573_) {
+         return (double)0.0F;
+      }
+
+      public void fillArray(double[] p_208575_, DensityFunction.ContextProvider p_208576_) {
+         Arrays.fill(p_208575_, (double)0.0F);
+      }
+
+      public double minValue() {
+         return (double)0.0F;
+      }
+
+      public double maxValue() {
+         return (double)0.0F;
+      }
+
+      public KeyDispatchDataCodec<? extends DensityFunction> codec() {
+         return CODEC;
+      }
+   }
+
 }
 
