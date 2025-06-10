@@ -35,21 +35,11 @@ public class HeightGenOpt {
             int cellZ = cellPZ * cellWidth;
             double xFactor = (double)cellOX / (double)cellWidth;
             double zFactor = (double)cellOZ / (double)cellWidth;
-//            fluidPicker = createFluidPicker(noise);
             NoiseChunkOpt.FluidStatusV def = new NoiseChunkOpt.FluidStatusV(noise.seaLevel(), noise.defaultFluid());
 
-//            NoiseChunk $$22 = new NoiseChunk(1, pRandom, $$18, $$19, $$6, BeardifierMarker.INSTANCE, noise, (Aquifer.FluidPicker)generator.globalFluidPicker.get(), Blender.empty());
-            Blender blender = Blender.empty();
-//            if (pLevel instanceof WorldGenRegion region) {
-//                blender = Blender.of(region);
-//            }
             BeardifierMarker beardifier = BeardifierMarker.INSTANCE;
 
-
-//            Beardifier.forStructuresInChunk(pLevel.getLevel().structureManager(), pos);
-
-
-            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, beardifier, noise, def, blender);
+            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, beardifier, noise, def);
             chunk.initializeForFirstCellX();
             chunk.advanceCellX(0);
 
