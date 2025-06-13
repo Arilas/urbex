@@ -270,9 +270,9 @@ public class LostCityTerrainFeature {
         ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
 
         ChunkHeightmap heightmap = getHeightmap(coord, provider.getWorld());
-        if (heightmap != null) {
-            return;
-        }
+//        if (heightmap != null) {
+//            return;
+//        }
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
 
         // @todo this setup is not very clean
