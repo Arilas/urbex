@@ -876,18 +876,20 @@ public class LostCityTerrainFeature {
         int cx = chunkX << 4;
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
-        if ((cx + 8) == 488 && (cz + 8) == -104) {
-            System.out.println("LostCityTerrainFeature.generateHeightmap");
-        }
 
-        int height1 = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        int height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
-        if (Math.abs(height1 - height2) > 4) {
-            System.out.println("height1 / height2 = " + height1 + " / height2 = " + height2 + ", at position " + (cx + 8) + ", " + (cz + 8));
-            generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-            HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
+        int height;
+        if (Config.OPTIMIZED_HEIGHTMAP.get()) {
+            height = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
+        } else {
+            height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
         }
-        heightmap.update(height1);
+//        int height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
+//        if (Math.abs(height - height2) > 4) {
+//            System.out.println("height1 / height2 = " + height + " / height2 = " + height2 + ", at position " + (cx + 8) + ", " + (cz + 8));
+//            generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+//            HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
+//        }
+        heightmap.update(height);
     }
 
     private void doCityChunk(BuildingInfo info, ChunkHeightmap heightmap) {

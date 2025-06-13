@@ -1,5 +1,7 @@
 Upcoming:
 - Fixed lost city loot folder
+- New 'railpartheight6' setting for worldstyle that indicates how high railway parts can be (in multiples of 6)
+- New 'optimizedHeightmap' option to use a more optimized way to calculate the heightmap. This is disabled by default
 
 1.21-8.2.6:
 - New 'avoidVillages' config to avoid generating Lost Cities in chunks that have villages. Default set to true

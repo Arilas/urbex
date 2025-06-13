@@ -60,7 +60,6 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
     int arrayIndex;
     private final DensityFunction.ContextProvider sliceFillingContextProvider;
 
-    // YES
     public NoiseChunkOpt(int pCellCountXZ, RandomState pRandom, int pFirstNoiseX, int pFirstNoiseZ, NoiseSettings pNoiseSettings, DensityFunctions.BeardifierOrMarker pBeardifier, NoiseGeneratorSettings pNoiseGeneratorSettings, NoiseChunkOpt.FluidStatusV fluidStatus) {
         sliceFillingContextProvider = new DensityFunction.ContextProvider() {
             public DensityFunction.FunctionContext forIndex(int p_209253_) {
@@ -217,7 +216,6 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
 
     }
 
-    // YES
     private void fillSlice(boolean pIsSlice0, int pStart) {
         this.cellStartBlockX = pStart * this.cellWidth;
         this.inCellX = 0;
@@ -237,7 +235,6 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         ++this.arrayInterpolationCounter;
     }
 
-    // YES
     public void initializeForFirstCellX() {
         if (this.interpolating) {
             throw new IllegalStateException("Staring interpolation twice");
@@ -248,56 +245,38 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         }
     }
 
-    // YES
     public void advanceCellX(int pIncrement) {
         this.fillSlice(false, this.firstCellX + pIncrement + 1);
         this.cellStartBlockX = (this.firstCellX + pIncrement) * this.cellWidth;
     }
 
-    // YES
     public void selectCellYZ(int pY, int pZ) {
-        this.interpolators.forEach((p_209205_) -> {
-            p_209205_.selectCellYZ(pY, pZ);
+        this.interpolators.forEach((interpolator) -> {
+            interpolator.selectCellYZ(pY, pZ);
         });
         this.fillingCell = true;
         this.cellStartBlockY = (pY + this.cellNoiseMinY) * this.cellHeight;
         this.cellStartBlockZ = (this.firstCellZ + pZ) * this.cellWidth;
         ++this.arrayInterpolationCounter;
 
-        for (NoiseChunkOpt.CacheAllInCell noisechunk$cacheallincell : this.cellCaches) {
-            noisechunk$cacheallincell.noiseFiller.fillArray(noisechunk$cacheallincell.values, this);
+        for (NoiseChunkOpt.CacheAllInCell cache : this.cellCaches) {
+            cache.noiseFiller.fillArray(cache.values, this);
         }
 
         ++this.arrayInterpolationCounter;
         this.fillingCell = false;
     }
 
-    // YES
-    public void updateForY(int pCellEndBlockY, double pY) {
-        this.inCellY = pCellEndBlockY - this.cellStartBlockY;
-        this.interpolators.forEach((p_209238_) -> {
-            p_209238_.updateForY(pY);
+    public void updateForYXZ(int cx, int cy, int cz, double x, double y, double z) {
+        this.inCellX = cx - this.cellStartBlockX;
+        this.inCellY = cy - this.cellStartBlockY;
+        this.inCellZ = cz - this.cellStartBlockZ;
+        this.interpolators.forEach((interpolator) -> {
+            interpolator.updateForYXZ(x, y, z);
         });
-    }
-
-    // YES
-    public void updateForX(int pCellEndBlockX, double pX) {
-        this.inCellX = pCellEndBlockX - this.cellStartBlockX;
-        this.interpolators.forEach((p_209229_) -> {
-            p_209229_.updateForX(pX);
-        });
-    }
-
-    // YES
-    public void updateForZ(int pCellEndBlockZ, double pZ) {
-        this.inCellZ = pCellEndBlockZ - this.cellStartBlockZ;
         ++this.interpolationCounter;
-        this.interpolators.forEach((p_209188_) -> {
-            p_209188_.updateForZ(pZ);
-        });
     }
 
-    // YES
     public void stopInterpolation() {
         if (!this.interpolating) {
             throw new IllegalStateException("Staring interpolation twice");
@@ -339,9 +318,9 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
 
     public record MaterialRuleList(List<BlockStateFiller> materialRuleList) implements BlockStateFiller {
         @Nullable
-        public BlockState calculate(DensityFunction.FunctionContext p_209815_) {
+        public BlockState calculate(DensityFunction.FunctionContext context) {
             for (BlockStateFiller noisechunk$blockstatefiller : this.materialRuleList) {
-                BlockState blockstate = noisechunk$blockstatefiller.calculate(p_209815_);
+                BlockState blockstate = noisechunk$blockstatefiller.calculate(context);
                 if (blockstate != null) {
                     return blockstate;
                 }
@@ -543,12 +522,6 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         private double noise011;
         private double noise110;
         private double noise111;
-        private double valueXZ00;
-        private double valueXZ10;
-        private double valueXZ01;
-        private double valueXZ11;
-        private double valueZ0;
-        private double valueZ1;
         private double value;
 
         NoiseInterpolator(DensityFunction pNoiseFilter) {
@@ -581,20 +554,14 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
             this.noise111 = this.slice1[pZ + 1][pY + 1];
         }
 
-        void updateForY(double pY) {
-            this.valueXZ00 = Mth.lerp(pY, this.noise000, this.noise010);
-            this.valueXZ10 = Mth.lerp(pY, this.noise100, this.noise110);
-            this.valueXZ01 = Mth.lerp(pY, this.noise001, this.noise011);
-            this.valueXZ11 = Mth.lerp(pY, this.noise101, this.noise111);
-        }
-
-        void updateForX(double pX) {
-            this.valueZ0 = Mth.lerp(pX, this.valueXZ00, this.valueXZ10);
-            this.valueZ1 = Mth.lerp(pX, this.valueXZ01, this.valueXZ11);
-        }
-
-        void updateForZ(double pZ) {
-            this.value = Mth.lerp(pZ, this.valueZ0, this.valueZ1);
+        void updateForYXZ(double pX, double pY, double pZ) {
+            double valueXZ00 = Mth.lerp(pY, this.noise000, this.noise010);
+            double valueXZ10 = Mth.lerp(pY, this.noise100, this.noise110);
+            double valueXZ01 = Mth.lerp(pY, this.noise001, this.noise011);
+            double valueXZ11 = Mth.lerp(pY, this.noise101, this.noise111);
+            double valueZ0 = Mth.lerp(pX, valueXZ00, valueXZ10);
+            double valueZ1 = Mth.lerp(pX, valueXZ01, valueXZ11);
+            this.value = Mth.lerp(pZ, valueZ0, valueZ1);
         }
 
         public double compute(FunctionContext pContext) {

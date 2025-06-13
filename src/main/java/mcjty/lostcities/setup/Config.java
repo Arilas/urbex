@@ -52,6 +52,7 @@ public class Config {
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES_ADJACENT;
     public static final ModConfigSpec.BooleanValue AVOID_FLATTENING;
+    public static final ModConfigSpec.BooleanValue OPTIMIZED_HEIGHTMAP;
 
     public static void reset() {
         profileFromClient = null;
@@ -158,6 +159,10 @@ public class Config {
         DIMENSION_PROFILES = COMMON_BUILDER
                 .comment("A list of dimensions with associated city generation profiles (format <dimensionid>=<profilename>")
                 .defineList("dimensionsWithProfiles", Lists.newArrayList(Config.DEFAULT_DIMENSION_PROFILES), s -> s instanceof String);
+
+        OPTIMIZED_HEIGHTMAP = COMMON_BUILDER
+                .comment("If true then a different heightmap generation algorithm is used which should be slightly more efficient. Be careful with this as it might not be 100% compatible with some other terrain generation mods!")
+                .define("optimizedHeightmap", false);
 
         SPECIAL_BED_BLOCK = SERVER_BUILDER
                 .comment("Block to put underneath a bed so that it qualifies as a teleporter bed")

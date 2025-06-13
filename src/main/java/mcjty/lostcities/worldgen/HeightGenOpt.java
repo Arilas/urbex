@@ -4,7 +4,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.*;
-import net.minecraft.world.level.levelgen.blending.Blender;
 
 import java.util.Arrays;
 import java.util.OptionalInt;
@@ -14,8 +13,6 @@ public class HeightGenOpt {
     public static int getBaseHeight(NoiseBasedChunkGenerator generator, int x, int z, WorldGenLevel level, RandomState rnd) {
         return iterateNoiseColumn(generator.generatorSettings().value(), level, rnd, x, z).orElse(level.getMinBuildHeight());
     }
-
-//    private static NoiseChunkOpt.FluidPickerV fluidPicker;
 
     private static OptionalInt iterateNoiseColumn(NoiseGeneratorSettings noise, WorldGenLevel pLevel, RandomState pRandom, int pX, int pZ) {
         NoiseSettings settings = noise.noiseSettings().clampToHeightAccessor(pLevel);
@@ -37,9 +34,7 @@ public class HeightGenOpt {
             double zFactor = (double)cellOZ / (double)cellWidth;
             NoiseChunkOpt.FluidStatusV def = new NoiseChunkOpt.FluidStatusV(noise.seaLevel(), noise.defaultFluid());
 
-            BeardifierMarker beardifier = BeardifierMarker.INSTANCE;
-
-            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, beardifier, noise, def);
+            NoiseChunkOpt chunk = new NoiseChunkOpt(1, pRandom, cellX, cellZ, settings, BeardifierMarker.INSTANCE, noise, def);
             chunk.initializeForFirstCellX();
             chunk.advanceCellX(0);
 
@@ -49,9 +44,7 @@ public class HeightGenOpt {
                 for(int y2 = cellH - 1; y2 >= 0; --y2) {
                     int cellEndBlockY = (cellMinY + y) * cellH + y2;
                     double dY = (double)y2 / (double)cellH;
-                    chunk.updateForY(cellEndBlockY, dY);
-                    chunk.updateForX(pX, xFactor);
-                    chunk.updateForZ(pZ, zFactor);
+                    chunk.updateForYXZ(pX, cellEndBlockY, pZ, xFactor, dY, zFactor);
                     BlockState stateI = chunk.getInterpolatedState();
                     BlockState state = stateI == null ? noise.defaultBlock() : stateI;
 
