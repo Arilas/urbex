@@ -53,6 +53,7 @@ public class Config {
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES_ADJACENT;
     public static final ModConfigSpec.BooleanValue AVOID_FLATTENING;
     public static final ModConfigSpec.BooleanValue OPTIMIZED_HEIGHTMAP;
+    public static final ModConfigSpec.IntValue HEIGHT_SAMPLE_SIZE;
 
     public static void reset() {
         profileFromClient = null;
@@ -163,6 +164,9 @@ public class Config {
         OPTIMIZED_HEIGHTMAP = COMMON_BUILDER
                 .comment("If true then a different heightmap generation algorithm is used which should be slightly more efficient. Be careful with this as it might not be 100% compatible with some other terrain generation mods!")
                 .define("optimizedHeightmap", false);
+        HEIGHT_SAMPLE_SIZE = COMMON_BUILDER
+                .comment("The size of the chunk grid used for heightmap sampling. Default is 1 which means every chunk is sampled. Higher values will sample less chunks and thus be faster but also less accurate")
+                .defineInRange("heightSampleSize", 1, 1, 100);
 
         SPECIAL_BED_BLOCK = SERVER_BUILDER
                 .comment("Block to put underneath a bed so that it qualifies as a teleporter bed")

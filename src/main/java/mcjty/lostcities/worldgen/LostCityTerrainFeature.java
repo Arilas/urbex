@@ -857,13 +857,19 @@ public class LostCityTerrainFeature {
         return Math.min(height, adjacent);
     }
 
-    public ChunkHeightmap getHeightmap(ChunkCoord key, @Nonnull WorldGenLevel world) {
+    public ChunkHeightmap getHeightmap(ChunkCoord chunk, @Nonnull WorldGenLevel world) {
+        int heightSampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
+        ChunkCoord key = chunk;
+        if (heightSampleSize > 1) {
+            // If we have a height sample size then we return the heightmap for the sample
+            key = new ChunkCoord(key.dimension(), key.chunkX() / heightSampleSize, key.chunkZ() / heightSampleSize);
+        }
         synchronized (this) {
             if (cachedHeightmaps.containsKey(key)) {
                 return cachedHeightmaps.get(key);
             } else {
                 ChunkHeightmap heightmap = new ChunkHeightmap(profile.LANDSCAPE_TYPE, profile.GROUNDLEVEL);
-                generateHeightmap(key.chunkX(), key.chunkZ(), world, heightmap);
+                generateHeightmap(chunk.chunkX(), chunk.chunkZ(), world, heightmap);
                 cachedHeightmaps.put(key, heightmap);
                 return heightmap;
             }
