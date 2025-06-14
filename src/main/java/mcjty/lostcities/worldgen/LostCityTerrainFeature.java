@@ -863,6 +863,13 @@ public class LostCityTerrainFeature {
         if (heightSampleSize > 1) {
             // If we have a height sample size then we return the heightmap for the sample
             key = new ChunkCoord(key.dimension(), key.chunkX() / heightSampleSize, key.chunkZ() / heightSampleSize);
+            // Recalculate chunk to be the center of the sample
+            if (heightSampleSize > 2) {
+                int sampleOffset = heightSampleSize / 2;
+                chunk = new ChunkCoord(key.dimension(),
+                        key.chunkX() * heightSampleSize + sampleOffset,
+                        key.chunkZ() * heightSampleSize + sampleOffset);
+            }
         }
         synchronized (this) {
             if (cachedHeightmaps.containsKey(key)) {
