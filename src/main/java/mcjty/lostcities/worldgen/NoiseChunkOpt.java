@@ -330,7 +330,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         }
     }
 
-    static class Cache2D implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+    static class Cache2D implements DensityFunctions.MarkerOrMarked, NoiseChunk.NoiseChunkDensityFunction {
         private final DensityFunction function;
         private long lastPos2D = ChunkPos.INVALID_CHUNK_POS;
         private double lastValue;
@@ -367,7 +367,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         }
     }
 
-    class CacheAllInCell implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+    class CacheAllInCell implements DensityFunctions.MarkerOrMarked, NoiseChunk.NoiseChunkDensityFunction {
         final DensityFunction noiseFiller;
         final double[] values;
 
@@ -403,7 +403,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         }
     }
 
-    class CacheOnce implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+    class CacheOnce implements DensityFunctions.MarkerOrMarked, NoiseChunk.NoiseChunkDensityFunction {
         private final DensityFunction function;
         private long lastCounter;
         private long lastArrayCounter;
@@ -454,7 +454,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         }
     }
 
-    class FlatCache implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+    class FlatCache implements DensityFunctions.MarkerOrMarked, NoiseChunk.NoiseChunkDensityFunction {
         private final DensityFunction noiseFiller;
         final double[][] values;
 
@@ -498,19 +498,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         }
     }
 
-    interface NoiseChunkDensityFunction extends DensityFunction {
-        DensityFunction wrapped();
-
-        default double minValue() {
-            return this.wrapped().minValue();
-        }
-
-        default double maxValue() {
-            return this.wrapped().maxValue();
-        }
-    }
-
-    public class NoiseInterpolator implements DensityFunctions.MarkerOrMarked, NoiseChunkOpt.NoiseChunkDensityFunction {
+    public class NoiseInterpolator implements DensityFunctions.MarkerOrMarked, NoiseChunk.NoiseChunkDensityFunction {
         double[][] slice0;
         double[][] slice1;
         private final DensityFunction noiseFiller;
