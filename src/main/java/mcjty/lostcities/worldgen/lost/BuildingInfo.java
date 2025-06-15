@@ -1069,8 +1069,16 @@ public class BuildingInfo implements ILostChunkInfo {
             return 2;
         } else if (height < profile.CITY_LEVEL3_HEIGHT) {
             return 3;
-        } else {
+        } else if (height < profile.CITY_LEVEL4_HEIGHT) {
             return 4;
+        } else if (height < profile.CITY_LEVEL5_HEIGHT) {
+            return 5;
+        } else if (height < profile.CITY_LEVEL6_HEIGHT) {
+            return 6;
+        } else if (height < profile.CITY_LEVEL7_HEIGHT) {
+            return 7;
+        } else {
+            return 8;
         }
     }
 

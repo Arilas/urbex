@@ -15,7 +15,7 @@ public interface ILostCityProfile {
 
     void setGroundLevel(int level);
 
-    void setCityLevelHeights(int l0, int l1, int l2, int l3);
+    void setCityLevelHeights(int l0, int l1, int l2, int l3, int l4, int l5, int l6, int l7);
 
     void setOceanCorrectionBorder(int border);
 }

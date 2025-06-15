@@ -52,6 +52,10 @@ public class ProfileSetup {
         profile.CITY_LEVEL1_HEIGHT = 40+12;
         profile.CITY_LEVEL2_HEIGHT = 40+20;
         profile.CITY_LEVEL3_HEIGHT = 40+28;
+        profile.CITY_LEVEL4_HEIGHT = 40+36;
+        profile.CITY_LEVEL5_HEIGHT = 40+42;
+        profile.CITY_LEVEL6_HEIGHT = 40+50;
+        profile.CITY_LEVEL7_HEIGHT = 40+58;
 //        profile.setIconFile("textures/gui/icon_default.png");
         STANDARD_PROFILES.put(profile.getName(), profile);
 
@@ -85,6 +89,10 @@ public class ProfileSetup {
         profile.CITY_LEVEL1_HEIGHT = 56;
         profile.CITY_LEVEL2_HEIGHT = 62;
         profile.CITY_LEVEL3_HEIGHT = 68;
+        profile.CITY_LEVEL4_HEIGHT = 76;
+        profile.CITY_LEVEL5_HEIGHT = 84;
+        profile.CITY_LEVEL6_HEIGHT = 92;
+        profile.CITY_LEVEL7_HEIGHT = 100;
         STANDARD_PROFILES.put(profile.getName(), profile);
 
         profile = new LostCityProfile("space", true);
@@ -118,6 +126,10 @@ public class ProfileSetup {
         profile.CITY_LEVEL1_HEIGHT = 66;
         profile.CITY_LEVEL2_HEIGHT = 72;
         profile.CITY_LEVEL3_HEIGHT = 78;
+        profile.CITY_LEVEL4_HEIGHT = 86;
+        profile.CITY_LEVEL5_HEIGHT = 94;
+        profile.CITY_LEVEL6_HEIGHT = 100;
+        profile.CITY_LEVEL7_HEIGHT = 108;
         profile.BUILDING_CHANCE = .3f;
         profile.GENERATE_LIGHTING = true;
         STANDARD_PROFILES.put(profile.getName(), profile);
@@ -195,6 +207,10 @@ public class ProfileSetup {
         profile.CITY_LEVEL1_HEIGHT = 66;
         profile.CITY_LEVEL2_HEIGHT = 72;
         profile.CITY_LEVEL3_HEIGHT = 78;
+        profile.CITY_LEVEL4_HEIGHT = 86;
+        profile.CITY_LEVEL5_HEIGHT = 94;
+        profile.CITY_LEVEL6_HEIGHT = 100;
+        profile.CITY_LEVEL7_HEIGHT = 108;
         profile.BUILDING_CHANCE = .3f;
         profile.GENERATE_LIGHTING = true;
         STANDARD_PROFILES.put(profile.getName(), profile);
@@ -238,6 +254,10 @@ public class ProfileSetup {
         profile.CITY_LEVEL1_HEIGHT = 66;
         profile.CITY_LEVEL2_HEIGHT = 72;
         profile.CITY_LEVEL3_HEIGHT = 78;
+        profile.CITY_LEVEL4_HEIGHT = 86;
+        profile.CITY_LEVEL5_HEIGHT = 94;
+        profile.CITY_LEVEL6_HEIGHT = 100;
+        profile.CITY_LEVEL7_HEIGHT = 108;
         profile.BUILDING_CHANCE = .3f;
         profile.GENERATE_LIGHTING = true;
         STANDARD_PROFILES.put(profile.getName(), profile);
