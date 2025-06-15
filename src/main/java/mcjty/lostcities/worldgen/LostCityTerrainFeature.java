@@ -859,25 +859,36 @@ public class LostCityTerrainFeature {
 
     public ChunkHeightmap getHeightmap(ChunkCoord chunk, @Nonnull WorldGenLevel world) {
         int heightSampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
-        ChunkCoord key = chunk;
+        int top, left;
+        ChunkCoord sampler = chunk;
         if (heightSampleSize > 1) {
-            // If we have a height sample size then we return the heightmap for the sample
-            key = new ChunkCoord(key.dimension(), key.chunkX() / heightSampleSize, key.chunkZ() / heightSampleSize);
             // Recalculate chunk to be the center of the sample
+            top = (chunk.chunkX() / heightSampleSize) * heightSampleSize;
+            left = (chunk.chunkZ() / heightSampleSize) * heightSampleSize;
             if (heightSampleSize > 2) {
                 int sampleOffset = heightSampleSize / 2;
-                chunk = new ChunkCoord(key.dimension(),
-                        key.chunkX() * heightSampleSize + sampleOffset,
-                        key.chunkZ() * heightSampleSize + sampleOffset);
+                sampler = new ChunkCoord(chunk.dimension(), top + sampleOffset, left + sampleOffset);
             }
+        } else {
+            top = chunk.chunkX();
+            left = chunk.chunkZ();
         }
         synchronized (this) {
-            if (cachedHeightmaps.containsKey(key)) {
-                return cachedHeightmaps.get(key);
+            if (cachedHeightmaps.containsKey(chunk)) {
+                return cachedHeightmaps.get(chunk);
             } else {
                 ChunkHeightmap heightmap = new ChunkHeightmap(profile.LANDSCAPE_TYPE, profile.GROUNDLEVEL);
-                generateHeightmap(chunk.chunkX(), chunk.chunkZ(), world, heightmap);
-                cachedHeightmaps.put(key, heightmap);
+                generateHeightmap(sampler.chunkX(), sampler.chunkZ(), world, heightmap);
+                if (heightSampleSize > 1) {
+                    for (int i = 0; i < heightSampleSize; i++) {
+                        for (int j = 0; j < heightSampleSize; j++) {
+                            ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + i, left + j);
+                            cachedHeightmaps.put(sampleKey, new ChunkHeightmap(heightmap));
+                        }
+                    }
+                } else {
+                    cachedHeightmaps.put(chunk, heightmap);
+                }
                 return heightmap;
             }
         }
