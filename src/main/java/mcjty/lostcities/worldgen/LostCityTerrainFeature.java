@@ -860,14 +860,17 @@ public class LostCityTerrainFeature {
     public ChunkHeightmap getHeightmap(ChunkCoord chunk, @Nonnull WorldGenLevel world) {
         int heightSampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
         int top, left;
+        int constX = 1, constZ = 1; // We'll need to take care of the negative part of the chunks as well
         ChunkCoord sampler = chunk;
         if (heightSampleSize > 1) {
             // Recalculate chunk to be the center of the sample
             top = (chunk.chunkX() / heightSampleSize) * heightSampleSize;
             left = (chunk.chunkZ() / heightSampleSize) * heightSampleSize;
+            constX = top < 0 ? -1 : 1;
+            constZ = left < 0 ? -1 : 1;
             if (heightSampleSize > 2) {
                 int sampleOffset = heightSampleSize / 2;
-                sampler = new ChunkCoord(chunk.dimension(), top + sampleOffset, left + sampleOffset);
+                sampler = new ChunkCoord(chunk.dimension(), top + (sampleOffset * constX), left + (sampleOffset * constZ));
             }
         } else {
             top = chunk.chunkX();
@@ -882,7 +885,7 @@ public class LostCityTerrainFeature {
                 if (heightSampleSize > 1) {
                     for (int i = 0; i < heightSampleSize; i++) {
                         for (int j = 0; j < heightSampleSize; j++) {
-                            ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + i, left + j);
+                            ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + (i * constX), left + (j * constZ));
                             cachedHeightmaps.put(sampleKey, new ChunkHeightmap(heightmap));
                         }
                     }
