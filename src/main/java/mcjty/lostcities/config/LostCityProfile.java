@@ -154,8 +154,6 @@ public class LostCityProfile implements ILostCityProfile {
     public int BUILDING_MAXCELLARS = 3;
     public float BUILDING_DOORWAYCHANCE = .6f;
     public float BUILDING_FRONTCHANCE = .2f;
-    public float LIBRARY_CHANCE = .1f;
-    public float DATACENTER_CHANCE = .1f;
     public float PARK_CHANCE = .2f;
 
     public float CORRIDOR_CHANCE = .7f;
@@ -338,8 +336,6 @@ public class LostCityProfile implements ILostCityProfile {
         BUILDING_MAXCELLARS = cfg.getInt("buildingMaxCellars", LostCityProfile.CATEGORY_LOSTCITY, BUILDING_MAXCELLARS, 0, 20, "The maximum number of cellars (below ground). 0 means no cellar");
         BUILDING_DOORWAYCHANCE = cfg.getFloat("buildingDoorwayChance", LostCityProfile.CATEGORY_LOSTCITY, BUILDING_DOORWAYCHANCE, 0.0f, 1.0f, "The chance that a doorway will be generated at a side of a building (on any level). Only when possible");
         BUILDING_FRONTCHANCE = cfg.getFloat("buildingFrontChance", LostCityProfile.CATEGORY_LOSTCITY, BUILDING_FRONTCHANCE, 0.0f, 1.0f, "The chance that a building will have a 'front' part if this is possible (i.e. adjacent street)");
-        LIBRARY_CHANCE = cfg.getFloat("libraryChance", LostCityProfile.CATEGORY_LOSTCITY, LIBRARY_CHANCE, 0.0f, 1.0f, "The chance that a 2x2 building will be a library");
-        DATACENTER_CHANCE = cfg.getFloat("dataCenterChance", LostCityProfile.CATEGORY_LOSTCITY, DATACENTER_CHANCE, 0.0f, 1.0f, "The chance that a 2x2 building will be a data center");
         PARK_CHANCE = cfg.getFloat("parkChance", LostCityProfile.CATEGORY_LOSTCITY, PARK_CHANCE, 0.0f, 1.0f, "The chance that a non-building section can be a park section");
 
         CORRIDOR_CHANCE = cfg.getFloat("corridorChance", LostCityProfile.CATEGORY_LOSTCITY, CORRIDOR_CHANCE, 0.0f, 1.0f, "The chance that a chunk can possibly contain a corridor. " +

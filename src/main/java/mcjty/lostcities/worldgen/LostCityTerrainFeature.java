@@ -866,8 +866,8 @@ public class LostCityTerrainFeature {
             // Recalculate chunk to be the center of the sample
             top = (chunk.chunkX() / heightSampleSize) * heightSampleSize;
             left = (chunk.chunkZ() / heightSampleSize) * heightSampleSize;
-            constX = top < 0 ? -1 : 1;
-            constZ = left < 0 ? -1 : 1;
+            constX = chunk.chunkX() < 0 ? -1 : 1;
+            constZ = chunk.chunkZ() < 0 ? -1 : 1;
             if (heightSampleSize > 2) {
                 int sampleOffset = heightSampleSize / 2;
                 sampler = new ChunkCoord(chunk.dimension(), top + (sampleOffset * constX), left + (sampleOffset * constZ));
