@@ -36,6 +36,7 @@ public class CityStyle implements ILostCityCityStyle {
     private Float buildingChance;   // Optional build chance override
 
     // Street settings
+    private Float fountainChance;
     private Integer streetWidth;
     private Character streetBlock;
     private Character streetBaseBlock;
@@ -44,10 +45,15 @@ public class CityStyle implements ILostCityCityStyle {
     private Character wallBlock;
 
     // Park settings
+    private Float parkChance;
+    private Boolean avoidFoliage;
+    private Boolean parkBorder;
+    private Boolean parkElevation;
     private Character parkElevationBlock;
     private Character grassBlock;
 
     // Corridor settings
+    private Float corridorChance;
     private Character corridorRoofBlock;
     private Character corridorGlassBlock;
 
@@ -87,6 +93,7 @@ public class CityStyle implements ILostCityCityStyle {
             minFloorCount = s.getMinFloorCount();
         });
         object.getCorridorSettings().ifPresent(s -> {
+            corridorChance = s.getCorridorChance();
             corridorGlassBlock = s.getCorridorGlassBlock();
             corridorRoofBlock = s.getCorridorRoofBlock();
         });
@@ -94,6 +101,10 @@ public class CityStyle implements ILostCityCityStyle {
             railMainBlock = s.getRailMainBlock();
         });
         object.getParkSettings().ifPresent(s -> {
+            parkChance = s.getParkChance();
+            avoidFoliage = s.getAvoidFoliage();
+            parkBorder = s.getParkBorder();
+            parkElevation = s.getParkElevation();
             grassBlock = s.getGrassBlock();
             parkElevationBlock = s.getParkElevationBlock();
         });
@@ -103,6 +114,7 @@ public class CityStyle implements ILostCityCityStyle {
             sphereSideBlock = s.getSphereSideBlock();
         });
         object.getStreetSettings().ifPresent(s -> {
+            fountainChance = s.getFountainChance();
             borderBlock = s.getBorderBlock();
             streetBaseBlock = s.getStreetBaseBlock();
             streetBlock = s.getStreetBlock();
@@ -184,6 +196,29 @@ public class CityStyle implements ILostCityCityStyle {
     }
 
     @Override
+    public Float getParkChance() {
+        return parkChance;
+    }
+
+    @Override
+    public Float getCorridorChance() { return corridorChance; }
+
+    @Override
+    public Boolean getAvoidFoliage() {
+        return avoidFoliage;
+    }
+
+    @Override
+    public Boolean getParkBorder() {
+        return parkBorder;
+    }
+
+    @Override
+    public Boolean getParkElevation() {
+        return parkElevation;
+    }
+
+    @Override
     public Character getGrassBlock() {
         return grassBlock;
     }
@@ -206,6 +241,9 @@ public class CityStyle implements ILostCityCityStyle {
     public Character getRubbleDirtBlock() {
         return rubbleDirtBlock;
     }
+
+    @Override
+    public Float getFountainChance() {return fountainChance; }
 
     @Override
     public Character getStreetBlock() {

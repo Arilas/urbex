@@ -9,14 +9,30 @@ import java.util.Optional;
  * For a city style this object represents settings for parks
  */
 public class ParkSettings {
+    private final Float parkChance;
+    private final Boolean avoidFoliage;
+    private final Boolean parkBorder;
+    private final Boolean parkElevation;
     private final Character parkElevationBlock;
     private final Character grassBlock;
 
     public static final Codec<ParkSettings> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
+                    Codec.FLOAT.optionalFieldOf("parkChance").forGetter(l -> Optional.ofNullable(l.parkChance)),
+                    Codec.BOOL.optionalFieldOf("avoidFoliage").forGetter(l -> Optional.ofNullable(l.avoidFoliage)),
+                    Codec.BOOL.optionalFieldOf("parkBorder").forGetter(l -> Optional.ofNullable(l.parkBorder)),
+                    Codec.BOOL.optionalFieldOf("parkElevation").forGetter(l -> Optional.ofNullable(l.parkElevation)),
                     Codec.STRING.optionalFieldOf("elevation").forGetter(l -> DataTools.toNullable(l.parkElevationBlock)),
                     Codec.STRING.optionalFieldOf("grass").forGetter(l -> DataTools.toNullable(l.grassBlock))
             ).apply(instance, ParkSettings::new));
+
+    public float getParkChance() { return parkChance; }
+
+    public boolean getAvoidFoliage() { return avoidFoliage; }
+
+    public boolean getParkBorder() { return parkBorder; }
+
+    public boolean getParkElevation() { return parkElevation; }
 
     public Character getParkElevationBlock() {
         return parkElevationBlock;
@@ -26,8 +42,16 @@ public class ParkSettings {
         return grassBlock;
     }
 
-    public ParkSettings(Optional<String> parkElevationBlock,
+    public ParkSettings(Optional<Float> parkChance,
+                        Optional<Boolean> avoidFoliage,
+                        Optional<Boolean> parkBorder,
+                        Optional<Boolean> parkElevation,
+                        Optional<String> parkElevationBlock,
                         Optional<String> grassBlock) {
+        this.parkChance = parkChance.orElse(null);
+        this.avoidFoliage = avoidFoliage.orElse(null);
+        this.parkBorder = parkBorder.orElse(null);
+        this.parkElevation = parkElevation.orElse(null);
         this.parkElevationBlock = DataTools.getNullableChar(parkElevationBlock);
         this.grassBlock = DataTools.getNullableChar(grassBlock);
     }

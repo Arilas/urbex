@@ -749,12 +749,17 @@ public class BuildingInfo implements ILostChunkInfo {
             highwayXLevel = Highway.getXHighwayLevel(key, provider, profile);
             highwayZLevel = Highway.getZHighwayLevel(key, provider, profile);
 
-            if (rand.nextDouble() < profile.PARK_CHANCE) {
+            float parkChance = profile.PARK_CHANCE;
+            if (cs.getParkChance() != null) {
+                parkChance = cs.getParkChance();
+            }
+            if (rand.nextDouble() < parkChance) {
                 streetType = StreetType.values()[rand.nextInt(StreetType.values().length)];
             } else {
                 streetType = StreetType.NORMAL;
             }
-            if (rand.nextFloat() < profile.FOUNTAIN_CHANCE) {
+            float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
+            if (rand.nextFloat() < fountainChance) {
                 fountainType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomFountain(rand));
             } else {
                 fountainType = null;
@@ -880,12 +885,16 @@ public class BuildingInfo implements ILostChunkInfo {
             connectionAtZ[i] = isCity(coord.north(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
         }
 
+        float corridorChance = profile.CORRIDOR_CHANCE;
+        if (cs.getCorridorChance() != null) {
+            corridorChance = cs.getCorridorChance();
+        }
         if (hasBuilding && cellars > 0) {
             xRailCorridor = false;
             zRailCorridor = false;
         } else {
-            xRailCorridor = rand.nextFloat() < profile.CORRIDOR_CHANCE;
-            zRailCorridor = rand.nextFloat() < profile.CORRIDOR_CHANCE;
+            xRailCorridor = rand.nextFloat() < corridorChance;
+            zRailCorridor = rand.nextFloat() < corridorChance;
         }
 
         if (isCity) {

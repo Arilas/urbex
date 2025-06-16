@@ -159,7 +159,6 @@ public class LostCityProfile implements ILostCityProfile {
     public float CORRIDOR_CHANCE = .7f;
     public float BRIDGE_CHANCE = .7f;
     public float FOUNTAIN_CHANCE = .05f;
-    public float BUILDING2X2_CHANCE = .03f; // No longer used!
     public boolean BRIDGE_SUPPORTS = true;
 
     public boolean PARK_ELEVATION = true;

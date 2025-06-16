@@ -16,7 +16,19 @@ public interface ILostCityCityStyle extends ILostCityAsset {
 
     Integer getMaxCellarCount();
 
+    Float getParkChance();
+
+    Float getFountainChance();
+
     Float getBuildingChance();
+
+    Float getCorridorChance();
+
+    Boolean getAvoidFoliage();
+
+    Boolean getParkBorder();
+
+    Boolean getParkElevation();
 
     Character getStreetBlock();
 
