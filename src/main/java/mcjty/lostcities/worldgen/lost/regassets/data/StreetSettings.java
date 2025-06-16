@@ -10,6 +10,7 @@ import java.util.Optional;
  */
 public class StreetSettings {
     private final Float fountainChance;
+    private final Float frontChance;
     private final Integer streetWidth;
     private final Character streetBlock;
     private final Character streetBaseBlock;
@@ -20,7 +21,8 @@ public class StreetSettings {
 
     public static final Codec<StreetSettings> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.FLOAT.optionalFieldOf("fountainChance").forGetter(l -> Optional.ofNullable(l.fountainChance)),
+                    Codec.FLOAT.optionalFieldOf("fountainchance").forGetter(l -> Optional.ofNullable(l.fountainChance)),
+                    Codec.FLOAT.optionalFieldOf("frontchance").forGetter(l -> Optional.ofNullable(l.frontChance)),
                     Codec.INT.optionalFieldOf("width").forGetter(l -> Optional.ofNullable(l.streetWidth)),
                     Codec.STRING.optionalFieldOf("street").forGetter(l -> DataTools.toNullable(l.streetBlock)),
                     Codec.STRING.optionalFieldOf("streetbase").forGetter(l -> DataTools.toNullable(l.streetBaseBlock)),
@@ -32,6 +34,10 @@ public class StreetSettings {
 
     public Float getFountainChance() {
         return fountainChance;
+    }
+
+    public Float getFrontChance() {
+        return frontChance;
     }
 
     public Integer getStreetWidth() {
@@ -63,6 +69,7 @@ public class StreetSettings {
     }
 
     public StreetSettings(Optional<Float> fountainChance,
+                          Optional<Float> frontChance,
                           Optional<Integer> streetWidth,
                           Optional<String> streetBlock,
                           Optional<String> streetBaseBlock,
@@ -71,6 +78,7 @@ public class StreetSettings {
                           Optional<String> wallBlock,
                           Optional<StreetParts> parts) {
         this.fountainChance = fountainChance.orElse(null);
+        this.frontChance = frontChance.orElse(null);
         this.streetWidth = streetWidth.orElse(null);
         this.streetBlock = DataTools.getNullableChar(streetBlock);
         this.streetBaseBlock = DataTools.getNullableChar(streetBaseBlock);

@@ -24,6 +24,8 @@ public interface ILostCityCityStyle extends ILostCityAsset {
 
     Float getCorridorChance();
 
+    Float getFrontChance();
+
     Boolean getAvoidFoliage();
 
     Boolean getParkBorder();

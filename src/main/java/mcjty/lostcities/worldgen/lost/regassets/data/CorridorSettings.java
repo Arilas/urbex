@@ -15,7 +15,7 @@ public class CorridorSettings {
 
     public static final Codec<CorridorSettings> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.FLOAT.optionalFieldOf("corridorChance").forGetter(l -> Optional.ofNullable(l.corridorChance)),
+                    Codec.FLOAT.optionalFieldOf("corridorchance").forGetter(l -> Optional.ofNullable(l.corridorChance)),
                     Codec.STRING.optionalFieldOf("roof").forGetter(l -> DataTools.toNullable(l.corridorRoofBlock)),
                     Codec.STRING.optionalFieldOf("glass").forGetter(l -> DataTools.toNullable(l.corridorGlassBlock))
             ).apply(instance, CorridorSettings::new));

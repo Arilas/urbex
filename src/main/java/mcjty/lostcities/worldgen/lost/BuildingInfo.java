@@ -882,10 +882,7 @@ public class BuildingInfo implements ILostChunkInfo {
             connectionAtZ[i] = isCity(coord.north(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
         }
 
-        float corridorChance = profile.CORRIDOR_CHANCE;
-        if (cs.getCorridorChance() != null) {
-            corridorChance = cs.getCorridorChance();
-        }
+        float corridorChance = cs.getCorridorChance() != null ? cs.getCorridorChance() : profile.CORRIDOR_CHANCE;
         if (hasBuilding && cellars > 0) {
             xRailCorridor = false;
             zRailCorridor = false;
@@ -912,7 +909,8 @@ public class BuildingInfo implements ILostChunkInfo {
             railDungeon = null;
         }
 
-        if (rand.nextFloat() < profile.BUILDING_FRONTCHANCE) {
+        float frontChance = cs.getFrontChance() != null ? cs.getFrontChance() : profile.BUILDING_FRONTCHANCE;
+        if (rand.nextFloat() < frontChance) {
             frontType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomFront(rand));
         } else {
             frontType = null;

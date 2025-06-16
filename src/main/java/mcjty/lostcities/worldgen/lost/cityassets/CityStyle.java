@@ -37,6 +37,7 @@ public class CityStyle implements ILostCityCityStyle {
 
     // Street settings
     private Float fountainChance;
+    private Float frontChance;
     private Integer streetWidth;
     private Character streetBlock;
     private Character streetBaseBlock;
@@ -117,6 +118,7 @@ public class CityStyle implements ILostCityCityStyle {
         });
         object.getStreetSettings().ifPresent(s -> {
             fountainChance = s.getFountainChance();
+            frontChance = s.getFrontChance();
             borderBlock = s.getBorderBlock();
             streetBaseBlock = s.getStreetBaseBlock();
             streetBlock = s.getStreetBlock();
@@ -199,6 +201,9 @@ public class CityStyle implements ILostCityCityStyle {
 
     @Override
     public Float getParkChance() { return parkChance; }
+
+    @Override
+    public Float getFrontChance() { return frontChance; }
 
     @Override
     public Float getCorridorChance() { return corridorChance; }
@@ -352,6 +357,9 @@ public class CityStyle implements ILostCityCityStyle {
                 }
                 if (fountainChance == null) {
                     fountainChance = inheritFrom.fountainChance;
+                }
+                if (frontChance == null) {
+                    frontChance = inheritFrom.frontChance;
                 }
                 if (corridorChance == null) {
                     corridorChance = inheritFrom.corridorChance;

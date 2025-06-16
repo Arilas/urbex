@@ -19,11 +19,11 @@ public class ParkSettings {
 
     public static final Codec<ParkSettings> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.FLOAT.optionalFieldOf("parkChance").forGetter(l -> Optional.ofNullable(l.parkChance)),
-                    Codec.BOOL.optionalFieldOf("avoidFoliage").forGetter(l -> Optional.ofNullable(l.avoidFoliage)),
-                    Codec.BOOL.optionalFieldOf("parkBorder").forGetter(l -> Optional.ofNullable(l.parkBorder)),
-                    Codec.BOOL.optionalFieldOf("parkElevation").forGetter(l -> Optional.ofNullable(l.parkElevation)),
-                    Codec.INT.optionalFieldOf("parkStreetThreshold").forGetter(l -> Optional.ofNullable(l.parkStreetThreshold)),
+                    Codec.FLOAT.optionalFieldOf("parkchance").forGetter(l -> Optional.ofNullable(l.parkChance)),
+                    Codec.BOOL.optionalFieldOf("avoidfoliage").forGetter(l -> Optional.ofNullable(l.avoidFoliage)),
+                    Codec.BOOL.optionalFieldOf("parkborder").forGetter(l -> Optional.ofNullable(l.parkBorder)),
+                    Codec.BOOL.optionalFieldOf("parkelevation").forGetter(l -> Optional.ofNullable(l.parkElevation)),
+                    Codec.INT.optionalFieldOf("parkstreetthreshold").forGetter(l -> Optional.ofNullable(l.parkStreetThreshold)),
                     Codec.STRING.optionalFieldOf("elevation").forGetter(l -> DataTools.toNullable(l.parkElevationBlock)),
                     Codec.STRING.optionalFieldOf("grass").forGetter(l -> DataTools.toNullable(l.grassBlock))
             ).apply(instance, ParkSettings::new));
