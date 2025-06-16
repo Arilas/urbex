@@ -4,6 +4,11 @@ Upcoming:
 - New 'optimizedHeightmap' config option to use a more optimized way to calculate the heightmap. This is disabled by default
 - New 'heightSampleSize' config option to control the size of the heightmap sample. This is used to calculate the heightmap for cities. By default this is 1 which means every chunk
 - TqLxQuanZ added four new city levels
+- Changed how park generation works, now there's a config to determine if park should spawn when the neighbouring street must more than a certain amount.
+- Added optional building floors override Profile/Citystyle floor settings. (Use "overrideFloors": true in building definition)
+- Added ParkChance/FountainChance/AvoidFoliage/ParkBorder/ParkElevation/CorridorChance/ParkStreetThreshold support for CityStyle override. Meaning each city style can have different chance now and settings on those now!
+- Fixed ParkChance not working at all, it scales with total neighbour street condition + current chunk's park chance.
+- Cleaned up unused/outdated profile settings.
 
 1.21-8.2.6:
 - New 'avoidVillages' config to avoid generating Lost Cities in chunks that have villages. Default set to true

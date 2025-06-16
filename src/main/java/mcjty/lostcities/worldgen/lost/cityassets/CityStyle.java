@@ -49,6 +49,7 @@ public class CityStyle implements ILostCityCityStyle {
     private Boolean avoidFoliage;
     private Boolean parkBorder;
     private Boolean parkElevation;
+    private Integer parkStreetThreshold;
     private Character parkElevationBlock;
     private Character grassBlock;
 
@@ -105,6 +106,7 @@ public class CityStyle implements ILostCityCityStyle {
             avoidFoliage = s.getAvoidFoliage();
             parkBorder = s.getParkBorder();
             parkElevation = s.getParkElevation();
+            parkStreetThreshold = s.getParkStreetThreshold();
             grassBlock = s.getGrassBlock();
             parkElevationBlock = s.getParkElevationBlock();
         });
@@ -196,9 +198,7 @@ public class CityStyle implements ILostCityCityStyle {
     }
 
     @Override
-    public Float getParkChance() {
-        return parkChance;
-    }
+    public Float getParkChance() { return parkChance; }
 
     @Override
     public Float getCorridorChance() { return corridorChance; }
@@ -212,6 +212,9 @@ public class CityStyle implements ILostCityCityStyle {
     public Boolean getParkBorder() {
         return parkBorder;
     }
+
+    @Override
+    public Integer getParkStreetThreshold() { return parkStreetThreshold; }
 
     @Override
     public Boolean getParkElevation() {
@@ -343,6 +346,27 @@ public class CityStyle implements ILostCityCityStyle {
                 }
                 if (buildingChance == null) {
                     buildingChance = inheritFrom.buildingChance;
+                }
+                if (parkChance == null) {
+                    parkChance = inheritFrom.parkChance;
+                }
+                if (fountainChance == null) {
+                    fountainChance = inheritFrom.fountainChance;
+                }
+                if (corridorChance == null) {
+                    corridorChance = inheritFrom.corridorChance;
+                }
+                if (parkElevation == null) {
+                    parkElevation = inheritFrom.parkElevation;
+                }
+                if (avoidFoliage == null) {
+                    avoidFoliage = inheritFrom.avoidFoliage;
+                }
+                if (parkBorder == null) {
+                    parkBorder = inheritFrom.parkBorder;
+                }
+                if (parkStreetThreshold == null) {
+                    parkStreetThreshold = inheritFrom.parkStreetThreshold;
                 }
                 if (streetBlock == null) {
                     streetBlock = inheritFrom.streetBlock;

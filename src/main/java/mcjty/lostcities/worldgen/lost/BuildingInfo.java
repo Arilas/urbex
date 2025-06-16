@@ -57,7 +57,7 @@ public class BuildingInfo implements ILostChunkInfo {
     public final BuildingPart frontType;
     private final float stairPriority;      // A random number that indicates if this chunk should get a stair if there are competing stairs around it. The highest wins
     public final BuildingPart railDungeon;    // Dungeon next to rails. Will only generate if there are actually rails next to it
-    public final StreetType streetType;
+    public StreetType streetType;
 
     private int floors;
     public int cellars;
@@ -749,14 +749,11 @@ public class BuildingInfo implements ILostChunkInfo {
             highwayXLevel = Highway.getXHighwayLevel(key, provider, profile);
             highwayZLevel = Highway.getZHighwayLevel(key, provider, profile);
 
-            float parkChance = profile.PARK_CHANCE;
-            if (cs.getParkChance() != null) {
-                parkChance = cs.getParkChance();
-            }
+            float parkChance = cs.getParkChance() != null ? cs.getParkChance() : profile.PARK_CHANCE;
             if (rand.nextDouble() < parkChance) {
-                streetType = StreetType.values()[rand.nextInt(StreetType.values().length)];
+                streetType = StreetType.PARK;
             } else {
-                streetType = StreetType.NORMAL;
+                streetType = StreetType.values()[rand.nextInt(0, BuildingInfo.StreetType.values().length - 2)];
             }
             float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
             if (rand.nextFloat() < fountainChance) {
@@ -1130,32 +1127,25 @@ public class BuildingInfo implements ILostChunkInfo {
         };
     }
 
-    public boolean isStreetSection() {
+    public boolean isStreetOrParkSection() {
         return isCity && !hasBuilding;
     }
 
     public boolean isElevatedParkSection() {
-        if (!isStreetSection()) {
+        if (!isStreetOrParkSection() || (streetType != StreetType.PARK)) {
             return false;
         }
-        if (!getXmin().isStreetSection()) {
-            return false;
-        }
-        if (!getXmax().isStreetSection()) {
-            return false;
-        }
-        if (!getZmin().isStreetSection()) {
-            return false;
-        }
-        if (!getZmax().isStreetSection()) {
-            return false;
-        }
-        int cnt = 0;
-        cnt += getXmin().getZmin().isStreetSection() ? 1 : 0;
-        cnt += getXmin().getZmax().isStreetSection() ? 1 : 0;
-        cnt += getXmax().getZmin().isStreetSection() ? 1 : 0;
-        cnt += getXmax().getZmax().isStreetSection() ? 1 : 0;
-        return cnt >= 3;
+        int threshold = getCityStyle().getParkStreetThreshold() != null ? getCityStyle().getParkStreetThreshold() : profile.PARK_STREET_THRESHOLD;
+        int counter = 0;
+        counter += getXmin().isStreetOrParkSection() ? 1 : 0;
+        counter += getXmax().isStreetOrParkSection() ? 1 : 0;
+        counter += getZmin().isStreetOrParkSection() ? 1 : 0;
+        counter += getZmax().isStreetOrParkSection() ? 1 : 0;
+        counter += getXmin().getZmin().isStreetOrParkSection() ? 1 : 0;
+        counter += getXmin().getZmax().isStreetOrParkSection() ? 1 : 0;
+        counter += getXmax().getZmin().isStreetOrParkSection() ? 1 : 0;
+        counter += getXmax().getZmax().isStreetOrParkSection() ? 1 : 0;
+        return counter >= threshold;
     }
 
     private Direction getStairDirection() {

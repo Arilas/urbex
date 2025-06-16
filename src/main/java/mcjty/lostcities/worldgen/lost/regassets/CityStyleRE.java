@@ -101,9 +101,7 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
         return Optional.ofNullable(corridorSettings);
     }
 
-    public Optional<ParkSettings> getParkSettings() {
-        return Optional.ofNullable(parkSettings);
-    }
+    public Optional<ParkSettings> getParkSettings() { return Optional.ofNullable(parkSettings); }
 
     public Optional<RailSettings> getRailSettings() {
         return Optional.ofNullable(railSettings);

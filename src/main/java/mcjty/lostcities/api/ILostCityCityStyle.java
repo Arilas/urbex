@@ -30,6 +30,8 @@ public interface ILostCityCityStyle extends ILostCityAsset {
 
     Boolean getParkElevation();
 
+    Integer getParkStreetThreshold();
+
     Character getStreetBlock();
 
     Character getStreetBaseBlock();
