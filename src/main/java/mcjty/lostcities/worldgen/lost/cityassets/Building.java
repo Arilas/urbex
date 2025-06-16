@@ -24,6 +24,7 @@ public class Building implements ILostCityBuilding {
     private int maxCellars = -1;        // -1 means default frmo level
     private Boolean allowDoors = true;  // true means generation for the door is allowed, adjacent to street and building
     private Boolean allowFillers = true;  // true means generation for the filler is allowed, for cellars
+    private Boolean overrideFloors = false;	// This overrides the citystyle/profile all min/max floors, meaning it will ONLY use this building definition's all min/max Floors.
     private final char fillerBlock;           // Block used to fill/close areas. Usually the block of the building itself
     private final Character rubbleBlock;      // Block used for destroyed building rubble
     private float prefersLonely = 0.0f; // The chance this this building is alone. If 1.0f this building wants to be alone all the time
@@ -42,6 +43,7 @@ public class Building implements ILostCityBuilding {
         maxCellars = object.getMaxCellars();
         allowDoors = object.getAllowDoors();
         allowFillers = object.getAllowFillers();
+        overrideFloors = object.getOverrideFloors();
         prefersLonely = object.getPrefersLonely();
         fillerBlock = object.getFillerBlock();
         rubbleBlock = object.getRubbleBlock();
@@ -120,6 +122,13 @@ public class Building implements ILostCityBuilding {
     public Boolean getAllowFillers() {
     	return allowFillers;
     }
+
+    @Override
+    public Boolean getOverrideFloors() {
+        return overrideFloors;
+    }
+
+
 
     @Override
     public char getFillerBlock() {

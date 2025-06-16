@@ -38,7 +38,12 @@ public interface ILostCityBuilding extends ILostCityAsset {
      * Allow the generation of filler.
      */
     public Boolean getAllowFillers();
-  
+
+    /*
+     * Allow building profile floor to override profile/citystyle floors.
+     */
+    public Boolean getOverrideFloors();
+
     /**
      * The filler block (from the palette) used to do procedural generation of extra
      * features (like the blocks around a door)

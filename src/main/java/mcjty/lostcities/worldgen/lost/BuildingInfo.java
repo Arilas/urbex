@@ -933,6 +933,16 @@ public class BuildingInfo implements ILostChunkInfo {
 
     private int getMaxcellars(CityStyle cs) {
         int maxcellars = profile.BUILDING_MAXCELLARS + cityLevel;
+        if (buildingType.getMaxCellars() != -1 && buildingType.getOverrideFloors())
+        {
+            maxcellars = buildingType.getMaxCellars();
+            return maxcellars;
+        }
+        if (buildingType.getMinCellars() != -1 && buildingType.getOverrideFloors())
+        {
+            maxcellars = buildingType.getMinCellars();
+            return maxcellars;
+        }
         if (buildingType.getMaxCellars() != -1) {
             maxcellars = Math.min(maxcellars, buildingType.getMaxCellars());
         }
@@ -950,6 +960,11 @@ public class BuildingInfo implements ILostChunkInfo {
 
     private int getMinfloors(CityStyle cs) {
         int minfloors = profile.BUILDING_MINFLOORS + 1;    // +1 because this doesn't count the top
+        if (buildingType.getMinFloors() != -1 && buildingType.getOverrideFloors())
+        {
+            minfloors = buildingType.getMinFloors();
+            return minfloors;
+        }
         if (buildingType.getMinFloors() != -1) {
             minfloors = Math.max(minfloors, buildingType.getMinFloors());
         }
@@ -961,6 +976,11 @@ public class BuildingInfo implements ILostChunkInfo {
 
     private int getMaxfloors(CityStyle cs) {
         int maxfloors = profile.BUILDING_MAXFLOORS;
+        if (buildingType.getMaxFloors() != -1 && buildingType.getOverrideFloors())
+        {
+            maxfloors = buildingType.getMaxFloors();
+            return maxfloors;
+        }
         if (buildingType.getMaxFloors() != -1) {
             maxfloors = Math.min(maxfloors, buildingType.getMaxFloors());
         }
@@ -975,8 +995,14 @@ public class BuildingInfo implements ILostChunkInfo {
     }
 
     public Boolean getAllowFillers() {
+
         return buildingType.getAllowFillers();
     }
+
+    public Boolean getOverrideFloors() {
+        return buildingType.getOverrideFloors();
+    }
+
 
     public int getHighwayXLevel() {
         return Highway.getXHighwayLevel(coord, provider, profile);
