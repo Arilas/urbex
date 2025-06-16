@@ -508,6 +508,18 @@ public class LostCityProfile implements ILostCityProfile {
     }
 
     @Override
+    public void setCityLevelHeights(int l0, int l1, int l2, int l3) {
+        this.CITY_LEVEL0_HEIGHT = l0;
+        this.CITY_LEVEL1_HEIGHT = l1;
+        this.CITY_LEVEL2_HEIGHT = l2;
+        this.CITY_LEVEL3_HEIGHT = l3;
+        this.CITY_LEVEL4_HEIGHT = l3 + 30;
+        this.CITY_LEVEL5_HEIGHT = l3 + 40;
+        this.CITY_LEVEL6_HEIGHT = l3 + 50;
+        this.CITY_LEVEL7_HEIGHT = l3 + 60;
+    }
+
+    @Override
     public void setCityLevelHeights(int l0, int l1, int l2, int l3, int l4, int l5, int l6, int l7) {
         this.CITY_LEVEL0_HEIGHT = l0;
         this.CITY_LEVEL1_HEIGHT = l1;
