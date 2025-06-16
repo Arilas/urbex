@@ -26,13 +26,13 @@ public class ParkSettings {
                     Codec.STRING.optionalFieldOf("grass").forGetter(l -> DataTools.toNullable(l.grassBlock))
             ).apply(instance, ParkSettings::new));
 
-    public float getParkChance() { return parkChance; }
+    public Float getParkChance() { return parkChance; }
 
-    public boolean getAvoidFoliage() { return avoidFoliage; }
+    public Boolean getAvoidFoliage() { return avoidFoliage; }
 
-    public boolean getParkBorder() { return parkBorder; }
+    public Boolean getParkBorder() { return parkBorder; }
 
-    public boolean getParkElevation() { return parkElevation; }
+    public Boolean getParkElevation() { return parkElevation; }
 
     public Character getParkElevationBlock() {
         return parkElevationBlock;

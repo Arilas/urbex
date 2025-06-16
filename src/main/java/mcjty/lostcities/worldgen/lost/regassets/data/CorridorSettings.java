@@ -9,7 +9,7 @@ import java.util.Optional;
  * For a city style this object represents settings for corridors
  */
 public class CorridorSettings {
-    private final float corridorChance;
+    private final Float corridorChance;
     private final Character corridorRoofBlock;
     private final Character corridorGlassBlock;
 
@@ -20,9 +20,7 @@ public class CorridorSettings {
                     Codec.STRING.optionalFieldOf("glass").forGetter(l -> DataTools.toNullable(l.corridorGlassBlock))
             ).apply(instance, CorridorSettings::new));
 
-    public float getCorridorChance() {
-        return corridorChance;
-    }
+    public Float getCorridorChance() { return corridorChance; }
 
     public Character getCorridorRoofBlock() {
         return corridorRoofBlock;
