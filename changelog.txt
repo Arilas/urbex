@@ -1,3 +1,6 @@
+Upcoming:
+- Fixed lost city loot folder
+
 1.21-8.2.6:
 - New 'avoidVillages' config to avoid generating Lost Cities in chunks that have villages. Default set to true
 - New 'biosphere_caves' landscape type and profile to combine a cavern type world with spheres (for usage with Lost Worlds)
