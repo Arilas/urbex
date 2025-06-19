@@ -270,9 +270,6 @@ public class LostCityTerrainFeature {
         ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
 
         ChunkHeightmap heightmap = getHeightmap(coord, provider.getWorld());
-//        if (heightmap != null) {
-//            return;
-//        }
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
 
         // @todo this setup is not very clean
@@ -1256,7 +1253,8 @@ public class LostCityTerrainFeature {
                     height++;
                 }
             } else {
-                info.streetType = BuildingInfo.StreetType.values()[info.provider.getRandom().nextInt(0, BuildingInfo.StreetType.values().length - 2)];
+                Random rnd = new Random(info.coord.chunkZ() * 155557723L + info.coord.chunkX() * 45555558379L);
+                info.streetType = BuildingInfo.StreetType.values()[rnd.nextInt(0, BuildingInfo.StreetType.values().length - 2)];
                 streetType = info.streetType;
             }
 
