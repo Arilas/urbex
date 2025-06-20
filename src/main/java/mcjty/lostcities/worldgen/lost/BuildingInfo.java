@@ -335,7 +335,7 @@ public class BuildingInfo implements ILostChunkInfo {
             if (characteristics.multiPos.isSingle()) {
                 characteristics.cityLevel = getCityLevel(coord, provider);
             } else {
-                characteristics.cityLevel = getAverageCityLevel(characteristics, coord, provider);
+                characteristics.cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(characteristics, coord, provider) : getAverageCityLevel(characteristics, coord, provider);
             }
             Random rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
             characteristics.couldHaveBuilding = characteristics.isCity && checkBuildingPossibility(coord, provider, profile, characteristics.multiPos, characteristics.cityLevel, rand);
@@ -546,6 +546,14 @@ public class BuildingInfo implements ILostChunkInfo {
             }
         }
         return level / (mp.w() * mp.h());
+    }
+
+    private static int getTopLeftCityLevel(LostChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
+        MultiPos mp = thisone.multiPos;
+        int topX = coord.chunkX() - mp.x();
+        int topZ = coord.chunkZ() - mp.z();
+        ChunkCoord key = new ChunkCoord(provider.dimension(), topX, topZ);
+        return getCityLevel(key, provider);
     }
 
     private static LostChunkCharacteristics getTopLeftCityInfo(LostChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {

@@ -154,17 +154,18 @@ public class LostCityProfile implements ILostCityProfile {
     public int BUILDING_MAXCELLARS = 3;
     public float BUILDING_DOORWAYCHANCE = .6f;
     public float BUILDING_FRONTCHANCE = .2f;
-    public float PARK_CHANCE = .2f;
 
+    public float PARK_CHANCE = .2f;
     public float CORRIDOR_CHANCE = .7f;
     public float BRIDGE_CHANCE = .7f;
     public float FOUNTAIN_CHANCE = .05f;
-    public boolean BRIDGE_SUPPORTS = true;
 
+    public boolean BRIDGE_SUPPORTS = true;
     public boolean PARK_ELEVATION = true;
     public boolean PARK_BORDER = true;
     public int PARK_STREET_THRESHOLD = 3;
 
+    public boolean MULTI_USE_CORNER = false;
 
     public int BEDROCK_LAYER = 1;
 
@@ -361,6 +362,8 @@ public class LostCityProfile implements ILostCityProfile {
                 "If true then railways are enabled. If false they are not (but stations will still generate)");
         RAILWAY_STATIONS_ENABLED = cfg.getBoolean("railwayStationsEnabled", LostCityProfile.CATEGORY_LOSTCITY, RAILWAY_STATIONS_ENABLED,
                 "If true then railway stations are enabled");
+
+        MULTI_USE_CORNER = cfg.getBoolean("multiUseCorner", LostCityProfile.CATEGORY_LOSTCITY, MULTI_USE_CORNER, "Determine whether the multibuilding should use surrounding average level, or just top left corner level.");
 
         HIGHWAY_REQUIRES_TWO_CITIES = cfg.getBoolean("highwayRequiresTwoCities", LostCityProfile.CATEGORY_LOSTCITY, HIGHWAY_REQUIRES_TWO_CITIES,
                 "If true then a highway will only generate if both sides have a valid city. If false then one city is sufficient");
