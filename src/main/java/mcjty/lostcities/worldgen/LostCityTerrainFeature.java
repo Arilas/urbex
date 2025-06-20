@@ -656,8 +656,8 @@ public class LostCityTerrainFeature {
         if (max00 < max || max10 < max || max01 < max || max11 < max ||
                 min00 < max || min10 < max || min01 < max || min11 < max) {
             // We need to fit the terrain between the upper and lower mesh here
-            int maxHeightP = heightmap.getHeight() + 10;
-            int minHeightP = heightmap.getHeight() - 10;
+            int maxHeightP = heightmap.getHeight() + 60;
+            int minHeightP = heightmap.getHeight() - 60;
             if (max00 >= max) {
                 max00 = maxHeightP;
             }
