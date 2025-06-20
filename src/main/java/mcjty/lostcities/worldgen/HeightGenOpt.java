@@ -18,7 +18,7 @@ import java.util.function.Predicate;
 public class HeightGenOpt {
 
     public static int getBaseHeight(NoiseBasedChunkGenerator generator, int x, int z, Heightmap.Types type, LevelHeightAccessor level, RandomState rnd) {
-        return iterateNoiseColumn(generator, generator.generatorSettings().get(), level, rnd, x, z, null, type.isOpaque()).orElse(level.getMinBuildHeight());
+        return iterateNoiseColumn(generator, generator.generatorSettings().value(), level, rnd, x, z, null, type.isOpaque()).orElse(level.getMinBuildHeight());
     }
 
     private static Aquifer.FluidPicker fluidPicker;
