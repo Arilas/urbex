@@ -9,6 +9,7 @@ Upcoming:
 - Added ParkChance/FountainChance/AvoidFoliage/ParkBorder/ParkElevation/CorridorChance/ParkStreetThreshold support for CityStyle override. Meaning each city style can have different chance now and settings on those now!
 - Fixed ParkChance not working at all, it scales with total neighbour street condition + current chunk's park chance.
 - Cleaned up unused/outdated profile settings.
+- TqLxQuanZ added an option to use multibuilding top left corner level instead of average level for multibuildings
 - Improved the flattening algorithm
 
 1.21-8.2.6:
