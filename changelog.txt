@@ -1,4 +1,4 @@
-Upcoming:
+1.21-8.3.0:
 - Fixed lost city loot folder
 - New 'railpartheight6' setting for worldstyle that indicates how high railway parts can be (in multiples of 6)
 - New 'optimizedHeightmap' config option to use a more optimized way to calculate the heightmap. This is disabled by default
