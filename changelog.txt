@@ -1,3 +1,7 @@
+1.21-8.3.1:
+- TqLxQuanZ added a config for enabling surface railway station.
+- TqLxQuanZ increased the flattening min/max height for tackling modded terrain generation.
+
 1.21-8.3.0:
 - Fixed lost city loot folder
 - New 'railpartheight6' setting for worldstyle that indicates how high railway parts can be (in multiples of 6)

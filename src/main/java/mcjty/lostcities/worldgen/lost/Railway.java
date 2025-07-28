@@ -293,7 +293,7 @@ public class Railway {
 
     private static RailChunkInfo getStationType(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile, float r, int rails, List<String> part) {
         int cityLevel = BuildingInfo.getCityLevel(coord, provider);
-        if (cityLevel > 2) {
+        if (cityLevel > 2 || !profile.RAILWAY_SURFACE_STATIONS_ENABLED) {
             // We are too high here. We need an underground station
             return new RailChunkInfo(STATION_UNDERGROUND, BI, RAILWAY_LEVEL_OFFSET, rails);
         }
