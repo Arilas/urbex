@@ -1,3 +1,6 @@
+Upcoming:
+- Fixed a problem with citystyles and multibuildings
+
 1.21-8.3.1:
 - TqLxQuanZ added a config for enabling surface railway station.
 - TqLxQuanZ increased the flattening min/max height for tackling modded terrain generation.
