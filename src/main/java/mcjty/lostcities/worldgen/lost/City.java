@@ -1,5 +1,6 @@
 package mcjty.lostcities.worldgen.lost;
 
+import mcjty.lostcities.LostCities;
 import mcjty.lostcities.config.LostCityProfile;
 import mcjty.lostcities.varia.ChunkCoord;
 import mcjty.lostcities.varia.Tools;
@@ -319,12 +320,6 @@ public class City {
         }
 
         if (factor > 0.0001 && provider.getWorld() != null) {
-            WorldStyle worldStyle = AssetRegistries.WORLDSTYLES.get(provider.getWorld(), profile.getWorldStyle());
-            float multiplier = worldStyle.getCityChanceMultiplier(provider, coord);
-            factor *= multiplier;
-        }
-
-        if (factor > 0.0001 && provider.getWorld() != null) {
             // Check if the terrain is not too low or high for building
             ChunkHeightmap heightmap = provider.getHeightmap(coord);
             if (heightmap == null) {
@@ -336,6 +331,12 @@ public class City {
             if (heightmap.getHeight() > profile.CITY_MAXHEIGHT) {
                 return 0;
             }
+        }
+
+        if (factor > 0.0001 && provider.getWorld() != null) {
+            WorldStyle worldStyle = AssetRegistries.WORLDSTYLES.get(provider.getWorld(), profile.getWorldStyle());
+            float multiplier = worldStyle.getCityChanceMultiplier(provider, coord);
+            factor *= multiplier;
         }
 
         // @todo 1.14: do we need this?
