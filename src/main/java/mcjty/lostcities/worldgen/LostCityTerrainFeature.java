@@ -2123,28 +2123,10 @@ public class LostCityTerrainFeature {
     }
 
     private void generateBuilding(BuildingInfo info, ChunkHeightmap heightmap) {
-        int min = info.provider.getWorld().getMinBuildHeight() + 2;
-        int max = info.provider.getWorld().getMaxBuildHeight() - 2 - FLOORHEIGHT;
-
+        int lowestLevel = info.getBuildingBottomHeight();
         int cellars = info.cellars;
         int floors = info.getNumFloors();
-        int lowestLevel = info.getCityGroundLevel() - cellars * FLOORHEIGHT;
-
-        // Fix lowest level so it goes above minimum build height
-        while (lowestLevel <= min) {
-            lowestLevel += FLOORHEIGHT;
-            cellars--;
-            if (cellars < 0) {
-                return;     // Bail out, this is a degenerate case
-            }
-        }
-
-        while (info.getCityGroundLevel() + floors * FLOORHEIGHT >= max) {
-            floors--;
-            if (floors < 0) {
-                return;     // Bail out, this is a degenerate case
-            }
-        }
+        int max = info.provider.getWorld().getMaxBuildHeight() - 2 - FLOORHEIGHT;
 
         CompiledPalette palette = info.getCompiledPalette();
         makeRoomForBuilding(info, lowestLevel, heightmap, palette);

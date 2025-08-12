@@ -1571,6 +1571,48 @@ public class BuildingInfo implements ILostChunkInfo {
     }
 
     /**
+     * Calculate the bottom height of a building chunk.
+     * Return Integer.MIN_VALUE if the building is degenerate (no floors, no cellars).
+     */
+    public int getBuildingBottomHeight() {
+        int min = provider.getWorld().getMinBuildHeight() + 2;
+        int max = provider.getWorld().getMaxBuildHeight() - 2 - FLOORHEIGHT;
+
+        int lowestLevel = getCityGroundLevel() - cellars * FLOORHEIGHT;
+
+        // Fix lowest level so it goes above minimum build height
+        while (lowestLevel <= min) {
+            lowestLevel += FLOORHEIGHT;
+            cellars--;
+            if (cellars < 0) {
+                return Integer.MIN_VALUE;     // Bail out, this is a degenerate case
+            }
+        }
+
+        while (getCityGroundLevel() + floors * FLOORHEIGHT >= max) {
+            floors--;
+            if (floors < 0) {
+                return Integer.MIN_VALUE;     // Bail out, this is a degenerate case
+            }
+        }
+        return lowestLevel;
+    }
+
+    /**
+     * Return the building part at a given y value. Return null if there is no building part at that level
+     */
+    public BuildingPart getFloorAtY(int lowestLevel, int y) {
+        if (y < lowestLevel || y >= lowestLevel + (floors + cellars + 1) * FLOORHEIGHT) {
+            return null;    // No building part at this level
+        }
+        int localY = (y - lowestLevel) / FLOORHEIGHT;
+        if (localY < 0 || localY >= floorTypes.length) {
+            return null;    // No building part at this level
+        }
+        return floorTypes[localY];
+    }
+
+    /**
      * Get the lowest height of a corner of four chunks (if it is a city chunk).
      * info: reference to the bottom-right chunk. The 0,0 position of this chunk is the reference.
      * Returns 100000 if the corner is not adjacent to any city chunk

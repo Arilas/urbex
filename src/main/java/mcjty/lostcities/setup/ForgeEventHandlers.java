@@ -11,6 +11,7 @@ import mcjty.lostcities.worldgen.GlobalTodo;
 import mcjty.lostcities.worldgen.IDimensionInfo;
 import mcjty.lostcities.worldgen.lost.*;
 import mcjty.lostcities.worldgen.lost.cityassets.AssetRegistries;
+import mcjty.lostcities.worldgen.lost.cityassets.BuildingPart;
 import mcjty.lostcities.worldgen.lost.cityassets.PredefinedCity;
 import mcjty.lostcities.worldgen.lost.cityassets.PredefinedSphere;
 import net.minecraft.ChatFormatting;
@@ -42,9 +43,7 @@ import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 import javax.annotation.Nonnull;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.function.Predicate;
 
 import static mcjty.lostcities.setup.Registration.LOSTCITY;
@@ -174,6 +173,35 @@ public class ForgeEventHandlers {
             if (profile.SPAWN_NOT_IN_BUILDING) {
                 isSuitable = isSuitable.and(blockPos -> isOutsideBuilding(dimensionInfo, blockPos));
                 needsCheck = true;
+            } else if (profile.FORCE_SPAWN_BUILDINGS.length > 0 || profile.FORCE_SPAWN_PARTS.length > 0) {
+                Set<String> buildings = Set.of(profile.FORCE_SPAWN_BUILDINGS);
+                Set<String> parts = Set.of(profile.FORCE_SPAWN_PARTS);
+                isSuitable = isSuitable.and(blockPos -> {
+                    ChunkCoord coord = new ChunkCoord(dimensionInfo.getType(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
+                    BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimensionInfo);
+                    if (info == null) {
+                        return false;
+                    }
+                    if (info.isCity() && info.hasBuilding) {
+                        if (!buildings.isEmpty()) {
+                            if (!buildings.contains(info.buildingType.getId().toString())) {
+                                return false;
+                            }
+                        }
+                        if (!parts.isEmpty()) {
+                            int lowestLevel = info.getBuildingBottomHeight();
+                            if (lowestLevel != Integer.MIN_VALUE) {
+                                BuildingPart part = info.getFloorAtY(lowestLevel, blockPos.getY());
+                                if (part == null || !parts.contains(part.getId().toString())) {
+                                    return false;
+                                }
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                });
+                needsCheck = true;
             } else if (profile.FORCE_SPAWN_IN_BUILDING) {
                 isSuitable = isSuitable.and(blockPos -> !isOutsideBuilding(dimensionInfo, blockPos));
                 needsCheck = true;
@@ -212,7 +240,7 @@ public class ForgeEventHandlers {
     private BlockPos findSafeSpawnPoint(Level world, IDimensionInfo provider, @Nonnull Predicate<BlockPos> isSuitable,
                                     @Nonnull ServerLevelData serverLevelData) {
         Random rand = new Random(provider.getSeed());
-        int radius = 200;
+        int radius = provider.getProfile().SPAWN_CHECK_RADIUS;
         int attempts = 0;
 //        int bottom = world.getWorldType().getMinimumSpawnHeight(world);
         while (true) {
@@ -236,8 +264,8 @@ public class ForgeEventHandlers {
                     }
                 }
             }
-            radius += 100;
-            if (attempts > 20000) {
+            radius += provider.getProfile().SPAWN_RADIUS_INCREASE;
+            if (attempts > provider.getProfile().SPAWN_CHECK_ATTEMPTS) {
                 LostCities.setup.getLogger().error("Can't find a valid spawn position!");
                 throw new RuntimeException("Can't find a valid spawn position!");
             }

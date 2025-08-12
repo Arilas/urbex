@@ -181,6 +181,11 @@ public class LostCityProfile implements ILostCityProfile {
     public String SPAWN_SPHERE = "";
     public boolean SPAWN_NOT_IN_BUILDING = false;
     public boolean FORCE_SPAWN_IN_BUILDING = false;
+    public String[] FORCE_SPAWN_BUILDINGS = new String[0];
+    public String[] FORCE_SPAWN_PARTS = new String[0];
+    public int SPAWN_CHECK_RADIUS = 200;
+    public int SPAWN_RADIUS_INCREASE = 100;
+    public int SPAWN_CHECK_ATTEMPTS = 20000;
 
     public LandscapeType LANDSCAPE_TYPE = LandscapeType.DEFAULT;
 
@@ -280,6 +285,11 @@ public class LostCityProfile implements ILostCityProfile {
         SPAWN_SPHERE = cfg.getString("spawnSphere", LostCityProfile.CATEGORY_LOSTCITY, SPAWN_SPHERE, "When this is set the player will always spawn in the given predefined sphere. If you use <in> the player will always spawn in a random sphere. If you use <out> the player will always spawn outside a sphere");
         SPAWN_NOT_IN_BUILDING = cfg.getBoolean("spawnNotInBuilding", LostCityProfile.CATEGORY_LOSTCITY, SPAWN_NOT_IN_BUILDING, "If this is true the player will not spawn in a building. This can be used in combination with the other spawn settings");
         FORCE_SPAWN_IN_BUILDING = cfg.getBoolean("forceSpawnInBuilding", LostCityProfile.CATEGORY_LOSTCITY, FORCE_SPAWN_IN_BUILDING, "If this is true the player will spawn in a building. This can be used in combination with the other spawn settings");
+        FORCE_SPAWN_BUILDINGS = cfg.getStringList("forceSpawnBuildings", LostCityProfile.CATEGORY_LOSTCITY, FORCE_SPAWN_BUILDINGS, "A list of buildings that the player will spawn in if FORCE_SPAWN_IN_BUILDING is true. If this is empty then any building will do. This can be used in combination with 'forceSpawnParts'");
+        FORCE_SPAWN_PARTS = cfg.getStringList("forceSpawnParts", LostCityProfile.CATEGORY_LOSTCITY, FORCE_SPAWN_PARTS, "A list of parts that the player will spawn in if FORCE_SPAWN_IN_BUILDING is true. If this is empty then any part will do. This can be used in combination with 'forceSpawnBuildings'");
+        SPAWN_CHECK_RADIUS = cfg.getInt("spawnCheckRadius", LostCityProfile.CATEGORY_LOSTCITY, SPAWN_CHECK_RADIUS, 1, 100000, "The start radius to check for a valid spawn location. This value will be increased with 100 if it couldn't find a valid spot");
+        SPAWN_RADIUS_INCREASE = cfg.getInt("spawnRadiusIncrease", LostCityProfile.CATEGORY_LOSTCITY, SPAWN_RADIUS_INCREASE, 1, 100000, "The radius increase to use if the spawn check radius is not large enough to find a valid spawn location");
+        SPAWN_CHECK_ATTEMPTS = cfg.getInt("spawnCheckAttempts", LostCityProfile.CATEGORY_LOSTCITY, SPAWN_CHECK_ATTEMPTS, 1, 1000000, "The number of attempts to find a valid spawn location. If this is not enough then this will error");
 
         SCATTERED_CHANCE_MULTIPLIER = cfg.getFloat("scatteredChanceMultiplier", LostCityProfile.CATEGORY_LOSTCITY, SCATTERED_CHANCE_MULTIPLIER, 0.0f, 100.0f, "Multiplier for the chance a scattered building will generate. With 0 all scattered buildings are disabled");
 
