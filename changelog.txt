@@ -1,6 +1,7 @@
 Upcoming:
 - Fixed a problem with citystyles and multibuildings
 - New 'forceSpawnBuildings' and 'forceSpawnParts' profile options to force the player to spawn in a building or part. A combination of both is possible
+- TqLxQuanZ fixed biome checking so it checks on surface instead of hardcoded Y
 
 1.21-8.3.1:
 - TqLxQuanZ added a config for enabling surface railway station.
