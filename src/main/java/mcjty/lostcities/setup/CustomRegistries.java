@@ -39,7 +39,7 @@ public class CustomRegistries {
     public static final ResourceKey<Registry<WorldStyleRE>> WORLDSTYLES_REGISTRY_KEY = ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "worldstyles"));
     public static final DeferredRegister<WorldStyleRE> WORLDSTYLES_DEFERRED_REGISTER = DeferredRegister.create(WORLDSTYLES_REGISTRY_KEY, LostCities.MODID);
 
-    public static final ResourceKey<Registry<PredefinedCityRE>> PREDEFINEDCITIES_REGISTRY_KEY = ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "predefinedcites"));
+    public static final ResourceKey<Registry<PredefinedCityRE>> PREDEFINEDCITIES_REGISTRY_KEY = ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "predefinedcities"));
     public static final DeferredRegister<PredefinedCityRE> PREDEFINEDCITIES_DEFERRED_REGISTER = DeferredRegister.create(PREDEFINEDCITIES_REGISTRY_KEY, LostCities.MODID);
 
     public static final ResourceKey<Registry<PredefinedSphereRE>> PREDEFINEDSPHERES_REGISTRY_KEY = ResourceKey.createRegistryKey(ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "predefinedspheres"));
