@@ -642,6 +642,7 @@ public class LostCityTerrainFeature {
         BuildingInfo.MinMax mm01 = info.getZmax().getDesiredMaxHeightL2();
         BuildingInfo.MinMax mm11 = info.getXmax().getZmax().getDesiredMaxHeightL2();
 
+        int min = level.getMinBuildHeight();
         int max = level.getMaxBuildHeight();
         int heightmapH = Short.MIN_VALUE;
 
@@ -692,10 +693,16 @@ public class LostCityTerrainFeature {
                 float minh1 = min10 + (min00 - min10) * factor;
                 for (int z = 0; z < 16; z++) {
                     float maxheight = maxh0 + (maxh1 - maxh0) * (15.0f - z) / 15.0f;
+                    if (maxheight > max) {
+                        maxheight = max;
+                    }
                     int maxTouchedY = moveDown(x, z, (int) maxheight, max);
 
                     if (maxTouchedY == Short.MIN_VALUE) {
                         float minheight = minh0 + (minh1 - minh0) * (15.0f - z) / 15.0f;
+                        if (minheight < min) {
+                            minheight = min;
+                        }
                         maxTouchedY = moveUp(x, z, (int) minheight, info.waterLevel > info.groundLevel);
                     }
                     if (maxTouchedY != Short.MIN_VALUE && x == 8 && z == 8) {
