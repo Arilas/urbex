@@ -4,6 +4,7 @@ import mcjty.lostcities.setup.CustomRegistries;
 import mcjty.lostcities.worldgen.lost.regassets.*;
 import mcjty.lostcities.worldgen.lost.regassets.StuffSettingsRE;
 import net.minecraft.world.level.CommonLevelAccessor;
+import org.checkerframework.checker.units.qual.C;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ public class AssetRegistries {
     public static final Map<String, List<StuffObject>> STUFF_BY_TAG = new HashMap<>();
 
     private static boolean loaded = false;
+    private static boolean loadedPredefined = false;
 
     public static void reset() {
         VARIANTS.reset();
@@ -45,6 +47,7 @@ public class AssetRegistries {
         STUFF.reset();
         STUFF_BY_TAG.clear();
         loaded = false;
+        loadedPredefined = false;
     }
 
     public static void load(CommonLevelAccessor level) {
@@ -54,12 +57,19 @@ public class AssetRegistries {
         PARTS.loadAll(level);
         BUILDINGS.loadAll(level);
         STUFF.loadAll(level);
-        PREDEFINED_CITIES.loadAll(level);
-        PREDEFINED_SPHERES.loadAll(level);
         STUFF.getIterable().forEach(stuff -> stuff.getSettings().getTags().forEach(tag -> {
             List<StuffObject> list = STUFF_BY_TAG.computeIfAbsent(tag, k -> new ArrayList<>());
             list.add(stuff);
         }));
         loaded = true;
+    }
+
+    public static void loadPredefinedStuff(CommonLevelAccessor level) {
+        if (loadedPredefined) {
+            return;
+        }
+        PREDEFINED_CITIES.loadAll(level);
+        PREDEFINED_SPHERES.loadAll(level);
+        loadedPredefined = true;
     }
 }

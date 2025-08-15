@@ -1,6 +1,5 @@
 package mcjty.lostcities.worldgen.lost;
 
-import mcjty.lostcities.LostCities;
 import mcjty.lostcities.config.LostCityProfile;
 import mcjty.lostcities.varia.ChunkCoord;
 import mcjty.lostcities.varia.Tools;
@@ -10,6 +9,7 @@ import mcjty.lostcities.worldgen.lost.cityassets.*;
 import mcjty.lostcities.worldgen.lost.regassets.data.PredefinedBuilding;
 import mcjty.lostcities.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.CommonLevelAccessor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 import org.apache.commons.lang3.tuple.Pair;
@@ -47,7 +47,8 @@ public class City {
         return CITY_RARITY_MAP.computeIfAbsent(level, k -> new CityRarityMap(seed, scale, offset, innerScale));
     }
 
-    public static PredefinedCity getPredefinedCity(ChunkCoord coord) {
+    public static PredefinedCity getPredefinedCity(CommonLevelAccessor level, ChunkCoord coord) {
+        AssetRegistries.loadPredefinedStuff(level);
         if (predefinedCityMap == null) {
             predefinedCityMap = new HashMap<>();
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
@@ -142,7 +143,7 @@ public class City {
 
 
     public static boolean isCityCenter(ChunkCoord coord, IDimensionInfo provider) {
-        PredefinedCity city = getPredefinedCity(coord);
+        PredefinedCity city = getPredefinedCity(provider.getWorld(), coord);
         if (city != null) {
             return true;
         }
@@ -170,7 +171,7 @@ public class City {
      * Return the radius of the city with the given center
      */
     public static float getCityRadius(ChunkCoord coord, IDimensionInfo provider) {
-        PredefinedCity city = getPredefinedCity(coord);
+        PredefinedCity city = getPredefinedCity(provider.getWorld(), coord);
         if (city != null) {
             return city.getRadius();
         }
@@ -195,7 +196,7 @@ public class City {
 
     // Call this on a city center to get the style of that city
     public static String getCityStyleForCityCenter(ChunkCoord coord, IDimensionInfo provider) {
-        PredefinedCity city = getPredefinedCity(coord);
+        PredefinedCity city = getPredefinedCity(provider.getWorld(), coord);
         if (city != null) {
             if (city.getCityStyle() != null) {
                 return city.getCityStyle();

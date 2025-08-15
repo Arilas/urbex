@@ -90,6 +90,9 @@ public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILost
     }
 
     public void loadAll(CommonLevelAccessor level) {
+        if (level == null) {
+            return;
+        }
         Registry<R> registry = level.registryAccess().registryOrThrow(registryKey);
         for (R r : registry) {
             ResourceLocation name = registry.getKey(r);

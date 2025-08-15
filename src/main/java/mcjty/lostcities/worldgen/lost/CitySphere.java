@@ -253,7 +253,7 @@ public class CitySphere implements ILostSphere {
      * From the center
      */
     private static float getSphereRadius(ChunkCoord center, IDimensionInfo provider, Random rand) {
-        PredefinedCity city = City.getPredefinedCity(center);
+        PredefinedCity city = City.getPredefinedCity(provider.getWorld(), center);
         LostCityProfile profile = provider.getProfile();
         if (city != null) {
             return city.getRadius() * profile.CITYSPHERE_FACTOR;
@@ -397,6 +397,7 @@ public class CitySphere implements ILostSphere {
      */
     @Nonnull
     public static synchronized CitySphere getCitySphere(ChunkCoord coord, IDimensionInfo provider) {
+        AssetRegistries.loadPredefinedStuff(provider.getWorld());
         if (!CITY_SPHERE_CACHE.containsKey(coord)) {
             for (PredefinedSphere predef : AssetRegistries.PREDEFINED_SPHERES.getIterable()) {
                 if (predef.getDimension() == provider.getType()) {

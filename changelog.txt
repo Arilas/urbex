@@ -1,5 +1,6 @@
 Upcoming:
 - Fixed chunk generation errors in the Lost City dimension
+- Fixed a problem with predefined cities and spheres loading at the wrong time
 
 1.21-8.3.2:
 - Fixed a problem with citystyles and multibuildings
