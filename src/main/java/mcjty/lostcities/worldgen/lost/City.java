@@ -61,8 +61,8 @@ public class City {
         return predefinedCityMap.get(coord);
     }
 
-    public static PredefinedBuilding getPredefinedBuildingAtTopLeft(ChunkCoord coord) {
-        calculateMap();
+    public static PredefinedBuilding getPredefinedBuildingAtTopLeft(CommonLevelAccessor level, ChunkCoord coord) {
+        calculateMap(level);
         return predefinedBuildingMap.get(coord);
     }
 
@@ -85,7 +85,7 @@ public class City {
     private static void calculateOccupied(IDimensionInfo provider) {
         if (OCCUPIED_CHUNKS_BUILDING == null) {
             OCCUPIED_CHUNKS_BUILDING = new HashMap<>();
-            calculateMap();
+            calculateMap(provider.getWorld());
             for (Map.Entry<ChunkCoord, PredefinedBuilding> entry : predefinedBuildingMap.entrySet()) {
                 PredefinedBuilding pb = entry.getValue();
                 ChunkCoord root = entry.getKey();
@@ -102,6 +102,7 @@ public class City {
                 }
             }
         }
+        AssetRegistries.loadPredefinedStuff(provider.getWorld());
         if (OCCUPIED_CHUNKS_STREET == null) {
             OCCUPIED_CHUNKS_STREET = new HashMap<>();
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
@@ -113,7 +114,8 @@ public class City {
         }
     }
 
-    private static void calculateMap() {
+    private static void calculateMap(CommonLevelAccessor level) {
+        AssetRegistries.loadPredefinedStuff(level);
         if (predefinedBuildingMap == null) {
             predefinedBuildingMap = new HashMap<>();
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
@@ -125,7 +127,8 @@ public class City {
         }
     }
 
-    public static PredefinedStreet getPredefinedStreet(ChunkCoord coord) {
+    public static PredefinedStreet getPredefinedStreet(CommonLevelAccessor level, ChunkCoord coord) {
+        AssetRegistries.loadPredefinedStuff(level);
         if (predefinedStreetMap == null) {
             predefinedStreetMap = new HashMap<>();
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
@@ -270,24 +273,24 @@ public class City {
         ResourceKey<Level> type = provider.getType();
         // If we have a predefined building here we force a high city factor
 
-        PredefinedBuilding predefinedBuilding = getPredefinedBuildingAtTopLeft(coord);
+        PredefinedBuilding predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord);
         if (predefinedBuilding != null) {
             return 1.0f;
         }
-        PredefinedStreet predefinedStreet = getPredefinedStreet(coord);
+        PredefinedStreet predefinedStreet = getPredefinedStreet(provider.getWorld(), coord);
         if (predefinedStreet != null) {
             return 1.0f;
         }
 
-        predefinedBuilding = getPredefinedBuildingAtTopLeft(coord.west());
+        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord.west());
         if (predefinedBuilding != null && predefinedBuilding.multi()) {
             return 1.0f;
         }
-        predefinedBuilding = getPredefinedBuildingAtTopLeft(coord.northWest());
+        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord.northWest());
         if (predefinedBuilding != null && predefinedBuilding.multi()) {
             return 1.0f;
         }
-        predefinedBuilding = getPredefinedBuildingAtTopLeft(coord.north());
+        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord.north());
         if (predefinedBuilding != null && predefinedBuilding.multi()) {
             return 1.0f;
         }

@@ -383,7 +383,7 @@ public class BuildingInfo implements ILostChunkInfo {
                     }
                 }
             } else {
-                PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(coord);
+                PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(world, coord);
                 if (characteristics.multiPos.isTopLeft()) {
 //                    String name = cityStyle.getRandomMultiBuilding(rand);
 //                    if (predefinedBuilding != null) {
@@ -447,11 +447,11 @@ public class BuildingInfo implements ILostChunkInfo {
         boolean b;
         float bc = rand.nextFloat();
 
-        PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(coord);
+        PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord);
         if (predefinedBuilding != null) {
             return true;    // We don't need other tests
         }
-        PredefinedStreet predefinedStreet = City.getPredefinedStreet(coord);
+        PredefinedStreet predefinedStreet = City.getPredefinedStreet(provider.getWorld(), coord);
         if (predefinedStreet != null) {
             return false;   // No building here
         }
@@ -753,7 +753,7 @@ public class BuildingInfo implements ILostChunkInfo {
             noLoot = topleft.noLoot;
             ruinHeight = topleft.ruinHeight;
         } else {
-            PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(key);
+            PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), key);
             highwayXLevel = Highway.getXHighwayLevel(key, provider, profile);
             highwayZLevel = Highway.getZHighwayLevel(key, provider, profile);
 
