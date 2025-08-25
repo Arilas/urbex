@@ -167,6 +167,7 @@ public class LostCityProfile implements ILostCityProfile {
     public int PARK_STREET_THRESHOLD = 3;
 
     public boolean MULTI_USE_CORNER = false;
+    public boolean USE_AVG_HEIGHTMAP = false;
 
     public int BEDROCK_LAYER = 1;
 
@@ -378,6 +379,8 @@ public class LostCityProfile implements ILostCityProfile {
 
         MULTI_USE_CORNER = cfg.getBoolean("multiUseCorner", LostCityProfile.CATEGORY_LOSTCITY, MULTI_USE_CORNER,
                 "Determine whether the multibuilding should use surrounding average level, or just top left corner level.");
+        USE_AVG_HEIGHTMAP = cfg.getBoolean("useAvgHeightmap", LostCityProfile.CATEGORY_LOSTCITY, USE_AVG_HEIGHTMAP,
+                "City normal level generation is now dependent on surrounding heightmap and get an average of the surrounding heightmap. This uses extra performance since it needs to retrieve surrounding city heightmaps.");
 
         HIGHWAY_REQUIRES_TWO_CITIES = cfg.getBoolean("highwayRequiresTwoCities", LostCityProfile.CATEGORY_LOSTCITY, HIGHWAY_REQUIRES_TWO_CITIES,
                 "If true then a highway will only generate if both sides have a valid city. If false then one city is sufficient");
