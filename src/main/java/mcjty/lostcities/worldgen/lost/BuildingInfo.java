@@ -662,7 +662,25 @@ public class BuildingInfo implements ILostChunkInfo {
             String randomPart = building.getRandomPart(rand, conditionContext);
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
             belowPart = randomPart;
-            randomPart = building.getRandomPart2(rand, conditionContext);
+
+            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, building.getName(), coord) {
+                @Override
+                public boolean isBuilding() {
+                    return true;
+                }
+
+                @Override
+                public boolean isSphere() {
+                    return CitySphere.isInSphere(coord, getCenter(0), provider);
+                }
+
+                @Override
+                public ResourceLocation getBiome() {
+                    Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
+                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().registry(Registries.BIOME).orElseThrow().getKey(b));
+                }
+            };
+            randomPart = building.getRandomPart2(rand, conditionContext2);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // null is legal
         }
     }
@@ -885,7 +903,25 @@ public class BuildingInfo implements ILostChunkInfo {
             }
             belowPart = randomPart;
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
-            randomPart = building.getRandomPart2(rand, conditionContext);
+
+            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, building.getName(), coord) {
+                @Override
+                public boolean isBuilding() {
+                    return true;
+                }
+
+                @Override
+                public boolean isSphere() {
+                    return CitySphere.isInSphere(coord, getCenter(0), provider);
+                }
+
+                @Override
+                public ResourceLocation getBiome() {
+                    Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
+                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().registry(Registries.BIOME).orElseThrow().getKey(b));
+                }
+            };
+            randomPart = building.getRandomPart2(rand, conditionContext2);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // null is legal
             connectionAtX[i] = isCity(coord.west(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
             connectionAtZ[i] = isCity(coord.north(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
