@@ -1,3 +1,7 @@
+1.21-8.3.4:
+- TqLxQuanZ added new feature useAvgHeightmap to blend city level heights more flattening
+- TqlxQuanZ added parts2 can use inpart to match specific parts with the generation
+
 1.21-8.3.3:
 - Fixed chunk generation errors in the Lost City dimension
 - Fixed a problem with predefined cities and spheres loading at the wrong time
