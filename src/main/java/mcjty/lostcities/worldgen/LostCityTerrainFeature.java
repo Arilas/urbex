@@ -298,7 +298,7 @@ public class LostCityTerrainFeature {
         }
 
         if (doCity) {
-            doCityChunk(info, heightmap);
+            doCityChunk(info, heightmap, chunk);
         } else {
             // We already have a prefilled core chunk (as generated from doCoreChunk)
             doNormalChunk(info, heightmap, avoidChunk);
@@ -923,7 +923,7 @@ public class LostCityTerrainFeature {
         heightmap.update(height);
     }
 
-    private void doCityChunk(BuildingInfo info, ChunkHeightmap heightmap) {
+    private void doCityChunk(BuildingInfo info, ChunkHeightmap heightmap, ChunkAccess chunk) {
         boolean building = info.hasBuilding;
 
         if (info.profile.isDefault() || info.profile.isVoidSpheres()) {
