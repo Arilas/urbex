@@ -104,6 +104,18 @@ public class LostCityProfile implements ILostCityProfile {
     // This threshold is used for both the cityChance variation as the perlin variation
     public float CITY_THRESHOLD = .2f;
 
+    // These four values are used to modify the city factor based on distance from spawn
+    // If CITY_SPAWN_DISTANCE2 is 0 then this is disabled
+    // The city factor will be multiplied with CITY_SPAWN_MULTIPLIER1 at CITY_SPAWN_DISTANCE1
+    // The city factor will be multiplied with CITY_SPAWN_MULTIPLIER2 at CITY_SPAWN_DISTANCE2
+    // In between these two distances the factor is linearly interpolated
+    // Closer to spawn then CITY_SPAWN_DISTANCE1, CITY_SPAWN_MULTIPLIER1 is used
+    // Further from spawn then CITY_SPAWN_DISTANCE2, CITY_SPAWN_MULTIPLIER2 is used
+    public int CITY_SPAWN_DISTANCE1 = 0;
+    public int CITY_SPAWN_DISTANCE2 = 0;
+    public double CITY_SPAWN_MULTIPLIER1 = 1.0;
+    public double CITY_SPAWN_MULTIPLIER2 = 1.0;
+
     // This threshold is used to select another citystyle if the city factor goes below this
     public float CITY_STYLE_THRESHOLD = -1f;
     public String CITY_STYLE_ALTERNATIVE = "";
@@ -417,6 +429,10 @@ public class LostCityProfile implements ILostCityProfile {
 
     private void initCities(Configuration cfg) {
         CITY_CHANCE = cfg.getDouble("cityChance", LostCityProfile.CATEGORY_CITIES, CITY_CHANCE, -1.0, 1.0, "The chance this chunk will be the center of a city (use -1 for perlin noise variant)");
+        CITY_SPAWN_DISTANCE1 = cfg.getInt("citySpawnDistance1", LostCityProfile.CATEGORY_CITIES, CITY_SPAWN_DISTANCE1, 0, 10000000, "At this distance from spawn (in blocks) the city factor will be equal to CITY_SPAWN_MULTIPLIER1");
+        CITY_SPAWN_DISTANCE2 = cfg.getInt("citySpawnDistance2", LostCityProfile.CATEGORY_CITIES, CITY_SPAWN_DISTANCE2, 0, 10000000, "At this distance from spawn (in blocks) the city factor will be equal to CITY_SPAWN_MULTIPLIER2. If this is 0 then no scaling is done");
+        CITY_SPAWN_MULTIPLIER1 = cfg.getDouble("citySpawnMultiplier1", LostCityProfile.CATEGORY_CITIES, CITY_SPAWN_MULTIPLIER1, 0, 1, "City factor at CITY_SPAWN_DISTANCE1");
+        CITY_SPAWN_MULTIPLIER2 = cfg.getDouble("citySpawnMultiplier2", LostCityProfile.CATEGORY_CITIES, CITY_SPAWN_MULTIPLIER2, 0, 1, "City factor at CITY_SPAWN_DISTANCE2");
         CITY_MINRADIUS = cfg.getInt("cityMinRadius", LostCityProfile.CATEGORY_CITIES, CITY_MINRADIUS, 1, 2000, "The minimum radius of a city");
         CITY_MAXRADIUS = cfg.getInt("cityMaxRadius", LostCityProfile.CATEGORY_CITIES, CITY_MAXRADIUS, 1, 2000, "The maximum radius of a city");
         CITY_PERLIN_SCALE = cfg.getDouble("cityPerlinScale", LostCityProfile.CATEGORY_CITIES, CITY_PERLIN_SCALE, -1000000, 1000000, "The scale for the city rarity perlin map");

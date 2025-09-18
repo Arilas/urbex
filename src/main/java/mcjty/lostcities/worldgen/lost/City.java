@@ -343,15 +343,19 @@ public class City {
             factor *= multiplier;
         }
 
-        // @todo 1.14: do we need this?
-//        for (int cx = -1 ; cx <= 1 ; cx++) {
-//            for (int cz = -1 ; cz <= 1 ; cz++) {
-//                Biome[] biomes = BiomeInfo.getBiomeInfo(provider, new ChunkCoord(type, chunkX + cx, chunkZ + cz)).getBiomes();
-//                if (isTooHighForBuilding(biomes)) {
-//                    return 0;
-//                }
-//            }
-//        }
+        if (profile.CITY_SPAWN_DISTANCE2 > 0) {
+            float dist = (float) Math.sqrt((chunkX << 4) * (chunkX << 4) + (chunkZ << 4) * (chunkZ << 4));
+            double factorDist;
+            if (dist <= profile.CITY_SPAWN_DISTANCE1) {
+                factorDist = profile.CITY_SPAWN_MULTIPLIER1;
+            } else if (dist >= profile.CITY_SPAWN_DISTANCE2) {
+                factorDist = profile.CITY_SPAWN_MULTIPLIER2;
+            } else {
+                float f = (dist - profile.CITY_SPAWN_DISTANCE1) / (profile.CITY_SPAWN_DISTANCE2 - profile.CITY_SPAWN_DISTANCE1);
+                factorDist = profile.CITY_SPAWN_MULTIPLIER1 + f * (profile.CITY_SPAWN_MULTIPLIER2 - profile.CITY_SPAWN_MULTIPLIER1);
+            }
+            factor *= (float) factorDist;
+        }
 
         return Math.min(Math.max(factor, 0), 1);
     }
