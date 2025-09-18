@@ -48,6 +48,7 @@ public class LostCities {
         container.registerConfig(ModConfig.Type.COMMON, Config.COMMON_CONFIG, "lostcities/common.toml");
         container.registerConfig(ModConfig.Type.SERVER, Config.SERVER_CONFIG);
 
+        setup.preInit();
         bus.addListener(setup::init);
         bus.addListener(this::onRegisterPayloadHandler);
         bus.addListener(this::processIMC);

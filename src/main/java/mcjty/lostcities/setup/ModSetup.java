@@ -22,12 +22,12 @@ public class ModSetup {
         return logger;
     }
 
+    public void preInit() {
+        logger = LogManager.getLogger();
+        ProfileSetup.setupProfiles();
+    }
 
     public void init(FMLCommonSetupEvent e) {
-        logger = LogManager.getLogger();
-
-        ProfileSetup.setupProfiles();
-
         NeoForge.EVENT_BUS.register(new ForgeEventHandlers());
         // @todo 1.14
 //        MinecraftForge.TERRAIN_GEN_BUS.register(new TerrainEventHandlers());
