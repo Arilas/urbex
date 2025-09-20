@@ -3,6 +3,8 @@ Upcoming:
 - New citySpawnDistance1, citySpawnDistance2, citySpawnMultiplier1 and citySpawnMultiplier2 profile options to control city spawning based on distance from world spawn
 - Fixed part2 generation issues
 - Fixed rain not properly going into destroyed buildings
+- New feature where it is possible to define how far away certain features can be used from within the city style. For example, you can specify that a building can
+  only spawn after 2000 blocks and up to 6000 blocks ('minSpawnDistance' and 'maxSpawnDistance'). There is also a 'feather' setting to make the transition smoother
 
 1.21-8.3.4:
 - TqLxQuanZ added new feature useAvgHeightmap to blend city level heights more flattening

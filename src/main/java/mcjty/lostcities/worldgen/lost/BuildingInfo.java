@@ -395,7 +395,7 @@ public class BuildingInfo implements ILostChunkInfo {
                     characteristics.buildingType = AssetRegistries.BUILDINGS.getOrThrow(world, b);
                 } else {
 //                    characteristics.multiBuilding = null;
-                    String name = cityStyle.getRandomBuilding(rand);
+                    String name = cityStyle.getRandomBuilding(rand, coord);
                     if (predefinedBuilding != null) {
                         name = predefinedBuilding.building();
                     }
@@ -784,11 +784,11 @@ public class BuildingInfo implements ILostChunkInfo {
             }
             float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
             if (rand.nextFloat() < fountainChance) {
-                fountainType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomFountain(rand));
+                fountainType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomFountain(rand, this.coord));
             } else {
                 fountainType = null;
             }
-            parkType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand));
+            parkType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand, this.coord));
             float cityFactor = City.getCityFactor(coord, provider, profile);
 
             int maxfloors = getMaxfloors(cs);
@@ -845,8 +845,8 @@ public class BuildingInfo implements ILostChunkInfo {
             cellars = fb;
 
             doorBlock = getRandomDoor(rand);
-            bridgeType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), cs.getRandomBridge(rand));
-            stairType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomStair(rand));
+            bridgeType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), cs.getRandomBridge(rand, this.coord));
+            stairType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomStair(rand, this.coord));
             stairPriority = rand.nextFloat();
             createPalette(rand);
             float r = rand.nextFloat();
@@ -946,7 +946,7 @@ public class BuildingInfo implements ILostChunkInfo {
 
         if (rand.nextFloat() < profile.RAILWAY_DUNGEON_CHANCE) {
             if (!hasBuilding || (Railway.RAILWAY_LEVEL_OFFSET < (cityLevel - cellars))) {
-                railDungeon = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomRailDungeon(rand));
+                railDungeon = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomRailDungeon(rand, this.coord));
             } else {
                 railDungeon = null;
             }
@@ -956,7 +956,7 @@ public class BuildingInfo implements ILostChunkInfo {
 
         float frontChance = cs.getFrontChance() != null ? cs.getFrontChance() : profile.BUILDING_FRONTCHANCE;
         if (rand.nextFloat() < frontChance) {
-            frontType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomFront(rand));
+            frontType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomFront(rand, this.coord));
         } else {
             frontType = null;
         }

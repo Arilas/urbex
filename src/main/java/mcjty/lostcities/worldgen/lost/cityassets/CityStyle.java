@@ -1,6 +1,7 @@
 package mcjty.lostcities.worldgen.lost.cityassets;
 
 import mcjty.lostcities.api.ILostCityCityStyle;
+import mcjty.lostcities.varia.ChunkCoord;
 import mcjty.lostcities.varia.Tools;
 import mcjty.lostcities.worldgen.lost.regassets.CityStyleRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
@@ -416,17 +417,43 @@ public class CityStyle implements ILostCityCityStyle {
         }
     }
 
-    private static String getRandomFromList(RandomSource random, List<ObjectSelector> list) {
-        ObjectSelector fromList = Tools.getRandomFromList(random, list, ObjectSelector::factor);
-        if (fromList == null) {
-            return null;
-        } else {
-            return fromList.value();
-        }
-    }
-
-    private static String getRandomFromList(Random random, List<ObjectSelector> list) {
-        ObjectSelector fromList = Tools.getRandomFromList(random, list, ObjectSelector::factor);
+    private static String getRandomFromList(Random random, List<ObjectSelector> list, ChunkCoord pos) {
+        ObjectSelector fromList = Tools.getRandomFromList(random, list, objectSelector -> {
+            if (objectSelector.minSpawnDistance() > 0 || objectSelector.maxSpawnDistance() < Integer.MAX_VALUE) {
+                // Distance in objectSelector is in blocks whereas pos is in chunks
+                // Objects can only return 'factor' between minSpawnDistance and maxSpawnDistance
+                // objectSelector.feather() is used to make the transition at minSpawnDistance and maxSpawnDistance more smooth
+                int squaredDist = (pos.chunkX() << 4) * (pos.chunkX() << 4) + (pos.chunkZ() << 4) * (pos.chunkZ() << 4);
+                int minDist = objectSelector.minSpawnDistance();
+                int maxDist = objectSelector.maxSpawnDistance();
+                if (squaredDist < minDist * minDist) {
+                    if (objectSelector.feather() <= 0) {
+                        return 0.0f;
+                    } else {
+                        int fd = minDist - objectSelector.feather();
+                        if (squaredDist < fd * fd) {
+                            return 0.0f;
+                        } else {
+                            float f = (float) (Math.sqrt(squaredDist) - fd) / (float) (minDist - fd);
+                            return f * objectSelector.factor();
+                        }
+                    }
+                } else if (squaredDist > maxDist * maxDist) {
+                    if (objectSelector.feather() <= 0) {
+                        return 0.0f;
+                    } else {
+                        int fd = maxDist + objectSelector.feather();
+                        if (squaredDist > fd * fd) {
+                            return 0.0f;
+                        } else {
+                            float f = (float) (fd - Math.sqrt(squaredDist)) / (float) (fd - maxDist);
+                            return f * objectSelector.factor();
+                        }
+                    }
+                }
+            }
+            return objectSelector.factor();
+        });
         if (fromList == null) {
             return null;
         } else {
@@ -438,36 +465,36 @@ public class CityStyle implements ILostCityCityStyle {
         return stuffTags;
     }
 
-    public String getRandomStair(Random random) {
-        return getRandomFromList(random, stairSelector);
+    public String getRandomStair(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, stairSelector, pos);
     }
 
-    public String getRandomFront(Random random) {
-        return getRandomFromList(random, frontSelector);
+    public String getRandomFront(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, frontSelector, pos);
     }
 
-    public String getRandomRailDungeon(Random random) {
-        return getRandomFromList(random, railDungeonSelector);
+    public String getRandomRailDungeon(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, railDungeonSelector, pos);
     }
 
-    public String getRandomPark(Random random) {
-        return getRandomFromList(random, parkSelector);
+    public String getRandomPark(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, parkSelector, pos);
     }
 
-    public String getRandomBridge(Random random) {
-        return getRandomFromList(random, bridgeSelector);
+    public String getRandomBridge(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, bridgeSelector, pos);
     }
 
-    public String getRandomFountain(Random random) {
-        return getRandomFromList(random, fountainSelector);
+    public String getRandomFountain(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, fountainSelector, pos);
     }
 
-    public String getRandomBuilding(Random random) {
-        return getRandomFromList(random, buildingSelector);
+    public String getRandomBuilding(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, buildingSelector, pos);
     }
 
-    public String getRandomMultiBuilding(Random random) {
-        return getRandomFromList(random, multiBuildingSelector);
+    public String getRandomMultiBuilding(Random random, ChunkCoord pos) {
+        return getRandomFromList(random, multiBuildingSelector, pos);
     }
 
     public boolean hasMultiBuildings() {
