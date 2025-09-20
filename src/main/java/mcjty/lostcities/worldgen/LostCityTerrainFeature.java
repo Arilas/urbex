@@ -50,6 +50,7 @@ import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.neoforged.neoforge.common.NeoForge;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -2139,7 +2140,7 @@ public class LostCityTerrainFeature {
         makeRoomForBuilding(info, lowestLevel, heightmap, palette);
 
         char fillerBlock = info.getBuilding().getFillerBlock();
-        Map<Integer, BuildingPart> part2Map = new HashMap<>();
+        List<Pair<Integer, BuildingPart>> part2Map = new ArrayList<>();
 
         int height = lowestLevel;
         for (int f = -cellars; f <= floors; f++) {
@@ -2154,7 +2155,7 @@ public class LostCityTerrainFeature {
             generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
             part = info.getFloorPart2(f);
             if (part != null) {
-                part2Map.put(height, part);
+                part2Map.add(Pair.of(height, part));
             }
 
             // Check for doors
@@ -2186,7 +2187,7 @@ public class LostCityTerrainFeature {
 
         if (!part2Map.isEmpty()) {
             driver.actuallyGenerate(chunk);
-            for (Map.Entry<Integer, BuildingPart> entry : part2Map.entrySet()) {
+            for (Pair<Integer, BuildingPart> entry : part2Map) {
                 int h = entry.getKey();
                 BuildingPart part = entry.getValue();
                 generatePart(info, part, Transform.ROTATE_NONE, 0, h, 0, HardAirSetting.AIR);

@@ -386,6 +386,22 @@ public class ChunkDriver {
                 if (heightmap[px][pz] < pos.getY()) {
                     heightmap[px][pz] = pos.getY();
                 }
+            } else {
+                // If state is air we need to recalculate the heightmap
+                if (heightmap[px][pz] >= pos.getY()) {
+                    int y = pos.getY()-1;
+                    while (y >= minY) {
+                        int si = (y - minY) / SECTION_HEIGHT;
+                        int i = (px << 8) + ((y & 0xf) << 4) + pz;
+                        BlockState st = cache[si].section[i];
+                        if (st != null && !st.isAir()) {
+                            heightmap[px][pz] = y;
+                            return;
+                        }
+                        y--;
+                    }
+                    heightmap[px][pz] = Integer.MIN_VALUE;
+                }
             }
         }
 
