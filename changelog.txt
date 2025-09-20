@@ -1,4 +1,4 @@
-Upcoming:
+1.21-8.3.5:
 - Avoid crashes accessing the generate_nether flag from the profile. Could mostly occur on servers
 - New citySpawnDistance1, citySpawnDistance2, citySpawnMultiplier1 and citySpawnMultiplier2 profile options to control city spawning based on distance from world spawn
 - Fixed part2 generation issues
