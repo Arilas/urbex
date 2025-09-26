@@ -122,6 +122,7 @@ public class LostCityProfile implements ILostCityProfile {
 
     public boolean CITY_AVOID_VOID = true;
 
+    public boolean CITYSPHERE_32GRID = false;
     public float CITYSPHERE_FACTOR = 1.2f;
     public float CITYSPHERE_CHANCE = 0.7f;
     public float CITYSPHERE_SURFACE_VARIATION = 1.0f;
@@ -281,6 +282,7 @@ public class LostCityProfile implements ILostCityProfile {
         CITYSPHERE_OUTSIDE_GROUNDLEVEL = cfg.getInt("outsideGroundLevel", LostCityProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_OUTSIDE_GROUNDLEVEL, -1, 256, "Ground level for outside city spheres (DEPRECATED, USE GROUNDLEVEL OF OTHER PROFILE)");
         CITYSPHERE_OUTSIDE_PROFILE = cfg.getString("outsideProfile", LostCityProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_OUTSIDE_PROFILE, "An optional profile to use for the outside world");
         CITYSPHERE_MONORAIL_HEIGHT_OFFSET = cfg.getInt("monorailOffset", LostCityProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_MONORAIL_HEIGHT_OFFSET, -100, 100, "Offset compared to main height");
+        CITYSPHERE_32GRID = cfg.getBoolean("grid32", LostCityProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_32GRID, "If this is true then city spheres are aligned to a 32x32 grid. Otherwise they are aligned to a 16x16 grid");
     }
 
     private void initLostcity(Configuration cfg) {

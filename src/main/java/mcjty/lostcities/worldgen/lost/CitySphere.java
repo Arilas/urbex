@@ -362,6 +362,14 @@ public class CitySphere implements ILostSphere {
         return (cx-x)*(cx-x) + (cz-z)*(cz-z);
     }
 
+    private static boolean isOnSphereGrid(LostCityProfile profile, int chunkX, int chunkZ) {
+        if (profile.CITYSPHERE_32GRID) {
+            return (chunkX & 0x1f) == 8 && (chunkZ & 0x1f) == 8;
+        } else {
+            return (chunkX & 0xf) == 8 && (chunkZ & 0xf) == 8;
+        }
+    }
+
     /**
      * Return a city sphere for this city center chunk
      */
@@ -369,15 +377,56 @@ public class CitySphere implements ILostSphere {
         int chunkX = center.chunkX();
         int chunkZ = center.chunkZ();
         Random rand = new Random(provider.getSeed() + chunkX * 961744153L + chunkZ * 837971201L);
-        CitySphere citySphere;
         // This information is for city spheres. This information is only relevant
         // in the chunk representing the center of the city
         LostCityProfile profile = provider.getProfile();
-        boolean enabled = predef != null || rand.nextFloat() < profile.CITYSPHERE_CHANCE;
+
+        // First compute the base properties (chance, radius, center position)
+        boolean baseEnabled = predef != null || (rand.nextFloat() < profile.CITYSPHERE_CHANCE && isOnSphereGrid(profile, chunkX, chunkZ));
         float radius = predef != null ? predef.getRadius() : getSphereRadius(center, provider, rand);
         BlockPos centerPosition = predef != null ? new BlockPos(predef.getCenterX(), profile.GROUNDLEVEL, predef.getCenterZ()) : getSphereCenterPosition(center, provider, rand);
-        citySphere = new CitySphere(center, radius, centerPosition, enabled);
-        if (enabled) {
+
+        boolean finalEnabled = baseEnabled;
+
+        // If this is a normal grid sphere (not predefined), suppress it if it would overlap
+        // with a larger enabled neighboring sphere. This makes the result independent
+        // of chunk generation order
+        if (predef == null && baseEnabled) {
+            // Check an 8-neighborhood of centers around this one (offsets of ±16 chunks)
+            // We only have to do this if the grid is 16 chunks
+            if (!profile.CITYSPHERE_32GRID) {
+                for (int dx = -16; dx <= 16 && finalEnabled; dx += 16) {
+                    for (int dz = -16; dz <= 16 && finalEnabled; dz += 16) {
+                        if (dx == 0 && dz == 0) continue;
+                        int nx = chunkX + dx;
+                        int nz = chunkZ + dz;
+                        // Deterministically compute the neighbor's base sphere
+                        Random nrand = new Random(provider.getSeed() + nx * 961744153L + nz * 837971201L);
+                        boolean nEnabled = nrand.nextFloat() < profile.CITYSPHERE_CHANCE && isOnSphereGrid(profile, nx, nz);
+                        if (!nEnabled) {
+                            continue; // Disabled neighbors cannot suppress this one
+                        }
+                        ChunkCoord adjacent = new ChunkCoord(provider.getType(), nx, nz);
+                        float nRadius = getSphereRadius(adjacent, provider, nrand);
+                        BlockPos nCenterPos = getSphereCenterPosition(adjacent, provider, nrand);
+
+                        // Check for overlap
+                        double dxBlocks = (double) centerPosition.getX() - nCenterPos.getX();
+                        double dzBlocks = (double) centerPosition.getZ() - nCenterPos.getZ();
+                        double dist = Math.sqrt(dxBlocks * dxBlocks + dzBlocks * dzBlocks);
+                        if (dist <= (radius + nRadius)) {
+                            // If neighbor is strictly larger, disable this sphere
+                            if (nRadius > radius) {
+                                finalEnabled = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        CitySphere citySphere = new CitySphere(center, radius, centerPosition, finalEnabled);
+        if (finalEnabled) {
             citySphere.monorailNorthCandidate = rand.nextFloat() < profile.CITYSPHERE_MONORAIL_CHANCE;
             citySphere.monorailSouthCandidate = rand.nextFloat() < profile.CITYSPHERE_MONORAIL_CHANCE;
             citySphere.monorailWestCandidate = rand.nextFloat() < profile.CITYSPHERE_MONORAIL_CHANCE;
