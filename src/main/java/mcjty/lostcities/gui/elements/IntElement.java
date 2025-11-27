@@ -63,7 +63,6 @@ public class IntElement extends GuiElement {
 
     @Override
     public void tick() {
-//        field.tick(); // @todo 1.21
     }
 
     @Override
