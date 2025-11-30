@@ -140,47 +140,19 @@ public class ChunkDriver {
     }
 
     public void setBlockRange(int x, int y, int z, int y2, BlockState state) {
-        pos.set(x + (primer.getPos().x << 4), y, z + (primer.getPos().z << 4));
-        while (y < y2) {
-            setBlock(pos, state);
-            y++;
-            pos.setY(y);
-        }
+        cache.putRange(x + (primer.getPos().x << 4), z + (primer.getPos().z << 4), y, y2-1, state);
     }
 
     public void setBlockRange(int x, int y, int z, int y2, BlockState state, Predicate<BlockState> test) {
-        pos.set(x + (primer.getPos().x << 4), y, z + (primer.getPos().z << 4));
-        while (y < y2) {
-            BlockState st = getBlock(pos);
-            if (st != state && test.test(st)) {
-                setBlock(pos, state);
-            }
-            y++;
-            pos.setY(y);
-        }
+        cache.putRange(x + (primer.getPos().x << 4), z + (primer.getPos().z << 4), y, y2-1, state, test);
     }
 
     public void setBlockRangeToAir(int x, int y, int z, int y2) {
-        BlockState air = Blocks.AIR.defaultBlockState();
-        pos.set(x + (primer.getPos().x << 4), y, z + (primer.getPos().z << 4));
-        while (y < y2) {
-            setBlock(pos, air);
-            y++;
-            pos.setY(y);
-        }
+        cache.putRange(x + (primer.getPos().x << 4), z + (primer.getPos().z << 4), y, y2-1, Blocks.AIR.defaultBlockState());
     }
 
     public void setBlockRangeToAir(int x, int y, int z, int y2, Predicate<BlockState> test) {
-        BlockState air = Blocks.AIR.defaultBlockState();
-        pos.set(x + (primer.getPos().x << 4), y, z + (primer.getPos().z << 4));
-        while (y < y2) {
-            BlockState st = getBlock(pos);
-            if (st != air && test.test(st)) {
-                setBlock(pos, air);
-            }
-            y++;
-            pos.setY(y);
-        }
+        cache.putRange(x + (primer.getPos().x << 4), z + (primer.getPos().z << 4), y, y2-1, Blocks.AIR.defaultBlockState(), test);
     }
 
     private boolean isThisChunk(BlockPos pos) {
@@ -297,11 +269,6 @@ public class ChunkDriver {
         return state;
     }
 
-    public ChunkDriver blockImm(BlockState c) {
-        setBlock(pos, c);
-        return this;
-    }
-
 //    private void validate() {
 //        if (current.getX() < 0 || current.getY() < 0 || current.getZ() < 0) {
 //            throw new RuntimeException("current: " + current.getX() + "," + current.getY() + "," + current.getZ());
@@ -375,33 +342,115 @@ public class ChunkDriver {
             clear();
         }
 
+        // Puts a range of blockstates starting at pos and ending at y2 (inclusive)
+        private void putRange(int x, int z, int y1, int y2, BlockState state) {
+            if (state == null) {
+                return;
+            }
+            int ystart = y1;
+            int px = x & 0xf;
+            int pz = z & 0xf;
+            boolean isAir = state.isAir();
+            boolean dirty = false;
+            while (y1 <= y2) {
+                int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
+                int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
+
+                if (cache[sectionIdx].section[idx] != state) {
+                    dirty = true;
+                    cache[sectionIdx].section[idx] = state;
+                    if (!isAir) {
+                        cache[sectionIdx].isEmpty = false;
+                    }
+                }
+                y1++;
+            }
+
+            // Now update the heightmap
+            if (dirty) {
+                if (!isAir) {
+                    if (heightmap[px][pz] < y2) {
+                        heightmap[px][pz] = y2;
+                    }
+                } else {
+                    // If state is air we need to recalculate the heightmap
+                    fixHeightmapForAir(ystart, px, pz);
+                }
+            }
+        }
+
+        // Puts a range of blockstates starting at pos and ending at y2 (inclusive)
+        private void putRange(int x, int z, int y1, int y2, BlockState state, Predicate<BlockState> test) {
+            if (state == null) {
+                return;
+            }
+            int ystart = y1;
+            int px = x & 0xf;
+            int pz = z & 0xf;
+            boolean isAir = state.isAir();
+            boolean dirty = false;
+            while (y1 <= y2) {
+                int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
+                int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
+
+                BlockState st = cache[sectionIdx].section[idx];
+                if (st != state && st != null && test.test(st)) {
+                    dirty = true;
+                    cache[sectionIdx].section[idx] = state;
+                    if (!isAir) {
+                        cache[sectionIdx].isEmpty = false;
+                    }
+                }
+                y1++;
+            }
+
+            // Now update the heightmap
+            if (dirty) {
+                if (!isAir) {
+                    if (heightmap[px][pz] < y2) {
+                        heightmap[px][pz] = y2;
+                    }
+                } else {
+                    // If state is air we need to recalculate the heightmap
+                    fixHeightmapForAir(ystart, px, pz);
+                }
+            }
+        }
+
         private void put(BlockPos pos, BlockState state) {
             int sectionIdx = (pos.getY() - minY) / SECTION_HEIGHT;
             int px = pos.getX() & 0xf;
             int pz = pos.getZ() & 0xf;
             int idx = (px << 8) + ((pos.getY() & 0xf) << 4) + pz;
+            if (cache[sectionIdx].section[idx] == state) {
+                return;
+            }
             cache[sectionIdx].section[idx] = state;
-            cache[sectionIdx].isEmpty = false;
             if (!state.isAir()) {
+                cache[sectionIdx].isEmpty = false;
                 if (heightmap[px][pz] < pos.getY()) {
                     heightmap[px][pz] = pos.getY();
                 }
             } else {
                 // If state is air we need to recalculate the heightmap
-                if (heightmap[px][pz] >= pos.getY()) {
-                    int y = pos.getY()-1;
-                    while (y >= minY) {
-                        int si = (y - minY) / SECTION_HEIGHT;
-                        int i = (px << 8) + ((y & 0xf) << 4) + pz;
-                        BlockState st = cache[si].section[i];
-                        if (st != null && !st.isAir()) {
-                            heightmap[px][pz] = y;
-                            return;
-                        }
-                        y--;
+                fixHeightmapForAir(pos.getY(), px, pz);
+            }
+        }
+
+        private void fixHeightmapForAir(int y1, int px, int pz) {
+            if (heightmap[px][pz] >= y1) {
+                int y = Math.max(heightmap[px][pz], y1);
+                while (y >= minY) {
+                    int si = (y - minY) / SECTION_HEIGHT;
+                    int i = (px << 8) + ((y & 0xf) << 4) + pz;
+                    BlockState st = cache[si].section[i];
+                    if (st != null && !st.isAir()) {
+                        heightmap[px][pz] = y;
+                        return;
                     }
-                    heightmap[px][pz] = Integer.MIN_VALUE;
+                    y--;
                 }
+                heightmap[px][pz] = Integer.MIN_VALUE;
             }
         }
 
