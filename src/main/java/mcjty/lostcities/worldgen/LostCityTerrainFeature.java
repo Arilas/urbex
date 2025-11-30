@@ -1078,6 +1078,7 @@ public class LostCityTerrainFeature {
         this.rubbleBuffer = this.rubbleNoise.getRegion(this.rubbleBuffer, (chunkX << 4), (chunkZ << 4), 16, 16, 1.0 / 16.0, 1.0 / 16.0, 1.0D);
         this.leavesBuffer = this.leavesNoise.getRegion(this.leavesBuffer, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
 
+        Set<BlockState> possibleRandomDirts = getPossibleRandomDirts(info, info.getCompiledPalette());
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 double vr = info.profile.RUBBLE_DIRT_SCALE < 0.01f ? 0 : rubbleBuffer[x + z * 16] / info.profile.RUBBLE_DIRT_SCALE;
@@ -1097,7 +1098,7 @@ public class LostCityTerrainFeature {
                     }
                     //first round may not have generated this - stops crash on create world
                     BlockState leafBaseState = driver.getBlockDown();
-                    if (leafBaseState == base || getPossibleRandomDirts(info, info.getCompiledPalette()).contains(leafBaseState)) {
+                    if (leafBaseState == base || possibleRandomDirts.contains(leafBaseState)) {
                         for (int i = 0; i < vl; i++) {
                             if (isEmpty(driver.getBlock())) {
                                 driver.add(getRandomLeaf(info, info.getCompiledPalette()));
