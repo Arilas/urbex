@@ -1,7 +1,10 @@
-1.21-8.3.6:
-- New feature to clean up the cache for unloaded chunks every now and then. This prevents memory leaks
+1.21-8.3.8:
+- TqLxQuanZ fixed spawn point searching function does not set world spawn itself, but only player spawn point.
 
 1.21-8.3.7:
+- New feature to clean up the cache for unloaded chunks every now and then. This prevents memory leaks
+
+1.21-8.3.6:
 - New 'grid32' profile option to force spheres to be placed on a 32x32 chunk grid instead of the normal 16x16 grid
 - In the default 16x16 grid Lost Cities will now try to avoid overlapping spheres
 - Fixed the heightmap test and also optimized it somewhat

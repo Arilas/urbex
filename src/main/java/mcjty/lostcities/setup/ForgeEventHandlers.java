@@ -216,6 +216,7 @@ public class ForgeEventHandlers {
                     if (needsCheck) {
                         BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, event.getSettings());
                         LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
+                        serverLevel.setRespawnData(data);
                         event.getSettings().setSpawn(data);
                         spawnPositions.put(serverLevel.dimension(), pos);
                         event.setCanceled(true);
@@ -224,6 +225,7 @@ public class ForgeEventHandlers {
                 case FLOATING, SPACE, CAVERN, CAVERNSPHERES -> {
                     BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, event.getSettings());
                     LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
+                    serverLevel.setRespawnData(data);
                     event.getSettings().setSpawn(data);
                     spawnPositions.put(serverLevel.dimension(), pos);
                     event.setCanceled(true);
