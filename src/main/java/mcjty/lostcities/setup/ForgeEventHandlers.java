@@ -24,7 +24,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
@@ -74,7 +73,6 @@ public class ForgeEventHandlers {
             }
         }
     }
-
 
     @SubscribeEvent
     public void onWorldTick(LevelTickEvent.Post event) {
@@ -217,6 +215,7 @@ public class ForgeEventHandlers {
                         BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, event.getSettings());
                         LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
                         serverLevel.setRespawnData(data);
+                        event.getSettings().setSpawn(data);
                         spawnPositions.put(serverLevel.dimension(), pos);
                         event.setCanceled(true);
                     }
@@ -225,6 +224,7 @@ public class ForgeEventHandlers {
                     BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, event.getSettings());
                     LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
                     serverLevel.setRespawnData(data);
+                    event.getSettings().setSpawn(data);
                     spawnPositions.put(serverLevel.dimension(), pos);
                     event.setCanceled(true);
                 }
