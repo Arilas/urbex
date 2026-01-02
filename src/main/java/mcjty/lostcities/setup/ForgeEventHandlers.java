@@ -88,7 +88,7 @@ public class ForgeEventHandlers {
                     data.setSpawn(newd);
                 }
                 serverPlayer.teleportTo(level, correctPos.getX() + 0.5, correctPos.getY(), correctPos.getZ() + 0.5, Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot(), true);
-                spawnPositions.clear();
+                spawnPositions.remove(dimKey);
             }
         }
     }
