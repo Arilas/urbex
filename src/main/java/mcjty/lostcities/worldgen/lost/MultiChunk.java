@@ -3,8 +3,10 @@ package mcjty.lostcities.worldgen.lost;
 import mcjty.lostcities.api.LostChunkCharacteristics;
 import mcjty.lostcities.api.RailChunkType;
 import mcjty.lostcities.config.LostCityProfile;
+import mcjty.lostcities.setup.Config;
 import mcjty.lostcities.varia.ChunkCoord;
 import mcjty.lostcities.varia.Counter;
+import mcjty.lostcities.varia.TimedCache;
 import mcjty.lostcities.varia.Tools;
 import mcjty.lostcities.worldgen.IDimensionInfo;
 import mcjty.lostcities.worldgen.lost.cityassets.AssetRegistries;
@@ -26,7 +28,7 @@ public class MultiChunk {
     record MB(String name, int offsetX, int offsetZ) {}
 
     // Multichunks are indexed by the chunk coordinates divided by the area size
-    private static final Map<ChunkCoord, MultiChunk> MULTICHUNKS = Collections.synchronizedMap(new HashMap<>());
+    private static final TimedCache<ChunkCoord, MultiChunk> MULTICHUNKS = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public static void cleanCache() {
         MULTICHUNKS.clear();
     }

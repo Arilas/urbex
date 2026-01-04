@@ -142,4 +142,5 @@ public class Tools {
                 .xmap(either -> either.map(List::of, Function.identity()), list -> list.size() == 1 ? Either.left(list.get(0)) : Either.right(list))
                 .forGetter(getter);
     }
+
 }
