@@ -59,15 +59,6 @@ public class ForgeEventHandlers {
         ModCommands.register(event.getDispatcher());
     }
 
-//    @SubscribeEvent
-//    public void onEntityConstructing(AttachCapabilitiesEvent<Entity> event){
-//        if (event.getObject() instanceof Player) {
-//            if (!event.getObject().getCapability(PlayerProperties.PLAYER_SPAWN_SET).isPresent()) {
-//                event.addCapability(new ResourceLocation(LostCities.MODID, "spawnset"), new PropertiesDispatcher());
-//            }
-//        }
-//    }
-
     @SubscribeEvent
     public void onPlayerFirstJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer serverPlayer)) return;
