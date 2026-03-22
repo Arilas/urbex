@@ -108,7 +108,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
                 noiserouter.erosion().mapAll(this::wrap),
                 noiserouter.depth().mapAll(this::wrap),
                 null, //noiserouter.ridges().mapAll(this::wrap),
-                noiserouter.initialDensityWithoutJaggedness().mapAll(this::wrap),
+                noiserouter.preliminarySurfaceLevel().mapAll(this::wrap),
                 noiserouter.finalDensity().mapAll(this::wrap),
                 null, //noiserouter.veinToggle().mapAll(this::wrap),
                 null, //noiserouter.veinRidged().mapAll(this::wrap),
@@ -136,7 +136,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         builder.add((context) -> this.aquifer.computeSubstance(context, densityfunction.compute(context)));
 
         this.blockStateRule = new MaterialRuleList(builder.build());
-        this.initialDensityNoJaggedness = noiserouter1.initialDensityWithoutJaggedness();
+        this.initialDensityNoJaggedness = noiserouter1.preliminarySurfaceLevel();
     }
 
     public int preliminarySurfaceLevel(int pX, int pZ) {

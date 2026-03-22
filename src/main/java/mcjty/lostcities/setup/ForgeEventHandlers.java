@@ -17,6 +17,7 @@ import mcjty.lostcities.worldgen.lost.cityassets.PredefinedSphere;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -32,6 +33,7 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -65,7 +67,8 @@ public class ForgeEventHandlers {
             player.setData(Registration.ATTACHMENT_TYPE_SPAWNSET, true);
             for (Map.Entry<ResourceKey<Level>, BlockPos> entry : spawnPositions.entrySet()) {
                 if (event.getEntity() instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.setRespawnPosition(new ServerPlayer.RespawnConfig(entry.getKey(), entry.getValue(), 0.0f, true), true);
+                    LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(entry.getKey(), entry.getValue()), 0.0f, 0.0f);
+                    serverPlayer.setRespawnPosition(new ServerPlayer.RespawnConfig(data, true), true);
                     serverPlayer.teleportTo(entry.getValue().getX(), entry.getValue().getY(), entry.getValue().getZ());
                 }
             }
@@ -212,14 +215,16 @@ public class ForgeEventHandlers {
                 case DEFAULT, SPHERES -> {
                     if (needsCheck) {
                         BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, event.getSettings());
-                        event.getSettings().setSpawn(pos, 0.0f);
+                        LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
+                        event.getSettings().setSpawn(data);
                         spawnPositions.put(serverLevel.dimension(), pos);
                         event.setCanceled(true);
                     }
                 }
                 case FLOATING, SPACE, CAVERN, CAVERNSPHERES -> {
                     BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, event.getSettings());
-                    event.getSettings().setSpawn(pos, 0.0f);
+                    LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
+                    event.getSettings().setSpawn(data);
                     spawnPositions.put(serverLevel.dimension(), pos);
                     event.setCanceled(true);
                 }
@@ -389,7 +394,7 @@ public class ForgeEventHandlers {
 //        }
 
         Level world = event.getEntity().level();
-        if (world.isClientSide) {
+        if (world.isClientSide()) {
             return;
         }
         BlockPos bedLocation = event.getPos();

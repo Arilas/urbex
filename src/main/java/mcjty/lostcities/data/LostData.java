@@ -30,7 +30,7 @@ public class LostData extends SavedData {
 
     @Nonnull
     public static LostData getData(Level level) {
-        if (level.isClientSide) {
+        if (level.isClientSide()) {
             throw new RuntimeException("Don't access this client-side!");
         }
         MinecraftServer server = level.getServer();
