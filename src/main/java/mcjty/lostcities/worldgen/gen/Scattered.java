@@ -109,7 +109,7 @@ public class Scattered {
                 if (!reference.isAllowVoid()) {
                     if (!(feature.profile.isDefault() || feature.profile.isCavern())) {
                         // We are in a world that can have void chunks. Check if this chunk is a void chunk
-                        if (height <= feature.provider.getWorld().getMinBuildHeight() + 3) {
+                        if (height <= feature.provider.getWorld().getMinY() + 3) {
                             return;
                         }
                     }
@@ -149,7 +149,7 @@ public class Scattered {
                 if (profile.isCavern()) {
                     lowestLevel = profile.GROUNDLEVEL;
                 } else {
-                    lowestLevel = provider.getWorld().getMinBuildHeight() + 2;  // @todo is this right?
+                    lowestLevel = provider.getWorld().getMinY() + 2;  // @todo is this right?
                 }
             }
             generateScatteredBuilding(feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
@@ -238,7 +238,7 @@ public class Scattered {
                 @Override
                 public ResourceLocation getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(info.getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().registryOrThrow(Registries.BIOME).getKey(b));
+                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
                 }
             };
             ChunkDriver driver = feature.driver;

@@ -69,7 +69,7 @@ public class Tools {
         }
 
         String converted = BlockStateData.upgradeBlock(s);
-        Block value = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(converted));
+        Block value = BuiltInRegistries.BLOCK.getValue(ResourceLocation.parse(converted));
         if (value == null) {
             throw new RuntimeException("Cannot find block: '" + s + "'!");
         }
@@ -123,7 +123,7 @@ public class Tools {
 
     public static boolean hasTag(Block block, TagKey<Block> tag) {
         //noinspection deprecation
-        return BuiltInRegistries.BLOCK.getHolderOrThrow(block.builtInRegistryHolder().key()).is(tag);
+        return BuiltInRegistries.BLOCK.get(block.builtInRegistryHolder().key()).get().is(tag);
     }
 
     public static int getSeaLevel(LevelReader level) {

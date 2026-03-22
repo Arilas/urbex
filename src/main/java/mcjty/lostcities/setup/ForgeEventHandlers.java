@@ -117,7 +117,7 @@ public class ForgeEventHandlers {
             boolean needsCheck = false;
 
             if (!profile.SPAWN_BIOME.isEmpty()) {
-                final Biome spawnBiome = serverLevel.registryAccess().registryOrThrow(Registries.BIOME).get(ResourceLocation.parse(profile.SPAWN_BIOME));
+                final Biome spawnBiome = serverLevel.registryAccess().lookupOrThrow(Registries.BIOME).getValue(ResourceLocation.parse(profile.SPAWN_BIOME));
                 if (spawnBiome == null) {
                     ModSetup.getLogger().error("Cannot find biome '{}' for the player to spawn in !", profile.SPAWN_BIOME);
                 } else {
@@ -296,7 +296,7 @@ public class ForgeEventHandlers {
         Direction direction = Blocks.BLACK_BED.getBedDirection(state, world, pos);
         Block b1 = world.getBlockState(pos.below()).getBlock();
         Block b2 = world.getBlockState(pos.relative(direction.getOpposite()).below()).getBlock();
-        Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(Config.SPECIAL_BED_BLOCK.get()));
+        Block b = BuiltInRegistries.BLOCK.getValue(ResourceLocation.parse(Config.SPECIAL_BED_BLOCK.get()));
         if (b1 != b || b2 != b) {
             return false;
         }

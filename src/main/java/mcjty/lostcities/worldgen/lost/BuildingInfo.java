@@ -656,7 +656,7 @@ public class BuildingInfo implements ILostChunkInfo {
                 @Override
                 public ResourceLocation getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().registry(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             String randomPart = building.getRandomPart(rand, conditionContext);
@@ -677,7 +677,7 @@ public class BuildingInfo implements ILostChunkInfo {
                 @Override
                 public ResourceLocation getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().registry(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             randomPart = building.getRandomPart2(rand, conditionContext2);
@@ -811,7 +811,7 @@ public class BuildingInfo implements ILostChunkInfo {
                 }
             }
 
-            int max = provider.getWorld().getMaxBuildHeight() - 2 - FLOORHEIGHT;
+            int max = provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
             while (getCityGroundLevel() + f * FLOORHEIGHT >= max) {
                 f--;
             }
@@ -894,7 +894,7 @@ public class BuildingInfo implements ILostChunkInfo {
                 @Override
                 public ResourceLocation getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().registry(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             String randomPart = building.getRandomPart(rand, conditionContext);
@@ -918,7 +918,7 @@ public class BuildingInfo implements ILostChunkInfo {
                 @Override
                 public ResourceLocation getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().registry(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             randomPart = building.getRandomPart2(rand, conditionContext2);
@@ -1647,8 +1647,8 @@ public class BuildingInfo implements ILostChunkInfo {
      * Return Integer.MIN_VALUE if the building is degenerate (no floors, no cellars).
      */
     public int getBuildingBottomHeight() {
-        int min = provider.getWorld().getMinBuildHeight() + 2;
-        int max = provider.getWorld().getMaxBuildHeight() - 2 - FLOORHEIGHT;
+        int min = provider.getWorld().getMinY() + 2;
+        int max = provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
 
         int lowestLevel = getCityGroundLevel() - cellars * FLOORHEIGHT;
 

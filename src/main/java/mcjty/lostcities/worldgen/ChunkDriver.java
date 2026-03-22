@@ -168,7 +168,7 @@ public class ChunkDriver {
         }
         BlockState newAdjacent = null;
         try {
-            newAdjacent = adjacent.updateShape(direction, state, region, pos, pos.relative(direction));
+            newAdjacent = adjacent.updateShape(region, region, pos, direction, pos.relative(direction), state, region.getRandom());
         } catch (Exception e) {
             // We got an exception. For example for beehives there can potentially be a problem so in this case we just ignore it
             return adjacent;
@@ -334,8 +334,8 @@ public class ChunkDriver {
         private final int[][] heightmap = new int[16][16];
 
         private SectionCache(LevelAccessor level, int cx, int cz) {
-            minY = level.getMinBuildHeight();
-            maxY = level.getMaxBuildHeight();
+            minY = level.getMinY();
+            maxY = level.getMaxY() + 1;
             this.cx = cx;
             this.cz = cz;
             cache = new S[(maxY - minY) / SECTION_HEIGHT];

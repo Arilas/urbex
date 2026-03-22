@@ -2,6 +2,7 @@ package mcjty.lostcities.worldgen.lost.regassets.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -11,9 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 public class BlockMatcher implements Predicate<BlockState> {
     private final Optional<List<String>> ifAll;
@@ -32,8 +31,8 @@ public class BlockMatcher implements Predicate<BlockState> {
             TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, ResourceLocation.parse(matcher.substring(1)));
             return state -> state.is(tagKey);
         } else {
-            Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(matcher));
-            return state -> state.getBlock() == b;
+            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(matcher));
+            return b.<Predicate<BlockState>>map(blockReference -> state -> state.getBlock() == blockReference.value()).orElseGet(() -> state -> false);
         }
     }
 
@@ -46,8 +45,8 @@ public class BlockMatcher implements Predicate<BlockState> {
             TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, ResourceLocation.parse(matcher.substring(1)));
             return state -> !state.is(tagKey);
         } else {
-            Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(matcher));
-            return state -> state.getBlock() != b;
+            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(matcher));
+            return b.<Predicate<BlockState>>map(blockReference -> state -> state.getBlock() != blockReference.value()).orElseGet(() -> state -> true);
         }
     }
 

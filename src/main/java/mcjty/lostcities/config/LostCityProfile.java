@@ -6,12 +6,15 @@ import com.google.gson.JsonParser;
 import mcjty.lostcities.LostCities;
 import mcjty.lostcities.api.ILostCityProfile;
 import mcjty.lostcities.setup.ModSetup;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+
+import java.util.Optional;
 
 public class LostCityProfile implements ILostCityProfile {
 
@@ -601,12 +604,12 @@ public class LostCityProfile implements ILostCityProfile {
 
     public BlockState getLiquidBlock() {
         if (liquidBlock == null) {
-            Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(LIQUID_BLOCK));
-            if (b == null) {
+            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(LIQUID_BLOCK));
+            if (b.isEmpty()) {
                 ModSetup.getLogger().error("Bad liquid block: {}!", LIQUID_BLOCK);
                 liquidBlock = Blocks.WATER.defaultBlockState();
             } else {
-                liquidBlock = b.defaultBlockState();
+                liquidBlock = b.get().value().defaultBlockState();
             }
         }
         return liquidBlock;
@@ -614,12 +617,12 @@ public class LostCityProfile implements ILostCityProfile {
 
     public BlockState getBaseBlock() {
         if (baseBlock == null) {
-            Block b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(BASE_BLOCK));
-            if (b == null) {
+            Optional<Holder.Reference<Block>>  b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(BASE_BLOCK));
+            if (b.isEmpty()) {
                 ModSetup.getLogger().error("Bad base block: {}!", BASE_BLOCK);
                 baseBlock = Blocks.STONE.defaultBlockState();
             } else {
-                baseBlock = b.defaultBlockState();
+                baseBlock = b.get().value().defaultBlockState();
             }
         }
         return baseBlock;

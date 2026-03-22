@@ -72,8 +72,8 @@ public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILost
         T t = assets.get(name);
         if (t == null) {
             try {
-                Registry<R> registry = level.registryAccess().registryOrThrow(registryKey);
-                R value = registry.get(ResourceKey.create(registryKey, name));
+                Registry<R> registry = level.registryAccess().lookupOrThrow(registryKey);
+                R value = registry.getValueOrThrow(ResourceKey.create(registryKey, name));
                 if (value instanceof IAsset asset) {
                     asset.setRegistryName(name);
                 }
@@ -93,7 +93,7 @@ public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILost
         if (level == null) {
             return;
         }
-        Registry<R> registry = level.registryAccess().registryOrThrow(registryKey);
+        Registry<R> registry = level.registryAccess().lookupOrThrow(registryKey);
         for (R r : registry) {
             ResourceLocation name = registry.getKey(r);
             if (!assets.containsKey(name)) {
@@ -112,7 +112,7 @@ public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILost
     }
 
     public int getNumAssets(CommonLevelAccessor level) {
-        return level.registryAccess().registryOrThrow(registryKey).size();
+        return level.registryAccess().lookupOrThrow(registryKey).size();
     }
 
     public void reset() {

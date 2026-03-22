@@ -10,6 +10,8 @@ plugins {
 
 if (project.file('../gradletools.gradle').exists()) {
     apply from: '../gradletools.gradle'
+} else if (project.file('gradletools.gradle').exists()) {
+    apply from: 'gradletools.gradle'
 } else {
     apply from: 'https://raw.githubusercontent.com/McJtyMods/MultiWorkspace/1.21_neo/gradletools.gradle'
 }
@@ -34,7 +36,7 @@ sourceSets.main.resources {
 dependencies {
     mc()
 //    jei()
-    top()
+//    top()
 }
 
 cfdeps(['the-one-probe'], [], [])
