@@ -65,7 +65,7 @@ public class ForgeEventHandlers {
             player.setData(Registration.ATTACHMENT_TYPE_SPAWNSET, true);
             for (Map.Entry<ResourceKey<Level>, BlockPos> entry : spawnPositions.entrySet()) {
                 if (event.getEntity() instanceof ServerPlayer serverPlayer) {
-                    serverPlayer.setRespawnPosition(entry.getKey(), entry.getValue(), 0.0f, true, true);
+                    serverPlayer.setRespawnPosition(new ServerPlayer.RespawnConfig(entry.getKey(), entry.getValue(), 0.0f, true), true);
                     serverPlayer.teleportTo(entry.getValue().getX(), entry.getValue().getY(), entry.getValue().getZ());
                 }
             }

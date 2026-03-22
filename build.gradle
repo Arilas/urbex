@@ -17,7 +17,6 @@ if (project.file('../gradletools.gradle').exists()) {
 }
 
 group = "com.github.mcjty"
-archivesBaseName = "lostcities"
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 if (System.getenv('BUILD_NUMBER') != null) {
@@ -67,7 +66,7 @@ publishing {
         from components.java
         artifact apiJar
 
-        artifactId = project.archivesBaseName
+        artifactId = "lostcities"
         pom {
             name = 'LostCities'
             description = 'Lost Cities'

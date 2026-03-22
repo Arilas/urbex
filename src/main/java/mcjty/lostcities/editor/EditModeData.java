@@ -1,17 +1,14 @@
 package mcjty.lostcities.editor;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import mcjty.lostcities.varia.ChunkCoord;
 import mcjty.lostcities.varia.WorldTools;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.DimensionDataStorage;
 
 import javax.annotation.Nonnull;
@@ -22,32 +19,46 @@ import java.util.*;
  */
 public class EditModeData extends SavedData {
 
-    public static final String NAME = "LostCityEditData";
+    public static final String NAME = "lostcity_editdata";
 
     public record PartData(String partName, int y) { }
+    private record CoordWithPart(ChunkCoord coord, PartData part) {
+        public static final Codec<CoordWithPart> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+                ResourceKey.codec(Registries.DIMENSION).fieldOf("level").forGetter(s -> s.coord.dimension()),
+                Codec.INT.fieldOf("x").forGetter(s -> s.coord.chunkX()),
+                Codec.INT.fieldOf("z").forGetter(s -> s.coord.chunkZ()),
+                Codec.STRING.fieldOf("part").forGetter(s -> s.part.partName()),
+                Codec.INT.fieldOf("y").forGetter(s -> s.part.y())
+        ).apply(instance, (level, x, z, part, y) -> new CoordWithPart(new ChunkCoord(level, x, z), new PartData(part, y))));
+    }
     private final Map<ChunkCoord, List<PartData>> partData = new HashMap<>();
+
+    private static final SavedDataType<EditModeData> TYPE = new SavedDataType<>(
+            NAME,
+            EditModeData::new,
+            ctx -> RecordCodecBuilder.create(instance -> instance.group(
+                    RecordCodecBuilder.point(ctx.levelOrThrow()),
+                    CoordWithPart.CODEC.listOf().fieldOf("data").forGetter(d -> {
+                        List<CoordWithPart> result = new ArrayList<>();
+                        d.partData.forEach((coord, list) -> list.forEach(part -> result.add(new CoordWithPart(coord, part))));
+                        return result;
+                    })
+            ).apply(instance, EditModeData::new))
+    );
 
     @Nonnull
     public static EditModeData getData() {
         ServerLevel overworld = WorldTools.getOverworld();
         DimensionDataStorage storage = overworld.getDataStorage();
-        return storage.computeIfAbsent(new Factory<>(EditModeData::new, (compoundTag, provider) -> new EditModeData(compoundTag)), NAME);
+        return storage.computeIfAbsent(TYPE);
     }
 
-    public EditModeData() {
+    private EditModeData(Context ctx) {
     }
 
-    public EditModeData(CompoundTag nbt) {
-        ListTag data = nbt.getList("data", Tag.TAG_COMPOUND);
-        for (Tag t : data) {
-            CompoundTag pdTag = (CompoundTag) t;
-            ResourceKey<Level> level = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(pdTag.getString("level")));
-            int chunkX = pdTag.getInt("x");
-            int chunkZ = pdTag.getInt("z");
-            ChunkCoord pos = new ChunkCoord(level, chunkX, chunkZ);
-            String part = pdTag.getString("part");
-            int y = pdTag.getInt("y");
-            addPartData(pos, y, part);
+    private EditModeData(ServerLevel level, List<CoordWithPart> partData) {
+        for (CoordWithPart d : partData) {
+            addPartData(d.coord, d.part.y, d.part.partName);
         }
     }
 
@@ -58,23 +69,5 @@ public class EditModeData extends SavedData {
 
     public List<PartData> getPartData(ChunkCoord pos) {
         return partData.getOrDefault(pos, Collections.emptyList());
-    }
-
-    @Override
-    public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider) {
-        ListTag data = new ListTag();
-        partData.forEach((pos, list) -> {
-            for (PartData pd : list) {
-                CompoundTag pdTag = new CompoundTag();
-                pdTag.putString("level", pos.dimension().location().toString());
-                pdTag.putInt("x", pos.chunkX());
-                pdTag.putInt("z", pos.chunkZ());
-                pdTag.putString("part", pd.partName());
-                pdTag.putInt("y", pd.y());
-                data.add(pdTag);
-            }
-        });
-        tag.put("data", data);
-        return tag;
     }
 }

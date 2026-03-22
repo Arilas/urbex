@@ -256,10 +256,10 @@ public class ChunkDriver {
             state = state.setValue(CrossCollisionBlock.NORTH, canAttach(northState));
             state = state.setValue(CrossCollisionBlock.SOUTH, canAttach(southState));
         } else if (state.getBlock() instanceof WallBlock) {
-            state = state.setValue(WallBlock.WEST_WALL, canAttachWall(westState));
-            state = state.setValue(WallBlock.EAST_WALL, canAttachWall(eastState));
-            state = state.setValue(WallBlock.NORTH_WALL, canAttachWall(northState));
-            state = state.setValue(WallBlock.SOUTH_WALL, canAttachWall(southState));
+            state = state.setValue(WallBlock.WEST, canAttachWall(westState));
+            state = state.setValue(WallBlock.EAST, canAttachWall(eastState));
+            state = state.setValue(WallBlock.NORTH, canAttachWall(northState));
+            state = state.setValue(WallBlock.SOUTH, canAttachWall(southState));
         } else if (state.getBlock() instanceof StairBlock) {
             state = state.setValue(StairBlock.SHAPE, getShapeProperty(state, pos.set(cx, cy, cz)));
         } else if (state.getBlock() instanceof StructureVoidBlock){

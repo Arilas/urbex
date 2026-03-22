@@ -76,7 +76,7 @@ public class LostCities {
     private void onConstructModEvent(FMLConstructModEvent event) {
         event.enqueueWork(() -> {
             event.getIMCStream(ILostCities.GET_LOST_CITIES_PRE::equals).forEach(message -> {
-                Supplier<Function<ILostCitiesPre, Void>> supplier = message.getMessageSupplier();
+                Supplier<Function<ILostCitiesPre, Void>> supplier = (Supplier<Function<ILostCitiesPre, Void>>) message.messageSupplier();
                 supplier.get().apply(new LostCitiesPreImp());
             });
         });
@@ -84,7 +84,7 @@ public class LostCities {
 
     private void processIMC(final InterModProcessEvent event) {
         event.getIMCStream(ILostCities.GET_LOST_CITIES::equals).forEach(message -> {
-            Supplier<Function<ILostCities, Void>> supplier = message.getMessageSupplier();
+            Supplier<Function<ILostCities, Void>> supplier = (Supplier<Function<ILostCities, Void>>) message.messageSupplier();
             supplier.get().apply(lostCitiesImp);
         });
     }
