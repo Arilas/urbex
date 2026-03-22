@@ -3,7 +3,7 @@ package mcjty.lostcities.worldgen.lost.regassets;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import mcjty.lostcities.worldgen.lost.regassets.data.*;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import javax.annotation.Nonnull;
@@ -24,7 +24,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
                     Codec.list(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
             ).apply(instance, WorldStyleRE::new));
 
-    private ResourceLocation name;
+    private Identifier name;
     private final String outsideStyle;
     private final MultiSettings multiSettings;
     private final WorldSettings worldSettings;
@@ -89,13 +89,13 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
     }
 
     @Override
-    public WorldStyleRE setRegistryName(ResourceLocation name) {
+    public WorldStyleRE setRegistryName(Identifier name) {
         this.name = name;
         return this;
     }
 
     @Nullable
-    public ResourceLocation getRegistryName() {
+    public Identifier getRegistryName() {
         return name;
     }
 }

@@ -1,6 +1,5 @@
 package mcjty.lostcities.setup;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import mcjty.lostcities.LostCities;
 import mcjty.lostcities.gui.GuiLCConfig;
 import mcjty.lostcities.gui.LostCitySetup;
@@ -10,11 +9,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.RenderType;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.bus.api.SubscribeEvent;
 
 public class ClientEventHandlers {
 
@@ -48,7 +46,7 @@ public class ClientEventHandlers {
 
     private Button lostCitiesButton = null;
 
-    private static final ResourceLocation txt = ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "textures/gui/configicon.png");
+    private static final Identifier txt = Identifier.fromNamespaceAndPath(LostCities.MODID, "textures/gui/configicon.png");
 
     @SubscribeEvent
     public void onGuiDraw(ScreenEvent.Render.Post event) {

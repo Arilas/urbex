@@ -3,7 +3,7 @@ package mcjty.lostcities.worldgen.lost.cityassets;
 import mcjty.lostcities.api.ILostCityAsset;
 import mcjty.lostcities.worldgen.lost.regassets.ScatteredRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringRepresentable;
 
 import javax.annotation.Nullable;
@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 public class ScatteredBuilding implements ILostCityAsset {
 
-    private final ResourceLocation name;
+    private final Identifier name;
     private final List<String> buildings;
     private final String multibuilding;
     private final ScatteredBuilding.TerrainHeight terrainheight;
@@ -58,7 +58,7 @@ public class ScatteredBuilding implements ILostCityAsset {
     }
 
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return name;
     }
 

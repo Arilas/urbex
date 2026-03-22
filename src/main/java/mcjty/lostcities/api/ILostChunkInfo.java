@@ -1,6 +1,6 @@
 package mcjty.lostcities.api;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -8,7 +8,7 @@ import java.util.Collection;
 
 public interface ILostChunkInfo {
 
-    record MultiBuildingInfo(ResourceLocation buildingType, int offsetX, int offsetZ, int w, int h) {
+    record MultiBuildingInfo(Identifier buildingType, int offsetX, int offsetZ, int w, int h) {
     }
 
     /**
@@ -34,7 +34,7 @@ public interface ILostChunkInfo {
     /**
      * Return the resource location for the building if there is a building here
      */
-    ResourceLocation getBuildingId();
+    Identifier getBuildingId();
 
     /**
      * Return a MultiBuildingInfo if this chunk is part of a multi-building. This will return

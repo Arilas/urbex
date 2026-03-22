@@ -33,8 +33,8 @@ public class ModSetup {
 //        MinecraftForge.TERRAIN_GEN_BUS.register(new TerrainEventHandlers());
 
         // @todo 1.14
-//        LootTableList.register(ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "chests/lostcitychest"));
-//        LootTableList.register(ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "chests/raildungeonchest"));
+//        LootTableList.register(Identifier.fromNamespaceAndPath(LostCities.MODID, "chests/lostcitychest"));
+//        LootTableList.register(Identifier.fromNamespaceAndPath(LostCities.MODID, "chests/raildungeonchest"));
 
         AssetRegistries.reset();
     }

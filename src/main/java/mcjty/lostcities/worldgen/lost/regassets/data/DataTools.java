@@ -1,7 +1,7 @@
 package mcjty.lostcities.worldgen.lost.regassets.data;
 
 import mcjty.lostcities.LostCities;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.Optional;
 
@@ -19,7 +19,7 @@ public class DataTools {
         return opt.isPresent() ? opt.get().charAt(0) : null;
     }
 
-    public static String toName(ResourceLocation rl) {
+    public static String toName(Identifier rl) {
         if (rl.getNamespace().equals(LostCities.MODID)) {
             return rl.getPath();
         } else {
@@ -27,11 +27,11 @@ public class DataTools {
         }
     }
 
-    public static ResourceLocation fromName(String name) {
+    public static Identifier fromName(String name) {
         if (name.contains(":")) {
-            return ResourceLocation.parse(name);
+            return Identifier.parse(name);
         } else {
-            return ResourceLocation.fromNamespaceAndPath(LostCities.MODID, name);
+            return Identifier.fromNamespaceAndPath(LostCities.MODID, name);
         }
     }
 }

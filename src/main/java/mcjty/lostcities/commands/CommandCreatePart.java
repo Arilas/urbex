@@ -14,11 +14,11 @@ import mcjty.lostcities.worldgen.lost.cityassets.BuildingPart;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.commands.arguments.IdentifierArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.commands.arguments.coordinates.WorldCoordinates;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
@@ -28,8 +28,8 @@ public class CommandCreatePart implements Command<CommandSourceStack> {
 
     public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("createpart")
-                .requires(cs -> cs.hasPermission(1))
-                .then(Commands.argument("name", ResourceLocationArgument.id())
+                .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
+                .then(Commands.argument("name", IdentifierArgument.id())
                         .suggests(ModCommands.getPartSuggestionProvider())
                         .then(Commands.argument("pos", BlockPosArgument.blockPos())
                                 .executes(CMD)));
@@ -37,7 +37,7 @@ public class CommandCreatePart implements Command<CommandSourceStack> {
 
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        ResourceLocation name = context.getArgument("name", ResourceLocation.class);
+        Identifier name = context.getArgument("name", Identifier.class);
         BuildingPart part = null;
         try {
             part = AssetRegistries.PARTS.get(context.getSource().getLevel(), name);

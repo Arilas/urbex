@@ -7,7 +7,7 @@ import mcjty.lostcities.varia.ComponentFactory;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.packs.resources.CloseableResourceManager;
@@ -119,7 +119,7 @@ public class LostCitySetup {
 //    }
 
 
-    private static String worldStyleToName(ResourceLocation rl) {
+    private static String worldStyleToName(Identifier rl) {
         String path = rl.getPath();
         int idx = path.lastIndexOf('/');
         if (idx != -1) {
@@ -138,7 +138,7 @@ public class LostCitySetup {
     public void toggleWorldStyle() {
         PackRepository repository = Minecraft.getInstance().getResourcePackRepository();
         CloseableResourceManager resourceManager = new MultiPackResourceManager(PackType.SERVER_DATA, repository.openAllSelected());
-        Map<ResourceLocation, Resource> map = resourceManager.listResources("lostcities/worldstyles", s -> s.toString().endsWith(".json"));
+        Map<Identifier, Resource> map = resourceManager.listResources("lostcities/worldstyles", s -> s.toString().endsWith(".json"));
         List<String> styles = map.keySet().stream().map(LostCitySetup::worldStyleToName).collect(Collectors.toList());
         String current = get().map(LostCityProfile::getWorldStyle).orElse("<none>");
         int idx = styles.indexOf(current);

@@ -2,21 +2,21 @@ package mcjty.lostcities.worldgen.lost.regassets.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.*;
 import java.util.function.Predicate;
 
-public class ResourceLocationMatcher implements Predicate<ResourceLocation> {
-    private final Set<ResourceLocation> ifAny;
-    private final Set<ResourceLocation> excluding;
+public class IdentifierMatcher implements Predicate<Identifier> {
+    private final Set<Identifier> ifAny;
+    private final Set<Identifier> excluding;
 
-    public static final Codec<ResourceLocationMatcher> CODEC = RecordCodecBuilder.create(codec -> codec.group(
-            Codec.STRING.listOf().optionalFieldOf("if_any").forGetter(ResourceLocationMatcher::getIfAny),
-            Codec.STRING.listOf().optionalFieldOf("excluding").forGetter(ResourceLocationMatcher::getExcluding)
-    ).apply(codec, ResourceLocationMatcher::new));
+    public static final Codec<IdentifierMatcher> CODEC = RecordCodecBuilder.create(codec -> codec.group(
+            Codec.STRING.listOf().optionalFieldOf("if_any").forGetter(IdentifierMatcher::getIfAny),
+            Codec.STRING.listOf().optionalFieldOf("excluding").forGetter(IdentifierMatcher::getExcluding)
+    ).apply(codec, IdentifierMatcher::new));
 
-    public ResourceLocationMatcher(Optional<List<String>> ifAny, Optional<List<String>> excluding) {
+    public IdentifierMatcher(Optional<List<String>> ifAny, Optional<List<String>> excluding) {
         this.ifAny = new HashSet<>();
         ifAny.ifPresent(strings -> strings.forEach(s -> this.ifAny.add(DataTools.fromName(s))));
         this.excluding = new HashSet<>();
@@ -31,7 +31,7 @@ public class ResourceLocationMatcher implements Predicate<ResourceLocation> {
         if (ifAny == null || ifAny.isEmpty()) {
             return Optional.empty();
         } else {
-            return Optional.of(ifAny.stream().map(ResourceLocation::toString).toList());
+            return Optional.of(ifAny.stream().map(Identifier::toString).toList());
         }
     }
 
@@ -39,19 +39,19 @@ public class ResourceLocationMatcher implements Predicate<ResourceLocation> {
         if (excluding == null || excluding.isEmpty()) {
             return Optional.empty();
         } else {
-            return Optional.of(excluding.stream().map(ResourceLocation::toString).toList());
+            return Optional.of(excluding.stream().map(Identifier::toString).toList());
         }
     }
 
-    public static final ResourceLocationMatcher ANY = new ResourceLocationMatcher(Optional.empty(), Optional.empty()) {
+    public static final IdentifierMatcher ANY = new IdentifierMatcher(Optional.empty(), Optional.empty()) {
         @Override
-        public boolean test(ResourceLocation str) {
+        public boolean test(Identifier str) {
             return true;
         }
     };
 
     @Override
-    public boolean test(ResourceLocation rl) {
+    public boolean test(Identifier rl) {
         if (rl == null) {
             return false;
         }

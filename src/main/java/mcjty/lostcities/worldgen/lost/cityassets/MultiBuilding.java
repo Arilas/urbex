@@ -3,7 +3,7 @@ package mcjty.lostcities.worldgen.lost.cityassets;
 import mcjty.lostcities.api.ILostCityMultiBuilding;
 import mcjty.lostcities.worldgen.lost.regassets.MultiBuildingRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.HashSet;
 import java.util.List;
@@ -11,7 +11,7 @@ import java.util.Set;
 
 public class MultiBuilding implements ILostCityMultiBuilding {
 
-    private final ResourceLocation name;
+    private final Identifier name;
     private final int dimX;
     private final int dimZ;
     private final List<List<String>> buildings;
@@ -53,7 +53,7 @@ public class MultiBuilding implements ILostCityMultiBuilding {
     }
 
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return name;
     }
 

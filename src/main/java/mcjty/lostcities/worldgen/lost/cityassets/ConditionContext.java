@@ -4,7 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import mcjty.lostcities.varia.ChunkCoord;
 import mcjty.lostcities.worldgen.lost.regassets.data.ConditionTest;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Set;
@@ -235,7 +235,7 @@ public abstract class ConditionContext {
 
     public abstract boolean isSphere();
 
-    public abstract ResourceLocation getBiome();
+    public abstract Identifier getBiome();
 
     public boolean isTopOfBuilding() {
         return floor >= floorsAboveGround;

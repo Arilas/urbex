@@ -7,13 +7,13 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 public record PacketRequestProfile(ResourceKey<Level> dimension) implements CustomPacketPayload {
 
-    public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "requestproofile");
+    public static final Identifier ID = Identifier.fromNamespaceAndPath(LostCities.MODID, "requestproofile");
     public static final CustomPacketPayload.Type<PacketRequestProfile> TYPE = new Type<>(ID);
 
     public static final StreamCodec<RegistryFriendlyByteBuf, PacketRequestProfile> CODEC = StreamCodec.composite(

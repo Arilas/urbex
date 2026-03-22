@@ -26,7 +26,7 @@ public class CommandResumeEdit implements Command<CommandSourceStack> {
 
     public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("resumeedit")
-                .requires(cs -> cs.hasPermission(1)).executes(CMD);
+                .requires(Commands.hasPermission(Commands.LEVEL_ADMINS)).executes(CMD);
     }
 
 

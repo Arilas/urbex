@@ -2,7 +2,6 @@ package mcjty.lostcities.worldgen.lost.regassets.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import org.checkerframework.checker.units.qual.C;
 
 /**
  * Represents an object with a factor indicating how likely this object is relative to others in the same list

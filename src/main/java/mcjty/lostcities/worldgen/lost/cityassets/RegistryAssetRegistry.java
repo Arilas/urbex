@@ -7,7 +7,7 @@ import mcjty.lostcities.worldgen.lost.regassets.IAsset;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
 
 import javax.annotation.Nonnull;
@@ -18,7 +18,7 @@ import java.util.function.Function;
 
 public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILostCityAssetRegistry<T>  {
 
-    private final Map<ResourceLocation, T> assets = new HashMap<>();
+    private final Map<Identifier, T> assets = new HashMap<>();
     private final ResourceKey<Registry<R>> registryKey;
     private final Function<R, T> assetConstructor;
 
@@ -65,7 +65,7 @@ public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILost
     }
 
     @Override
-    public T get(CommonLevelAccessor level, ResourceLocation name) {
+    public T get(CommonLevelAccessor level, Identifier name) {
         if (name == null) {
             return null;
         }
@@ -95,7 +95,7 @@ public class RegistryAssetRegistry<T extends ILostCityAsset, R> implements ILost
         }
         Registry<R> registry = level.registryAccess().lookupOrThrow(registryKey);
         for (R r : registry) {
-            ResourceLocation name = registry.getKey(r);
+            Identifier name = registry.getKey(r);
             if (!assets.containsKey(name)) {
                 if (r instanceof IAsset asset) {
                     asset.setRegistryName(name);

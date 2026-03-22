@@ -12,10 +12,10 @@ import mcjty.lostcities.worldgen.IDimensionInfo;
 import mcjty.lostcities.worldgen.lost.BuildingInfo;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import net.minecraft.commands.arguments.ResourceLocationArgument;
+import net.minecraft.commands.arguments.IdentifierArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
@@ -26,8 +26,8 @@ public class CommandLocate implements Command<CommandSourceStack> {
 
     public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("locate")
-                .requires(cs -> cs.hasPermission(1))
-                .then(Commands.argument("name", ResourceLocationArgument.id()).suggests(
+                .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
+                .then(Commands.argument("name", IdentifierArgument.id()).suggests(
                         ModCommands.getBuildingSuggestionProvider()
                 ).executes(CMD));
     }
@@ -35,7 +35,7 @@ public class CommandLocate implements Command<CommandSourceStack> {
 
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        ResourceLocation name = context.getArgument("name", ResourceLocation.class);
+        Identifier name = context.getArgument("name", Identifier.class);
 
         ServerPlayer player = context.getSource().getPlayerOrException();
         BlockPos start = player.blockPosition();

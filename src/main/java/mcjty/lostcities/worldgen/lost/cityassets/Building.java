@@ -4,7 +4,7 @@ import mcjty.lostcities.api.ILostCityBuilding;
 import mcjty.lostcities.worldgen.lost.regassets.BuildingRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
 import mcjty.lostcities.worldgen.lost.regassets.data.PartRef;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
@@ -16,7 +16,7 @@ import java.util.function.Predicate;
 
 public class Building implements ILostCityBuilding {
 
-    private final ResourceLocation name;
+    private final Identifier name;
 
     private int minFloors = -1;         // -1 means default from level
     private int minCellars = -1;        // -1 means default frmo level
@@ -64,7 +64,7 @@ public class Building implements ILostCityBuilding {
     }
 
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return name;
     }
 

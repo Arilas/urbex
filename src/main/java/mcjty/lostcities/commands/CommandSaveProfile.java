@@ -26,7 +26,7 @@ public class CommandSaveProfile implements Command<CommandSourceStack> {
 
     public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("saveprofile")
-                .requires(cs -> cs.hasPermission(0))
+                .requires(Commands.hasPermission(Commands.LEVEL_ALL))
                 .then(Commands.argument("profile", StringArgumentType.word())
                     .executes(CMD));
     }

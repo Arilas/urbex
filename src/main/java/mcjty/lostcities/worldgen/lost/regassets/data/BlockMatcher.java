@@ -5,7 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
@@ -28,10 +28,10 @@ public class BlockMatcher implements Predicate<BlockState> {
 
     private Predicate<BlockState> getStatePredicate(String matcher) {
         if (matcher.startsWith("#")) {
-            TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, ResourceLocation.parse(matcher.substring(1)));
+            TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, Identifier.parse(matcher.substring(1)));
             return state -> state.is(tagKey);
         } else {
-            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(matcher));
+            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(Identifier.parse(matcher));
             return b.<Predicate<BlockState>>map(blockReference -> state -> state.getBlock() == blockReference.value()).orElseGet(() -> state -> false);
         }
     }
@@ -42,10 +42,10 @@ public class BlockMatcher implements Predicate<BlockState> {
 
     private Predicate<BlockState> getNotStatePredicate(String matcher) {
         if (matcher.startsWith("#")) {
-            TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, ResourceLocation.parse(matcher.substring(1)));
+            TagKey<Block> tagKey = TagKey.create(Registries.BLOCK, Identifier.parse(matcher.substring(1)));
             return state -> !state.is(tagKey);
         } else {
-            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(matcher));
+            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(Identifier.parse(matcher));
             return b.<Predicate<BlockState>>map(blockReference -> state -> state.getBlock() != blockReference.value()).orElseGet(() -> state -> true);
         }
     }

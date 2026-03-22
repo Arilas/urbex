@@ -8,7 +8,7 @@ import mcjty.lostcities.worldgen.lost.BiomeInfo;
 import mcjty.lostcities.worldgen.lost.regassets.WorldStyleRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.*;
 import net.minecraft.core.Holder;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.biome.Biome;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
@@ -21,7 +21,7 @@ import java.util.function.Predicate;
 
 public class WorldStyle implements ILostCityAsset {
 
-    private final ResourceLocation name;
+    private final Identifier name;
     private final String outsideStyle;
 
     private final CitySphereSettings citysphereSettings;
@@ -60,7 +60,7 @@ public class WorldStyle implements ILostCityAsset {
     }
 
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return name;
     }
 

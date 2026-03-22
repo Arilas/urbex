@@ -9,7 +9,7 @@ import mcjty.lostcities.setup.ModSetup;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -32,7 +32,7 @@ public class LostCityProfile implements ILostCityProfile {
     private String warning = "";
     private String worldStyle = "standard";
     private String iconFile = "";
-    private ResourceLocation icon;
+    private Identifier icon;
 
     public int DEBRIS_TO_NEARBYCHUNK_FACTOR = 200;
 
@@ -225,14 +225,14 @@ public class LostCityProfile implements ILostCityProfile {
         this.iconFile = iconFile;
     }
 
-    public ResourceLocation getIcon() {
+    public Identifier getIcon() {
         if (icon != null) {
             return icon;
         }
         if (iconFile == null || iconFile.isEmpty()) {
             return null;
         }
-        icon = ResourceLocation.fromNamespaceAndPath(LostCities.MODID, iconFile);
+        icon = Identifier.fromNamespaceAndPath(LostCities.MODID, iconFile);
         return icon;
     }
 
@@ -604,7 +604,7 @@ public class LostCityProfile implements ILostCityProfile {
 
     public BlockState getLiquidBlock() {
         if (liquidBlock == null) {
-            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(LIQUID_BLOCK));
+            Optional<Holder.Reference<Block>> b = BuiltInRegistries.BLOCK.get(Identifier.parse(LIQUID_BLOCK));
             if (b.isEmpty()) {
                 ModSetup.getLogger().error("Bad liquid block: {}!", LIQUID_BLOCK);
                 liquidBlock = Blocks.WATER.defaultBlockState();
@@ -617,7 +617,7 @@ public class LostCityProfile implements ILostCityProfile {
 
     public BlockState getBaseBlock() {
         if (baseBlock == null) {
-            Optional<Holder.Reference<Block>>  b = BuiltInRegistries.BLOCK.get(ResourceLocation.parse(BASE_BLOCK));
+            Optional<Holder.Reference<Block>>  b = BuiltInRegistries.BLOCK.get(Identifier.parse(BASE_BLOCK));
             if (b.isEmpty()) {
                 ModSetup.getLogger().error("Bad base block: {}!", BASE_BLOCK);
                 baseBlock = Blocks.STONE.defaultBlockState();

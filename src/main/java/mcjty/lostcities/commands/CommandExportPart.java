@@ -44,7 +44,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
 
     public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("exportpart")
-                .requires(cs -> cs.hasPermission(1))
+                .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                 .then(Commands.argument("name", StringArgumentType.word()).executes(CMD));
     }
 

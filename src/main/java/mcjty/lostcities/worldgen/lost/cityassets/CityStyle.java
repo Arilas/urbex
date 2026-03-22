@@ -7,7 +7,7 @@ import mcjty.lostcities.worldgen.lost.regassets.CityStyleRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
 import mcjty.lostcities.worldgen.lost.regassets.data.ObjectSelector;
 import mcjty.lostcities.worldgen.lost.regassets.data.StreetParts;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.CommonLevelAccessor;
 
@@ -15,7 +15,7 @@ import java.util.*;
 
 public class CityStyle implements ILostCityCityStyle {
 
-    private final ResourceLocation name;
+    private final Identifier name;
 
     private final Set<String> stuffTags = new HashSet<>();
 
@@ -152,7 +152,7 @@ public class CityStyle implements ILostCityCityStyle {
     }
 
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return name;
     }
 

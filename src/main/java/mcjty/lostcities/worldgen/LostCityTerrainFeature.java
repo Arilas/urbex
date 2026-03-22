@@ -25,7 +25,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.tags.BiomeTags;
@@ -426,7 +426,7 @@ public class LostCityTerrainFeature {
                         }
                     }
                     if (center || Config.AVOID_STRUCTURES_ADJACENT.get()) {
-                        if (Config.isAvoidedStructure(key.get().location())) {
+                        if (Config.isAvoidedStructure(key.get().identifier())) {
                             return true;
                         }
                     }
@@ -1873,7 +1873,7 @@ public class LostCityTerrainFeature {
             tag.putInt("y", pos.getY());
             tag.putInt("z", pos.getZ());
             tag.putString("id", "minecraft:mob_spawner");
-            ResourceLocation randomValue = getRandomSpawnerMob(world.getLevel(), rand, provider, info,
+            Identifier randomValue = getRandomSpawnerMob(world.getLevel(), rand, provider, info,
                     new BuildingInfo.ConditionTodo(mobid, part.getName(), info), pos);
             CompoundTag sd = new CompoundTag();
             sd.putString("id", randomValue.toString());
@@ -1953,7 +1953,7 @@ public class LostCityTerrainFeature {
     }
 
 
-    public static ResourceLocation getRandomSpawnerMob(Level world, RandomSource random, IDimensionInfo diminfo, BuildingInfo info, BuildingInfo.ConditionTodo todo, BlockPos pos) {
+    public static Identifier getRandomSpawnerMob(Level world, RandomSource random, IDimensionInfo diminfo, BuildingInfo info, BuildingInfo.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();
         Condition cnd = AssetRegistries.CONDITIONS.getOrThrow(world, condition);
         int level = (pos.getY() - diminfo.getProfile().GROUNDLEVEL) / FLOORHEIGHT;
@@ -1967,15 +1967,15 @@ public class LostCityTerrainFeature {
             }
 
             @Override
-            public ResourceLocation getBiome() {
-                return world.getBiome(pos).unwrap().map(ResourceKey::location, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
+            public Identifier getBiome() {
+                return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
             }
         };
         String randomValue = cnd.getRandomValue(random, conditionContext);
         if (randomValue == null) {
             throw new RuntimeException("Condition '" + cnd.getName() + "' did not return a valid mob!");
         }
-        return ResourceLocation.parse(randomValue);
+        return Identifier.parse(randomValue);
     }
 
 
@@ -2008,17 +2008,17 @@ public class LostCityTerrainFeature {
                     }
 
                     @Override
-                    public ResourceLocation getBiome() {
-                        return world.getBiome(pos).unwrap().map(ResourceKey::location, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
+                    public Identifier getBiome() {
+                        return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
                     }
                 };
                 String randomValue = AssetRegistries.CONDITIONS.getOrThrow(world, lootTable).getRandomValue(random, conditionContext);
-//                ((LockableLootTileEntity) tileentity).setLootTable(ResourceLocation.fromNamespaceAndPath(randomValue), random.nextLong());
+//                ((LockableLootTileEntity) tileentity).setLootTable(Identifier.fromNamespaceAndPath(randomValue), random.nextLong());
 //                tileentity.markDirty();
 //                if (LostCityConfiguration.DEBUG) {
 //                    LostCities.setup.getLogger().debug("createLootChest: loot=" + randomValue + " pos=" + pos.toString());
 //                }
-                rcbe.setLootTable(ResourceKey.create(Registries.LOOT_TABLE, ResourceLocation.parse(randomValue)));
+                rcbe.setLootTable(ResourceKey.create(Registries.LOOT_TABLE, Identifier.parse(randomValue)));
             }
         }
     }

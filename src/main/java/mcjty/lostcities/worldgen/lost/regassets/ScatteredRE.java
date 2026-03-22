@@ -3,7 +3,7 @@ package mcjty.lostcities.worldgen.lost.regassets;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import mcjty.lostcities.worldgen.lost.cityassets.ScatteredBuilding;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringRepresentable;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,7 +22,7 @@ public class ScatteredRE implements IAsset<ScatteredRE> {
                     Codec.INT.optionalFieldOf("heightoffset", 0).forGetter(l -> l.heightoffset)
             ).apply(instance, ScatteredRE::new));
 
-    private ResourceLocation name;
+    private Identifier name;
     private final ScatteredBuilding.TerrainHeight terrainheight;
     private final ScatteredBuilding.TerrainFix terrainfix;
     private final int heightoffset;
@@ -69,13 +69,13 @@ public class ScatteredRE implements IAsset<ScatteredRE> {
     }
 
     @Override
-    public ScatteredRE setRegistryName(ResourceLocation name) {
+    public ScatteredRE setRegistryName(Identifier name) {
         this.name = name;
         return this;
     }
 
     @Nullable
-    public ResourceLocation getRegistryName() {
+    public Identifier getRegistryName() {
         return name;
     }
 }

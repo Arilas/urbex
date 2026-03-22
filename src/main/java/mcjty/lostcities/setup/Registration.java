@@ -9,7 +9,7 @@ import mcjty.lostcities.worldgen.LostCityFeature;
 import mcjty.lostcities.worldgen.LostCitySphereFeature;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.feature.Feature;
@@ -43,7 +43,7 @@ public class Registration {
     public static final DeferredHolder<Feature<?>, LostCityFeature> LOSTCITY_FEATURE = FEATURES.register("lostcity", LostCityFeature::new);
     public static final DeferredHolder<Feature<?>, LostCitySphereFeature> LOSTCITY_SPHERE_FEATURE = FEATURES.register("spheres", LostCitySphereFeature::new);
 
-    public static final ResourceLocation LOSTCITY = ResourceLocation.fromNamespaceAndPath(LostCities.MODID, "lostcity");
+    public static final Identifier LOSTCITY = Identifier.fromNamespaceAndPath(LostCities.MODID, "lostcity");
 
     public static final ResourceKey<DimensionType> DIMENSION_TYPE = ResourceKey.create(Registries.DIMENSION_TYPE, LOSTCITY);
     public static final ResourceKey<Level> DIMENSION = ResourceKey.create(Registries.DIMENSION, LOSTCITY);

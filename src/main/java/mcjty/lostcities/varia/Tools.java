@@ -10,7 +10,7 @@ import net.minecraft.core.DefaultedRegistry;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.tags.TagKey;
 import net.minecraft.util.RandomSource;
@@ -69,7 +69,7 @@ public class Tools {
         }
 
         String converted = BlockStateData.upgradeBlock(s);
-        Block value = BuiltInRegistries.BLOCK.getValue(ResourceLocation.parse(converted));
+        Block value = BuiltInRegistries.BLOCK.getValue(Identifier.parse(converted));
         if (value == null) {
             throw new RuntimeException("Cannot find block: '" + s + "'!");
         }

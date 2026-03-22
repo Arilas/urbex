@@ -33,17 +33,18 @@ public class EditModeData extends SavedData {
     }
     private final Map<ChunkCoord, List<PartData>> partData = new HashMap<>();
 
+    private static final Codec<EditModeData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            CoordWithPart.CODEC.listOf().fieldOf("data").forGetter(d -> {
+                List<CoordWithPart> result = new ArrayList<>();
+                d.partData.forEach((coord, list) -> list.forEach(part -> result.add(new CoordWithPart(coord, part))));
+                return result;
+            })
+    ).apply(instance, EditModeData::new));
+
     private static final SavedDataType<EditModeData> TYPE = new SavedDataType<>(
             NAME,
             EditModeData::new,
-            ctx -> RecordCodecBuilder.create(instance -> instance.group(
-                    RecordCodecBuilder.point(ctx.levelOrThrow()),
-                    CoordWithPart.CODEC.listOf().fieldOf("data").forGetter(d -> {
-                        List<CoordWithPart> result = new ArrayList<>();
-                        d.partData.forEach((coord, list) -> list.forEach(part -> result.add(new CoordWithPart(coord, part))));
-                        return result;
-                    })
-            ).apply(instance, EditModeData::new))
+            CODEC
     );
 
     @Nonnull
@@ -53,10 +54,10 @@ public class EditModeData extends SavedData {
         return storage.computeIfAbsent(TYPE);
     }
 
-    private EditModeData(Context ctx) {
+    private EditModeData() {
     }
 
-    private EditModeData(ServerLevel level, List<CoordWithPart> partData) {
+    private EditModeData(List<CoordWithPart> partData) {
         for (CoordWithPart d : partData) {
             addPartData(d.coord, d.part.y, d.part.partName);
         }

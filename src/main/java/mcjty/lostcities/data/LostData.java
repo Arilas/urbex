@@ -15,14 +15,15 @@ public class LostData extends SavedData {
 
     public static final String NAME = "lostcities_data";
 
+    private static Codec<LostData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.STRING.fieldOf("profile").forGetter(d -> d.selectedProfile),
+            Codec.STRING.fieldOf("json").forGetter(d -> d.selectedJson)
+            ).apply(instance, LostData::new));
+
     private static final SavedDataType<LostData> TYPE = new SavedDataType<>(
             NAME,
             LostData::new,
-            ctx -> RecordCodecBuilder.create(instance -> instance.group(
-                    RecordCodecBuilder.point(ctx.levelOrThrow()),
-                    Codec.STRING.fieldOf("profile").forGetter(d -> d.selectedProfile),
-                    Codec.STRING.fieldOf("json").forGetter(d -> d.selectedJson)
-            ).apply(instance, LostData::new))
+            CODEC
     );
 
     private String selectedProfile = "";
@@ -39,10 +40,10 @@ public class LostData extends SavedData {
         return storage.computeIfAbsent(TYPE);
     }
 
-    public LostData(Context context) {
+    public LostData() {
     }
 
-    public LostData(ServerLevel level, String profile, String json) {
+    public LostData(String profile, String json) {
         selectedProfile = profile;
         selectedJson = json;
     }

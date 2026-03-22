@@ -5,7 +5,7 @@ import mcjty.lostcities.varia.Tools;
 import mcjty.lostcities.worldgen.lost.regassets.ConditionRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.ConditionPart;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -15,7 +15,7 @@ import java.util.function.Predicate;
 
 public class Condition implements ILostCityAsset {
 
-    private final ResourceLocation name;
+    private final Identifier name;
 
     private final List<Pair<Predicate<ConditionContext>, Pair<Float, String>>> valueSelector = new ArrayList<>();
 
@@ -35,7 +35,7 @@ public class Condition implements ILostCityAsset {
     }
 
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return name;
     }
 

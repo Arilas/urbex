@@ -9,7 +9,7 @@ import mcjty.lostcities.worldgen.lost.cityassets.CompiledPalette;
 import mcjty.lostcities.worldgen.lost.cityassets.StuffObject;
 import mcjty.lostcities.worldgen.lost.regassets.StuffSettingsRE;
 import mcjty.lostcities.worldgen.lost.regassets.data.BlockMatcher;
-import mcjty.lostcities.worldgen.lost.regassets.data.ResourceLocationMatcher;
+import mcjty.lostcities.worldgen.lost.regassets.data.IdentifierMatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
@@ -30,7 +30,7 @@ public class Stuff {
                     StuffSettingsRE settings = stuff.getSettings();
                     Boolean inBuilding = settings.isInBuilding();
                     if (inBuilding != null && inBuilding == info.hasBuilding) {
-                        ResourceLocationMatcher buildingMatcher = settings.getBuildingMatcher();
+                        IdentifierMatcher buildingMatcher = settings.getBuildingMatcher();
                         if (buildingMatcher.isAny() || buildingMatcher.test(info.buildingType.getId())) {
                             if (settings.getBiomeMatcher().test(biome.getMainBiome())) {
                                 actuallyGenerateStuff(feature, info, settings, palette, inBuilding == Boolean.TRUE);

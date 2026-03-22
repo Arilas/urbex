@@ -8,7 +8,7 @@ import mcjty.lostcities.data.LostData;
 import mcjty.lostcities.worldgen.lost.regassets.data.Selectors;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -47,7 +47,7 @@ public class Config {
             "minecraft:pillager_outpost"
     };
     private static final ModConfigSpec.ConfigValue<List<? extends String>> AVOID_STRUCTURES;
-    private static Set<ResourceLocation> AVOID_STRUCTURES_SET = new HashSet<>();
+    private static Set<Identifier> AVOID_STRUCTURES_SET = new HashSet<>();
     public static final ModConfigSpec.BooleanValue AVOID_STRUCTURES_ADJACENT;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES_ADJACENT;
@@ -81,7 +81,7 @@ public class Config {
                 if (split.length != 2) {
                     LostCities.getLogger().error("Bad format for config value: '{}'!", dp);
                 } else {
-                    ResourceKey<Level> dimensionType = ResourceKey.create(Registries.DIMENSION, ResourceLocation.parse(split[0]));
+                    ResourceKey<Level> dimensionType = ResourceKey.create(Registries.DIMENSION, Identifier.parse(split[0]));
                     String profileName = split[1];
                     LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
                     if (profile != null) {
@@ -129,7 +129,7 @@ public class Config {
         return dimensionProfileCache.get(type);
     }
 
-    public static boolean isAvoidedStructure(ResourceLocation id) {
+    public static boolean isAvoidedStructure(Identifier id) {
         cacheAvoidedStructures();
         return AVOID_STRUCTURES_SET.contains(id);
     }
@@ -143,7 +143,7 @@ public class Config {
         if (AVOID_STRUCTURES_SET == null) {
             AVOID_STRUCTURES_SET = new HashSet<>();
             for (String s : AVOID_STRUCTURES.get()) {
-                AVOID_STRUCTURES_SET.add(ResourceLocation.parse(s));
+                AVOID_STRUCTURES_SET.add(Identifier.parse(s));
             }
         }
     }

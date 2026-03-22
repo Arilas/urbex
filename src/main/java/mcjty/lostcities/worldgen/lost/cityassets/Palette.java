@@ -8,7 +8,7 @@ import mcjty.lostcities.worldgen.lost.regassets.data.BlockEntry;
 import mcjty.lostcities.worldgen.lost.regassets.data.DataTools;
 import mcjty.lostcities.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -26,7 +26,7 @@ import java.util.Map;
  */
 public class Palette implements ILostCityAsset {
 
-    private final ResourceLocation name;
+    private final Identifier name;
     private final Map<Character, PE> palette = new HashMap<>();
     private final Map<BlockState, BlockState> damaged = new HashMap<>();
 
@@ -36,7 +36,7 @@ public class Palette implements ILostCityAsset {
     }
 
     public Palette(String name) {
-        this.name = ResourceLocation.fromNamespaceAndPath(LostCities.MODID, name);
+        this.name = Identifier.fromNamespaceAndPath(LostCities.MODID, name);
     }
 
     public void merge(Palette other) {
@@ -50,7 +50,7 @@ public class Palette implements ILostCityAsset {
     }
 
     @Override
-    public ResourceLocation getId() {
+    public Identifier getId() {
         return name;
     }
 

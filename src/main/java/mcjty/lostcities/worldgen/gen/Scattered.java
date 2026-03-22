@@ -14,7 +14,7 @@ import mcjty.lostcities.worldgen.lost.regassets.data.ScatteredSettings;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
@@ -236,9 +236,9 @@ public class Scattered {
                 }
 
                 @Override
-                public ResourceLocation getBiome() {
+                public Identifier getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(info.getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
+                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
                 }
             };
             ChunkDriver driver = feature.driver;

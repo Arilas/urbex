@@ -20,7 +20,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
@@ -654,9 +654,9 @@ public class BuildingInfo implements ILostChunkInfo {
                 }
 
                 @Override
-                public ResourceLocation getBiome() {
+                public Identifier getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             String randomPart = building.getRandomPart(rand, conditionContext);
@@ -675,9 +675,9 @@ public class BuildingInfo implements ILostChunkInfo {
                 }
 
                 @Override
-                public ResourceLocation getBiome() {
+                public Identifier getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             randomPart = building.getRandomPart2(rand, conditionContext2);
@@ -892,9 +892,9 @@ public class BuildingInfo implements ILostChunkInfo {
                 }
 
                 @Override
-                public ResourceLocation getBiome() {
+                public Identifier getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             String randomPart = building.getRandomPart(rand, conditionContext);
@@ -916,9 +916,9 @@ public class BuildingInfo implements ILostChunkInfo {
                 }
 
                 @Override
-                public ResourceLocation getBiome() {
+                public Identifier getBiome() {
                     Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::location, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             randomPart = building.getRandomPart2(rand, conditionContext2);
@@ -1859,7 +1859,7 @@ public class BuildingInfo implements ILostChunkInfo {
     }
 
     @Override
-    public ResourceLocation getBuildingId() {
+    public Identifier getBuildingId() {
         return hasBuilding ? buildingType.getId() : null;
     }
 
