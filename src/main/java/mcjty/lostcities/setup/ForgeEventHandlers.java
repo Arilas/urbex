@@ -388,7 +388,7 @@ public class ForgeEventHandlers {
 //            return;
 //        }
 
-        Level world = event.getEntity().getCommandSenderWorld();
+        Level world = event.getEntity().level();
         if (world.isClientSide) {
             return;
         }
@@ -404,7 +404,7 @@ public class ForgeEventHandlers {
             CustomTeleporter.teleportToDimension(event.getEntity(), destWorld, location);
         } else {
             event.setProblem(Player.BedSleepingProblem.OTHER_PROBLEM);
-            ServerLevel destWorld = event.getEntity().getCommandSenderWorld().getServer().getLevel(Registration.DIMENSION);
+            ServerLevel destWorld = event.getEntity().level().getServer().getLevel(Registration.DIMENSION);
             if (destWorld == null) {
                 event.getEntity().sendSystemMessage(ComponentFactory.literal("Error finding Lost City dimension: " + LOSTCITY + "!").withStyle(ChatFormatting.RED));
             } else {

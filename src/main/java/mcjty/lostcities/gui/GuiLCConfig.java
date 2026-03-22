@@ -500,10 +500,11 @@ public class GuiLCConfig extends Screen {
         for(GuiEventListener listener : this.children()) {
             if (listener instanceof AbstractWidget widget) {
                 if (widget.isMouseOver(mouseX, mouseY) && widget.visible) {
-                    Tooltip tooltip = widget.getTooltip();
-                    if (tooltip != null) {
-                        setTooltipForNextRenderPass(tooltip.toCharSequence(this.minecraft));
-                    }
+                    // @todo 1.21.6
+//                    Tooltip tooltip = widget.getTooltip();
+//                    if (tooltip != null) {
+//                        setTooltipForNextRenderPass(tooltip.toCharSequence(this.minecraft));
+//                    }
                     break;
                 }
             }

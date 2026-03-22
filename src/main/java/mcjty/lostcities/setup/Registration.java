@@ -2,6 +2,8 @@ package mcjty.lostcities.setup;
 
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import mcjty.lostcities.LostCities;
 import mcjty.lostcities.worldgen.LostCityFeature;
 import mcjty.lostcities.worldgen.LostCitySphereFeature;
@@ -24,8 +26,12 @@ public class Registration {
     public static final DeferredRegister<Feature<?>> FEATURES = DeferredRegister.create(Registries.FEATURE, LostCities.MODID);
     public static final DeferredRegister<AttachmentType<?>> ATTACHMENT_TYPES = DeferredRegister.create(NeoForgeRegistries.Keys.ATTACHMENT_TYPES, LostCities.MODID);
 
+    private static final MapCodec<Boolean> BOOLEAN_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+            Codec.BOOL.fieldOf("value").forGetter(b -> b)
+    ).apply(instance, (value) -> value));
+
     public static final Supplier<AttachmentType<Boolean>> ATTACHMENT_TYPE_SPAWNSET = ATTACHMENT_TYPES.register("spawnset", () -> AttachmentType.builder(() -> false)
-            .serialize(Codec.BOOL)
+            .serialize(BOOLEAN_CODEC)
             .copyOnDeath()
             .build());
 
