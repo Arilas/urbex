@@ -11,7 +11,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.common.data.BlockTagsProvider;
-import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 import javax.annotation.Nonnull;
 import java.util.Set;
@@ -19,8 +18,8 @@ import java.util.concurrent.CompletableFuture;
 
 public class LCBlockTags extends BlockTagsProvider {
 
-    public LCBlockTags(DataGenerator generator, CompletableFuture<HolderLookup.Provider> lookupProvider , ExistingFileHelper helper) {
-        super(generator.getPackOutput(), lookupProvider, LostCities.MODID, helper);
+    public LCBlockTags(DataGenerator generator, CompletableFuture<HolderLookup.Provider> lookupProvider ) {
+        super(generator.getPackOutput(), lookupProvider, LostCities.MODID);
     }
 
     private static final Set<TagKey<Block>> PLANT_TAGS = Set.of(
