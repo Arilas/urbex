@@ -104,9 +104,41 @@ as 1.21.11. **Runtime behavior is unverified** — the optimized path is only us
   palette (stone bricks + mossy/cracked variants, iron bars, smooth stone slab).
 - Client: boots to resource load with both entrypoints, no errors.
 
+## Thread safety during parallel chunk generation (post-crash fix)
+The first in-game test crashed "Preparing spawn area" (NPE on `ChunkDriver.primer/region`,
+plus "Requested chunk unavailable" and out-of-region access flagged by C2ME). Root cause —
+present in the NeoForge original too, not introduced by the port: each dimension caches ONE
+`LostCityTerrainFeature` with ONE shared `ChunkDriver`, and `IDimensionInfo.setWorld(...)` swaps
+the shared region reference right before each generation. The vanilla feature step runs
+concurrently on worker threads (much more aggressively under C2ME), so one thread's driver
+teardown/region swap could hit mid-generation of another thread — explaining both the NPEs and
+the far (3-8 chunk) out-of-region accesses (a thread generating against another thread's region).
+
+Fixes applied:
+- `LostCityFeature.place` and `LostCitySphereFeature.place` now `synchronized` on the shared
+  per-dimension `LostCityTerrainFeature` instance around `setWorld` + generation. Both features
+  use the same monitor, so city and sphere passes cannot interleave for a dimension. This
+  serializes Lost Cities generation per dimension (worldgen for other features stays parallel).
+- `ChunkDriver.getBlockSafe`/`updateAdjacent` clamp gracefully: neighbouring chunks not present
+  in the current `WorldGenRegion` are treated as air / skipped instead of crashing chunk gen
+  (these reads only drive cosmetic fence/wall/stairs connection states).
+- Verified: `lostcities:spheres` running in the overworld is correct behavior when a spheres
+  profile (e.g. `biosphere`) is selected; `Spheres.generateSpheres` no-ops for non-sphere
+  profiles (`profile.isSpace() || profile.isSpheres()`), identical gating to NeoForge, and
+  `getDimensionInfo` returns null (feature no-op) when the dimension has no profile.
+
+Re-verified with dedicated-server world creation on fresh worlds using both `default` and
+`biosphere` profiles: clean boot, no exceptions, sphere glass shells present in region files.
+C2ME remains disabled in the user instance; with these fixes vanilla parallel generation is safe,
+and C2ME can be re-tried experimentally (Lost Cities generation itself is now serialized, so C2ME
+would mainly parallelize the other steps).
+
 ## Known risks / follow-ups
 - **Pre-existing NPE** (also on NeoForge): an invalid `selectedProfile` crashes world init at
   `Config.getProfileForDimension` (`STANDARD_PROFILES.get(profile).GENERATE_NETHER`).
+- Lost Cities generation is now serialized per dimension (see thread-safety section); if this
+  measurably slows worldgen, a finer-grained approach (per-invocation ChunkDriver + confining
+  `street`/rand state) could restore parallelism later.
 - Optimized heightmap path (`optimizedHeightmap=true`) needs in-game verification vs 26.2 density
   functions before recommending it.
 - The `CanPlayerSleepEvent` port: Fabric's `ALLOW_SLEEPING` fires at a slightly different point in
