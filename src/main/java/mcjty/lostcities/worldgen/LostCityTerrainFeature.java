@@ -28,6 +28,7 @@ import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.tags.StructureTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.*;
@@ -199,7 +200,7 @@ public class LostCityTerrainFeature {
     private Set<BlockState> getStatesNeedingTodo() {
         if (statesNeedingTodo == null) {
             statesNeedingTodo = new HashSet<>();
-            for (Holder<Block> bh : Tools.getBlocksForTag(BlockTags.SAPLINGS)) {
+            for (Holder<Block> bh : Tools.getBlocksForTag(TagKey.create(Registries.BLOCK, Identifier.withDefaultNamespace("saplings")))) {
                 addStates(bh.value(), statesNeedingTodo);
             }
             for (Holder<Block> bh : Tools.getBlocksForTag(BlockTags.SMALL_FLOWERS)) {
@@ -262,8 +263,8 @@ public class LostCityTerrainFeature {
 
         driver.setPrimer(region, chunk);
 
-        int chunkX = chunk.getPos().x;
-        int chunkZ = chunk.getPos().z;
+        int chunkX = chunk.getPos().x();
+        int chunkZ = chunk.getPos().z();
 
         ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
 
@@ -1915,7 +1916,7 @@ public class LostCityTerrainFeature {
                     if (Config.FORCE_SAPLING_GROWTH.get()) {
                         RandomSource forkedRand = rand.fork();
                         GlobalTodo.get(world.getLevel()).addTodo(pos, (level) -> {
-                            if (level.isAreaLoaded(pos, 1) && level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
+                            if (level.hasChunksAt(pos.offset(-1, -1, -1), pos.offset(1, 1, 1)) && level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
                                 level.setBlock(pos, finalB, Block.UPDATE_CLIENTS);
                                 // We do rand.fork() to avoid accessing LegacyRandomSource from multiple threads
                                 saplingBlock.advanceTree(level, pos, finalB, forkedRand);

@@ -72,8 +72,8 @@ public class LostCities implements ModInitializer {
     }
 
     private void registerNetworking() {
-        PayloadTypeRegistry.playS2C().register(PacketReturnProfileToClient.TYPE, PacketReturnProfileToClient.CODEC);
-        PayloadTypeRegistry.playC2S().register(PacketRequestProfile.TYPE, PacketRequestProfile.CODEC);
+        PayloadTypeRegistry.clientboundPlay().register(PacketReturnProfileToClient.TYPE, PacketReturnProfileToClient.CODEC);
+        PayloadTypeRegistry.serverboundPlay().register(PacketRequestProfile.TYPE, PacketRequestProfile.CODEC);
         ServerPlayNetworking.registerGlobalReceiver(PacketRequestProfile.TYPE, (payload, context) -> payload.handle());
     }
 

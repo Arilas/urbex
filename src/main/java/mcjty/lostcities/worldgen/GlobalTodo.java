@@ -37,7 +37,7 @@ public class GlobalTodo {
     }
 
     public void addTodo(BlockPos pos, Consumer<ServerLevel> code) {
-        ChunkPos chunkPos = new ChunkPos(pos);
+        ChunkPos chunkPos = ChunkPos.containing(pos);
         TodoQueues queues = todoQueues.computeIfAbsent(chunkPos, k -> new TodoQueues(new TodoQueue<>()));
         queues.todo.add(pos, code);
     }

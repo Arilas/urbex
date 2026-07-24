@@ -20,7 +20,7 @@ public class ClientEventHandlers {
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (screen instanceof CreateWorldScreen createWorldScreen) {
                 Button lostCitiesButton = Button.builder(ComponentFactory.literal("Cities"), b ->
-                        Minecraft.getInstance().setScreen(new GuiLCConfig(createWorldScreen))
+                        Minecraft.getInstance().gui.setScreen(new GuiLCConfig(createWorldScreen))
                 ).bounds(screen.width - 100, 40, 70, 20).build();
                 lostCitiesButton.visible = false;
                 Screens.getWidgets(screen).add(lostCitiesButton);

@@ -1,4 +1,4 @@
-accessWidener v2 named
+accessWidener v2 official
 
 # CreateWorldScreen "Cities" button injection
 accessible field net/minecraft/client/gui/screens/worldselection/CreateWorldScreen tabManager Lnet/minecraft/client/gui/components/tabs/TabManager;

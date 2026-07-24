@@ -9,7 +9,9 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
-import net.minecraft.world.level.storage.DimensionDataStorage;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.storage.SavedDataStorage;
 
 import javax.annotation.Nonnull;
 import java.util.*;
@@ -42,15 +44,16 @@ public class EditModeData extends SavedData {
     ).apply(instance, EditModeData::new));
 
     private static final SavedDataType<EditModeData> TYPE = new SavedDataType<>(
-            NAME,
+            Identifier.fromNamespaceAndPath("lostcities", NAME),
             EditModeData::new,
-            CODEC
+            CODEC,
+            DataFixTypes.SAVED_DATA_COMMAND_STORAGE
     );
 
     @Nonnull
     public static EditModeData getData() {
         ServerLevel overworld = WorldTools.getOverworld();
-        DimensionDataStorage storage = overworld.getDataStorage();
+        SavedDataStorage storage = overworld.getDataStorage();
         return storage.computeIfAbsent(TYPE);
     }
 

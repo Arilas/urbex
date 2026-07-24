@@ -54,8 +54,8 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
                     return false;
                 }
 
-                int chunkX = center.x;
-                int chunkZ = center.z;
+                int chunkX = center.x();
+                int chunkZ = center.z();
                 diminfo.setWorld(level);
                 try {
                     diminfo.getFeature().generate(region, region.getChunk(chunkX, chunkZ));

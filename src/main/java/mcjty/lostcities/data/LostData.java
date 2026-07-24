@@ -7,7 +7,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
-import net.minecraft.world.level.storage.DimensionDataStorage;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.level.storage.SavedDataStorage;
 
 import javax.annotation.Nonnull;
 
@@ -21,9 +23,10 @@ public class LostData extends SavedData {
             ).apply(instance, LostData::new));
 
     private static final SavedDataType<LostData> TYPE = new SavedDataType<>(
-            NAME,
+            Identifier.fromNamespaceAndPath("lostcities", NAME),
             LostData::new,
-            CODEC
+            CODEC,
+            DataFixTypes.SAVED_DATA_COMMAND_STORAGE
     );
 
     private String selectedProfile = "";
@@ -36,7 +39,7 @@ public class LostData extends SavedData {
         }
         MinecraftServer server = level.getServer();
         ServerLevel overworld = server.getLevel(Level.OVERWORLD);
-        DimensionDataStorage storage = overworld.getDataStorage();
+        SavedDataStorage storage = overworld.getDataStorage();
         return storage.computeIfAbsent(TYPE);
     }
 

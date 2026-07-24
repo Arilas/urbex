@@ -112,7 +112,7 @@ public class ForgeEventHandlers {
         {
             IDimensionInfo dimensionInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(serverLevel);
             if (dimensionInfo == null) {
-                return;
+                return false;
             }
             LostCityProfile profile = dimensionInfo.getProfile();
 
@@ -304,7 +304,7 @@ public class ForgeEventHandlers {
         if (!(state.getBlock() instanceof BedBlock)) {
             return false;
         }
-        Direction direction = Blocks.BLACK_BED.getBedDirection(state, world, pos);
+        Direction direction = state.getValue(BedBlock.FACING);
         Block b1 = world.getBlockState(pos.below()).getBlock();
         Block b2 = world.getBlockState(pos.relative(direction.getOpposite()).below()).getBlock();
         Block b = BuiltInRegistries.BLOCK.getValue(Identifier.parse(Config.SPECIAL_BED_BLOCK.get()));

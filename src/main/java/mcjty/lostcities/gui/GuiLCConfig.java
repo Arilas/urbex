@@ -12,7 +12,7 @@ import mcjty.lostcities.worldgen.LostCityFeature;
 import mcjty.lostcities.worldgen.lost.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
@@ -271,8 +271,8 @@ public class GuiLCConfig extends Screen {
         CitySphere.cleanCache();
     }
 
-    private void renderExtra(GuiGraphics graphics) {
-        graphics.drawString(font, "Profile:", 10, 16, 0xffffffff);
+    private void renderExtra(GuiGraphicsExtractor graphics) {
+        graphics.text(font, "Profile:", 10, 16, 0xffffffff);
         elements.forEach(el -> el.render(graphics));
 
         localSetup.get().ifPresent(profile -> {
@@ -288,7 +288,7 @@ public class GuiLCConfig extends Screen {
         });
     }
 
-    private void renderPreviewTransports(GuiGraphics graphics, LostCityProfile profile) {
+    private void renderPreviewTransports(GuiGraphicsExtractor graphics, LostCityProfile profile) {
         renderPreviewMap(graphics, profile, true);
         NullDimensionInfo diminfo = new NullDimensionInfo(profile, seed);
         for (int z = 0; z < NullDimensionInfo.PREVIEW_HEIGHT; z++) {
@@ -317,7 +317,7 @@ public class GuiLCConfig extends Screen {
         }
     }
 
-    private void renderPreviewCity(GuiGraphics graphics, LostCityProfile profile, boolean showDamage) {
+    private void renderPreviewCity(GuiGraphicsExtractor graphics, LostCityProfile profile, boolean showDamage) {
         int base = 50 + 120;
         int leftRender = this.width - 157;
         graphics.fill(leftRender, 50, leftRender + 150, base, 0xff0099bb);
@@ -411,7 +411,7 @@ public class GuiLCConfig extends Screen {
         return color;
     }
 
-    private void renderPreviewMap(GuiGraphics graphics, LostCityProfile profile, boolean soft) {
+    private void renderPreviewMap(GuiGraphicsExtractor graphics, LostCityProfile profile, boolean soft) {
         NullDimensionInfo diminfo = new NullDimensionInfo(profile, seed);
         for (int z = 0; z < NullDimensionInfo.PREVIEW_HEIGHT; z++) {
             for (int x = 0; x < NullDimensionInfo.PREVIEW_WIDTH; x++) {
@@ -472,7 +472,7 @@ public class GuiLCConfig extends Screen {
 
     private void cancel() {
         refreshPreview();
-        Minecraft.getInstance().setScreen(parent);
+        Minecraft.getInstance().gui.setScreen(parent);
     }
 
     private void done() {
@@ -486,15 +486,14 @@ public class GuiLCConfig extends Screen {
             selectProfile(localSetup.getProfile(), null);
         }
 
-        Minecraft.getInstance().setScreen(parent);
+        Minecraft.getInstance().gui.setScreen(parent);
         LostCityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-//        this.renderBackground(graphics, mouseX, mouseY, partialTicks);
-        super.render(graphics, mouseX, mouseY, partialTicks);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTicks) {
+        super.extractRenderState(graphics, mouseX, mouseY, partialTicks);
         refreshButtons();
         renderExtra(graphics);
         for(GuiEventListener listener : this.children()) {

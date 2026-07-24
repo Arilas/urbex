@@ -30,8 +30,8 @@ public class LostCitySphereFeature extends Feature<NoneFeatureConfiguration> {
                     return false;
                 }
 
-                int chunkX = center.x;
-                int chunkZ = center.z;
+                int chunkX = center.x();
+                int chunkZ = center.z();
                 diminfo.setWorld(level);
                 Spheres.generateSpheres(diminfo.getFeature(), region, region.getChunk(chunkX, chunkZ));
                 return true;

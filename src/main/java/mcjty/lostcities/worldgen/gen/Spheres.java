@@ -32,8 +32,8 @@ public class Spheres {
             ChunkAccess oldChunk = driver.getPrimer();
             driver.setPrimer(region, chunk);
 
-            int chunkX = chunk.getPos().x;
-            int chunkZ = chunk.getPos().z;
+            int chunkX = chunk.getPos().x();
+            int chunkZ = chunk.getPos().z();
             ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
 
             CitySphere sphere = CitySphere.getCitySphere(coord, provider);

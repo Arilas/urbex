@@ -180,7 +180,6 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         return this.cellStartBlockZ + this.inCellZ;
     }
 
-    @Override
     public Blender getBlender() {
         return Blender.empty();
     }
@@ -297,6 +296,9 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
                 case Cache2D -> new Cache2D(marker.wrapped());
                 case CacheOnce -> new CacheOnce(marker.wrapped());
                 case CacheAllInCell -> new CacheAllInCell(marker.wrapped());
+                // BlendDensity markers are new in 26.2; we don't blend in this optimized
+                // heightmap-only pipeline, so just unwrap them
+                case BlendDensity -> wrap(marker.wrapped());
             };
             return (DensityFunction) object;
         } else {
@@ -342,7 +344,7 @@ public class NoiseChunkOpt implements DensityFunction.ContextProvider, DensityFu
         public double compute(FunctionContext pContext) {
             int i = pContext.blockX();
             int j = pContext.blockZ();
-            long k = ChunkPos.asLong(i, j);
+            long k = ChunkPos.pack(i, j);
             if (this.lastPos2D == k) {
                 return this.lastValue;
             } else {
