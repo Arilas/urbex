@@ -1,64 +1,83 @@
-buildscript {
-    repositories {
-        maven { url = 'https://maven.firstdark.dev/releases' }
-        mavenCentral()
-        gradlePluginPortal()
-    }
-    dependencies {
-        classpath 'com.hypherionmc.modutils:modpublisher:2.2.1'
-    }
-}
-
 plugins {
     id 'java-library'
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
-    id 'net.neoforged.gradle.userdev' version '7.1.4'
-}
-
-apply plugin: 'com.hypherionmc.modutils.modpublisher'
-
-if (project.file('../gradletools.gradle').exists()) {
-    apply from: '../gradletools.gradle'
-} else if (project.file('gradletools.gradle').exists()) {
-    apply from: 'gradletools.gradle'
-} else {
-    apply from: 'https://raw.githubusercontent.com/McJtyMods/MultiWorkspace/1.21_neo/gradletools.gradle'
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
 group = "com.github.mcjty"
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+version = project.version
+
+base {
+    archivesName = "${mod_id}-fabric-${minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(Integer.parseInt(java_version))
 
 if (System.getenv('BUILD_NUMBER') != null) {
     version += "-${System.getenv('BUILD_NUMBER')}"
 }
 
-repos()
-at()
-runs()
-jars()
+repositories {
+    mavenCentral()
+    maven {
+        name = "Fuzs Mod Resources"
+        url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/"
+    }
+}
 
 sourceSets.main.resources {
     srcDir 'src/generated/resources'
 }
 
-dependencies {
-    mc()
-//    jei()
-//    top()
+// The vestigial legacy API stub lives in src/api/java
+sourceSets.main.java {
+    srcDir 'src/api/java'
 }
 
-modpublisher(['the-one-probe'], [], ['the-one-probe'], [], [])
-
-
-subsystems {
-    parchment {
-        minecraftVersion = "${parchment_minecraft_version}"
-        mappingsVersion = "${parchment_version}"
+loom {
+    def aw = file("src/main/resources/META-INF/${mod_id}.accesswidener")
+    if (aw.exists()) {
+        accessWidenerPath.set(aw)
+    }
+    runs {
+        client {
+            client()
+            setConfigName('Fabric Client')
+            ideConfigGenerated(true)
+            runDir('runs/client')
+        }
+        server {
+            server()
+            setConfigName('Fabric Server')
+            ideConfigGenerated(true)
+            runDir('runs/server')
+        }
     }
 }
 
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+    modImplementation "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}"
+}
+
+processResources {
+    def expandProps = [
+            'version'              : version,
+            'mod_id'               : mod_id,
+            'mod_name'             : mod_name,
+            'minecraft_version'    : minecraft_version,
+            'fabric_loader_version': fabric_loader_version,
+            'java_version'         : java_version
+    ]
+    filesMatching('fabric.mod.json') {
+        expand expandProps
+    }
+    inputs.properties(expandProps)
+}
 
 task apiJar(type: Jar) {
     archiveClassifier = "api"
@@ -80,28 +99,6 @@ publishing {
         pom {
             name = 'LostCities'
             description = 'Lost Cities'
-            scm {
-                url = 'https://github.com/McJtyMods/LostCities'
-                connection = 'scm:git:git@github.com:McJtyMods/LostCities.git'
-                developerConnection = 'scm:git:git@github.com:McJtyMods/LostCities.git'
-            }
-            issueManagement {
-                system = 'github'
-                url = 'https://github.com/McJtyMods/LostCities/issues'
-            }
-            licenses {
-                license {
-                    name = 'MIT'
-                    distribution = 'repo'
-                }
-            }
-            developers {
-                developer {
-                    id = 'McJty'
-                    name = 'McJty'
-                    roles = ['developer']
-                }
-            }
         }
     }
     repositories {
