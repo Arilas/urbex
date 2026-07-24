@@ -143,8 +143,14 @@ would mainly parallelize the other steps).
   functions before recommending it.
 - The `CanPlayerSleepEvent` port: Fabric's `ALLOW_SLEEPING` fires at a slightly different point in
   the sleep flow; teleport-bed behavior should be tested in game (bed + diamond block + 6 skulls).
-- GuiLCConfig (Cities config screen) compiles against the new extract-based GUI pipeline but has not
-  been exercised in-game; test the CreateWorldScreen "More" tab button and preview rendering.
+- GuiLCConfig (Cities config screen): first in-game test showed the header buttons (Profile,
+  Worldstyle, Customize, mode) rendering as bare text with labels that never updated. Cause:
+  `ButtonExt` extended vanilla `PlainTextButton`, which draws no background and renders a label
+  cached at construction time (setMessage() from refreshButtons() was invisible). Fixed by making
+  `ButtonExt` extend `Button.Plain` — the standard vanilla button (background sprite + scrolling
+  label read from getMessage() every frame). Tooltips render via the vanilla deferred pass, which
+  already runs after all widgets and custom drawing, so tooltip-over-header is normal MC hover
+  behavior. Remaining GUI polish (preview map layout, label spacing) should be eyeballed in game.
 - `lostcities/stuff/example.json` still references `#forge:stone` in a selector (inert example data).
 - IMC-based integrations (e.g. other McJty mods) will not find Lost Cities via IMC on Fabric.
 - Old worlds from the NeoForge 1.21.11 build are not migration targets (saved-data ids changed,
