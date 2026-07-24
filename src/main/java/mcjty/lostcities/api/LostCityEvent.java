@@ -2,8 +2,6 @@ package mcjty.lostcities.api;
 
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.neoforged.bus.api.Event;
-import net.neoforged.bus.api.ICancellableEvent;
 
 /**
  * LostCityEvent is fired whenever an event involving a Lost City chunk generation occurs. <br>
@@ -12,7 +10,9 @@ import net.neoforged.bus.api.ICancellableEvent;
  * <br>
  * All children of this event are fired on the {@link MinecraftForge#EVENT_BUS}.
  **/
-public class LostCityEvent extends Event {
+public class LostCityEvent {
+
+    private boolean canceled = false;
 
     private final WorldGenLevel world;
     private final ILostCities lostCities;
@@ -40,6 +40,17 @@ public class LostCityEvent extends Event {
 
     public int getChunkZ() {
         return chunkZ;
+    }
+
+    /**
+     * Only meaningful for cancellable events (PreGenCityChunkEvent, PreExplosionEvent).
+     */
+    public boolean isCanceled() {
+        return canceled;
+    }
+
+    public void setCanceled(boolean canceled) {
+        this.canceled = canceled;
     }
 
     /**
@@ -89,7 +100,7 @@ public class LostCityEvent extends Event {
      * <br>
      * This event is fired on the {@link MinecraftForge#EVENT_BUS}.
      **/
-    public static class PreGenCityChunkEvent extends LostCityEvent implements ICancellableEvent {
+    public static class PreGenCityChunkEvent extends LostCityEvent {
         private final ChunkAccess primer;
 
         public PreGenCityChunkEvent(WorldGenLevel world, ILostCities lostCities, int chunkX, int chunkZ, ChunkAccess primer) {
@@ -169,7 +180,7 @@ public class LostCityEvent extends Event {
      * <br>
      * This event is fired on the {@link MinecraftForge#EVENT_BUS}.
      **/
-    public static class PreExplosionEvent extends LostCityEvent implements ICancellableEvent {
+    public static class PreExplosionEvent extends LostCityEvent {
         private final ChunkAccess primer;
 
         public PreExplosionEvent(WorldGenLevel world, ILostCities lostCities, int chunkX, int chunkZ, ChunkAccess primer) {

@@ -23,7 +23,6 @@ import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.neoforged.neoforge.common.NeoForge;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -405,7 +404,7 @@ public class BuildingInfo implements ILostChunkInfo {
 
         LostCityEvent.CharacteristicsEvent event = new LostCityEvent.CharacteristicsEvent(world, LostCities.lostCitiesImp,
                 chunkX, chunkZ, characteristics);
-        NeoForge.EVENT_BUS.post(event);
+        mcjty.lostcities.api.LostCityEvents.post(mcjty.lostcities.api.LostCityEvents.CHARACTERISTICS, event);
 
         CITY_INFO_MAP.put(coord, characteristics);
         return characteristics;
