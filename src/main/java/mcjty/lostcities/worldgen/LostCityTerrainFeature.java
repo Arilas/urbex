@@ -354,6 +354,8 @@ public class LostCityTerrainFeature {
         driver.actuallyGenerate(chunk);
         driver.setPrimer(oldRegion, oldChunk);
         ChunkFixer.fix(provider, coord);
+        // After the fixer, so the post-todos have placed their blocks and what we see is final
+        forgetOverwrittenBlockEntities(chunk);
 
         long time = System.currentTimeMillis() - start;
         statistics.addTime(time);
@@ -1861,6 +1863,35 @@ public class LostCityTerrainFeature {
             });
         }
         return b;
+    }
+
+    /**
+     * Forget queued block entity data for blocks that a later pass has overwritten.
+     *
+     * A spawner or a tagged block entity queues its NBT with setBlockEntityNbt the
+     * moment the part owning it is generated, but everything that runs afterwards —
+     * ruins above all, plus explosions, rubble, stuff and the post-todos — writes
+     * through the ChunkDriver or through setBlock, and neither of those touches that
+     * queue. ProtoChunk.setBlockState does not either; clearing it is ours to do.
+     *
+     * What is left is a spawner queued onto the air that replaced it. Minecraft
+     * discovers this when the chunk is saved or promoted, logs "Invalid block entity"
+     * with a full stack trace, and throws the data away anyway — so dropping it here
+     * changes nothing about the world and removes the noise from the log.
+     */
+    private static void forgetOverwrittenBlockEntities(ChunkAccess chunk) {
+        // getBlockEntitiesPos() hands back a copy, so removing while iterating is safe.
+        for (BlockPos pos : chunk.getBlockEntitiesPos()) {
+            CompoundTag tag = chunk.getBlockEntityNbt(pos);
+            if (tag == null) {
+                continue;   // a real block entity, already validated against its block
+            }
+            Identifier id = Identifier.tryParse(tag.getStringOr("id", ""));
+            BlockEntityType<?> type = id == null ? null : BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(id);
+            if (type == null || !type.isValid(chunk.getBlockState(pos))) {
+                chunk.removeBlockEntity(pos);
+            }
+        }
     }
 
     private BlockState handleSpawner(BuildingInfo info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
