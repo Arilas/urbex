@@ -1,5 +1,6 @@
 package mcjty.lostcities.worldgen.gen;
 
+import mcjty.lostcities.LostCities;
 import mcjty.lostcities.worldgen.ChunkDriver;
 import mcjty.lostcities.worldgen.LostCityTerrainFeature;
 import mcjty.lostcities.worldgen.lost.BiomeInfo;
@@ -16,8 +17,15 @@ import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Stuff {
+
+    // Stuff is picked by tag, so a pack can contribute stuff to a tag that other packs'
+    // city styles also declare, while the character it uses is only defined in its own
+    // palettes. Report each such combination once instead of on every city chunk.
+    private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
     public static void generateStuff(LostCityTerrainFeature feature, BuildingInfo info) {
         feature.rand.setSeed(info.coord.chunkX() * 2570174657L + info.coord.chunkZ() * 101754695981L);
@@ -33,7 +41,7 @@ public class Stuff {
                         IdentifierMatcher buildingMatcher = settings.getBuildingMatcher();
                         if (buildingMatcher.isAny() || buildingMatcher.test(info.buildingType.getId())) {
                             if (settings.getBiomeMatcher().test(biome.getMainBiome())) {
-                                actuallyGenerateStuff(feature, info, settings, palette, inBuilding == Boolean.TRUE);
+                                actuallyGenerateStuff(feature, info, stuff, palette, inBuilding == Boolean.TRUE);
                             }
                         }
                     }
@@ -49,7 +57,40 @@ public class Stuff {
         return matcher.test(driver.getBlock(x, y, z));
     }
 
-    private static void actuallyGenerateStuff(LostCityTerrainFeature feature, BuildingInfo info, StuffSettingsRE settings, CompiledPalette palette, boolean inBuilding) {
+    /**
+     * Is every character of this column defined in the palette that is active here?
+     *
+     * <p>{@link CompiledPalette#get(char)} returns null for a character it does not know.
+     * Feeding that null to the driver used to throw from {@link ChunkDriver#correct},
+     * killing the worldgen worker and leaving the chunk ungenerated. The column is
+     * checked as a whole and up front so a partly resolved one is never placed.
+     *
+     * <p>Asks {@link CompiledPalette#isDefined} rather than calling get(): for a weighted
+     * character get() draws from the shared fastrand sequence, so probing with it would
+     * shift what every later call produces.
+     */
+    private static boolean columnResolves(StuffObject stuff, String blocks, CompiledPalette palette) {
+        for (int k = 0; k < blocks.length(); k++) {
+            char c = blocks.charAt(k);
+            if (!palette.isDefined(c)) {
+                if (REPORTED_UNRESOLVED.add(stuff.getId() + ":" + c)) {
+                    LostCities.getLogger().warn(
+                            "Stuff '{}' uses character '{}', which no palette of the city style being generated defines. " +
+                                    "Skipping it. Add the character to a palette used by that style, or restrict the stuff to its own tag.",
+                            stuff.getId(), c);
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static void actuallyGenerateStuff(LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, boolean inBuilding) {
+        StuffSettingsRE settings = stuff.getSettings();
+        String blocks = settings.getColumn();
+        if (!columnResolves(stuff, blocks, palette)) {
+            return;
+        }
         ChunkDriver driver = feature.driver;
         WorldGenLevel level = info.provider.getWorld();
         int attempts = settings.getAttempts();
@@ -77,7 +118,6 @@ public class Stuff {
                 int x = rand.nextInt(16);
                 int y = rand.nextInt(maxheight - minheight) + minheight;
                 int z = rand.nextInt(16);
-                String blocks = settings.getColumn();
                 if (testBlock(driver, settings.getBlockMatcher(), x, y-1, z) && testBlock(driver, settings.getUpperBlockMatcher(), x, y + blocks.length(), z)) {
                     Boolean isSeesky = settings.isSeesky();
                     if (isSeesky == null || isSeesky == level.canSeeSky(info.getRelativePos(x, y, z))) {

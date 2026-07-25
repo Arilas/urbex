@@ -269,6 +269,12 @@ public class ChunkDriver {
     }
 
     private BlockState correct(BlockState state) {
+        if (state == null) {
+            // A caller could not resolve a palette character. setBlock() already treats null
+            // as "leave what is there", so stop before dereferencing it. Whoever produced the
+            // null is responsible for reporting which asset is at fault.
+            return null;
+        }
         int cx = current.getX();
         int cy = current.getY();
         int cz = current.getZ();
