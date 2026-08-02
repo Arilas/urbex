@@ -744,6 +744,20 @@ public class LostCityTerrainFeature {
         return Tools.hasTag(state.getBlock(), LostTags.FOLIAGE_TAG);
     }
 
+    /**
+     * Fill base blocks downwards from 'y' until solid ground (or the bedrock layer) is reached,
+     * so that whatever rests on top of it is not left hanging in the air. This is the same fill
+     * fillToBedrockStreetBlock() applies under streets.
+     */
+    private void fillSupportBelow(int x, int z, int y) {
+        int lowest = provider.getWorld().getMinY() + profile.BEDROCK_LAYER;
+        driver.current(x, y, z);
+        while (driver.getY() > lowest && isEmpty(driver.getBlock())) {
+            driver.block(base);
+            driver.decY();
+        }
+    }
+
     // Return the new max height of the chunk in this column. Or Short.MIN_VALUE if nothing was done
     private int moveUp(int x, int z, int height, boolean dowater) {
         int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
@@ -808,6 +822,13 @@ public class LostCityTerrainFeature {
             driver.block(buffer[idx++]);
             driver.decY();
         }
+
+        // The buffer only carried the top few blocks of whatever used to be here, and nothing
+        // above this point looked at what is underneath. Whenever the column we just moved that
+        // surface down onto is empty - an overhang or cliff shoulder over a carved cavern, or a
+        // sampled heightmap that disagrees with the local terrain - the relocated surface is
+        // left hanging in the air, and so is everything the city then builds on top of it.
+        fillSupportBelow(x, z, driver.getY());
 
 //
 //        if (dowater) {
@@ -2305,6 +2326,9 @@ public class LostCityTerrainFeature {
                         BlockState filler = palette.get(fillerBlock);
                         driver.current(x, lowestLevel, z).block(filler); // There is nothing below so we fill this with the filler
                     }
+                    // That single filler block is not enough when the bottom of the building ends
+                    // up over a cave, a ravine or a terrain step: give it ground to stand on.
+                    fillSupportBelow(x, z, lowestLevel - 1);
 
                     // Also clear the inside of buildings to avoid geometry that doesn't really belong there
                     clearRange(info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
