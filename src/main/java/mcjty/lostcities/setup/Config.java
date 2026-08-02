@@ -53,6 +53,7 @@ public class Config {
     private static Set<Identifier> AVOID_STRUCTURES_SET = null;
     public static final ModConfigSpec.BooleanValue AVOID_STRUCTURES_ADJACENT;
     public static final ModConfigSpec.BooleanValue AVOID_SURFACE_STRUCTURES;
+    public static final ModConfigSpec.BooleanValue STRUCTURES_YIELD_TO_CITIES;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES_ADJACENT;
     public static final ModConfigSpec.BooleanValue AVOID_FLATTENING;
@@ -200,6 +201,9 @@ public class Config {
         AVOID_SURFACE_STRUCTURES = SERVER_BUILDER
                 .comment("If true then avoid generating cities in chunks with any structure that generates at the 'surface_structures' step, without having to list them all in 'avoidStructures'. Useful with structure mods. Underground structures (mineshafts, strongholds, ...) are not affected")
                 .define("avoidSurfaceStructures", false);
+        STRUCTURES_YIELD_TO_CITIES = SERVER_BUILDER
+                .comment("If true then structures are not placed in the chunks and at the heights a city occupies, so the city wins instead of being built over. A structure at the edge of a city keeps the part that falls outside it. Structures that pass well below the city (ancient cities, mineshafts, ...) are not affected")
+                .define("structuresYieldToCities", false);
         AVOID_VILLAGES_ADJACENT = SERVER_BUILDER
                 .comment("If true then also avoid generating cities in chunks adjacent to the chunks with villages")
                 .define("avoidVillagesAdjacent", false);

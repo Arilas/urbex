@@ -3,7 +3,8 @@
   "package": "mcjty.lostcities.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "MinecraftServerMixin"
+    "MinecraftServerMixin",
+    "StructureStartMixin"
   ],
   "client": [
   ],
