@@ -84,6 +84,12 @@ Verified against the ported source. Line numbers are as of commit `0bffd84`.
   clears to a literal `256` with its own `// @todo hardcoded height` (line 1091); `DamageArea`
   builds its AABB as `0..256` (`DamageArea.java:38`, with acknowledgements at lines 165 and 176);
   `BuildingInfo.java:1759` and `:1813` compare against `256`. The entire -64..320 range is invisible.
+- **A7 — city placement ignores the world seed.** `City.isCityCenter()` seeds from coordinates
+  alone (`City.java:157`), as do `getCityRadius()` (`:185`) and `getCityStyleForCityCenter()`
+  (`:213`) — unlike `getCityStyleInt()` at `:226`, which does mix in `provider.getSeed()`.
+  `MultiChunk.java:72` has the same shape. Every world on a given profile therefore places its
+  cities in identical chunks at identical radii. Found during the P1a RNG audit, after §1.2 was
+  settled.
 - **B2 — one shared mutable `ChunkDriver`, `rand` and `street` per dimension**, which is why
   generation is serialized (`LostCityFeature.place`, `LostCitySphereFeature.place`,
   `StructureSuppressor.suppressedByCity`).
