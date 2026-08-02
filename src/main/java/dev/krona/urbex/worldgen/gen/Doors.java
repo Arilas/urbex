@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.ChunkDriver;
+import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.Orientation;
@@ -21,10 +22,10 @@ public class Doors
                 .setValue(DoorBlock.FACING, facing);
     }
 
-    public static void generateDoors(LostCityTerrainFeature feature, BuildingInfo info, int height, int f) {
+    public static void generateDoors(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, int height, int f) {
         BlockState air = Blocks.AIR.defaultBlockState();
         BlockState filler = info.getCompiledPalette().get(info.getBuilding().getFillerBlock());
-        ChunkDriver driver = feature.driver;
+        ChunkDriver driver = ctx.driver;
 
         height--;       // Start generating doors one below for the filler
 

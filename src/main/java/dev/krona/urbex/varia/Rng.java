@@ -42,7 +42,14 @@ public final class Rng {
         HIGHWAY,
         RAILWAY,
         SPHERE,
-        SCATTERED
+        SCATTERED,
+        // Added after the first release of this enum. New consumers append here; they never
+        // reorder what is above them, so an existing world keeps generating what it did.
+        PALETTE,
+        NOISE,
+        SHAPE,
+        TERRAIN_L1,
+        TERRAIN_L2
     }
 
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;

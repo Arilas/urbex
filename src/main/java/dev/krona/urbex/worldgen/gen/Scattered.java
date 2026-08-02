@@ -4,6 +4,7 @@ import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.QualityRandom;
 import dev.krona.urbex.worldgen.ChunkDriver;
+import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
@@ -36,7 +37,7 @@ public class Scattered {
         return Highway.hasHighway(info.coord, feature.provider, feature.profile);
     }
 
-    public static void generateScattered(LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings, ChunkHeightmap heightmap) {
+    public static void generateScattered(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings, ChunkHeightmap heightmap) {
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
         IDimensionInfo provider = feature.provider;
@@ -152,14 +153,14 @@ public class Scattered {
                     lowestLevel = provider.getWorld().getMinY() + 2;  // @todo is this right?
                 }
             }
-            generateScatteredBuilding(feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
+            generateScatteredBuilding(ctx, feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
         } else {
             int lowestLevel = handleScatteredTerrainMulti(feature, scattered, info.coord, minheight, maxheight, avgheight);
             int relx = chunkX - tlChunkX;
             int relz = chunkZ - tlChunkZ;
             String buildingName = multiBuilding.getBuilding(relx, relz);
             Building building = AssetRegistries.BUILDINGS.getOrThrow(provider.getWorld(), buildingName);
-            generateScatteredBuilding(feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
+            generateScatteredBuilding(ctx, feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
         }
     }
 
@@ -203,7 +204,7 @@ public class Scattered {
         return true;
     }
 
-    private static void generateScatteredBuilding(LostCityTerrainFeature feature, BuildingInfo info, Building building, Random rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
+    private static void generateScatteredBuilding(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, Building building, Random rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
         IDimensionInfo provider = feature.provider;
 
         int height = lowestLevel;
@@ -241,7 +242,7 @@ public class Scattered {
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
                 }
             };
-            ChunkDriver driver = feature.driver;
+            ChunkDriver driver = ctx.driver;
             BlockState air = Blocks.AIR.defaultBlockState();
             BlockState liquid = feature.liquid;
             String randomPart = building.getRandomPart(rand, conditionContext);
@@ -257,7 +258,7 @@ public class Scattered {
                     case CLEAR -> {
                         for (int x = 0; x < 16; x++) {
                             for (int z = 0; z < 16; z++) {
-                                feature.clearRange(info, x, z, lowestLevel, lowestLevel + 50, false);
+                                feature.clearRange(ctx, info, x, z, lowestLevel, lowestLevel + 50, false);
                             }
                         }
                     }
@@ -282,9 +283,9 @@ public class Scattered {
                 }
             }
 
-            height = feature.generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+            height = feature.generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
             if (part2 != null) {
-                feature.generatePart(info, part2, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+                feature.generatePart(ctx, info, part2, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
             }
         }
     }

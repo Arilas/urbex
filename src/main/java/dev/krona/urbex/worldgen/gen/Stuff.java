@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.worldgen.ChunkDriver;
+import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
@@ -27,7 +28,7 @@ public class Stuff {
     // palettes. Report each such combination once instead of on every city chunk.
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
-    public static void generateStuff(LostCityTerrainFeature feature, BuildingInfo info) {
+    public static void generateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
         feature.rand.setSeed(info.coord.chunkX() * 2570174657L + info.coord.chunkZ() * 101754695981L);
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
@@ -41,7 +42,7 @@ public class Stuff {
                         IdentifierMatcher buildingMatcher = settings.getBuildingMatcher();
                         if (buildingMatcher.isAny() || buildingMatcher.test(info.buildingType.getId())) {
                             if (settings.getBiomeMatcher().test(biome.getMainBiome())) {
-                                actuallyGenerateStuff(feature, info, stuff, palette, inBuilding == Boolean.TRUE);
+                                actuallyGenerateStuff(ctx, feature, info, stuff, palette, inBuilding == Boolean.TRUE);
                             }
                         }
                     }
@@ -85,13 +86,13 @@ public class Stuff {
         return true;
     }
 
-    private static void actuallyGenerateStuff(LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, boolean inBuilding) {
+    private static void actuallyGenerateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, boolean inBuilding) {
         StuffSettingsRE settings = stuff.getSettings();
         String blocks = settings.getColumn();
         if (!columnResolves(stuff, blocks, palette)) {
             return;
         }
-        ChunkDriver driver = feature.driver;
+        ChunkDriver driver = ctx.driver;
         WorldGenLevel level = info.provider.getWorld();
         int attempts = settings.getAttempts();
         Integer minheight = settings.getMinheight();

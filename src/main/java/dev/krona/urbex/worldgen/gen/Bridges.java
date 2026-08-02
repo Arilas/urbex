@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.ChunkDriver;
+import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.Orientation;
@@ -12,7 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class Bridges {
 
-    public static void generateBridges(LostCityTerrainFeature feature, BuildingInfo info) {
+    public static void generateBridges(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
         if (info.getHighwayXLevel() == 0 || info.getHighwayZLevel() == 0) {
             // If there is a highway at level 0 we cannot generate bridge parts. If there
             // is no highway or a highway at level 1 then bridge sections can generate just fine
@@ -20,18 +21,18 @@ public class Bridges {
         }
         BuildingPart bt = info.hasXBridge(info.provider);
         if (bt != null) {
-            generateBridge(feature, info, bt, Orientation.X);
+            generateBridge(ctx, feature, info, bt, Orientation.X);
         } else {
             bt = info.hasZBridge(info.provider);
             if (bt != null) {
-                generateBridge(feature, info, bt, Orientation.Z);
+                generateBridge(ctx, feature, info, bt, Orientation.Z);
             }
         }
     }
 
-    private static void generateBridge(LostCityTerrainFeature feature, BuildingInfo info, BuildingPart bt, Orientation orientation) {
+    private static void generateBridge(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, BuildingPart bt, Orientation orientation) {
         CompiledPalette compiledPalette = feature.computePalette(info, bt);
-        ChunkDriver driver = feature.driver;
+        ChunkDriver driver = ctx.driver;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 driver.current(x, info.profile.GROUNDLEVEL + 1, z);

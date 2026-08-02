@@ -1753,23 +1753,23 @@ public class BuildingInfo {
             if (h < 256) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
-                        h + LostCityTerrainFeature.getRandomizedOffset(cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET),
-                        h + LostCityTerrainFeature.getRandomizedOffset(cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET));
+                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET),
+                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET));
                 return desiredMaxHeight1;
             }
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(cx - 1, cz - 1));
-            getXmin().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(cx, cz - 1));
-            getZmax().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(cx, cz + 1));
+            getZmin().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx, cz - 1));
+            getZmax().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(cx + 1, cz - 1));
-            getXmax().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx + 1, cz + 1));
 
             desiredMaxHeight1 = minMax;
         }
@@ -1815,16 +1815,16 @@ public class BuildingInfo {
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(cx - 1, cz - 1));
-            getXmin().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(cx, cz - 1));
-            getZmax().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(cx, cz + 1));
+            getZmin().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx, cz - 1));
+            getZmax().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(cx + 1, cz - 1));
-            getXmax().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx + 1, cz + 1));
             desiredTerrainCorrectionHeights = minMax;
         }
         return desiredTerrainCorrectionHeights;

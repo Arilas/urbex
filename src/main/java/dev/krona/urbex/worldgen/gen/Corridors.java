@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.ChunkDriver;
+import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
@@ -12,12 +13,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.RailShape;
 
 public class Corridors {
-    public static void generateCorridors(LostCityTerrainFeature feature, BuildingInfo info, boolean xRail, boolean zRail) {
+    public static void generateCorridors(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, boolean xRail, boolean zRail) {
         BlockState air = Blocks.AIR.defaultBlockState();
         BlockState base = info.profile.getBaseBlock();
         BlockState railx = Blocks.RAIL.defaultBlockState().setValue(RailBlock.SHAPE, RailShape.EAST_WEST);
         BlockState railz = Blocks.RAIL.defaultBlockState();
-        ChunkDriver driver = feature.driver;
+        ChunkDriver driver = ctx.driver;
 
         Character corridorRoofBlock = info.getCityStyle().getCorridorRoofBlock();
         Character corridorGlassBlock = info.getCityStyle().getCorridorGlassBlock();

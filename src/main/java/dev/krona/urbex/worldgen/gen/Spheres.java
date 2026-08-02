@@ -5,13 +5,13 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkFixer;
+import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.CitySphere;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.WorldGenRegion;
-import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -21,16 +21,13 @@ public class Spheres {
     public static void generateSpheres(LostCityTerrainFeature feature, WorldGenRegion region, ChunkAccess chunk) {
         IDimensionInfo provider = feature.provider;
         LostCityProfile profile = feature.profile;
-        ChunkDriver driver = feature.driver;
         // Do the city spheres
         if (profile.isSpace() || profile.isSpheres()) {
-            LevelAccessor oldRegion = driver.getRegion();
-            ChunkAccess oldChunk = driver.getPrimer();
-            driver.setPrimer(region, chunk);
-
             int chunkX = chunk.getPos().x();
             int chunkZ = chunk.getPos().z();
             ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
+            BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
+            ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info);
 
             CitySphere sphere = CitySphere.getCitySphere(coord, provider);
             CitySphere.initSphere(sphere, provider);   // Make sure city sphere information is complete
@@ -39,24 +36,22 @@ public class Spheres {
                 BlockPos cc = sphere.getCenterPos();
                 int cx = cc.getX() - (chunkX << 4);
                 int cz = cc.getZ() - (chunkZ << 4);
-                fillSphere(feature, cx, profile.GROUNDLEVEL, cz, (int) radius, sphere.getGlassBlock(), sphere.getSideBlock());
+                fillSphere(ctx, feature, cx, profile.GROUNDLEVEL, cz, (int) radius, sphere.getGlassBlock(), sphere.getSideBlock());
             }
 
             if (profile.isSpace()) {
-                BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-                Monorails.generateMonorails(feature, info);
+                Monorails.generateMonorails(ctx, feature, info);
             }
 
-            driver.actuallyGenerate(chunk);
-            driver.setPrimer(oldRegion, oldChunk);
+            ctx.driver.actuallyGenerate(chunk);
             ChunkFixer.fix(provider, coord);
         }
     }
 
-    private static void fillSphere(LostCityTerrainFeature feature, int centerx, int centery, int centerz, int radius,
+    private static void fillSphere(ChunkGenContext ctx, LostCityTerrainFeature feature, int centerx, int centery, int centerz, int radius,
                                    BlockState glass, BlockState sideBlock) {
         IDimensionInfo provider = feature.provider;
-        ChunkDriver driver = feature.driver;
+        ChunkDriver driver = ctx.driver;
         LostCityProfile profile = feature.profile;
         BlockState air = Blocks.AIR.defaultBlockState();
         double sqradius = radius * radius;

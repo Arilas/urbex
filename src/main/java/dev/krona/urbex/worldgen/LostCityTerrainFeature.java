@@ -69,23 +69,14 @@ public class LostCityTerrainFeature {
     private Set<BlockState> statesNeedingLightingUpdate = null;
     private Set<BlockState> statesNeedingPoiUpdate = null;
 
-    private char street;
-
     private final NoiseGeneratorPerlin rubbleNoise;
     private final NoiseGeneratorPerlin leavesNoise;
     private final NoiseGeneratorPerlin ruinNoise;
     private final NoiseGeneratorPerlin bottomLayerNoise;    // Used in floating profile for the underside of buildings
 
-    private double[] rubbleBuffer = new double[256];
-    private double[] leavesBuffer = new double[256];
-    private double[] ruinBuffer = new double[256];
-    private double[] bottomLayerBuffer = new double[256];
-
     private BlockState[] randomLeafs = null;
     private BlockState[] randomDirt = null;
     private Set<BlockState> randomDirtSet = null;
-
-    public final ChunkDriver driver;
 
     public final IDimensionInfo provider;
     public final LostCityProfile profile;
@@ -99,7 +90,6 @@ public class LostCityTerrainFeature {
         this.provider = provider;
         this.profile = profile;
         this.rand = rand;
-        driver = new ChunkDriver();
 //        int waterLevel = provider.getWorld() == null ? 65 : Tools.getSeaLevel(provider.getWorld());// profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
         this.rubbleNoise = new NoiseGeneratorPerlin(rand, 4);
         this.leavesNoise = new NoiseGeneratorPerlin(rand, 4);
@@ -114,7 +104,7 @@ public class LostCityTerrainFeature {
 //        spaceTerrainGenerator.setup(provider.getWorld().getWorld(), provider);
     }
 
-    private BlockState getRandomLeaf(BuildingInfo info, CompiledPalette compiledPalette) {
+    private BlockState getRandomLeaf(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character leavesBlock = info.getCityStyle().getLeavesBlock();
         if (leavesBlock != null) {
             return compiledPalette.get(leavesBlock);
@@ -142,18 +132,18 @@ public class LostCityTerrainFeature {
         return randomLeafs[fastrand128()];
     }
 
-    private Set<BlockState> getPossibleRandomDirts(BuildingInfo info, CompiledPalette compiledPalette) {
+    private Set<BlockState> getPossibleRandomDirts(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
         if (rubbleDirtBlock != null) {
             return compiledPalette.getAll(rubbleDirtBlock);
         } else {
-            getRandomDirt(info, compiledPalette);
+            getRandomDirt(ctx, info, compiledPalette);
             return randomDirtSet;
         }
     }
 
     // Gets rubble block - regenerates list if empty
-    private BlockState getRandomDirt(BuildingInfo info, CompiledPalette compiledPalette) {
+    private BlockState getRandomDirt(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
         if (rubbleDirtBlock != null) {
             return compiledPalette.get(rubbleDirtBlock);
@@ -243,7 +233,8 @@ public class LostCityTerrainFeature {
         return (gSeed >> 16) & 0x7F;
     }
 
-    private boolean isVoid(int x, int z) {
+    private boolean isVoid(ChunkGenContext ctx, int x, int z) {
+        ChunkDriver driver = ctx.driver;
         driver.current(x, 255, z);
         int minHeight = provider.getWorld().getMinY();
         while (driver.getBlock() == air && driver.getY() > minHeight) {
@@ -255,11 +246,6 @@ public class LostCityTerrainFeature {
     public void generate(WorldGenRegion region, ChunkAccess chunk) {
         long start = System.currentTimeMillis();
 
-        LevelAccessor oldRegion = driver.getRegion();
-        ChunkAccess oldChunk = driver.getPrimer();
-
-        driver.setPrimer(region, chunk);
-
         int chunkX = chunk.getPos().x();
         int chunkZ = chunk.getPos().z();
 
@@ -267,10 +253,7 @@ public class LostCityTerrainFeature {
 
         ChunkHeightmap heightmap = getHeightmap(coord, provider.getWorld());
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-
-        // @todo this setup is not very clean
-        CityStyle cityStyle = info.getCityStyle();
-        street = cityStyle.getStreetBlock();//info.getCompiledPalette().get(cityStyle.getStreetBlock());
+        ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info);
 
         boolean doCity = info.isCity || (info.outsideChunk && info.hasBuilding);
 
@@ -289,15 +272,15 @@ public class LostCityTerrainFeature {
         // we happen to have a void chunk we detect that here and go back to normal chunk generation
         // anyway
         if (doCity && provider.getProfile().CITY_AVOID_VOID && provider.getProfile().isFloating()) {
-            boolean v = isVoid(2, 2) || isVoid(2, 14) || isVoid(14, 2) || isVoid(14, 14) || isVoid(8, 8);
+            boolean v = isVoid(ctx, 2, 2) || isVoid(ctx, 2, 14) || isVoid(ctx, 14, 2) || isVoid(ctx, 14, 14) || isVoid(ctx, 8, 8);
             doCity = !v;
         }
 
         if (doCity) {
-            doCityChunk(info, heightmap, chunk);
+            doCityChunk(ctx, info, heightmap, chunk);
         } else {
             // We already have a prefilled core chunk (as generated from doCoreChunk)
-            doNormalChunk(info, heightmap, avoidChunk);
+            doNormalChunk(ctx, info, heightmap, avoidChunk);
         }
 
         if (profile.isSpace() || profile.isSpheres()) {
@@ -315,7 +298,7 @@ public class LostCityTerrainFeature {
                             case TOP -> getTopLevel(info);
                         };
                         partY += offset;
-                        generatePart(info, part, Transform.ROTATE_NONE, 0, partY, 0, HardAirSetting.WATERLEVEL);
+                        generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, partY, 0, HardAirSetting.WATERLEVEL);
                     }
                 }
             }
@@ -323,29 +306,23 @@ public class LostCityTerrainFeature {
 
         Railway.RailChunkInfo railInfo = info.getRailInfo();
         if (railInfo.getType() != RailChunkType.NONE) {
-            Railways.generateRailways(this, info, railInfo, heightmap);
+            Railways.generateRailways(ctx, this, info, railInfo, heightmap);
         }
-        Railways.generateRailwayDungeons(this, info);
+        Railways.generateRailwayDungeons(ctx, this, info);
 
 //        if (profile.isSpace()) {
 //            generateMonorails(info);
 //        }
 //
-        fixTorches(info);
-
-        // We make a new random here because the primer for a normal chunk may have
-        // been cached and we want to be able to do the same when returning from a cached
-        // primer vs generating it here
-        rand.setSeed(chunkX * 257017164707L + chunkZ * 101754694003L);
+        fixTorches(ctx, info);
 
         if (info.getDamageArea().hasExplosions()) {
-            breakBlocksForDamageNew(chunkX, chunkZ, info);
-            fixAfterExplosion(info);
+            breakBlocksForDamageNew(ctx, chunkX, chunkZ, info);
+            fixAfterExplosion(ctx, info);
         }
-        generateDebris(info);
+        generateDebris(ctx, info);
 
-        driver.actuallyGenerate(chunk);
-        driver.setPrimer(oldRegion, oldChunk);
+        ctx.driver.actuallyGenerate(chunk);
         ChunkFixer.fix(provider, coord);
         // After the fixer, so the post-todos have placed their blocks and what we see is final
         forgetOverwrittenBlockEntities(chunk);
@@ -433,12 +410,13 @@ public class LostCityTerrainFeature {
     }
 
 
-    private void fixTorches(BuildingInfo info) {
+    private void fixTorches(ChunkGenContext ctx, BuildingInfo info) {
         List<BlockPos> torches = info.getTorchTodo();
         if (torches.isEmpty()) {
             return;
         }
 
+        ChunkDriver driver = ctx.driver;
         BlockState torchState = Blocks.WALL_TORCH.defaultBlockState();
         for (BlockPos pos : torches) {
             int x = pos.getX() & 0xf;
@@ -460,25 +438,26 @@ public class LostCityTerrainFeature {
         info.clearTorchTodo();
     }
 
-    private void doNormalChunk(BuildingInfo info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
+    private void doNormalChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
 //        debugClearChunk(chunkX, chunkZ, primer);
         if ((avoidChunk != AvoidChunk.YES || !Config.AVOID_FLATTENING.get()) && (profile.isDefault() || profile.isVoidSpheres())) {
-            correctTerrainShape(provider.getWorld(), info.coord, heightmap);
+            correctTerrainShape(ctx, provider.getWorld(), info.coord, heightmap);
 //            flattenChunkToCityBorder(chunkX, chunkZ);
         }
 
-        Bridges.generateBridges(this, info);
-        Highways.generateHighways(this, info);
+        Bridges.generateBridges(ctx, this, info);
+        Highways.generateHighways(ctx, this, info);
 
         ScatteredSettings scatteredSettings = provider.getWorldStyle().getScatteredSettings();
         if (scatteredSettings != null) {
             if (!Scattered.avoidScattered(this, info)) {
-                Scattered.generateScattered(this, info, scatteredSettings, heightmap);
+                Scattered.generateScattered(ctx, this, info, scatteredSettings, heightmap);
             }
         }
     }
 
-    private void breakBlocksForDamageNew(int chunkX, int chunkZ, BuildingInfo info) {
+    private void breakBlocksForDamageNew(ChunkGenContext ctx, int chunkX, int chunkZ, BuildingInfo info) {
+        ChunkDriver driver = ctx.driver;
         int cx = chunkX << 4;
         int cz = chunkZ << 4;
 
@@ -557,7 +536,7 @@ public class LostCityTerrainFeature {
         }
     }
 
-    public String getRandomPart(List<String> parts) {
+    public String getRandomPart(ChunkGenContext ctx, List<String> parts) {
         if (parts.size() == 1) {
             return parts.get(0);
         } else {
@@ -565,7 +544,8 @@ public class LostCityTerrainFeature {
         }
     }
 
-    public void clearRange(BuildingInfo info, int x, int z, int height1, int height2, boolean dowater) {
+    public void clearRange(ChunkGenContext ctx, BuildingInfo info, int x, int z, int height1, int height2, boolean dowater) {
+        ChunkDriver driver = ctx.driver;
         if (dowater) {
             // Special case for drowned city
             driver.setBlockRange(x, height1, z, info.waterLevel, liquid);
@@ -575,7 +555,8 @@ public class LostCityTerrainFeature {
         }
     }
 
-    public void clearRange(BuildingInfo info, int x, int z, int height1, int height2, boolean dowater, Predicate<BlockState> test) {
+    public void clearRange(ChunkGenContext ctx, BuildingInfo info, int x, int z, int height1, int height2, boolean dowater, Predicate<BlockState> test) {
+        ChunkDriver driver = ctx.driver;
         if (dowater) {
             // Special case for drowned city
             driver.setBlockRange(x, height1, z, info.waterLevel, liquid, test);
@@ -587,21 +568,21 @@ public class LostCityTerrainFeature {
 
     private static final Random RANDOMIZED_OFFSET = new Random();
 
-    public static int getRandomizedOffset(int chunkX, int chunkZ, int min, int max) {
+    public static int getRandomizedOffset(long seed, int chunkX, int chunkZ, int min, int max) {
         RANDOMIZED_OFFSET.setSeed(chunkZ * 256203221L + chunkX * 899809363L);
         return RANDOMIZED_OFFSET.nextInt(max - min + 1) + min;
     }
 
     private static final Random RANDOMIZED_OFFSET_L1 = new Random();
 
-    public static int getHeightOffsetL1(int chunkX, int chunkZ) {
+    public static int getHeightOffsetL1(long seed, int chunkX, int chunkZ) {
         RANDOMIZED_OFFSET_L1.setSeed(chunkZ * 341873128712L + chunkX * 132897987541L);
         return RANDOMIZED_OFFSET_L1.nextInt(5);
     }
 
     private static final Random RANDOMIZED_OFFSET_L2 = new Random();
 
-    public static int getHeightOffsetL2(int chunkX, int chunkZ) {
+    public static int getHeightOffsetL2(long seed, int chunkX, int chunkZ) {
         RANDOMIZED_OFFSET_L2.setSeed(chunkZ * 132897987541L + chunkX * 341873128712L);
         return RANDOMIZED_OFFSET_L2.nextInt(5);
     }
@@ -627,7 +608,7 @@ public class LostCityTerrainFeature {
      * or up the top layer (6 thick) of the terrain. In a chunk these heights are interpolated
      * (bilinear interpolation).
      */
-    private void correctTerrainShape(WorldGenLevel level, ChunkCoord coord, ChunkHeightmap heightmap) {
+    private void correctTerrainShape(ChunkGenContext ctx, WorldGenLevel level, ChunkCoord coord, ChunkHeightmap heightmap) {
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
         BuildingInfo.MinMax mm00 = info.getDesiredMaxHeightL2();
         BuildingInfo.MinMax mm10 = info.getXmax().getDesiredMaxHeightL2();
@@ -688,14 +669,14 @@ public class LostCityTerrainFeature {
                     if (maxheight > max) {
                         maxheight = max;
                     }
-                    int maxTouchedY = moveDown(x, z, (int) maxheight, max);
+                    int maxTouchedY = moveDown(ctx, x, z, (int) maxheight, max);
 
                     if (maxTouchedY == Short.MIN_VALUE) {
                         float minheight = minh0 + (minh1 - minh0) * (15.0f - z) / 15.0f;
                         if (minheight < min) {
                             minheight = min;
                         }
-                        maxTouchedY = moveUp(x, z, (int) minheight, info.waterLevel > info.groundLevel);
+                        maxTouchedY = moveUp(ctx, x, z, (int) minheight, info.waterLevel > info.groundLevel);
                     }
                     if (maxTouchedY != Short.MIN_VALUE && x == 8 && z == 8) {
                         // Only adjust heightmap for center value
@@ -736,7 +717,8 @@ public class LostCityTerrainFeature {
      * so that whatever rests on top of it is not left hanging in the air. This is the same fill
      * fillToBedrockStreetBlock() applies under streets.
      */
-    private void fillSupportBelow(int x, int z, int y) {
+    private void fillSupportBelow(ChunkGenContext ctx, int x, int z, int y) {
+        ChunkDriver driver = ctx.driver;
         int lowest = provider.getWorld().getMinY() + profile.BEDROCK_LAYER;
         driver.current(x, y, z);
         while (driver.getY() > lowest && isEmpty(driver.getBlock())) {
@@ -746,7 +728,8 @@ public class LostCityTerrainFeature {
     }
 
     // Return the new max height of the chunk in this column. Or Short.MIN_VALUE if nothing was done
-    private int moveUp(int x, int z, int height, boolean dowater) {
+    private int moveUp(ChunkGenContext ctx, int x, int z, int height, boolean dowater) {
+        ChunkDriver driver = ctx.driver;
         int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
         // Find the first non-empty block starting at the given height
         driver.current(x, height, z);
@@ -780,7 +763,8 @@ public class LostCityTerrainFeature {
     private final BlockState[] buffer = new BlockState[6];
 
     // Return the new max height of the chunk in this column. Or Short.MIN_VALUE if nothing was done
-    private int moveDown(int x, int z, int height, int maxBuildLimit) {
+    private int moveDown(ChunkGenContext ctx, int x, int z, int height, int maxBuildLimit) {
+        ChunkDriver driver = ctx.driver;
         int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
         int y = maxBuildLimit-1;
         driver.current(x, y, z);
@@ -815,7 +799,7 @@ public class LostCityTerrainFeature {
         // surface down onto is empty - an overhang or cliff shoulder over a carved cavern, or a
         // sampled heightmap that disagrees with the local terrain - the relocated surface is
         // left hanging in the air, and so is everything the city then builds on top of it.
-        fillSupportBelow(x, z, driver.getY());
+        fillSupportBelow(ctx, x, z, driver.getY());
 
 //
 //        if (dowater) {
@@ -936,7 +920,8 @@ public class LostCityTerrainFeature {
         heightmap.update(height);
     }
 
-    private void doCityChunk(BuildingInfo info, ChunkHeightmap heightmap, ChunkAccess chunk) {
+    private void doCityChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, ChunkAccess chunk) {
+        ChunkDriver driver = ctx.driver;
         boolean building = info.hasBuilding;
 
         if (info.profile.isDefault() || info.profile.isVoidSpheres()) {
@@ -964,22 +949,22 @@ public class LostCityTerrainFeature {
             int ground = info.getCityGroundLevel();
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
-                    int maxTouchedY = moveDown(x, z, ground + 1, provider.getWorld().getMaxY() + 1);
+                    int maxTouchedY = moveDown(ctx, x, z, ground + 1, provider.getWorld().getMaxY() + 1);
                     if (maxTouchedY == Short.MIN_VALUE) {
-                        moveUp(x, z, ground, info.waterLevel > info.groundLevel);
+                        moveUp(ctx, x, z, ground, info.waterLevel > info.groundLevel);
                     }
                 }
             }
         }
 
         if (building) {
-            generateBuilding(info, heightmap, chunk);
+            generateBuilding(ctx, info, heightmap, chunk);
         } else {
-            generateStreet(info, heightmap);
+            generateStreet(ctx, info, heightmap);
         }
 
         if (info.profile.RUIN_CHANCE > 0.0) {
-            generateRuins(info);
+            generateRuins(ctx, info);
         }
 
         int levelX = info.getHighwayXLevel();
@@ -987,23 +972,23 @@ public class LostCityTerrainFeature {
         if (!building) {
             Railway.RailChunkInfo railInfo = info.getRailInfo();
             if (levelX < 0 && levelZ < 0 && !railInfo.getType().isSurface()) {
-                generateStreetDecorations(info);
+                generateStreetDecorations(ctx, info);
             }
         }
         if (levelX >= 0 || levelZ >= 0) {
-            Highways.generateHighways(this, info);
+            Highways.generateHighways(ctx, this, info);
         }
 
         if (info.profile.RUBBLELAYER) {
             if (!info.hasBuilding || info.ruinHeight >= 0) {
-                generateRubble(info);
+                generateRubble(ctx, info);
             }
         }
 
-        Stuff.generateStuff(this, info);
+        Stuff.generateStuff(ctx, this, info);
     }
 
-    private void generateStreetDecorations(BuildingInfo info) {
+    private void generateStreetDecorations(ChunkGenContext ctx, BuildingInfo info) {
         Direction stairDirection = info.getActualStairDirection();
         if (stairDirection != null) {
             BuildingPart stairs = info.stairType;
@@ -1017,12 +1002,13 @@ public class LostCityTerrainFeature {
                     case ZMAX -> Transform.ROTATE_270;
                 };
 
-                generatePart(info, stairs, transform, 0, oy, 0, HardAirSetting.AIR);
+                generatePart(ctx, info, stairs, transform, 0, oy, 0, HardAirSetting.AIR);
             }
         }
     }
 
-    private int countNotEmpty(int y, int max) {
+    private int countNotEmpty(ChunkGenContext ctx, int y, int max) {
+        ChunkDriver driver = ctx.driver;
         int cnt = 0;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -1038,7 +1024,8 @@ public class LostCityTerrainFeature {
     }
 
     /// Fix floating blocks after an explosion
-    private void fixAfterExplosion(BuildingInfo info) {
+    private void fixAfterExplosion(ChunkGenContext ctx, BuildingInfo info) {
+        ChunkDriver driver = ctx.driver;
         if (info.profile.isCavern() && !info.hasBuilding) {
             // In a cavern we only do this correction when there is a building
             return;
@@ -1052,7 +1039,7 @@ public class LostCityTerrainFeature {
         int end = info.getDamageArea().getHighestExplosionHeight();
 
         for (int y = start; y <= end; y++) {
-            int count = countNotEmpty(y, 20);
+            int count = countNotEmpty(ctx, y, 20);
             if (count < 16) {   // @todo configurable?
                 // (Almost) empty! That means everything above this can be deleted
                 // Except in a cavern, there we only delete the building
@@ -1076,13 +1063,14 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private void generateRubble(BuildingInfo info) {
+    private void generateRubble(ChunkGenContext ctx, BuildingInfo info) {
+        ChunkDriver driver = ctx.driver;
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
-        this.rubbleBuffer = this.rubbleNoise.getRegion(this.rubbleBuffer, (chunkX << 4), (chunkZ << 4), 16, 16, 1.0 / 16.0, 1.0 / 16.0, 1.0D);
-        this.leavesBuffer = this.leavesNoise.getRegion(this.leavesBuffer, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
+        double[] rubbleBuffer = ctx.buffers.rubble = this.rubbleNoise.getRegion(ctx.buffers.rubble, (chunkX << 4), (chunkZ << 4), 16, 16, 1.0 / 16.0, 1.0 / 16.0, 1.0D);
+        double[] leavesBuffer = ctx.buffers.leaves = this.leavesNoise.getRegion(ctx.buffers.leaves, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
 
-        Set<BlockState> possibleRandomDirts = getPossibleRandomDirts(info, info.getCompiledPalette());
+        Set<BlockState> possibleRandomDirts = getPossibleRandomDirts(ctx, info, info.getCompiledPalette());
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 double vr = info.profile.RUBBLE_DIRT_SCALE < 0.01f ? 0 : rubbleBuffer[x + z * 16] / info.profile.RUBBLE_DIRT_SCALE;
@@ -1094,7 +1082,7 @@ public class LostCityTerrainFeature {
                     if (c != air && c != liquid) {
                         for (int i = 0; i < vr; i++) {
                             if (isEmpty(driver.getBlock())) {
-                                driver.add(getRandomDirt(info, info.getCompiledPalette()));
+                                driver.add(getRandomDirt(ctx, info, info.getCompiledPalette()));
                             } else {
                                 driver.incY();
                             }
@@ -1105,7 +1093,7 @@ public class LostCityTerrainFeature {
                     if (leafBaseState == base || possibleRandomDirts.contains(leafBaseState)) {
                         for (int i = 0; i < vl; i++) {
                             if (isEmpty(driver.getBlock())) {
-                                driver.add(getRandomLeaf(info, info.getCompiledPalette()));
+                                driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                             } else {
                                 driver.incY();
                             }
@@ -1157,18 +1145,20 @@ public class LostCityTerrainFeature {
     }
 
 
-    private void generateRuins(BuildingInfo info) {
+    private void generateRuins(ChunkGenContext ctx, BuildingInfo info) {
         if (info.ruinHeight < 0) {
             return;
         }
 
+        ChunkDriver driver = ctx.driver;
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
         double d0 = 0.03125D;
-        this.ruinBuffer = this.ruinNoise.getRegion(this.ruinBuffer, (chunkX << 4), (chunkZ << 4), 16, 16, d0 * 2.0D, d0 * 2.0D, 1.0D);
+        double[] ruinBuffer = ctx.buffers.ruin = this.ruinNoise.getRegion(ctx.buffers.ruin, (chunkX << 4), (chunkZ << 4), 16, 16, d0 * 2.0D, d0 * 2.0D, 1.0D);
+        double[] leavesBuffer = ctx.buffers.leaves;
         boolean doLeaves = info.profile.RUBBLELAYER;
         if (doLeaves) {
-            this.leavesBuffer = this.leavesNoise.getRegion(this.leavesBuffer, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
+            leavesBuffer = ctx.buffers.leaves = this.leavesNoise.getRegion(ctx.buffers.leaves, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
         }
 
         int baseheight = (int) (info.getCityGroundLevel() + 1 + (info.ruinHeight * info.getNumFloors() * FLOORHEIGHT));
@@ -1216,7 +1206,7 @@ public class LostCityTerrainFeature {
                                 height++;   // Make sure we keep on filling with air a bit longer because we are lowering here
                                 c = driver.getBlockDown();
                             }
-                            driver.add(getRandomLeaf(info, palette));
+                            driver.add(getRandomLeaf(ctx, info, palette));
                             vl--;
                         } else {
                             driver.add(air);
@@ -1228,11 +1218,12 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private void generateStreet(BuildingInfo info, ChunkHeightmap heightmap) {
+    private void generateStreet(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap) {
+        ChunkDriver driver = ctx.driver;
         boolean xRail = info.hasXCorridor();
         boolean zRail = info.hasZCorridor();
         if (xRail || zRail) {
-            Corridors.generateCorridors(this, info, xRail, zRail);
+            Corridors.generateCorridors(ctx, this, info, xRail, zRail);
         }
 
         Railway.RailChunkInfo railInfo = info.getRailInfo();
@@ -1272,9 +1263,9 @@ public class LostCityTerrainFeature {
             }
 
             switch (streetType) {
-                case NORMAL -> generateNormalStreetSection(info, height);
-                case FULL -> generateFullStreetSection(info, height);
-                case PARK -> generateParkSection(info, height, elevated);
+                case NORMAL -> generateNormalStreetSection(ctx, info, height);
+                case FULL -> generateFullStreetSection(ctx, info, height);
+                case PARK -> generateParkSection(ctx, info, height, elevated);
             }
             height++;
 
@@ -1286,55 +1277,55 @@ public class LostCityTerrainFeature {
                     part = info.fountainType;
                 }
                 if (part != null) {
-                    generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
+                    generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
                 }
             }
 
-            generateRandomVegetation(info, height);
+            generateRandomVegetation(ctx, info, height);
 
-            generateFrontPart(info, height, info.getXmin(), Transform.ROTATE_NONE);
-            generateFrontPart(info, height, info.getZmin(), Transform.ROTATE_90);
-            generateFrontPart(info, height, info.getXmax(), Transform.ROTATE_180);
-            generateFrontPart(info, height, info.getZmax(), Transform.ROTATE_270);
+            generateFrontPart(ctx, info, height, info.getXmin(), Transform.ROTATE_NONE);
+            generateFrontPart(ctx, info, height, info.getZmin(), Transform.ROTATE_90);
+            generateFrontPart(ctx, info, height, info.getXmax(), Transform.ROTATE_180);
+            generateFrontPart(ctx, info, height, info.getZmax(), Transform.ROTATE_270);
         }
 
-        generateBorders(info, canDoStreetOrPark, heightmap);
+        generateBorders(ctx, info, canDoStreetOrPark, heightmap);
     }
 
-    private void generateBorders(BuildingInfo info, boolean canDoParks, ChunkHeightmap heightmap) {
+    private void generateBorders(ChunkGenContext ctx, BuildingInfo info, boolean canDoParks, ChunkHeightmap heightmap) {
         Character borderBlock = info.getCityStyle().getBorderBlock();
 
         switch (info.profile.LANDSCAPE_TYPE) {
-            case DEFAULT -> fillToBedrockStreetBlock(info);
-            case FLOATING -> fillMainStreetBlock(info, borderBlock, 3);
-            case CAVERN -> fillMainStreetBlock(info, borderBlock, 2);
-            case CAVERNSPHERES -> fillMainStreetBlock(info, borderBlock, 2);
-            case SPACE -> fillToGroundStreetBlock(info, info.getCityGroundLevel());
-            case SPHERES -> fillToBedrockStreetBlock(info);
+            case DEFAULT -> fillToBedrockStreetBlock(ctx, info);
+            case FLOATING -> fillMainStreetBlock(ctx, info, borderBlock, 3);
+            case CAVERN -> fillMainStreetBlock(ctx, info, borderBlock, 2);
+            case CAVERNSPHERES -> fillMainStreetBlock(ctx, info, borderBlock, 2);
+            case SPACE -> fillToGroundStreetBlock(ctx, info, info.getCityGroundLevel());
+            case SPHERES -> fillToBedrockStreetBlock(ctx, info);
         }
 
         if (doBorder(info, Direction.XMIN)) {
             int x = 0;
             for (int z = 0; z < 16; z++) {
-                generateBorder(info, canDoParks, x, z, Direction.XMIN.get(info), heightmap);
+                generateBorder(ctx, info, canDoParks, x, z, Direction.XMIN.get(info), heightmap);
             }
         }
         if (doBorder(info, Direction.XMAX)) {
             int x = 15;
             for (int z = 0; z < 16; z++) {
-                generateBorder(info, canDoParks, x, z, Direction.XMAX.get(info), heightmap);
+                generateBorder(ctx, info, canDoParks, x, z, Direction.XMAX.get(info), heightmap);
             }
         }
         if (doBorder(info, Direction.ZMIN)) {
             int z = 0;
             for (int x = 0; x < 16; x++) {
-                generateBorder(info, canDoParks, x, z, Direction.ZMIN.get(info), heightmap);
+                generateBorder(ctx, info, canDoParks, x, z, Direction.ZMIN.get(info), heightmap);
             }
         }
         if (doBorder(info, Direction.ZMAX)) {
             int z = 15;
             for (int x = 0; x < 16; x++) {
-                generateBorder(info, canDoParks, x, z, Direction.ZMAX.get(info), heightmap);
+                generateBorder(ctx, info, canDoParks, x, z, Direction.ZMAX.get(info), heightmap);
             }
         }
     }
@@ -1342,7 +1333,8 @@ public class LostCityTerrainFeature {
     /**
      * Fill base blocks under streets to bedrock
      */
-    private void fillToBedrockStreetBlock(BuildingInfo info) {
+    private void fillToBedrockStreetBlock(ChunkGenContext ctx, BuildingInfo info) {
+        ChunkDriver driver = ctx.driver;
         // Base blocks below streets
         int minHeight = info.provider.getWorld().getMinY();
         for (int x = 0; x < 16; ++x) {
@@ -1361,7 +1353,8 @@ public class LostCityTerrainFeature {
     /**
      * Fill from a certain lowest level with base blocks until non air is hit
      */
-    private void fillToGroundStreetBlock(BuildingInfo info, int lowestLevel) {
+    private void fillToGroundStreetBlock(ChunkGenContext ctx, BuildingInfo info, int lowestLevel) {
+        ChunkDriver driver = ctx.driver;
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 int y = lowestLevel - 1;
@@ -1377,7 +1370,8 @@ public class LostCityTerrainFeature {
     /**
      * Fill a main street block with base blocks and border blocks at the bottom
      */
-    private void fillMainStreetBlock(BuildingInfo info, Character borderBlock, int offset) {
+    private void fillMainStreetBlock(ChunkGenContext ctx, BuildingInfo info, Character borderBlock, int offset) {
+        ChunkDriver driver = ctx.driver;
         BlockState border = info.getCompiledPalette().get(borderBlock);
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
@@ -1390,7 +1384,8 @@ public class LostCityTerrainFeature {
     /**
      * Generate a single border column for one side of a street block
      */
-    private void generateBorder(BuildingInfo info, boolean canDoParks, int x, int z, BuildingInfo adjacent, ChunkHeightmap heightmap) {
+    private void generateBorder(ChunkGenContext ctx, BuildingInfo info, boolean canDoParks, int x, int z, BuildingInfo adjacent, ChunkHeightmap heightmap) {
+        ChunkDriver driver = ctx.driver;
         Character borderBlock = info.getCityStyle().getBorderBlock();
         Character wallBlock = info.getCityStyle().getWallBlock();
         BlockState wall = info.getCompiledPalette().get(wallBlock);
@@ -1400,10 +1395,10 @@ public class LostCityTerrainFeature {
                 int y = getMinHeightAt(info, x, z, heightmap);
                 if (y < info.getCityGroundLevel() + 1) {
                     // We are above heightmap level. Generated a border from that level to our ground level
-                    setBlocksFromPalette(x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                    setBlocksFromPalette(ctx, x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 } else {
                     // We are below heightmap level. Generate a thin border anyway
-                    setBlocksFromPalette(x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                    setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 }
             }
             case SPACE -> {
@@ -1417,25 +1412,25 @@ public class LostCityTerrainFeature {
                 }
 
                 if (adjacentY > 5) {
-                    setBlocksFromPalette(x, adjacentY, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                    setBlocksFromPalette(ctx, x, adjacentY, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 }
             }
             case FLOATING -> {
-                setBlocksFromPalette(x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 if (isCorner(x, z)) {
-                    generateBorderSupport(info, wall, x, z, 3, heightmap);
+                    generateBorderSupport(ctx, info, wall, x, z, 3, heightmap);
                 }
             }
             case CAVERN -> {
-                setBlocksFromPalette(x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 if (isCorner(x, z)) {
-                    generateBorderSupport(info, wall, x, z, 2, heightmap);
+                    generateBorderSupport(ctx, info, wall, x, z, 2, heightmap);
                 }
             }
             case CAVERNSPHERES -> {
-                setBlocksFromPalette(x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 if (isCorner(x, z)) {
-                    generateBorderSupport(info, wall, x, z, 2, heightmap);
+                    generateBorderSupport(ctx, info, wall, x, z, 2, heightmap);
                 }
             }
         }
@@ -1451,7 +1446,8 @@ public class LostCityTerrainFeature {
     /**
      * Generate a column of wall blocks (and stone below that in water)
      */
-    private void generateBorderSupport(BuildingInfo info, BlockState wall, int x, int z, int offset, ChunkHeightmap heightmap) {
+    private void generateBorderSupport(ChunkGenContext ctx, BuildingInfo info, BlockState wall, int x, int z, int offset, ChunkHeightmap heightmap) {
+        ChunkDriver driver = ctx.driver;
         int height = heightmap.getHeight();
         if (height > 1) {
             // None void
@@ -1468,16 +1464,17 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private int generateFrontPart(BuildingInfo info, int height, BuildingInfo adj, Transform rot) {
+    private int generateFrontPart(ChunkGenContext ctx, BuildingInfo info, int height, BuildingInfo adj, Transform rot) {
         if (info.hasFrontPartFrom(adj)) {
-            return generatePart(adj, adj.frontType, rot, 0, height, 0, HardAirSetting.AIR);
+            return generatePart(ctx, adj, adj.frontType, rot, 0, height, 0, HardAirSetting.AIR);
         }
         return height;
     }
 
     private static final Random VEGETATION_RAND = new Random();
 
-    private void generateRandomVegetation(BuildingInfo info, int height) {
+    private void generateRandomVegetation(ChunkGenContext ctx, BuildingInfo info, int height) {
+        ChunkDriver driver = ctx.driver;
         VEGETATION_RAND.setSeed(provider.getSeed() * 377 + info.coord.chunkZ() * 341873128712L + info.coord.chunkX() * 132897987541L);
 
         if (info.getXmin().hasBuilding) {
@@ -1492,7 +1489,7 @@ public class LostCityTerrainFeature {
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS + 1 - x));
                     int cnt = 0;
                     while (VEGETATION_RAND.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(info, info.getCompiledPalette()));
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1510,7 +1507,7 @@ public class LostCityTerrainFeature {
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (x - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS));
                     int cnt = 0;
                     while (VEGETATION_RAND.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(info, info.getCompiledPalette()));
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1528,7 +1525,7 @@ public class LostCityTerrainFeature {
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS + 1 - z));
                     int cnt = 0;
                     while (VEGETATION_RAND.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(info, info.getCompiledPalette()));
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1546,7 +1543,7 @@ public class LostCityTerrainFeature {
                     float v = info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (z - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS);
                     int cnt = 0;
                     while (VEGETATION_RAND.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(info, info.getCompiledPalette()));
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1554,7 +1551,9 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private void generateParkSection(BuildingInfo info, int height, boolean elevated) {
+    private void generateParkSection(ChunkGenContext ctx, BuildingInfo info, int height, boolean elevated) {
+        ChunkDriver driver = ctx.driver;
+        char street = ctx.street;
         BlockState b;
         boolean el00 = info.getXmin().getZmin().isElevatedParkSection();
         boolean el10 = info.getZmin().isElevatedParkSection();
@@ -1623,15 +1622,15 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private void generateFullStreetSection(BuildingInfo info, int height) {
+    private void generateFullStreetSection(ChunkGenContext ctx, BuildingInfo info, int height) {
         StreetParts parts = info.getCityStyle().getStreetParts();
-        BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.full()));
+        BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.full()));
         if (part != null) {
-            generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.VOID);
+            generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.VOID);
         }
     }
 
-    private void generateNormalStreetSection(BuildingInfo info, int height) {
+    private void generateNormalStreetSection(ChunkGenContext ctx, BuildingInfo info, int height) {
         StreetParts parts = info.getCityStyle().getStreetParts();
         boolean xmin = BuildingInfo.hasRoadConnection(info, info.getXmin()) || (info.getXmin().hasXBridge(provider) != null);
         boolean xmax = BuildingInfo.hasRoadConnection(info, info.getXmax()) || (info.getXmax().hasXBridge(provider) != null);
@@ -1640,9 +1639,9 @@ public class LostCityTerrainFeature {
         int cnt = (xmin ? 1 : 0) + (xmax ? 1 : 0) + (zmin ? 1 : 0) + (zmax ? 1 : 0);
         Transform transform = Transform.ROTATE_NONE;
         BuildingPart part = switch (cnt) {
-            case 0 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.none()));
+            case 0 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.none()));
             case 1 -> {
-                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.end()));
+                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.end()));
                 if (xmin) {
                 } else if (xmax) {
                     transform = Transform.ROTATE_180;
@@ -1655,7 +1654,7 @@ public class LostCityTerrainFeature {
             }
             case 2 -> {
                 if (xmin == xmax || zmin == zmax) {
-                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.straight()));
+                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.straight()));
                     if (xmin) {
                     } else if (xmax) {
                         transform = Transform.ROTATE_180;
@@ -1666,7 +1665,7 @@ public class LostCityTerrainFeature {
                     }
                     yield p;
                 } else {
-                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.bend()));
+                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.bend()));
                     if (xmin && zmin) {
                     } else if (xmin && zmax) {
                         transform = Transform.ROTATE_270;
@@ -1679,7 +1678,7 @@ public class LostCityTerrainFeature {
                 }
             }
             case 3 -> {
-                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.t()));
+                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.t()));
                 if (!xmin) {
                     transform = Transform.ROTATE_90;
                 } else if (!xmax) {
@@ -1689,11 +1688,11 @@ public class LostCityTerrainFeature {
                 }
                 yield p;
             }
-            case 4 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(parts.all()));
+            case 4 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.all()));
             default -> throw new RuntimeException("Not possible!");
         };
         if (part != null) {
-        generatePart(info, part, transform, 0, height, 0, HardAirSetting.VOID);
+            generatePart(ctx, info, part, transform, 0, height, 0, HardAirSetting.VOID);
         }
     }
 
@@ -1732,9 +1731,10 @@ public class LostCityTerrainFeature {
      * Generate a part. If 'airWaterLevel' is true then 'hard air' blocks are replaced with water below the waterLevel.
      * Otherwise they are replaced with air.
      */
-    public int generatePart(BuildingInfo info, IBuildingPart part,
+    public int generatePart(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part,
                              Transform transform,
                              int ox, int oy, int oz, HardAirSetting airWaterLevel) {
+        ChunkDriver driver = ctx.driver;
         if (profile.EDITMODE) {
             EditModeData.getData().addPartData(info.coord, oy, part.getName());
         }
@@ -1793,9 +1793,9 @@ public class LostCityTerrainFeature {
                                         b = air;        // No torches
                                     }
                                 } else if (inf.loot() != null && !inf.loot().isEmpty()) {
-                                    handleLoot(info, part, provider.getWorld(), b, inf);
+                                    handleLoot(ctx, info, part, provider.getWorld(), b, inf);
                                 } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
-                                    b = handleSpawner(info, part, oy, provider.getWorld(), rx, rz, y, b, inf);
+                                    b = handleSpawner(ctx, info, part, oy, provider.getWorld(), rx, rz, y, b, inf);
                                 } else if (inf.tag() != null) {
                                     b = handleBlockEntity(info, oy, provider.getWorld(), rx, rz, y, b, inf);
                                 }
@@ -1812,7 +1812,7 @@ public class LostCityTerrainFeature {
                             } else if (getStatesNeedingLightingUpdate().contains(b)) {
                                 updateNeeded(info, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             } else if (getStatesNeedingTodo().contains(b)) {
-                                b = handleTodo(info, oy, provider.getWorld(), rx, rz, y, b);
+                                b = handleTodo(ctx, info, oy, provider.getWorld(), rx, rz, y, b);
                             }
                             driver.add(b);
                         } else {
@@ -1898,7 +1898,7 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private BlockState handleSpawner(BuildingInfo info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
+    private BlockState handleSpawner(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
         if (info.profile.GENERATE_SPAWNERS && !info.noLoot) {
             String mobid = inf.mobId();
             BlockPos pos = info.getRelativePos(rx, oy + y, rz);
@@ -1921,9 +1921,9 @@ public class LostCityTerrainFeature {
         return b;
     }
 
-    private void handleLoot(BuildingInfo info, IBuildingPart part, WorldGenLevel world, BlockState b, Palette.Info inf) {
+    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, WorldGenLevel world, BlockState b, Palette.Info inf) {
         if (!info.noLoot) {
-            BlockPos pos = driver.getCurrentCopy();
+            BlockPos pos = ctx.driver.getCurrentCopy();
             info.addPostTodo(pos, () -> {
                 WorldGenLevel inWorld = info.provider.getWorld();
                 if (!inWorld.getBlockState(pos).isAir()) {
@@ -1934,7 +1934,7 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private BlockState handleTodo(BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
+    private BlockState handleTodo(ChunkGenContext ctx, BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
         Block block = b.getBlock();
         CityStyle cs = info.getCityStyle();
         boolean avoidFoliage = info.profile.AVOID_FOLIAGE;
@@ -2060,18 +2060,19 @@ public class LostCityTerrainFeature {
     }
 
 
-    private void generateDebris(BuildingInfo info) {
-        generateDebrisFromChunk(info, info.getXmin(), (xx, zz) -> (15.0f - xx) / 16.0f);
-        generateDebrisFromChunk(info, info.getXmax(), (xx, zz) -> xx / 16.0f);
-        generateDebrisFromChunk(info, info.getZmin(), (xx, zz) -> (15.0f - zz) / 16.0f);
-        generateDebrisFromChunk(info, info.getZmax(), (xx, zz) -> zz / 16.0f);
-        generateDebrisFromChunk(info, info.getXmin().getZmin(), (xx, zz) -> ((15.0f - xx) * (15.0f - zz)) / 256.0f);
-        generateDebrisFromChunk(info, info.getXmax().getZmax(), (xx, zz) -> (xx * zz) / 256.0f);
-        generateDebrisFromChunk(info, info.getXmin().getZmax(), (xx, zz) -> ((15.0f - xx) * zz) / 256.0f);
-        generateDebrisFromChunk(info, info.getXmax().getZmin(), (xx, zz) -> (xx * (15.0f - zz)) / 256.0f);
+    private void generateDebris(ChunkGenContext ctx, BuildingInfo info) {
+        generateDebrisFromChunk(ctx, info, info.getXmin(), (xx, zz) -> (15.0f - xx) / 16.0f);
+        generateDebrisFromChunk(ctx, info, info.getXmax(), (xx, zz) -> xx / 16.0f);
+        generateDebrisFromChunk(ctx, info, info.getZmin(), (xx, zz) -> (15.0f - zz) / 16.0f);
+        generateDebrisFromChunk(ctx, info, info.getZmax(), (xx, zz) -> zz / 16.0f);
+        generateDebrisFromChunk(ctx, info, info.getXmin().getZmin(), (xx, zz) -> ((15.0f - xx) * (15.0f - zz)) / 256.0f);
+        generateDebrisFromChunk(ctx, info, info.getXmax().getZmax(), (xx, zz) -> (xx * zz) / 256.0f);
+        generateDebrisFromChunk(ctx, info, info.getXmin().getZmax(), (xx, zz) -> ((15.0f - xx) * zz) / 256.0f);
+        generateDebrisFromChunk(ctx, info, info.getXmax().getZmin(), (xx, zz) -> (xx * (15.0f - zz)) / 256.0f);
     }
 
-    private void generateDebrisFromChunk(BuildingInfo info, BuildingInfo adjacentInfo, BiFunction<Integer, Integer, Float> locationFactor) {
+    private void generateDebrisFromChunk(ChunkGenContext ctx, BuildingInfo info, BuildingInfo adjacentInfo, BiFunction<Integer, Integer, Float> locationFactor) {
+        ChunkDriver driver = ctx.driver;
         if (adjacentInfo.hasBuilding) {
             CompiledPalette adjacentPalette = adjacentInfo.getCompiledPalette();
             Character rubbleBlock = adjacentInfo.getBuilding().getRubbleBlock();
@@ -2154,7 +2155,8 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private void setBlocksFromPalette(int x, int y, int z, int y2, CompiledPalette palette, char character) {
+    private void setBlocksFromPalette(ChunkGenContext ctx, int x, int y, int z, int y2, CompiledPalette palette, char character) {
+        ChunkDriver driver = ctx.driver;
         if (palette.isSimple(character)) {
             BlockState b = palette.get(character);
             driver.setBlockRange(x, y, z, y2, b);
@@ -2167,14 +2169,15 @@ public class LostCityTerrainFeature {
         }
     }
 
-    private void generateBuilding(BuildingInfo info, ChunkHeightmap heightmap, ChunkAccess chunk) {
+    private void generateBuilding(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, ChunkAccess chunk) {
+        ChunkDriver driver = ctx.driver;
         int lowestLevel = info.getBuildingBottomHeight();
         int cellars = info.cellars;
         int floors = info.getNumFloors();
         int max = info.provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
 
         CompiledPalette palette = info.getCompiledPalette();
-        makeRoomForBuilding(info, lowestLevel, heightmap, palette);
+        makeRoomForBuilding(ctx, info, lowestLevel, heightmap, palette);
 
         char fillerBlock = info.getBuilding().getFillerBlock();
         List<Pair<Integer, BuildingPart>> part2Map = new ArrayList<>();
@@ -2184,12 +2187,12 @@ public class LostCityTerrainFeature {
             // In default landscape type we clear the landscape on top of the building when we are at the top floor
             if (f == floors) {
                 if (profile.isDefault() || profile.isVoidSpheres()) {
-                    clearToMax(info, heightmap, height, max);
+                    clearToMax(ctx, info, heightmap, height, max);
                 }
             }
 
             BuildingPart part = info.getFloor(f);
-            generatePart(info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
+            generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
             part = info.getFloorPart2(f);
             if (part != null) {
                 part2Map.add(Pair.of(height, part));
@@ -2198,7 +2201,7 @@ public class LostCityTerrainFeature {
             // Check for doors
             boolean isTop = f == floors;   // The top does not need generated doors
             if (!isTop && info.getAllowDoors()) {
-                Doors.generateDoors(this, info, height + 1, f);
+                Doors.generateDoors(ctx, this, info, height + 1, f);
             }
 
             height += FLOORHEIGHT;    // We currently only support 6 here
@@ -2208,12 +2211,12 @@ public class LostCityTerrainFeature {
             // Underground we replace the glass with the filler
             for (int x = 0; x < 16; x++) {
                 // Use safe version because this may end up being lower
-                setBlocksFromPalette(x, lowestLevel, 0, Math.min(info.getCityGroundLevel(), info.getZmin().getCityGroundLevel()) + 1, palette, fillerBlock);
-                setBlocksFromPalette(x, lowestLevel, 15, Math.min(info.getCityGroundLevel(), info.getZmax().getCityGroundLevel()) + 1, palette, fillerBlock);
+                setBlocksFromPalette(ctx, x, lowestLevel, 0, Math.min(info.getCityGroundLevel(), info.getZmin().getCityGroundLevel()) + 1, palette, fillerBlock);
+                setBlocksFromPalette(ctx, x, lowestLevel, 15, Math.min(info.getCityGroundLevel(), info.getZmax().getCityGroundLevel()) + 1, palette, fillerBlock);
             }
             for (int z = 1; z < 15; z++) {
-                setBlocksFromPalette(0, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmin().getCityGroundLevel()) + 1, palette, fillerBlock);
-                setBlocksFromPalette(15, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmax().getCityGroundLevel()) + 1, palette, fillerBlock);
+                setBlocksFromPalette(ctx, 0, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmin().getCityGroundLevel()) + 1, palette, fillerBlock);
+                setBlocksFromPalette(ctx, 15, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmax().getCityGroundLevel()) + 1, palette, fillerBlock);
             }
         }
 
@@ -2227,7 +2230,7 @@ public class LostCityTerrainFeature {
             for (Pair<Integer, BuildingPart> entry : part2Map) {
                 int h = entry.getKey();
                 BuildingPart part = entry.getValue();
-                generatePart(info, part, Transform.ROTATE_NONE, 0, h, 0, HardAirSetting.AIR);
+                generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, h, 0, HardAirSetting.AIR);
             }
         }
     }
@@ -2235,7 +2238,8 @@ public class LostCityTerrainFeature {
     /*
      * Make sure the space for the building is cleared and everything below the building is ok
      */
-    private void makeRoomForBuilding(BuildingInfo info, int lowestLevel, ChunkHeightmap heightmap, CompiledPalette palette) {
+    private void makeRoomForBuilding(ChunkGenContext ctx, BuildingInfo info, int lowestLevel, ChunkHeightmap heightmap, CompiledPalette palette) {
+        ChunkDriver driver = ctx.driver;
         char borderBlock = info.getCityStyle().getBorderBlock();
         char fillerBlock = info.getBuilding().getFillerBlock();
 
@@ -2243,7 +2247,7 @@ public class LostCityTerrainFeature {
             // For floating worldgen we try to fit the underside of the building better with the island
             // We also remove all blocks from the inside because we generate buildings on top of
             // generated chunks as opposed to blank chunks with non-floating worlds
-            this.bottomLayerBuffer = this.bottomLayerNoise.getRegion(this.bottomLayerBuffer, (info.coord.chunkX() << 4), (info.coord.chunkZ() << 4), 16, 16, 8.0 / 16.0, 8.0 / 16.0, 1.0D);
+            double[] bottomLayerBuffer = ctx.buffers.bottomLayer = this.bottomLayerNoise.getRegion(ctx.buffers.bottomLayer, (info.coord.chunkX() << 4), (info.coord.chunkZ() << 4), 16, 16, 8.0 / 16.0, 8.0 / 16.0, 1.0D);
             int minBuildHeight = info.provider.getWorld().getMinY();
             int maxBuildHeight = info.provider.getWorld().getMaxY() + 1;
             for (int x = 0; x < 16; ++x) {
@@ -2261,15 +2265,15 @@ public class LostCityTerrainFeature {
                         driver.setBlockRange(x, height + 1, z, lowestLevel, base);
                     }
                     // Also clear the inside of buildings to avoid geometry that doesn't really belong there
-                    clearRange(info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
+                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
         } else if (info.profile.isSpace()) {
-            fillToGround(info, lowestLevel, borderBlock);
+            fillToGround(ctx, info, lowestLevel, borderBlock);
             // Also clear the inside of buildings to avoid geometry that doesn't really belong there
             for (int x = 0; x < 16; ++x) {
                 for (int z = 0; z < 16; ++z) {
-                    clearRange(info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, false);     // Never water in bubbles?
+                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, false);     // Never water in bubbles?
                 }
             }
         } else if (info.profile.isCavern()) {
@@ -2277,7 +2281,7 @@ public class LostCityTerrainFeature {
             for (int x = 0; x < 16; ++x) {
                 for (int z = 0; z < 16; ++z) {
                     if (isSide(x, z)) {
-                        setBlocksFromPalette(x, lowestLevel - 10, z, lowestLevel, palette, borderBlock);
+                        setBlocksFromPalette(ctx, x, lowestLevel - 10, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
                         BlockState filler = palette.get(fillerBlock);
@@ -2285,7 +2289,7 @@ public class LostCityTerrainFeature {
                     }
 
                     // Also clear the inside of buildings to avoid geometry that doesn't really belong there
-                    clearRange(info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
+                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
         } else { // (also for spheres)
@@ -2299,7 +2303,7 @@ public class LostCityTerrainFeature {
                             // The building generates below heightmap height. So we generate a border of 3 only
                             y = lowestLevel - 3;
                         }
-                        setBlocksFromPalette(x, y, z, lowestLevel, palette, borderBlock);
+                        setBlocksFromPalette(ctx, x, y, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
                         BlockState filler = palette.get(fillerBlock);
@@ -2307,28 +2311,29 @@ public class LostCityTerrainFeature {
                     }
                     // That single filler block is not enough when the bottom of the building ends
                     // up over a cave, a ravine or a terrain step: give it ground to stand on.
-                    fillSupportBelow(x, z, lowestLevel - 1);
+                    fillSupportBelow(ctx, x, z, lowestLevel - 1);
 
                     // Also clear the inside of buildings to avoid geometry that doesn't really belong there
-                    clearRange(info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
+                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
         }
     }
 
-    private void clearToMax(BuildingInfo info, ChunkHeightmap heightmap, int height, int max) {
+    private void clearToMax(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, int height, int max) {
         int maximumHeight = Math.min(max, heightmap.getHeight() + 10);
         if (height < maximumHeight) {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
-                    clearRange(info, x, z, height, maximumHeight, false);
+                    clearRange(ctx, info, x, z, height, maximumHeight, false);
                 }
             }
         }
     }
 
     // Used for space type worlds: fill underside the building/street until a block is encountered
-    public void fillToGround(BuildingInfo info, int lowestLevel, Character borderBlock) {
+    public void fillToGround(ChunkGenContext ctx, BuildingInfo info, int lowestLevel, Character borderBlock) {
+        ChunkDriver driver = ctx.driver;
         int deepestY = Math.max(1, lowestLevel - 10);
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {

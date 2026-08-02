@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
@@ -12,7 +13,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.MonorailParts;
 
 public class Monorails {
 
-    public static void generateMonorails(LostCityTerrainFeature feature, BuildingInfo info) {
+    public static void generateMonorails(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
         LostCityProfile profile = info.profile;
         IDimensionInfo provider = info.provider;
         MonorailParts monoRailParts = provider.getWorldStyle().getPartSelector().monoRailParts();
@@ -22,7 +23,7 @@ public class Monorails {
         if (horiz && vert) {
             if (!CitySphere.intersectsWithCitySphere(info.coord, provider)) {
                 BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.both());
-                feature.generatePart(info, part, Transform.ROTATE_NONE, 0, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
+                feature.generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
             }
             return;
         } else if (horiz) {
@@ -40,22 +41,22 @@ public class Monorails {
                 part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
                 Character borderBlock = info.getCityStyle().getBorderBlock();
                 transform = Transform.MIRROR_90_X; // flip
-                feature.fillToGround(info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
             } else if (hasNonStationMonoRail(info.getXmax())) {
                 part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
                 Character borderBlock = info.getCityStyle().getBorderBlock();
                 transform = Transform.ROTATE_90;
-                feature.fillToGround(info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
             } else if (hasNonStationMonoRail(info.getZmin())) {
                 part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
                 Character borderBlock = info.getCityStyle().getBorderBlock();
                 transform = Transform.ROTATE_NONE;
-                feature.fillToGround(info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
             } else if (hasNonStationMonoRail(info.getZmax())) {
                 part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
                 Character borderBlock = info.getCityStyle().getBorderBlock();
                 transform = Transform.MIRROR_Z; // flip
-                feature.fillToGround(info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
             } else {
                 return;
             }
@@ -63,7 +64,7 @@ public class Monorails {
             part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.vertical());
         }
 
-        feature.generatePart(info, part, transform, 0, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
+        feature.generatePart(ctx, info, part, transform, 0, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
     }
 
     private static boolean hasNonStationMonoRail(BuildingInfo info) {
