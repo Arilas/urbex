@@ -53,7 +53,28 @@ public final class Rng {
         EXPLOSION,
         EXPLOSION_MINI,
         RUINS_BARS,
-        DAMAGE_VARIANT
+        DAMAGE_VARIANT,
+        // Each of these splits a second, logically independent decision off an address that
+        // already had one. Two decisions sharing an address and a purpose read the same draw, so
+        // one becomes a monotone function of the other - a sphere's block from its radius, a
+        // vine's length from where vines start.
+        SPHERE_BLOCKS,
+        SPHERE_CITY_LEVEL,
+        VINES_CONTINUE,
+        TERRAIN_FIX_LOWER,
+        TERRAIN_FIX_UPPER,
+        CITY_STYLE_LOCAL,
+        VEGETATION_GROWTH,
+        BUILDING_FLOORS,
+        BUILDING_LAYOUT,
+        // generateRandomVegetation runs four wall passes whose bands overlap at the corner
+        // columns. One purpose would have both passes over a corner read the same roll, so a
+        // corner would get one effective try at a leaf where an edge gets one - and, since the
+        // second pass only starts at the same height when the first added nothing, the two would
+        // fail together every time.
+        VEGETATION_XMAX,
+        VEGETATION_ZMIN,
+        VEGETATION_ZMAX
     }
 
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;

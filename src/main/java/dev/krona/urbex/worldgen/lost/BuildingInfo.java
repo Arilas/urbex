@@ -302,7 +302,7 @@ public class BuildingInfo {
 
         characteristics.isCity = isCityRaw(key, provider, profile);
         characteristics.cityLevel = getCityLevelGui(key, provider);
-        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
+        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
         characteristics.couldHaveBuilding = characteristics.isCity && rand.nextFloat() < profile.BUILDING_CHANCE;
 //        CITY_INFO_MAP.put(key, characteristics);
         return characteristics;
@@ -333,7 +333,7 @@ public class BuildingInfo {
         } else {
             characteristics.cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(characteristics, coord, provider) : getAverageCityLevel(characteristics, coord, provider);
         }
-        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
+        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
         characteristics.couldHaveBuilding = characteristics.isCity && checkBuildingPossibility(coord, provider, profile, characteristics.multiPos, characteristics.cityLevel, rand);
         if ((profile.isSpace() || profile.isSpheres()) && characteristics.multiPos.isSingle()) {
             // Minimize cities at the edge of the city in an orb
@@ -629,7 +629,7 @@ public class BuildingInfo {
         floorTypes = new BuildingPart[floors + cellars + 1];
         floorTypes2 = new BuildingPart[floors + cellars + 1];
 
-        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed());
+        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_FLOORS);
 
         String belowPart = "<none>";
         for (int i = 0; i <= floors + cellars; i++) {
@@ -690,7 +690,7 @@ public class BuildingInfo {
         multiBuilding = characteristics.multiBuilding;
         multiBuildingPos = characteristics.multiPos;
 
-        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed());
+        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_LAYOUT);
 
         boolean b = characteristics.couldHaveBuilding;
         if (b && multiBuildingPos.isSingle()) {
@@ -1115,7 +1115,9 @@ public class BuildingInfo {
             int chunkX = coord.chunkX();
             int chunkZ = coord.chunkZ();
             float dist = CitySphere.getRelativeDistanceToCityCenter(coord, provider);
-            RandomSource rand = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.SPHERE);
+            // Not SPHERE: getSphereAtCenter draws from that address, and this chunk may be a
+            // sphere centre, which would tie the city level to the sphere's radius.
+            RandomSource rand = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.SPHERE_CITY_LEVEL);
             if (dist < .3f) {
                 return 2 + rand.nextInt(2);
             } else if (dist < .4f) {
@@ -1528,8 +1530,16 @@ public class BuildingInfo {
         return false;
     }
 
-    public static RandomSource getBuildingRandom(int chunkX, int chunkZ, long seed) {
-        return Rng.at(seed, chunkX, chunkZ, Rng.Purpose.BUILDING);
+    /**
+     * A stream for one of the per-chunk building decisions.
+     * <p>
+     * The purpose is the caller's because three independent decisions are made at this one
+     * coordinate - whether a building is here at all, which parts its floors use, and whether a
+     * lonely neighbour suppresses it - and each of them reads draw 1. Sharing a purpose made the
+     * building chance and the loneliness roll literally the same number.
+     */
+    public static RandomSource getBuildingRandom(int chunkX, int chunkZ, long seed, Rng.Purpose purpose) {
+        return Rng.at(seed, chunkX, chunkZ, purpose);
     }
 
     // Convert a local building level to a global one (where cityLevel == 0)
@@ -1754,8 +1764,8 @@ public class BuildingInfo {
             if (h < 256) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
-                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET),
-                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET));
+                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
+                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_UPPER));
                 return desiredMaxHeight1;
             }
 

@@ -225,7 +225,9 @@ public class City {
         List<Pair<Float, String>> styles = new ArrayList<>();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        RandomSource cityStyleRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
+        // Not CITY_STYLE: getCityStyleForCityCenter draws from that address for this same chunk,
+        // and this method calls it, so one purpose would make the blend agree with the centre.
+        RandomSource cityStyleRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE_LOCAL);
 
         if (profile.CITY_CHANCE < 0) {
             WorldGenLevel world = provider.getWorld();

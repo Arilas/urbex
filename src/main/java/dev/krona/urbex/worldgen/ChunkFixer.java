@@ -103,6 +103,16 @@ public class ChunkFixer {
         return Rng.atPos(seed, x, y, z, Rng.Purpose.VINES).nextFloat();
     }
 
+    /**
+     * Whether a strip already running continues through this block. A separate purpose from
+     * {@link #vineRoll}: the two ask about the same block, and against thresholds far apart
+     * (vineChance against 0.8), so one address would mean a strip could never stop where a strip
+     * would have started.
+     */
+    private static float vineContinueRoll(long seed, int x, int y, int z) {
+        return Rng.atPos(seed, x, y, z, Rng.Purpose.VINES_CONTINUE).nextFloat();
+    }
+
     private static void createVineStrip(long seed, LevelAccessor world, int bottom, BlockState state, BlockPos pos, BlockPos vineHolderPos) {
         if (world.isEmptyBlock(vineHolderPos)) {
             return;
@@ -112,7 +122,7 @@ public class ChunkFixer {
         }
         world.setBlock(pos, state, 0);
         pos = pos.below();
-        while (pos.getY() >= bottom && vineRoll(seed, pos.getX(), pos.getY(), pos.getZ()) < .8f) {
+        while (pos.getY() >= bottom && vineContinueRoll(seed, pos.getX(), pos.getY(), pos.getZ()) < .8f) {
             if (!world.isEmptyBlock(pos)) {
                 return;
             }

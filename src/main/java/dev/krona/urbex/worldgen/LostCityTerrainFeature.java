@@ -574,9 +574,14 @@ public class LostCityTerrainFeature {
      * These three are asked about chunks other than the one being generated - a chunk interpolates
      * its terrain fix against its eight neighbours - so they take the seed and the coordinate they
      * are being asked about rather than a {@link ChunkGenContext}.
+     * <p>
+     * {@code getRandomizedOffset} takes its purpose from the caller because it is asked twice at
+     * one coordinate, for the lower and the upper bound of the same mesh. One purpose would tie
+     * them together, and neither may be shared with the street-type pick, which is drawn at the
+     * same address.
      */
-    public static int getRandomizedOffset(long seed, int chunkX, int chunkZ, int min, int max) {
-        return Rng.at(seed, chunkX, chunkZ, Rng.Purpose.STREET).nextInt(max - min + 1) + min;
+    public static int getRandomizedOffset(long seed, int chunkX, int chunkZ, int min, int max, Rng.Purpose purpose) {
+        return Rng.at(seed, chunkX, chunkZ, purpose).nextInt(max - min + 1) + min;
     }
 
     public static int getHeightOffsetL1(long seed, int chunkX, int chunkZ) {
@@ -1511,7 +1516,7 @@ public class LostCityTerrainFeature {
                     }
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (x - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS));
                     int cnt = 0;
-                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
+                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_XMAX) < v && cnt < 30) {
                         driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
@@ -1529,7 +1534,7 @@ public class LostCityTerrainFeature {
                     }
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS + 1 - z));
                     int cnt = 0;
-                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
+                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMIN) < v && cnt < 30) {
                         driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
@@ -1547,7 +1552,7 @@ public class LostCityTerrainFeature {
                     }
                     float v = info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (z - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS);
                     int cnt = 0;
-                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
+                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMAX) < v && cnt < 30) {
                         driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
@@ -1962,7 +1967,7 @@ public class LostCityTerrainFeature {
                         // The todo runs later, on the server thread, long after this context is gone.
                         // Key the tree it grows on the sapling's position so it is the same tree no
                         // matter when the todo is drained.
-                        RandomSource growthRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.VEGETATION);
+                        RandomSource growthRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.VEGETATION_GROWTH);
                         GlobalTodo.get(world.getLevel()).addTodo(pos, (level) -> {
                             if (level.hasChunksAt(pos.offset(-1, -1, -1), pos.offset(1, 1, 1)) && level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
                                 level.setBlock(pos, finalB, Block.UPDATE_CLIENTS);

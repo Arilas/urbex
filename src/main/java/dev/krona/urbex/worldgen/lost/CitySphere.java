@@ -55,7 +55,9 @@ public class CitySphere {
         BuildingInfo info = BuildingInfo.getBuildingInfo(center, provider);
         CityStyle cs = info.getCityStyle();
 
-        RandomSource rand = Rng.at(info.provider.getSeed(), center.chunkX(), center.chunkZ(), Rng.Purpose.SPHERE);
+        // Not SPHERE: getSphereAtCenter already draws from that address for this same centre, so
+        // sharing it would make a sphere's block choice a function of its radius.
+        RandomSource rand = Rng.at(info.provider.getSeed(), center.chunkX(), center.chunkZ(), Rng.Purpose.SPHERE_BLOCKS);
 
         BlockState glass = info.getCompiledPalette().get(cs.getSphereGlassBlock(), rand);
         BlockState base = info.getCompiledPalette().get(cs.getSphereBlock(), rand);
