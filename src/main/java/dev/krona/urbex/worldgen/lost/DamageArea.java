@@ -135,7 +135,12 @@ public class DamageArea {
         return explosions;
     }
 
-    // Return true if this subchunk (every 16 blocks) is affected by explosions
+    // Return true if this subchunk (every 16 blocks) is affected by explosions.
+    // The scan below is bounded to subchunks 0..15, i.e. world Y 0-255: explosions below Y 0 or
+    // above Y 255 are invisible to it. This disagrees with chunkBox above, which was widened in
+    // P1a to the level's real min/max Y - chunkBox only gates whether an explosion intersects this
+    // chunk at all and is not consulted here. Tracked as Arilas/urbex#19; not currently reachable
+    // by any shipped profile.
     public boolean hasExplosions(int y) {
         AABB box = new AABB(chunkX << 4, y << 4, chunkZ << 4, (chunkX << 4) + 15, (y << 4) + 15, (chunkZ << 4) + 15);
         for (Explosion explosion : explosions) {
@@ -166,7 +171,8 @@ public class DamageArea {
 
     }
 
-    // Get the lowest height that is affected by an explosion
+    // Get the lowest height that is affected by an explosion.
+    // Same Y 0-255 subchunk bound as hasExplosions(int y) above - see its comment. Arilas/urbex#19.
     public int getLowestExplosionHeight() {
         for (int yy = 0 ; yy < 16 ; yy++) {
             if (hasExplosions(yy)) {
@@ -176,7 +182,8 @@ public class DamageArea {
         return -1;
     }
 
-    // Get the lowest height that is affected by an explosion
+    // Get the lowest height that is affected by an explosion.
+    // Same Y 0-255 subchunk bound as hasExplosions(int y) above - see its comment. Arilas/urbex#19.
     public int getHighestExplosionHeight() {
         for (int yy = 15 ; yy >= 0 ; yy--) {
             if (hasExplosions(yy)) {

@@ -472,7 +472,9 @@ public class LostCityTerrainFeature {
         boolean hasCollectedDamage = false;
         float[][] collectedDamage = new float[16][16];
 
-        // @todo this only supports explosions between 0 and 256 for now
+        // Bounded to subchunks 0..15, i.e. world Y 0-255, matching damageArea.hasExplosions(int y)'s
+        // own bound - explosions below Y 0 or above Y 255 are invisible to this loop. Tracked as
+        // Arilas/urbex#19; not currently reachable by any shipped profile.
         for (int yy = 0; yy < 16; yy++) {
             boolean hasExplosions = damageArea.hasExplosions(yy);
             for (int y = 0; y < 16; y++) {
