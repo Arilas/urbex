@@ -116,7 +116,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
                     int rz = cp.getBlockZ(z);
                     current.set(rx, oy, rz);
                     for (char c : vs) {
-                        BlockState b = compiledPalette.get(c);
+                        BlockState b = compiledPalette.get(c, level.getRandom());
                         if (b == null) {
                             throw new RuntimeException("Could not find entry '" + c + "' in the palette for part '" + part.getName() + "'!");
                         }

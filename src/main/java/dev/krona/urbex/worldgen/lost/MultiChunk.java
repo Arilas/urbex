@@ -4,6 +4,7 @@ import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Counter;
+import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
@@ -13,6 +14,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.cityassets.MultiBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.MultiSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
+import net.minecraft.util.RandomSource;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -67,7 +69,7 @@ public class MultiChunk {
     }
 
     private MultiChunk calculateBuildings(IDimensionInfo provider) {
-        Random rand = new Random(mc.chunkX() * 797013493L + mc.chunkZ() * 295085213L);
+        RandomSource rand = Rng.at(provider.getSeed(), mc.chunkX(), mc.chunkZ(), Rng.Purpose.MULTI);
 
         // Determine how many multibuildings we want to place in this multichunk
         MultiSettings settings = provider.getWorldStyle().getMultiSettings();

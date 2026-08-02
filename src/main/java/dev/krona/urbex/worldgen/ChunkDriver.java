@@ -1,8 +1,11 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.varia.Rng;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.StairsShape;
@@ -26,6 +29,7 @@ public class ChunkDriver {
     private static final int SECTION_SIZE = SECTION_WIDTH * SECTION_WIDTH * SECTION_HEIGHT;
 
     private LevelAccessor region;
+    private long seed;
     private ChunkAccess primer;
     private final BlockPos.MutableBlockPos current = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
@@ -36,6 +40,7 @@ public class ChunkDriver {
 
     public void setPrimer(LevelAccessor region, ChunkAccess primer) {
         this.region = region;
+        this.seed = region instanceof WorldGenLevel level ? level.getSeed() : 0L;
         this.primer = primer;
         if (primer != null) {
             cache = new SectionCache(region, primer.getPos().x() << 4, primer.getPos().z() << 4);
@@ -187,7 +192,10 @@ public class ChunkDriver {
         }
         BlockState newAdjacent = null;
         try {
-            newAdjacent = adjacent.updateShape(region, region, pos, direction, pos.relative(direction), state, region.getRandom());
+            // updateShape hands the block a RandomSource; almost none use it, but the level's own
+            // source is shared across every chunk being generated, so address one on this position.
+            RandomSource shapeRandom = Rng.atPos(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SHAPE);
+            newAdjacent = adjacent.updateShape(region, region, pos, direction, pos.relative(direction), state, shapeRandom);
         } catch (Exception e) {
             // We got an exception. For example for beehives there can potentially be a problem so in this case we just ignore it
             return adjacent;

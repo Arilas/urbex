@@ -17,7 +17,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.levelgen.LegacyRandomSource;
 
 import java.util.Collections;
 import java.util.Optional;
@@ -111,8 +110,7 @@ public class NullDimensionInfo implements IDimensionInfo {
         ));
         this.seed = seed;
         random = new Random(seed);
-        RandomSource randomSource = new LegacyRandomSource(seed);
-        feature = new LostCityTerrainFeature(this, profile, randomSource);
+        feature = new LostCityTerrainFeature(this, profile);
         feature.setupStates(profile);
         // @todo 1.19.3
 //        biomeRegistry = ServerLifecycleHooks.getCurrentServer().registryAccess().registryOrThrow(Registries.BIOME);
@@ -154,7 +152,7 @@ public class NullDimensionInfo implements IDimensionInfo {
         return style;
     }
 
-    @Override
+    /** The config preview renderer's own source. Nothing here places generated blocks. */
     public Random getRandom() {
         return random;
     }

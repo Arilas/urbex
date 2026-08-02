@@ -17,6 +17,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.BiomeTags;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
@@ -194,7 +195,7 @@ public class BuildingInfo {
         return AssetRegistries.STYLES.get(provider.getWorld(), provider.getWorldStyle().getOutsideStyle());
     }
 
-    private void createPalette(Random rand) {
+    private void createPalette(RandomSource rand) {
         Style style;
         if (!isCity) {
             style = getOutsideStyle();
@@ -301,7 +302,7 @@ public class BuildingInfo {
 
         characteristics.isCity = isCityRaw(key, provider, profile);
         characteristics.cityLevel = getCityLevelGui(key, provider);
-        Random rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
+        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
         characteristics.couldHaveBuilding = characteristics.isCity && rand.nextFloat() < profile.BUILDING_CHANCE;
 //        CITY_INFO_MAP.put(key, characteristics);
         return characteristics;
@@ -332,7 +333,7 @@ public class BuildingInfo {
         } else {
             characteristics.cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(characteristics, coord, provider) : getAverageCityLevel(characteristics, coord, provider);
         }
-        Random rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
+        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
         characteristics.couldHaveBuilding = characteristics.isCity && checkBuildingPossibility(coord, provider, profile, characteristics.multiPos, characteristics.cityLevel, rand);
         if ((profile.isSpace() || profile.isSpheres()) && characteristics.multiPos.isSingle()) {
             // Minimize cities at the edge of the city in an orb
@@ -433,7 +434,7 @@ public class BuildingInfo {
         return getChunkCharacteristics(coord, provider).isCity;
     }
 
-    private static boolean checkBuildingPossibility(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile, MultiPos section, int cityLevel, Random rand) {
+    private static boolean checkBuildingPossibility(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile, MultiPos section, int cityLevel, RandomSource rand) {
         boolean b;
         float bc = rand.nextFloat();
 
@@ -628,7 +629,7 @@ public class BuildingInfo {
         floorTypes = new BuildingPart[floors + cellars + 1];
         floorTypes2 = new BuildingPart[floors + cellars + 1];
 
-        Random rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed());
+        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed());
 
         String belowPart = "<none>";
         for (int i = 0; i <= floors + cellars; i++) {
@@ -689,7 +690,7 @@ public class BuildingInfo {
         multiBuilding = characteristics.multiBuilding;
         multiBuildingPos = characteristics.multiPos;
 
-        Random rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed());
+        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed());
 
         boolean b = characteristics.couldHaveBuilding;
         if (b && multiBuildingPos.isSingle()) {
@@ -1114,7 +1115,7 @@ public class BuildingInfo {
             int chunkX = coord.chunkX();
             int chunkZ = coord.chunkZ();
             float dist = CitySphere.getRelativeDistanceToCityCenter(coord, provider);
-            Random rand = new Random(provider.getSeed() + chunkZ * 817505771L + chunkX * 217645177L);
+            RandomSource rand = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.SPHERE);
             if (dist < .3f) {
                 return 2 + rand.nextInt(2);
             } else if (dist < .4f) {
@@ -1197,7 +1198,7 @@ public class BuildingInfo {
         }
     }
 
-    private Block getRandomDoor(Random rand) {
+    private Block getRandomDoor(RandomSource rand) {
         return switch (rand.nextInt(7)) {
             case 0 -> Blocks.BIRCH_DOOR;
             case 1 -> Blocks.ACACIA_DOOR;
@@ -1527,8 +1528,8 @@ public class BuildingInfo {
         return false;
     }
 
-    public static Random getBuildingRandom(int chunkX, int chunkZ, long seed) {
-        return new QualityRandom(seed + chunkZ * 341873128712L + chunkX * 132897987541L);
+    public static RandomSource getBuildingRandom(int chunkX, int chunkZ, long seed) {
+        return Rng.at(seed, chunkX, chunkZ, Rng.Purpose.BUILDING);
     }
 
     // Convert a local building level to a global one (where cityLevel == 0)

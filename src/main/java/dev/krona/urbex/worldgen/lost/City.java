@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.lost;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
@@ -11,6 +12,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.CommonLevelAccessor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
@@ -154,7 +156,7 @@ public class City {
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        Random cityCenterRandom = new Random(chunkZ * 797003437L + chunkX * 295075153L);
+        RandomSource cityCenterRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_CENTER);
         if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres())) {
             // @todo config
             CitySphere sphere = CitySphere.getCitySphere(coord, provider);
@@ -182,7 +184,7 @@ public class City {
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        Random cityRadiusRandom = new Random(chunkZ * 100001653L + chunkX * 295075153L);
+        RandomSource cityRadiusRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_RADIUS);
         LostCityProfile profile = provider.getProfile();
         int cityRange = profile.CITY_MAXRADIUS - profile.CITY_MINRADIUS;
         if (cityRange < 1) {
@@ -210,7 +212,7 @@ public class City {
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        Random cityStyleForCenterRandom = new Random(chunkZ * 899809363L + chunkX * 256203221L);
+        RandomSource cityStyleForCenterRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
         return provider.getWorldStyle().getRandomCityStyle(provider, coord, cityStyleForCenterRandom);
     }
 
@@ -223,7 +225,7 @@ public class City {
         List<Pair<Float, String>> styles = new ArrayList<>();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        Random cityStyleRandom = new Random(provider.getSeed() + chunkZ * 593441843L + chunkX * 217645177L);
+        RandomSource cityStyleRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
 
         if (profile.CITY_CHANCE < 0) {
             WorldGenLevel world = provider.getWorld();

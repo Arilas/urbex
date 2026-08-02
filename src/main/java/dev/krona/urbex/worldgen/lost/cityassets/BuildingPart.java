@@ -175,10 +175,6 @@ public class BuildingPart implements IBuildingPart {
         return slices[y].charAt(z * xSize + x);
     }
 
-    public BlockState get(BuildingInfo info, int x, int y, int z) {
-        return info.getCompiledPalette().get(slices[y].charAt(z * xSize + x));
-    }
-
     public Character getC(int x, int y, int z) {
         return slices[y].charAt(z * xSize + x);
     }

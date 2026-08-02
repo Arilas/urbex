@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.QualityRandom;
+import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
@@ -17,6 +17,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -24,7 +25,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 public class Scattered {
     public static boolean avoidScattered(LostCityTerrainFeature feature, BuildingInfo info) {
@@ -46,7 +46,7 @@ public class Scattered {
         int ax = (chunkX + 2000000) / scatteredSettings.getAreasize();
         int az = (chunkZ + 2000000) / scatteredSettings.getAreasize();
 
-        QualityRandom scatteredRandom = new QualityRandom(provider.getSeed() + ax * 5564338337L + az * 25564337621L);
+        RandomSource scatteredRandom = Rng.at(provider.getSeed(), ax, az, Rng.Purpose.SCATTERED);
 
         if (scatteredRandom.nextFloat() >= (scatteredSettings.getChance() * provider.getProfile().SCATTERED_CHANCE_MULTIPLIER)) {
             // No scattered structure in this area
@@ -165,7 +165,7 @@ public class Scattered {
     }
 
     @Nullable
-    private static ScatteredReference selectRandomScattered(LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings, Random rand) {
+    private static ScatteredReference selectRandomScattered(LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings, RandomSource rand) {
         List<ScatteredReference> list = scatteredSettings.getList();
         if (list.isEmpty()) {
             return null;
@@ -204,7 +204,7 @@ public class Scattered {
         return true;
     }
 
-    private static void generateScatteredBuilding(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, Building building, Random rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
+    private static void generateScatteredBuilding(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, Building building, RandomSource rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
         IDimensionInfo provider = feature.provider;
 
         int height = lowestLevel;
@@ -272,7 +272,7 @@ public class Scattered {
                                     driver.current(x, y, z);
                                     BlockState b = driver.getBlock();
                                     while (b == air || b == liquid) {
-                                        driver.block(compiledPalette.get(c));
+                                        driver.block(compiledPalette.get(c, ctx.paletteRandom));
                                         driver.decY();
                                         b = driver.getBlock();
                                     }

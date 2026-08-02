@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
@@ -20,6 +21,7 @@ public class ChunkFixer {
     }
 
     private static void generateVines(ChunkCoord coord, LevelAccessor world, IDimensionInfo provider) {
+        long seed = provider.getSeed();
         float vineChance = provider.getProfile().VINE_CHANCE;
         if (vineChance < 0.000001) {
             return;
@@ -41,8 +43,8 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineWest();
                 for (int z = 0; z < 15; z++) {
                     for (int y = bottom; y < maxHeight; y++) {
-                        if (world.getRandom().nextFloat() < vineChance) {
-                            createVineStrip(world, bottom, state, new BlockPos(cx + 16, y, cz + z), new BlockPos(cx + 15, y, cz + z));
+                        if (vineRoll(seed, cx + 16, y, cz + z) < vineChance) {
+                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + 16, y, cz + z), new BlockPos(cx + 15, y, cz + z));
                         }
                     }
                 }
@@ -55,8 +57,8 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineEast();
                 for (int z = 0; z < 15; z++) {
                     for (int y = bottom; y < (adjacent.getMaxHeight()); y++) {
-                        if (world.getRandom().nextFloat() < vineChance) {
-                            createVineStrip(world, bottom, state, new BlockPos(cx + 15, y, cz + z), new BlockPos(cx + 16, y, cz + z));
+                        if (vineRoll(seed, cx + 15, y, cz + z) < vineChance) {
+                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + 15, y, cz + z), new BlockPos(cx + 16, y, cz + z));
                         }
                     }
                 }
@@ -70,8 +72,8 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineNorth();
                 for (int x = 0; x < 15; x++) {
                     for (int y = bottom; y < maxHeight; y++) {
-                        if (world.getRandom().nextFloat() < vineChance) {
-                            createVineStrip(world, bottom, state, new BlockPos(cx + x, y, cz + 16), new BlockPos(cx + x, y, cz + 15));
+                        if (vineRoll(seed, cx + x, y, cz + 16) < vineChance) {
+                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + x, y, cz + 16), new BlockPos(cx + x, y, cz + 15));
                         }
                     }
                 }
@@ -84,8 +86,8 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineSouth();
                 for (int x = 0; x < 15; x++) {
                     for (int y = bottom; y < (adjacent.getMaxHeight()); y++) {
-                        if (world.getRandom().nextFloat() < vineChance) {
-                            createVineStrip(world, bottom, state, new BlockPos(cx + x, y, cz + 15), new BlockPos(cx + x, y, cz + 16));
+                        if (vineRoll(seed, cx + x, y, cz + 15) < vineChance) {
+                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + x, y, cz + 15), new BlockPos(cx + x, y, cz + 16));
                         }
                     }
                 }
@@ -93,7 +95,15 @@ public class ChunkFixer {
         }
     }
 
-    private static void createVineStrip(LevelAccessor world, int bottom, BlockState state, BlockPos pos, BlockPos vineHolderPos) {
+    /**
+     * Whether a vine starts here. Addressed by the block it would hang at, so it does not matter
+     * which chunk of a wall the loop reaches first, or how many blocks it looked at before.
+     */
+    private static float vineRoll(long seed, int x, int y, int z) {
+        return Rng.atPos(seed, x, y, z, Rng.Purpose.VINES).nextFloat();
+    }
+
+    private static void createVineStrip(long seed, LevelAccessor world, int bottom, BlockState state, BlockPos pos, BlockPos vineHolderPos) {
         if (world.isEmptyBlock(vineHolderPos)) {
             return;
         }
@@ -102,7 +112,7 @@ public class ChunkFixer {
         }
         world.setBlock(pos, state, 0);
         pos = pos.below();
-        while (pos.getY() >= bottom && world.getRandom().nextFloat() < .8f) {
+        while (pos.getY() >= bottom && vineRoll(seed, pos.getX(), pos.getY(), pos.getZ()) < .8f) {
             if (!world.isEmptyBlock(pos)) {
                 return;
             }

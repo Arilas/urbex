@@ -9,7 +9,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import net.minecraft.util.RandomSource;
 
 public class Style {
 
@@ -38,7 +38,7 @@ public class Style {
         return name;
     }
 
-    public Palette getRandomPalette(IDimensionInfo provider, Random random) {
+    public Palette getRandomPalette(IDimensionInfo provider, RandomSource random) {
         Palette palette = new Palette("__random__");
         for (List<Pair<Float, String>> pairs : randomPaletteChoices) {
             float totalweight = 0;

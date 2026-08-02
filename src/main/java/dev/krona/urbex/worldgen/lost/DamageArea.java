@@ -3,18 +3,19 @@ package dev.krona.urbex.worldgen.lost;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.GeometryTools;
+import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.LostTags;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 public class DamageArea {
 
@@ -37,7 +38,7 @@ public class DamageArea {
         this.air = Blocks.AIR.defaultBlockState();
         chunkBox = new AABB(chunkX << 4, 0, chunkZ << 4, (chunkX << 4) + 15, 256, (chunkZ << 4) + 15);
 
-        Random damageRandom = new Random(seed + chunkZ * 295075153L + chunkX * 899826547L);
+        RandomSource damageRandom = Rng.at(seed, chunkX, chunkZ, Rng.Purpose.DAMAGE);
 
         int offset = (Math.max(info.profile.EXPLOSION_MAXRADIUS, info.profile.MINI_EXPLOSION_MAXRADIUS)+15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
@@ -69,7 +70,7 @@ public class DamageArea {
         }
     }
 
-    public BlockState damageBlock(BlockState b, IDimensionInfo provider, int y, float damage, CompiledPalette palette, BlockState liquidChar) {
+    public BlockState damageBlock(BlockState b, RandomSource damageRandom, IDimensionInfo provider, int y, float damage, CompiledPalette palette, BlockState liquidChar) {
         if (Tools.hasTag(b.getBlock(), LostTags.NOT_BREAKABLE_TAG)) {
             return b;
         }
@@ -77,11 +78,11 @@ public class DamageArea {
         if (Tools.hasTag(b.getBlock(), LostTags.EASY_BREAKABLE_TAG)) {
             damage *= 2.5f;    // As if this block gets double the damage
         }
-        if (provider.getRandom().nextFloat() <= damage) {
+        if (damageRandom.nextFloat() <= damage) {
             BlockState damaged = palette.canBeDamagedToIronBars(b);
             int waterlevel = Tools.getSeaLevel(provider.getWorld());//profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
             if (damage < BLOCK_DAMAGE_CHANCE && damaged != null) {
-                if (provider.getRandom().nextFloat() < .7f) {
+                if (damageRandom.nextFloat() < .7f) {
                     b = damaged;
                 } else {
                     b = y <= waterlevel ? liquidChar : air;
@@ -99,7 +100,7 @@ public class DamageArea {
     }
 
     private Explosion getExplosionAt(ChunkCoord coord, IDimensionInfo provider) {
-        Random randomExplosion = new Random(seed + coord.chunkZ() * 295075153L + coord.chunkX() * 797003437L);
+        RandomSource randomExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION);
         if (randomExplosion.nextFloat() < profile.EXPLOSION_CHANCE) {
             return new Explosion(profile.EXPLOSION_MINRADIUS + randomExplosion.nextInt(profile.EXPLOSION_MAXRADIUS - profile.EXPLOSION_MINRADIUS),
                     new BlockPos((coord.chunkX() << 4) + randomExplosion.nextInt(16),
@@ -110,7 +111,7 @@ public class DamageArea {
     }
 
     private Explosion getMiniExplosionAt(ChunkCoord coord, IDimensionInfo provider) {
-        Random randomMiniExplosion = new Random(seed + coord.chunkZ() * 1400305337L + coord.chunkX() * 573259391L);
+        RandomSource randomMiniExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION_MINI);
         if (randomMiniExplosion.nextFloat() < profile.MINI_EXPLOSION_CHANCE) {
             return new Explosion(profile.MINI_EXPLOSION_MINRADIUS + randomMiniExplosion.nextInt(profile.MINI_EXPLOSION_MAXRADIUS - profile.MINI_EXPLOSION_MINRADIUS),
                     new BlockPos((coord.chunkX() << 4) + randomMiniExplosion.nextInt(16),

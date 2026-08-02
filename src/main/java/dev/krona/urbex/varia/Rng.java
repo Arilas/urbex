@@ -49,7 +49,9 @@ public final class Rng {
         NOISE,
         SHAPE,
         TERRAIN_L1,
-        TERRAIN_L2
+        TERRAIN_L2,
+        EXPLOSION,
+        EXPLOSION_MINI
     }
 
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;

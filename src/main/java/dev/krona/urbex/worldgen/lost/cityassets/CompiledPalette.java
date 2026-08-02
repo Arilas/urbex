@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.Level;
@@ -130,8 +130,14 @@ public class CompiledPalette {
         return o instanceof Character;
     }
 
-    // Same as get(c) but with a predefined random generator that is predictable
-    public BlockState get(char c, Random rand) {
+    /**
+     * The state for {@code c}, drawing from {@code rand} when the character is a weighted choice.
+     * <p>
+     * There is deliberately no no-argument {@code get(char)}: it used to draw from a static LCG
+     * shared by every chunk and every thread, which is exactly what made generation depend on the
+     * order chunks were built in. Callers pass the stream they are responsible for.
+     */
+    public BlockState get(char c, RandomSource rand) {
         try {
             Object o = palette.get(c);
             if (o instanceof BlockState state) {
@@ -149,6 +155,23 @@ public class CompiledPalette {
 
     }
 
+    /**
+     * A representative state for {@code c}, with no randomness at all: the first entry of a
+     * weighted list. For the editor and for commands that only need to show or match a character.
+     * Generation must use {@link #get(char, RandomSource)} - it is what makes rubble look like
+     * rubble rather than one repeated block.
+     */
+    public BlockState getRepresentative(char c) {
+        Object o = palette.get(c);
+        if (o instanceof BlockState state) {
+            return state;
+        } else if (o == null) {
+            return null;
+        } else {
+            return ((BlockState[]) o)[0];
+        }
+    }
+
     public Set<BlockState> getAll(char c) {
         try {
             Object o = palette.get(c);
@@ -159,22 +182,6 @@ public class CompiledPalette {
             } else {
                 BlockState[] randomBlocks = (BlockState[]) o;
                 return Set.of(randomBlocks);
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public BlockState get(char c) {
-        try {
-            Object o = palette.get(c);
-            if (o instanceof BlockState state) {
-                return state;
-            } else if (o == null) {
-                return null;
-            } else {
-                BlockState[] randomBlocks = (BlockState[]) o;
-                return randomBlocks[LostCityTerrainFeature.fastrand128()];
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

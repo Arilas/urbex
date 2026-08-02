@@ -36,17 +36,17 @@ public class Corridors {
                     } else {
                         b = air;
                     }
-                    driver.current(x, height, z).add(palette.get(corridorRoofBlock)).add(b).add(air).add(air);
+                    driver.current(x, height, z).add(palette.get(corridorRoofBlock, ctx.paletteRandom)).add(b).add(air).add(air);
 
                     if ((xRail && x == 7 && (z == 8 || z == 9)) || (zRail && z == 7 && (x == 8 || x == 9))) {
-                        driver.add(palette.get(corridorGlassBlock));
+                        driver.add(palette.get(corridorGlassBlock, ctx.paletteRandom));
                         BlockPos pos = driver.getCurrentCopy();
                         Character glowstoneChar = info.getCityStyle().getGlowstoneBlock();
-                        BlockState glowstone = glowstoneChar == null ? Blocks.GLOWSTONE.defaultBlockState() : palette.get(glowstoneChar);
+                        BlockState glowstone = glowstoneChar == null ? Blocks.GLOWSTONE.defaultBlockState() : palette.get(glowstoneChar, ctx.paletteRandom);
                         driver.add(glowstone);
                         LostCityTerrainFeature.updateNeeded(info, pos, Block.UPDATE_CLIENTS);
                     } else {
-                        BlockState roof = palette.get(corridorRoofBlock);
+                        BlockState roof = palette.get(corridorRoofBlock, ctx.paletteRandom);
                         driver.add(roof).add(roof);
                     }
                 } else {

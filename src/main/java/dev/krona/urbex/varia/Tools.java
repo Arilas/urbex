@@ -81,26 +81,6 @@ public class Tools {
         return elements.get(elements.size() - 1);
     }
 
-    public static <T> T getRandomFromList(Random random, List<T> list, Function<T, Float> weightGetter) {
-        if (list.isEmpty()) {
-            return null;
-        }
-        List<T> elements = new ArrayList<>();
-        float totalweight = 0;
-        for (T pair : list) {
-            elements.add(pair);
-            totalweight += weightGetter.apply(pair);
-        }
-        float r = random.nextFloat() * totalweight;
-        for (T pair : elements) {
-            r -= weightGetter.apply(pair);
-            if (r <= 0) {
-                return pair;
-            }
-        }
-        return null;
-    }
-
     public static Iterable<Holder<Block>> getBlocksForTag(TagKey<Block> rl) {
         @SuppressWarnings("deprecation") DefaultedRegistry<Block> registry = BuiltInRegistries.BLOCK;
         return registry.getTagOrEmpty(rl);

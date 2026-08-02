@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import net.minecraft.util.RandomSource;
 import java.util.function.Predicate;
 
 public class Building {
@@ -127,7 +127,7 @@ public class Building {
         return rubbleBlock;
     }
 
-    public String getRandomPart(Random random, ConditionContext info) {
+    public String getRandomPart(RandomSource random, ConditionContext info) {
         List<String> partNames = new ArrayList<>();
         for (Pair<Predicate<ConditionContext>, String> pair : parts) {
             if (pair.getLeft().test(info)) {
@@ -140,7 +140,7 @@ public class Building {
         return partNames.get(random.nextInt(partNames.size()));
     }
 
-    public String getRandomPart2(Random random, ConditionContext info) {
+    public String getRandomPart2(RandomSource random, ConditionContext info) {
         List<String> partNames = new ArrayList<>();
         for (Pair<Predicate<ConditionContext>, String> pair : parts2) {
             if (pair.getLeft().test(info)) {

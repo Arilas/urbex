@@ -37,7 +37,7 @@ public class Editor {
                         for (int z = 0; z < part.getZSize(); z++) {
                             BlockPos pos = info.getRelativePos(x, start.getY() + y, z);
                             Character character = part.getC(x, y, z);
-                            BlockState state = finalPalette.get(character);
+                            BlockState state = finalPalette.getRepresentative(character);
                             if (state != null) {
                                 level.setBlock(pos, state, Block.UPDATE_ALL);
                             } else {
@@ -52,7 +52,7 @@ public class Editor {
                     for (int z = 0; z < part.getZSize(); z++) {
                         BlockPos pos = info.getRelativePos(x, start.getY() + y, z);
                         Character character = part.getC(x, y, z);
-                        if (finalPalette.get(character) != null) {
+                        if (finalPalette.getRepresentative(character) != null) {
                             BlockState state = level.getBlockState(pos);
                             editorInfo.addPaletteEntry(character, state);
                         }

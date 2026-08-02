@@ -2,7 +2,8 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.QualityRandom;
+import dev.krona.urbex.varia.Rng;
+import net.minecraft.util.RandomSource;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 
@@ -99,7 +100,7 @@ public class Railway {
     private static RailChunkInfo getRailChunkTypeInternal(ChunkCoord key, IDimensionInfo provider) {
         int chunkX = key.chunkX();
         int chunkZ = key.chunkZ();
-        QualityRandom randomRailChunkType = new QualityRandom(provider.getSeed() + chunkZ * 2600003897L + chunkX * 43600002517L);
+        RandomSource randomRailChunkType = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.RAILWAY);
 
         LostCityProfile profile = BuildingInfo.getProfile(key, provider);
         RailwayParts railwayParts = provider.getWorldStyle().getPartSelector().railwayParts();

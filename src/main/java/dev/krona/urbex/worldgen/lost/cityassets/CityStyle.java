@@ -384,7 +384,7 @@ public class CityStyle {
         }
     }
 
-    private static String getRandomFromList(Random random, List<ObjectSelector> list, ChunkCoord pos) {
+    private static String getRandomFromList(RandomSource random, List<ObjectSelector> list, ChunkCoord pos) {
         ObjectSelector fromList = Tools.getRandomFromList(random, list, objectSelector -> {
             if (objectSelector.minSpawnDistance() > 0 || objectSelector.maxSpawnDistance() < Integer.MAX_VALUE) {
                 // Distance in objectSelector is in blocks whereas pos is in chunks
@@ -432,35 +432,35 @@ public class CityStyle {
         return stuffTags;
     }
 
-    public String getRandomStair(Random random, ChunkCoord pos) {
+    public String getRandomStair(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, stairSelector, pos);
     }
 
-    public String getRandomFront(Random random, ChunkCoord pos) {
+    public String getRandomFront(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, frontSelector, pos);
     }
 
-    public String getRandomRailDungeon(Random random, ChunkCoord pos) {
+    public String getRandomRailDungeon(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, railDungeonSelector, pos);
     }
 
-    public String getRandomPark(Random random, ChunkCoord pos) {
+    public String getRandomPark(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, parkSelector, pos);
     }
 
-    public String getRandomBridge(Random random, ChunkCoord pos) {
+    public String getRandomBridge(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, bridgeSelector, pos);
     }
 
-    public String getRandomFountain(Random random, ChunkCoord pos) {
+    public String getRandomFountain(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, fountainSelector, pos);
     }
 
-    public String getRandomBuilding(Random random, ChunkCoord pos) {
+    public String getRandomBuilding(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, buildingSelector, pos);
     }
 
-    public String getRandomMultiBuilding(Random random, ChunkCoord pos) {
+    public String getRandomMultiBuilding(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, multiBuildingSelector, pos);
     }
 

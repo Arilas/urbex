@@ -11,7 +11,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerChunkCache;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
@@ -20,10 +19,7 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkSource;
-import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.Random;
 
 public class DefaultDimensionInfo implements IDimensionInfo {
 
@@ -31,8 +27,6 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     private final LostCityProfile profile;
     private final LostCityProfile profileOutside;
     private final WorldStyle style;
-
-    private final Random random;
 
     private final Registry<Biome> biomeRegistry;
     private final LostCityTerrainFeature feature;
@@ -42,9 +36,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
         this.profile = profile;
         this.profileOutside = profileOutside;
         style = AssetRegistries.WORLDSTYLES.get(world, profile.getWorldStyle());
-        random = new Random(world.getSeed());
-        RandomSource randomSource = new LegacyRandomSource(world.getSeed());
-        feature = new LostCityTerrainFeature(this, profile, randomSource);
+        feature = new LostCityTerrainFeature(this, profile);
         feature.setupStates(profile);
         biomeRegistry = world.registryAccess().lookupOrThrow(Registries.BIOME);
     }
@@ -82,11 +74,6 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     @Override
     public WorldStyle getWorldStyle() {
         return style;
-    }
-
-    @Override
-    public Random getRandom() {
-        return random;
     }
 
     @Override

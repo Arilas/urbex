@@ -11,7 +11,6 @@ import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 
 import javax.annotation.Nullable;
-import java.util.Random;
 
 public interface IDimensionInfo {
     void setWorld(WorldGenLevel world);
@@ -27,8 +26,6 @@ public interface IDimensionInfo {
     LostCityProfile getOutsideProfile();
 
     WorldStyle getWorldStyle();
-
-    Random getRandom();
 
     LostCityTerrainFeature getFeature();
 

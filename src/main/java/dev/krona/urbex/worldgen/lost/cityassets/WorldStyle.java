@@ -15,7 +15,7 @@ import org.jetbrains.annotations.Nullable;
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import net.minecraft.util.RandomSource;
 import java.util.function.Predicate;
 
 public class WorldStyle {
@@ -99,7 +99,7 @@ public class WorldStyle {
         return 1.0f;
     }
 
-    public String getRandomCityStyle(IDimensionInfo provider, ChunkCoord coord, Random random) {
+    public String getRandomCityStyle(IDimensionInfo provider, ChunkCoord coord, RandomSource random) {
         Holder<Biome> biome = BiomeInfo.getBiomeInfo(provider, coord).getMainBiome();
         List<Pair<Float, String>> ct = new ArrayList<>();
         for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> pair : cityStyleSelector) {

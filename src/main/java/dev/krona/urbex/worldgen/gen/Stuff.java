@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
@@ -29,7 +30,9 @@ public class Stuff {
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
     public static void generateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
-        feature.rand.setSeed(info.coord.chunkX() * 2570174657L + info.coord.chunkZ() * 101754695981L);
+        // One stream for every stuff object this chunk places, drawn from in the order they are
+        // visited. A fresh one per object would put each of them at the same coordinates.
+        RandomSource rand = ctx.rng(Rng.Purpose.STUFF);
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
         for (String tag : info.getCityStyle().getStuffTags()) {
@@ -42,7 +45,7 @@ public class Stuff {
                         IdentifierMatcher buildingMatcher = settings.getBuildingMatcher();
                         if (buildingMatcher.isAny() || buildingMatcher.test(info.buildingType.getId())) {
                             if (settings.getBiomeMatcher().test(biome.getMainBiome())) {
-                                actuallyGenerateStuff(ctx, feature, info, stuff, palette, inBuilding == Boolean.TRUE);
+                                actuallyGenerateStuff(ctx, feature, info, stuff, palette, rand, inBuilding == Boolean.TRUE);
                             }
                         }
                     }
@@ -86,7 +89,7 @@ public class Stuff {
         return true;
     }
 
-    private static void actuallyGenerateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, boolean inBuilding) {
+    private static void actuallyGenerateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, RandomSource rand, boolean inBuilding) {
         StuffSettingsRE settings = stuff.getSettings();
         String blocks = settings.getColumn();
         if (!columnResolves(stuff, blocks, palette)) {
@@ -112,7 +115,6 @@ public class Stuff {
         }
         int mincount = settings.getMincount();
         int maxcount = settings.getMaxcount();
-        RandomSource rand = feature.rand;
         int count = rand.nextInt(maxcount - mincount) + mincount;
         for (int j = 0; j < count; j++) {
             for (int i = 0; i < attempts; i++) {
@@ -133,7 +135,7 @@ public class Stuff {
                         if (ok) {
                             driver.current(x, y, z);
                             for (int k = 0; k < blocks.length(); k++) {
-                                BlockState block = palette.get(blocks.charAt(k));
+                                BlockState block = palette.get(blocks.charAt(k), ctx.paletteRandom);
                                 driver.add(block);
                             }
                             break;

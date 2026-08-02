@@ -2,12 +2,14 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedSphere;
 import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -16,7 +18,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 
 public class CitySphere {
 
@@ -54,7 +55,7 @@ public class CitySphere {
         BuildingInfo info = BuildingInfo.getBuildingInfo(center, provider);
         CityStyle cs = info.getCityStyle();
 
-        Random rand = new Random(info.provider.getSeed() + center.chunkX() * 837971201L + center.chunkZ() * 961744153L);
+        RandomSource rand = Rng.at(info.provider.getSeed(), center.chunkX(), center.chunkZ(), Rng.Purpose.SPHERE);
 
         BlockState glass = info.getCompiledPalette().get(cs.getSphereGlassBlock(), rand);
         BlockState base = info.getCompiledPalette().get(cs.getSphereBlock(), rand);
@@ -247,7 +248,7 @@ public class CitySphere {
     /**
      * From the center
      */
-    private static float getSphereRadius(ChunkCoord center, IDimensionInfo provider, Random rand) {
+    private static float getSphereRadius(ChunkCoord center, IDimensionInfo provider, RandomSource rand) {
         PredefinedCity city = City.getPredefinedCity(provider.getWorld(), center);
         LostCityProfile profile = provider.getProfile();
         if (city != null) {
@@ -371,7 +372,7 @@ public class CitySphere {
     private static CitySphere getSphereAtCenter(ChunkCoord center, IDimensionInfo provider, @Nullable PredefinedSphere predef) {
         int chunkX = center.chunkX();
         int chunkZ = center.chunkZ();
-        Random rand = new Random(provider.getSeed() + chunkX * 961744153L + chunkZ * 837971201L);
+        RandomSource rand = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.SPHERE);
         // This information is for city spheres. This information is only relevant
         // in the chunk representing the center of the city
         LostCityProfile profile = provider.getProfile();
@@ -396,7 +397,7 @@ public class CitySphere {
                         int nx = chunkX + dx;
                         int nz = chunkZ + dz;
                         // Deterministically compute the neighbor's base sphere
-                        Random nrand = new Random(provider.getSeed() + nx * 961744153L + nz * 837971201L);
+                        RandomSource nrand = Rng.at(provider.getSeed(), nx, nz, Rng.Purpose.SPHERE);
                         boolean nEnabled = nrand.nextFloat() < profile.CITYSPHERE_CHANCE && isOnSphereGrid(profile, nx, nz);
                         if (!nEnabled) {
                             continue; // Disabled neighbors cannot suppress this one
@@ -491,7 +492,7 @@ public class CitySphere {
     /**
      * Given a sphere center, return the actual position of the center
      */
-    private static BlockPos getSphereCenterPosition(ChunkCoord center, IDimensionInfo provider, Random rand) {
+    private static BlockPos getSphereCenterPosition(ChunkCoord center, IDimensionInfo provider, RandomSource rand) {
         int cx = (center.chunkX() << 4) + rand.nextInt(16) - 8;
         int cz = (center.chunkZ() << 4) + rand.nextInt(16) - 8;
         return new BlockPos(cx, provider.getProfile().GROUNDLEVEL, cz);

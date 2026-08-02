@@ -39,7 +39,7 @@ public class Bridges {
                 int l = 0;
                 while (l < bt.getSliceCount()) {
                     Character c = orientation == Orientation.X ? bt.getPaletteChar(x, l, z) : bt.getPaletteChar(z, l, x); // @todo general rotation system?
-                    BlockState b = compiledPalette.get(c);
+                    BlockState b = compiledPalette.get(c, ctx.paletteRandom);
                     Palette.Info inf = compiledPalette.getInfo(c);
                     if (inf != null) {
                         if (inf.isTorch()) {
@@ -58,7 +58,7 @@ public class Bridges {
 
         Character support = bt.getMetaChar(BuildingPart.META_SUPPORT);
         if (info.profile.BRIDGE_SUPPORTS && support != null) {
-            BlockState sup = compiledPalette.get(support);
+            BlockState sup = compiledPalette.get(support, ctx.paletteRandom);
             BuildingInfo minDir = orientation.getMinDir().get(info);
             BuildingInfo maxDir = orientation.getMaxDir().get(info);
             if (minDir.hasBridge(info.provider, orientation) != null && maxDir.hasBridge(info.provider, orientation) != null) {

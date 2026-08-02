@@ -1,6 +1,6 @@
 package dev.krona.urbex.varia;
 
-import net.minecraft.world.level.levelgen.LegacyRandomSource;
+import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 import net.minecraft.world.level.levelgen.synth.SimplexNoise;
 
 // @todo 1.15 copy from 1.14: use the 1.15 version!
@@ -13,7 +13,7 @@ public class PerlinNoiseGenerator14 {
       this.noiseLevels = new SimplexNoise[levelsIn];
 
       for(int i = 0; i < levelsIn; ++i) {
-         this.noiseLevels[i] = new SimplexNoise(new LegacyRandomSource(seed));
+         this.noiseLevels[i] = new SimplexNoise(new XoroshiroRandomSource(seed));
       }
 
    }
