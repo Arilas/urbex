@@ -51,7 +51,9 @@ public final class Rng {
         TERRAIN_L1,
         TERRAIN_L2,
         EXPLOSION,
-        EXPLOSION_MINI
+        EXPLOSION_MINI,
+        RUINS_BARS,
+        DAMAGE_VARIANT
     }
 
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
@@ -76,12 +78,52 @@ public final class Rng {
      * (per-block vine placement, per-spawner mob choice).
      */
     public static RandomSource atPos(long worldSeed, int x, int y, int z, Purpose purpose) {
+        return new XoroshiroRandomSource(hashPos(worldSeed, x, y, z, purpose));
+    }
+
+    /**
+     * A value in {@code [0, bound)} addressed by a block position, without allocating a stream.
+     * <p>
+     * For the per-block consumers that run in the hot loops - every weighted palette character,
+     * every rubble and leaf block. Those must be addressed rather than drawn in sequence: a
+     * sequential stream makes the <em>number</em> of draws upstream leak into every pick
+     * downstream, so a fill loop that runs two blocks longer re-rolls the rest of the chunk.
+     * Allocating a {@link RandomSource} per block to avoid that would cost more than the bug.
+     */
+    public static int indexAtPos(long worldSeed, int x, int y, int z, Purpose purpose, int bound) {
+        long h = hashPos(worldSeed, x, y, z, purpose);
+        // Multiply-shift over the top 32 bits: no division, and no modulo bias worth the name.
+        return (int) (((h >>> 32) * bound) >>> 32);
+    }
+
+    /** A value in {@code [0, 1)} addressed by a block position, without allocating a stream. */
+    public static float floatAtPos(long worldSeed, int x, int y, int z, Purpose purpose) {
+        long h = hashPos(worldSeed, x, y, z, purpose);
+        return (h >>> 40) * 0x1.0p-24f;     // top 24 bits, the same width as nextFloat()
+    }
+
+    /**
+     * A stream addressed by a chunk and an arbitrary slot within it, for consumers whose draws
+     * decide a <em>position</em> and so cannot be addressed by one. The slot must be derived from
+     * loop indices, never from a running counter that stops early - the point is that attempt
+     * (j, i) draws the same values however many attempts before it were abandoned.
+     */
+    public static RandomSource atSlot(long worldSeed, int chunkX, int chunkZ, long slot, Purpose purpose) {
+        long h = mix(worldSeed);
+        h = mix(h ^ (chunkX * X_MULTIPLIER));
+        h = mix(h ^ (chunkZ * Z_MULTIPLIER));
+        h = mix(h ^ (slot * GOLDEN_GAMMA));
+        h = mix(h ^ ((purpose.ordinal() + 1L) * PURPOSE_MULTIPLIER));
+        return new XoroshiroRandomSource(h);
+    }
+
+    private static long hashPos(long worldSeed, int x, int y, int z, Purpose purpose) {
         long h = mix(worldSeed);
         h = mix(h ^ (x * X_MULTIPLIER));
         h = mix(h ^ (y * GOLDEN_GAMMA));
         h = mix(h ^ (z * Z_MULTIPLIER));
         h = mix(h ^ ((purpose.ordinal() + 1L) * PURPOSE_MULTIPLIER));
-        return new XoroshiroRandomSource(h);
+        return h;
     }
 
     /** splitmix64 finalizer. */

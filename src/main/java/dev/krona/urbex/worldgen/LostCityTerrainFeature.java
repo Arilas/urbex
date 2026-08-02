@@ -105,13 +105,13 @@ public class LostCityTerrainFeature {
     }
 
     /**
-     * One leaf state. {@code leafRandom} is the caller's stream for this pass: obtain it once
-     * before the loop that places leaves, never per block.
+     * One leaf state for the block the driver is about to write. Addressed by that position, so
+     * how many leaves this chunk placed first cannot change which one this is.
      */
-    private BlockState getRandomLeaf(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette, RandomSource leafRandom) {
+    private BlockState getRandomLeaf(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character leavesBlock = info.getCityStyle().getLeavesBlock();
         if (leavesBlock != null) {
-            return compiledPalette.get(leavesBlock, ctx.paletteRandom);
+            return ctx.paletteHere(compiledPalette, leavesBlock);
         }
         if (randomLeafs == null) {
             BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
@@ -133,27 +133,28 @@ public class LostCityTerrainFeature {
                 i++;
             }
         }
-        return randomLeafs[leafRandom.nextInt(randomLeafs.length)];
+        return randomLeafs[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
+                Rng.Purpose.LEAVES, randomLeafs.length)];
     }
 
-    private Set<BlockState> getPossibleRandomDirts(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette, RandomSource rubbleRandom) {
+    private Set<BlockState> getPossibleRandomDirts(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
         if (rubbleDirtBlock != null) {
             return compiledPalette.getAll(rubbleDirtBlock);
         } else {
-            getRandomDirt(ctx, info, compiledPalette, rubbleRandom);
+            getRandomDirt(ctx, info, compiledPalette);
             return randomDirtSet;
         }
     }
 
     /**
-     * One rubble state - regenerates the weight table if empty. {@code rubbleRandom} is the
-     * caller's stream for this pass: obtain it once before the loop, never per block.
+     * One rubble state for the block the driver is about to write - regenerates the weight table
+     * if empty. Addressed by that position, for the same reason as {@link #getRandomLeaf}.
      */
-    private BlockState getRandomDirt(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette, RandomSource rubbleRandom) {
+    private BlockState getRandomDirt(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
         if (rubbleDirtBlock != null) {
-            return compiledPalette.get(rubbleDirtBlock, ctx.paletteRandom);
+            return ctx.paletteHere(compiledPalette, rubbleDirtBlock);
         }
         if (randomDirt == null) {
             randomDirtSet = new HashSet<>();
@@ -179,7 +180,8 @@ public class LostCityTerrainFeature {
                 i++;
             }
         }
-        return randomDirt[rubbleRandom.nextInt(randomDirt.length)];
+        return randomDirt[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
+                Rng.Purpose.RUBBLE, randomDirt.length)];
     }
 
     public Set<BlockState> getRailStates() {
@@ -460,7 +462,6 @@ public class LostCityTerrainFeature {
 
     private void breakBlocksForDamageNew(ChunkGenContext ctx, int chunkX, int chunkZ, BuildingInfo info) {
         ChunkDriver driver = ctx.driver;
-        RandomSource damageRandom = ctx.rng(Rng.Purpose.DAMAGE);
         int cx = chunkX << 4;
         int cz = chunkZ << 4;
 
@@ -504,7 +505,7 @@ public class LostCityTerrainFeature {
                             if (d != air || cury <= info.waterLevel) {
                                 float damage = collectedDamage[x][z];
                                 if (damage >= 0.001) {
-                                    BlockState newd = damageArea.damageBlock(d, damageRandom, provider, cury, damage, info.getCompiledPalette(), liquid);
+                                    BlockState newd = damageArea.damageBlock(d, provider, cx + x, cury, cz + z, damage, info.getCompiledPalette(), liquid);
                                     if (newd != d) {
                                         driver.block(newd);
                                         cntDamaged++;
@@ -1069,9 +1070,7 @@ public class LostCityTerrainFeature {
         double[] rubbleBuffer = ctx.buffers.rubble = this.rubbleNoise.getRegion(ctx.buffers.rubble, (chunkX << 4), (chunkZ << 4), 16, 16, 1.0 / 16.0, 1.0 / 16.0, 1.0D);
         double[] leavesBuffer = ctx.buffers.leaves = this.leavesNoise.getRegion(ctx.buffers.leaves, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
 
-        RandomSource rubbleRandom = ctx.rng(Rng.Purpose.RUBBLE);
-        RandomSource leafRandom = ctx.rng(Rng.Purpose.LEAVES);
-        Set<BlockState> possibleRandomDirts = getPossibleRandomDirts(ctx, info, info.getCompiledPalette(), rubbleRandom);
+        Set<BlockState> possibleRandomDirts = getPossibleRandomDirts(ctx, info, info.getCompiledPalette());
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 double vr = info.profile.RUBBLE_DIRT_SCALE < 0.01f ? 0 : rubbleBuffer[x + z * 16] / info.profile.RUBBLE_DIRT_SCALE;
@@ -1083,7 +1082,7 @@ public class LostCityTerrainFeature {
                     if (c != air && c != liquid) {
                         for (int i = 0; i < vr; i++) {
                             if (isEmpty(driver.getBlock())) {
-                                driver.add(getRandomDirt(ctx, info, info.getCompiledPalette(), rubbleRandom));
+                                driver.add(getRandomDirt(ctx, info, info.getCompiledPalette()));
                             } else {
                                 driver.incY();
                             }
@@ -1094,7 +1093,7 @@ public class LostCityTerrainFeature {
                     if (leafBaseState == base || possibleRandomDirts.contains(leafBaseState)) {
                         for (int i = 0; i < vl; i++) {
                             if (isEmpty(driver.getBlock())) {
-                                driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette(), leafRandom));
+                                driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                             } else {
                                 driver.incY();
                             }
@@ -1146,6 +1145,15 @@ public class LostCityTerrainFeature {
     }
 
 
+    /**
+     * A roll in {@code [0, 1)} for the block the driver is currently on. Addressed by that
+     * position, so a loop that walks two blocks further than it did last time changes those two
+     * blocks and nothing else.
+     */
+    private static float rollHere(ChunkGenContext ctx, ChunkDriver driver, Rng.Purpose purpose) {
+        return Rng.floatAtPos(ctx.seed, driver.getX(), driver.getY(), driver.getZ(), purpose);
+    }
+
     private void generateRuins(ChunkGenContext ctx, BuildingInfo info) {
         if (info.ruinHeight < 0) {
             return;
@@ -1165,12 +1173,9 @@ public class LostCityTerrainFeature {
         int baseheight = (int) (info.getCityGroundLevel() + 1 + (info.ruinHeight * info.getNumFloors() * FLOORHEIGHT));
 
         CompiledPalette palette = info.getCompiledPalette();
-        RandomSource ruinRandom = ctx.rng(Rng.Purpose.RUINS);
-        RandomSource leafRandom = ctx.rng(Rng.Purpose.LEAVES);
-
         BlockState ironbarsState = Blocks.IRON_BARS.defaultBlockState();
         Character infobarsChar = info.getCityStyle().getIronbarsBlock();
-        Supplier<BlockState> ironbars = infobarsChar == null ? () -> ironbarsState : () -> palette.get(infobarsChar, ctx.paletteRandom);
+        Supplier<BlockState> ironbars = infobarsChar == null ? () -> ironbarsState : () -> ctx.paletteHere(palette, infobarsChar);
         Set<BlockState> infoBarSet = infobarsChar == null ? Collections.singleton(ironbarsState) : palette.getAll(infobarsChar);
         Predicate<BlockState> checkIronbars = infobarsChar == null ? s -> s == ironbarsState : infoBarSet::contains;
         Character rubbleBlock = info.getBuilding().getRubbleBlock();
@@ -1196,10 +1201,10 @@ public class LostCityTerrainFeature {
                     BlockState damage = palette.canBeDamagedToIronBars(driver.getBlock());
                     BlockState c = driver.getBlockDown();
 
-                    if (doRubble && !checkIronbars.test(c) && c != air && c != liquid && ruinRandom.nextFloat() < .2f) {      // @todo hardcoded random
+                    if (doRubble && !checkIronbars.test(c) && c != air && c != liquid && rollHere(ctx, driver, Rng.Purpose.RUINS) < .2f) {      // @todo hardcoded random
                         doRubble = false;
-                        driver.add(palette.get(rubbleBlock, ctx.paletteRandom));
-                    } else if ((damage != null || checkIronbars.test(c)) && c != air && c != liquid && ruinRandom.nextFloat() < .2f) {    // @todo hardcoded random
+                        driver.add(ctx.paletteHere(palette, rubbleBlock));
+                    } else if ((damage != null || checkIronbars.test(c)) && c != air && c != liquid && rollHere(ctx, driver, Rng.Purpose.RUINS_BARS) < .2f) {    // @todo hardcoded random
                         driver.add(ironbars.get());
                     } else {
                         if (vl > 0) {
@@ -1209,7 +1214,7 @@ public class LostCityTerrainFeature {
                                 height++;   // Make sure we keep on filling with air a bit longer because we are lowering here
                                 c = driver.getBlockDown();
                             }
-                            driver.add(getRandomLeaf(ctx, info, palette, leafRandom));
+                            driver.add(getRandomLeaf(ctx, info, palette));
                             vl--;
                         } else {
                             driver.add(air);
@@ -1245,7 +1250,7 @@ public class LostCityTerrainFeature {
             boolean elevated = info.isElevatedParkSection();
             if (elevated) {
                 Character elevationBlock = info.getCityStyle().getParkElevationBlock();
-                BlockState elevation = info.getCompiledPalette().get(elevationBlock, ctx.paletteRandom);
+                BlockState elevation = ctx.paletteAt(info.getCompiledPalette(), elevationBlock, 0, height, 0);
                 for (int x = 0; x < 16; ++x) {
                     driver.current(x, height, 0);
                     for (int z = 0; z < 16; ++z) {
@@ -1375,7 +1380,7 @@ public class LostCityTerrainFeature {
      */
     private void fillMainStreetBlock(ChunkGenContext ctx, BuildingInfo info, Character borderBlock, int offset) {
         ChunkDriver driver = ctx.driver;
-        BlockState border = info.getCompiledPalette().get(borderBlock, ctx.paletteRandom);
+        BlockState border = ctx.paletteAt(info.getCompiledPalette(), borderBlock, 0, info.getCityGroundLevel() - offset, 0);
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 driver.setBlockRange(x, info.getCityGroundLevel() - (offset - 1), z, info.getCityGroundLevel(), base);
@@ -1391,7 +1396,7 @@ public class LostCityTerrainFeature {
         ChunkDriver driver = ctx.driver;
         Character borderBlock = info.getCityStyle().getBorderBlock();
         Character wallBlock = info.getCityStyle().getWallBlock();
-        BlockState wall = info.getCompiledPalette().get(wallBlock, ctx.paletteRandom);
+        BlockState wall = ctx.paletteAt(info.getCompiledPalette(), wallBlock, x, info.getCityGroundLevel() + 1, z);
 
         switch (info.profile.LANDSCAPE_TYPE) {
             case DEFAULT, SPHERES -> {
@@ -1476,9 +1481,6 @@ public class LostCityTerrainFeature {
 
     private void generateRandomVegetation(ChunkGenContext ctx, BuildingInfo info, int height) {
         ChunkDriver driver = ctx.driver;
-        // One stream for the whole pass, drawn from inside the loops below.
-        RandomSource vegetationRandom = ctx.rng(Rng.Purpose.VEGETATION);
-        RandomSource leafRandom = ctx.rng(Rng.Purpose.LEAVES);
 
         if (info.getXmin().hasBuilding) {
             for (int x = 0; x < info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS; x++) {
@@ -1491,8 +1493,8 @@ public class LostCityTerrainFeature {
                     }
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS + 1 - x));
                     int cnt = 0;
-                    while (vegetationRandom.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette(), leafRandom));
+                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1509,8 +1511,8 @@ public class LostCityTerrainFeature {
                     }
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (x - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS));
                     int cnt = 0;
-                    while (vegetationRandom.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette(), leafRandom));
+                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1527,8 +1529,8 @@ public class LostCityTerrainFeature {
                     }
                     float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS + 1 - z));
                     int cnt = 0;
-                    while (vegetationRandom.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette(), leafRandom));
+                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1545,8 +1547,8 @@ public class LostCityTerrainFeature {
                     }
                     float v = info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (z - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS);
                     int cnt = 0;
-                    while (vegetationRandom.nextFloat() < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette(), leafRandom));
+                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
+                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1570,55 +1572,57 @@ public class LostCityTerrainFeature {
 
         Character grassChar = info.getCityStyle().getGrassBlock();
         BlockState grassBlock = Blocks.GRASS_BLOCK.defaultBlockState();
-        Supplier<BlockState> grass = (grassChar == null) ? () -> grassBlock : () -> compiledPalette.get(grassChar, ctx.paletteRandom);
-
         boolean parkBorder = info.getCityStyle().getParkBorder() != null ? info.getCityStyle().getParkBorder() : info.profile.PARK_BORDER;
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
+                // Resolved per column, at the block it will be written to.
+                BlockState grass = (grassChar == null)
+                        ? grassBlock
+                        : ctx.paletteAt(compiledPalette, grassChar, x, height, z);
                 if (x == 0 || x == 15 || z == 0 || z == 15) {
                     b = null;
                     if (elevated) {
                         if (x == 0 && z == 0) {
                             if (el01 && el00 && el10) {
-                                b = grass.get();
+                                b = grass;
                             }
                         } else if (x == 15 && z == 0) {
                             if (el21 && el20 && el10) {
-                                b = grass.get();
+                                b = grass;
                             }
                         } else if (x == 0 && z == 15) {
                             if (el01 && el02 && el12) {
-                                b = grass.get();
+                                b = grass;
                             }
                         } else if (x == 15 && z == 15) {
                             if (el12 && el22 && el21) {
-                                b = grass.get();
+                                b = grass;
                             }
                         } else if (x == 0) {
                             if (el01) {
-                                b = grass.get();
+                                b = grass;
                             }
                         } else if (x == 15) {
                             if (el21) {
-                                b = grass.get();
+                                b = grass;
                             }
                         } else if (z == 0) {
                             if (el10) {
-                                b = grass.get();
+                                b = grass;
                             }
                         } else if (z == 15) {
                             if (el12) {
-                                b = grass.get();
+                                b = grass;
                             }
                         }
                         if (b == null) {
-                            b = parkBorder ? compiledPalette.get(street, ctx.paletteRandom) : grass.get();
+                            b = parkBorder ? ctx.paletteAt(compiledPalette, street, x, height, z) : grass;
                         }
                     } else {
-                        b = parkBorder ? compiledPalette.get(street, ctx.paletteRandom) : grass.get();
+                        b = parkBorder ? ctx.paletteAt(compiledPalette, street, x, height, z) : grass;
                     }
                 } else {
-                    b = grass.get();
+                    b = grass;
                 }
                 driver.current(x, height, z).block(b);
             }
@@ -1755,7 +1759,7 @@ public class LostCityTerrainFeature {
                     int len = vs.length;
                     for (int y = 0; y < len; y++) {
                         char c = vs[y];
-                        BlockState b = compiledPalette.get(c, ctx.paletteRandom);
+                        BlockState b = ctx.paletteAt(compiledPalette, c, rx, oy + y, rz);
                         if (b == null) {
                             throw new RuntimeException("Could not find entry '" + c + "' in the palette for part '" + part.getName() + "'!");
                         }
@@ -2111,7 +2115,6 @@ public class LostCityTerrainFeature {
                 CompiledPalette palette = info.getCompiledPalette();
                 BlockState ironbarsState = Blocks.IRON_BARS.defaultBlockState();
                 Character infobarsChar = info.getCityStyle().getIronbarsBlock();
-                Supplier<BlockState> ironbars = infobarsChar == null ? () -> ironbarsState : () -> palette.get(infobarsChar, ctx.paletteRandom);
 
                 for (int i = 0; i < destroyedBlocks; i++) {
                     int x = debrisRandom.nextInt(16);
@@ -2125,9 +2128,9 @@ public class LostCityTerrainFeature {
                         // Fix for FLOATING // @todo!
                         BlockState b;
                         if (debrisRandom.nextInt(5) == 0) {
-                            b = ironbars.get();
+                            b = infobarsChar == null ? ironbarsState : ctx.paletteAt(palette, infobarsChar, x, h + 1, z);
                         } else {
-                            b = adjacentPalette.get(rubbleBlock, ctx.paletteRandom);     // Filler from adjacent building
+                            b = ctx.paletteAt(adjacentPalette, rubbleBlock, x, h + 1, z);     // Filler from adjacent building
                         }
                         driver.current(x, h + 1, z).block(b);
                     }
@@ -2172,12 +2175,12 @@ public class LostCityTerrainFeature {
     private void setBlocksFromPalette(ChunkGenContext ctx, int x, int y, int z, int y2, CompiledPalette palette, char character) {
         ChunkDriver driver = ctx.driver;
         if (palette.isSimple(character)) {
-            BlockState b = palette.get(character, ctx.paletteRandom);
+            BlockState b = ctx.paletteAt(palette, character, x, y, z);
             driver.setBlockRange(x, y, z, y2, b);
         } else {
             driver.current(x, y, z);
             while (y < y2) {
-                driver.add(palette.get(character, ctx.paletteRandom));
+                driver.add(ctx.paletteHere(palette, character));
                 y++;
             }
         }
@@ -2298,7 +2301,7 @@ public class LostCityTerrainFeature {
                         setBlocksFromPalette(ctx, x, lowestLevel - 10, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
-                        BlockState filler = palette.get(fillerBlock, ctx.paletteRandom);
+                        BlockState filler = ctx.paletteAt(palette, fillerBlock, x, lowestLevel, z);
                         driver.current(x, lowestLevel, z).block(filler); // There is nothing below so we fill this with the filler
                     }
 
@@ -2320,7 +2323,7 @@ public class LostCityTerrainFeature {
                         setBlocksFromPalette(ctx, x, y, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
-                        BlockState filler = palette.get(fillerBlock, ctx.paletteRandom);
+                        BlockState filler = ctx.paletteAt(palette, fillerBlock, x, lowestLevel, z);
                         driver.current(x, lowestLevel, z).block(filler); // There is nothing below so we fill this with the filler
                     }
                     // That single filler block is not enough when the bottom of the building ends
@@ -2355,7 +2358,7 @@ public class LostCityTerrainFeature {
                 driver.current(x, y, z);
                 if (isSide(x, z)) {
                     while (y > deepestY && driver.getBlock() == air) {
-                        driver.block(info.getCompiledPalette().get(borderBlock, ctx.paletteRandom)).decY();
+                        driver.block(ctx.paletteHere(info.getCompiledPalette(), borderBlock)).decY();
                         y--;
                     }
                 } else {

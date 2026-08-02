@@ -24,7 +24,7 @@ public class Doors
 
     public static void generateDoors(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, int height, int f) {
         BlockState air = Blocks.AIR.defaultBlockState();
-        BlockState filler = info.getCompiledPalette().get(info.getBuilding().getFillerBlock(), ctx.paletteRandom);
+        BlockState filler = ctx.paletteAt(info.getCompiledPalette(), info.getBuilding().getFillerBlock(), 0, height, 0);
         ChunkDriver driver = ctx.driver;
 
         height--;       // Start generating doors one below for the filler

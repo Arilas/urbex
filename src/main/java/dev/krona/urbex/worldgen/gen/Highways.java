@@ -85,7 +85,7 @@ public class Highways {
 
         Character support = part.getMetaChar(BuildingPart.META_SUPPORT);
         if (info.profile.HIGHWAY_SUPPORTS && support != null) {
-            BlockState sup = info.getCompiledPalette().get(support, ctx.paletteRandom);
+            BlockState sup = ctx.paletteAt(info.getCompiledPalette(), support, 0, highwayGroundLevel - 1, 0);
             if (sup == null) {
                 throw new RuntimeException("Cannot find support block '" + support + "' for highway part '" + part.getName() + "'!");
             }

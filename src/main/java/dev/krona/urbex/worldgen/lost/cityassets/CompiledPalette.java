@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.varia.Rng;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
@@ -153,6 +154,26 @@ public class CompiledPalette {
             return null;
         }
 
+    }
+
+    /**
+     * The state for {@code c} at a block position, drawing nothing from any stream.
+     * <p>
+     * This is how generation resolves a weighted character. The pick is a pure function of the
+     * world seed and the position it is being placed at, so how many other characters this chunk
+     * resolved first cannot change it - which is exactly what a per-chunk sequential stream got
+     * wrong, and what {@link dev.krona.urbex.varia.Rng} exists to prevent.
+     */
+    public BlockState getAt(char c, long seed, int x, int y, int z) {
+        Object o = palette.get(c);
+        if (o instanceof BlockState state) {
+            return state;
+        } else if (o == null) {
+            return null;
+        } else {
+            BlockState[] randomBlocks = (BlockState[]) o;
+            return randomBlocks[Rng.indexAtPos(seed, x, y, z, Rng.Purpose.PALETTE, randomBlocks.length)];
+        }
     }
 
     /**

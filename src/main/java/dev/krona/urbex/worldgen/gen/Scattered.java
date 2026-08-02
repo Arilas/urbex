@@ -272,7 +272,7 @@ public class Scattered {
                                     driver.current(x, y, z);
                                     BlockState b = driver.getBlock();
                                     while (b == air || b == liquid) {
-                                        driver.block(compiledPalette.get(c, ctx.paletteRandom));
+                                        driver.block(ctx.paletteHere(compiledPalette, c));
                                         driver.decY();
                                         b = driver.getBlock();
                                     }

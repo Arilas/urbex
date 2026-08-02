@@ -4,7 +4,9 @@ import net.minecraft.util.RandomSource;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RngTest {
 
@@ -71,6 +73,62 @@ class RngTest {
         // change to the mixing function shows up as a test failure rather than a silently
         // different world.
         assertArrayEquals(GOLDEN, take(Rng.at(42L, 100, -100, Rng.Purpose.RUINS), 4));
+    }
+
+    @Test
+    void indexAtPosStaysInBounds() {
+        for (int y = 0; y < 512; y++) {
+            int i = Rng.indexAtPos(9L, 3, y, -7, Rng.Purpose.PALETTE, 128);
+            assertTrue(i >= 0 && i < 128, "out of bounds: " + i);
+        }
+    }
+
+    @Test
+    void indexAtPosIsAddressedNotSequential() {
+        // The same address always resolves the same way, however many other addresses were
+        // resolved in between. This is the property a per-chunk sequential stream lacked.
+        int first = Rng.indexAtPos(9L, 3, 64, -7, Rng.Purpose.PALETTE, 128);
+        for (int y = 0; y < 100; y++) {
+            Rng.indexAtPos(9L, 3, y, -7, Rng.Purpose.PALETTE, 128);
+        }
+        assertEquals(first, Rng.indexAtPos(9L, 3, 64, -7, Rng.Purpose.PALETTE, 128));
+    }
+
+    @Test
+    void indexAtPosSpreadsOverItsRange() {
+        boolean[] seen = new boolean[16];
+        for (int y = 0; y < 4096; y++) {
+            seen[Rng.indexAtPos(9L, 3, y, -7, Rng.Purpose.PALETTE, 16)] = true;
+        }
+        for (int i = 0; i < seen.length; i++) {
+            assertTrue(seen[i], "index " + i + " never produced");
+        }
+    }
+
+    @Test
+    void floatAtPosIsAUnitInterval() {
+        for (int y = 0; y < 512; y++) {
+            float f = Rng.floatAtPos(9L, 3, y, -7, Rng.Purpose.DAMAGE);
+            assertTrue(f >= 0.0f && f < 1.0f, "out of range: " + f);
+        }
+    }
+
+    @Test
+    void pairedRollsAtOnePositionAreIndependent() {
+        // damageBlock rolls twice on one block; the two purposes must not hand back the same value.
+        assertNotEquals(Rng.floatAtPos(9L, 3, 64, -7, Rng.Purpose.DAMAGE),
+                        Rng.floatAtPos(9L, 3, 64, -7, Rng.Purpose.DAMAGE_VARIANT));
+        assertNotEquals(Rng.floatAtPos(9L, 3, 64, -7, Rng.Purpose.RUINS),
+                        Rng.floatAtPos(9L, 3, 64, -7, Rng.Purpose.RUINS_BARS));
+    }
+
+    @Test
+    void differentSlotsDiffer() {
+        assertNotEquals(Rng.atSlot(1L, 4, 5, 0, Rng.Purpose.STUFF).nextLong(),
+                        Rng.atSlot(1L, 4, 5, 1, Rng.Purpose.STUFF).nextLong());
+        // and the chunk still separates two identical slots
+        assertNotEquals(Rng.atSlot(1L, 4, 5, 7, Rng.Purpose.STUFF).nextLong(),
+                        Rng.atSlot(1L, 5, 4, 7, Rng.Purpose.STUFF).nextLong());
     }
 
     private static final long[] GOLDEN = {

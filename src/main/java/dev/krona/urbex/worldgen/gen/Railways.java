@@ -143,7 +143,7 @@ public class Railways {
         }
 
         Character railMainBlock = info.getCityStyle().getRailMainBlock();
-        BlockState rail = info.getCompiledPalette().get(railMainBlock, ctx.paletteRandom);
+        BlockState rail = ctx.paletteAt(info.getCompiledPalette(), railMainBlock, 0, height, 0);
         if (rail == null) {
             throw new RuntimeException("Cannot find rail block '" + railMainBlock + "' for type '" + type + "'!");
         }

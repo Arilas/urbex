@@ -27,19 +27,9 @@ public final class ChunkGenContext {
     public final char street;
     public final NoiseBuffers buffers;
 
-    /**
-     * The one stream every weighted palette character in this chunk draws from.
-     * <p>
-     * {@link CompiledPalette#get(char, RandomSource)} is called from dozens of places across a
-     * single chunk - every floor of every building, every street slice, every filler column - and
-     * the variety it produces is only interesting if consecutive draws differ. A fresh
-     * {@link #rng} per call site would hand every one of them the same first value, so a building
-     * would repeat itself floor for floor. One stream per chunk, addressed by seed and coordinate,
-     * keeps that variety while staying independent of the order chunks are generated in.
-     */
-    public final RandomSource paletteRandom;
 
-    private final long seed;
+    /** The world seed, for the position-addressed picks that resolve palette characters. */
+    public final long seed;
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
                            IDimensionInfo provider, LostCityProfile profile, BuildingInfo info) {
@@ -55,7 +45,21 @@ public final class ChunkGenContext {
         this.driver.setPrimer(region, chunk);
         this.buffers = new NoiseBuffers();
         this.seed = provider.getSeed();
-        this.paletteRandom = Rng.at(this.seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.PALETTE);
+    }
+
+    /**
+     * Resolve a weighted palette character at the block the driver is about to write.
+     * <p>
+     * Valid only where {@code driver.current} already points at the destination - inside a
+     * {@code block()} or {@code add()} chain. Where it does not, use {@link #paletteAt}.
+     */
+    public net.minecraft.world.level.block.state.BlockState paletteHere(CompiledPalette p, char c) {
+        return p.getAt(c, seed, driver.getX(), driver.getY(), driver.getZ());
+    }
+
+    /** Resolve a weighted palette character at a chunk-local position. */
+    public net.minecraft.world.level.block.state.BlockState paletteAt(CompiledPalette p, char c, int x, int y, int z) {
+        return p.getAt(c, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
     }
 
     /**
@@ -63,6 +67,10 @@ public final class ChunkGenContext {
      * <p>
      * A <em>new</em> stream every call. Obtain one per pass, before the loop that draws from it -
      * calling this inside a loop body hands back the same first value on every iteration.
+     * <p>
+     * Only for consumers drawn a <em>fixed</em> number of times per chunk. If the trip count of
+     * the loop depends on what is already in the world, use {@link Rng#atPos} and friends: a
+     * sequential stream would let that trip count perturb every later draw.
      */
     public RandomSource rng(Rng.Purpose purpose) {
         return Rng.at(seed, coord.chunkX(), coord.chunkZ(), purpose);

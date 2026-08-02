@@ -30,9 +30,11 @@ public class Stuff {
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
     public static void generateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
-        // One stream for every stuff object this chunk places, drawn from in the order they are
-        // visited. A fresh one per object would put each of them at the same coordinates.
-        RandomSource rand = ctx.rng(Rng.Purpose.STUFF);
+        // Each stuff object gets its own address, and within it each placement attempt gets its
+        // own, derived from the loop indices. An attempt therefore draws the same values however
+        // many attempts before it were abandoned - and whether an attempt is abandoned depends on
+        // what is already in the world, which is not ours to depend on.
+        int stuffOrdinal = 0;
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
         for (String tag : info.getCityStyle().getStuffTags()) {
@@ -45,13 +47,19 @@ public class Stuff {
                         IdentifierMatcher buildingMatcher = settings.getBuildingMatcher();
                         if (buildingMatcher.isAny() || buildingMatcher.test(info.buildingType.getId())) {
                             if (settings.getBiomeMatcher().test(biome.getMainBiome())) {
-                                actuallyGenerateStuff(ctx, feature, info, stuff, palette, rand, inBuilding == Boolean.TRUE);
+                                actuallyGenerateStuff(ctx, feature, info, stuff, palette, stuffOrdinal++, inBuilding == Boolean.TRUE);
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    /** The stream for one placement attempt, addressed by (stuff, count index, attempt index). */
+    private static RandomSource slot(ChunkGenContext ctx, int stuffOrdinal, int j, int i) {
+        long address = ((long) stuffOrdinal * 4096L + (j + 1)) * 4096L + i;
+        return Rng.atSlot(ctx.seed, ctx.coord.chunkX(), ctx.coord.chunkZ(), address, Rng.Purpose.STUFF);
     }
 
     private static boolean testBlock(ChunkDriver driver, BlockMatcher matcher, int x, int y, int z) {
@@ -89,7 +97,7 @@ public class Stuff {
         return true;
     }
 
-    private static void actuallyGenerateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, RandomSource rand, boolean inBuilding) {
+    private static void actuallyGenerateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, int stuffOrdinal, boolean inBuilding) {
         StuffSettingsRE settings = stuff.getSettings();
         String blocks = settings.getColumn();
         if (!columnResolves(stuff, blocks, palette)) {
@@ -115,9 +123,10 @@ public class Stuff {
         }
         int mincount = settings.getMincount();
         int maxcount = settings.getMaxcount();
-        int count = rand.nextInt(maxcount - mincount) + mincount;
+        int count = slot(ctx, stuffOrdinal, -1, 0).nextInt(maxcount - mincount) + mincount;
         for (int j = 0; j < count; j++) {
             for (int i = 0; i < attempts; i++) {
+                RandomSource rand = slot(ctx, stuffOrdinal, j, i);
                 int x = rand.nextInt(16);
                 int y = rand.nextInt(maxheight - minheight) + minheight;
                 int z = rand.nextInt(16);
@@ -135,7 +144,7 @@ public class Stuff {
                         if (ok) {
                             driver.current(x, y, z);
                             for (int k = 0; k < blocks.length(); k++) {
-                                BlockState block = palette.get(blocks.charAt(k), ctx.paletteRandom);
+                                BlockState block = ctx.paletteHere(palette, blocks.charAt(k));
                                 driver.add(block);
                             }
                             break;

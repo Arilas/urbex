@@ -70,7 +70,12 @@ public class DamageArea {
         }
     }
 
-    public BlockState damageBlock(BlockState b, RandomSource damageRandom, IDimensionInfo provider, int y, float damage, CompiledPalette palette, BlockState liquidChar) {
+    /**
+     * Damage one block. The two rolls are addressed by the block's own position rather than drawn
+     * from a stream: whether a block is damaged is decided per block, and the number of blocks
+     * damaged before it depends on what was already in the world.
+     */
+    public BlockState damageBlock(BlockState b, IDimensionInfo provider, int x, int y, int z, float damage, CompiledPalette palette, BlockState liquidChar) {
         if (Tools.hasTag(b.getBlock(), LostTags.NOT_BREAKABLE_TAG)) {
             return b;
         }
@@ -78,11 +83,11 @@ public class DamageArea {
         if (Tools.hasTag(b.getBlock(), LostTags.EASY_BREAKABLE_TAG)) {
             damage *= 2.5f;    // As if this block gets double the damage
         }
-        if (damageRandom.nextFloat() <= damage) {
+        if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {
             BlockState damaged = palette.canBeDamagedToIronBars(b);
             int waterlevel = Tools.getSeaLevel(provider.getWorld());//profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
             if (damage < BLOCK_DAMAGE_CHANCE && damaged != null) {
-                if (damageRandom.nextFloat() < .7f) {
+                if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
                     b = damaged;
                 } else {
                     b = y <= waterlevel ? liquidChar : air;
