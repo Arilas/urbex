@@ -238,9 +238,12 @@ public class Scattered {
 
                 @Override
                 public Identifier getBiome() {
-                    // provider.getBiome(), not level.getBiome(): the latter goes through the chunk,
-                    // which during generation may not be loaded in this region at all.
-                    Holder<Biome> biome = provider.getBiome(info.getCenter(0));
+                    // ctx.region, not provider.getWorld(): the region is what this used to be, back
+                    // when IDimensionInfo held a mutable world reference. Not provider.getBiome()
+                    // either - that asks the biome source directly, while WorldGenLevel.getBiome
+                    // goes through BiomeManager, which applies a seeded sub-quart fuzzy offset. The
+                    // two disagree near quart boundaries, so swapping them would move output.
+                    Holder<Biome> biome = ctx.region.getBiome(info.getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
                 }
             };

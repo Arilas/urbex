@@ -77,10 +77,11 @@ public class CityStyle {
     private String style;
     private final String inherit;
     // 'initialized' is written last, inside the monitor, so a reader that sees it set is guaranteed
-    // to see every field init() copied down from the parent style. 'resolving' keeps the reentrant
-    // case (a style whose parent chain leads back to it) behaving exactly as it did before.
+    // to see every field init() copied down from the parent style.
     private volatile boolean initialized = false;
-    private boolean resolving = false;
+
+    // Per-thread cycle guard for the inherit chain - see init().
+    private static final ThreadLocal<Set<CityStyle>> RESOLVING = ThreadLocal.withInitial(HashSet::new);
 
     public CityStyle(CityStyleRE object) {
         name = object.getRegistryName();
@@ -288,18 +289,40 @@ public class CityStyle {
      * it has to be safe to race - and it mutates about thirty fields, so it cannot be done with a
      * volatile write per field. A monitor on this style is the cheap answer: after the first call
      * the volatile read below short-circuits and no lock is taken at all.
+     * <p>
+     * The parent is resolved <em>before</em> the monitor is taken, deliberately. Resolving it
+     * recursively init()s the parent, so doing it inside would mean holding this style's monitor
+     * while acquiring the parent's - and a cyclic inherit chain touched by two threads would then
+     * be a lock-ordering deadlock, which in worldgen means a hung server and no diagnostic at all.
+     * By the time the monitor is entered, every lock this method needs has already been released.
+     * <p>
+     * That moves the cycle guard out of the monitor, so it is a ThreadLocal rather than a field: a
+     * field would make one thread's half-resolved style visible to another. A style already being
+     * resolved further up <em>this thread's</em> stack returns uninitialised, which is exactly what
+     * the old single-threaded 'resolveInherit' flag did - a cycle terminates rather than recursing.
      */
     public void init(CommonLevelAccessor level) {
         if (initialized) {
             return;
         }
+        CityStyle inheritFrom = null;
+        if (inherit != null) {
+            Set<CityStyle> inProgress = RESOLVING.get();
+            if (!inProgress.add(this)) {
+                return;     // cycle in the inherit chain; leave this style as it is, as before
+            }
+            try {
+                inheritFrom = AssetRegistries.CITYSTYLES.getOrThrow(level, inherit);
+            } finally {
+                inProgress.remove(this);
+            }
+        }
         synchronized (this) {
-            if (initialized || resolving) {
+            // Re-check: the addAll()s below are not idempotent, so exactly one thread may run them.
+            if (initialized) {
                 return;
             }
-            resolving = true;
-            if (inherit != null) {
-                CityStyle inheritFrom = AssetRegistries.CITYSTYLES.getOrThrow(level, inherit);
+            if (inheritFrom != null) {
                 if (style == null) {
                     style = inheritFrom.getStyle();
                 }

@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -96,9 +97,31 @@ public class ChunkDriver {
 
     /** Thread-confined: only ever touched by the single thread driving this chunk. */
     private LongOpenHashSet recorded;
+    private boolean published;
+    private boolean loggedLateWrite;
 
     private void recordWrite(int x, int y, int z) {
         if (!recordingWrites) {
+            return;
+        }
+        if (published) {
+            // publishRecordedWrites() has already run for this driver, so the accumulator is gone
+            // and this position would simply vanish. Nothing reaches here today - updateAdjacent is
+            // the only writer that could outlive the placement pass, and it is only ever called
+            // from correct(). But Task 6 verifies itself with this harness, and a harness that
+            // silently discards writes is the worst possible thing to debug. So: say so, loudly,
+            // and record it anyway rather than quietly reporting a wrong digest.
+            if (!loggedLateWrite) {
+                loggedLateWrite = true;
+                Urbex.getLogger().error(
+                        "ChunkDriver write recorder: block written at {},{},{} after this driver "
+                                + "published its writes. The /urbex digest harness would have "
+                                + "dropped it; recording it separately. This is a bug - some pass "
+                                + "now runs after actuallyGenerate().", x, y, z);
+            }
+            LongOpenHashSet late = new LongOpenHashSet();
+            late.add(BlockPos.asLong(x, y, z));
+            mergeIntoRecordedWrites(late);
             return;
         }
         if (recorded == null) {
@@ -114,9 +137,14 @@ public class ChunkDriver {
     private void publishRecordedWrites() {
         LongOpenHashSet local = recorded;
         recorded = null;
+        published = true;
         if (local == null || local.isEmpty()) {
             return;
         }
+        mergeIntoRecordedWrites(local);
+    }
+
+    private static void mergeIntoRecordedWrites(LongOpenHashSet local) {
         Map<ChunkPos, LongOpenHashSet> byChunk = new HashMap<>();
         for (long packed : local) {
             ChunkPos key = new ChunkPos(BlockPos.getX(packed) >> 4, BlockPos.getZ(packed) >> 4);

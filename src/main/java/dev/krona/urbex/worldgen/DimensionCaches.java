@@ -44,8 +44,16 @@ public final class DimensionCaches {
 
     /**
      * The city-rarity map is per profile rather than per chunk: a city-sphere dimension asks for
-     * one for its inside profile and one for its outside profile, which have different perlin
+     * one for its inside profile and one for its outside profile, which can have different perlin
      * settings, so the key is the settings themselves.
+     * <p>
+     * This is a deliberate behaviour change. The old cache was static and keyed by dimension alone,
+     * so in a dimension whose two profiles disagreed on cityPerlinScale/Offset/InnerScale, whichever
+     * profile asked first silently imposed its field on the other. Shipped content is unaffected:
+     * 'largecities' is the only profile with cityChance &lt; 0 (ProfileSetup.java:431) and it never
+     * sets CITYSPHERE_OUTSIDE_PROFILE, so only one profile ever reaches this map and the key is
+     * constant. A <em>user-authored</em> sphere profile pair with cityChance &lt; 0 and differing
+     * perlin settings will generate differently than it did before - correctly, now.
      */
     public final ConcurrentHashMap<RaritySettings, CityRarityMap> cityRarity = new ConcurrentHashMap<>();
 

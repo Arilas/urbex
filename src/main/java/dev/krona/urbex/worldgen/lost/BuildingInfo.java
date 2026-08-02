@@ -668,8 +668,11 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
-                    // would go via the chunk, which the dimension's level may not have loaded.
+                    // provider.getBiome() asks the biome source directly, where the old
+                    // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
+                    // offset - so the two can disagree right at a quart boundary. Forced: a cached
+                    // BuildingInfo is reached from its neighbours' generation and has no region to
+                    // ask, and the dimension's own level would go looking for unloaded chunks.
                     Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
@@ -691,8 +694,11 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
-                    // would go via the chunk, which the dimension's level may not have loaded.
+                    // provider.getBiome() asks the biome source directly, where the old
+                    // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
+                    // offset - so the two can disagree right at a quart boundary. Forced: a cached
+                    // BuildingInfo is reached from its neighbours' generation and has no region to
+                    // ask, and the dimension's own level would go looking for unloaded chunks.
                     Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
@@ -910,8 +916,11 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
-                    // would go via the chunk, which the dimension's level may not have loaded.
+                    // provider.getBiome() asks the biome source directly, where the old
+                    // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
+                    // offset - so the two can disagree right at a quart boundary. Forced: a cached
+                    // BuildingInfo is reached from its neighbours' generation and has no region to
+                    // ask, and the dimension's own level would go looking for unloaded chunks.
                     Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
@@ -936,8 +945,11 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
-                    // would go via the chunk, which the dimension's level may not have loaded.
+                    // provider.getBiome() asks the biome source directly, where the old
+                    // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
+                    // offset - so the two can disagree right at a quart boundary. Forced: a cached
+                    // BuildingInfo is reached from its neighbours' generation and has no region to
+                    // ask, and the dimension's own level would go looking for unloaded chunks.
                     Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
