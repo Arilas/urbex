@@ -65,8 +65,8 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
                 try {
                     feature.generate(region, region.getChunk(chunkX, chunkZ));
                 } catch (Exception e) {
-                    Urbex.getLogger().error("Error generating chunk {},{}: {}", chunkX, chunkZ, e.getMessage(), e);
-                    e.printStackTrace();
+                    Urbex.getLogger().error("Error generating chunk {},{} (profile={}, dimension={})",
+                            chunkX, chunkZ, diminfo.getProfile().getName(), diminfo.getType().identifier(), e);
                     ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
                     ErrorLogger.report("There was an error generating a chunk. See log for details!");
                 }

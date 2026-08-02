@@ -144,6 +144,37 @@ public class Config {
         return dimensionProfileCache.get(type);
     }
 
+    /**
+     * Validate that every profile name referenced by config actually exists, so an unknown
+     * profile fails loudly at server start with the list of valid names instead of NPEing
+     * later in {@link #getProfileForDimension} during world init.
+     *
+     * Must run after {@link ProfileSetup#setupProfiles()} has populated {@code STANDARD_PROFILES}
+     * (which includes any user profile JSON files under config/urbex/profiles/, not just the
+     * built-in ones) - i.e. from {@code ServerLifecycleEvents.SERVER_STARTING} or later, once the
+     * server config (selectedProfile) has also been loaded.
+     */
+    public static void validateSelectedProfiles() {
+        String selected = SELECTED_PROFILE.get();
+        if (selected != null && !selected.isEmpty() && !ProfileSetup.STANDARD_PROFILES.containsKey(selected)) {
+            throw new IllegalStateException(
+                    "Unknown Urbex profile '" + selected + "'. Valid profiles: "
+                    + String.join(", ", new TreeSet<>(ProfileSetup.STANDARD_PROFILES.keySet())));
+        }
+        for (String dp : DIMENSION_PROFILES.get()) {
+            String[] split = dp.split("=");
+            if (split.length == 2) {
+                String profileName = split[1];
+                if (!ProfileSetup.STANDARD_PROFILES.containsKey(profileName)) {
+                    throw new IllegalStateException(
+                            "Unknown Urbex profile '" + profileName + "' in dimensionsWithProfiles entry '" + dp
+                            + "'. Valid profiles: " + String.join(", ", new TreeSet<>(ProfileSetup.STANDARD_PROFILES.keySet())));
+                }
+            }
+            // Malformed entries (missing '=') are reported by getProfileForDimension itself; not this method's concern.
+        }
+    }
+
     public static boolean isAvoidedStructure(Identifier id) {
         cacheAvoidedStructures();
         return AVOID_STRUCTURES_SET.contains(id);

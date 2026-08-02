@@ -1816,7 +1816,7 @@ public class BuildingInfo {
             int cz = coord.chunkZ();
 
             // @todo build limit
-            if (h < 256) {
+            if (h < provider.getWorld().getMaxY() + 1) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
                         h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
@@ -1870,7 +1870,7 @@ public class BuildingInfo {
         if (desiredTerrainCorrectionHeights == null) {
             MinMax mm = getDesiredMaxHeightL1();
             // @todo build limit
-            if (mm.min < 256) {
+            if (mm.min < provider.getWorld().getMaxY() + 1) {
                 // The L1 height at this corner is fixed so we return that
                 desiredTerrainCorrectionHeights = new MinMax(mm);
                 return desiredTerrainCorrectionHeights;

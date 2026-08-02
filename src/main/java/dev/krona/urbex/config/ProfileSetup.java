@@ -12,7 +12,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -443,37 +442,51 @@ public class ProfileSetup {
     }
 
     public static void setupProfiles() {
-        Path path = FabricLoader.getInstance().getConfigDir();
-        Path profileDir = Paths.get(path.toString(), "urbex/profiles");
-
-        Urbex.getLogger().info("Creating standard profiles into 'config/urbex/profiles'");
+        Path configDir = FabricLoader.getInstance().getConfigDir();
+        Path profileDir = configDir.resolve("urbex/profiles");
+        Path defaultsDir = profileDir.resolve("defaults");
 
         initStandardProfiles();
 
-        new File(profileDir.toString()).mkdirs();
+        // defaults/ is regenerated every launch as read-only reference material.
+        defaultsDir.toFile().mkdirs();
         for (Map.Entry<String, LostCityProfile> entry : STANDARD_PROFILES.entrySet()) {
-            String name = entry.getKey();
-            if (!"customized".equals(name)) {
-                LostCityProfile profile = entry.getValue();
-                JsonObject jsonObject = profile.toJson(true);
-                Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-                try {
-                    try (PrintWriter writer = new PrintWriter(new File(profileDir.toString(), name + ".json"))) {
-                        writer.print(gson.toJson(jsonObject));
-                        writer.flush();
-                    }
-                } catch (FileNotFoundException e) {
-                    Urbex.getLogger().error("Couldn't save profile '{}'!", name);
-                }
+            writeProfile(defaultsDir, entry.getKey(), entry.getValue());
+        }
+
+        // profiles/ belongs to the user. Seed a file only when it is absent; never overwrite.
+        for (Map.Entry<String, LostCityProfile> entry : STANDARD_PROFILES.entrySet()) {
+            File target = new File(profileDir.toString(), entry.getKey() + ".json");
+            if (!target.exists()) {
+                writeProfile(profileDir, entry.getKey(), entry.getValue());
             }
         }
 
-        Urbex.getLogger().info("Reading existing profiles from 'config/urbex/profiles'");
+        Urbex.getLogger().info("Reading profiles from 'config/urbex/profiles'");
         readProfiles(profileDir);
     }
 
+    private static void writeProfile(Path dir, String name, LostCityProfile profile) {
+        JsonObject jsonObject = profile.toJson(true);
+        Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        try {
+            try (PrintWriter writer = new PrintWriter(new File(dir.toString(), name + ".json"))) {
+                writer.print(gson.toJson(jsonObject));
+                writer.flush();
+            }
+        } catch (FileNotFoundException e) {
+            Urbex.getLogger().error("Couldn't save profile '{}'!", name);
+        }
+    }
+
     private static void readProfiles(Path profileDir) {
+        // listFiles is non-recursive and only matches "*.json" names directly inside profileDir,
+        // so the "defaults" subdirectory (a directory, not a "*.json" file) is never picked up here.
         File[] files = new File(profileDir.toString()).listFiles((dir, name) -> name.endsWith(".json"));
+        if (files == null) {
+            // profileDir doesn't exist (or isn't a directory) - nothing to read.
+            return;
+        }
         for (File file : files) {
             String name = file.getName();
             try {

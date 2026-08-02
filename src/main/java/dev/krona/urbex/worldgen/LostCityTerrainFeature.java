@@ -239,7 +239,7 @@ public class LostCityTerrainFeature {
 
     private boolean isVoid(ChunkGenContext ctx, int x, int z) {
         ChunkDriver driver = ctx.driver;
-        driver.current(x, 255, z);
+        driver.current(x, provider.getWorld().getMaxY(), z);
         int minHeight = provider.getWorld().getMinY();
         while (driver.getBlock() == air && driver.getY() > minHeight) {
             driver.decY();
@@ -1061,7 +1061,7 @@ public class LostCityTerrainFeature {
                 } else {
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
-                            driver.setBlockRangeToAir(x, y + 1, z, 256);  // @todo hardcoded height
+                            driver.setBlockRangeToAir(x, y + 1, z, provider.getWorld().getMaxY() + 1);
                         }
                     }
                 }

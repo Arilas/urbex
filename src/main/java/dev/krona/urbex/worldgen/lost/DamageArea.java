@@ -36,7 +36,7 @@ public class DamageArea {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
         this.air = Blocks.AIR.defaultBlockState();
-        chunkBox = new AABB(chunkX << 4, 0, chunkZ << 4, (chunkX << 4) + 15, 256, (chunkZ << 4) + 15);
+        chunkBox = new AABB(chunkX << 4, provider.getWorld().getMinY(), chunkZ << 4, (chunkX << 4) + 15, provider.getWorld().getMaxY() + 1, (chunkZ << 4) + 15);
 
         RandomSource damageRandom = Rng.at(seed, chunkX, chunkZ, Rng.Purpose.DAMAGE);
 
@@ -168,7 +168,6 @@ public class DamageArea {
 
     // Get the lowest height that is affected by an explosion
     public int getLowestExplosionHeight() {
-        // @todo Technically not correct (should also cover below 0 and above 256)
         for (int yy = 0 ; yy < 16 ; yy++) {
             if (hasExplosions(yy)) {
                 return yy * 16;
@@ -179,7 +178,6 @@ public class DamageArea {
 
     // Get the lowest height that is affected by an explosion
     public int getHighestExplosionHeight() {
-        // @todo Technically not correct (should also cover below 0 and above 256)
         for (int yy = 15 ; yy >= 0 ; yy--) {
             if (hasExplosions(yy)) {
                 return yy * 16 + 15;
