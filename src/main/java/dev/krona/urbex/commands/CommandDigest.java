@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import dev.krona.urbex.worldgen.ChunkDriver;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,11 +26,18 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Generates a square of chunks in a chosen order and prints a hash of the result.
+ * Generates a square of chunks in a chosen order and prints two hashes of the result.
  * <p>
- * The acceptance harness for reproducible worldgen: generating the same seed in two different
- * orders must produce the same digest. Aggregation is order-independent by construction (chunks
- * are sorted before hashing), so only the <em>generation</em> order is under test.
+ * {@code DRIVERDIGEST} is the acceptance signal: it covers exactly the positions this mod wrote,
+ * and nothing else. Generating the same seed in two different orders must produce the same value.
+ * <p>
+ * {@code DIGEST} hashes every non-air block in every chunk. It is kept as a loose tripwire only.
+ * It cannot be used as an acceptance signal, because it also hashes vanilla's ore blobs and
+ * underwater vegetation, and those bleed across chunk borders: the same seed in the same order,
+ * in a dimension with no Urbex profile at all, produces two different values on two runs.
+ * <p>
+ * Both aggregate in a canonical sorted order - chunks by (x, z), and within a chunk the recorded
+ * positions ascending - so only the <em>generation</em> order is ever under test.
  */
 public class CommandDigest implements Command<CommandSourceStack> {
 
@@ -73,8 +81,15 @@ public class CommandDigest implements Command<CommandSourceStack> {
         }
 
         long start = System.currentTimeMillis();
-        for (ChunkPos pos : chunks) {
-            level.getChunk(pos.x(), pos.z(), ChunkStatus.FULL, true);
+        int recordedChunks;
+        ChunkDriver.startRecordingWrites();
+        try {
+            for (ChunkPos pos : chunks) {
+                level.getChunk(pos.x(), pos.z(), ChunkStatus.FULL, true);
+            }
+        } finally {
+            ChunkDriver.stopRecordingWrites();
+            recordedChunks = ChunkDriver.recordedChunkCount();
         }
 
         // Hash in a canonical order so only generation order can affect the result.
@@ -82,16 +97,48 @@ public class CommandDigest implements Command<CommandSourceStack> {
         sorted.sort(Comparator.comparingInt(ChunkPos::x).thenComparingInt(ChunkPos::z));
 
         long digest = FNV_OFFSET;
+        long driverDigest = FNV_OFFSET;
+        long driverBlocks = 0;
         for (ChunkPos pos : sorted) {
             digest = hashChunk(level, pos, digest);
+            long[] written = ChunkDriver.recordedWrites(pos);
+            driverBlocks += written.length;
+            driverDigest = hashDriverWrites(level, written, driverDigest);
         }
+        ChunkDriver.clearRecordedWrites();
 
         long elapsed = System.currentTimeMillis() - start;
+        String driverLine = String.format(
+                "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d",
+                driverDigest, driverBlocks, recordedChunks, chunks.size(), order, offset, elapsed);
         String line = String.format("DIGEST=%016x chunks=%d order=%s offset=%d ms=%d",
                 digest, chunks.size(), order, offset, elapsed);
+        context.getSource().sendSuccess(() -> Component.literal(driverLine).withStyle(ChatFormatting.GREEN), true);
         context.getSource().sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.YELLOW), true);
-        System.out.println(line);   // so headless runs can grep stdout
+        System.out.println(driverLine);     // so headless runs can grep stdout
+        System.out.println(line);
         return 1;
+    }
+
+    /**
+     * Hash the final state at each position this mod wrote.
+     * <p>
+     * The states are read here, once, after every chunk has finished generating - not folded in as
+     * the writes happened. A position overwritten three times therefore contributes its last state
+     * exactly once, and two runs that reach the same blocks by different internal paths agree.
+     */
+    private long hashDriverWrites(ServerLevel level, long[] written, long digest) {
+        BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
+        for (long packed : written) {
+            mutable.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
+            digest = hashLong(digest, packed);
+            digest = hashString(digest, level.getBlockState(mutable).toString());
+            BlockEntity be = level.getBlockEntity(mutable);
+            if (be != null) {
+                digest = hashString(digest, be.saveWithFullMetadata(level.registryAccess()).toString());
+            }
+        }
+        return digest;
     }
 
     private long hashChunk(ServerLevel level, ChunkPos pos, long digest) {

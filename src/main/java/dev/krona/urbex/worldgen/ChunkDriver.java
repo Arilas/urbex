@@ -16,7 +16,13 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import net.minecraft.world.level.ChunkPos;
+
 import javax.annotation.Nullable;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 // Section constants (formerly on LevelChunkSection, removed in 26.2)
@@ -27,6 +33,70 @@ public class ChunkDriver {
     private static final int SECTION_WIDTH = 16;
     private static final int SECTION_HEIGHT = 16;
     private static final int SECTION_SIZE = SECTION_WIDTH * SECTION_WIDTH * SECTION_HEIGHT;
+
+    // ---------------------------------------------------------------------------------------
+    // Write recording. Off in normal play; /urbex digest switches it on around a generation run
+    // so it can hash exactly what this mod placed, rather than the whole chunk. Hashing a whole
+    // chunk also hashes vanilla's ore blobs and underwater vegetation, which bleed across chunk
+    // borders and so disagree between two runs even with this mod switched off entirely.
+    //
+    // Only the touched *positions* are recorded, never the states. The digest reads each final
+    // state back from the world once generation is over, so a position written three times
+    // contributes once, and the internal path by which two runs reached the same block cannot
+    // change the answer. That is the property under test.
+    //
+    // Thread safety: driver writes are already serialised per dimension - LostCityFeature.place
+    // and LostCitySphereFeature.place both hold the feature monitor for the whole generation
+    // call, and there is one feature per dimension. The map is concurrent so two dimensions
+    // cannot corrupt it, and each per-chunk set is guarded on itself so the command thread,
+    // which never takes the feature monitor, still sees a complete set.
+    // ---------------------------------------------------------------------------------------
+
+    private static volatile boolean recordingWrites = false;
+    private static final Map<ChunkPos, LongOpenHashSet> RECORDED_WRITES = new ConcurrentHashMap<>();
+
+    public static void startRecordingWrites() {
+        RECORDED_WRITES.clear();
+        recordingWrites = true;
+    }
+
+    public static void stopRecordingWrites() {
+        recordingWrites = false;
+    }
+
+    public static boolean isRecordingWrites() {
+        return recordingWrites;
+    }
+
+    /** Positions this mod wrote in {@code pos}, ascending. Empty if the chunk was never driven. */
+    public static long[] recordedWrites(ChunkPos pos) {
+        LongOpenHashSet set = RECORDED_WRITES.get(pos);
+        if (set == null) {
+            return new long[0];
+        }
+        long[] positions;
+        synchronized (set) {
+            positions = set.toLongArray();
+        }
+        Arrays.sort(positions);     // canonical order, so hashing cannot see the write order
+        return positions;
+    }
+
+    public static int recordedChunkCount() {
+        return RECORDED_WRITES.size();
+    }
+
+    public static void clearRecordedWrites() {
+        RECORDED_WRITES.clear();
+    }
+
+    private static void recordWrite(int x, int y, int z) {
+        LongOpenHashSet set = RECORDED_WRITES.computeIfAbsent(
+                new ChunkPos(x >> 4, z >> 4), k -> new LongOpenHashSet());
+        synchronized (set) {
+            set.add(BlockPos.asLong(x, y, z));
+        }
+    }
 
     private LevelAccessor region;
     private long seed;
@@ -73,6 +143,9 @@ public class ChunkDriver {
     private void setBlock(BlockPos p, BlockState state) {
         if (state != null) {
             cache.put(p, state);
+            if (recordingWrites) {
+                recordWrite(p.getX(), p.getY(), p.getZ());
+            }
         }
     }
 
@@ -216,6 +289,9 @@ public class ChunkDriver {
                 setBlock(pos, newAdjacent);
             } else if (chunk.getPersistedStatus().isOrAfter(ChunkStatus.FULL)) {
                 region.setBlock(pos, newAdjacent, Block.UPDATE_CLIENTS);
+                if (recordingWrites) {
+                    recordWrite(pos.getX(), pos.getY(), pos.getZ());
+                }
             }
         }
         return newAdjacent;
@@ -395,6 +471,7 @@ public class ChunkDriver {
             int pz = z & 0xf;
             boolean isAir = state.isAir();
             boolean dirty = false;
+            boolean record = recordingWrites;    // read the flag once, not once per block
             while (y1 <= y2) {
                 int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
                 int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
@@ -405,6 +482,9 @@ public class ChunkDriver {
                     if (!isAir) {
                         cache[sectionIdx].isEmpty = false;
                     }
+                }
+                if (record) {
+                    recordWrite(x, y1, z);
                 }
                 y1++;
             }
@@ -432,6 +512,7 @@ public class ChunkDriver {
             int pz = z & 0xf;
             boolean isAir = state.isAir();
             boolean dirty = false;
+            boolean record = recordingWrites;    // read the flag once, not once per block
             while (y1 <= y2) {
                 int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
                 int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
@@ -442,6 +523,9 @@ public class ChunkDriver {
                     cache[sectionIdx].section[idx] = state;
                     if (!isAir) {
                         cache[sectionIdx].isEmpty = false;
+                    }
+                    if (record) {
+                        recordWrite(x, y1, z);
                     }
                 }
                 y1++;
