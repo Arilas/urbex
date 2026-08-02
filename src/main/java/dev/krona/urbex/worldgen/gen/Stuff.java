@@ -104,7 +104,8 @@ public class Stuff {
             return;
         }
         ChunkDriver driver = ctx.driver;
-        WorldGenLevel level = info.provider.getWorld();
+        // The generating region, not the dimension's level: canSeeSky() below reads blocks.
+        WorldGenLevel level = ctx.region;
         int attempts = settings.getAttempts();
         Integer minheight = settings.getMinheight();
         Integer maxheight = settings.getMaxheight();

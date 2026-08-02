@@ -12,8 +12,6 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.WorldGenLevel;
 
 public class CommandStats implements Command<CommandSourceStack> {
 
@@ -28,8 +26,9 @@ public class CommandStats implements Command<CommandSourceStack> {
 
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
-        ServerPlayer player = context.getSource().getPlayerOrException();
-        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo((WorldGenLevel) player.level());
+        // The source's own level, not the player's: this has to work from the server console too,
+        // which is where the generation timings are actually read from during a headless run.
+        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(context.getSource().getLevel());
         if (dimInfo != null) {
             Statistics statistics = dimInfo.getFeature().getStatistics();
             float averageTime = statistics.getAverageTime();

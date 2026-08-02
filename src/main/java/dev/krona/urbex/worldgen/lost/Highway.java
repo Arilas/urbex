@@ -2,36 +2,14 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.PerlinNoiseGenerator14;
+
 import dev.krona.urbex.worldgen.IDimensionInfo;
 
-import java.util.HashMap;
+
 import java.util.Map;
 import java.util.function.Function;
 
 public class Highway {
-
-    private static PerlinNoiseGenerator14 perlinX = null;
-    private static PerlinNoiseGenerator14 perlinZ = null;
-    private static final Map<ChunkCoord, Integer> X_HIGHWAY_LEVEL_CACHE = new HashMap<>();
-    private static final Map<ChunkCoord, Integer> Z_HIGHWAY_LEVEL_CACHE = new HashMap<>();
-
-
-    private static void makePerlin(long seed) {
-        if (perlinX == null) {
-            perlinX = new PerlinNoiseGenerator14(seed, 4);
-        }
-        if (perlinZ == null) {
-            perlinZ = new PerlinNoiseGenerator14(seed, 4);
-        }
-    }
-
-    public static void cleanCache() {
-        perlinX = null;
-        perlinZ = null;
-        X_HIGHWAY_LEVEL_CACHE.clear();
-        Z_HIGHWAY_LEVEL_CACHE.clear();
-    }
 
     public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
         if (getXHighwayLevel(coord, provider, profile) >= 0) {
@@ -48,7 +26,8 @@ public class Highway {
      * Returns 0 or 1 if there is a highway (at that city level) going through this chunk.
      */
     public static int getXHighwayLevel(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
-        return getHighwayLevel(provider, profile, Highway.X_HIGHWAY_LEVEL_CACHE, cp -> hasXHighway(cp, profile), Orientation.X, coord);
+        return getHighwayLevel(provider, profile, provider.caches().xHighwayLevel,
+                cp -> hasXHighway(provider, cp, profile), Orientation.X, coord);
     }
 
     /**
@@ -56,12 +35,14 @@ public class Highway {
      * Returns 0 or 1 if there is a highway (at that city level) going through this chunk.
      */
     public static int getZHighwayLevel(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
-        return getHighwayLevel(provider, profile, Highway.Z_HIGHWAY_LEVEL_CACHE, cp -> hasZHighway(cp, profile), Orientation.Z, coord);
+        return getHighwayLevel(provider, profile, provider.caches().zHighwayLevel,
+                cp -> hasZHighway(provider, cp, profile), Orientation.Z, coord);
     }
 
     private static int getHighwayLevel(IDimensionInfo provider, LostCityProfile profile, Map<ChunkCoord, Integer> cache, Function<ChunkCoord, Boolean> hasHighway, Orientation orientation, ChunkCoord cp) {
-        if (cache.containsKey(cp)) {
-            return cache.get(cp);
+        Integer known = cache.get(cp);
+        if (known != null) {
+            return known;
         }
 
         // Highways can only occur at chunkZ that is a multiple of 8
@@ -82,7 +63,6 @@ public class Highway {
             return -1;
         }
 
-        makePerlin(provider.getSeed());
         if (hasHighway.apply(cp)) {
             // This is part of a highway. Find the left-most chunk that is still part of this highway
             ChunkCoord lower = cp.lower(orientation);
@@ -131,13 +111,13 @@ public class Highway {
         return -1;
     }
 
-    private static boolean hasXHighway(ChunkCoord cp, LostCityProfile profile) {
-        return perlinX.getValue(cp.chunkX() / profile.HIGHWAY_MAINPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_SECONDARYPERLIN_SCALE)
+    private static boolean hasXHighway(IDimensionInfo provider, ChunkCoord cp, LostCityProfile profile) {
+        return provider.caches().highwayPerlinX.getValue(cp.chunkX() / profile.HIGHWAY_MAINPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_SECONDARYPERLIN_SCALE)
                 > profile.HIGHWAY_PERLIN_FACTOR;
     }
 
-    private static boolean hasZHighway(ChunkCoord cp, LostCityProfile profile) {
-        return perlinZ.getValue(cp.chunkX() / profile.HIGHWAY_SECONDARYPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_MAINPERLIN_SCALE)
+    private static boolean hasZHighway(IDimensionInfo provider, ChunkCoord cp, LostCityProfile profile) {
+        return provider.caches().highwayPerlinZ.getValue(cp.chunkX() / profile.HIGHWAY_SECONDARYPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_MAINPERLIN_SCALE)
                 > profile.HIGHWAY_PERLIN_FACTOR;
     }
 

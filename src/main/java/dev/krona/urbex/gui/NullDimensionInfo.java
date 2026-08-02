@@ -3,6 +3,7 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
+import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
@@ -95,9 +96,11 @@ public class NullDimensionInfo implements IDimensionInfo {
 
     private final Registry<Biome> biomeRegistry;
     private final LostCityTerrainFeature feature;
+    private final DimensionCaches caches;
 
     public NullDimensionInfo(LostCityProfile profile, long seed) {
         this.profile = profile;
+        this.caches = new DimensionCaches(seed);
         style = new WorldStyle(new WorldStyleRE(
                 "standard",
                 Optional.empty(),
@@ -111,15 +114,10 @@ public class NullDimensionInfo implements IDimensionInfo {
         this.seed = seed;
         random = new Random(seed);
         feature = new LostCityTerrainFeature(this, profile);
-        feature.setupStates(profile);
         // @todo 1.19.3
 //        biomeRegistry = ServerLifecycleHooks.getCurrentServer().registryAccess().registryOrThrow(Registries.BIOME);
 //        biomeRegistry = RegistryAccess.builtinCopy().registry(Registry.BIOME_REGISTRY).get();
         biomeRegistry = null;
-    }
-
-    @Override
-    public void setWorld(WorldGenLevel world) {
     }
 
     @Override
@@ -130,6 +128,11 @@ public class NullDimensionInfo implements IDimensionInfo {
     @Override
     public WorldGenLevel getWorld() {
         return null;
+    }
+
+    @Override
+    public DimensionCaches caches() {
+        return caches;
     }
 
     @Override

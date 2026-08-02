@@ -2,7 +2,10 @@ package dev.krona.urbex.varia;
 
 /**
  * This class keeps track of the average calculation time of something. It only keeps the
- * last 100 measurements. It is used for statistics
+ * last 100 measurements. It is used for statistics.
+ * <p>
+ * Synchronized: chunks are timed from every worldgen worker thread and read from the server thread.
+ * One monitor per generated chunk is nothing next to generating it.
  */
 public class Statistics {
 
@@ -13,7 +16,7 @@ public class Statistics {
     private long minTime = Long.MAX_VALUE;
     private long maxTime = Long.MIN_VALUE;
 
-    public void addTime(long time) {
+    public synchronized void addTime(long time) {
         times[(int) (totalCnt % times.length)] = time;
         totalCnt++;
         if (time < minTime) {
@@ -24,21 +27,21 @@ public class Statistics {
         }
     }
 
-    public float getAverageTime() {
+    public synchronized float getAverageTime() {
         // Calculate the average time starting at totalCnt - times.length and counting 100 items.
         // Use modulo
         long total = 0;
         for (int i = totalCnt + 1; i < totalCnt + 1 + times.length; i++) {
             total += times[i % times.length];
         }
-        return (float)(total / times.length);
+        return (float) total / times.length;
     }
 
-    public long getMinTime() {
+    public synchronized long getMinTime() {
         return minTime;
     }
 
-    public long getMaxTime() {
+    public synchronized long getMaxTime() {
         return maxTime;
     }
 }

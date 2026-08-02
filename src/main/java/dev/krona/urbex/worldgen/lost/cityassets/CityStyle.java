@@ -76,7 +76,11 @@ public class CityStyle {
     private Float explosionChance;
     private String style;
     private final String inherit;
-    private boolean resolveInherit = false;
+    // 'initialized' is written last, inside the monitor, so a reader that sees it set is guaranteed
+    // to see every field init() copied down from the parent style. 'resolving' keeps the reentrant
+    // case (a style whose parent chain leads back to it) behaving exactly as it did before.
+    private volatile boolean initialized = false;
+    private boolean resolving = false;
 
     public CityStyle(CityStyleRE object) {
         name = object.getRegistryName();
@@ -279,9 +283,21 @@ public class CityStyle {
         return sphereGlassBlock;
     }
 
+    /**
+     * Resolve 'inherit'. Called on every lookup of this style, from any worldgen worker thread, so
+     * it has to be safe to race - and it mutates about thirty fields, so it cannot be done with a
+     * volatile write per field. A monitor on this style is the cheap answer: after the first call
+     * the volatile read below short-circuits and no lock is taken at all.
+     */
     public void init(CommonLevelAccessor level) {
-        if (!resolveInherit) {
-            resolveInherit = true;
+        if (initialized) {
+            return;
+        }
+        synchronized (this) {
+            if (initialized || resolving) {
+                return;
+            }
+            resolving = true;
             if (inherit != null) {
                 CityStyle inheritFrom = AssetRegistries.CITYSTYLES.getOrThrow(level, inherit);
                 if (style == null) {
@@ -381,6 +397,7 @@ public class CityStyle {
                     sphereGlassBlock = inheritFrom.sphereGlassBlock;
                 }
             }
+            initialized = true;
         }
     }
 

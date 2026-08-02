@@ -32,13 +32,9 @@ public class LostCitySphereFeature extends Feature<NoneFeatureConfiguration> {
 
                 int chunkX = center.x();
                 int chunkZ = center.z();
-                // See LostCityFeature.place: the terrain feature and its ChunkDriver are shared
-                // per dimension; serialize on the same monitor to avoid concurrent driver teardown.
+                // See LostCityFeature.place: no shared mutable state left to guard.
                 LostCityTerrainFeature feature = diminfo.getFeature();
-                synchronized (feature) {
-                    diminfo.setWorld(level);
-                    Spheres.generateSpheres(feature, region, region.getChunk(chunkX, chunkZ));
-                }
+                Spheres.generateSpheres(feature, region, region.getChunk(chunkX, chunkZ));
                 return true;
             }
         }

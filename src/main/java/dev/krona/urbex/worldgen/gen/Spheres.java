@@ -44,7 +44,7 @@ public class Spheres {
             }
 
             ctx.driver.actuallyGenerate(chunk);
-            ChunkFixer.fix(provider, coord);
+            ChunkFixer.fix(provider, coord, region);
         }
     }
 

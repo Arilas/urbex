@@ -261,12 +261,9 @@ public class GuiLCConfig extends Screen {
     }
 
     public void refreshPreview() {
-        BuildingInfo.cleanCache();
-        MultiChunk.cleanCache();
-        Highway.cleanCache();
-        Railway.cleanCache();
-        City.cleanCache();
-        CitySphere.cleanCache();
+        // The per-dimension caches go with the NullDimensionInfo, and the preview builds a fresh
+        // one on every pass, so there is nothing left to clear here but the datapack-derived maps.
+        City.cleanPredefinedCache();
     }
 
     private void renderExtra(GuiGraphicsExtractor graphics) {

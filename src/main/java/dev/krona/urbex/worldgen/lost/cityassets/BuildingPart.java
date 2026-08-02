@@ -32,10 +32,17 @@ public class BuildingPart implements IBuildingPart {
     private final int xSize;
     private final int zSize;
 
-    // Optimized version of this part which is organized in xSize*ySize vertical strings
-    private char[][] vslices = null;
+    // Optimized version of this part which is organized in xSize*ySize vertical strings.
+    // Built in the constructor: a BuildingPart is held by the asset registry and shared by every
+    // chunk being generated, so filling this in on first use was a data race the moment worldgen
+    // stopped being serialised. There are a couple of hundred parts and each is tiny.
+    private final char[][] vslices;
 
-    private Palette localPalette = null;
+    // Cannot be resolved in the constructor when it is a *reference* to another palette: that needs
+    // the level to reach the registry, and the level is not available here. Volatile, and the
+    // resolution is idempotent (the registry hands back the same Palette), so a race just means two
+    // threads look the same thing up.
+    private volatile Palette localPalette = null;
     private String refPaletteName;
 
     private final Map<String, Object> metadata = new HashMap<>();
@@ -51,6 +58,7 @@ public class BuildingPart implements IBuildingPart {
         } else if (object.getRefPaletteName() != null) {
             refPaletteName = object.getRefPaletteName();
         }
+        vslices = buildVslices();
         if (object.getMetadata() != null) {
             for (PartMeta meta : object.getMetadata()) {
                 String key = meta.key();
@@ -111,28 +119,30 @@ public class BuildingPart implements IBuildingPart {
      */
     @Override
     public char[][] getVslices() {
-        if (vslices == null) {
-            vslices = new char[xSize * zSize][];
-            for (int x = 0 ; x < xSize ; x++) {
-                for (int z = 0 ; z < zSize ; z++) {
-                    StringBuilder vs = new StringBuilder();
-                    boolean empty = true;
-                    for (int y = 0; y < slices.length; y++) {
-                        Character c = getC(x, y, z);
-                        vs.append(c);
-                        if (c != ' ') {
-                            empty = false;
-                        }
+        return vslices;
+    }
+
+    private char[][] buildVslices() {
+        char[][] result = new char[xSize * zSize][];
+        for (int x = 0 ; x < xSize ; x++) {
+            for (int z = 0 ; z < zSize ; z++) {
+                StringBuilder vs = new StringBuilder();
+                boolean empty = true;
+                for (int y = 0; y < slices.length; y++) {
+                    Character c = getC(x, y, z);
+                    vs.append(c);
+                    if (c != ' ') {
+                        empty = false;
                     }
-                    if (empty) {
-                        vslices[z*xSize+x] = null;
-                    } else {
-                        vslices[z*xSize+x] = vs.toString().toCharArray();
-                    }
+                }
+                if (empty) {
+                    result[z*xSize+x] = null;
+                } else {
+                    result[z*xSize+x] = vs.toString().toCharArray();
                 }
             }
         }
-        return vslices;
+        return result;
     }
 
     @Override
@@ -142,10 +152,12 @@ public class BuildingPart implements IBuildingPart {
 
     @Override
     public Palette getLocalPalette(CommonLevelAccessor level) {
-        if (localPalette == null && refPaletteName != null) {
-            localPalette = AssetRegistries.PALETTES.getOrThrow(level, refPaletteName);
+        Palette p = localPalette;
+        if (p == null && refPaletteName != null) {
+            p = AssetRegistries.PALETTES.getOrThrow(level, refPaletteName);
+            localPalette = p;
         }
-        return localPalette;
+        return p;
     }
 
     @Override

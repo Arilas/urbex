@@ -13,11 +13,23 @@ import net.minecraft.world.level.biome.Biome;
 import javax.annotation.Nullable;
 
 public interface IDimensionInfo {
-    void setWorld(WorldGenLevel world);
 
     long getSeed();
 
+    /**
+     * The dimension's own level. Stable for the life of the dimension and safe to hold: this is
+     * <em>not</em> the WorldGenRegion of whatever chunk happens to be generating, which is what it
+     * used to be (via a setWorld() that a per-dimension lock had to guard).
+     * <p>
+     * Use it for level-wide questions - registry access, min/max build height, sea level, the seed.
+     * Reading or writing blocks during generation must go through the region on the
+     * {@link ChunkGenContext} instead; a region only has the chunks around the one being built,
+     * and the level would go looking for the rest.
+     */
     WorldGenLevel getWorld();
+
+    /** The per-dimension caches. Dropped with the dimension. */
+    DimensionCaches caches();
 
     ResourceKey<Level> getType();
 

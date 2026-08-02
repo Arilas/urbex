@@ -49,6 +49,7 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nonnull;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -60,29 +61,32 @@ public class LostCityTerrainFeature {
     public final BlockState air;
     private final BlockState hardAir;
 
-    private BlockState base = null;
-    public BlockState liquid;
+    private final BlockState base;
+    public final BlockState liquid;
 
-    private Set<BlockState> railStates = null;
-    private Set<BlockState> statesNeedingTodo = null;
-    private Set<BlockState> statesNeedingLightingUpdate = null;
-    private Set<BlockState> statesNeedingPoiUpdate = null;
+    // Every one of these used to be built on first use and cached on this object, which is shared
+    // by the whole dimension. That was safe only because generation held a lock on this feature.
+    // They are all derived from block tags and block states - nothing here needs a Level - so they
+    // are built once in the constructor and never written again.
+    private final Set<BlockState> railStates;
+    private final Set<BlockState> statesNeedingTodo;
+    private final Set<BlockState> statesNeedingLightingUpdate;
+    private final Set<BlockState> statesNeedingPoiUpdate;
 
     private final NoiseGeneratorPerlin rubbleNoise;
     private final NoiseGeneratorPerlin leavesNoise;
     private final NoiseGeneratorPerlin ruinNoise;
     private final NoiseGeneratorPerlin bottomLayerNoise;    // Used in floating profile for the underside of buildings
 
-    private BlockState[] randomLeafs = null;
-    private BlockState[] randomDirt = null;
-    private Set<BlockState> randomDirtSet = null;
+    private final BlockState[] randomLeafs;
+    private final BlockState[] randomDirt;
+    private final Set<BlockState> randomDirtSet;
 
     public final IDimensionInfo provider;
     public final LostCityProfile profile;
 
-    private final TimedCache<ChunkCoord, ChunkHeightmap> cachedHeightmaps = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     private final Statistics statistics = new Statistics();
-    private final Map<Block, BlockEntityType> typeCache = new HashMap<>();
+    private final Map<Block, BlockEntityType> typeCache = new ConcurrentHashMap<>();
 
     public LostCityTerrainFeature(IDimensionInfo provider, LostCityProfile profile) {
         this.provider = provider;
@@ -98,10 +102,84 @@ public class LostCityTerrainFeature {
 
         air = Blocks.AIR.defaultBlockState();
         hardAir = Blocks.STRUCTURE_VOID.defaultBlockState();
+        base = profile.getBaseBlock();
+        liquid = profile.getLiquidBlock();
+
+        railStates = new HashSet<>();
+        addStates(Blocks.RAIL, railStates);
+        addStates(Blocks.POWERED_RAIL, railStates);
+
+        statesNeedingTodo = new HashSet<>();
+        for (Holder<Block> bh : Tools.getBlocksForTag(TagKey.create(Registries.BLOCK, Identifier.withDefaultNamespace("saplings")))) {
+            addStates(bh.value(), statesNeedingTodo);
+        }
+        for (Holder<Block> bh : Tools.getBlocksForTag(BlockTags.SMALL_FLOWERS)) {
+            addStates(bh.value(), statesNeedingTodo);
+        }
+
+        statesNeedingLightingUpdate = new HashSet<>();
+        for (Holder<Block> bh : Tools.getBlocksForTag(LostTags.LIGHTS_TAG)) {
+            addStates(bh.value(), statesNeedingLightingUpdate);
+        }
+
+        statesNeedingPoiUpdate = new HashSet<>();
+        for (Holder<Block> bh : Tools.getBlocksForTag(LostTags.NEEDSPOI_TAG)) {
+            addStates(bh.value(), statesNeedingPoiUpdate);
+        }
+
+        randomLeafs = buildRandomLeafs();
+        randomDirt = buildRandomDirt();
+        randomDirtSet = Set.of(Blocks.MOSSY_STONE_BRICKS.defaultBlockState(),
+                Blocks.MOSSY_COBBLESTONE.defaultBlockState(),
+                Blocks.MOSS_BLOCK.defaultBlockState());
 
 //        islandTerrainGenerator.setup(provider.getWorld().getWorld(), provider);
 //        cavernTerrainGenerator.setup(provider.getWorld().getWorld(), provider);
 //        spaceTerrainGenerator.setup(provider.getWorld().getWorld(), provider);
+    }
+
+    private static BlockState[] buildRandomLeafs() {
+        BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        BlockState leaves2 = Blocks.JUNGLE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        BlockState leaves3 = Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+
+        BlockState[] result = new BlockState[128];
+        int i = 0;
+        while (i < 20) {
+            result[i] = leaves2;
+            i++;
+        }
+        while (i < 40) {
+            result[i] = leaves3;
+            i++;
+        }
+        while (i < result.length) {
+            result[i] = leaves;
+            i++;
+        }
+        return result;
+    }
+
+    private static BlockState[] buildRandomDirt() {
+        BlockState mBricks = Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
+        BlockState mCobble = Blocks.MOSSY_COBBLESTONE.defaultBlockState();
+        BlockState moss = Blocks.MOSS_BLOCK.defaultBlockState();
+
+        BlockState[] result = new BlockState[128];
+        int i = 0;
+        while (i < 20) {
+            result[i] = mBricks;
+            i++;
+        }
+        while (i < 60) {
+            result[i] = mCobble;
+            i++;
+        }
+        while (i < result.length) {
+            result[i] = moss;
+            i++;
+        }
+        return result;
     }
 
     /**
@@ -113,26 +191,6 @@ public class LostCityTerrainFeature {
         if (leavesBlock != null) {
             return ctx.paletteHere(compiledPalette, leavesBlock);
         }
-        if (randomLeafs == null) {
-            BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-            BlockState leaves2 = Blocks.JUNGLE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-            BlockState leaves3 = Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-
-            randomLeafs = new BlockState[128];
-            int i = 0;
-            while (i < 20) {
-                randomLeafs[i] = leaves2;
-                i++;
-            }
-            while (i < 40) {
-                randomLeafs[i] = leaves3;
-                i++;
-            }
-            while (i < randomLeafs.length) {
-                randomLeafs[i] = leaves;
-                i++;
-            }
-        }
         return randomLeafs[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
                 Rng.Purpose.LEAVES, randomLeafs.length)];
     }
@@ -142,7 +200,6 @@ public class LostCityTerrainFeature {
         if (rubbleDirtBlock != null) {
             return compiledPalette.getAll(rubbleDirtBlock);
         } else {
-            getRandomDirt(ctx, info, compiledPalette);
             return randomDirtSet;
         }
     }
@@ -156,85 +213,28 @@ public class LostCityTerrainFeature {
         if (rubbleDirtBlock != null) {
             return ctx.paletteHere(compiledPalette, rubbleDirtBlock);
         }
-        if (randomDirt == null) {
-            randomDirtSet = new HashSet<>();
-            BlockState mBricks = Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
-            BlockState mCobble = Blocks.MOSSY_COBBLESTONE.defaultBlockState();
-            BlockState moss = Blocks.MOSS_BLOCK.defaultBlockState();
-            randomDirtSet.add(mBricks);
-            randomDirtSet.add(mCobble);
-            randomDirtSet.add(moss);
-
-            randomDirt = new BlockState[128];
-            int i = 0;
-            while (i < 20) {
-                randomDirt[i] = mBricks;
-                i++;
-            }
-            while (i < 60) {
-                randomDirt[i] = mCobble;
-                i++;
-            }
-            while (i < randomDirt.length) {
-                randomDirt[i] = moss;
-                i++;
-            }
-        }
         return randomDirt[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
                 Rng.Purpose.RUBBLE, randomDirt.length)];
     }
 
     public Set<BlockState> getRailStates() {
-        if (railStates == null) {
-            railStates = new HashSet<>();
-            addStates(Blocks.RAIL, railStates);
-            addStates(Blocks.POWERED_RAIL, railStates);
-        }
         return railStates;
     }
 
     private Set<BlockState> getStatesNeedingTodo() {
-        if (statesNeedingTodo == null) {
-            statesNeedingTodo = new HashSet<>();
-            for (Holder<Block> bh : Tools.getBlocksForTag(TagKey.create(Registries.BLOCK, Identifier.withDefaultNamespace("saplings")))) {
-                addStates(bh.value(), statesNeedingTodo);
-            }
-            for (Holder<Block> bh : Tools.getBlocksForTag(BlockTags.SMALL_FLOWERS)) {
-                addStates(bh.value(), statesNeedingTodo);
-            }
-        }
         return statesNeedingTodo;
     }
 
     private Set<BlockState> getStatesNeedingLightingUpdate() {
-        if (statesNeedingLightingUpdate == null) {
-            statesNeedingLightingUpdate = new HashSet<>();
-            for (Holder<Block> bh : Tools.getBlocksForTag(LostTags.LIGHTS_TAG)) {
-                addStates(bh.value(), statesNeedingLightingUpdate);
-            }
-        }
         return statesNeedingLightingUpdate;
     }
 
     private Set<BlockState> getStatesNeedingPoiUpdate() {
-        if (statesNeedingPoiUpdate == null) {
-            statesNeedingPoiUpdate = new HashSet<>();
-            for (Holder<Block> bh : Tools.getBlocksForTag(LostTags.NEEDSPOI_TAG)) {
-                addStates(bh.value(), statesNeedingPoiUpdate);
-            }
-        }
         return statesNeedingPoiUpdate;
     }
 
     private static void addStates(Block block, Set<BlockState> set) {
         set.addAll(block.getStateDefinition().getPossibleStates());
-    }
-
-    public void setupStates(LostCityProfile profile) {
-        if (base == null) {
-            base = profile.getBaseBlock();
-            liquid = profile.getLiquidBlock();
-        }
     }
 
     private boolean isVoid(ChunkGenContext ctx, int x, int z) {
@@ -327,7 +327,7 @@ public class LostCityTerrainFeature {
         generateDebris(ctx, info);
 
         ctx.driver.actuallyGenerate(chunk);
-        ChunkFixer.fix(provider, coord);
+        ChunkFixer.fix(provider, coord, region);
         // After the fixer, so the post-todos have placed their blocks and what we see is final
         forgetOverwrittenBlockEntities(chunk);
 
@@ -882,25 +882,27 @@ public class LostCityTerrainFeature {
             top = chunk.chunkX();
             left = chunk.chunkZ();
         }
-        synchronized (this) {
-            ChunkHeightmap cached = cachedHeightmaps.get(chunk);
-            if (cached != null) {
-                return cached;
-            }
-            ChunkHeightmap heightmap = new ChunkHeightmap(profile.LANDSCAPE_TYPE, profile.GROUNDLEVEL);
-            generateHeightmap(sampler.chunkX(), sampler.chunkZ(), world, heightmap);
-            if (heightSampleSize > 1) {
-                for (int i = 0; i < heightSampleSize; i++) {
-                    for (int j = 0; j < heightSampleSize; j++) {
-                        ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + (i * constX), left + (j * constZ));
-                        cachedHeightmaps.put(sampleKey, new ChunkHeightmap(heightmap));
-                    }
-                }
-            } else {
-                cachedHeightmaps.put(chunk, heightmap);
-            }
-            return heightmap;
+        // No lock. The heightmap is a pure function of the generator and the coordinate, so two
+        // threads that race on the same chunk build two equal heightmaps and one of them is thrown
+        // away; a third thread reading the cache sees whichever was published, and they agree.
+        TimedCache<ChunkCoord, ChunkHeightmap> cachedHeightmaps = provider.caches().heightmap;
+        ChunkHeightmap cached = cachedHeightmaps.get(chunk);
+        if (cached != null) {
+            return cached;
         }
+        ChunkHeightmap heightmap = new ChunkHeightmap(profile.LANDSCAPE_TYPE, profile.GROUNDLEVEL);
+        generateHeightmap(sampler.chunkX(), sampler.chunkZ(), world, heightmap);
+        if (heightSampleSize > 1) {
+            for (int i = 0; i < heightSampleSize; i++) {
+                for (int j = 0; j < heightSampleSize; j++) {
+                    ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + (i * constX), left + (j * constZ));
+                    cachedHeightmaps.putIfAbsent(sampleKey, new ChunkHeightmap(heightmap));
+                }
+            }
+        } else {
+            cachedHeightmaps.putIfAbsent(chunk, heightmap);
+        }
+        return heightmap;
     }
 
     private void generateHeightmap(int chunkX, int chunkZ, WorldGenLevel region, ChunkHeightmap heightmap) {
@@ -1805,26 +1807,28 @@ public class LostCityTerrainFeature {
                                         b = air;        // No torches
                                     }
                                 } else if (inf.loot() != null && !inf.loot().isEmpty()) {
-                                    handleLoot(ctx, info, part, provider.getWorld(), b, inf);
+                                    handleLoot(ctx, info, part, b, inf);
                                 } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
-                                    b = handleSpawner(ctx, info, part, oy, provider.getWorld(), rx, rz, y, b, inf);
+                                    // ctx.region, not provider.getWorld(): these write block entity
+                                    // NBT into a chunk, which only the generating region has.
+                                    b = handleSpawner(ctx, info, part, oy, ctx.region, rx, rz, y, b, inf);
                                 } else if (inf.tag() != null) {
-                                    b = handleBlockEntity(info, oy, provider.getWorld(), rx, rz, y, b, inf);
+                                    b = handleBlockEntity(info, oy, ctx.region, rx, rz, y, b, inf);
                                 }
                             } else if (getStatesNeedingPoiUpdate().contains(b)) {
                                 // If this block has POI data we need to delay setting it
                                 BlockState finalB = b;
                                 BlockPos p = driver.getCurrentCopy();
-                                info.addPostTodo(p, () -> {
-                                    if (provider.getWorld().getBlockState(p).getBlock() == Blocks.DIRT) {
-                                        provider.getWorld().setBlock(p, finalB, Block.UPDATE_NONE);
+                                info.addPostTodo(p, inWorld -> {
+                                    if (inWorld.getBlockState(p).getBlock() == Blocks.DIRT) {
+                                        inWorld.setBlock(p, finalB, Block.UPDATE_NONE);
                                     }
                                 });
                                 b = Blocks.DIRT.defaultBlockState();
                             } else if (getStatesNeedingLightingUpdate().contains(b)) {
                                 updateNeeded(info, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             } else if (getStatesNeedingTodo().contains(b)) {
-                                b = handleTodo(ctx, info, oy, provider.getWorld(), rx, rz, y, b);
+                                b = handleTodo(ctx, info, oy, ctx.region, rx, rz, y, b);
                             }
                             driver.add(b);
                         } else {
@@ -1872,9 +1876,8 @@ public class LostCityTerrainFeature {
         tag.putString("id", BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type).toString());
         world.getChunk(pos).setBlockEntityNbt(tag);
         if (b.getBlock() == Blocks.COMMAND_BLOCK) {
-            info.addPostTodo(pos, () -> {
-                WorldGenLevel inWorld = info.provider.getWorld();
-                ((ServerChunkCache)inWorld.getChunkSource()).blockChanged(pos);
+            info.addPostTodo(pos, inWorld -> {
+                ((ServerChunkCache) inWorld.getLevel().getChunkSource()).blockChanged(pos);
                 inWorld.scheduleTick(pos, b.getBlock(), 1);
             });
         }
@@ -1936,11 +1939,10 @@ public class LostCityTerrainFeature {
         return b;
     }
 
-    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, WorldGenLevel world, BlockState b, Palette.Info inf) {
+    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, BlockState b, Palette.Info inf) {
         if (!info.noLoot) {
             BlockPos pos = ctx.driver.getCurrentCopy();
-            info.addPostTodo(pos, () -> {
-                WorldGenLevel inWorld = info.provider.getWorld();
+            info.addPostTodo(pos, inWorld -> {
                 if (!inWorld.getBlockState(pos).isAir()) {
                     inWorld.setBlock(pos, b, Block.UPDATE_CLIENTS);
                     generateLoot(info, inWorld, pos, new BuildingInfo.ConditionTodo(inf.loot(), part.getName(), info));
@@ -1975,8 +1977,7 @@ public class LostCityTerrainFeature {
                             }
                         });
                     } else {
-                        info.addPostTodo(pos, () -> {
-                            WorldGenLevel inWorld = info.provider.getWorld();
+                        info.addPostTodo(pos, inWorld -> {
                             BlockState state = finalB.setValue(SaplingBlock.STAGE, 1);
                             inWorld.setBlock(pos, state, Block.UPDATE_ALL_IMMEDIATE);
                         });
@@ -2385,8 +2386,7 @@ public class LostCityTerrainFeature {
     }
 
     public static void updateNeeded(BuildingInfo info, BlockPos pos, int flags) {
-        info.addPostTodo(pos, () -> {
-            WorldGenLevel world = info.provider.getWorld();
+        info.addPostTodo(pos, world -> {
             BlockState state = world.getBlockState(pos);
             if (!state.isAir()) {
                 world.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);

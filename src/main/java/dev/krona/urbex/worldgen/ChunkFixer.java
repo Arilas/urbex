@@ -7,6 +7,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -14,9 +15,9 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 public class ChunkFixer {
 
 
-    private static void executePostTodo(ChunkCoord coord, IDimensionInfo provider) {
+    private static void executePostTodo(ChunkCoord coord, IDimensionInfo provider, WorldGenLevel region) {
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-        info.getPostTodo().forEach((pos, runnable) -> runnable.run());
+        info.getPostTodo().forEach((pos, todo) -> todo.accept(region));
         info.clearPostTodo();
     }
 
@@ -132,8 +133,12 @@ public class ChunkFixer {
     }
 
 
-    public static void fix(IDimensionInfo info, ChunkCoord coord) {
-        generateVines(coord, info.getWorld(), info);
-        executePostTodo(coord, info);
+    /**
+     * The region, not {@code info.getWorld()}: both the vines and the post-todos read and write
+     * blocks, and only the region generating this chunk is guaranteed to have the chunks they touch.
+     */
+    public static void fix(IDimensionInfo info, ChunkCoord coord, WorldGenLevel region) {
+        generateVines(coord, region, info);
+        executePostTodo(coord, info, region);
     }
 }

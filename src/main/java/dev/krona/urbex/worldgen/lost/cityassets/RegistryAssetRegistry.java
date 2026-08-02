@@ -10,13 +10,17 @@ import net.minecraft.world.level.CommonLevelAccessor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public class RegistryAssetRegistry<T, R> {
 
-    private final Map<Identifier, T> assets = new HashMap<>();
+    // Registry assets are looked up from every worldgen worker thread. Concurrent, and populated
+    // with get / construct-outside / putIfAbsent rather than computeIfAbsent: constructing a
+    // CityStyle resolves its 'inherit' parent through this same map, which would deadlock inside a
+    // bin lock. Losing the race just means one throwaway copy of an immutable asset.
+    private final Map<Identifier, T> assets = new ConcurrentHashMap<>();
     private final ResourceKey<Registry<R>> registryKey;
     private final Function<R, T> assetConstructor;
 
@@ -73,7 +77,10 @@ public class RegistryAssetRegistry<T, R> {
             } catch (Exception e) {
                 throw new RuntimeException("Error getting resource " + name + "!", e);
             }
-            assets.put(name, t);
+            T raced = assets.putIfAbsent(name, t);
+            if (raced != null) {
+                t = raced;
+            }
         }
         if (t instanceof CityStyle cs) {
             cs.init(level);
@@ -93,7 +100,7 @@ public class RegistryAssetRegistry<T, R> {
                     asset.setRegistryName(name);
                 }
                 T t = assetConstructor.apply(r);
-                assets.put(name, t);
+                assets.putIfAbsent(name, t);
             }
         }
     }

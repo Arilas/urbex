@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class GlobalTodo {
@@ -29,8 +30,11 @@ public class GlobalTodo {
         }
     }
 
-    private final Map<ChunkPos, TodoQueues> todoQueues = new HashMap<>();
-    private static final Map<ResourceKey<Level>, GlobalTodo> instances = new HashMap<>();
+    // Both concurrent: addTodo() runs on a worldgen worker thread while executeAndClearTodo() runs
+    // on the server thread. computeIfAbsent is safe here - neither mapping function reaches back
+    // into the map it is populating.
+    private final Map<ChunkPos, TodoQueues> todoQueues = new ConcurrentHashMap<>();
+    private static final Map<ResourceKey<Level>, GlobalTodo> instances = new ConcurrentHashMap<>();
 
     public static GlobalTodo get(Level world) {
         return instances.computeIfAbsent(world.dimension(), k -> new GlobalTodo());

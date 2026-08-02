@@ -21,6 +21,7 @@ import net.minecraft.world.level.ChunkPos;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
@@ -45,11 +46,17 @@ public class ChunkDriver {
     // contributes once, and the internal path by which two runs reached the same block cannot
     // change the answer. That is the property under test.
     //
-    // Thread safety: driver writes are already serialised per dimension - LostCityFeature.place
-    // and LostCitySphereFeature.place both hold the feature monitor for the whole generation
-    // call, and there is one feature per dimension. The map is concurrent so two dimensions
-    // cannot corrupt it, and each per-chunk set is guarded on itself so the command thread,
-    // which never takes the feature monitor, still sees a complete set.
+    // Thread safety: a ChunkDriver belongs to one ChunkGenContext, which belongs to one call of
+    // LostCityTerrainFeature.generate() on one thread, and never escapes it. So the accumulator
+    // is a plain, unsynchronised, thread-confined set - no lock is taken per block written.
+    //
+    // It crosses to other threads exactly once, at the end of actuallyGenerate(): the local set is
+    // split by chunk and merged into RECORDED_WRITES. Merging produces a *new* set rather than
+    // mutating the one already in the map, so nothing reachable from the map is ever written to
+    // again after it is published. The reader (the /urbex digest command, on the server thread,
+    // after every chunk it asked for has finished) therefore needs no lock either: the
+    // ConcurrentHashMap.merge/get pair gives it the happens-before edge, and what it finds is
+    // immutable.
     // ---------------------------------------------------------------------------------------
 
     private static volatile boolean recordingWrites = false;
@@ -74,10 +81,7 @@ public class ChunkDriver {
         if (set == null) {
             return new long[0];
         }
-        long[] positions;
-        synchronized (set) {
-            positions = set.toLongArray();
-        }
+        long[] positions = set.toLongArray();
         Arrays.sort(positions);     // canonical order, so hashing cannot see the write order
         return positions;
     }
@@ -90,12 +94,41 @@ public class ChunkDriver {
         RECORDED_WRITES.clear();
     }
 
-    private static void recordWrite(int x, int y, int z) {
-        LongOpenHashSet set = RECORDED_WRITES.computeIfAbsent(
-                new ChunkPos(x >> 4, z >> 4), k -> new LongOpenHashSet());
-        synchronized (set) {
-            set.add(BlockPos.asLong(x, y, z));
+    /** Thread-confined: only ever touched by the single thread driving this chunk. */
+    private LongOpenHashSet recorded;
+
+    private void recordWrite(int x, int y, int z) {
+        if (!recordingWrites) {
+            return;
         }
+        if (recorded == null) {
+            recorded = new LongOpenHashSet();
+        }
+        recorded.add(BlockPos.asLong(x, y, z));
+    }
+
+    /**
+     * Hand this chunk's recorded positions over to the shared map. Called once, at the end of
+     * generation, from the thread that did the driving.
+     */
+    private void publishRecordedWrites() {
+        LongOpenHashSet local = recorded;
+        recorded = null;
+        if (local == null || local.isEmpty()) {
+            return;
+        }
+        Map<ChunkPos, LongOpenHashSet> byChunk = new HashMap<>();
+        for (long packed : local) {
+            ChunkPos key = new ChunkPos(BlockPos.getX(packed) >> 4, BlockPos.getZ(packed) >> 4);
+            byChunk.computeIfAbsent(key, k -> new LongOpenHashSet()).add(packed);
+        }
+        // Copy-on-merge: whatever is already published stays untouched, so a concurrent reader
+        // never sees a set being mutated underneath it.
+        byChunk.forEach((key, set) -> RECORDED_WRITES.merge(key, set, (existing, added) -> {
+            LongOpenHashSet merged = new LongOpenHashSet(existing);
+            merged.addAll(added);
+            return merged;
+        }));
     }
 
     private LevelAccessor region;
@@ -113,7 +146,7 @@ public class ChunkDriver {
         this.seed = region instanceof WorldGenLevel level ? level.getSeed() : 0L;
         this.primer = primer;
         if (primer != null) {
-            cache = new SectionCache(region, primer.getPos().x() << 4, primer.getPos().z() << 4);
+            cache = new SectionCache(this, region, primer.getPos().x() << 4, primer.getPos().z() << 4);
             this.cx = primer.getPos().x();
             this.cz = primer.getPos().z();
         }
@@ -138,14 +171,13 @@ public class ChunkDriver {
         }
 
         cache.clear();
+        publishRecordedWrites();
     }
 
     private void setBlock(BlockPos p, BlockState state) {
         if (state != null) {
             cache.put(p, state);
-            if (recordingWrites) {
-                recordWrite(p.getX(), p.getY(), p.getZ());
-            }
+            recordWrite(p.getX(), p.getY(), p.getZ());
         }
     }
 
@@ -289,9 +321,7 @@ public class ChunkDriver {
                 setBlock(pos, newAdjacent);
             } else if (chunk.getPersistedStatus().isOrAfter(ChunkStatus.FULL)) {
                 region.setBlock(pos, newAdjacent, Block.UPDATE_CLIENTS);
-                if (recordingWrites) {
-                    recordWrite(pos.getX(), pos.getY(), pos.getZ());
-                }
+                recordWrite(pos.getX(), pos.getY(), pos.getZ());
             }
         }
         return newAdjacent;
@@ -445,6 +475,7 @@ public class ChunkDriver {
     }
 
     private static class SectionCache {
+        private final ChunkDriver owner;
         private final int minY;
         private final int maxY;
         private final int cx;
@@ -452,7 +483,8 @@ public class ChunkDriver {
         private final S[] cache;
         private final int[][] heightmap = new int[16][16];
 
-        private SectionCache(LevelAccessor level, int cx, int cz) {
+        private SectionCache(ChunkDriver owner, LevelAccessor level, int cx, int cz) {
+            this.owner = owner;
             minY = level.getMinY();
             maxY = level.getMaxY() + 1;
             this.cx = cx;
@@ -484,7 +516,7 @@ public class ChunkDriver {
                     }
                 }
                 if (record) {
-                    recordWrite(x, y1, z);
+                    owner.recordWrite(x, y1, z);
                 }
                 y1++;
             }
@@ -525,7 +557,7 @@ public class ChunkDriver {
                         cache[sectionIdx].isEmpty = false;
                     }
                     if (record) {
-                        recordWrite(x, y1, z);
+                        owner.recordWrite(x, y1, z);
                     }
                 }
                 y1++;

@@ -94,13 +94,10 @@ public class ForgeEventHandlers {
 
     public static void cleanUp() {
         Config.resetProfileCache();
-        BuildingInfo.cleanCache();
-        MultiChunk.cleanCache();
-        Highway.cleanCache();
-        Railway.cleanCache();
-        BiomeInfo.cleanCache();
-        City.cleanCache();
-        CitySphere.cleanCache();
+        // Everything that used to be cleared here now lives on DimensionCaches, and goes away with
+        // the IDimensionInfo that owns it (LostCityFeature.cleanUp clears that map right after
+        // calling us). Only the datapack-derived predefined maps are still global.
+        City.cleanPredefinedCache();
     }
 
     /**

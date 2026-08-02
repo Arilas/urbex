@@ -23,27 +23,26 @@ import org.jetbrains.annotations.Nullable;
 
 public class DefaultDimensionInfo implements IDimensionInfo {
 
-    private WorldGenLevel world;
+    // The dimension's ServerLevel, not the region of whichever chunk is generating. Final, so it
+    // cannot be swapped out from under a worker thread, which is what the per-dimension lock in
+    // LostCityFeature.place used to be protecting.
+    private final WorldGenLevel world;
     private final LostCityProfile profile;
     private final LostCityProfile profileOutside;
     private final WorldStyle style;
+    private final DimensionCaches caches;
 
     private final Registry<Biome> biomeRegistry;
     private final LostCityTerrainFeature feature;
 
     public DefaultDimensionInfo(WorldGenLevel world, LostCityProfile profile, LostCityProfile profileOutside) {
-        this.world = world;
+        this.world = world.getLevel();
         this.profile = profile;
         this.profileOutside = profileOutside;
-        style = AssetRegistries.WORLDSTYLES.get(world, profile.getWorldStyle());
+        this.caches = new DimensionCaches(this.world.getSeed());
+        style = AssetRegistries.WORLDSTYLES.get(this.world, profile.getWorldStyle());
         feature = new LostCityTerrainFeature(this, profile);
-        feature.setupStates(profile);
-        biomeRegistry = world.registryAccess().lookupOrThrow(Registries.BIOME);
-    }
-
-    @Override
-    public void setWorld(WorldGenLevel world) {
-        this.world = world;
+        biomeRegistry = this.world.registryAccess().lookupOrThrow(Registries.BIOME);
     }
 
     @Override
@@ -54,6 +53,11 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     @Override
     public WorldGenLevel getWorld() {
         return world;
+    }
+
+    @Override
+    public DimensionCaches caches() {
+        return caches;
     }
 
     @Override

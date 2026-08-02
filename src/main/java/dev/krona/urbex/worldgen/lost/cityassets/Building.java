@@ -28,7 +28,9 @@ public class Building {
     private final Character rubbleBlock;      // Block used for destroyed building rubble
     private float prefersLonely = 0.0f; // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
-    private Palette localPalette = null;
+    // See BuildingPart.localPalette: a reference to another palette needs the level to resolve, so
+    // this one cannot be done in the constructor. Volatile; resolving it twice is harmless.
+    private volatile Palette localPalette = null;
     private String refPaletteName;
 
     private final List<Pair<Predicate<ConditionContext>, String>> parts = new ArrayList<>();
@@ -66,13 +68,15 @@ public class Building {
     }
 
     public Palette getLocalPalette(CommonLevelAccessor level) {
-        if (localPalette == null && refPaletteName != null) {
-            localPalette = AssetRegistries.PALETTES.getOrThrow(level, refPaletteName);
+        Palette p = localPalette;
+        if (p == null && refPaletteName != null) {
+            p = AssetRegistries.PALETTES.getOrThrow(level, refPaletteName);
+            localPalette = p;
         }
-        return localPalette;
+        return p;
     }
 
-    public void readParts(List<Pair<Predicate<ConditionContext>, String>> p, List<PartRef> partRefs) {
+    private void readParts(List<Pair<Predicate<ConditionContext>, String>> p, List<PartRef> partRefs) {
         p.clear();
         if (partRefs == null) {
             return;

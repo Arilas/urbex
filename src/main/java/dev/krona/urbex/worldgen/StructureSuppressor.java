@@ -36,27 +36,23 @@ public class StructureSuppressor {
             return false;   // No Lost Cities profile for this dimension
         }
 
-        // The city caches (BuildingInfo, heightmaps) are not thread safe and IDimensionInfo
-        // holds a single mutable world reference, so take the same per-dimension monitor
-        // LostCityFeature.place uses before touching either.
-        LostCityTerrainFeature terrain = diminfo.getFeature();
-        synchronized (terrain) {
-            diminfo.setWorld(level);
-            ChunkCoord coord = new ChunkCoord(diminfo.getType(), chunkPos.x(), chunkPos.z());
-            if (!BuildingInfo.isCity(coord, diminfo)) {
-                return false;
-            }
-            BuildingInfo info = BuildingInfo.getBuildingInfo(coord, diminfo);
-            int ground = info.getCityGroundLevel();
-            // One extra floor of slack at both ends so a structure does not clip the roof or
-            // undermine the lowest cellar.
-            int top = ground + (info.hasBuilding ? info.getNumFloors() * LostCityTerrainFeature.FLOORHEIGHT : 0)
-                    + LostCityTerrainFeature.FLOORHEIGHT;
-            int bottom = ground - info.getNumCellars() * LostCityTerrainFeature.FLOORHEIGHT
-                    - LostCityTerrainFeature.FLOORHEIGHT;
-            // Structures that pass well under the city (ancient cities, mineshafts, deep
-            // ruined portals) never conflict with it, so leave those alone.
-            return structureBox.maxY() >= bottom && structureBox.minY() <= top;
+        // No lock and no setWorld: the city caches are concurrent now, and IDimensionInfo's level
+        // is final. Structure placement runs on the worker pool too, so this used to be one of the
+        // threads contending for the per-dimension monitor.
+        ChunkCoord coord = new ChunkCoord(diminfo.getType(), chunkPos.x(), chunkPos.z());
+        if (!BuildingInfo.isCity(coord, diminfo)) {
+            return false;
         }
+        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, diminfo);
+        int ground = info.getCityGroundLevel();
+        // One extra floor of slack at both ends so a structure does not clip the roof or
+        // undermine the lowest cellar.
+        int top = ground + (info.hasBuilding ? info.getNumFloors() * LostCityTerrainFeature.FLOORHEIGHT : 0)
+                + LostCityTerrainFeature.FLOORHEIGHT;
+        int bottom = ground - info.getNumCellars() * LostCityTerrainFeature.FLOORHEIGHT
+                - LostCityTerrainFeature.FLOORHEIGHT;
+        // Structures that pass well under the city (ancient cities, mineshafts, deep
+        // ruined portals) never conflict with it, so leave those alone.
+        return structureBox.maxY() >= bottom && structureBox.minY() <= top;
     }
 }

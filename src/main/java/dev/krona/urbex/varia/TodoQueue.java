@@ -2,13 +2,16 @@ package dev.krona.urbex.varia;
 
 import net.minecraft.core.BlockPos;
 
-import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 
+/**
+ * Concurrent: todos are queued from the worldgen worker threads and drained on the server thread.
+ */
 public class TodoQueue<T> {
 
-    private final Queue<Todo<T>> queue = new ArrayDeque<>();
+    private final Queue<Todo<T>> queue = new ConcurrentLinkedQueue<>();
 
     private record Todo<D>(BlockPos pos, D data) {
     }

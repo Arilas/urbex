@@ -18,8 +18,8 @@ import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 
 import javax.annotation.Nullable;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
 
@@ -30,9 +30,9 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
      * exits the world and creates a new one we keep a static flag which is incremented whenever
      * the player exits the world. That is then used to help clear this cache
      */
-    private final Map<ResourceKey<Level>, IDimensionInfo> dimensionInfo = new HashMap<>();
-    public static int globalDimensionInfoDirtyCounter = 0;
-    private int dimensionInfoDirtyCounter = -1;
+    private final Map<ResourceKey<Level>, IDimensionInfo> dimensionInfo = new ConcurrentHashMap<>();
+    public static volatile int globalDimensionInfoDirtyCounter = 0;
+    private volatile int dimensionInfoDirtyCounter = -1;
 
     public LostCityFeature() {
         super(NoneFeatureConfiguration.CODEC);
@@ -56,22 +56,19 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
 
                 int chunkX = center.x();
                 int chunkZ = center.z();
-                // The terrain feature (and its ChunkDriver) is shared per dimension while the
-                // feature step can run concurrently for different chunks (vanilla worker threads,
-                // and even more so with mods like C2ME). Serialize the world swap + generation on
-                // the shared feature instance so one thread can never tear down the driver or swap
-                // the region out from under another. LostCitySphereFeature locks the same monitor.
+                // No lock. The terrain feature holds no per-chunk state any more (that is on the
+                // ChunkGenContext built inside generate()), the caches it reaches are concurrent,
+                // and the region arrives as an argument instead of being written onto the shared
+                // IDimensionInfo. So Urbex generation runs on the worker pool in parallel with the
+                // rest of worldgen again, as it did before the driver became shared.
                 LostCityTerrainFeature feature = diminfo.getFeature();
-                synchronized (feature) {
-                    diminfo.setWorld(level);
-                    try {
-                        feature.generate(region, region.getChunk(chunkX, chunkZ));
-                    } catch (Exception e) {
-                        Urbex.getLogger().error("Error generating chunk {},{}: {}", chunkX, chunkZ, e.getMessage(), e);
-                        e.printStackTrace();
-                        ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
-                        ErrorLogger.report("There was an error generating a chunk. See log for details!");
-                    }
+                try {
+                    feature.generate(region, region.getChunk(chunkX, chunkZ));
+                } catch (Exception e) {
+                    Urbex.getLogger().error("Error generating chunk {},{}: {}", chunkX, chunkZ, e.getMessage(), e);
+                    e.printStackTrace();
+                    ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
+                    ErrorLogger.report("There was an error generating a chunk. See log for details!");
                 }
                 return true;
             }
@@ -86,18 +83,22 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
             cleanUp();
         }
         ResourceKey<Level> type = world.getLevel().dimension();
+        IDimensionInfo known = dimensionInfo.get(type);
+        if (known != null) {
+            return known;
+        }
         String profileName = Config.getProfileForDimension(world.getLevel(), type);
         if (profileName != null) {
-            if (!dimensionInfo.containsKey(type)) {
-                LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
-                if (profile == null) {
-                    return null;
-                }
-                LostCityProfile outsideProfile = profile.CITYSPHERE_OUTSIDE_PROFILE == null ? null : ProfileSetup.STANDARD_PROFILES.get(profile.CITYSPHERE_OUTSIDE_PROFILE);
-                IDimensionInfo diminfo = new DefaultDimensionInfo(world, profile, outsideProfile);
-                dimensionInfo.put(type, diminfo);
+            LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
+            if (profile == null) {
+                return null;
             }
-            return dimensionInfo.get(type);
+            LostCityProfile outsideProfile = profile.CITYSPHERE_OUTSIDE_PROFILE == null ? null : ProfileSetup.STANDARD_PROFILES.get(profile.CITYSPHERE_OUTSIDE_PROFILE);
+            // Built outside the map. Two threads may both build one for the same dimension the
+            // first time a chunk is generated - the loser's is simply dropped, caches and all.
+            IDimensionInfo diminfo = new DefaultDimensionInfo(world, profile, outsideProfile);
+            IDimensionInfo raced = dimensionInfo.putIfAbsent(type, diminfo);
+            return raced != null ? raced : diminfo;
         }
         return null;
     }

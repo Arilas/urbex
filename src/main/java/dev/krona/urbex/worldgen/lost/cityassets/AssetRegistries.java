@@ -4,10 +4,11 @@ import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.*;
 import net.minecraft.world.level.CommonLevelAccessor;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class AssetRegistries {
 
@@ -25,10 +26,12 @@ public class AssetRegistries {
     public static final RegistryAssetRegistry<PredefinedSphere, PredefinedSphereRE> PREDEFINED_SPHERES = new RegistryAssetRegistry<>(CustomRegistries.PREDEFINEDSPHERES_REGISTRY_KEY, PredefinedSphere::new);
     public static final RegistryAssetRegistry<StuffObject, StuffSettingsRE> STUFF = new RegistryAssetRegistry<>(CustomRegistries.STUFF_REGISTRY_KEY, StuffObject::new);
 
-    public static final Map<String, List<StuffObject>> STUFF_BY_TAG = new HashMap<>();
+    public static final Map<String, List<StuffObject>> STUFF_BY_TAG = new ConcurrentHashMap<>();
 
-    private static boolean loaded = false;
-    private static boolean loadedPredefined = false;
+    // Volatile, and written after the maps they guard are filled: load() is called from the server
+    // thread on every tick, while worker threads are reading the registries during generation.
+    private static volatile boolean loaded = false;
+    private static volatile boolean loadedPredefined = false;
 
     public static void reset() {
         VARIANTS.reset();
@@ -56,7 +59,12 @@ public class AssetRegistries {
         BUILDINGS.loadAll(level);
         STUFF.loadAll(level);
         STUFF.getIterable().forEach(stuff -> stuff.getSettings().getTags().forEach(tag -> {
-            List<StuffObject> list = STUFF_BY_TAG.computeIfAbsent(tag, k -> new ArrayList<>());
+            List<StuffObject> list = STUFF_BY_TAG.get(tag);
+            if (list == null) {
+                List<StuffObject> fresh = new CopyOnWriteArrayList<>();
+                List<StuffObject> raced = STUFF_BY_TAG.putIfAbsent(tag, fresh);
+                list = raced != null ? raced : fresh;
+            }
             list.add(stuff);
         }));
         loaded = true;

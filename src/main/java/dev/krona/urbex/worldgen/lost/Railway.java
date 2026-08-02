@@ -88,11 +88,6 @@ public class Railway {
         }
     }
 
-    private static final Map<ChunkCoord, RailChunkInfo> RAIL_INFO = Collections.synchronizedMap(new HashMap<>());
-
-    public static void cleanCache() {
-        RAIL_INFO.clear();
-    }
 
     /**
      * The station grid repeats every 9 chunks. There is never a station at every 18/18 multiple chunk
@@ -320,8 +315,10 @@ public class Railway {
     }
 
     public static RailChunkInfo getRailChunkType(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
-        if (RAIL_INFO.containsKey(coord)) {
-            return RAIL_INFO.get(coord);
+        Map<ChunkCoord, RailChunkInfo> cache = provider.caches().railInfo;
+        RailChunkInfo known = cache.get(coord);
+        if (known != null) {
+            return known;
         }
         RailChunkInfo info = getRailChunkTypeInternal(coord, provider);
         if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.onCitySphereBorder(coord, provider)) {
@@ -335,12 +332,12 @@ public class Railway {
                 info = RailChunkInfo.NOTHING;
             }
         }
-        RAIL_INFO.put(coord, info);
-        return info;
+        RailChunkInfo raced = cache.putIfAbsent(coord, info);
+        return raced != null ? raced : info;
     }
 
-    public static void removeRailChunkType(ChunkCoord coord) {
-        RAIL_INFO.put(coord, RailChunkInfo.NOTHING);
+    public static void removeRailChunkType(IDimensionInfo provider, ChunkCoord coord) {
+        provider.caches().railInfo.put(coord, RailChunkInfo.NOTHING);
     }
 
     private static RailChunkInfo testAdjacentRailChunk(float r, RailChunkInfo adjacent, RailDirection direction, ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {

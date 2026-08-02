@@ -11,26 +11,25 @@ import net.minecraft.world.level.biome.Biome;
 
 public class BiomeInfo {
 
-    private static final TimedCache<ChunkCoord, BiomeInfo> BIOME_INFO_CACHE = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
+    private final Holder<Biome> mainBiome;
 
-    private Holder<Biome> mainBiome;
-
-    public static void cleanCache() {
-        BIOME_INFO_CACHE.clear();
+    private BiomeInfo(Holder<Biome> mainBiome) {
+        this.mainBiome = mainBiome;
     }
 
     public static BiomeInfo getBiomeInfo(IDimensionInfo provider, ChunkCoord coord) {
-        BiomeInfo info = BIOME_INFO_CACHE.get(coord);
-        if (info == null) {
-            info = new BiomeInfo();
-            ChunkHeightmap heightmap = provider.getHeightmap(coord);
-            int chunkX = coord.chunkX();
-            int chunkZ = coord.chunkZ();
-            info.mainBiome = provider.getBiome(new BlockPos((chunkX << 4) + 8, heightmap.getHeight(), (chunkZ << 4) + 8));
-            BIOME_INFO_CACHE.put(coord, info);
+        BiomeInfo info = provider.caches().biomeInfo.get(coord);
+        if (info != null) {
             return info;
         }
-        return info;
+        ChunkHeightmap heightmap = provider.getHeightmap(coord);
+        int chunkX = coord.chunkX();
+        int chunkZ = coord.chunkZ();
+        // Fully built before it is published, so the mainBiome can be final and a reader can never
+        // catch it half-constructed.
+        info = new BiomeInfo(provider.getBiome(new BlockPos((chunkX << 4) + 8, heightmap.getHeight(), (chunkZ << 4) + 8)));
+        BiomeInfo raced = provider.caches().biomeInfo.putIfAbsent(coord, info);
+        return raced != null ? raced : info;
     }
 
     public Holder<Biome> getMainBiome() {

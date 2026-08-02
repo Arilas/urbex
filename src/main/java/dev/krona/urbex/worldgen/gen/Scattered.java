@@ -106,7 +106,7 @@ public class Scattered {
                 }
                 ChunkHeightmap hm = feature.getHeightmap(coord, provider.getWorld());
                 int height = hm.getHeight();
-                hm.calculateAccurateHeight(provider.getWorld(), x, z);
+                hm.calculateAccurateHeight(provider.getWorld(), x, z);   // generator-only, no block access
                 if (!reference.isAllowVoid()) {
                     if (!(feature.profile.isDefault() || feature.profile.isCavern())) {
                         // We are in a world that can have void chunks. Check if this chunk is a void chunk
@@ -238,7 +238,9 @@ public class Scattered {
 
                 @Override
                 public Identifier getBiome() {
-                    Holder<Biome> biome = provider.getWorld().getBiome(info.getCenter(0));
+                    // provider.getBiome(), not level.getBiome(): the latter goes through the chunk,
+                    // which during generation may not be loaded in this region at all.
+                    Holder<Biome> biome = provider.getBiome(info.getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
                 }
             };

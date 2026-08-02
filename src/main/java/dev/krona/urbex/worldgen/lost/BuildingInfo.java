@@ -26,6 +26,8 @@ import net.minecraft.world.level.block.Blocks;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import static dev.krona.urbex.worldgen.LostCityTerrainFeature.FLOORHEIGHT;
 
@@ -39,7 +41,9 @@ public class BuildingInfo {
     public int groundLevel;
     public final int waterLevel;
 
-    public boolean isCity;
+    // Volatile: LostCityTerrainFeature.generate() clears this when it finds a blacklisted structure
+    // in the chunk, after the info is already in the shared cache and visible to other threads.
+    public volatile boolean isCity;
     public boolean hasBuilding;
     public final MultiPos multiBuildingPos;
     public final MultiBuilding multiBuilding;
@@ -76,35 +80,48 @@ public class BuildingInfo {
 
     public final Block doorBlock;
 
-    // Transient info that is calculated on demand
-    private BuildingInfo xmin = null;   // @todo remove
-    private BuildingInfo xmax = null;   // @todo remove
-    private BuildingInfo zmin = null;   // @todo remove
-    private BuildingInfo zmax = null;   // @todo remove
-    private DamageArea damageArea = null;
-    private Palette palette = null;
-    private CompiledPalette compiledPalette = null;
-    private Boolean isOcean = null;
+    // Transient info that is calculated on demand.
+    //
+    // A BuildingInfo lives in the dimension's cache and is read by every chunk that neighbours it,
+    // so these are filled in from whichever thread got here first while other threads are reading.
+    // They are all volatile, and every "…Calculated" flag is written *after* the value it guards,
+    // so a reader that sees the flag set is guaranteed to see the value. Two threads racing on the
+    // same field both compute and both write; the result is the same either way, because it is
+    // derived from the (already fixed) info graph. This is the racy-single-check idiom, not
+    // double-checked locking - there is no lock, on purpose: hasXBridge() walks and writes into its
+    // neighbours, so any per-instance lock would be a lock-ordering deadlock waiting to happen.
+    private volatile BuildingInfo xmin = null;   // @todo remove
+    private volatile BuildingInfo xmax = null;   // @todo remove
+    private volatile BuildingInfo zmin = null;   // @todo remove
+    private volatile BuildingInfo zmax = null;   // @todo remove
+    private volatile DamageArea damageArea = null;
+    private Palette palette = null;             // written once, in the constructor
+    private volatile CompiledPalette compiledPalette = null;
+    private volatile Boolean isOcean = null;
 
-    private boolean xBridgeTypeCalculated = false;
-    private boolean zBridgeTypeCalculated = false;
-    private BuildingPart xBridgeType = null;
-    private BuildingPart zBridgeType = null;
+    private volatile boolean xBridgeTypeCalculated = false;
+    private volatile boolean zBridgeTypeCalculated = false;
+    private volatile BuildingPart xBridgeType = null;
+    private volatile BuildingPart zBridgeType = null;
 
-    private boolean stairsCalculated = false;
-    private Direction stairDirection;
-    private boolean actualStairsCalculated = false;
-    private Direction actualStairDirection;
+    private volatile boolean stairsCalculated = false;
+    private volatile Direction stairDirection;
+    private volatile boolean actualStairsCalculated = false;
+    private volatile Direction actualStairDirection;
 
-    private Boolean horizontalMonorail = null;
-    private Boolean verticalMonorail = null;
+    private volatile Boolean horizontalMonorail = null;
+    private volatile Boolean verticalMonorail = null;
 
-    private MinMax desiredTerrainCorrectionHeights = null;
-    private MinMax desiredMaxHeight1 = null;
+    private volatile MinMax desiredTerrainCorrectionHeights = null;
+    private volatile MinMax desiredMaxHeight1 = null;
 
-    // A list of todo's
-    private final List<BlockPos> torchTodo = new ArrayList<>();
-    private final Map<BlockPos, Runnable> postTodo = new HashMap<>();
+    // A list of todo's. Both are filled while this chunk generates and drained at the end of the
+    // same call, on the same thread - but generatePart() can be handed a neighbour's info, so they
+    // are concurrent rather than relying on that.
+    private final List<BlockPos> torchTodo = Collections.synchronizedList(new ArrayList<>());
+    // The todos run after the chunk is driven, and they need the region that is generating - which
+    // is not something a cached BuildingInfo can know. So it is handed to them.
+    private final Map<BlockPos, Consumer<WorldGenLevel>> postTodo = new ConcurrentHashMap<>();
 
     public static class ConditionTodo {
         private final String condition;
@@ -134,11 +151,6 @@ public class BuildingInfo {
         }
     }
 
-    // BuildingInfo cache
-    private static final TimedCache<ChunkCoord, BuildingInfo> BUILDING_INFO_MAP = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
-    private static final TimedCache<ChunkCoord, LostChunkCharacteristics> CITY_INFO_MAP = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
-    private static final TimedCache<ChunkCoord, Integer> CITY_LEVEL_CACHE = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
-
     public void addTorchTodo(BlockPos index) {
         torchTodo.add(index);
     }
@@ -151,11 +163,11 @@ public class BuildingInfo {
         torchTodo.clear();
     }
 
-    public void addPostTodo(BlockPos index, Runnable inf) {
+    public void addPostTodo(BlockPos index, Consumer<WorldGenLevel> inf) {
         postTodo.put(index, inf);
     }
 
-    public Map<BlockPos, Runnable> getPostTodo() {
+    public Map<BlockPos, Consumer<WorldGenLevel>> getPostTodo() {
         return postTodo;
     }
 
@@ -172,16 +184,21 @@ public class BuildingInfo {
     }
 
     public CompiledPalette getCompiledPalette() {
-        if (compiledPalette == null) {
-            compiledPalette = new CompiledPalette(palette);
-            if (hasBuilding) {
-                Palette buildingPalette = buildingType.getLocalPalette(provider.getWorld());
-                if (buildingPalette != null) {
-                    compiledPalette = new CompiledPalette(compiledPalette, buildingPalette);
-                }
+        CompiledPalette cached = compiledPalette;
+        if (cached != null) {
+            return cached;
+        }
+        // Built into a local and published in one write: the half-built palette (without the
+        // building's own entries merged in) must never be visible to another chunk's thread.
+        CompiledPalette built = new CompiledPalette(palette);
+        if (hasBuilding) {
+            Palette buildingPalette = buildingType.getLocalPalette(provider.getWorld());
+            if (buildingPalette != null) {
+                built = new CompiledPalette(built, buildingPalette);
             }
         }
-        return compiledPalette;
+        compiledPalette = built;
+        return built;
     }
 
     public DamageArea getDamageArea() {
@@ -290,7 +307,7 @@ public class BuildingInfo {
         return characteristics.couldHaveBuilding;
     }
 
-    public static synchronized LostChunkCharacteristics getChunkCharacteristicsGui(ChunkCoord key, IDimensionInfo provider) {
+    public static LostChunkCharacteristics getChunkCharacteristicsGui(ChunkCoord key, IDimensionInfo provider) {
 //        LostChunkCharacteristics cached = CITY_INFO_MAP.get(key);
 //        if (cached != null) {
 //            return cached;
@@ -308,8 +325,14 @@ public class BuildingInfo {
         return characteristics;
     }
 
-    public static synchronized LostChunkCharacteristics getChunkCharacteristics(ChunkCoord coord, IDimensionInfo provider) {
-        LostChunkCharacteristics cached = CITY_INFO_MAP.get(coord);
+    /**
+     * Not synchronized: the characteristics of a chunk are a pure function of the seed and the
+     * coordinate, so two threads racing on the same coordinate compute the same answer and one of
+     * them simply loses the putIfAbsent below. Locking here would be a deadlock waiting to happen -
+     * this method reaches its neighbours' city styles, which reach back here.
+     */
+    public static LostChunkCharacteristics getChunkCharacteristics(ChunkCoord coord, IDimensionInfo provider) {
+        LostChunkCharacteristics cached = provider.caches().characteristics.get(coord);
         if (cached != null) {
             return cached;
         }
@@ -401,8 +424,8 @@ public class BuildingInfo {
             }
         }
 
-        CITY_INFO_MAP.put(coord, characteristics);
-        return characteristics;
+        LostChunkCharacteristics raced = provider.caches().characteristics.putIfAbsent(coord, characteristics);
+        return raced != null ? raced : characteristics;
     }
 
     // Change city status
@@ -587,20 +610,19 @@ public class BuildingInfo {
         return heightmap.getHeight() > highwayHeight;
     }
 
-    public static void cleanCache() {
-        BUILDING_INFO_MAP.clear();
-        CITY_INFO_MAP.clear();
-        CITY_LEVEL_CACHE.clear();
-    }
-
-    public static synchronized BuildingInfo getBuildingInfo(ChunkCoord key, IDimensionInfo provider) {
-        BuildingInfo info = BUILDING_INFO_MAP.get(key);
+    /**
+     * Not synchronized, and deliberately not computeIfAbsent: constructing a BuildingInfo reads its
+     * neighbours', so populating inside the map's bin lock deadlocks. Racing threads both build one
+     * and one of them is thrown away - identical, because it is a pure function of seed + coord.
+     */
+    public static BuildingInfo getBuildingInfo(ChunkCoord key, IDimensionInfo provider) {
+        BuildingInfo info = provider.caches().buildingInfo.get(key);
         if (info != null) {
             return info;
         }
         info = new BuildingInfo(key, provider);
-        BUILDING_INFO_MAP.put(key, info);
-        return info;
+        BuildingInfo raced = provider.caches().buildingInfo.putIfAbsent(key, info);
+        return raced != null ? raced : info;
     }
 
     /**
@@ -646,7 +668,9 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
+                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
+                    // would go via the chunk, which the dimension's level may not have loaded.
+                    Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
@@ -667,7 +691,9 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
+                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
+                    // would go via the chunk, which the dimension's level may not have loaded.
+                    Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
@@ -858,7 +884,7 @@ public class BuildingInfo {
                 int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
                 if (lowestLevel <= railInfo.getLevel() + partlevel - 1) {
                     // There is a collision
-                    Railway.removeRailChunkType(coord);
+                    Railway.removeRailChunkType(provider, coord);
                 }
             }
         }
@@ -884,7 +910,9 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
+                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
+                    // would go via the chunk, which the dimension's level may not have loaded.
+                    Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
@@ -908,7 +936,9 @@ public class BuildingInfo {
 
                 @Override
                 public Identifier getBiome() {
-                    Holder<Biome> biome = provider.getWorld().getBiome(getCenter(0));
+                    // provider.getBiome() asks the biome source directly. getWorld().getBiome()
+                    // would go via the chunk, which the dimension's level may not have loaded.
+                    Holder<Biome> biome = provider.getBiome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
@@ -1066,9 +1096,9 @@ public class BuildingInfo {
      * This function does not use the cache. So safe to use when the cache is building
      * This function uses its own cache.
      */
-    public static synchronized int getCityLevel(ChunkCoord key, IDimensionInfo provider) {
+    public static int getCityLevel(ChunkCoord key, IDimensionInfo provider) {
         if (provider.getWorld() != null) {  // In LC preview we don't want to use the cache as the config isn't loaded yet
-            Integer cached = CITY_LEVEL_CACHE.get(key);
+            Integer cached = provider.caches().cityLevel.get(key);
             if (cached != null) {
                 return cached;
             }
@@ -1084,12 +1114,15 @@ public class BuildingInfo {
             result = getCityLevelNormal(key, provider, provider.getProfile());
         }
         if (provider.getWorld() != null) {
-            CITY_LEVEL_CACHE.put(key, result);
+            Integer raced = provider.caches().cityLevel.putIfAbsent(key, result);
+            if (raced != null) {
+                return raced;
+            }
         }
         return result;
     }
 
-    public static synchronized int getCityLevelGui(ChunkCoord key, IDimensionInfo provider) {
+    public static int getCityLevelGui(ChunkCoord key, IDimensionInfo provider) {
         int result;
         if ((provider.getProfile().isSpace() || provider.getProfile().isVoidSpheres())) {
             result = getCityLevelSpace(key, provider);
@@ -1235,49 +1268,51 @@ public class BuildingInfo {
     }
 
     private Direction getStairDirection() {
-        if (!stairsCalculated) {
-            stairsCalculated = true;
-            if (streetType != StreetType.PARK && !hasBuilding && isCity) {
-                if (cityLevel == getXmin().cityLevel - 1 && !getXmin().hasBuilding && getXmin().isCity) {
-                    stairDirection = Direction.XMIN;
-                } else if (cityLevel == getXmax().cityLevel - 1 && !getXmax().hasBuilding && getXmax().isCity) {
-                    stairDirection = Direction.XMAX;
-                } else if (cityLevel == getZmin().cityLevel - 1 && !getZmin().hasBuilding && getZmin().isCity) {
-                    stairDirection = Direction.ZMIN;
-                } else if (cityLevel == getZmax().cityLevel - 1 && !getZmax().hasBuilding && getZmax().isCity) {
-                    stairDirection = Direction.ZMAX;
-                } else {
-                    stairDirection = null;
-                }
-            } else {
-                stairDirection = null;
+        if (stairsCalculated) {
+            return stairDirection;
+        }
+        Direction direction = null;
+        if (streetType != StreetType.PARK && !hasBuilding && isCity) {
+            if (cityLevel == getXmin().cityLevel - 1 && !getXmin().hasBuilding && getXmin().isCity) {
+                direction = Direction.XMIN;
+            } else if (cityLevel == getXmax().cityLevel - 1 && !getXmax().hasBuilding && getXmax().isCity) {
+                direction = Direction.XMAX;
+            } else if (cityLevel == getZmin().cityLevel - 1 && !getZmin().hasBuilding && getZmin().isCity) {
+                direction = Direction.ZMIN;
+            } else if (cityLevel == getZmax().cityLevel - 1 && !getZmax().hasBuilding && getZmax().isCity) {
+                direction = Direction.ZMAX;
             }
         }
-        return stairDirection;
+        // Value first, then the flag: a reader that sees the flag set must see the value.
+        stairDirection = direction;
+        stairsCalculated = true;
+        return direction;
     }
 
     // This returns the actual stair direction. It keeps track if there are stair chunks around
     // it those have higher stair priority
     public Direction getActualStairDirection() {
-        if (!actualStairsCalculated) {
-            actualStairsCalculated = true;
-            actualStairDirection = getStairDirection();
-            if (actualStairDirection != null) {
-                for (int cx = -1; cx <= 1; cx++) {
-                    for (int cz = -1; cz <= 1; cz++) {
-                        if (cx != 0 || cz != 0) {
-                            ChunkCoord key = coord.offset(cx, cz);
-                            BuildingInfo adjacent = getBuildingInfo(key, provider);
-                            if (adjacent.getStairDirection() != null && adjacent.stairPriority > stairPriority) {
-                                actualStairDirection = null;
-                                break;
-                            }
+        if (actualStairsCalculated) {
+            return actualStairDirection;
+        }
+        Direction direction = getStairDirection();
+        if (direction != null) {
+            for (int cx = -1; cx <= 1; cx++) {
+                for (int cz = -1; cz <= 1; cz++) {
+                    if (cx != 0 || cz != 0) {
+                        ChunkCoord key = coord.offset(cx, cz);
+                        BuildingInfo adjacent = getBuildingInfo(key, provider);
+                        if (adjacent.getStairDirection() != null && adjacent.stairPriority > stairPriority) {
+                            direction = null;
+                            break;
                         }
                     }
                 }
             }
         }
-        return actualStairDirection;
+        actualStairDirection = direction;
+        actualStairsCalculated = true;
+        return direction;
     }
 
 
@@ -1303,9 +1338,15 @@ public class BuildingInfo {
         if (xBridgeTypeCalculated) {
             return xBridgeType;
         }
+        BuildingPart result = computeXBridge(provider);
+        // Value first, then the flag. The old code set the flag up front and filled the value in
+        // afterwards, which is fine under a lock and a lie without one.
+        xBridgeType = result;
         xBridgeTypeCalculated = true;
-        xBridgeType = null;
+        return result;
+    }
 
+    private BuildingPart computeXBridge(IDimensionInfo provider) {
         if (!xBridge) {
             return null;
         }
@@ -1340,7 +1381,6 @@ public class BuildingInfo {
         if ((!i.isCity) || i.hasBuilding || i.cityLevel > 0) {
             return null;
         }
-        xBridgeType = bt;
         // Here we can automatically mark the rest of the bridge as ok. Saves on calculation
         i = i.getXmin();
         ChunkCoord minCoord = minimum.coord;
@@ -1360,9 +1400,13 @@ public class BuildingInfo {
         if (zBridgeTypeCalculated) {
             return zBridgeType;
         }
+        BuildingPart result = computeZBridge(provider);
+        zBridgeType = result;
         zBridgeTypeCalculated = true;
-        zBridgeType = null;
+        return result;
+    }
 
+    private BuildingPart computeZBridge(IDimensionInfo provider) {
         if (!zBridge) {
             return null;
         }
@@ -1409,7 +1453,6 @@ public class BuildingInfo {
         if ((!i.isCity) || i.hasBuilding || i.cityLevel > 0) {
             return null;
         }
-        zBridgeType = bt;
         // Here we can automatically mark the rest of the bridge as ok. Saves on calculation
         i = i.getZmin();
         ChunkCoord minCoord = minimum.coord;

@@ -21,8 +21,6 @@ import java.util.Map;
 
 public class CitySphere {
 
-    private static final Map<ChunkCoord, CitySphere> CITY_SPHERE_CACHE = new HashMap<>();
-
     public static final CitySphere EMPTY = new CitySphere(new ChunkCoord(Level.OVERWORLD, 0, 0), 0.0f, new BlockPos(0, 0, 0), false);
 
     private final ChunkCoord center;
@@ -35,9 +33,11 @@ public class CitySphere {
     private boolean monorailWestCandidate;
     private boolean monorailEastCandidate;
 
-    private BlockState glassBlock = Blocks.AIR.defaultBlockState();
-    private BlockState baseBlock = Blocks.AIR.defaultBlockState();
-    private BlockState sideBlock = Blocks.AIR.defaultBlockState();
+    // Filled in by initSphere() long after the sphere is in the shared cache, from whichever
+    // thread got there first. baseBlock is the guard initSphere() tests, so it is written last.
+    private volatile BlockState glassBlock = Blocks.AIR.defaultBlockState();
+    private volatile BlockState baseBlock = Blocks.AIR.defaultBlockState();
+    private volatile BlockState sideBlock = Blocks.AIR.defaultBlockState();
 
     private CitySphere(ChunkCoord center, float radius, BlockPos centerPos, boolean enabled) {
         this.enabled = enabled;
@@ -125,8 +125,8 @@ public class CitySphere {
 
     public void setBlocks(BlockState glassBlock, BlockState baseBlock, BlockState sideBlock) {
         this.glassBlock = glassBlock;
-        this.baseBlock = baseBlock;
         this.sideBlock = sideBlock;
+        this.baseBlock = baseBlock;     // last: this is what initSphere() checks to decide it is done
     }
 
     public boolean isEnabled() {
@@ -143,10 +143,6 @@ public class CitySphere {
 
     public BlockState getSideBlock() {
         return sideBlock;
-    }
-
-    public static void cleanCache() {
-        CITY_SPHERE_CACHE.clear();
     }
 
     /**
@@ -443,15 +439,16 @@ public class CitySphere {
      * spheres that are disabled so always test for that! If this returns EMPTY there is no sphere at all
      */
     @Nonnull
-    public static synchronized CitySphere getCitySphere(ChunkCoord coord, IDimensionInfo provider) {
+    public static CitySphere getCitySphere(ChunkCoord coord, IDimensionInfo provider) {
+        Map<ChunkCoord, CitySphere> cache = provider.caches().citySphere;
         AssetRegistries.loadPredefinedStuff(provider.getWorld());
-        if (!CITY_SPHERE_CACHE.containsKey(coord)) {
+        if (!cache.containsKey(coord)) {
             for (PredefinedSphere predef : AssetRegistries.PREDEFINED_SPHERES.getIterable()) {
                 if (predef.getDimension() == provider.getType()) {
                     if (intersectChunkWithSphere(coord.chunkX(), coord.chunkZ(), predef.getRadius(), new BlockPos(predef.getCenterX(), 0, predef.getCenterZ()))) {
                         ChunkCoord center = new ChunkCoord(provider.getType(), predef.getChunkX(), predef.getChunkZ());
                         CitySphere sphere = getSphereAtCenter(center, provider, predef);
-                        updateCache(coord, sphere);
+                        updateCache(cache, coord, sphere);
                         return sphere;
                     }
                 }
@@ -466,26 +463,26 @@ public class CitySphere {
                 ChunkCoord center = new ChunkCoord(provider.getType(), cx, cz);
                 sphere = getSphereAtCenter(center, provider, null);
             }
-            updateCache(coord, sphere);
+            updateCache(cache, coord, sphere);
             return sphere;
         } else {
-            return CITY_SPHERE_CACHE.get(coord);
+            return cache.get(coord);
         }
     }
 
-    private static void updateCache(ChunkCoord coord, CitySphere sphere) {
-        CITY_SPHERE_CACHE.put(coord, sphere);
+    private static void updateCache(Map<ChunkCoord, CitySphere> cache, ChunkCoord coord, CitySphere sphere) {
+        cache.put(coord, sphere);
         BlockPos centerPos = sphere.getCenterPos();
         int radius = (int) sphere.getRadius();
         if (radius < 0.0001f) {
-            CITY_SPHERE_CACHE.put(sphere.center, sphere);
+            cache.put(sphere.center, sphere);
             return;
         }
         for (int cx = centerPos.getX() - radius-16 ; cx <= centerPos.getX() + radius+16 ; cx += 16) {
             for (int cz = centerPos.getZ() - radius-16 ; cz <= centerPos.getZ()+radius+16 ; cz += 16) {
                 ChunkCoord cc = new ChunkCoord(sphere.getCenter().dimension(), cx >> 4, cz >> 4);
                 if (intersectChunkWithSphere(cc.chunkX(), cc.chunkZ(), radius, centerPos)) {
-                    CITY_SPHERE_CACHE.put(cc, sphere);
+                    cache.put(cc, sphere);
                 }
             }
         }

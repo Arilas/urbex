@@ -28,11 +28,6 @@ public class MultiChunk {
 
     record MB(String name, int offsetX, int offsetZ) {}
 
-    // Multichunks are indexed by the chunk coordinates divided by the area size
-    private static final TimedCache<ChunkCoord, MultiChunk> MULTICHUNKS = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
-    public static void cleanCache() {
-        MULTICHUNKS.clear();
-    }
 
     private final ChunkCoord mc;    // This coordinate is divided by areasize
     private final ChunkCoord topleft;
@@ -52,10 +47,14 @@ public class MultiChunk {
         }
     }
 
-    public static synchronized MultiChunk getOrCreate(IDimensionInfo provider, ChunkCoord coord) {
+    /**
+     * Not synchronized, and getOrCompute rather than computeIfAbsent: calculateBuildings() reaches
+     * back into the city caches, which reach back here.
+     */
+    public static MultiChunk getOrCreate(IDimensionInfo provider, ChunkCoord coord) {
         int areasize = provider.getWorldStyle().getMultiSettings().areasize();
         ChunkCoord mc = getMultiCoord(coord, areasize);
-        return MULTICHUNKS.computeIfAbsent(mc, k -> new MultiChunk(mc, areasize).calculateBuildings(provider));
+        return provider.caches().multiChunk.getOrCompute(mc, k -> new MultiChunk(mc, areasize).calculateBuildings(provider));
     }
 
     public MB getMultiBuilding(ChunkCoord coord) {
