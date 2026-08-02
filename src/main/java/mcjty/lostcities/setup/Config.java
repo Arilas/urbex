@@ -48,8 +48,11 @@ public class Config {
             "minecraft:pillager_outpost"
     };
     private static final ModConfigSpec.ConfigValue<List<? extends String>> AVOID_STRUCTURES;
-    private static Set<Identifier> AVOID_STRUCTURES_SET = new HashSet<>();
+    // Lazily filled from AVOID_STRUCTURES by cacheAvoidedStructures(). Must start out null:
+    // that method only fills the set when it is still null.
+    private static Set<Identifier> AVOID_STRUCTURES_SET = null;
     public static final ModConfigSpec.BooleanValue AVOID_STRUCTURES_ADJACENT;
+    public static final ModConfigSpec.BooleanValue AVOID_SURFACE_STRUCTURES;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES_ADJACENT;
     public static final ModConfigSpec.BooleanValue AVOID_FLATTENING;
@@ -60,6 +63,7 @@ public class Config {
         profileFromClient = null;
         jsonFromClient = null;
         dimensionProfileCache = null;
+        AVOID_STRUCTURES_SET = null;
     }
 
     public static void resetProfileCache() {
@@ -193,6 +197,9 @@ public class Config {
         AVOID_STRUCTURES_ADJACENT = SERVER_BUILDER
                 .comment("If true then also avoid generating the structures mentioned in 'avoidStructures' in chunks adjacent to the chunk with the structure")
                 .define("avoidStructuresAdjacent", false);
+        AVOID_SURFACE_STRUCTURES = SERVER_BUILDER
+                .comment("If true then avoid generating cities in chunks with any structure that generates at the 'surface_structures' step, without having to list them all in 'avoidStructures'. Useful with structure mods. Underground structures (mineshafts, strongholds, ...) are not affected")
+                .define("avoidSurfaceStructures", false);
         AVOID_VILLAGES_ADJACENT = SERVER_BUILDER
                 .comment("If true then also avoid generating cities in chunks adjacent to the chunks with villages")
                 .define("avoidVillagesAdjacent", false);

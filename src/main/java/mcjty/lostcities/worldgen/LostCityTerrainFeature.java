@@ -43,6 +43,7 @@ import net.minecraft.world.level.block.state.properties.RailShape;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
@@ -381,22 +382,19 @@ public class LostCityTerrainFeature {
 
     private static AvoidChunk hasBlacklistedStructure(WorldGenLevel level, int chunkX, int chunkZ) {
         boolean doAdjacent = Config.AVOID_VILLAGES_ADJACENT.get() || Config.AVOID_STRUCTURES_ADJACENT.get();
-        if (doAdjacent || Config.AVOID_VILLAGES.get() || Config.hasAvoidedStructures()) {
+        if (doAdjacent || Config.AVOID_VILLAGES.get() || Config.AVOID_SURFACE_STRUCTURES.get() || Config.hasAvoidedStructures()) {
             if (doAdjacent) {
-                boolean couldBeUnknown = false;
                 for (int dx = -1; dx <= 1; dx++) {
                     for (int dz = -1; dz <= 1; dz++) {
+                        // Chunks that are not part of this region are unknown and assumed to be ok.
+                        // Skip them, but keep testing the ones we can see.
                         if (level.hasChunk(chunkX + dx, chunkZ + dz)) {
-                            ChunkAccess ch = level.getChunk(chunkX + dx, chunkZ + dx, ChunkStatus.STRUCTURE_REFERENCES);
-                            if (testBlacklistedStructure(level, ch, chunkX == 0 && chunkZ == 0)) {
-                                return (dx == 0 && dz == 0) ? AvoidChunk.YES : AvoidChunk.ADJACENT;
+                            ChunkAccess ch = level.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.STRUCTURE_REFERENCES);
+                            boolean center = dx == 0 && dz == 0;
+                            if (testBlacklistedStructure(level, ch, center)) {
+                                return center ? AvoidChunk.YES : AvoidChunk.ADJACENT;
                             }
-                        } else {
-                            couldBeUnknown = true;
                         }
-                    }
-                    if (couldBeUnknown) {
-                        return AvoidChunk.NO;  // If we have unknown chunks we assume it is ok
                     }
                 }
             } else {
@@ -417,7 +415,8 @@ public class LostCityTerrainFeature {
             var references = ch.getAllReferences();
             for (var entry : references.entrySet()) {
                 if (!entry.getValue().isEmpty()) {
-                    Optional<ResourceKey<Structure>> key = structures.getResourceKey(entry.getKey());
+                    Structure structure = entry.getKey();
+                    Optional<ResourceKey<Structure>> key = structures.getResourceKey(structure);
                     if (Config.AVOID_VILLAGES.get()) {
                         if (center || Config.AVOID_VILLAGES_ADJACENT.get()) {
                             if (key.map(k -> structures.getOrThrow(k).is(StructureTags.VILLAGE)).orElse(false)) {
@@ -426,7 +425,12 @@ public class LostCityTerrainFeature {
                         }
                     }
                     if (center || Config.AVOID_STRUCTURES_ADJACENT.get()) {
-                        if (Config.isAvoidedStructure(key.get().identifier())) {
+                        // Catch-all for structure mods: everything that builds at the surface step
+                        if (Config.AVOID_SURFACE_STRUCTURES.get() && structure.step() == GenerationStep.Decoration.SURFACE_STRUCTURES) {
+                            return true;
+                        }
+                        // An unregistered structure has no id to match against the blacklist
+                        if (key.isPresent() && Config.isAvoidedStructure(key.get().identifier())) {
                             return true;
                         }
                     }
