@@ -6,7 +6,7 @@ plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-group = "com.github.mcjty"
+group = "dev.krona"
 version = project.version
 
 base {
@@ -75,26 +75,13 @@ processResources {
     inputs.properties(expandProps)
 }
 
-task apiJar(type: Jar) {
-    archiveClassifier = "api"
-    from(sourceSets.main.output) {
-        include "mcjty/lostcities/api/**"
-    }
-}
-
-artifacts {
-    archives apiJar
-}
-
 publishing {
     publications.create('mavenJava', MavenPublication) {
         from components.java
-        artifact apiJar
-
-        artifactId = "lostcities"
+        artifactId = "urbex"
         pom {
-            name = 'LostCities'
-            description = 'Lost Cities'
+            name = 'Urbex'
+            description = 'Procedural abandoned-city worldgen'
         }
     }
     repositories {
