@@ -3,29 +3,22 @@
   "id": "${mod_id}",
   "version": "${version}",
   "name": "${mod_name}",
-  "description": "Generate cities all over the world",
-  "authors": [
-    "McJty"
-  ],
+  "description": "Procedural abandoned-city worldgen. A fork of Lost Cities by McJty.",
+  "authors": ["Oleksandr Hanzha"],
+  "contributors": ["McJty (original Lost Cities)"],
   "contact": {
-    "homepage": "http://github.com/McJtyMods/LostCities/",
-    "issues": "http://github.com/McJtyMods/LostCities/issues",
-    "sources": "https://github.com/McJtyMods/LostCities"
+    "homepage": "https://github.com/Arilas/urbex",
+    "issues": "https://github.com/Arilas/urbex/issues",
+    "sources": "https://github.com/Arilas/urbex"
   },
   "license": "MIT",
   "environment": "*",
   "accessWidener": "META-INF/${mod_id}.accesswidener",
   "entrypoints": {
-    "main": [
-      "mcjty.lostcities.LostCities"
-    ],
-    "client": [
-      "mcjty.lostcities.setup.ClientSetup"
-    ]
+    "main": ["dev.krona.urbex.Urbex"],
+    "client": ["dev.krona.urbex.setup.ClientSetup"]
   },
-  "mixins": [
-    "${mod_id}.mixins.json"
-  ],
+  "mixins": ["${mod_id}.mixins.json"],
   "depends": {
     "fabricloader": ">=${fabric_loader_version}",
     "fabric-api": "*",

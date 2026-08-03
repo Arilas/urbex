@@ -329,8 +329,24 @@ bug from RNG noise.
 
 ### 5.1 The harness
 
-A `/urbex digest <radius>` command force-generates a square of chunks and emits a stable hash over
-block states and block entities. Three assertions on it are the acceptance criteria for P1:
+> **Amended 2026-08-03 during P1a execution.** As first specified, the harness hashed *whole
+> chunks*. That was wrong: a whole-chunk hash includes vanilla terrain, and vanilla terrain is not
+> run-stable under forced concurrent generation. Proven by control — the plain overworld, with no
+> Urbex profile and this mod generating nothing, gave two different digests for the same seed in
+> the same order (`5750acb1ce8e44a4` vs `1b9a1c68bdac96d6`). The acceptance signal is instead a
+> digest that `ChunkDriver` accumulates over exactly the positions and states **Urbex wrote**:
+> final-state semantics, canonically sorted, off by default. The whole-chunk hash survives as a
+> loose tripwire only.
+>
+> Two consequences for anyone reading this later. Digests must be taken as
+> `execute in urbex:city run urbex digest ...` — the overworld has no Urbex profile by default, so
+> a bare invocation measures vanilla. And exact equality across all three chunk orders is not
+> reachable in P1a: ~11 positions still vary because Urbex reads neighbouring vanilla state during
+> the decoration step. That is precisely what §4's structure-based placement (P4) fixes, and it is
+> tracked as `Arilas/urbex#18`.
+
+A `/urbex digest <radius> <order> <offset>` command force-generates a square of chunks and emits a
+stable hash. Three assertions on it are the acceptance criteria for P1:
 
 - **Order independence** — same seed, chunks walked row-major versus shuffled, identical digest.
   This is the test for A1 and A2, and the one that would have caught them.

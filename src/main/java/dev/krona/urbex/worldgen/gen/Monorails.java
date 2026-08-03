@@ -1,0 +1,73 @@
+package dev.krona.urbex.worldgen.gen;
+
+import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.worldgen.ChunkGenContext;
+import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.CitySphere;
+import dev.krona.urbex.worldgen.lost.Transform;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
+import dev.krona.urbex.worldgen.lost.regassets.data.MonorailParts;
+
+public class Monorails {
+
+    public static void generateMonorails(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
+        LostCityProfile profile = info.profile;
+        IDimensionInfo provider = info.provider;
+        MonorailParts monoRailParts = provider.getWorldStyle().getPartSelector().monoRailParts();
+        Transform transform;
+        boolean horiz = info.hasHorizontalMonorail();
+        boolean vert = info.hasVerticalMonorail();
+        if (horiz && vert) {
+            if (!CitySphere.intersectsWithCitySphere(info.coord, provider)) {
+                BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.both());
+                feature.generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
+            }
+            return;
+        } else if (horiz) {
+            transform = Transform.ROTATE_90;
+        } else if (vert) {
+            transform = Transform.ROTATE_NONE;
+        } else {
+            return;
+        }
+        BuildingPart part;
+
+        if (CitySphere.fullyInsideCitySpere(info.coord, provider)) {
+            // If there is a non-enclosed monorail nearby we generate a station
+            if (hasNonStationMonoRail(info.getXmin())) {
+                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
+                Character borderBlock = info.getCityStyle().getBorderBlock();
+                transform = Transform.MIRROR_90_X; // flip
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+            } else if (hasNonStationMonoRail(info.getXmax())) {
+                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
+                Character borderBlock = info.getCityStyle().getBorderBlock();
+                transform = Transform.ROTATE_90;
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+            } else if (hasNonStationMonoRail(info.getZmin())) {
+                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
+                Character borderBlock = info.getCityStyle().getBorderBlock();
+                transform = Transform.ROTATE_NONE;
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+            } else if (hasNonStationMonoRail(info.getZmax())) {
+                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.station());
+                Character borderBlock = info.getCityStyle().getBorderBlock();
+                transform = Transform.MIRROR_Z; // flip
+                feature.fillToGround(ctx, info, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, borderBlock);
+            } else {
+                return;
+            }
+        } else {
+            part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), monoRailParts.vertical());
+        }
+
+        feature.generatePart(ctx, info, part, transform, 0, profile.GROUNDLEVEL + profile.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
+    }
+
+    private static boolean hasNonStationMonoRail(BuildingInfo info) {
+        return info.hasMonorail() && !CitySphere.fullyInsideCitySpere(info.coord, info.provider);
+    }
+}

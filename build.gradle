@@ -6,7 +6,7 @@ plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-group = "com.github.mcjty"
+group = "dev.krona"
 version = project.version
 
 base {
@@ -60,6 +60,26 @@ dependencies {
     implementation "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}"
 }
 
+dependencies {
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+
+jar {
+    // MIT requires the notice in "all copies", and for a mod the distributed copy is the jar,
+    // not this repository. Loom's remapJar takes this jar as its input, so the file carries
+    // through to the artifact that actually ships.
+    from(rootProject.file('LICENSE'))
+}
+
 processResources {
     def expandProps = [
             'version'              : version,
@@ -75,26 +95,13 @@ processResources {
     inputs.properties(expandProps)
 }
 
-task apiJar(type: Jar) {
-    archiveClassifier = "api"
-    from(sourceSets.main.output) {
-        include "mcjty/lostcities/api/**"
-    }
-}
-
-artifacts {
-    archives apiJar
-}
-
 publishing {
     publications.create('mavenJava', MavenPublication) {
         from components.java
-        artifact apiJar
-
-        artifactId = "lostcities"
+        artifactId = "urbex"
         pom {
-            name = 'LostCities'
-            description = 'Lost Cities'
+            name = 'Urbex'
+            description = 'Procedural abandoned-city worldgen'
         }
     }
     repositories {

@@ -1,0 +1,54 @@
+package dev.krona.urbex.worldgen;
+
+import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.biome.Biome;
+
+import javax.annotation.Nullable;
+
+public interface IDimensionInfo {
+
+    long getSeed();
+
+    /**
+     * The dimension's own level. Stable for the life of the dimension and safe to hold: this is
+     * <em>not</em> the WorldGenRegion of whatever chunk happens to be generating, which is what it
+     * used to be (via a setWorld() that a per-dimension lock had to guard).
+     * <p>
+     * Use it for level-wide questions - registry access, min/max build height, sea level, the seed.
+     * Reading or writing blocks during generation must go through the region on the
+     * {@link ChunkGenContext} instead; a region only has the chunks around the one being built,
+     * and the level would go looking for the rest.
+     */
+    WorldGenLevel getWorld();
+
+    /** The per-dimension caches. Dropped with the dimension. */
+    DimensionCaches caches();
+
+    ResourceKey<Level> getType();
+
+    LostCityProfile getProfile();
+
+    LostCityProfile getOutsideProfile();
+
+    WorldStyle getWorldStyle();
+
+    LostCityTerrainFeature getFeature();
+
+    ChunkHeightmap getHeightmap(int chunkX, int chunkZ);
+
+    ChunkHeightmap getHeightmap(ChunkCoord coord);
+
+//    Biome[] getBiomes(int chunkX, int chunkZ);
+
+    Holder<Biome> getBiome(BlockPos pos);
+
+    @Nullable
+    ResourceKey<Level> dimension();
+}

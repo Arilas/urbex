@@ -1,0 +1,237 @@
+package dev.krona.urbex.worldgen.lost;
+
+import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.GeometryTools;
+import dev.krona.urbex.varia.Rng;
+import dev.krona.urbex.varia.Tools;
+import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.LostTags;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class DamageArea {
+
+    public static final float BLOCK_DAMAGE_CHANCE = .7f;
+
+    private final long seed;
+    private final int chunkX;
+    private final int chunkZ;
+    private final List<Explosion> explosions = new ArrayList<>();
+    private final AABB chunkBox;
+    private final LostCityProfile profile;
+
+    private final BlockState air;
+
+    public DamageArea(int chunkX, int chunkZ, IDimensionInfo provider, BuildingInfo info) {
+        this.seed = provider.getSeed();
+        this.profile = info.profile;
+        this.chunkX = chunkX;
+        this.chunkZ = chunkZ;
+        this.air = Blocks.AIR.defaultBlockState();
+        chunkBox = new AABB(chunkX << 4, provider.getWorld().getMinY(), chunkZ << 4, (chunkX << 4) + 15, provider.getWorld().getMaxY() + 1, (chunkZ << 4) + 15);
+
+        int offset = (Math.max(info.profile.EXPLOSION_MAXRADIUS, info.profile.MINI_EXPLOSION_MAXRADIUS)+15) / 16;
+        for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
+            for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
+                ChunkCoord coord = new ChunkCoord(provider.getType(), cx, cz);
+                if ((!info.profile.EXPLOSIONS_IN_CITIES_ONLY) || BuildingInfo.isCity(coord, provider)) {
+                    Explosion explosion = getExplosionAt(coord, provider);
+                    if (explosion != null) {
+                        if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
+//                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
+                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
+                            if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_ACCEPT)) {
+                                explosions.add(explosion);
+                            }
+                        }
+                    }
+                    explosion = getMiniExplosionAt(coord, provider);
+                    if (explosion != null) {
+                        if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
+//                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
+                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
+                            if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_MINI_ACCEPT)) {
+                                explosions.add(explosion);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether the city style keeps the explosion rolled at {@code coord}.
+     * <p>
+     * Addressed at the explosion's own chunk, not at the chunk asking. Every chunk within the blast
+     * radius evaluates the same explosion, and each reaches it having skipped a different number of
+     * non-intersecting candidates - so a single per-chunk stream gave the same explosion a different
+     * draw in each observer, and a crater was accepted on one side of a chunk border and rejected on
+     * the other. This is the case {@code ChunkGenContext.rng} warns about: a stream drawn a variable
+     * number of times per chunk. Addressed by {@code coord}, every observer agrees.
+     */
+    private boolean isAccepted(ChunkCoord coord, Float chance, Rng.Purpose purpose) {
+        if (chance == null) {
+            return true;
+        }
+        return Rng.at(seed, coord.chunkX(), coord.chunkZ(), purpose).nextFloat() < chance;
+    }
+
+    /**
+     * Damage one block. The two rolls are addressed by the block's own position rather than drawn
+     * from a stream: whether a block is damaged is decided per block, and the number of blocks
+     * damaged before it depends on what was already in the world.
+     */
+    public BlockState damageBlock(BlockState b, IDimensionInfo provider, int x, int y, int z, float damage, CompiledPalette palette, BlockState liquidChar) {
+        if (Tools.hasTag(b.getBlock(), LostTags.NOT_BREAKABLE_TAG)) {
+            return b;
+        }
+
+        if (Tools.hasTag(b.getBlock(), LostTags.EASY_BREAKABLE_TAG)) {
+            damage *= 2.5f;    // As if this block gets double the damage
+        }
+        if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {
+            BlockState damaged = palette.canBeDamagedToIronBars(b);
+            int waterlevel = Tools.getSeaLevel(provider.getWorld());//profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
+            if (damage < BLOCK_DAMAGE_CHANCE && damaged != null) {
+                if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
+                    b = damaged;
+                } else {
+                    b = y <= waterlevel ? liquidChar : air;
+                }
+            } else {
+                b = y <= waterlevel ? liquidChar : air;
+            }
+        }
+        return b;
+    }
+
+    private boolean intersectsWith(BlockPos center, int radius) {
+        double dmin = GeometryTools.squaredDistanceBoxPoint(chunkBox, center);
+        return dmin <= radius * radius;
+    }
+
+    private Explosion getExplosionAt(ChunkCoord coord, IDimensionInfo provider) {
+        RandomSource randomExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION);
+        if (randomExplosion.nextFloat() < profile.EXPLOSION_CHANCE) {
+            return new Explosion(profile.EXPLOSION_MINRADIUS + randomExplosion.nextInt(profile.EXPLOSION_MAXRADIUS - profile.EXPLOSION_MINRADIUS),
+                    new BlockPos((coord.chunkX() << 4) + randomExplosion.nextInt(16),
+                            BuildingInfo.getBuildingInfo(coord, provider).cityLevel * 6 + profile.EXPLOSION_MINHEIGHT + randomExplosion.nextInt(profile.EXPLOSION_MAXHEIGHT - profile.EXPLOSION_MINHEIGHT),
+                            (coord.chunkZ() << 4) + randomExplosion.nextInt(16)));
+        }
+        return null;
+    }
+
+    private Explosion getMiniExplosionAt(ChunkCoord coord, IDimensionInfo provider) {
+        RandomSource randomMiniExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION_MINI);
+        if (randomMiniExplosion.nextFloat() < profile.MINI_EXPLOSION_CHANCE) {
+            return new Explosion(profile.MINI_EXPLOSION_MINRADIUS + randomMiniExplosion.nextInt(profile.MINI_EXPLOSION_MAXRADIUS - profile.MINI_EXPLOSION_MINRADIUS),
+                    new BlockPos((coord.chunkX() << 4) + randomMiniExplosion.nextInt(16),
+                            BuildingInfo.getBuildingInfo(coord, provider).cityLevel * 6 + profile.MINI_EXPLOSION_MINHEIGHT + randomMiniExplosion.nextInt(profile.MINI_EXPLOSION_MAXHEIGHT - profile.MINI_EXPLOSION_MINHEIGHT),
+                            (coord.chunkZ() << 4) + randomMiniExplosion.nextInt(16)));
+        }
+        return null;
+    }
+
+    // Return true if this chunk is affected by explosions
+    public boolean hasExplosions() {
+        return !explosions.isEmpty();
+    }
+
+    public List<Explosion> getExplosions() {
+        return explosions;
+    }
+
+    // Return true if this subchunk (every 16 blocks) is affected by explosions.
+    // The scan below is bounded to subchunks 0..15, i.e. world Y 0-255: explosions below Y 0 or
+    // above Y 255 are invisible to it. This disagrees with chunkBox above, which was widened in
+    // P1a to the level's real min/max Y - chunkBox only gates whether an explosion intersects this
+    // chunk at all and is not consulted here. Tracked as Arilas/urbex#19; not currently reachable
+    // by any shipped profile.
+    public boolean hasExplosions(int y) {
+        AABB box = new AABB(chunkX << 4, y << 4, chunkZ << 4, (chunkX << 4) + 15, (y << 4) + 15, (chunkZ << 4) + 15);
+        for (Explosion explosion : explosions) {
+            double dmin = GeometryTools.squaredDistanceBoxPoint(box, explosion.getCenter());
+            if (dmin <= explosion.getRadius() * explosion.getRadius()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Return true if this subchunk is completely destroyed by an explosion
+    public boolean isCompletelyDestroyed(int y) {
+        AABB box = new AABB(chunkX << 4, y * 16, chunkZ << 4, (chunkX << 4) + 15, (y * 16) + 15, (chunkZ << 4) + 15);
+        for (Explosion explosion : explosions) {
+            double dmax = GeometryTools.maxSquaredDistanceBoxPoint(box, explosion.getCenter());
+            int sqdist = explosion.getRadius() * explosion.getRadius();
+            if (dmax <= sqdist) {
+                // The distance at which this explosion is totally fatal (destroys all blocks)
+                double dist = (explosion.getRadius() - 3.0 * explosion.getRadius()) / -3.0;
+                dist *= dist;
+                if (dmax <= dist) {
+                    return true;
+                }
+            }
+        }
+        return false;
+
+    }
+
+    // Get the lowest height that is affected by an explosion.
+    // Same Y 0-255 subchunk bound as hasExplosions(int y) above - see its comment. Arilas/urbex#19.
+    public int getLowestExplosionHeight() {
+        for (int yy = 0 ; yy < 16 ; yy++) {
+            if (hasExplosions(yy)) {
+                return yy * 16;
+            }
+        }
+        return -1;
+    }
+
+    // Get the lowest height that is affected by an explosion.
+    // Same Y 0-255 subchunk bound as hasExplosions(int y) above - see its comment. Arilas/urbex#19.
+    public int getHighestExplosionHeight() {
+        for (int yy = 15 ; yy >= 0 ; yy--) {
+            if (hasExplosions(yy)) {
+                return yy * 16 + 15;
+            }
+        }
+        return -1;
+    }
+
+    // Give an indication of how much damage this chunk got
+    public float getDamageFactor() {
+        float damage = 0.0f;
+        for (Explosion explosion : explosions) {
+            double sq = explosion.getCenter().distToCenterSqr(chunkX * 16.0, explosion.getCenter().getY(), chunkZ * 16.0);
+            if (sq < explosion.getSqradius()) {
+                double d = Math.sqrt(sq);
+                damage += 3.0f * (explosion.getRadius() - d) / explosion.getRadius();
+            }
+        }
+        return damage;
+    }
+
+    // Get a number indicating how much damage this point should get. 0 Means no damage
+    public float getDamage(int x, int y, int z) {
+        float damage = 0.0f;
+        for (Explosion explosion : explosions) {
+            double sq = explosion.getCenter().distToCenterSqr(x, y, z);
+            if (sq < explosion.getSqradius()) {
+                double d = Math.sqrt(sq);
+                damage += 3.0f * (explosion.getRadius() - d) / explosion.getRadius();
+            }
+        }
+        return damage;
+    }
+
+}
