@@ -45,8 +45,10 @@ class LotSubdividerTest {
 
         assertEquals(1, lots.size());
         Lot lot = lots.get(0);
-        // Shrunk by 1 block on every side from the 0..16 leaf.
-        assertEquals(new Rect(1, 1, 15, 15), lot.footprint());
+        // Shrunk by ARTERIAL's road half-width (3, with P's defaults) on every side from the 0..16
+        // leaf, not a flat 1 block - see PlanParams.roadHalfWidthBlocks's doc for why a lot's near
+        // edge has to clear the carriageway's real width, not just sit one block off its centreline.
+        assertEquals(new Rect(3, 3, 13, 13), lot.footprint());
         assertTrue(lot.frontingEdgeIndex() >= 0 && lot.frontingEdgeIndex() < g.edges().size());
     }
 

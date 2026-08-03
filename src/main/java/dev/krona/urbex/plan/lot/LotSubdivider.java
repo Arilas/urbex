@@ -9,6 +9,7 @@ import dev.krona.urbex.plan.district.District;
 import dev.krona.urbex.plan.geom.Polygon;
 import dev.krona.urbex.plan.geom.Rect;
 import dev.krona.urbex.plan.geom.Vec2;
+import dev.krona.urbex.plan.road.RoadClass;
 import dev.krona.urbex.plan.road.RoadEdge;
 import dev.krona.urbex.plan.road.RoadGraph;
 
@@ -40,9 +41,6 @@ public final class LotSubdivider {
     /** How far the split position may drift from the midpoint, as a fraction of the side being cut. */
     private static final double SPLIT_JITTER_FRACTION = 0.2;
 
-    /** A leaf narrower than this on either axis cannot survive the 1-block shrink on every side. */
-    private static final int MIN_LEAF_SIDE_BLOCKS = 3;
-
     /**
      * How far below the district's target size {@link #refineToFit} is allowed to keep cutting a
      * leaf that does not fit. Without a floor tied to the target size, refinement chases a diagonal
@@ -63,13 +61,16 @@ public final class LotSubdivider {
     public static List<Lot> subdivide(long seed, CityBlock b, District d, RoadGraph g, TerrainSampler t,
                                        PlanParams p) {
         double targetSize = targetLotSize(d, p);
+        int inset = blockInset(p);
 
         List<Rect> leaves = new ArrayList<>();
-        splitRect(b.boundingBox(), targetSize, seed, b, t, leaves);
+        splitRect(b.boundingBox(), targetSize, seed, b, g, t, inset, p, leaves);
 
-        // Every leaf here is already guaranteed, by construction, to fit entirely inside b's outline
-        // and off the water once shrunk (refineToFit only ever emits leaves that pass fits). Only
-        // whether a road is close enough to front remains to be checked.
+        // Every leaf here is already guaranteed, by construction, to fit entirely inside b's outline,
+        // be entirely dry, and clear every road in the settlement by that road's own width (see
+        // RoadClearance - whole-branch review, I2/C1) once shrunk - refineToFit only ever emits
+        // leaves that pass all three. Only whether a road is close enough to front remains to be
+        // checked.
         List<Lot> lots = new ArrayList<>();
         for (Rect leaf : leaves) {
             Vec2 centre = leaf.center();
@@ -91,17 +92,37 @@ public final class LotSubdivider {
                 continue;
             }
 
-            Rect footprint = shrink(leaf);
+            Rect footprint = shrink(leaf, inset);
             // Step 4b of the brief. Shared with RoadsideLots - see WaterFrontage's doc for why this
             // is a full per-side scan rather than the three-point probe that used to live here.
             int waterSides = WaterFrontage.sidesOf(footprint, t, p.probeDistanceBlocks());
-            int groundHeight = t.heightAt(centre.x(), centre.z());
+            GroundHeightRange.Range heights = GroundHeightRange.of(footprint, t);
 
             // Placeholder id and sizeClass: Planner rebuilds every lot once it has seen the whole
             // settlement, since sizeClass is an area tertile across all of it, not just this block.
-            lots.add(new Lot(0, footprint, d, 0, frontingEdgeIndex, groundHeight, waterSides));
+            lots.add(new Lot(0, footprint, d, 0, frontingEdgeIndex, heights.min(), heights.max(), waterSides));
         }
         return lots;
+    }
+
+    /**
+     * The uniform inset {@link #shrink} applies on every side of every leaf: {@link RoadClass#ARTERIAL}'s
+     * half-width, the widest class {@code ArterialGrowth} ever draws a block's boundary from (rings
+     * and the perimeter ring are {@link RoadClass#COLLECTOR}; {@link RoadClass#LOCAL} never bounds a
+     * block at all - only {@code SpineGrowth}'s branches use it, and spine settlements have no
+     * blocks). This is only a starting guess, not the guarantee - {@link #refineToFit}'s use of
+     * {@link RoadClearance#clearsEveryRoad} is the exact, authoritative check, which is why a leaf
+     * that this inset alone would not have cleared still gets a chance: failing clearance keeps
+     * splitting the same way failing the outline or dryness check already did, rather than the whole
+     * candidate being thrown away and never retried smaller.
+     */
+    private static int blockInset(PlanParams p) {
+        return p.roadHalfWidthBlocks(RoadClass.ARTERIAL);
+    }
+
+    /** A leaf narrower than this on either axis cannot survive shrinking by {@code inset} on every side. */
+    private static int minLeafSideBlocks(int inset) {
+        return 2 * inset + 1;
     }
 
     /**
@@ -125,38 +146,44 @@ public final class LotSubdivider {
     /**
      * Recursively halves {@code r} while its longer side exceeds twice {@code targetSize}. Once a
      * branch reaches that scale, {@link #refineToFit} takes over to make sure what comes out
-     * actually belongs to {@code b} and is dry.
+     * actually belongs to {@code b}, is dry, and clears every road.
      */
-    private static void splitRect(Rect r, double targetSize, long seed, CityBlock b, TerrainSampler t,
-                                   List<Rect> out) {
+    private static void splitRect(Rect r, double targetSize, long seed, CityBlock b, RoadGraph g,
+                                   TerrainSampler t, int inset, PlanParams p, List<Rect> out) {
         int longer = Math.max(r.width(), r.depth());
         if (longer <= 2.0 * targetSize) {
-            refineToFit(r, targetSize, seed, b, t, out);
+            refineToFit(r, targetSize, seed, b, g, t, inset, p, out);
             return;
         }
         Rect[] children = cut(r, seed);
-        splitRect(children[0], targetSize, seed, b, t, out);
-        splitRect(children[1], targetSize, seed, b, t, out);
+        splitRect(children[0], targetSize, seed, b, g, t, inset, p, out);
+        splitRect(children[1], targetSize, seed, b, g, t, inset, p, out);
     }
 
     /**
      * {@code r} is already at or under the district's target lot scale. If the footprint it would
-     * become (r shrunk by 1 block on every side) lies entirely inside {@code b}'s outline and is
-     * entirely dry ({@link FootprintDryness#isFullyDry}, shared with {@code RoadsideLots} - see its
-     * doc for why this used to be a sparse probe and no longer is), keep it. Otherwise either the
-     * block's boundary cuts through {@code r} or water does — cut {@code r} again with the same
-     * jittered rule and try each half independently. That continues only while {@code r}'s longer
-     * side is still above {@code targetSize * REFINEMENT_FLOOR_FRACTION}; once a branch reaches the
-     * floor and still does not fit, it is dropped rather than cut smaller still, so a diagonal
-     * boundary is approximated by a handful of smaller-than-usual lots, not a fine staircase of them.
+     * become (r shrunk by {@code inset} blocks on every side) lies entirely inside {@code b}'s
+     * outline, is entirely dry ({@link FootprintDryness#isFullyDry}, shared with {@code RoadsideLots}
+     * - see its doc for why this used to be a sparse probe and no longer is), <em>and</em> clears
+     * every road in the settlement by that road's own required distance
+     * ({@link RoadClearance#clearsEveryRoad} - {@code inset} alone is a conservative starting guess,
+     * not a guarantee, since it is sized for the widest class that could border any block, uniformly,
+     * regardless of which class actually borders this particular side), keep it. Otherwise the
+     * block's boundary cuts through {@code r}, water does, or a road runs closer than it should — cut
+     * {@code r} again with the same jittered rule and try each half independently. That continues
+     * only while {@code r}'s longer side is still above {@code targetSize * REFINEMENT_FLOOR_FRACTION};
+     * once a branch reaches the floor and still does not fit, it is dropped rather than cut smaller
+     * still, so a diagonal boundary - or a road running close by - is approximated by a handful of
+     * smaller-than-usual lots, not a fine staircase of them.
      */
-    private static void refineToFit(Rect r, double targetSize, long seed, CityBlock b, TerrainSampler t,
-                                     List<Rect> out) {
-        if (r.width() < MIN_LEAF_SIDE_BLOCKS || r.depth() < MIN_LEAF_SIDE_BLOCKS) {
+    private static void refineToFit(Rect r, double targetSize, long seed, CityBlock b, RoadGraph g,
+                                     TerrainSampler t, int inset, PlanParams p, List<Rect> out) {
+        if (r.width() < minLeafSideBlocks(inset) || r.depth() < minLeafSideBlocks(inset)) {
             return;
         }
-        Rect footprint = shrink(r);
-        if (liesFullyInside(footprint, b) && FootprintDryness.isFullyDry(footprint, t)) {
+        Rect footprint = shrink(r, inset);
+        if (liesFullyInside(footprint, b) && FootprintDryness.isFullyDry(footprint, t)
+                && RoadClearance.clearsEveryRoad(g, footprint, -1, 0, p)) {
             out.add(r);
             return;
         }
@@ -164,8 +191,8 @@ public final class LotSubdivider {
             return;
         }
         Rect[] children = cut(r, seed);
-        refineToFit(children[0], targetSize, seed, b, t, out);
-        refineToFit(children[1], targetSize, seed, b, t, out);
+        refineToFit(children[0], targetSize, seed, b, g, t, inset, p, out);
+        refineToFit(children[1], targetSize, seed, b, g, t, inset, p, out);
     }
 
     /**
@@ -196,8 +223,8 @@ public final class LotSubdivider {
         }
     }
 
-    private static Rect shrink(Rect r) {
-        return new Rect(r.minX() + 1, r.minZ() + 1, r.maxX() - 1, r.maxZ() - 1);
+    private static Rect shrink(Rect r, int inset) {
+        return new Rect(r.minX() + inset, r.minZ() + inset, r.maxX() - inset, r.maxZ() - inset);
     }
 
     private static int clamp(int v, int lo, int hi) {

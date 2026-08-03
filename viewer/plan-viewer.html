@@ -83,7 +83,7 @@
     </select>
   </label>
   <button id="regenBtn" class="primary">Regenerate</button>
-  <button id="loadFileBtn" title="Pick a single JSON file instead of using a granted folder">Load fileâ€¦</button>
+  <button id="loadFileBtn" title="Pick a single JSON file instead of using a granted folder">Load file…</button>
   <input type="file" id="fileInput" accept="application/json,.json" hidden>
   <button id="fitBtn" title="Reset pan/zoom to fit the settlement">Fit view</button>
   <span id="status">no plan loaded</span>
@@ -206,13 +206,13 @@
     try {
       let text;
       if (dirHandle) {
-        setStatus('reading ' + name + 'â€¦');
+        setStatus('reading ' + name + '…');
         text = await loadFromDirHandle(name);
       } else if (supportsFsAccess) {
-        setStatus('no folder chosen yet - pick one, or use "Load fileâ€¦"');
+        setStatus('no folder chosen yet - pick one, or use "Load file…"');
         return;
       } else {
-        setStatus('choose ' + name + ' in the file pickerâ€¦');
+        setStatus('choose ' + name + ' in the file picker…');
         text = await loadViaFilePicker();
       }
       applyPlan(JSON.parse(text));

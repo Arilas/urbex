@@ -5,6 +5,7 @@ import dev.krona.urbex.plan.Settlement;
 import dev.krona.urbex.plan.SettlementClass;
 import dev.krona.urbex.plan.geom.Rect;
 import dev.krona.urbex.plan.geom.Vec2;
+import dev.krona.urbex.plan.road.RoadEdge;
 import dev.krona.urbex.plan.road.RoadGraph;
 import dev.krona.urbex.plan.road.SpineGrowth;
 import dev.krona.urbex.plan.terrain.FlatTerrain;
@@ -59,24 +60,40 @@ class RoadsideLotsTest {
         }
     }
 
+    /**
+     * The setback plus the road's own half-width is what stops a building being placed in - or too
+     * close to - the carriageway, for every road in the settlement, not just the one a lot fronts.
+     * <p>
+     * Whole-branch review (C1) found this test's original form only ever checked the fronting edge,
+     * which was exactly what production did too and so could never have caught it doing so: measured
+     * over 100 flat-terrain seeds, 63.2% of hamlet lots and 64.3% of village lots sat closer than the
+     * setback to some <em>other</em> road, 20.8%/29.3% with a road actually running through the
+     * footprint (concretely, HAMLET seed 1 lot 0 was crossed by an edge it didn't front at all). This
+     * checks every edge in the graph, each against its own required clearance -
+     * {@link PlanParams#roadHalfWidthBlocks} for every edge, plus {@link PlanParams#roadsideSetbackBlocks()}
+     * for the one this lot fronts - matching {@code RoadClearance.clearsEveryRoad}'s own rule exactly,
+     * but re-derived here rather than calling it, so a bug in that method's math could not hide from
+     * its own test.
+     */
     @Test
-    void noLotSitsOnTheRoadItFronts() {
-        // The setback is what stops a building being placed in the carriageway. This measures the
-        // distance from the road segment to the NEAREST POINT of the lot's footprint - not its
-        // centre, which a bounding-box footprint preserves by central symmetry regardless of how far
-        // the box's actual edges have crept toward (or past) the road. A test that only checks the
-        // centre cannot fail no matter how badly a lot overhangs into the carriageway; this one can.
+    void noLotSitsOnAnyRoad() {
         for (long seed = 0; seed < 50; seed++) {
             RoadGraph g = SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P);
+            List<RoadEdge> edges = g.edges();
             for (Lot lot : RoadsideLots.place(seed, g, VILLAGE, new FlatTerrain(64), P)) {
-                var e = g.edges().get(lot.frontingEdgeIndex());
-                Vec2 a = g.nodeAt(e.fromId()).pos();
-                Vec2 b = g.nodeAt(e.toId()).pos();
-                double distance = distanceToFootprint(a, b, lot.footprint());
-                assertTrue(distance >= P.roadsideSetbackBlocks(),
-                        "seed " + seed + ": lot " + lot.id() + " footprint " + lot.footprint()
-                                + " is only " + distance + " blocks from its own road (needs >= "
-                                + P.roadsideSetbackBlocks() + ")");
+                for (int i = 0; i < edges.size(); i++) {
+                    RoadEdge e = edges.get(i);
+                    Vec2 a = g.nodeAt(e.fromId()).pos();
+                    Vec2 b = g.nodeAt(e.toId()).pos();
+                    double required = P.roadHalfWidthBlocks(e.cls())
+                            + (i == lot.frontingEdgeIndex() ? P.roadsideSetbackBlocks() : 0);
+                    double distance = distanceToFootprint(a, b, lot.footprint());
+                    assertTrue(distance >= required,
+                            "seed " + seed + ": lot " + lot.id() + " footprint " + lot.footprint()
+                                    + " is only " + distance + " blocks from road " + i + " (" + e.cls()
+                                    + (i == lot.frontingEdgeIndex() ? ", fronted" : "") + "), needs >= "
+                                    + required);
+                }
             }
         }
     }

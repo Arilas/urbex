@@ -132,8 +132,8 @@ public final class Planner {
         List<Lot> result = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             Lot l = interim.get(i);
-            result.add(new Lot(i, l.footprint(), l.district(), sizeClassOf[i],
-                    l.frontingEdgeIndex(), l.groundHeight(), l.waterSides()));
+            result.add(new Lot(i, l.footprint(), l.district(), sizeClassOf[i], l.frontingEdgeIndex(),
+                    l.minGroundHeight(), l.maxGroundHeight(), l.waterSides()));
         }
         return result;
     }

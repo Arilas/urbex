@@ -7,6 +7,7 @@ import dev.krona.urbex.plan.district.District;
 import dev.krona.urbex.plan.district.DistrictMap;
 import dev.krona.urbex.plan.geom.Rect;
 import dev.krona.urbex.plan.geom.Vec2;
+import dev.krona.urbex.plan.road.RoadClass;
 import dev.krona.urbex.plan.road.RoadEdge;
 import dev.krona.urbex.plan.road.RoadGraph;
 
@@ -20,11 +21,11 @@ import java.util.List;
  * <p>
  * For each edge, this walks its length in strides of the lot width and offers a candidate lot on each
  * side. A candidate is dropped outright - never shrunk - if it leaves the settlement bounds, is not
- * fully dry, overlaps a lot already kept, or (see {@link #placeAlongEdge}) does not actually clear the
- * road it fronts once measured for real. Because a lot is placed directly against the edge it was
- * offered on, {@code frontingEdgeIndex} is known by construction - the one thing this path doesn't
- * have to search for, unlike {@link LotSubdivider}, which has to find the nearest edge to every leaf
- * after the fact.
+ * fully dry, overlaps a lot already kept, or (see {@link #placeAlongEdge}) does not actually clear
+ * every road in the settlement - not just the one it fronts, see {@link RoadClearance} - once measured
+ * for real. Because a lot is placed directly against the edge it was offered on, {@code
+ * frontingEdgeIndex} is known by construction - the one thing this path doesn't have to search for,
+ * unlike {@link LotSubdivider}, which has to find the nearest edge to every leaf after the fact.
  * <p>
  * <b>On the footprint's shape.</b> {@link dev.krona.urbex.plan.geom.Rect} is axis-aligned, and stays
  * that way here: Minecraft buildings are axis-aligned too, so a rotated footprint could never have
@@ -71,7 +72,7 @@ public final class RoadsideLots {
             RoadEdge edge = edges.get(i);
             Vec2 a = g.nodeAt(edge.fromId()).pos();
             Vec2 b = g.nodeAt(edge.toId()).pos();
-            placeAlongEdge(i, a, b, lotWidth, centre, radius, t, p, lots);
+            placeAlongEdge(i, edge.cls(), a, b, lotWidth, centre, radius, t, p, g, lots);
         }
         return assignIds(lots);
     }
@@ -102,7 +103,8 @@ public final class RoadsideLots {
      * review caught - see the class doc), each candidate is axis-aligned from the start: whichever of
      * X or Z the edge's own displacement is larger along becomes the lot's "along-road" axis (its
      * width, {@code lotWidth}), and the other becomes its "away-from-road" axis (its depth, from
-     * {@code roadsideSetbackBlocks} to {@code roadsideSetbackBlocks + roadsideLotDepthBlocks}).
+     * {@code requiredClearance} - this edge's own {@link PlanParams#roadHalfWidthBlocks} plus
+     * {@code roadsideSetbackBlocks} - to that plus {@code roadsideLotDepthBlocks}).
      * <p>
      * The away-from-road offset has to account for two things, not just the edge's steepness: a
      * purely axis-aligned offset from a single reference point only gives the right perpendicular
@@ -112,13 +114,19 @@ public final class RoadsideLots {
      * further away - and with {@code lotWidth} close to a whole segment's length, that drift is not a
      * rounding-scale correction, it is comparable to the offset itself. {@code perpOffset}/
      * {@code perpFar} below add {@code halfWidth} scaled by the edge's non-dominant-axis ratio to
-     * cover the worst case across the lot's whole width, not just its centre. {@link
-     * #realSetbackClears} still re-measures the real, final distance and rejects outright if this
-     * construction falls short anyway (integer rounding, mostly) - the guarantee comes from that
-     * check, this is what keeps it from firing on nearly everything.
+     * cover the worst case across the lot's whole width, not just its centre.
+     * <p>
+     * Neither that correction nor the offset itself is trusted alone: {@link RoadClearance
+     * #clearsEveryRoad} re-measures the real, final distance from the finished rectangle to
+     * <em>every</em> edge in the graph - not just this one - and rejects outright if any of them falls
+     * short. Checking only the fronting edge was review's C1 finding: 63.2%/64.3% of hamlet/village
+     * lots sat closer than the setback to some other road, 20.8%/29.3% with a road actually crossing
+     * the footprint (100-seed flat-terrain sweep) - a branch or a neighbouring segment can pass close
+     * enough to a lot that only ever checked its own fronting edge to still run through it.
      */
-    private static void placeAlongEdge(int edgeIndex, Vec2 a, Vec2 b, double lotWidth, Vec2 centre, int radius,
-                                        TerrainSampler t, PlanParams p, List<Lot> lots) {
+    private static void placeAlongEdge(int edgeIndex, RoadClass edgeClass, Vec2 a, Vec2 b, double lotWidth,
+                                        Vec2 centre, int radius, TerrainSampler t, PlanParams p, RoadGraph g,
+                                        List<Lot> lots) {
         double dx = b.x() - a.x();
         double dz = b.z() - a.z();
         double len = Math.hypot(dx, dz);
@@ -132,13 +140,16 @@ public final class RoadsideLots {
         double dominantRatio = (dominantX ? Math.abs(dx) : Math.abs(dz)) / len;    // in [1/sqrt2, 1]
         double nonDominantRatio = (dominantX ? Math.abs(dz) : Math.abs(dx)) / len; // in [0, 1/sqrt2]
 
-        double setback = p.roadsideSetbackBlocks();
+        // The clearance this edge's own class requires, plus the additional building-to-kerb gap -
+        // see PlanParams.roadHalfWidthBlocks's doc for why this is per-edge rather than one shared
+        // number.
+        double requiredClearance = p.roadHalfWidthBlocks(edgeClass) + p.roadsideSetbackBlocks();
         double depth = p.roadsideLotDepthBlocks();
         double halfWidth = lotWidth / 2.0;
         // See the method doc: the halfWidth * nonDominantRatio term covers the road's drift across
         // the lot's whole along-edge extent, not just its centre reference point.
-        double perpOffset = (setback + halfWidth * nonDominantRatio) / dominantRatio;
-        double perpFar = (setback + depth + halfWidth * nonDominantRatio) / dominantRatio;
+        double perpOffset = (requiredClearance + halfWidth * nonDominantRatio) / dominantRatio;
+        double perpFar = (requiredClearance + depth + halfWidth * nonDominantRatio) / dominantRatio;
 
         for (double alongDist = lotWidth / 2.0; alongDist < len; alongDist += lotWidth) {
             double alongX = a.x() + (dx / len) * alongDist;
@@ -159,17 +170,17 @@ public final class RoadsideLots {
                 if (overlapsAny(footprint, lots)) {
                     continue;
                 }
-                // The authoritative check: the real distance from the road segment to the finished
-                // rectangle's nearest point, not the intermediate offset used to build it.
-                if (!realSetbackClears(a, b, footprint, setback)) {
+                // The authoritative check: the real distance from every road in the graph to the
+                // finished rectangle's nearest point, not the intermediate offset used to build it,
+                // and not just the edge this lot was offered on (see the method doc, C1).
+                if (!RoadClearance.clearsEveryRoad(g, footprint, edgeIndex, p.roadsideSetbackBlocks(), p)) {
                     continue;
                 }
 
                 // Step 5 of the brief: the exact water-side scan LotSubdivider uses, shared rather
                 // than copied - see WaterFrontage's doc for what the copy here used to get wrong.
                 int waterSides = WaterFrontage.sidesOf(footprint, t, p.probeDistanceBlocks());
-                Vec2 lotCentre = footprint.center();
-                int groundHeight = t.heightAt(lotCentre.x(), lotCentre.z());
+                GroundHeightRange.Range heights = GroundHeightRange.of(footprint, t);
                 // Step 1: OUTER unless the lot is actually near water, in which case WATERFRONT. Lot
                 // width no longer comes from District at all (see lotWidthFor), so this only ever sets
                 // the tag. "Near water" uses DistrictMap's own threshold and probe (any corner within
@@ -178,7 +189,8 @@ public final class RoadsideLots {
                 // see DistrictMap.WATERFRONT_RADIUS_BLOCKS's doc.
                 District district = isNearWater(footprint, t) ? District.WATERFRONT : District.OUTER;
 
-                lots.add(new Lot(0, footprint, district, SIZE_CLASS, edgeIndex, groundHeight, waterSides));
+                lots.add(new Lot(0, footprint, district, SIZE_CLASS, edgeIndex,
+                        heights.min(), heights.max(), waterSides));
             }
         }
     }
@@ -217,91 +229,6 @@ public final class RoadsideLots {
     }
 
     /**
-     * Whether {@code footprint}'s nearest point to segment {@code a-b} is at least {@code setback}
-     * away - the real check the brief's step 2 asks for, independent of whatever offset the
-     * construction above used to get there. False (rejected) if the segment touches or crosses the
-     * footprint at all. Otherwise, since both a segment and an axis-aligned rectangle are convex, the
-     * true minimum separation is always achieved at one of six candidates: each segment endpoint's
-     * distance to the rectangle, or each rectangle corner's distance to the segment.
-     */
-    private static boolean realSetbackClears(Vec2 a, Vec2 b, Rect footprint, double setback) {
-        if (segmentIntersectsRect(a, b, footprint)) {
-            return false;
-        }
-        double best = Math.min(distanceToRect(a, footprint), distanceToRect(b, footprint));
-        Vec2[] corners = {
-                new Vec2(footprint.minX(), footprint.minZ()), new Vec2(footprint.maxX(), footprint.minZ()),
-                new Vec2(footprint.maxX(), footprint.maxZ()), new Vec2(footprint.minX(), footprint.maxZ())
-        };
-        for (Vec2 c : corners) {
-            best = Math.min(best, distanceToSegment(c, a, b));
-        }
-        return best >= setback;
-    }
-
-    private static double distanceToRect(Vec2 p, Rect r) {
-        double dx = Math.max(Math.max(r.minX() - p.x(), 0), p.x() - r.maxX());
-        double dz = Math.max(Math.max(r.minZ() - p.z(), 0), p.z() - r.maxZ());
-        return Math.hypot(dx, dz);
-    }
-
-    private static double distanceToSegment(Vec2 p, Vec2 a, Vec2 b) {
-        double ax = a.x(), az = a.z();
-        double dx = b.x() - ax, dz = b.z() - az;
-        double lengthSq = dx * dx + dz * dz;
-        double t = lengthSq == 0
-                ? 0
-                : Math.max(0.0, Math.min(1.0, ((p.x() - ax) * dx + (p.z() - az) * dz) / lengthSq));
-        double cx = ax + t * dx, cz = az + t * dz;
-        double ddx = p.x() - cx, ddz = p.z() - cz;
-        return Math.sqrt(ddx * ddx + ddz * ddz);
-    }
-
-    private static boolean segmentIntersectsRect(Vec2 a, Vec2 b, Rect r) {
-        if (r.contains(a) || r.contains(b)) {
-            return true;
-        }
-        Vec2 topLeft = new Vec2(r.minX(), r.minZ());
-        Vec2 topRight = new Vec2(r.maxX(), r.minZ());
-        Vec2 bottomRight = new Vec2(r.maxX(), r.maxZ());
-        Vec2 bottomLeft = new Vec2(r.minX(), r.maxZ());
-        return segmentsIntersect(a, b, topLeft, topRight)
-                || segmentsIntersect(a, b, topRight, bottomRight)
-                || segmentsIntersect(a, b, bottomRight, bottomLeft)
-                || segmentsIntersect(a, b, bottomLeft, topLeft);
-    }
-
-    /** General-position segment intersection, exact in long arithmetic; touching counts as crossing. */
-    private static boolean segmentsIntersect(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4) {
-        long d1 = cross(p3, p4, p1);
-        long d2 = cross(p3, p4, p2);
-        long d3 = cross(p1, p2, p3);
-        long d4 = cross(p1, p2, p4);
-        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
-            return true;
-        }
-        if (d1 == 0 && onSegment(p3, p4, p1)) {
-            return true;
-        }
-        if (d2 == 0 && onSegment(p3, p4, p2)) {
-            return true;
-        }
-        if (d3 == 0 && onSegment(p1, p2, p3)) {
-            return true;
-        }
-        return d4 == 0 && onSegment(p1, p2, p4);
-    }
-
-    private static long cross(Vec2 a, Vec2 b, Vec2 c) {
-        return (long) (b.x() - a.x()) * (c.z() - a.z()) - (long) (b.z() - a.z()) * (c.x() - a.x());
-    }
-
-    private static boolean onSegment(Vec2 a, Vec2 b, Vec2 p) {
-        return Math.min(a.x(), b.x()) <= p.x() && p.x() <= Math.max(a.x(), b.x())
-                && Math.min(a.z(), b.z()) <= p.z() && p.z() <= Math.max(a.z(), b.z());
-    }
-
-    /**
      * Whether any corner of {@code footprint} has open water within
      * {@link DistrictMap#WATERFRONT_RADIUS_BLOCKS}, using {@link DistrictMap#waterWithin} directly
      * rather than a second copy of the same disc scan at a second magic-number radius - see the class
@@ -330,7 +257,7 @@ public final class RoadsideLots {
         for (int i = 0; i < interim.size(); i++) {
             Lot l = interim.get(i);
             result.add(new Lot(i, l.footprint(), l.district(), l.sizeClass(),
-                    l.frontingEdgeIndex(), l.groundHeight(), l.waterSides()));
+                    l.frontingEdgeIndex(), l.minGroundHeight(), l.maxGroundHeight(), l.waterSides()));
         }
         return result;
     }

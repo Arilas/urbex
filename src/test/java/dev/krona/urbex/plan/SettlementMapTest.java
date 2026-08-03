@@ -1,6 +1,7 @@
 package dev.krona.urbex.plan;
 
 import dev.krona.urbex.plan.geom.Rect;
+import dev.krona.urbex.plan.road.RoadClass;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -164,7 +165,9 @@ class SettlementMapTest {
                 base.maxLotDepthBlocks(), base.coreLotSizeBlocks(), base.fringeLotSizeBlocks(),
                 base.probeDistanceBlocks(), base.perimeterRingFraction(), false,
                 base.spineSegmentLengthBlocks(), base.branchChance(), base.branchLengthSegments(),
-                base.roadsideSetbackBlocks(), base.roadsideLotDepthBlocks());
+                base.roadsideSetbackBlocks(), base.roadsideLotDepthBlocks(),
+                base.roadHalfWidthBlocks(RoadClass.ARTERIAL), base.roadHalfWidthBlocks(RoadClass.COLLECTOR),
+                base.roadHalfWidthBlocks(RoadClass.LOCAL));
     }
 
     private static List<Settlement> scan(long seed, int span) {
