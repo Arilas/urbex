@@ -156,7 +156,7 @@ public final class RoadsideLots {
                 if (!liesWithinSettlement(footprint, centre, radius)) {
                     continue;
                 }
-                if (!isFullyDry(footprint, t)) {
+                if (!FootprintDryness.isFullyDry(footprint, t)) {
                     continue;
                 }
                 if (overlapsAny(footprint, lots)) {
@@ -300,34 +300,6 @@ public final class RoadsideLots {
     private static boolean onSegment(Vec2 a, Vec2 b, Vec2 p) {
         return Math.min(a.x(), b.x()) <= p.x() && p.x() <= Math.max(a.x(), b.x())
                 && Math.min(a.z(), b.z()) <= p.z() && p.z() <= Math.max(a.z(), b.z());
-    }
-
-    /**
-     * Whether every block of {@code r} is dry - an exhaustive scan, not a sparse probe.
-     * <p>
-     * This used to be the same 9-point (20/50/80% columns and rows) grid {@code LotSubdivider.
-     * isFullyDry} uses, on the reasoning that it was "the same test LotSubdivider uses." Review found
-     * that reasoning didn't transfer: {@code LotSubdivider}'s leaves can be block-scale (up to
-     * {@code maxLotDepthBlocks}-ish per side before refinement kicks in), where scanning every block
-     * of every candidate really would be expensive, and its 9 points are deliberately positioned to
-     * catch a leaf spanning a river with both banks dry (see its doc). A roadside lot is always small
-     * (~22x14 at most, {@link #lotWidthFor} makes it smaller still for short-segment classes) and,
-     * critically, its long edge usually runs close to parallel with a nearby riverbank - exactly the
-     * geometry where a thin wet strip can sit between two 20/50/80% sample columns and never be seen.
-     * Measured on 500 river-terrain seeds, that blind spot put water under 64.4% of HAMLET lots and
-     * 23.3% of VILLAGE lots despite every one of them passing the old probe. At this size, scanning
-     * every block is affordable (low hundreds of samples per candidate, and only for candidates that
-     * already passed the cheaper bounds/overlap checks), so there is no reason to keep sampling.
-     */
-    private static boolean isFullyDry(Rect r, TerrainSampler t) {
-        for (int x = r.minX(); x <= r.maxX(); x++) {
-            for (int z = r.minZ(); z <= r.maxZ(); z++) {
-                if (t.isWaterAt(x, z)) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 
     /**

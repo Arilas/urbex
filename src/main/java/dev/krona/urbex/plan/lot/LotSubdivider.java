@@ -28,7 +28,7 @@ import java.util.List;
  * neighbour means straying into the neighbour's territory. The same is true of water: a leaf wide
  * enough to span a river can have a dry centre and dry corners while its middle sits in the channel.
  * {@link #refineToFit} is what checks for both properly (every corner of the leaf's would-be
- * footprint plus an interior grid, against the outline and against {@link TerrainSampler#isWaterAt})
+ * footprint against the outline, and every block of it against {@link FootprintDryness#isFullyDry})
  * and, if a leaf fails either, keeps splitting it — past the district's normal target size if it has
  * to — rather than discarding it outright. That is what keeps a thin, wedge-shaped block, or a block
  * that only grazes a riverbank, from losing its lots wholesale: the boundary gets approximated by a
@@ -42,9 +42,6 @@ public final class LotSubdivider {
 
     /** Three points per side, offset in from the corners so no sample lands exactly on another side's probe. */
     private static final double[] SIDE_SAMPLE_FRACTIONS = {0.2, 0.5, 0.8};
-
-    /** Same fractions, used as a 3x3 interior grid so a leaf wide enough to span a river is caught too. */
-    private static final double[] INTERIOR_SAMPLE_FRACTIONS = SIDE_SAMPLE_FRACTIONS;
 
     /** A leaf narrower than this on either axis cannot survive the 1-block shrink on every side. */
     private static final int MIN_LEAF_SIDE_BLOCKS = 3;
@@ -146,12 +143,13 @@ public final class LotSubdivider {
     /**
      * {@code r} is already at or under the district's target lot scale. If the footprint it would
      * become (r shrunk by 1 block on every side) lies entirely inside {@code b}'s outline and is
-     * entirely dry, keep it. Otherwise either the block's boundary cuts through {@code r} or water
-     * does — cut {@code r} again with the same jittered rule and try each half independently. That
-     * continues only while {@code r}'s longer side is still above {@code targetSize *
-     * REFINEMENT_FLOOR_FRACTION}; once a branch reaches the floor and still does not fit, it is
-     * dropped rather than cut smaller still, so a diagonal boundary is approximated by a handful of
-     * smaller-than-usual lots, not a fine staircase of them.
+     * entirely dry ({@link FootprintDryness#isFullyDry}, shared with {@code RoadsideLots} - see its
+     * doc for why this used to be a sparse probe and no longer is), keep it. Otherwise either the
+     * block's boundary cuts through {@code r} or water does — cut {@code r} again with the same
+     * jittered rule and try each half independently. That continues only while {@code r}'s longer
+     * side is still above {@code targetSize * REFINEMENT_FLOOR_FRACTION}; once a branch reaches the
+     * floor and still does not fit, it is dropped rather than cut smaller still, so a diagonal
+     * boundary is approximated by a handful of smaller-than-usual lots, not a fine staircase of them.
      */
     private static void refineToFit(Rect r, double targetSize, long seed, CityBlock b, TerrainSampler t,
                                      List<Rect> out) {
@@ -159,7 +157,7 @@ public final class LotSubdivider {
             return;
         }
         Rect footprint = shrink(r);
-        if (liesFullyInside(footprint, b) && isFullyDry(footprint, t)) {
+        if (liesFullyInside(footprint, b) && FootprintDryness.isFullyDry(footprint, t)) {
             out.add(r);
             return;
         }
@@ -231,27 +229,6 @@ public final class LotSubdivider {
             Vec2 bPoint = ring.get((i + 1) % ring.size());
             if (segmentCrossesRectBoundary(a, bPoint, topLeft, topRight, bottomRight, bottomLeft)) {
                 return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * Whether every point of a 3x3 grid across {@code rect} — corners, edge midpoints and centre, at
-     * the same {@link #INTERIOR_SAMPLE_FRACTIONS} used elsewhere — is dry. A single centre sample
-     * (the brief's literal step 3) misses a rect wide enough to span a river with both banks dry: its
-     * corners can sit on dry land on either side while the whole middle of the rect is channel. The
-     * grid catches that the same way {@link #computeWaterSides} catches a river meeting a side at an
-     * angle — several samples instead of one.
-     */
-    private static boolean isFullyDry(Rect rect, TerrainSampler t) {
-        for (double fx : INTERIOR_SAMPLE_FRACTIONS) {
-            int x = (int) Math.round(rect.minX() + fx * (rect.maxX() - rect.minX()));
-            for (double fz : INTERIOR_SAMPLE_FRACTIONS) {
-                int z = (int) Math.round(rect.minZ() + fz * (rect.maxZ() - rect.minZ()));
-                if (t.isWaterAt(x, z)) {
-                    return false;
-                }
             }
         }
         return true;

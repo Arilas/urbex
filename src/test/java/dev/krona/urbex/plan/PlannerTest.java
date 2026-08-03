@@ -124,32 +124,28 @@ class PlannerTest {
     }
 
     /**
-     * VILLAGE gets the full-area check task 5b's second review round required: every block of the
-     * footprint, not just its centre, which is what caught {@code RoadsideLots}' sparse-probe bug in
-     * the first place (see {@code RoadsideLotsTest.noLotSitsUnderWater}'s doc). TOWN deliberately
-     * keeps the weaker centre-only check here: scanning its {@code LotSubdivider}-produced lots the
-     * same way surfaced a smaller but real gap of its own (3.56% of TOWN's river-terrain lots contain
-     * a wet block despite passing {@code LotSubdivider.isFullyDry}, measured over 100 seeds) - but
-     * {@code LotSubdivider} is protected from this task's changes, so that gets flagged as a separate,
-     * properly-scoped follow-up rather than silently patched here as a side effect of hardening a
-     * different pipeline's test.
+     * Every block of every lot's footprint, not just its centre, for every class this suite covers -
+     * TOWN and CITY (block-subdivision, via {@code LotSubdivider}) as well as VILLAGE (roadside, via
+     * {@code RoadsideLots}). Both pipelines' dryness checks now share one exhaustive scan
+     * ({@code FootprintDryness.isFullyDry}, in {@code dev.krona.urbex.plan.lot}) after review found
+     * TOWN's separate 9-point probe had the same class of gap {@code RoadsideLots}' did: 3.56% of
+     * TOWN's river-terrain lots contained a wet block despite passing it (100-seed sweep). This test
+     * used to give TOWN a weaker, centre-only pass while that was still true; see the task report for
+     * the sweep confirming this assertion failed against the unshared probe first.
      */
     @Test
     void noLotSitsUnderWater() {
         RiverTerrain river = new RiverTerrain(64, 0, 24);
         for (long seed = 0; seed < 20; seed++) {
-            for (Lot lot : Planner.plan(seed, TOWN, river, P).lots()) {
-                Vec2 c = lot.footprint().center();
-                assertTrue(!river.isWaterAt(c.x(), c.z()),
-                        "TOWN seed " + seed + ": lot " + lot.id() + " sits in the river");
-            }
-            for (Lot lot : Planner.plan(seed, VILLAGE, river, P).lots()) {
-                Rect fp = lot.footprint();
-                for (int x = fp.minX(); x <= fp.maxX(); x++) {
-                    for (int z = fp.minZ(); z <= fp.maxZ(); z++) {
-                        assertTrue(!river.isWaterAt(x, z),
-                                "VILLAGE seed " + seed + ": lot " + lot.id() + " footprint " + fp
-                                        + " contains a wet block at " + x + "," + z);
+            for (Settlement s : List.of(TOWN, CITY, VILLAGE)) {
+                for (Lot lot : Planner.plan(seed, s, river, P).lots()) {
+                    Rect fp = lot.footprint();
+                    for (int x = fp.minX(); x <= fp.maxX(); x++) {
+                        for (int z = fp.minZ(); z <= fp.maxZ(); z++) {
+                            assertTrue(!river.isWaterAt(x, z),
+                                    s.cls() + " seed " + seed + ": lot " + lot.id() + " footprint " + fp
+                                            + " contains a wet block at " + x + "," + z);
+                        }
                     }
                 }
             }
