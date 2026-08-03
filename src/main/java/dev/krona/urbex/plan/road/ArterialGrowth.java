@@ -8,7 +8,9 @@ import dev.krona.urbex.plan.TerrainSampler;
 import dev.krona.urbex.plan.geom.Vec2;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Grows a settlement's major road network outward from its centre: a set of spokes walking away
@@ -39,6 +41,9 @@ public final class ArterialGrowth {
         RoadGraph.Builder builder = RoadGraph.builder();
         List<RoadNode> allNodes = new ArrayList<>();
         List<RoadEdge> allEdges = new ArrayList<>();
+        // Membership only, never iterated to decide output order or content - safe under the
+        // determinism rule, which is about iteration order leaking into what gets produced.
+        Set<Long> edgeKeys = new HashSet<>();
 
         Vec2 centre = s.centerBlock();
         int cx = s.centerChunkX();
@@ -118,14 +123,14 @@ public final class ArterialGrowth {
                 // Step 5: snap to an existing node within range instead of adding a new one.
                 Integer snapTarget = findSnapTarget(allNodes, bestPos, currentId, p.snapRadiusBlocks());
                 if (snapTarget != null) {
-                    allEdges.add(new RoadEdge(currentId, snapTarget, RoadClass.ARTERIAL, false, 0));
+                    addEdge(allEdges, edgeKeys, currentId, snapTarget, RoadClass.ARTERIAL);
                     chain.add(snapTarget);
                     break;
                 }
 
                 int newId = allNodes.size();
                 allNodes.add(new RoadNode(newId, bestPos));
-                allEdges.add(new RoadEdge(currentId, newId, RoadClass.ARTERIAL, false, 0));
+                addEdge(allEdges, edgeKeys, currentId, newId, RoadClass.ARTERIAL);
                 chain.add(newId);
 
                 currentId = newId;
@@ -157,7 +162,11 @@ public final class ArterialGrowth {
                 if (from == to) {
                     continue;
                 }
-                allEdges.add(new RoadEdge(from, to, RoadClass.COLLECTOR, false, 0));
+                // Different rings can land on the same pair of spoke nodes (a tight ring spacing,
+                // or jitter, can make two rings pick identical "nearest" nodes). Two edges on the
+                // same pair make face rotation undefined downstream, so skip a pair already joined,
+                // by an earlier ring or by the spokes themselves, in either direction.
+                addEdge(allEdges, edgeKeys, from, to, RoadClass.COLLECTOR);
             }
         }
 
@@ -169,7 +178,23 @@ public final class ArterialGrowth {
         }
 
         RoadGraph grown = builder.build();
-        return BridgeDetector.mark(grown, terrain, p, centreId);
+        RoadGraph planar = Planarizer.planarize(grown);
+        return BridgeDetector.mark(planar, terrain, p, centreId);
+    }
+
+    /** Adds an edge only if that node pair (in either direction) isn't already connected. */
+    private static void addEdge(List<RoadEdge> edges, Set<Long> edgeKeys, int from, int to, RoadClass cls) {
+        long key = edgeKey(from, to);
+        if (!edgeKeys.add(key)) {
+            return;
+        }
+        edges.add(new RoadEdge(from, to, cls, false, 0));
+    }
+
+    private static long edgeKey(int a, int b) {
+        int lo = Math.min(a, b);
+        int hi = Math.max(a, b);
+        return ((long) lo << 32) | (hi & 0xFFFFFFFFL);
     }
 
     private static Vec2 step(Vec2 from, double bearing, int length) {
