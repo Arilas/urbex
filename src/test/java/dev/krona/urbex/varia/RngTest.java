@@ -3,6 +3,8 @@ package dev.krona.urbex.varia;
 import net.minecraft.util.RandomSource;
 import org.junit.jupiter.api.Test;
 
+import java.util.StringJoiner;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -69,10 +71,38 @@ class RngTest {
 
     @Test
     void streamIsStableAcrossRuns() {
-        // Golden vector. Generated once by GOLDEN_VECTOR_PRINTER below and pinned here so a
-        // change to the mixing function shows up as a test failure rather than a silently
-        // different world.
+        // Golden vector, pinned so a change to the mixing function shows up as a test failure
+        // rather than a silently different world. To regenerate after an intended change: print
+        // take(Rng.at(42L, 100, -100, Rng.Purpose.RUINS), 4) and paste the four values below.
         assertArrayEquals(GOLDEN, take(Rng.at(42L, 100, -100, Rng.Purpose.RUINS), 4));
+    }
+
+    @Test
+    void streamIsStableAcrossRunsForTheLastPurpose() {
+        // A second golden vector, over the tail of the enum. GOLDEN pins RUINS, ordinal 4, so it
+        // survives an insertion or reorder anywhere below it - which is all but the first five
+        // constants, including everything recent commits appended. This one moves whenever the
+        // tail moves. Regenerate the same way as GOLDEN, over LAST_PURPOSE.
+        assertArrayEquals(GOLDEN_LAST, take(Rng.at(42L, 100, -100, LAST_PURPOSE), 4));
+    }
+
+    @Test
+    void theEnumIsAppendOnly() {
+        // purpose.ordinal() feeds the hash, so inserting, removing or reordering a constant
+        // reseeds every consumer from that ordinal on, in every world that already exists.
+        // Appending is the only safe edit. A failure here is either a genuine append - update
+        // PURPOSE_COUNT, LAST_PURPOSE, GOLDEN_LAST and PURPOSE_ORDER, and say so in the commit -
+        // or a reorder that must be undone.
+        assertEquals(PURPOSE_COUNT, Rng.Purpose.values().length, "Purpose constant count changed");
+        assertEquals(PURPOSE_COUNT - 1, LAST_PURPOSE.ordinal(), LAST_PURPOSE + " is no longer last");
+
+        // The count and the last constant alone would still miss a swap in the middle, so pin the
+        // whole order. This is the only assertion that catches every reorder.
+        StringJoiner actual = new StringJoiner(",");
+        for (Rng.Purpose purpose : Rng.Purpose.values()) {
+            actual.add(purpose.name());
+        }
+        assertEquals(PURPOSE_ORDER, actual.toString(), "Purpose order changed");
     }
 
     @Test
@@ -134,4 +164,21 @@ class RngTest {
     private static final long[] GOLDEN = {
             -9164405306304841749L, 7151656282857621996L, -5080990405395573686L, 7700290050221519842L
     };
+
+    private static final Rng.Purpose LAST_PURPOSE = Rng.Purpose.VINES_SOUTH;
+
+    private static final long[] GOLDEN_LAST = {
+            8746288884060633781L, 6127573032896386187L, -152608793693685502L, 2958957741384179174L
+    };
+
+    private static final int PURPOSE_COUNT = 47;
+
+    private static final String PURPOSE_ORDER =
+            "BUILDING,STREET,MULTI,PARTS,RUINS,RUBBLE,LEAVES,DEBRIS,STUFF,SPAWNERS,LOOT,VEGETATION,"
+                    + "DAMAGE,VINES,CITY_CENTER,CITY_RADIUS,CITY_STYLE,HIGHWAY,RAILWAY,SPHERE,SCATTERED,"
+                    + "PALETTE,NOISE,SHAPE,TERRAIN_L1,TERRAIN_L2,EXPLOSION,EXPLOSION_MINI,RUINS_BARS,"
+                    + "DAMAGE_VARIANT,SPHERE_BLOCKS,SPHERE_CITY_LEVEL,VINES_CONTINUE,TERRAIN_FIX_LOWER,"
+                    + "TERRAIN_FIX_UPPER,CITY_STYLE_LOCAL,VEGETATION_GROWTH,BUILDING_FLOORS,BUILDING_LAYOUT,"
+                    + "VEGETATION_XMAX,VEGETATION_ZMIN,VEGETATION_ZMAX,EXPLOSION_ACCEPT,EXPLOSION_MINI_ACCEPT,"
+                    + "VINES_EAST,VINES_NORTH,VINES_SOUTH";
 }
