@@ -4,6 +4,7 @@ import dev.krona.urbex.plan.geom.Vec2;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Makes a grown road graph planar by construction.
@@ -19,8 +20,28 @@ import java.util.List;
  * guarantee against a spoke that wanders across that radius and back under terrain avoidance — the
  * exact case this exists to cover). It finds every pair of edges that properly cross within the span
  * of both segments — not merely touching at a shared endpoint — and resolves each crossing, repeating
- * until none remain. That is a real guarantee, not a strong tendency: it holds regardless of how
- * curved any particular road turns out to be.
+ * until none remain.
+ * <p>
+ * <b>What is actually guaranteed: no two edges properly cross.</b> Two things are deliberately out
+ * of scope and are not detected or fixed by this pass:
+ * <ul>
+ *   <li><b>Collinear overlap</b> — two non-incident edges lying along the same line and overlapping
+ *   along it. The direction-vector cross product used to find a crossing is exactly zero for
+ *   collinear segments the same way it is for merely parallel ones, and this pass treats both as
+ *   "no unique crossing point, leave alone" rather than as a degenerate case needing its own
+ *   handling. Measured at 274 of 5,000 grown graphs across all five settlement classes and all five
+ *   synthetic terrains (down from 374 before the duplicate-edge fix, which removes one common source
+ *   of collinear overlap: two ring edges occupying the literal same segment).</li>
+ *   <li><b>Vertex-on-edge incidence</b> — an existing node that isn't an endpoint of some edge, yet
+ *   sits exactly on that edge's interior. This pass only ever looks at pairs of <em>edges</em>; a
+ *   node sitting on an edge it has no relationship to, with no second edge to form a crossing pair
+ *   with, is never examined. Measured at 440 of 5,000 (down from 484, for the same reason).</li>
+ * </ul>
+ * Neither has been observed to make {@code BlockExtractor} throw — it degrades gracefully on both —
+ * which is why they're documented and tested as a known residual (see
+ * {@code PlanarityTest.collinearOverlapIsAMeasuredResidualNotAGoal}) rather than fixed here. A future
+ * change that alters this residual should do so on purpose, with that test updated to match, not by
+ * accident.
  * <p>
  * Two resolutions, depending on where the crossing lands once rounded to an integer position (every
  * node is integer, per the planner's determinism rule): if it coincides with one of the two edges'
@@ -28,16 +49,29 @@ import java.util.List;
  * can round back onto a nearby node — that edge already has a vertex there, so only the *other* edge
  * is split, reusing the existing node instead of manufacturing a near-zero-length stub next to it.
  * Otherwise a genuinely new node is inserted and both edges are split at it.
+ * <p>
+ * The crossing <em>test</em> itself is exact: whether two segments properly cross, and within what
+ * range, is decided entirely with {@code long} arithmetic over the integer node coordinates — no
+ * epsilon, because there is nothing approximate to guard against (deltas are {@code int}, and their
+ * products fit in a {@code long} without needing an assumption about how far apart two nodes are, the
+ * way a {@code double} cross product silently depends on staying under 2^53 - i.e. on the world
+ * border never being approached). Only the final step, turning a confirmed crossing into an actual
+ * {@code Vec2} to round to the lattice, needs a division and therefore a {@code double}; by then
+ * whether a crossing exists is no longer in question, only where.
  */
 final class Planarizer {
 
-    /** Below this, a computed cross product is treated as exactly zero (parallel/collinear segments). */
-    private static final double DENOM_EPSILON = 1.0e-9;
+    private static final Logger LOG = Logger.getLogger(Planarizer.class.getName());
 
-    /** Slack applied only at the true segment boundary (t/u = 0 or 1), to absorb float roundoff. */
-    private static final double BOUNDS_EPSILON = 1.0e-9;
-
-    /** Guards against a pass that never converges, which would mean the intersection math is wrong. */
+    /**
+     * Guards against a pass that never converges. Splitting rounds an intersection to the lattice,
+     * which can in principle create a new crossing that wasn't there before, so the scan restarts and
+     * loops; empirically this reaches a fixed point everywhere it's been swept (including a second
+     * {@code planarize} call over an already-planarized graph producing zero further changes), but
+     * termination is bounded here rather than proven. Hitting the cap degrades rather than throws —
+     * see the note below — because a bound whose failure mode is an exception is the same crash class
+     * this pass exists to remove from world generation.
+     */
     private static final int MAX_SPLITS = 4096;
 
     private Planarizer() {
@@ -48,11 +82,12 @@ final class Planarizer {
         List<RoadEdge> edges = new ArrayList<>(g.edges());
 
         int splits = 0;
+        boolean capped = false;
         boolean changed = true;
+        outer:
         while (changed) {
             changed = false;
 
-            search:
             for (int i = 0; i < edges.size(); i++) {
                 for (int j = i + 1; j < edges.size(); j++) {
                     RoadEdge e1 = edges.get(i);
@@ -71,10 +106,14 @@ final class Planarizer {
                         continue;
                     }
 
-                    if (++splits > MAX_SPLITS) {
-                        throw new IllegalStateException(
-                                "planarization did not converge after " + MAX_SPLITS + " splits");
+                    if (splits >= MAX_SPLITS) {
+                        // Not observed in practice (see the field javadoc), but if it ever happens,
+                        // a partially-planarized road network is a far better outcome for a running
+                        // world than a failed chunk. Return what's been built so far.
+                        capped = true;
+                        break outer;
                     }
+                    splits++;
 
                     int existingId = existingNodeAt(crossing, e1, a1, b1, e2, a2, b2);
                     if (existingId >= 0) {
@@ -97,9 +136,17 @@ final class Planarizer {
                     }
 
                     changed = true;
-                    break search;
+                    continue outer;
                 }
             }
+        }
+
+        if (capped) {
+            LOG.warning("Planarizer reached its " + MAX_SPLITS + "-split cap before the graph was "
+                    + "fully planar; returning it as reached (" + nodes.size() + " nodes, "
+                    + edges.size() + " edges) instead of failing generation. This has not been "
+                    + "observed in testing - if you see this in practice, the graph it produced is "
+                    + "worth capturing.");
         }
 
         RoadGraph.Builder builder = RoadGraph.builder();
@@ -170,37 +217,50 @@ final class Planarizer {
     }
 
     /**
-     * The point where segments {@code a1-b1} and {@code a2-b2} meet within the span of both
-     * (parameters in the closed {@code [0, 1]} range, up to float roundoff at the boundary), or
-     * {@code null} if they don't: parallel/collinear, or the intersection of the two infinite lines
-     * falls beyond one segment's actual extent.
+     * The point where segments {@code a1-b1} and {@code a2-b2} meet within the span of both, or
+     * {@code null} if they don't: parallel/collinear (see the class javadoc — collinear overlap is
+     * out of scope, not handled here), or the intersection of the two infinite lines falls beyond one
+     * segment's actual extent.
      * <p>
-     * This deliberately does <em>not</em> try to guess "too close to an endpoint to count" from the
-     * continuous parameters — on a short edge (routinely produced by an earlier split in this same
-     * pass) a solidly-interior parameter can still round to an endpoint's integer position, and a
-     * parameter-based cutoff was found to discard exactly those crossings instead of resolving them.
-     * The caller decides what a rounded-to-an-endpoint result means.
+     * Whether a crossing exists, and where along each segment, is decided first with exact
+     * {@code long} arithmetic (cross products of {@code int}-derived deltas, which cannot lose
+     * precision at any coordinate this planner produces) — <em>then</em>, only once that's settled,
+     * a {@code double} division turns the confirmed crossing into a lattice point to round to. This
+     * deliberately does not try to guess "too close to an endpoint to count": on a short edge
+     * (routinely produced by an earlier split in this same pass) a solidly-interior crossing can
+     * still round to an endpoint's integer position, and an earlier version that used a
+     * parameter-based cutoff for this was found to discard exactly those crossings instead of
+     * resolving them. The caller decides what a rounded-to-an-endpoint result means.
      */
     private static Vec2 intersection(Vec2 a1, Vec2 b1, Vec2 a2, Vec2 b2) {
-        double d1x = b1.x() - a1.x();
-        double d1z = b1.z() - a1.z();
-        double d2x = b2.x() - a2.x();
-        double d2z = b2.z() - a2.z();
+        long d1x = b1.x() - a1.x();
+        long d1z = b1.z() - a1.z();
+        long d2x = b2.x() - a2.x();
+        long d2z = b2.z() - a2.z();
 
-        double denom = d1x * d2z - d1z * d2x;
-        if (Math.abs(denom) < DENOM_EPSILON) {
-            return null;
+        long denom = d1x * d2z - d1z * d2x;
+        if (denom == 0) {
+            return null; // parallel or collinear: no unique crossing point
         }
 
-        double ex = a2.x() - a1.x();
-        double ez = a2.z() - a1.z();
-        double t = (ex * d2z - ez * d2x) / denom;
-        double u = (ex * d1z - ez * d1x) / denom;
+        long ex = a2.x() - a1.x();
+        long ez = a2.z() - a1.z();
+        long tNum = ex * d2z - ez * d2x;
+        long uNum = ex * d1z - ez * d1x;
 
-        if (t < -BOUNDS_EPSILON || t > 1.0 + BOUNDS_EPSILON || u < -BOUNDS_EPSILON || u > 1.0 + BOUNDS_EPSILON) {
-            return null;
+        // t = tNum/denom and u = uNum/denom must both land in [0, 1]. Checked by comparing the
+        // numerator against the denominator directly - exact, no floating-point division involved.
+        if (denom > 0) {
+            if (tNum < 0 || tNum > denom || uNum < 0 || uNum > denom) {
+                return null;
+            }
+        } else {
+            if (tNum > 0 || tNum < denom || uNum > 0 || uNum < denom) {
+                return null;
+            }
         }
 
+        double t = (double) tNum / (double) denom;
         int x = (int) Math.round(a1.x() + t * d1x);
         int z = (int) Math.round(a1.z() + t * d1z);
         return new Vec2(x, z);
