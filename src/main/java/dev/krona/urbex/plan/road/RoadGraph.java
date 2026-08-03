@@ -6,6 +6,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * An immutable road network. Node ids are stable, dense array indices assigned in insertion order,
@@ -13,6 +14,11 @@ import java.util.List;
  * <p>
  * Build one through {@link #builder()}; there is no public constructor and no mutator, so a
  * {@code RoadGraph} handed to a caller can never change under it.
+ * <p>
+ * {@code equals}/{@code hashCode} compare {@link #nodes} and {@link #edges} — both lists of records,
+ * so this gives real value equality rather than the identity equality a plain class gets by default.
+ * {@link #adjacency} is excluded because it is entirely derived from the other two: two graphs with
+ * equal nodes and edges always build equal adjacency, so comparing it too would only cost time.
  */
 public final class RoadGraph {
 
@@ -82,6 +88,22 @@ public final class RoadGraph {
             }
         }
         return reached == nodes.size();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof RoadGraph other)) {
+            return false;
+        }
+        return nodes.equals(other.nodes) && edges.equals(other.edges);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(nodes, edges);
     }
 
     public static final class Builder {

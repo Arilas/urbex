@@ -22,8 +22,9 @@ class ArterialGrowthTest {
     void growthIsDeterministic() {
         RoadGraph a = ArterialGrowth.grow(1L, TOWN, new FlatTerrain(64), P);
         RoadGraph b = ArterialGrowth.grow(1L, TOWN, new FlatTerrain(64), P);
-        assertEquals(a.edges(), b.edges());
-        assertEquals(a.nodes(), b.nodes());
+        // RoadGraph now has real value equality (nodes and edges), so this compares the graphs
+        // directly rather than their nodes() and edges() lists separately.
+        assertEquals(a, b);
     }
 
     @Test
