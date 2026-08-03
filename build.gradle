@@ -73,6 +73,13 @@ test {
     }
 }
 
+jar {
+    // MIT requires the notice in "all copies", and for a mod the distributed copy is the jar,
+    // not this repository. Loom's remapJar takes this jar as its input, so the file carries
+    // through to the artifact that actually ships.
+    from(rootProject.file('LICENSE'))
+}
+
 processResources {
     def expandProps = [
             'version'              : version,
