@@ -17,6 +17,7 @@ class PlannerTest {
 
     private static final PlanParams P = PlanParams.defaults();
     private static final Settlement TOWN = new Settlement(SettlementClass.TOWN, 0, 0);
+    private static final Settlement CITY = new Settlement(SettlementClass.CITY, 0, 0);
 
     /**
      * A spine class (see task 5b), exercised alongside {@link #TOWN} in every invariant below that
@@ -136,11 +137,19 @@ class PlannerTest {
      * FRINGE needs a block whose bounding-box centre sits past 0.75 of the settlement radius, and
      * the ring-growth geometry rarely puts one there: the outermost annulus beyond the last ring is
      * never closed into a block, so a block's centre generally falls well short of the settlement's
-     * nominal edge. Sweeping seeds 0-199, CITY never produced a FRINGE lot at all (max observed
-     * block-centre fraction 0.655) — TOWN did, in 16 of 200. Seed 67 is the lowest TOWN seed with
-     * lots in both CORE and FRINGE, so that is what this test uses; CITY as the brief originally
-     * specified was empty in CORE for its own seed 7 for an unrelated reason (that combination
-     * happened to land no block within the CORE radius) and would have been just as empty in FRINGE.
+     * nominal edge. That used to mean CITY never produced a FRINGE lot at all (sweeping seeds 0-199
+     * pre-perimeter-ring, max observed block-centre fraction 0.655) while TOWN did, in 16 of 200 -
+     * which is why this test uses TOWN and, of TOWN's seeds, specifically seed 67, the lowest with
+     * lots in both CORE and FRINGE.
+     * <p>
+     * The perimeter ring added since (a ring close to the settlement's true edge, closing that outer
+     * band the same way every other ring closes the one inside it - see {@code ArterialGrowth}'s own
+     * doc) fixed CITY's reachability too: sweeping seeds 0-299 today, CITY produces a FRINGE lot in
+     * 165 of 300 seeds. {@link #fringeIsReachableForACityAcrossManySeeds} is the regression guard for
+     * that fix specifically; this test's job is narrower and unrelated to which class can reach
+     * FRINGE at all - it only checks that, once a settlement (any settlement) has lots in both bands,
+     * CORE's really are smaller - so it stays on TOWN/seed 67 rather than switching to CITY now that
+     * CITY could serve too.
      */
     @Test
     void coreLotsAreSmallerThanFringeLots() {
@@ -149,6 +158,30 @@ class PlannerTest {
         double fringe = averageArea(plan, District.FRINGE);
         assertTrue(core < fringe,
                 "core lots (" + core + ") should be smaller than fringe lots (" + fringe + ")");
+    }
+
+    /**
+     * The perimeter ring (see {@code ArterialGrowth}) is what makes the settlement's outermost band
+     * enclose any blocks at all, and CITY specifically used to reach none of them (see
+     * {@link #coreLotsAreSmallerThanFringeLots}'s doc for the history). That fix has its own review
+     * evidence (zero FRINGE blocks before, 526 total across a 300-seed sweep after) but nothing in
+     * the suite pinned the reachability itself, so a future change to the ring could silently regress
+     * CITY back to zero FRINGE blocks without failing anything. This is that guard: sweep seeds 0-299
+     * and require a healthy, not just nonzero, total - nonzero alone would still pass if the ring
+     * regressed to reaching FRINGE on a single lucky seed in 300.
+     */
+    @Test
+    void fringeIsReachableForACityAcrossManySeeds() {
+        long totalFringeBlocks = 0;
+        for (long seed = 0; seed < 300; seed++) {
+            CityPlan plan = Planner.plan(seed, CITY, new FlatTerrain(64), P);
+            totalFringeBlocks += plan.districts().values().stream()
+                    .filter(d -> d == District.FRINGE)
+                    .count();
+        }
+        assertTrue(totalFringeBlocks > 100,
+                "expected CITY to reach FRINGE comfortably across 300 seeds, got only "
+                        + totalFringeBlocks + " total FRINGE blocks");
     }
 
     @Test

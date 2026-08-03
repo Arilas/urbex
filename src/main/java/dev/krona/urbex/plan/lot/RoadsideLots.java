@@ -4,13 +4,13 @@ import dev.krona.urbex.plan.PlanParams;
 import dev.krona.urbex.plan.Settlement;
 import dev.krona.urbex.plan.TerrainSampler;
 import dev.krona.urbex.plan.district.District;
+import dev.krona.urbex.plan.district.DistrictMap;
 import dev.krona.urbex.plan.geom.Rect;
 import dev.krona.urbex.plan.geom.Vec2;
 import dev.krona.urbex.plan.road.RoadEdge;
 import dev.krona.urbex.plan.road.RoadGraph;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -18,18 +18,42 @@ import java.util.List;
  * block: {@link dev.krona.urbex.plan.road.SpineGrowth} grows a tree, which encloses no faces, so
  * {@code BlockExtractor}/{@code LotSubdivider} have nothing to work with.
  * <p>
- * For each edge, this walks its length in steps of the lot width and offers a candidate lot on each
+ * For each edge, this walks its length in strides of the lot width and offers a candidate lot on each
  * side. A candidate is dropped outright - never shrunk - if it leaves the settlement bounds, is not
- * fully dry, or overlaps a lot already kept; see the brief's rationale for why rejecting keeps the
- * "lots never overlap" invariant structural rather than something to patch up afterwards. Because a
- * lot is placed directly against the edge it was offered on, {@code frontingEdgeIndex} is known by
- * construction - the one thing this path doesn't have to search for, unlike
- * {@link LotSubdivider}, which has to find the nearest edge to every leaf after the fact.
+ * fully dry, overlaps a lot already kept, or (see {@link #placeAlongEdge}) does not actually clear the
+ * road it fronts once measured for real. Because a lot is placed directly against the edge it was
+ * offered on, {@code frontingEdgeIndex} is known by construction - the one thing this path doesn't
+ * have to search for, unlike {@link LotSubdivider}, which has to find the nearest edge to every leaf
+ * after the fact.
+ * <p>
+ * <b>On the footprint's shape.</b> {@link dev.krona.urbex.plan.geom.Rect} is axis-aligned, and stays
+ * that way here: Minecraft buildings are axis-aligned too, so a rotated footprint could never have
+ * held one anyway. An earlier version of this class built a true rectangle rotated to match the
+ * road, then took its bounding box - which inflated every lot's real area well past its nominal size
+ * (up to +227% at 45 degrees) and, worse, let the setback the rotated rectangle respected evaporate
+ * in the conversion, since a bounding box's corners can reach back past the rotated rectangle's own
+ * near edge and into the carriageway. This version never builds a rotated rectangle in the first
+ * place: it chooses the lot's width and depth along whichever of X or Z the road segment runs closer
+ * to (see {@link #placeAlongEdge}), so the shape offered is the shape kept.
  */
 public final class RoadsideLots {
 
     /** Same three offsets {@link LotSubdivider} uses for both its dryness and water-side probes. */
     private static final double[] SAMPLE_FRACTIONS = {0.2, 0.5, 0.8};
+
+    /**
+     * {@code sizeClass} for every roadside lot. {@code Planner.finalizeLots} ranks block-subdivision
+     * lots into tertiles because that pipeline actually produces a range of areas (a block's
+     * recursive split yields leaves of genuinely different sizes). Every roadside lot, by contrast,
+     * is cut from the same {@code lotWidth} x {@code roadsideLotDepthBlocks} target - review found
+     * that ranking these by area was ranking bounding-box inflation (which varies with a lot's road's
+     * bearing) rather than plot size, since the old rotated-then-bbox construction was the only source
+     * of area variance at all. Axis-aligned construction removes even that: real footprint area now
+     * only ever differs between lots by a block or so of rounding. Encoding rounding noise as a
+     * meaningful size tier would be worse than not encoding a tier at all, so every roadside lot gets
+     * the same, middle {@code sizeClass} instead of a fabricated ranking.
+     */
+    private static final int SIZE_CLASS = 1;
 
     private RoadsideLots() {
     }
@@ -44,15 +68,15 @@ public final class RoadsideLots {
         int radius = s.radiusBlocks();
         double lotWidth = outerLotSize(p);
 
-        List<Lot> interim = new ArrayList<>();
+        List<Lot> lots = new ArrayList<>();
         List<RoadEdge> edges = g.edges();
         for (int i = 0; i < edges.size(); i++) {
             RoadEdge edge = edges.get(i);
             Vec2 a = g.nodeAt(edge.fromId()).pos();
             Vec2 b = g.nodeAt(edge.toId()).pos();
-            placeAlongEdge(i, a, b, lotWidth, centre, radius, t, p, interim);
+            placeAlongEdge(i, a, b, lotWidth, centre, radius, t, p, lots);
         }
-        return finalizeLots(interim);
+        return assignIds(lots);
     }
 
     /**
@@ -60,6 +84,10 @@ public final class RoadsideLots {
      * front water, so every lot uses {@code OUTER}'s target size regardless of which district it
      * ends up tagged with - {@code LotSubdivider.targetLotSize} maps {@code WATERFRONT} to the same
      * rank as {@code OUTER} for exactly this reason.
+     * <p>
+     * {@link PlanParams#spineSegmentLengthBlocks()} is required to be at least this wide (see its
+     * doc) precisely so a lot offered on one segment fits inside it instead of overhanging into
+     * whatever comes next.
      */
     private static double outerLotSize(PlanParams p) {
         double core = p.coreLotSizeBlocks();
@@ -70,11 +98,24 @@ public final class RoadsideLots {
 
     /**
      * Walks edge {@code a-b} in strides of {@code lotWidth}, offering one candidate lot per side at
-     * each stride. The candidate rectangle is built in the edge's own (tangent, normal) frame - its
-     * near side {@code roadsideSetbackBlocks} off the centreline, its far side
-     * {@code roadsideLotDepthBlocks} beyond that, {@code lotWidth} wide along the edge - then
-     * converted to an axis-aligned {@link Rect} by taking the bounding box of its four corners, since
-     * {@link Rect} cannot represent a rotated rectangle and a spine edge is rarely axis-aligned.
+     * each stride. Rather than building a rotated rectangle and taking its bounding box (the bug
+     * review caught - see the class doc), each candidate is axis-aligned from the start: whichever of
+     * X or Z the edge's own displacement is larger along becomes the lot's "along-road" axis (its
+     * width, {@code lotWidth}), and the other becomes its "away-from-road" axis (its depth, from
+     * {@code roadsideSetbackBlocks} to {@code roadsideSetbackBlocks + roadsideLotDepthBlocks}).
+     * <p>
+     * The away-from-road offset has to account for two things, not just the edge's steepness: a
+     * purely axis-aligned offset from a single reference point only gives the right perpendicular
+     * distance to the road <em>at that point</em>. Away from it, the road drifts along the
+     * non-dominant axis while the lot's near edge stays a straight (non-drifting) line, so on a
+     * diagonal edge one end of that near edge creeps back toward the road even as the other end pulls
+     * further away - and with {@code lotWidth} close to a whole segment's length, that drift is not a
+     * rounding-scale correction, it is comparable to the offset itself. {@code perpOffset}/
+     * {@code perpFar} below add {@code halfWidth} scaled by the edge's non-dominant-axis ratio to
+     * cover the worst case across the lot's whole width, not just its centre. {@link
+     * #realSetbackClears} still re-measures the real, final distance and rejects outright if this
+     * construction falls short anyway (integer rounding, mostly) - the guarantee comes from that
+     * check, this is what keeps it from firing on nearly everything.
      */
     private static void placeAlongEdge(int edgeIndex, Vec2 a, Vec2 b, double lotWidth, Vec2 centre, int radius,
                                         TerrainSampler t, PlanParams p, List<Lot> lots) {
@@ -86,29 +127,26 @@ public final class RoadsideLots {
             // SpineGrowth, but staying safe costs nothing.
             return;
         }
-        double tx = dx / len;
-        double tz = dz / len;
-        // The left-hand normal; the loop below tries both this and its negation.
-        double nx = -tz;
-        double nz = tx;
 
-        double halfWidth = lotWidth / 2.0;
+        boolean dominantX = Math.abs(dx) >= Math.abs(dz);
+        double dominantRatio = (dominantX ? Math.abs(dx) : Math.abs(dz)) / len;    // in [1/sqrt2, 1]
+        double nonDominantRatio = (dominantX ? Math.abs(dz) : Math.abs(dx)) / len; // in [0, 1/sqrt2]
+
         double setback = p.roadsideSetbackBlocks();
         double depth = p.roadsideLotDepthBlocks();
+        double halfWidth = lotWidth / 2.0;
+        // See the method doc: the halfWidth * nonDominantRatio term covers the road's drift across
+        // the lot's whole along-edge extent, not just its centre reference point.
+        double perpOffset = (setback + halfWidth * nonDominantRatio) / dominantRatio;
+        double perpFar = (setback + depth + halfWidth * nonDominantRatio) / dominantRatio;
 
         for (double alongDist = lotWidth / 2.0; alongDist < len; alongDist += lotWidth) {
-            double px = a.x() + tx * alongDist;
-            double pz = a.z() + tz * alongDist;
+            double alongX = a.x() + (dx / len) * alongDist;
+            double alongZ = a.z() + (dz / len) * alongDist;
 
             for (int side = -1; side <= 1; side += 2) {
-                double ux = nx * side;
-                double uz = nz * side;
-
-                Rect footprint = boundingBoxOf(
-                        corner(px, pz, tx, tz, ux, uz, -halfWidth, setback),
-                        corner(px, pz, tx, tz, ux, uz, halfWidth, setback),
-                        corner(px, pz, tx, tz, ux, uz, halfWidth, setback + depth),
-                        corner(px, pz, tx, tz, ux, uz, -halfWidth, setback + depth));
+                Rect footprint = axisAlignedFootprint(alongX, alongZ, halfWidth, side * perpOffset,
+                        side * perpFar, dominantX);
 
                 // Step 3 of the brief: reject, never shrink, so "lots never overlap" and "every lot
                 // is dry" stay properties of the construction rather than something checked after.
@@ -121,36 +159,45 @@ public final class RoadsideLots {
                 if (overlapsAny(footprint, lots)) {
                     continue;
                 }
+                // The authoritative check: the real distance from the road segment to the finished
+                // rectangle's nearest point, not the intermediate offset used to build it.
+                if (!realSetbackClears(a, b, footprint, setback)) {
+                    continue;
+                }
 
                 int waterSides = computeWaterSides(footprint, t, p.probeDistanceBlocks());
                 Vec2 lotCentre = footprint.center();
                 int groundHeight = t.heightAt(lotCentre.x(), lotCentre.z());
-                // Step 1: OUTER unless the lot actually fronts water, in which case WATERFRONT -
-                // both map to the same target size, so this only changes the district tag, not
-                // the width already chosen above.
-                District district = waterSides != 0 ? District.WATERFRONT : District.OUTER;
+                // Step 1: OUTER unless the lot is actually near water, in which case WATERFRONT -
+                // both map to the same target size, so this only changes the district tag, not the
+                // width already chosen above. "Near water" uses DistrictMap's own threshold and probe
+                // (any corner within WATERFRONT_RADIUS_BLOCKS), not the narrower probeDistanceBlocks
+                // waterSides uses, so a spine settlement and a block-subdivided one agree on what the
+                // WATERFRONT tag means - see DistrictMap.WATERFRONT_RADIUS_BLOCKS's doc.
+                District district = isNearWater(footprint, t) ? District.WATERFRONT : District.OUTER;
 
-                // Placeholder id and sizeClass: finalizeLots below fills both in once every
-                // candidate for the whole settlement has been collected, exactly as Planner does
-                // for the block-subdivision path.
-                lots.add(new Lot(0, footprint, district, 0, edgeIndex, groundHeight, waterSides));
+                lots.add(new Lot(0, footprint, district, SIZE_CLASS, edgeIndex, groundHeight, waterSides));
             }
         }
     }
 
-    private static Vec2 corner(double px, double pz, double tx, double tz, double ux, double uz,
-                                double alongOffset, double acrossOffset) {
-        double x = px + tx * alongOffset + ux * acrossOffset;
-        double z = pz + tz * alongOffset + uz * acrossOffset;
-        return new Vec2((int) Math.round(x), (int) Math.round(z));
-    }
+    /**
+     * Builds the axis-aligned candidate directly: {@code lotWidth} wide along whichever axis is
+     * dominant, from {@code nearPerp} to {@code farPerp} (in either order) along the other.
+     */
+    private static Rect axisAlignedFootprint(double alongX, double alongZ, double halfWidth,
+                                              double nearPerp, double farPerp, boolean dominantX) {
+        double loPerp = Math.min(nearPerp, farPerp);
+        double hiPerp = Math.max(nearPerp, farPerp);
 
-    private static Rect boundingBoxOf(Vec2 c0, Vec2 c1, Vec2 c2, Vec2 c3) {
-        int minX = Math.min(Math.min(c0.x(), c1.x()), Math.min(c2.x(), c3.x()));
-        int maxX = Math.max(Math.max(c0.x(), c1.x()), Math.max(c2.x(), c3.x()));
-        int minZ = Math.min(Math.min(c0.z(), c1.z()), Math.min(c2.z(), c3.z()));
-        int maxZ = Math.max(Math.max(c0.z(), c1.z()), Math.max(c2.z(), c3.z()));
-        return new Rect(minX, minZ, maxX, maxZ);
+        if (dominantX) {
+            return new Rect(
+                    (int) Math.round(alongX - halfWidth), (int) Math.round(alongZ + loPerp),
+                    (int) Math.round(alongX + halfWidth), (int) Math.round(alongZ + hiPerp));
+        }
+        return new Rect(
+                (int) Math.round(alongX + loPerp), (int) Math.round(alongZ - halfWidth),
+                (int) Math.round(alongX + hiPerp), (int) Math.round(alongZ + halfWidth));
     }
 
     private static boolean liesWithinSettlement(Rect footprint, Vec2 centre, int radius) {
@@ -167,6 +214,91 @@ public final class RoadsideLots {
         return false;
     }
 
+    /**
+     * Whether {@code footprint}'s nearest point to segment {@code a-b} is at least {@code setback}
+     * away - the real check the brief's step 2 asks for, independent of whatever offset the
+     * construction above used to get there. False (rejected) if the segment touches or crosses the
+     * footprint at all. Otherwise, since both a segment and an axis-aligned rectangle are convex, the
+     * true minimum separation is always achieved at one of six candidates: each segment endpoint's
+     * distance to the rectangle, or each rectangle corner's distance to the segment.
+     */
+    private static boolean realSetbackClears(Vec2 a, Vec2 b, Rect footprint, double setback) {
+        if (segmentIntersectsRect(a, b, footprint)) {
+            return false;
+        }
+        double best = Math.min(distanceToRect(a, footprint), distanceToRect(b, footprint));
+        Vec2[] corners = {
+                new Vec2(footprint.minX(), footprint.minZ()), new Vec2(footprint.maxX(), footprint.minZ()),
+                new Vec2(footprint.maxX(), footprint.maxZ()), new Vec2(footprint.minX(), footprint.maxZ())
+        };
+        for (Vec2 c : corners) {
+            best = Math.min(best, distanceToSegment(c, a, b));
+        }
+        return best >= setback;
+    }
+
+    private static double distanceToRect(Vec2 p, Rect r) {
+        double dx = Math.max(Math.max(r.minX() - p.x(), 0), p.x() - r.maxX());
+        double dz = Math.max(Math.max(r.minZ() - p.z(), 0), p.z() - r.maxZ());
+        return Math.hypot(dx, dz);
+    }
+
+    private static double distanceToSegment(Vec2 p, Vec2 a, Vec2 b) {
+        double ax = a.x(), az = a.z();
+        double dx = b.x() - ax, dz = b.z() - az;
+        double lengthSq = dx * dx + dz * dz;
+        double t = lengthSq == 0
+                ? 0
+                : Math.max(0.0, Math.min(1.0, ((p.x() - ax) * dx + (p.z() - az) * dz) / lengthSq));
+        double cx = ax + t * dx, cz = az + t * dz;
+        double ddx = p.x() - cx, ddz = p.z() - cz;
+        return Math.sqrt(ddx * ddx + ddz * ddz);
+    }
+
+    private static boolean segmentIntersectsRect(Vec2 a, Vec2 b, Rect r) {
+        if (r.contains(a) || r.contains(b)) {
+            return true;
+        }
+        Vec2 topLeft = new Vec2(r.minX(), r.minZ());
+        Vec2 topRight = new Vec2(r.maxX(), r.minZ());
+        Vec2 bottomRight = new Vec2(r.maxX(), r.maxZ());
+        Vec2 bottomLeft = new Vec2(r.minX(), r.maxZ());
+        return segmentsIntersect(a, b, topLeft, topRight)
+                || segmentsIntersect(a, b, topRight, bottomRight)
+                || segmentsIntersect(a, b, bottomRight, bottomLeft)
+                || segmentsIntersect(a, b, bottomLeft, topLeft);
+    }
+
+    /** General-position segment intersection, exact in long arithmetic; touching counts as crossing. */
+    private static boolean segmentsIntersect(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4) {
+        long d1 = cross(p3, p4, p1);
+        long d2 = cross(p3, p4, p2);
+        long d3 = cross(p1, p2, p3);
+        long d4 = cross(p1, p2, p4);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+            return true;
+        }
+        if (d1 == 0 && onSegment(p3, p4, p1)) {
+            return true;
+        }
+        if (d2 == 0 && onSegment(p3, p4, p2)) {
+            return true;
+        }
+        if (d3 == 0 && onSegment(p1, p2, p3)) {
+            return true;
+        }
+        return d4 == 0 && onSegment(p1, p2, p4);
+    }
+
+    private static long cross(Vec2 a, Vec2 b, Vec2 c) {
+        return (long) (b.x() - a.x()) * (c.z() - a.z()) - (long) (b.z() - a.z()) * (c.x() - a.x());
+    }
+
+    private static boolean onSegment(Vec2 a, Vec2 b, Vec2 p) {
+        return Math.min(a.x(), b.x()) <= p.x() && p.x() <= Math.max(a.x(), b.x())
+                && Math.min(a.z(), b.z()) <= p.z() && p.z() <= Math.max(a.z(), b.z());
+    }
+
     /** The same 3x3-grid dryness probe {@code LotSubdivider.isFullyDry} uses. */
     private static boolean isFullyDry(Rect r, TerrainSampler t) {
         for (double fx : SAMPLE_FRACTIONS) {
@@ -179,6 +311,25 @@ public final class RoadsideLots {
             }
         }
         return true;
+    }
+
+    /**
+     * Whether any corner of {@code footprint} has open water within
+     * {@link DistrictMap#WATERFRONT_RADIUS_BLOCKS}, using {@link DistrictMap#waterWithin} directly
+     * rather than a second copy of the same disc scan at a second magic-number radius - see the class
+     * doc on why the two settlement shapes have to agree on this distance.
+     */
+    private static boolean isNearWater(Rect footprint, TerrainSampler t) {
+        Vec2[] corners = {
+                new Vec2(footprint.minX(), footprint.minZ()), new Vec2(footprint.maxX(), footprint.minZ()),
+                new Vec2(footprint.maxX(), footprint.maxZ()), new Vec2(footprint.minX(), footprint.maxZ())
+        };
+        for (Vec2 c : corners) {
+            if (DistrictMap.waterWithin(c, t, DistrictMap.WATERFRONT_RADIUS_BLOCKS)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Step 5 of the brief: the exact water-side probe {@code LotSubdivider.computeWaterSides} uses. */
@@ -221,37 +372,15 @@ public final class RoadsideLots {
     }
 
     /**
-     * Same ranking {@code Planner.finalizeLots} performs for the block-subdivision path: rank every
-     * candidate by footprint area (ties broken by construction order, itself deterministic) into
-     * tertiles for {@code sizeClass}, then hand out final sequential ids in that same construction
-     * order. Duplicated rather than shared because {@code Planner}'s version is private and this
-     * class produces {@link Lot}s directly rather than handing interim ones back to a caller that
-     * will finish them.
+     * Hands out final, sequential ids in construction order. Unlike {@code Planner.finalizeLots},
+     * there is no area-tertile ranking to duplicate here any more - see {@link #SIZE_CLASS}'s doc for
+     * why a roadside lot's {@code sizeClass} is a constant rather than a computed rank.
      */
-    private static List<Lot> finalizeLots(List<Lot> interim) {
-        int n = interim.size();
-        if (n == 0) {
-            return List.of();
-        }
-
-        Integer[] byArea = new Integer[n];
-        for (int i = 0; i < n; i++) {
-            byArea[i] = i;
-        }
-        Arrays.sort(byArea, (a, b) -> {
-            int cmp = Integer.compare(interim.get(a).footprint().area(), interim.get(b).footprint().area());
-            return cmp != 0 ? cmp : Integer.compare(a, b);
-        });
-
-        int[] sizeClassOf = new int[n];
-        for (int rank = 0; rank < n; rank++) {
-            sizeClassOf[byArea[rank]] = Math.min(2, rank * 3 / n);
-        }
-
-        List<Lot> result = new ArrayList<>(n);
-        for (int i = 0; i < n; i++) {
+    private static List<Lot> assignIds(List<Lot> interim) {
+        List<Lot> result = new ArrayList<>(interim.size());
+        for (int i = 0; i < interim.size(); i++) {
             Lot l = interim.get(i);
-            result.add(new Lot(i, l.footprint(), l.district(), sizeClassOf[i],
+            result.add(new Lot(i, l.footprint(), l.district(), l.sizeClass(),
                     l.frontingEdgeIndex(), l.groundHeight(), l.waterSides()));
         }
         return result;

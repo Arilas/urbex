@@ -23,6 +23,15 @@ import java.util.List;
  * faces a loop would create, and a tree encloses none. {@link dev.krona.urbex.plan.lot.RoadsideLots}
  * is what derives lots for a tree instead, straight from road frontage.
  * <p>
+ * Never snapping stops a node from being <em>reused</em>, but it does nothing to stop a fresh edge
+ * from crossing an <em>existing</em> one geometrically without sharing a node - a branch curving back
+ * across the spine it grew from, say. Review (after this class shipped) measured that at ~2.4% of
+ * graphs. {@code ArterialGrowth} would fix that after the fact with {@code Planarizer}, but running
+ * Planarizer here would split the crossing into a shared node, which turns a tree into a graph with
+ * a cycle - exactly the property this class exists to prevent. So instead {@link #nextStep} rejects
+ * any candidate whose new edge would cross one already grown, the same way it rejects a candidate for
+ * bad slope or leaving the bounds: prevented by construction, never patched up after.
+ * <p>
  * Every decision is addressed through {@link Hash} against the seed and either the settlement's
  * centre chunk or a node's own block position, so two calls with the same inputs always grow the
  * identical tree and nothing here ever consults {@link Math#random()} or {@link java.util.Random}.
@@ -76,6 +85,9 @@ public final class SpineGrowth {
         RoadGraph grown = builder.build();
 
         // Step 6: bridges stay derived from terrain, never rolled, exactly as ArterialGrowth does.
+        // Planarizer is deliberately NOT run here - see the class doc: splitting a crossing would add
+        // a node and turn this tree into a graph with a cycle. Crossings are prevented earlier, in
+        // nextStep, by construction instead.
         return BridgeDetector.mark(grown, terrain, p, centreId);
     }
 
@@ -94,7 +106,8 @@ public final class SpineGrowth {
         double currentBearing = bearing;
 
         for (int step = 0; step < maxSteps; step++) {
-            StepResult next = nextStep(currentPos, currentBearing, centre, radius, terrain, p);
+            StepResult next = nextStep(currentId, currentPos, currentBearing, nodes, edges, centre, radius,
+                    terrain, p);
             if (next == null) {
                 // No candidate survived: stop this arm where it stands.
                 return;
@@ -143,13 +156,15 @@ public final class SpineGrowth {
      * One candidate-scored step from {@code currentPos} along {@code bearing}, or {@code null} if
      * nothing survives. This mirrors {@link ArterialGrowth}'s per-step scoring exactly: consider the
      * current bearing and +-15 degrees and +-30 degrees, drop anything that would leave the
-     * settlement's square bounds or run from water into more water (following a riverbed rather than
-     * crossing it), drop anything exceeding {@code maxSlopePerSegment} unless the candidate is itself
-     * over water (a bridge in waiting, judged later by {@link BridgeDetector}), and take whichever
-     * surviving candidate has the lowest slope.
+     * settlement's square bounds, run from water into more water (following a riverbed rather than
+     * crossing it), exceed {@code maxSlopePerSegment} unless the candidate is itself over water (a
+     * bridge in waiting, judged later by {@link BridgeDetector}), or - the one rule
+     * {@code ArterialGrowth} doesn't need, because it planarizes after the fact - cross an edge
+     * already grown elsewhere in this same graph. Whatever survives, take the lowest-slope candidate.
      */
-    private static StepResult nextStep(Vec2 currentPos, double bearing, Vec2 centre, int radius,
-                                        TerrainSampler terrain, PlanParams p) {
+    private static StepResult nextStep(int currentId, Vec2 currentPos, double bearing, List<RoadNode> nodes,
+                                        List<RoadEdge> edges, Vec2 centre, int radius, TerrainSampler terrain,
+                                        PlanParams p) {
         boolean currentInWater = terrain.isWaterAt(currentPos.x(), currentPos.z());
         int currentHeight = terrain.heightAt(currentPos.x(), currentPos.z());
 
@@ -177,6 +192,10 @@ public final class SpineGrowth {
                 continue;
             }
 
+            if (crossesExistingEdge(currentId, currentPos, candidatePos, nodes, edges)) {
+                continue;
+            }
+
             if (slope < bestScore) {
                 bestScore = slope;
                 bestPos = candidatePos;
@@ -185,6 +204,57 @@ public final class SpineGrowth {
         }
 
         return bestPos == null ? null : new StepResult(bestPos, bestBearing);
+    }
+
+    /**
+     * Whether the prospective new edge {@code currentPos -> candidatePos} would cross any edge
+     * already in the graph. Edges incident to {@code currentId} are skipped - sharing the start point
+     * is an ordinary junction, not a crossing - so this only ever rejects a genuinely new
+     * intersection between two edges that don't already meet at a node.
+     */
+    private static boolean crossesExistingEdge(int currentId, Vec2 currentPos, Vec2 candidatePos,
+                                                List<RoadNode> nodes, List<RoadEdge> edges) {
+        for (RoadEdge e : edges) {
+            if (e.fromId() == currentId || e.toId() == currentId) {
+                continue;
+            }
+            Vec2 a = nodes.get(e.fromId()).pos();
+            Vec2 b = nodes.get(e.toId()).pos();
+            if (segmentsIntersect(currentPos, candidatePos, a, b)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** General-position segment intersection, exact in long arithmetic; touching counts as crossing. */
+    private static boolean segmentsIntersect(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4) {
+        long d1 = cross(p3, p4, p1);
+        long d2 = cross(p3, p4, p2);
+        long d3 = cross(p1, p2, p3);
+        long d4 = cross(p1, p2, p4);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+            return true;
+        }
+        if (d1 == 0 && onSegment(p3, p4, p1)) {
+            return true;
+        }
+        if (d2 == 0 && onSegment(p3, p4, p2)) {
+            return true;
+        }
+        if (d3 == 0 && onSegment(p1, p2, p3)) {
+            return true;
+        }
+        return d4 == 0 && onSegment(p1, p2, p4);
+    }
+
+    private static long cross(Vec2 a, Vec2 b, Vec2 c) {
+        return (long) (b.x() - a.x()) * (c.z() - a.z()) - (long) (b.z() - a.z()) * (c.x() - a.x());
+    }
+
+    private static boolean onSegment(Vec2 a, Vec2 b, Vec2 p) {
+        return Math.min(a.x(), b.x()) <= p.x() && p.x() <= Math.max(a.x(), b.x())
+                && Math.min(a.z(), b.z()) <= p.z() && p.z() <= Math.max(a.z(), b.z());
     }
 
     private static Vec2 step(Vec2 from, double bearing, int length) {

@@ -15,8 +15,15 @@ import dev.krona.urbex.plan.geom.Vec2;
  */
 public final class DistrictMap {
 
-    /** How close, in blocks, any outline vertex must come to open water to count as waterfront. */
-    private static final int WATERFRONT_RADIUS_BLOCKS = 24;
+    /**
+     * How close, in blocks, any outline vertex must come to open water to count as waterfront.
+     * <p>
+     * Public (and {@link #waterWithin} below with it) so {@code RoadsideLots} can classify a spine
+     * settlement's lots against the exact same distance instead of a second, drifted-apart magic
+     * number - the two settlement shapes disagreeing on what "near water" means would give P3 two
+     * different meanings for one district tag.
+     */
+    public static final int WATERFRONT_RADIUS_BLOCKS = 24;
 
     private static final double CORE_FRACTION = 0.2;
     private static final double INNER_FRACTION = 0.45;
@@ -57,7 +64,7 @@ public final class DistrictMap {
     }
 
     /** Exhaustive disc scan, exact to the block: a settlement-scale radius of 24 is cheap to search fully. */
-    private static boolean waterWithin(Vec2 centre, TerrainSampler t, int radius) {
+    public static boolean waterWithin(Vec2 centre, TerrainSampler t, int radius) {
         long radiusSq = (long) radius * radius;
         for (int dz = -radius; dz <= radius; dz++) {
             long remainder = radiusSq - (long) dz * dz;

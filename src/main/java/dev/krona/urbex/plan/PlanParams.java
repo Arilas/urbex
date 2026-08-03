@@ -34,7 +34,17 @@ public record PlanParams(
 
     /** Defaults for the small-settlement spine fields, added by task 5b; see the constants below. */
     private static final boolean DEFAULT_SMALL_SETTLEMENTS_ENABLED = true;
-    private static final int DEFAULT_SPINE_SEGMENT_LENGTH_BLOCKS = 16;
+    /**
+     * Must stay at or above the lot width {@code RoadsideLots} derives from
+     * {@link #coreLotSizeBlocks} / {@link #fringeLotSizeBlocks} (~22.67 blocks with the defaults
+     * below), or every roadside lot overhangs past the end of the single segment it was offered on
+     * and into whatever - settlement boundary or a neighbouring segment - happens to be there. 16
+     * (smaller than that derived width) was the value task 5b shipped with; review found it was the
+     * dominant cause of lots being rejected for leaving the settlement bounds, not just the separate
+     * bounding-box bug the same review caught. 24 comfortably clears the derived width so a lot
+     * offered on one segment fits inside it with room to spare.
+     */
+    private static final int DEFAULT_SPINE_SEGMENT_LENGTH_BLOCKS = 24;
     private static final float DEFAULT_BRANCH_CHANCE = 0.45f;
     private static final int DEFAULT_BRANCH_LENGTH_SEGMENTS = 2;
     private static final int DEFAULT_ROADSIDE_SETBACK_BLOCKS = 3;
