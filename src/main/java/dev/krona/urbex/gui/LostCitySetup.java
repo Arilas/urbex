@@ -68,7 +68,7 @@ public class LostCitySetup {
                         ComponentFactory.literal(p.getExtraDescription() + "\n").withStyle(ChatFormatting.AQUA)).append(
                         ComponentFactory.literal(p.getWarning()).withStyle(ChatFormatting.RED)
                 ))
-                .orElse(ComponentFactory.literal("Click here to select a profile for your Lost Cities"));
+                .orElse(ComponentFactory.literal("Click here to select an Urbex profile for your world"));
     }
 
     public String getWorldStyleLabel() {

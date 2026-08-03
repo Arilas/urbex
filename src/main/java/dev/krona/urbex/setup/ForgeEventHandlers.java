@@ -407,7 +407,7 @@ public class ForgeEventHandlers {
         } else {
             ServerLevel destWorld = player.level().getServer().getLevel(Registration.DIMENSION);
             if (destWorld == null) {
-                player.sendSystemMessage(ComponentFactory.literal("Error finding Lost City dimension: " + LOSTCITY + "!").withStyle(ChatFormatting.RED));
+                player.sendSystemMessage(ComponentFactory.literal("Error finding Urbex dimension: " + LOSTCITY + "!").withStyle(ChatFormatting.RED));
             } else {
                 BlockPos location = findLocation(bedLocation, destWorld);
                 CustomTeleporter.teleportToDimension(player, destWorld, location);

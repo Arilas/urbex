@@ -70,7 +70,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         ServerLevel level = (ServerLevel) player.level();
         IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Lost Cities!"));
+            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
 

@@ -63,7 +63,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
 
         IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Lost Cities!"));
+            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
         ChunkCoord coord = new ChunkCoord(level.dimension(), bottom.getX() >> 4, bottom.getZ() >> 4);

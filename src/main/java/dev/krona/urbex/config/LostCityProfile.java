@@ -240,7 +240,7 @@ public class LostCityProfile {
     }
 
     public void init(Configuration cfg) {
-        cfg.addCustomCategoryComment(LostCityProfile.CATEGORY_LOSTCITY, "Settings related to the Lost City for the " + name + " profile");
+        cfg.addCustomCategoryComment(LostCityProfile.CATEGORY_LOSTCITY, "Settings related to Urbex city generation for the " + name + " profile");
         cfg.addCustomCategoryComment(LostCityProfile.CATEGORY_EXPLOSIONS, "Settings related to explosions and damage for the " + name + " profile");
         cfg.addCustomCategoryComment(LostCityProfile.CATEGORY_CITIES, "Settings related to city generation for the " + name + " profile");
         cfg.addCustomCategoryComment(LostCityProfile.CATEGORY_CITY_SPHERES, "Settings related to city sphere generation for the " + name + " profile");

@@ -50,7 +50,7 @@ public class GuiLCConfig extends Screen {
     private final LostCitySetup localSetup = new LostCitySetup(this::refreshPreview);
 
     public GuiLCConfig(Screen parent) {
-        super(ComponentFactory.literal("Lost City Configuration"));
+        super(ComponentFactory.literal("Urbex Configuration"));
         this.parent = parent;
         localSetup.copyFrom(LostCitySetup.CLIENT_SETUP);
     }
@@ -89,7 +89,7 @@ public class GuiLCConfig extends Screen {
         profileButton = addRenderableWidget(new ButtonExt(55, 10, 80, 20, ComponentFactory.literal(localSetup.getProfileLabel()), p -> {
             localSetup.toggleProfile();
             updateValues();
-        }).tooltip(ComponentFactory.literal("Select a standard profile for your Lost City worldgen")));
+        }).tooltip(ComponentFactory.literal("Select a standard profile for Urbex worldgen")));
 
         worldstyleButton = addRenderableWidget(new ButtonExt(145, 10, 120, 20, ComponentFactory.literal(localSetup.getWorldStyleLabel()), p -> {
             localSetup.toggleWorldStyle();
@@ -219,7 +219,7 @@ public class GuiLCConfig extends Screen {
     private void initCities(int left) {
         start("Cities");
         TextExt info = addRenderableWidget(new TextExt(this, 10, 30, 230, 3, getFont(),
-                ComponentFactory.literal("Cities are the main feature of Lost Cities. In this page you can control the rarity of them")));
+                ComponentFactory.literal("Cities are the main feature of Urbex. In this page you can control the rarity of them")));
         add(new WidgetElement(info, curpage, 10, 30));
         nl();
         addDouble(left,120, "cities.cityChance").label("Rarity:"); nl();
