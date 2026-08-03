@@ -44,7 +44,7 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineWest();
                 for (int z = 0; z < 15; z++) {
                     for (int y = bottom; y < maxHeight; y++) {
-                        if (vineRoll(seed, cx + 16, y, cz + z) < vineChance) {
+                        if (vineRoll(seed, cx + 16, y, cz + z, Rng.Purpose.VINES) < vineChance) {
                             createVineStrip(seed, world, bottom, state, new BlockPos(cx + 16, y, cz + z), new BlockPos(cx + 15, y, cz + z));
                         }
                     }
@@ -58,7 +58,7 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineEast();
                 for (int z = 0; z < 15; z++) {
                     for (int y = bottom; y < (adjacent.getMaxHeight()); y++) {
-                        if (vineRoll(seed, cx + 15, y, cz + z) < vineChance) {
+                        if (vineRoll(seed, cx + 15, y, cz + z, Rng.Purpose.VINES_EAST) < vineChance) {
                             createVineStrip(seed, world, bottom, state, new BlockPos(cx + 15, y, cz + z), new BlockPos(cx + 16, y, cz + z));
                         }
                     }
@@ -73,7 +73,7 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineNorth();
                 for (int x = 0; x < 15; x++) {
                     for (int y = bottom; y < maxHeight; y++) {
-                        if (vineRoll(seed, cx + x, y, cz + 16) < vineChance) {
+                        if (vineRoll(seed, cx + x, y, cz + 16, Rng.Purpose.VINES_NORTH) < vineChance) {
                             createVineStrip(seed, world, bottom, state, new BlockPos(cx + x, y, cz + 16), new BlockPos(cx + x, y, cz + 15));
                         }
                     }
@@ -87,7 +87,7 @@ public class ChunkFixer {
                 BlockState state = worldSettings.vineSouth();
                 for (int x = 0; x < 15; x++) {
                     for (int y = bottom; y < (adjacent.getMaxHeight()); y++) {
-                        if (vineRoll(seed, cx + x, y, cz + 15) < vineChance) {
+                        if (vineRoll(seed, cx + x, y, cz + 15, Rng.Purpose.VINES_SOUTH) < vineChance) {
                             createVineStrip(seed, world, bottom, state, new BlockPos(cx + x, y, cz + 15), new BlockPos(cx + x, y, cz + 16));
                         }
                     }
@@ -99,9 +99,17 @@ public class ChunkFixer {
     /**
      * Whether a vine starts here. Addressed by the block it would hang at, so it does not matter
      * which chunk of a wall the loop reaches first, or how many blocks it looked at before.
+     * <p>
+     * Each of the four wall passes carries its own purpose. The bounds on the loops keep five of
+     * the six pass pairs on disjoint blocks, but not the west pass and the north pass: block
+     * {@code (16a, y, 16b)} is the west pass of chunk {@code (a-1, b)} and the north pass of chunk
+     * {@code (a, b-1)}. Under one purpose those two are the identical roll, so at every chunk's
+     * NW corner column the two facings could never disagree and whichever chunk generated first
+     * decided both. Split the same way {@code VEGETATION_XMAX} and friends were split off
+     * {@code VEGETATION}.
      */
-    private static float vineRoll(long seed, int x, int y, int z) {
-        return Rng.atPos(seed, x, y, z, Rng.Purpose.VINES).nextFloat();
+    private static float vineRoll(long seed, int x, int y, int z, Rng.Purpose purpose) {
+        return Rng.atPos(seed, x, y, z, purpose).nextFloat();
     }
 
     /**

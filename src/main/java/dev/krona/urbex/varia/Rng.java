@@ -86,7 +86,14 @@ public final class Rng {
         // separate constants because a chunk can roll a main and a mini explosion at one address,
         // and one purpose would make accepting the one imply accepting the other.
         EXPLOSION_ACCEPT,
-        EXPLOSION_MINI_ACCEPT
+        EXPLOSION_MINI_ACCEPT,
+        // generateVines runs four wall passes. The west pass keeps VINES; the other three take
+        // their own constant because the west and north passes address the same block at a chunk's
+        // NW corner column - one purpose there would make the two facings the identical roll, so
+        // the corner could never have one facing without the other.
+        VINES_EAST,
+        VINES_NORTH,
+        VINES_SOUTH
     }
 
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
