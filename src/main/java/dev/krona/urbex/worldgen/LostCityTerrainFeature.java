@@ -255,7 +255,14 @@ public class LostCityTerrainFeature {
 
         ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
 
-        ChunkHeightmap heightmap = getHeightmap(coord, provider.getWorld());
+        // A copy, because correctTerrainShape() below writes the corrected surface back into it.
+        // The instance in caches().heightmap is shared with every other thread generating a chunk
+        // near this one and must stay what getHeightmap() promises it is: a pure function of the
+        // generator and the coordinate. Writing the correction into it instead would publish a
+        // value whose presence depends on whether this chunk ran before or after its neighbour
+        // read it - the neighbour's border height, and so the terrain, would depend on generation
+        // order. See Arilas/urbex#24.
+        ChunkHeightmap heightmap = new ChunkHeightmap(getHeightmap(coord, provider.getWorld()));
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
         ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info);
 
@@ -887,6 +894,12 @@ public class LostCityTerrainFeature {
         // No lock. The heightmap is a pure function of the generator and the coordinate, so two
         // threads that race on the same chunk build two equal heightmaps and one of them is thrown
         // away; a third thread reading the cache sees whichever was published, and they agree.
+        //
+        // That holds only as long as nobody writes to what this returns. The instance is shared,
+        // so a caller that needs to mutate one - correctTerrainShape's setHeight,
+        // calculateAccurateHeight - must take a copy first (the copy constructor exists for this).
+        // Mutating the published instance would be a data race on a plain int field and, worse,
+        // would make what a neighbouring chunk reads depend on generation order.
         TimedCache<ChunkCoord, ChunkHeightmap> cachedHeightmaps = provider.caches().heightmap;
         ChunkHeightmap cached = cachedHeightmaps.get(chunk);
         if (cached != null) {

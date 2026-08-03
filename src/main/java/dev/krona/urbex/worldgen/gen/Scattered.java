@@ -104,7 +104,9 @@ public class Scattered {
                         return;
                     }
                 }
-                ChunkHeightmap hm = feature.getHeightmap(coord, provider.getWorld());
+                // A copy: calculateAccurateHeight writes minHeight/maxHeight, and the cached
+                // instance is shared with every thread generating near this chunk. See #24.
+                ChunkHeightmap hm = new ChunkHeightmap(feature.getHeightmap(coord, provider.getWorld()));
                 int height = hm.getHeight();
                 hm.calculateAccurateHeight(provider.getWorld(), x, z);   // generator-only, no block access
                 if (!reference.isAllowVoid()) {
