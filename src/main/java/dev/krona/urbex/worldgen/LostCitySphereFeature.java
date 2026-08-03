@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.worldgen.gen.Spheres;
 import net.minecraft.core.Holder;
@@ -34,7 +35,17 @@ public class LostCitySphereFeature extends Feature<NoneFeatureConfiguration> {
                 int chunkZ = center.z();
                 // See LostCityFeature.place: no shared mutable state left to guard.
                 LostCityTerrainFeature feature = diminfo.getFeature();
-                Spheres.generateSpheres(feature, region, region.getChunk(chunkX, chunkZ));
+                // Same treatment as LostCityFeature.place: an exception thrown out of here
+                // propagates into vanilla's feature loop and kills generation of the whole chunk,
+                // so it is logged with the same context and swallowed instead.
+                try {
+                    Spheres.generateSpheres(feature, region, region.getChunk(chunkX, chunkZ));
+                } catch (Exception e) {
+                    Urbex.getLogger().error("Error generating spheres for chunk {},{} (profile={}, dimension={})",
+                            chunkX, chunkZ, diminfo.getProfile().getName(), diminfo.getType().identifier(), e);
+                    ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
+                    ErrorLogger.report("There was an error generating a chunk. See log for details!");
+                }
                 return true;
             }
         }
