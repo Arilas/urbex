@@ -1,5 +1,6 @@
 package dev.krona.urbex.varia;
 
+import dev.krona.urbex.plan.Hash;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 
@@ -96,21 +97,12 @@ public final class Rng {
         VINES_SOUTH
     }
 
-    private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
-    private static final long X_MULTIPLIER = 0x9E3779B97F4A7C15L;
-    private static final long Z_MULTIPLIER = 0xC2B2AE3D27D4EB4FL;
-    private static final long PURPOSE_MULTIPLIER = 0x165667B19E3779F9L;
-
     /**
      * A fresh stream for {@code purpose} at chunk {@code (chunkX, chunkZ)} in the world with
      * {@code worldSeed}. Cheap enough to call per use site; do not cache the result across chunks.
      */
     public static RandomSource at(long worldSeed, int chunkX, int chunkZ, Purpose purpose) {
-        long h = mix(worldSeed);
-        h = mix(h ^ (chunkX * X_MULTIPLIER));
-        h = mix(h ^ (chunkZ * Z_MULTIPLIER));
-        h = mix(h ^ ((purpose.ordinal() + 1L) * PURPOSE_MULTIPLIER));
-        return new XoroshiroRandomSource(h);
+        return new XoroshiroRandomSource(Hash.at(worldSeed, chunkX, chunkZ, key(purpose)));
     }
 
     /**
@@ -118,7 +110,7 @@ public final class Rng {
      * (per-block vine placement, per-spawner mob choice).
      */
     public static RandomSource atPos(long worldSeed, int x, int y, int z, Purpose purpose) {
-        return new XoroshiroRandomSource(hashPos(worldSeed, x, y, z, purpose));
+        return new XoroshiroRandomSource(Hash.atPos(worldSeed, x, y, z, key(purpose)));
     }
 
     /**
@@ -131,15 +123,12 @@ public final class Rng {
      * Allocating a {@link RandomSource} per block to avoid that would cost more than the bug.
      */
     public static int indexAtPos(long worldSeed, int x, int y, int z, Purpose purpose, int bound) {
-        long h = hashPos(worldSeed, x, y, z, purpose);
-        // Multiply-shift over the top 32 bits: no division, and no modulo bias worth the name.
-        return (int) (((h >>> 32) * bound) >>> 32);
+        return Hash.index(Hash.atPos(worldSeed, x, y, z, key(purpose)), bound);
     }
 
     /** A value in {@code [0, 1)} addressed by a block position, without allocating a stream. */
     public static float floatAtPos(long worldSeed, int x, int y, int z, Purpose purpose) {
-        long h = hashPos(worldSeed, x, y, z, purpose);
-        return (h >>> 40) * 0x1.0p-24f;     // top 24 bits, the same width as nextFloat()
+        return Hash.unit(Hash.atPos(worldSeed, x, y, z, key(purpose)));
     }
 
     /**
@@ -149,28 +138,11 @@ public final class Rng {
      * (j, i) draws the same values however many attempts before it were abandoned.
      */
     public static RandomSource atSlot(long worldSeed, int chunkX, int chunkZ, long slot, Purpose purpose) {
-        long h = mix(worldSeed);
-        h = mix(h ^ (chunkX * X_MULTIPLIER));
-        h = mix(h ^ (chunkZ * Z_MULTIPLIER));
-        h = mix(h ^ (slot * GOLDEN_GAMMA));
-        h = mix(h ^ ((purpose.ordinal() + 1L) * PURPOSE_MULTIPLIER));
-        return new XoroshiroRandomSource(h);
+        return new XoroshiroRandomSource(Hash.atSlot(worldSeed, chunkX, chunkZ, slot, key(purpose)));
     }
 
-    private static long hashPos(long worldSeed, int x, int y, int z, Purpose purpose) {
-        long h = mix(worldSeed);
-        h = mix(h ^ (x * X_MULTIPLIER));
-        h = mix(h ^ (y * GOLDEN_GAMMA));
-        h = mix(h ^ (z * Z_MULTIPLIER));
-        h = mix(h ^ ((purpose.ordinal() + 1L) * PURPOSE_MULTIPLIER));
-        return h;
-    }
-
-    /** splitmix64 finalizer. */
-    private static long mix(long z) {
-        z += GOLDEN_GAMMA;
-        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
-        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
-        return z ^ (z >>> 31);
+    /** The enum's ordinal is what the hash actually consumes; +1 so the first constant is not zero. */
+    private static long key(Purpose purpose) {
+        return purpose.ordinal() + 1L;
     }
 }
