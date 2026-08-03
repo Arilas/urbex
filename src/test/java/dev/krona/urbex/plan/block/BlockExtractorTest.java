@@ -258,7 +258,7 @@ class BlockExtractorTest {
                 P.spokeCountMin(), P.spokeCountMax(), P.ringCountMin(), P.ringCountMax(),
                 P.segmentLengthBlocks(), P.snapRadiusBlocks(), P.maxSlopePerSegment(),
                 P.maxBridgeSpanBlocks(), 0, P.maxLotDepthBlocks(),
-                P.coreLotSizeBlocks(), P.fringeLotSizeBlocks());
+                P.coreLotSizeBlocks(), P.fringeLotSizeBlocks(), P.probeDistanceBlocks());
 
         for (SettlementClass cls : SettlementClass.values()) {
             for (TerrainSampler terrain : terrains()) {

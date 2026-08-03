@@ -16,7 +16,8 @@ public record PlanParams(
         int minBlockAreaBlocks,
         int maxLotDepthBlocks,
         int coreLotSizeBlocks,
-        int fringeLotSizeBlocks
+        int fringeLotSizeBlocks,
+        int probeDistanceBlocks
 ) {
     public static PlanParams defaults() {
         return new PlanParams(
@@ -29,7 +30,8 @@ public record PlanParams(
                 256,           // min block area
                 40,            // max lot depth before an alley is needed
                 12,            // core lot size
-                28             // fringe lot size
+                28,            // fringe lot size
+                6              // water-side probe distance beyond a lot's edge
         );
     }
 }
