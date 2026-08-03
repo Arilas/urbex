@@ -14,7 +14,9 @@ import java.util.Set;
 
 /**
  * Grows a settlement's major road network outward from its centre: a set of spokes walking away
- * from the centre in short, terrain-scored steps, closed into loops by a set of connecting rings.
+ * from the centre in short, terrain-scored steps, closed into loops by a set of connecting rings and
+ * a final perimeter ring near the settlement edge, which is what gives the outermost band anything
+ * to enclose (see the perimeter-ring step below for why the regular rings alone never reach there).
  * <p>
  * Every decision is addressed through {@link Hash} against the seed and the settlement's centre
  * chunk (or a per-spoke/per-ring slot within it), so two calls with the same inputs always grow the
@@ -168,6 +170,35 @@ public final class ArterialGrowth {
                 // by an earlier ring or by the spokes themselves, in either direction.
                 addEdge(allEdges, edgeKeys, from, to, RoadClass.COLLECTOR);
             }
+        }
+
+        // Step 7: a perimeter ring near the settlement edge. Rings above only ever reach
+        // ringCount/(ringCount+1) of the radius - 0.75 at the most rings ever rolls - so nothing is
+        // ever enclosed beyond that: the outer band has spokes running through it but nothing to
+        // close them into a face, so it contains no blocks, and the district model's outermost band
+        // is unreachable by construction. A ring close to the true edge - real cities have exactly
+        // this, an outer ring road or bypass - closes that band the same way every other ring closes
+        // the one inside it. Reuses the ring loop's own machinery (nearest spoke node to a target
+        // radius, connected around) and the ring-slot addressing scheme at the next free slot
+        // (ringCount, since regular rings only ever use 0..ringCount-1), so no new PlanPurpose key is
+        // needed for a decision that is, structurally, just one more ring.
+        double perimeterSpacing = s.radiusBlocks() * (1.0 - p.perimeterRingFraction());
+        double perimeterBase = s.radiusBlocks() * p.perimeterRingFraction();
+        long perimeterJitterHash = Hash.atSlot(seed, cx, cz, ringCount, PlanPurpose.RING_RADIUS.key());
+        double perimeterJitter = (Hash.unit(perimeterJitterHash) * 2.0 - 1.0) * (perimeterSpacing / 4.0);
+        double perimeterTargetRadius = perimeterBase + perimeterJitter;
+
+        int[] perimeterNearest = new int[spokeCount];
+        for (int i = 0; i < spokeCount; i++) {
+            perimeterNearest[i] = nearestInChain(spokeChains.get(i), allNodes, centre, perimeterTargetRadius);
+        }
+        for (int i = 0; i < spokeCount; i++) {
+            int from = perimeterNearest[i];
+            int to = perimeterNearest[(i + 1) % spokeCount];
+            if (from == to) {
+                continue;
+            }
+            addEdge(allEdges, edgeKeys, from, to, RoadClass.COLLECTOR);
         }
 
         for (RoadNode n : allNodes) {
