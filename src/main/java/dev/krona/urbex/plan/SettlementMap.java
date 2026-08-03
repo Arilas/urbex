@@ -38,7 +38,7 @@ public final class SettlementMap {
      */
     public static Settlement at(long seed, int chunkX, int chunkZ, PlanParams params) {
         for (SettlementClass cls : LARGEST_FIRST) {
-            Settlement s = candidateFor(seed, chunkX, chunkZ, cls);
+            Settlement s = candidateFor(seed, chunkX, chunkZ, cls, params);
             if (s != null && s.boundsChunks().contains(new Vec2(chunkX, chunkZ))) {
                 return s;
             }
@@ -52,17 +52,32 @@ public final class SettlementMap {
      * strictly larger class (see class doc). Delegates to {@link #resolvedCandidateForCell} once the
      * chunk coordinate has been reduced to this class's own cell coordinate.
      */
-    private static Settlement candidateFor(long seed, int chunkX, int chunkZ, SettlementClass cls) {
+    private static Settlement candidateFor(long seed, int chunkX, int chunkZ, SettlementClass cls, PlanParams params) {
         int cell = cls.cellSizeChunks();
         int cellX = Math.floorDiv(chunkX, cell);
         int cellZ = Math.floorDiv(chunkZ, cell);
-        return resolvedCandidateForCell(seed, cellX, cellZ, cls);
+        return resolvedCandidateForCell(seed, cellX, cellZ, cls, params);
     }
 
-    /** The raw candidate for {@code cls} in this cell, or {@code null} if it does not exist or is shadowed. */
-    private static Settlement resolvedCandidateForCell(long seed, int cellX, int cellZ, SettlementClass cls) {
+    /**
+     * The raw candidate for {@code cls} in this cell, or {@code null} if it does not exist, is
+     * shadowed, or {@code cls} is a spine class ({@link SettlementClass#usesSpine()}) while
+     * {@link PlanParams#smallSettlementsEnabled()} is off.
+     * <p>
+     * That toggle check has to live here, at the root of resolution, rather than only in {@link #at}:
+     * {@link #shadowedByLargerClass} also calls back into this method to resolve a candidate's larger
+     * neighbours, and a disabled class must be just as absent from that recursion as it is from
+     * {@code at}'s result. Filtering only in {@code at} would leave a disabled class's raw candidates
+     * fully able to shadow smaller classes underneath them while never being reported themselves -
+     * countryside with invisible holes in it, not the empty countryside the toggle promises.
+     */
+    private static Settlement resolvedCandidateForCell(long seed, int cellX, int cellZ, SettlementClass cls,
+                                                         PlanParams params) {
+        if (cls.usesSpine() && !params.smallSettlementsEnabled()) {
+            return null;
+        }
         Settlement candidate = rawCandidateForCell(seed, cellX, cellZ, cls);
-        if (candidate == null || shadowedByLargerClass(seed, candidate, cls)) {
+        if (candidate == null || shadowedByLargerClass(seed, candidate, cls, params)) {
             return null;
         }
         return candidate;
@@ -106,7 +121,8 @@ public final class SettlementMap {
      * ever descends into classes strictly larger than its own, and there are five classes total, so
      * the call stack is at most four deep (from {@code HAMLET} up through {@code METROPOLIS}).
      */
-    private static boolean shadowedByLargerClass(long seed, Settlement candidate, SettlementClass cls) {
+    private static boolean shadowedByLargerClass(long seed, Settlement candidate, SettlementClass cls,
+                                                  PlanParams params) {
         Rect bounds = candidate.boundsChunks();
         for (SettlementClass bigger : SettlementClass.values()) {
             if (bigger.ordinal() <= cls.ordinal()) {
@@ -119,7 +135,7 @@ public final class SettlementMap {
             int maxCellZ = Math.floorDiv(bounds.maxZ(), bigCell);
             for (int cellX = minCellX; cellX <= maxCellX; cellX++) {
                 for (int cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
-                    Settlement other = resolvedCandidateForCell(seed, cellX, cellZ, bigger);
+                    Settlement other = resolvedCandidateForCell(seed, cellX, cellZ, bigger, params);
                     if (other != null && other.boundsChunks().intersects(bounds)) {
                         return true;
                     }

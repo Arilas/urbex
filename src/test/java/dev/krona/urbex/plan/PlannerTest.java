@@ -1,13 +1,14 @@
 package dev.krona.urbex.plan;
 
 import dev.krona.urbex.plan.district.District;
-import dev.krona.urbex.plan.geom.Rect;
 import dev.krona.urbex.plan.geom.Vec2;
 import dev.krona.urbex.plan.lot.Lot;
 import dev.krona.urbex.plan.terrain.CoastTerrain;
 import dev.krona.urbex.plan.terrain.FlatTerrain;
 import dev.krona.urbex.plan.terrain.RiverTerrain;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,28 +18,44 @@ class PlannerTest {
     private static final PlanParams P = PlanParams.defaults();
     private static final Settlement TOWN = new Settlement(SettlementClass.TOWN, 0, 0);
 
+    /**
+     * A spine class (see task 5b), exercised alongside {@link #TOWN} in every invariant below that
+     * makes sense for a tree: it has no blocks, so the two tests that are inherently about
+     * block-subdivided districts ({@link #everyLotLiesInsideExactlyOneBlock} and
+     * {@link #coreLotsAreSmallerThanFringeLots}/{@link #waterfrontDistrictsAppearOnACoastAndNotInland})
+     * either handle that explicitly or stay {@link #TOWN}-only rather than being weakened to fit a
+     * shape they were never about.
+     */
+    private static final Settlement VILLAGE = new Settlement(SettlementClass.VILLAGE, 0, 0);
+
+    private static final List<Settlement> ALL_CLASSES = List.of(TOWN, VILLAGE);
+
     @Test
     void everyLotTouchesARoad() {
         // A building with no access is the classic failure of generated cities.
-        for (long seed = 0; seed < 20; seed++) {
-            CityPlan plan = Planner.plan(seed, TOWN, new FlatTerrain(64), P);
-            for (Lot lot : plan.lots()) {
-                assertTrue(lot.frontingEdgeIndex() >= 0
-                                && lot.frontingEdgeIndex() < plan.roads().edges().size(),
-                        "seed " + seed + ": lot " + lot.id() + " fronts onto no road");
+        for (Settlement s : ALL_CLASSES) {
+            for (long seed = 0; seed < 20; seed++) {
+                CityPlan plan = Planner.plan(seed, s, new FlatTerrain(64), P);
+                for (Lot lot : plan.lots()) {
+                    assertTrue(lot.frontingEdgeIndex() >= 0
+                                    && lot.frontingEdgeIndex() < plan.roads().edges().size(),
+                            s.cls() + " seed " + seed + ": lot " + lot.id() + " fronts onto no road");
+                }
             }
         }
     }
 
     @Test
     void lotsNeverOverlap() {
-        for (long seed = 0; seed < 20; seed++) {
-            CityPlan plan = Planner.plan(seed, TOWN, new FlatTerrain(64), P);
-            var lots = plan.lots();
-            for (int i = 0; i < lots.size(); i++) {
-                for (int j = i + 1; j < lots.size(); j++) {
-                    assertTrue(!lots.get(i).footprint().intersects(lots.get(j).footprint()),
-                            "seed " + seed + ": lots " + i + " and " + j + " overlap");
+        for (Settlement s : ALL_CLASSES) {
+            for (long seed = 0; seed < 20; seed++) {
+                CityPlan plan = Planner.plan(seed, s, new FlatTerrain(64), P);
+                var lots = plan.lots();
+                for (int i = 0; i < lots.size(); i++) {
+                    for (int j = i + 1; j < lots.size(); j++) {
+                        assertTrue(!lots.get(i).footprint().intersects(lots.get(j).footprint()),
+                                s.cls() + " seed " + seed + ": lots " + i + " and " + j + " overlap");
+                    }
                 }
             }
         }
@@ -59,23 +76,49 @@ class PlannerTest {
         }
     }
 
+    /**
+     * The block-containment invariant above is about block-subdivided lots and does not translate to
+     * a spine settlement: {@code SpineGrowth} grows a tree, which encloses no faces, so
+     * {@code RoadsideLots} derives lots from road frontage instead and {@link Planner#plan} hands
+     * back an empty block list by construction (task 5b, step 6). Weakening
+     * {@link #everyLotLiesInsideExactlyOneBlock} to tolerate that would let a real regression in the
+     * block-subdivision path go unnoticed, so instead this documents and checks the block-free shape
+     * on its own terms: no blocks, no districts, but still real lots on flat ground.
+     */
+    @Test
+    void aSpineSettlementsPlanHasNoBlocksButStillHasLots() {
+        for (long seed = 0; seed < 20; seed++) {
+            CityPlan plan = Planner.plan(seed, VILLAGE, new FlatTerrain(64), P);
+            assertTrue(plan.blocks().isEmpty(),
+                    "seed " + seed + ": a spine settlement's plan should have no blocks");
+            assertTrue(plan.districts().isEmpty(),
+                    "seed " + seed + ": a spine settlement's plan should have no districts");
+            assertTrue(!plan.lots().isEmpty(),
+                    "seed " + seed + ": a village on flat ground should still get roadside lots");
+        }
+    }
+
     @Test
     void noLotSitsUnderWater() {
         RiverTerrain river = new RiverTerrain(64, 0, 24);
-        for (long seed = 0; seed < 20; seed++) {
-            for (Lot lot : Planner.plan(seed, TOWN, river, P).lots()) {
-                Vec2 c = lot.footprint().center();
-                assertTrue(!river.isWaterAt(c.x(), c.z()),
-                        "seed " + seed + ": lot " + lot.id() + " sits in the river");
+        for (Settlement s : ALL_CLASSES) {
+            for (long seed = 0; seed < 20; seed++) {
+                for (Lot lot : Planner.plan(seed, s, river, P).lots()) {
+                    Vec2 c = lot.footprint().center();
+                    assertTrue(!river.isWaterAt(c.x(), c.z()),
+                            s.cls() + " seed " + seed + ": lot " + lot.id() + " sits in the river");
+                }
             }
         }
     }
 
     @Test
     void theRoadNetworkIsConnected() {
-        for (long seed = 0; seed < 20; seed++) {
-            assertTrue(Planner.plan(seed, TOWN, new FlatTerrain(64), P).roads().isConnected(),
-                    "seed " + seed + " produced a disconnected network");
+        for (Settlement s : ALL_CLASSES) {
+            for (long seed = 0; seed < 20; seed++) {
+                assertTrue(Planner.plan(seed, s, new FlatTerrain(64), P).roads().isConnected(),
+                        s.cls() + " seed " + seed + " produced a disconnected network");
+            }
         }
     }
 
@@ -112,6 +155,8 @@ class PlannerTest {
     void planningIsDeterministic() {
         assertEquals(Planner.plan(11L, TOWN, new FlatTerrain(64), P),
                 Planner.plan(11L, TOWN, new FlatTerrain(64), P));
+        assertEquals(Planner.plan(11L, VILLAGE, new FlatTerrain(64), P),
+                Planner.plan(11L, VILLAGE, new FlatTerrain(64), P));
     }
 
     private static double averageArea(CityPlan plan, District d) {

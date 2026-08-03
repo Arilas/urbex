@@ -6,8 +6,10 @@ import dev.krona.urbex.plan.district.District;
 import dev.krona.urbex.plan.district.DistrictMap;
 import dev.krona.urbex.plan.lot.Lot;
 import dev.krona.urbex.plan.lot.LotSubdivider;
+import dev.krona.urbex.plan.lot.RoadsideLots;
 import dev.krona.urbex.plan.road.ArterialGrowth;
 import dev.krona.urbex.plan.road.RoadGraph;
+import dev.krona.urbex.plan.road.SpineGrowth;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +45,17 @@ public final class Planner {
     }
 
     public static CityPlan plan(long seed, Settlement s, TerrainSampler terrain, PlanParams p) {
+        // A spine settlement (hamlet, village) grows a tree, never a network with enclosed faces, so
+        // it takes its own generator end to end: SpineGrowth in place of ArterialGrowth, RoadsideLots
+        // deriving lots straight from road frontage in place of BlockExtractor + DistrictMap +
+        // LotSubdivider. Its CityPlan has no blocks and no districts - a tree encloses none - which
+        // is exactly what CityPlan's existing shape already allows, needing nothing new from it.
+        if (s.cls().usesSpine()) {
+            RoadGraph spine = SpineGrowth.grow(seed, s, terrain, p);
+            List<Lot> spineLots = RoadsideLots.place(seed, spine, s, terrain, p);
+            return new CityPlan(s, spine, List.of(), Map.of(), spineLots);
+        }
+
         RoadGraph roads = ArterialGrowth.grow(seed, s, terrain, p);
         List<CityBlock> blocks = BlockExtractor.extract(roads, p);
 

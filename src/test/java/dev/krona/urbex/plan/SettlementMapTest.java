@@ -109,6 +109,64 @@ class SettlementMapTest {
         }
     }
 
+    /**
+     * Task 5b: with {@code smallSettlementsEnabled} off, hamlets and villages must not be reported
+     * <em>at all</em> - not merely filtered out of {@link SettlementMap#at} while still occupying
+     * bounds internally. Getting this wrong is subtle: {@link SettlementMap}'s shadowing rule
+     * discards a smaller settlement whose bounds touch a larger one's, so a disabled class that still
+     * computed a raw candidate internally could go on shadowing a genuinely smaller neighbour (were
+     * there one) while never being reported itself - holes in the countryside instead of the plain
+     * countryside the toggle promises. There is nothing smaller than {@code HAMLET} to demonstrate
+     * that concrete failure mode with today's classes, so this test instead asserts the directly
+     * observable half of the contract - the toggle's entire job: scan a wide area and confirm no
+     * spine-class settlement is ever reported.
+     */
+    @Test
+    void disablingSmallSettlementsReportsNoSpineClassAnywhere() {
+        PlanParams disabled = withSmallSettlementsDisabled(P);
+        for (int cx = -400; cx < 400; cx += 2) {
+            for (int cz = -400; cz < 400; cz += 2) {
+                Settlement s = SettlementMap.at(SEED, cx, cz, disabled);
+                if (s != null) {
+                    assertTrue(!s.cls().usesSpine(),
+                            "chunk " + cx + "," + cz + " reported spine-class settlement " + s
+                                    + " despite smallSettlementsEnabled=false");
+                }
+            }
+        }
+    }
+
+    /**
+     * The toggle should be inert for every other class: nothing about disabling hamlets and villages
+     * should perturb where a town, city or metropolis is placed, since {@code shadowedByLargerClass}
+     * only ever looks at classes strictly bigger than the one being resolved and neither hamlet nor
+     * village is ever bigger than anything.
+     */
+    @Test
+    void disablingSmallSettlementsDoesNotMoveLargerClasses() {
+        PlanParams disabled = withSmallSettlementsDisabled(P);
+        for (int cx = -400; cx < 400; cx += 3) {
+            for (int cz = -400; cz < 400; cz += 3) {
+                Settlement withSmall = SettlementMap.at(SEED, cx, cz, P);
+                if (withSmall != null && !withSmall.cls().usesSpine()) {
+                    assertEquals(withSmall, SettlementMap.at(SEED, cx, cz, disabled),
+                            "chunk " + cx + "," + cz + ": disabling small settlements changed a "
+                                    + withSmall.cls() + " placement");
+                }
+            }
+        }
+    }
+
+    private static PlanParams withSmallSettlementsDisabled(PlanParams base) {
+        return new PlanParams(base.spokeCountMin(), base.spokeCountMax(), base.ringCountMin(),
+                base.ringCountMax(), base.segmentLengthBlocks(), base.snapRadiusBlocks(),
+                base.maxSlopePerSegment(), base.maxBridgeSpanBlocks(), base.minBlockAreaBlocks(),
+                base.maxLotDepthBlocks(), base.coreLotSizeBlocks(), base.fringeLotSizeBlocks(),
+                base.probeDistanceBlocks(), base.perimeterRingFraction(), false,
+                base.spineSegmentLengthBlocks(), base.branchChance(), base.branchLengthSegments(),
+                base.roadsideSetbackBlocks(), base.roadsideLotDepthBlocks());
+    }
+
     private static List<Settlement> scan(long seed, int span) {
         List<Settlement> out = new ArrayList<>();
         for (int cx = 0; cx < span; cx += 4) {

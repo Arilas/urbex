@@ -11,8 +11,8 @@ package dev.krona.urbex.plan;
  */
 public enum SettlementClass {
 
-    HAMLET(2, 24, 0.55f),
-    VILLAGE(4, 48, 0.45f),
+    HAMLET(4, 24, 0.55f),
+    VILLAGE(8, 48, 0.45f),
     TOWN(12, 128, 0.35f),
     CITY(32, 384, 0.30f),
     METROPOLIS(96, 1024, 0.25f);
@@ -40,5 +40,15 @@ public enum SettlementClass {
 
     public float spawnChance() {
         return spawnChance;
+    }
+
+    /**
+     * True for the two smallest classes, which grow a {@code SpineGrowth} tree of a main road with
+     * branches instead of {@code ArterialGrowth}'s spoke-and-ring network. Their radii are too small
+     * for even one arterial segment to take a first step, and the owner's ruling was that they
+     * should not be miniature cities anyway.
+     */
+    public boolean usesSpine() {
+        return this == HAMLET || this == VILLAGE;
     }
 }
