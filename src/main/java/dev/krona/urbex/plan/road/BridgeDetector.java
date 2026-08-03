@@ -27,7 +27,14 @@ public final class BridgeDetector {
     private BridgeDetector() {
     }
 
-    public static RoadGraph mark(RoadGraph g, TerrainSampler terrain, PlanParams p) {
+    /**
+     * @param centreNodeId the node whose component survives if rejecting an edge splits the graph.
+     *                      {@link ArterialGrowth} always passes its hub node's id (0 in every graph
+     *                      it builds); a caller working from a hand-built {@link RoadGraph} must say
+     *                      explicitly which node is the one that has to stay reachable, rather than
+     *                      this method assuming id 0 means something it may not.
+     */
+    public static RoadGraph mark(RoadGraph g, TerrainSampler terrain, PlanParams p, int centreNodeId) {
         List<RoadEdge> marked = new ArrayList<>(g.edges().size());
         for (RoadEdge e : g.edges()) {
             Vec2 a = g.nodeAt(e.fromId()).pos();
@@ -41,7 +48,7 @@ public final class BridgeDetector {
             marked.add(waterSpan > 0 ? e.asBridge(waterSpan) : e);
         }
 
-        return keepOnlyCentreComponent(g.nodes(), marked);
+        return keepOnlyCentreComponent(g.nodes(), marked, centreNodeId);
     }
 
     /** The length, in blocks, of the longest unbroken run of water samples along the segment a-b. */
@@ -69,10 +76,10 @@ public final class BridgeDetector {
 
     /**
      * Rejecting an over-span edge can split the graph. Keep only the component that still contains
-     * node 0 — the settlement's centre in every graph {@link ArterialGrowth} produces — not merely
-     * the largest surviving piece.
+     * {@code centreNodeId} — not merely the largest surviving piece; the two are not the same thing
+     * whenever the rejected edge was the sole link to a bigger cluster on the far side.
      */
-    private static RoadGraph keepOnlyCentreComponent(List<RoadNode> nodes, List<RoadEdge> edges) {
+    private static RoadGraph keepOnlyCentreComponent(List<RoadNode> nodes, List<RoadEdge> edges, int centreNodeId) {
         if (nodes.isEmpty()) {
             return RoadGraph.builder().build();
         }
@@ -88,8 +95,8 @@ public final class BridgeDetector {
 
         Set<Integer> reachable = new HashSet<>();
         Deque<Integer> queue = new ArrayDeque<>();
-        reachable.add(0);
-        queue.add(0);
+        reachable.add(centreNodeId);
+        queue.add(centreNodeId);
         while (!queue.isEmpty()) {
             int cur = queue.poll();
             for (RoadEdge e : adjacency.get(cur)) {

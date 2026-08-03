@@ -169,7 +169,7 @@ public final class ArterialGrowth {
         }
 
         RoadGraph grown = builder.build();
-        return BridgeDetector.mark(grown, terrain, p);
+        return BridgeDetector.mark(grown, terrain, p, centreId);
     }
 
     private static Vec2 step(Vec2 from, double bearing, int length) {
