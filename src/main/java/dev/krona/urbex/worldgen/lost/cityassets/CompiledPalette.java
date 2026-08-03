@@ -15,6 +15,9 @@ import java.util.*;
  */
 public class CompiledPalette {
 
+    /** Keys the world seed by a palette character. Odd, so distinct characters give distinct keys. */
+    private static final long CHARACTER_KEY = 0x9E3779B97F4A7C15L;
+
     private final Map<Character, Object> palette = new HashMap<>();
     private final Map<BlockState, BlockState> damagedToBlock = new HashMap<>();
     private final Map<Character, Palette.Info> information = new HashMap<>();
@@ -160,9 +163,17 @@ public class CompiledPalette {
      * The state for {@code c} at a block position, drawing nothing from any stream.
      * <p>
      * This is how generation resolves a weighted character. The pick is a pure function of the
-     * world seed and the position it is being placed at, so how many other characters this chunk
-     * resolved first cannot change it - which is exactly what a per-chunk sequential stream got
-     * wrong, and what {@link dev.krona.urbex.varia.Rng} exists to prevent.
+     * world seed, the character, and the position it is being placed at, so how many other
+     * characters this chunk resolved first cannot change it - which is exactly what a per-chunk
+     * sequential stream got wrong, and what {@link dev.krona.urbex.varia.Rng} exists to prevent.
+     * <p>
+     * The character is part of the address. Without it every weighted character resolves to the
+     * same index at a given block, so a mossy-cobble wall and a cracked-brick floor put their
+     * minority variants at identical offsets - one spatial pattern shared by the whole palette
+     * instead of one per character. The character is keyed into the seed rather than into
+     * {@code x}, {@code y} or {@code z} so that the address stays the block itself: perturbing a
+     * coordinate would alias two characters at neighbouring blocks onto one draw, and
+     * {@link Rng.Purpose} cannot carry it because palette characters are datapack-defined.
      */
     public BlockState getAt(char c, long seed, int x, int y, int z) {
         Object o = palette.get(c);
@@ -172,8 +183,16 @@ public class CompiledPalette {
             return null;
         } else {
             BlockState[] randomBlocks = (BlockState[]) o;
-            return randomBlocks[Rng.indexAtPos(seed, x, y, z, Rng.Purpose.PALETTE, randomBlocks.length)];
+            return randomBlocks[Rng.indexAtPos(characterSeed(seed, c), x, y, z, Rng.Purpose.PALETTE, randomBlocks.length)];
         }
+    }
+
+    /**
+     * The world seed keyed by a palette character. The multiplier is odd, so distinct characters
+     * always give distinct keys and no two characters can share a stream.
+     */
+    private static long characterSeed(long seed, char c) {
+        return seed ^ (c * CHARACTER_KEY);
     }
 
     /**
