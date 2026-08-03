@@ -103,6 +103,78 @@ class SpineGrowthTest {
         }
     }
 
+    /**
+     * {@code aSpineHasNoCycles} only counts nodes and edges, which held true even before
+     * {@code crossesExistingEdge} existed (a graph can be a tree by that count and still cross itself
+     * geometrically - a branch curving back across the spine it grew from adds no node or edge, just
+     * an X in the middle of nowhere). This is the test that actually exercises the crossing rejection:
+     * for every pair of edges that don't already share a node - sharing one is an ordinary junction,
+     * not a crossing - assert they don't properly intersect. Independently re-derived (not calling
+     * {@code SpineGrowth}'s own {@code crossesExistingEdge}) so a bug in that method's own segment math
+     * couldn't hide from its own test.
+     */
+    @Test
+    void noTwoNonAdjacentSpineEdgesCross() {
+        for (Settlement s : new Settlement[]{HAMLET, VILLAGE}) {
+            for (long seed = 0; seed < 300; seed++) {
+                RoadGraph g = SpineGrowth.grow(seed, s, new FlatTerrain(64), P);
+                var edges = g.edges();
+                for (int i = 0; i < edges.size(); i++) {
+                    for (int j = i + 1; j < edges.size(); j++) {
+                        RoadEdge e1 = edges.get(i);
+                        RoadEdge e2 = edges.get(j);
+                        if (shareNode(e1, e2)) {
+                            continue;
+                        }
+                        Vec2 a1 = g.nodeAt(e1.fromId()).pos();
+                        Vec2 b1 = g.nodeAt(e1.toId()).pos();
+                        Vec2 a2 = g.nodeAt(e2.fromId()).pos();
+                        Vec2 b2 = g.nodeAt(e2.toId()).pos();
+                        assertTrue(!segmentsIntersect(a1, b1, a2, b2),
+                                s.cls() + " seed " + seed + ": edges " + i + " (" + a1 + "->" + b1
+                                        + ") and " + j + " (" + a2 + "->" + b2
+                                        + ") cross without sharing a node");
+                    }
+                }
+            }
+        }
+    }
+
+    private static boolean shareNode(RoadEdge a, RoadEdge b) {
+        return a.fromId() == b.fromId() || a.fromId() == b.toId()
+                || a.toId() == b.fromId() || a.toId() == b.toId();
+    }
+
+    /** General-position segment intersection, exact in long arithmetic; touching counts as crossing. */
+    private static boolean segmentsIntersect(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4) {
+        long d1 = cross(p3, p4, p1);
+        long d2 = cross(p3, p4, p2);
+        long d3 = cross(p1, p2, p3);
+        long d4 = cross(p1, p2, p4);
+        if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+            return true;
+        }
+        if (d1 == 0 && onSegment(p3, p4, p1)) {
+            return true;
+        }
+        if (d2 == 0 && onSegment(p3, p4, p2)) {
+            return true;
+        }
+        if (d3 == 0 && onSegment(p1, p2, p3)) {
+            return true;
+        }
+        return d4 == 0 && onSegment(p1, p2, p4);
+    }
+
+    private static long cross(Vec2 a, Vec2 b, Vec2 c) {
+        return (long) (b.x() - a.x()) * (c.z() - a.z()) - (long) (b.z() - a.z()) * (c.x() - a.x());
+    }
+
+    private static boolean onSegment(Vec2 a, Vec2 b, Vec2 p) {
+        return Math.min(a.x(), b.x()) <= p.x() && p.x() <= Math.max(a.x(), b.x())
+                && Math.min(a.z(), b.z()) <= p.z() && p.z() <= Math.max(a.z(), b.z());
+    }
+
     @Test
     void spineBridgesAreStillDerived() {
         for (long seed = 0; seed < 50; seed++) {

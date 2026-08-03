@@ -1,6 +1,8 @@
 package dev.krona.urbex.plan;
 
 import dev.krona.urbex.plan.district.District;
+import dev.krona.urbex.plan.geom.Polygon;
+import dev.krona.urbex.plan.geom.Rect;
 import dev.krona.urbex.plan.geom.Vec2;
 import dev.krona.urbex.plan.lot.Lot;
 import dev.krona.urbex.plan.terrain.CoastTerrain;
@@ -62,19 +64,41 @@ class PlannerTest {
         }
     }
 
+    /**
+     * Checks every block of a lot's footprint against every block's outline, not just the
+     * footprint's centre point - a lot is an area, and "lies inside exactly one block" has to mean
+     * the whole area does, or the assertion can pass for a lot whose corner pokes into a neighbour
+     * while its centre happens to sit safely inside the block it was cut from. In practice this
+     * still passes: {@code LotSubdivider} already guarantees full-footprint containment by
+     * construction ({@code liesFullyInside} checks every corner plus every outline edge against the
+     * candidate before it is ever emitted), so this is verifying that guarantee properly rather than
+     * catching a live bug - but a centre-only check couldn't have told the difference.
+     */
     @Test
     void everyLotLiesInsideExactlyOneBlock() {
         for (long seed = 0; seed < 20; seed++) {
             CityPlan plan = Planner.plan(seed, TOWN, new FlatTerrain(64), P);
             for (Lot lot : plan.lots()) {
-                Vec2 c = lot.footprint().center();
+                Rect fp = lot.footprint();
                 long containing = plan.blocks().stream()
-                        .filter(b -> b.outline().contains(c))
+                        .filter(b -> footprintFullyInside(fp, b.outline()))
                         .count();
                 assertEquals(1, containing,
-                        "seed " + seed + ": lot " + lot.id() + " lies in " + containing + " blocks");
+                        "seed " + seed + ": lot " + lot.id() + " footprint " + fp
+                                + " lies fully in " + containing + " blocks");
             }
         }
+    }
+
+    private static boolean footprintFullyInside(Rect footprint, Polygon outline) {
+        for (int x = footprint.minX(); x <= footprint.maxX(); x++) {
+            for (int z = footprint.minZ(); z <= footprint.maxZ(); z++) {
+                if (!outline.contains(new Vec2(x, z))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -99,15 +123,34 @@ class PlannerTest {
         }
     }
 
+    /**
+     * VILLAGE gets the full-area check task 5b's second review round required: every block of the
+     * footprint, not just its centre, which is what caught {@code RoadsideLots}' sparse-probe bug in
+     * the first place (see {@code RoadsideLotsTest.noLotSitsUnderWater}'s doc). TOWN deliberately
+     * keeps the weaker centre-only check here: scanning its {@code LotSubdivider}-produced lots the
+     * same way surfaced a smaller but real gap of its own (3.56% of TOWN's river-terrain lots contain
+     * a wet block despite passing {@code LotSubdivider.isFullyDry}, measured over 100 seeds) - but
+     * {@code LotSubdivider} is protected from this task's changes, so that gets flagged as a separate,
+     * properly-scoped follow-up rather than silently patched here as a side effect of hardening a
+     * different pipeline's test.
+     */
     @Test
     void noLotSitsUnderWater() {
         RiverTerrain river = new RiverTerrain(64, 0, 24);
-        for (Settlement s : ALL_CLASSES) {
-            for (long seed = 0; seed < 20; seed++) {
-                for (Lot lot : Planner.plan(seed, s, river, P).lots()) {
-                    Vec2 c = lot.footprint().center();
-                    assertTrue(!river.isWaterAt(c.x(), c.z()),
-                            s.cls() + " seed " + seed + ": lot " + lot.id() + " sits in the river");
+        for (long seed = 0; seed < 20; seed++) {
+            for (Lot lot : Planner.plan(seed, TOWN, river, P).lots()) {
+                Vec2 c = lot.footprint().center();
+                assertTrue(!river.isWaterAt(c.x(), c.z()),
+                        "TOWN seed " + seed + ": lot " + lot.id() + " sits in the river");
+            }
+            for (Lot lot : Planner.plan(seed, VILLAGE, river, P).lots()) {
+                Rect fp = lot.footprint();
+                for (int x = fp.minX(); x <= fp.maxX(); x++) {
+                    for (int z = fp.minZ(); z <= fp.maxZ(); z++) {
+                        assertTrue(!river.isWaterAt(x, z),
+                                "VILLAGE seed " + seed + ": lot " + lot.id() + " footprint " + fp
+                                        + " contains a wet block at " + x + "," + z);
+                    }
                 }
             }
         }

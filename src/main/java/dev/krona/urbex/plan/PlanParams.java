@@ -35,16 +35,20 @@ public record PlanParams(
     /** Defaults for the small-settlement spine fields, added by task 5b; see the constants below. */
     private static final boolean DEFAULT_SMALL_SETTLEMENTS_ENABLED = true;
     /**
-     * Must stay at or above the lot width {@code RoadsideLots} derives from
-     * {@link #coreLotSizeBlocks} / {@link #fringeLotSizeBlocks} (~22.67 blocks with the defaults
-     * below), or every roadside lot overhangs past the end of the single segment it was offered on
-     * and into whatever - settlement boundary or a neighbouring segment - happens to be there. 16
-     * (smaller than that derived width) was the value task 5b shipped with; review found it was the
-     * dominant cause of lots being rejected for leaving the settlement bounds, not just the separate
-     * bounding-box bug the same review caught. 24 comfortably clears the derived width so a lot
-     * offered on one segment fits inside it with room to spare.
+     * How far a spine or branch step travels, and - since a second review round found the dependency
+     * had been coupled the wrong way round - the thing {@code RoadsideLots} now derives lot width
+     * from, not the other way around. An earlier version of this constant was raised from 16 to 24 so
+     * a lot sized from {@link #coreLotSizeBlocks}/{@link #fringeLotSizeBlocks} would fit inside one
+     * segment; that stretched every spine/branch step by 50%, which for {@code HAMLET} (radius 32,
+     * so 1-2 steps per arm to begin with) nearly halved its whole network and left 29% of hamlets on
+     * flat terrain a bare two-edge line with no branches at all - a hamlet with no branches is just a
+     * road, not "a main road with some additional branches." Segment length should answer "how
+     * frequently does this class's road network turn or branch," which is a property of the class,
+     * not of a lot-sizing constant meant for an unrelated pipeline (block subdivision has its own
+     * concentric-band sizing that never touches this field). 16 restores hamlet branching; lot width
+     * follows from it instead.
      */
-    private static final int DEFAULT_SPINE_SEGMENT_LENGTH_BLOCKS = 24;
+    private static final int DEFAULT_SPINE_SEGMENT_LENGTH_BLOCKS = 16;
     private static final float DEFAULT_BRANCH_CHANCE = 0.45f;
     private static final int DEFAULT_BRANCH_LENGTH_SEGMENTS = 2;
     private static final int DEFAULT_ROADSIDE_SETBACK_BLOCKS = 3;

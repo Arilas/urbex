@@ -83,13 +83,22 @@ class RoadsideLotsTest {
 
     @Test
     void noLotSitsUnderWater() {
+        // A lot is an area, not its centre point: checking only the centre missed a thin wet strip
+        // hugging a lot's edge, which the sparse (9-point) old dryness probe missed too - the same
+        // sample points, the same blind spot. This checks every block of the footprint, which is what
+        // "no lot sits under water" has to mean once "sits" is read honestly.
         RiverTerrain river = new RiverTerrain(64, 0, 20);
         for (long seed = 0; seed < 50; seed++) {
             RoadGraph g = SpineGrowth.grow(seed, VILLAGE, river, P);
             for (Lot lot : RoadsideLots.place(seed, g, VILLAGE, river, P)) {
-                Vec2 c = lot.footprint().center();
-                assertTrue(!river.isWaterAt(c.x(), c.z()),
-                        "seed " + seed + ": lot " + lot.id() + " sits in the river");
+                Rect fp = lot.footprint();
+                for (int x = fp.minX(); x <= fp.maxX(); x++) {
+                    for (int z = fp.minZ(); z <= fp.maxZ(); z++) {
+                        assertTrue(!river.isWaterAt(x, z),
+                                "seed " + seed + ": lot " + lot.id() + " footprint " + fp
+                                        + " contains a wet block at " + x + "," + z);
+                    }
+                }
             }
         }
     }

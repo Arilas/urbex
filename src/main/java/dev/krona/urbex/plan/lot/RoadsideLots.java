@@ -66,7 +66,7 @@ public final class RoadsideLots {
     public static List<Lot> place(long seed, RoadGraph g, Settlement s, TerrainSampler t, PlanParams p) {
         Vec2 centre = s.centerBlock();
         int radius = s.radiusBlocks();
-        double lotWidth = outerLotSize(p);
+        double lotWidth = lotWidthFor(p);
 
         List<Lot> lots = new ArrayList<>();
         List<RoadEdge> edges = g.edges();
@@ -80,20 +80,23 @@ public final class RoadsideLots {
     }
 
     /**
-     * Step 1 of the brief: a spine settlement is {@code OUTER} throughout unless a lot turns out to
-     * front water, so every lot uses {@code OUTER}'s target size regardless of which district it
-     * ends up tagged with - {@code LotSubdivider.targetLotSize} maps {@code WATERFRONT} to the same
-     * rank as {@code OUTER} for exactly this reason.
+     * Lot width, in blocks, along the road - derived from {@link PlanParams#spineSegmentLengthBlocks()}
+     * rather than the block-subdivision pipeline's {@link PlanParams#coreLotSizeBlocks()} /
+     * {@link PlanParams#fringeLotSizeBlocks()} (a spine settlement has no concentric bands for those to
+     * describe, and it briefly used to anyway - see {@code spineSegmentLengthBlocks}' own doc for why
+     * that direction of coupling was wrong). Deriving width from segment length instead means a class
+     * whose spine takes short, frequent steps gets correspondingly small plots and a class with longer
+     * steps gets bigger ones - a hamlet plot ends up smaller than a city's block-subdivided one, which
+     * is exactly the relationship a hamlet's buildings should have anyway.
      * <p>
-     * {@link PlanParams#spineSegmentLengthBlocks()} is required to be at least this wide (see its
-     * doc) precisely so a lot offered on one segment fits inside it instead of overhanging into
-     * whatever comes next.
+     * The 2-block margin below the raw segment length isn't arbitrary: {@code SpineGrowth}'s per-step
+     * rounding of (dx, dz) to the nearest block means a real edge's length can land a fraction under
+     * its nominal {@code spineSegmentLengthBlocks}. Without margin, a lot sized to exactly that nominal
+     * length could occasionally find no along-position satisfies "starts before the edge's real end"
+     * and lose an edge's only candidate to a sub-block rounding difference.
      */
-    private static double outerLotSize(PlanParams p) {
-        double core = p.coreLotSizeBlocks();
-        double fringe = p.fringeLotSizeBlocks();
-        double t = 2.0 / 3.0; // OUTER/WATERFRONT is rank 2 of {CORE, INNER, OUTER, FRINGE}.
-        return core + (fringe - core) * t;
+    private static double lotWidthFor(PlanParams p) {
+        return Math.max(1, p.spineSegmentLengthBlocks() - 2);
     }
 
     /**
@@ -168,12 +171,12 @@ public final class RoadsideLots {
                 int waterSides = computeWaterSides(footprint, t, p.probeDistanceBlocks());
                 Vec2 lotCentre = footprint.center();
                 int groundHeight = t.heightAt(lotCentre.x(), lotCentre.z());
-                // Step 1: OUTER unless the lot is actually near water, in which case WATERFRONT -
-                // both map to the same target size, so this only changes the district tag, not the
-                // width already chosen above. "Near water" uses DistrictMap's own threshold and probe
-                // (any corner within WATERFRONT_RADIUS_BLOCKS), not the narrower probeDistanceBlocks
-                // waterSides uses, so a spine settlement and a block-subdivided one agree on what the
-                // WATERFRONT tag means - see DistrictMap.WATERFRONT_RADIUS_BLOCKS's doc.
+                // Step 1: OUTER unless the lot is actually near water, in which case WATERFRONT. Lot
+                // width no longer comes from District at all (see lotWidthFor), so this only ever sets
+                // the tag. "Near water" uses DistrictMap's own threshold and probe (any corner within
+                // WATERFRONT_RADIUS_BLOCKS), not the narrower probeDistanceBlocks waterSides uses, so a
+                // spine settlement and a block-subdivided one agree on what the WATERFRONT tag means -
+                // see DistrictMap.WATERFRONT_RADIUS_BLOCKS's doc.
                 District district = isNearWater(footprint, t) ? District.WATERFRONT : District.OUTER;
 
                 lots.add(new Lot(0, footprint, district, SIZE_CLASS, edgeIndex, groundHeight, waterSides));
@@ -299,12 +302,26 @@ public final class RoadsideLots {
                 && Math.min(a.z(), b.z()) <= p.z() && p.z() <= Math.max(a.z(), b.z());
     }
 
-    /** The same 3x3-grid dryness probe {@code LotSubdivider.isFullyDry} uses. */
+    /**
+     * Whether every block of {@code r} is dry - an exhaustive scan, not a sparse probe.
+     * <p>
+     * This used to be the same 9-point (20/50/80% columns and rows) grid {@code LotSubdivider.
+     * isFullyDry} uses, on the reasoning that it was "the same test LotSubdivider uses." Review found
+     * that reasoning didn't transfer: {@code LotSubdivider}'s leaves can be block-scale (up to
+     * {@code maxLotDepthBlocks}-ish per side before refinement kicks in), where scanning every block
+     * of every candidate really would be expensive, and its 9 points are deliberately positioned to
+     * catch a leaf spanning a river with both banks dry (see its doc). A roadside lot is always small
+     * (~22x14 at most, {@link #lotWidthFor} makes it smaller still for short-segment classes) and,
+     * critically, its long edge usually runs close to parallel with a nearby riverbank - exactly the
+     * geometry where a thin wet strip can sit between two 20/50/80% sample columns and never be seen.
+     * Measured on 500 river-terrain seeds, that blind spot put water under 64.4% of HAMLET lots and
+     * 23.3% of VILLAGE lots despite every one of them passing the old probe. At this size, scanning
+     * every block is affordable (low hundreds of samples per candidate, and only for candidates that
+     * already passed the cheaper bounds/overlap checks), so there is no reason to keep sampling.
+     */
     private static boolean isFullyDry(Rect r, TerrainSampler t) {
-        for (double fx : SAMPLE_FRACTIONS) {
-            int x = (int) Math.round(r.minX() + fx * (r.maxX() - r.minX()));
-            for (double fz : SAMPLE_FRACTIONS) {
-                int z = (int) Math.round(r.minZ() + fz * (r.maxZ() - r.minZ()));
+        for (int x = r.minX(); x <= r.maxX(); x++) {
+            for (int z = r.minZ(); z <= r.maxZ(); z++) {
                 if (t.isWaterAt(x, z)) {
                     return false;
                 }
