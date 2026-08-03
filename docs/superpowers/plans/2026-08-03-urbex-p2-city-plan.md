@@ -1001,7 +1001,7 @@ metropolis simply hides the hamlets inside it."
   - `TerrainSampler` with `int heightAt(int x, int z)` and `boolean isWaterAt(int x, int z)`
   - `RoadGraph` with `List<RoadNode> nodes()`, `List<RoadEdge> edges()`, `boolean isConnected()`
   - `RoadNode(int id, Vec2 pos)`
-  - `RoadEdge(int fromId, int toId, RoadClass cls, boolean bridge)`
+  - `RoadEdge(int fromId, int toId, RoadClass cls, boolean bridge, int waterSpanBlocks)`
   - `ArterialGrowth.grow(long seed, Settlement s, TerrainSampler t, PlanParams p) -> RoadGraph`
   - `BridgeDetector.mark(RoadGraph g, TerrainSampler t, PlanParams p) -> RoadGraph`
 
@@ -1292,11 +1292,18 @@ public record RoadNode(int id, Vec2 pos) {
 ```java
 package dev.krona.urbex.plan.road;
 
-/** {@code bridge} is derived from terrain by {@link BridgeDetector}, never rolled. */
-public record RoadEdge(int fromId, int toId, RoadClass cls, boolean bridge) {
+/**
+ * {@code bridge} is derived from terrain by {@link BridgeDetector}, never rolled.
+ * <p>
+ * {@code waterSpanBlocks} is how much water the edge actually crosses, 0 when dry. Downstream
+ * phases need the span, not just the flag: the current datapack's bridge is a single 16x16 chunk
+ * piece, which is only correct for a river exactly that wide. A span lets P4 choose an asset, or
+ * repeat a section, instead of assuming one chunk.
+ */
+public record RoadEdge(int fromId, int toId, RoadClass cls, boolean bridge, int waterSpanBlocks) {
 
-    public RoadEdge asBridge() {
-        return new RoadEdge(fromId, toId, cls, true);
+    public RoadEdge asBridge(int waterSpanBlocks) {
+        return new RoadEdge(fromId, toId, cls, true, waterSpanBlocks);
     }
 }
 ```
@@ -1319,7 +1326,7 @@ Then call `BridgeDetector.mark(...)` on the result before returning, so a caller
 
 - [ ] **Step 6: Implement `BridgeDetector`**
 
-For each edge, sample the terrain at intervals of 4 blocks along the segment. If any sample is water, the edge is a bridge. If the contiguous run of water samples is longer than `maxBridgeSpanBlocks`, the edge is instead *rejected* — return a graph without it — because a 500-block bridge is not a road, it is a mistake. Rejecting an edge may disconnect the graph, so re-run connectivity afterwards and drop any component not containing the centre node.
+For each edge, sample the terrain at intervals of 4 blocks along the segment. If any sample is water, the edge is a bridge, and its `waterSpanBlocks` is the length of the longest contiguous run of water samples along it — that is the number P4 needs to size a crossing. If that run is longer than `maxBridgeSpanBlocks`, the edge is instead *rejected* — return a graph without it — because a 500-block bridge is not a road, it is a mistake. Rejecting an edge may disconnect the graph, so re-run connectivity afterwards and drop any component not containing the centre node.
 
 - [ ] **Step 7: Run the tests**
 
@@ -1544,7 +1551,7 @@ area."
 ### Task 5: Districts and lots
 
 **Files:**
-- Create: `plan/district/District.java`, `plan/district/DistrictMap.java`, `plan/lot/Lot.java`, `plan/lot/LotSubdivider.java`, `plan/CityPlan.java`, `plan/Planner.java`
+- Create: `plan/district/District.java`, `plan/district/DistrictMap.java`, `plan/lot/Lot.java`, `plan/lot/WaterShape.java`, `plan/lot/LotSubdivider.java`, `plan/CityPlan.java`, `plan/Planner.java`
 - Test: `src/test/java/dev/krona/urbex/plan/lot/LotSubdividerTest.java`, `plan/PlannerTest.java`
 
 **Interfaces:**
@@ -1552,7 +1559,8 @@ area."
 - Produces:
   - `District` enum: `CORE`, `INNER`, `OUTER`, `FRINGE`, `WATERFRONT`
   - `DistrictMap.assign(CityBlock b, Settlement s, TerrainSampler t) -> District`
-  - `Lot(int id, Rect footprint, District district, int sizeClass, int frontingEdgeIndex, int groundHeight)`
+  - `Lot(int id, Rect footprint, District district, int sizeClass, int frontingEdgeIndex, int groundHeight, int waterSides)` with `WaterShape waterShape()`
+  - `WaterShape` enum: `INLAND`, `STRAIGHT`, `CORNER`, `CHANNEL`, `PENINSULA`, `ISLAND`, via `WaterShape.of(int mask)`
   - `LotSubdivider.subdivide(long seed, CityBlock b, District d, RoadGraph g, TerrainSampler t, PlanParams p) -> List<Lot>`
   - `CityPlan(Settlement settlement, RoadGraph roads, List<CityBlock> blocks, Map<Integer, District> districts, List<Lot> lots)`
   - `Planner.plan(long seed, Settlement s, TerrainSampler t, PlanParams p) -> CityPlan`
@@ -1730,8 +1738,14 @@ public record Lot(
         District district,
         int sizeClass,
         int frontingEdgeIndex,
-        int groundHeight
+        int groundHeight,
+        int waterSides
 ) {
+
+    /** North, east, south, west as bits 0-3 of {@link #waterSides}. */
+    public WaterShape waterShape() {
+        return WaterShape.of(waterSides);
+    }
 }
 ```
 
@@ -1745,6 +1759,102 @@ public record Lot(
 6. `groundHeight` is `terrain.heightAt(centre)`.
 
 Shrink each leaf rect by 1 block on every side before emitting it, so adjacent lots never share a boundary block and `lotsNeverOverlap` holds by construction rather than by luck.
+
+- [ ] **Step 4b: Implement `WaterShape` and populate `waterSides`**
+
+Create `src/main/java/dev/krona/urbex/plan/lot/WaterShape.java`:
+
+```java
+package dev.krona.urbex.plan.lot;
+
+/**
+ * What kind of water frontage a lot has, derived from which of its four sides face water.
+ * <p>
+ * The shapes are not enumerated by hand — they fall out of the 4-bit mask, which is why this can
+ * cover cases nobody thought to author a piece for. P3 authors one piece per shape; P2 decides
+ * which applies. A river is frequently not one chunk wide, so a single "bridge" piece and a single
+ * "canal side" piece cannot cover the real geometry.
+ */
+public enum WaterShape {
+    /** No side faces water. */
+    INLAND,
+    /** One side. The plain canal or riverbank edge. */
+    STRAIGHT,
+    /** Two adjacent sides — an outside corner where two banks meet. */
+    CORNER,
+    /** Two opposite sides — a channel running straight through. */
+    CHANNEL,
+    /** Three sides — the tip of a peninsula. */
+    PENINSULA,
+    /** All four sides. */
+    ISLAND;
+
+    public static final int NORTH = 1;
+    public static final int EAST = 1 << 1;
+    public static final int SOUTH = 1 << 2;
+    public static final int WEST = 1 << 3;
+
+    public static WaterShape of(int mask) {
+        return switch (Integer.bitCount(mask & 0b1111)) {
+            case 0 -> INLAND;
+            case 1 -> STRAIGHT;
+            case 2 -> isOpposite(mask) ? CHANNEL : CORNER;
+            case 3 -> PENINSULA;
+            default -> ISLAND;
+        };
+    }
+
+    private static boolean isOpposite(int mask) {
+        return mask == (NORTH | SOUTH) || mask == (EAST | WEST);
+    }
+}
+```
+
+In `LotSubdivider`, after a lot's footprint is fixed, set `waterSides` by probing a few blocks
+beyond each of its four edges — sample three points along each side at `probeDistanceBlocks` (add
+it to `PlanParams`, default 6) and set that side's bit if any sample is water. Probing several
+points rather than one matters: a river meeting a lot at an angle touches part of a side, not its
+midpoint.
+
+Add to `LotSubdividerTest`:
+
+```java
+@Test
+void aLotBesideAStraightRiverHasExactlyOneWaterSide() {
+    RiverTerrain river = new RiverTerrain(64, 0, 24);
+    CityPlan plan = Planner.plan(3L, new Settlement(SettlementClass.TOWN, 0, 0), river, P);
+    long waterfront = plan.lots().stream().filter(l -> l.waterSides() != 0).count();
+    assertTrue(waterfront > 0, "a town on a river should have lots fronting it");
+    for (Lot lot : plan.lots()) {
+        if (lot.waterSides() != 0) {
+            assertEquals(WaterShape.STRAIGHT, lot.waterShape(),
+                    "lot " + lot.id() + " beside a straight river should have a straight frontage");
+        }
+    }
+}
+
+@Test
+void inlandLotsHaveNoWaterSides() {
+    CityPlan plan = Planner.plan(3L, new Settlement(SettlementClass.TOWN, 0, 0),
+            new FlatTerrain(64), P);
+    for (Lot lot : plan.lots()) {
+        assertEquals(0, lot.waterSides(), "lot " + lot.id() + " found water on flat dry ground");
+        assertEquals(WaterShape.INLAND, lot.waterShape());
+    }
+}
+
+@Test
+void theShapeTaxonomyCoversEveryMask() {
+    assertEquals(WaterShape.INLAND, WaterShape.of(0));
+    assertEquals(WaterShape.STRAIGHT, WaterShape.of(WaterShape.NORTH));
+    assertEquals(WaterShape.CORNER, WaterShape.of(WaterShape.NORTH | WaterShape.EAST));
+    assertEquals(WaterShape.CHANNEL, WaterShape.of(WaterShape.NORTH | WaterShape.SOUTH));
+    assertEquals(WaterShape.CHANNEL, WaterShape.of(WaterShape.EAST | WaterShape.WEST));
+    assertEquals(WaterShape.PENINSULA,
+            WaterShape.of(WaterShape.NORTH | WaterShape.EAST | WaterShape.SOUTH));
+    assertEquals(WaterShape.ISLAND, WaterShape.of(0b1111));
+}
+```
 
 - [ ] **Step 5: Implement `CityPlan` and `Planner`**
 
@@ -1834,6 +1944,7 @@ class PlanDigestTest {
             h = fold(h, l.footprint().maxX());
             h = fold(h, l.footprint().maxZ());
             h = fold(h, l.district().ordinal());
+            h = fold(h, l.waterSides());
         }
         return String.format("%016x", h);
     }

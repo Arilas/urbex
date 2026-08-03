@@ -166,6 +166,33 @@ Each `Lot` carries:
 - a size class
 - the road edge it fronts onto
 - its ground height
+- **which of its four sides face water**, as a 4-bit mask, and the `WaterShape` derived from it
+
+Each `RoadEdge` carries, besides its class and its `bridge` flag, **the length of water it actually
+crosses**.
+
+### 6.1 Why water gets its own fields
+
+The shipped datapack has one bridge piece, a single 16×16 chunk, and canal pieces that assume banks
+on both sides. A river is frequently not one chunk wide, and a bank is frequently not straight — so
+a plan that emits only `bridge: true` leaves P4 unable to choose between a short crossing and a long
+one, and leaves P3 with no way to know whether a bank piece should be straight, a corner, or the tip
+of a peninsula.
+
+Recording which sides face water makes the variants fall out of the mask rather than being
+enumerated by hand:
+
+| Sides facing water | Shape | |
+|---|---|---|
+| none | `INLAND` | no water piece |
+| one | `STRAIGHT` | the plain canal or riverbank edge |
+| two adjacent | `CORNER` | an L |
+| two opposite | `CHANNEL` | a canal running straight through |
+| three | `PENINSULA` | a U |
+| four | `ISLAND` | |
+
+P3 authors one piece per shape; P2 decides which applies. Cases nobody thought to author are then
+visible as a missing piece rather than as a silently wrong one.
 
 **This set is the contract P3's asset model must satisfy.** Getting it wrong is expensive later, so
 it deserves review on its own terms rather than as an implementation detail. In particular: a lot
