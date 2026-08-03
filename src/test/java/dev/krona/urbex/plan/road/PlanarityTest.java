@@ -19,23 +19,31 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Guards the two graph-level invariants block extraction depends on and {@link ArterialGrowth}
- * doesn't get for free just by growing a network: that the graph is planar, and that no two edges
- * connect the same pair of nodes.
+ * Guards the graph-level invariants block extraction — and the lot-frontage assignment after it —
+ * depend on and {@link ArterialGrowth} doesn't get for free just by growing a network: that the
+ * graph is planar, that no two edges connect the same pair of nodes, and that no two edges sharing a
+ * node retrace the same tarmac.
  * <p>
- * Both were violated in practice before {@link Planarizer} and the ring-edge dedup existed: ring
- * chords are straight lines between spoke nodes, and spokes curve under terrain avoidance, so a ring
- * could cross a spoke without a node at the crossing; separately, two rings could pick the same node
- * pair and emit the same edge twice. Either one makes face traversal undefined - the first swallows
- * neighbouring faces (a real seed extracted zero blocks against a circuit rank of 3), the second
- * makes face rotation undefined outright. This sweeps every settlement class against every synthetic
- * terrain so a regression in either one is caught here, not several phases downstream.
+ * All three were violated in practice before {@link Planarizer} and the ring-edge dedup existed:
+ * ring chords are straight lines between spoke nodes, and spokes curve under terrain avoidance, so a
+ * ring could cross a spoke without a node at the crossing, or run collinear from a shared node along
+ * part of a spoke it's attached to (almost always a ring edge retracing a spoke's first segment or
+ * more); separately, two rings could pick the same node pair and emit the same edge twice. All three
+ * make face traversal undefined or the graph ambiguous downstream - the first swallows neighbouring
+ * faces (a real seed extracted zero blocks against a circuit rank of 3), the second leaves two edges
+ * that a lot could legitimately front onto for the same stretch of road, the third makes face
+ * rotation undefined outright. This sweeps every settlement class against every synthetic terrain so
+ * a regression in any of the three is caught here, not several phases downstream.
  * <p>
- * {@link #collinearOverlapIsAMeasuredResidualNotAGoal} covers the known gap in that guarantee: two
- * non-incident edges lying exactly on the same line and overlapping along it are never split (see
- * {@link Planarizer}'s class javadoc for why), and this pins the current, non-zero rate so a future
- * change to it - for better or worse - is a deliberate, reviewed change to this test, not a silent
- * side effect nobody notices.
+ * {@link #nonIncidentCollinearOverlapIsAMeasuredResidualNotAGoal} covers the one gap that remains:
+ * two edges sharing <em>no</em> node, lying exactly on the same line and overlapping along it, are
+ * never split (see {@link Planarizer}'s class javadoc for why) - though in practice, every instance
+ * of this ever measured turned out to be a downstream consequence of the shared-endpoint case (a ring
+ * edge retracing a multi-segment spoke chain, non-incident only with the chain's later links), so
+ * fixing that case resolved every measured instance of this one too. The rate is pinned regardless,
+ * because that's an empirical fact about what {@link ArterialGrowth} currently produces, not a
+ * property {@link Planarizer} enforces - so a future change to either should still be a deliberate,
+ * reviewed change to this test, not a silent side effect nobody notices.
  */
 class PlanarityTest {
 
@@ -86,19 +94,15 @@ class PlanarityTest {
     }
 
     /**
-     * {@link Planarizer} does not detect or fix collinear overlap (two non-incident edges on the same
-     * line, overlapping along it) - see its class javadoc for why. This is not a correctness bug:
-     * {@code BlockExtractor} has been swept against it and degrades gracefully rather than throwing.
-     * It is, however, a real gap in "the graph is planar" as a blanket claim, so this pins the exact
-     * count over the same sweep {@link #theGraphIsPlanar()} uses (63 of 1250 graphs, measured after
-     * the duplicate-ring-edge fix, which removes one common source of collinear overlap - two ring
-     * edges occupying the literal same segment - and so already reduced this from a higher count).
-     * If this number moves, that's either a real change in what {@code ArterialGrowth} grows or a
-     * change in whether {@code Planarizer} still leaves this alone; either way it deserves a look
-     * before this assertion is just updated to match.
+     * Growth can emit a ring edge that shares a node with a spoke edge and runs collinear from it in
+     * the same direction - one road laid along a prefix of another from the same node. {@link
+     * Planarizer} resolves this (see its class javadoc), so this asserts zero across the same sweep
+     * {@link #theGraphIsPlanar()} uses. Before the fix this affected 440 of 1250 graphs here (79 CITY,
+     * 119 METROPOLIS at a 5,000-graph scale; zero at HAMLET/VILLAGE/TOWN), so this is a real
+     * regression guard, not a tautology - it would have caught the defect the day it was introduced.
      */
     @Test
-    void collinearOverlapIsAMeasuredResidualNotAGoal() {
+    void noEndpointSharingEdgesOverlapCollinearly() {
         int graphsWithOverlap = 0;
         int totalGraphs = 0;
         for (SettlementClass cls : SettlementClass.values()) {
@@ -106,16 +110,56 @@ class PlanarityTest {
                 for (long seed = 0; seed < SEEDS_PER_COMBINATION; seed++) {
                     RoadGraph g = ArterialGrowth.grow(seed, new Settlement(cls, 0, 0), terrain, P);
                     totalGraphs++;
-                    if (anyCollinearOverlap(g)) {
+                    if (anyEndpointSharingCollinearOverlap(g)) {
                         graphsWithOverlap++;
                     }
                 }
             }
         }
         assertEquals(1250, totalGraphs, "the sweep size changed; the pinned count below no longer applies as-is");
-        assertEquals(63, graphsWithOverlap,
-                "collinear-overlap rate moved - confirm whether that's an intended consequence "
-                        + "of a growth or Planarizer change before updating this number");
+        assertEquals(0, graphsWithOverlap,
+                "a ring edge is retracing part of a spoke it shares a node with - Planarizer should "
+                        + "have resolved this, and previously did across the same sweep");
+    }
+
+    /**
+     * {@link Planarizer} does not detect or fix collinear overlap between two edges sharing no
+     * endpoint - see its class javadoc for why. This is not a correctness bug: {@code BlockExtractor}
+     * has been swept against it and degrades gracefully rather than throwing. It is, however, a real
+     * gap in "the graph is planar" as a blanket claim, so this pins the exact count over the same
+     * sweep {@link #theGraphIsPlanar()} uses. It currently measures **zero** - not because
+     * {@link Planarizer} handles this case, it still doesn't, but because every instance measured so
+     * far turned out to be a ring edge retracing a multi-segment spoke chain: fixing the first
+     * (shared-endpoint) link in the chain cascades through {@link Planarizer}'s convergence loop and
+     * resolves the later, non-incident links too, since each resolution can turn a non-incident pair
+     * into a shared-endpoint one by introducing a new edge that starts exactly where the chain
+     * continues. If a future change to {@code ArterialGrowth} produces a genuinely unrelated
+     * non-incident overlap - two edges that were never connected through a common node - this
+     * assertion will fail, which is the point: that's the real residual reappearing; before the
+     * shared-endpoint fix it was 274 of 1250 graphs here (down from 374 before the duplicate-edge fix,
+     * which removes one common source: two ring edges occupying the literal same segment).
+     */
+    @Test
+    void nonIncidentCollinearOverlapIsAMeasuredResidualNotAGoal() {
+        int graphsWithOverlap = 0;
+        int totalGraphs = 0;
+        for (SettlementClass cls : SettlementClass.values()) {
+            for (TerrainSampler terrain : terrains()) {
+                for (long seed = 0; seed < SEEDS_PER_COMBINATION; seed++) {
+                    RoadGraph g = ArterialGrowth.grow(seed, new Settlement(cls, 0, 0), terrain, P);
+                    totalGraphs++;
+                    if (anyNonIncidentCollinearOverlap(g)) {
+                        graphsWithOverlap++;
+                    }
+                }
+            }
+        }
+        assertEquals(1250, totalGraphs, "the sweep size changed; the pinned count below no longer applies as-is");
+        assertEquals(0, graphsWithOverlap,
+                "non-incident collinear overlap reappeared - confirm whether this is a genuinely new, "
+                        + "unrelated overlap (Planarizer still won't fix it, extend it or accept the "
+                        + "residual and update this number) or another shared-endpoint chain that "
+                        + "should have cascaded away; either way it deserves a look");
     }
 
     private static long edgeKey(int a, int b) {
@@ -172,11 +216,78 @@ class PlanarityTest {
     }
 
     /**
+     * Whether any two edges in {@code g} sharing exactly one endpoint run collinear from it in the
+     * same direction, with different lengths - i.e. one is laid along a prefix of the other from
+     * their shared node. Independent of {@link Planarizer}'s own {@code findEndpointOverlap} for the
+     * same reason {@link #countProperCrossings} is independent of its crossing predicate: reusing the
+     * implementation under test to verify it would let a shared bug pass on both sides.
+     */
+    private static boolean anyEndpointSharingCollinearOverlap(RoadGraph g) {
+        var edges = g.edges();
+        for (int i = 0; i < edges.size(); i++) {
+            RoadEdge e1 = edges.get(i);
+            for (int j = i + 1; j < edges.size(); j++) {
+                RoadEdge e2 = edges.get(j);
+                int hub;
+                int far1;
+                int far2;
+                if (e1.fromId() == e2.fromId()) {
+                    hub = e1.fromId();
+                    far1 = e1.toId();
+                    far2 = e2.toId();
+                } else if (e1.fromId() == e2.toId()) {
+                    hub = e1.fromId();
+                    far1 = e1.toId();
+                    far2 = e2.fromId();
+                } else if (e1.toId() == e2.fromId()) {
+                    hub = e1.toId();
+                    far1 = e1.fromId();
+                    far2 = e2.toId();
+                } else if (e1.toId() == e2.toId()) {
+                    hub = e1.toId();
+                    far1 = e1.fromId();
+                    far2 = e2.fromId();
+                } else {
+                    continue; // no shared endpoint at all
+                }
+                if (far1 == far2) {
+                    continue; // an exact duplicate pair, not this check's concern
+                }
+
+                Vec2 posHub = g.nodeAt(hub).pos();
+                Vec2 posFar1 = g.nodeAt(far1).pos();
+                Vec2 posFar2 = g.nodeAt(far2).pos();
+                long d1x = posFar1.x() - posHub.x();
+                long d1z = posFar1.z() - posHub.z();
+                long d2x = posFar2.x() - posHub.x();
+                long d2z = posFar2.z() - posHub.z();
+
+                if ((d1x == 0 && d1z == 0) || (d2x == 0 && d2z == 0)) {
+                    continue; // a zero-length edge
+                }
+                if (d1x * d2z - d1z * d2x != 0) {
+                    continue; // not collinear
+                }
+                if (d1x * d2x + d1z * d2z <= 0) {
+                    continue; // opposite directions: an ordinary through-node, not an overlap
+                }
+                long len1Sq = d1x * d1x + d1z * d1z;
+                long len2Sq = d2x * d2x + d2z * d2z;
+                if (len1Sq == len2Sq) {
+                    continue; // far1 and far2 coincide positionally
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Whether any two non-incident edges in {@code g} lie exactly on the same line and overlap along
      * it by more than a shared endpoint. Independent of {@link Planarizer} for the same reason
      * {@link #countProperCrossings} is.
      */
-    private static boolean anyCollinearOverlap(RoadGraph g) {
+    private static boolean anyNonIncidentCollinearOverlap(RoadGraph g) {
         var edges = g.edges();
         for (int i = 0; i < edges.size(); i++) {
             RoadEdge e1 = edges.get(i);

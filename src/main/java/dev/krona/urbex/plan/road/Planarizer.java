@@ -22,33 +22,49 @@ import java.util.logging.Logger;
  * of both segments — not merely touching at a shared endpoint — and resolves each crossing, repeating
  * until none remain.
  * <p>
- * <b>What is actually guaranteed: no two edges properly cross.</b> Two things are deliberately out
- * of scope and are not detected or fixed by this pass:
+ * A second, related case is resolved alongside it: two edges that <em>do</em> share an endpoint but
+ * run collinear from it in the same direction — one road laid along a prefix of another from the same
+ * node, almost always a ring edge retracing part of a spoke it shares a node with. Two edges sharing a
+ * node never "cross" in the proper sense (that's exactly what makes a node the right place for two
+ * roads to meet), so this is deliberately a separate check, not a special case of the crossing test;
+ * see {@link #findEndpointOverlap} for the resolution. Left alone, this doubles tarmac and leaves a
+ * later phase — assigning each lot the road edge it fronts onto — with two edges that are legitimately
+ * both correct.
+ * <p>
+ * <b>What is actually guaranteed: no two edges properly cross, and no two edges sharing an endpoint
+ * overlap collinearly.</b> One thing remains deliberately out of scope:
  * <ul>
- *   <li><b>Collinear overlap</b> — two non-incident edges lying along the same line and overlapping
- *   along it. The direction-vector cross product used to find a crossing is exactly zero for
- *   collinear segments the same way it is for merely parallel ones, and this pass treats both as
- *   "no unique crossing point, leave alone" rather than as a degenerate case needing its own
- *   handling. Measured at 274 of 5,000 grown graphs across all five settlement classes and all five
- *   synthetic terrains (down from 374 before the duplicate-edge fix, which removes one common source
- *   of collinear overlap: two ring edges occupying the literal same segment).</li>
- *   <li><b>Vertex-on-edge incidence</b> — an existing node that isn't an endpoint of some edge, yet
- *   sits exactly on that edge's interior. This pass only ever looks at pairs of <em>edges</em>; a
- *   node sitting on an edge it has no relationship to, with no second edge to form a crossing pair
- *   with, is never examined. Measured at 440 of 5,000 (down from 484, for the same reason).</li>
+ *   <li><b>Non-incident collinear overlap</b> — two edges sharing <em>no</em> endpoint, lying along
+ *   the same line and overlapping along it. Unlike the shared-endpoint case, resolving this in general
+ *   needs up to two new nodes (one per edge, wherever the overlap interval begins or ends on a segment
+ *   that isn't already a node) and a three-way split of the overlap region — real machinery that nothing
+ *   observed so far has justified. {@code BlockExtractor} has been swept against it and degrades
+ *   gracefully rather than throwing, and it doesn't have the shared-endpoint case's lot-frontage
+ *   ambiguity, since the two edges were never topologically the same connection to begin with. Measured
+ *   at 274 of 5,000 grown graphs across all five settlement classes and all five synthetic terrains
+ *   (down from 374 before the duplicate-edge fix, which removes one common source: two ring edges
+ *   occupying the literal same segment).</li>
  * </ul>
- * Neither has been observed to make {@code BlockExtractor} throw — it degrades gracefully on both —
- * which is why they're documented and tested as a known residual (see
- * {@code PlanarityTest.collinearOverlapIsAMeasuredResidualNotAGoal}) rather than fixed here. A future
- * change that alters this residual should do so on purpose, with that test updated to match, not by
+ * A second thing, vertex-on-edge incidence (an existing node that isn't an endpoint of some edge, yet
+ * sits exactly on that edge's interior), is also not detected: this pass only ever looks at pairs of
+ * <em>edges</em>, never a node against an edge it has no relationship to. Measured at 440 of 5,000
+ * (down from 484, for the same reason as above).
+ * <p>
+ * Both are documented and tested as known residuals (see {@code PlanarityTest}'s
+ * {@code nonIncidentCollinearOverlapIsAMeasuredResidualNotAGoal} and
+ * {@code noEndpointSharingEdgesOverlapCollinearly}) rather than fixed here. A future change that
+ * alters either residual should do so on purpose, with the relevant test updated to match, not by
  * accident.
  * <p>
- * Two resolutions, depending on where the crossing lands once rounded to an integer position (every
+ * Resolutions, depending on where a proper crossing lands once rounded to an integer position (every
  * node is integer, per the planner's determinism rule): if it coincides with one of the two edges'
  * own endpoints — the common case on a short edge, where even a solidly-interior crossing parameter
  * can round back onto a nearby node — that edge already has a vertex there, so only the *other* edge
  * is split, reusing the existing node instead of manufacturing a near-zero-length stub next to it.
- * Otherwise a genuinely new node is inserted and both edges are split at it.
+ * Otherwise a genuinely new node is inserted and both edges are split at it. A shared-endpoint overlap
+ * resolves differently (no new node at all): the longer of the two edges is replaced by just its
+ * remainder past the shorter edge's far endpoint, so the shorter edge becomes the longer one's first
+ * segment and the overlapping tarmac is covered exactly once.
  * <p>
  * The crossing <em>test</em> itself is exact: whether two segments properly cross, and within what
  * range, is decided entirely with {@code long} arithmetic over the integer node coordinates — no
@@ -57,7 +73,9 @@ import java.util.logging.Logger;
  * way a {@code double} cross product silently depends on staying under 2^53 - i.e. on the world
  * border never being approached). Only the final step, turning a confirmed crossing into an actual
  * {@code Vec2} to round to the lattice, needs a division and therefore a {@code double}; by then
- * whether a crossing exists is no longer in question, only where.
+ * whether a crossing exists is no longer in question, only where. The shared-endpoint overlap check
+ * is exact throughout — it never needs a fractional point at all, since the split always lands on an
+ * existing node.
  */
 final class Planarizer {
 
@@ -93,7 +111,25 @@ final class Planarizer {
                     RoadEdge e1 = edges.get(i);
                     RoadEdge e2 = edges.get(j);
                     if (shareEndpoint(e1, e2)) {
-                        continue;
+                        EndpointOverlap overlap = findEndpointOverlap(nodes, e1, e2, i, j);
+                        if (overlap == null) {
+                            continue;
+                        }
+                        if (splits >= MAX_SPLITS) {
+                            capped = true;
+                            break outer;
+                        }
+                        splits++;
+
+                        edges.remove(overlap.longIndex());
+                        RoadEdge remainder = new RoadEdge(overlap.shortFar(), overlap.longFar(),
+                                overlap.longEdge().cls(), overlap.longEdge().bridge(), overlap.longEdge().waterSpanBlocks());
+                        if (!containsPair(edges, remainder.fromId(), remainder.toId())) {
+                            edges.add(remainder);
+                        }
+
+                        changed = true;
+                        continue outer;
                     }
 
                     Vec2 a1 = nodes.get(e1.fromId()).pos();
@@ -214,6 +250,78 @@ final class Planarizer {
     private static boolean shareEndpoint(RoadEdge e1, RoadEdge e2) {
         return e1.fromId() == e2.fromId() || e1.fromId() == e2.toId()
                 || e1.toId() == e2.fromId() || e1.toId() == e2.toId();
+    }
+
+    /**
+     * @param longIndex the current index (in the caller's edge list) of the edge to remove
+     * @param longEdge  that edge, kept only for its {@code cls}/{@code bridge}/{@code waterSpanBlocks}
+     * @param shortFar  the shorter edge's far endpoint - where the remainder should start
+     * @param longFar   the longer edge's far endpoint - where the remainder should end
+     */
+    private record EndpointOverlap(int longIndex, RoadEdge longEdge, int shortFar, int longFar) {
+    }
+
+    /**
+     * If {@code e1} and {@code e2} share exactly one endpoint and run collinear from it in the same
+     * direction — one edge's far endpoint lying exactly on the other's line, past the shared node —
+     * describes how to resolve the overlap: replace the longer edge with just its remainder beyond
+     * the shorter edge's far endpoint. Returns {@code null} if there's nothing to resolve: not
+     * collinear, collinear but pointing away from each other (a normal through-node), or - the
+     * degenerate case of two different node ids sitting at the exact same position - equal length.
+     */
+    private static EndpointOverlap findEndpointOverlap(List<RoadNode> nodes, RoadEdge e1, RoadEdge e2, int i, int j) {
+        int hub;
+        int far1;
+        int far2;
+        if (e1.fromId() == e2.fromId()) {
+            hub = e1.fromId();
+            far1 = e1.toId();
+            far2 = e2.toId();
+        } else if (e1.fromId() == e2.toId()) {
+            hub = e1.fromId();
+            far1 = e1.toId();
+            far2 = e2.fromId();
+        } else if (e1.toId() == e2.fromId()) {
+            hub = e1.toId();
+            far1 = e1.fromId();
+            far2 = e2.toId();
+        } else {
+            hub = e1.toId();
+            far1 = e1.fromId();
+            far2 = e2.fromId();
+        }
+        if (far1 == far2) {
+            return null; // an exact duplicate pair; not this method's concern
+        }
+
+        Vec2 posHub = nodes.get(hub).pos();
+        Vec2 posFar1 = nodes.get(far1).pos();
+        Vec2 posFar2 = nodes.get(far2).pos();
+
+        long d1x = posFar1.x() - posHub.x();
+        long d1z = posFar1.z() - posHub.z();
+        long d2x = posFar2.x() - posHub.x();
+        long d2z = posFar2.z() - posHub.z();
+
+        if ((d1x == 0 && d1z == 0) || (d2x == 0 && d2z == 0)) {
+            return null; // a zero-length edge; not this method's concern
+        }
+        if (d1x * d2z - d1z * d2x != 0) {
+            return null; // not collinear
+        }
+        if (d1x * d2x + d1z * d2z <= 0) {
+            return null; // collinear but opposite directions: an ordinary through-node, not an overlap
+        }
+
+        long len1Sq = d1x * d1x + d1z * d1z;
+        long len2Sq = d2x * d2x + d2z * d2z;
+        if (len1Sq == len2Sq) {
+            return null; // far1 and far2 coincide positionally; not the pattern this resolves
+        }
+
+        return len1Sq < len2Sq
+                ? new EndpointOverlap(j, e2, far1, far2)
+                : new EndpointOverlap(i, e1, far2, far1);
     }
 
     /**
