@@ -38,9 +38,6 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
         super(NoneFeatureConfiguration.CODEC);
     }
 
-    private static final long[] times = new long[1000];
-    private static long totalCnt = 0;
-
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();

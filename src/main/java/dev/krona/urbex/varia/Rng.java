@@ -39,6 +39,11 @@ public final class Rng {
         CITY_CENTER,
         CITY_RADIUS,
         CITY_STYLE,
+        // RESERVED - do not delete, even though nothing calls Rng with it today. The ordinal is
+        // part of the hash (see at()/atPos()/atSlot(): purpose.ordinal() feeds the mix), so
+        // removing this constant would shift RAILWAY and everything after it by one and silently
+        // change every world ever generated. If highway placement ever needs an addressed stream
+        // again, reuse this constant rather than appending a new one.
         HIGHWAY,
         RAILWAY,
         SPHERE,
