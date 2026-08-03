@@ -38,8 +38,6 @@ public class DamageArea {
         this.air = Blocks.AIR.defaultBlockState();
         chunkBox = new AABB(chunkX << 4, provider.getWorld().getMinY(), chunkZ << 4, (chunkX << 4) + 15, provider.getWorld().getMaxY() + 1, (chunkZ << 4) + 15);
 
-        RandomSource damageRandom = Rng.at(seed, chunkX, chunkZ, Rng.Purpose.DAMAGE);
-
         int offset = (Math.max(info.profile.EXPLOSION_MAXRADIUS, info.profile.MINI_EXPLOSION_MAXRADIUS)+15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
             for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
@@ -50,7 +48,7 @@ public class DamageArea {
                         if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
 //                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
                             Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
-                            if (chance == null || damageRandom.nextFloat() < chance) {
+                            if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_ACCEPT)) {
                                 explosions.add(explosion);
                             }
                         }
@@ -60,7 +58,7 @@ public class DamageArea {
                         if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
 //                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
                             Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
-                            if (chance == null || damageRandom.nextFloat() < chance) {
+                            if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_MINI_ACCEPT)) {
                                 explosions.add(explosion);
                             }
                         }
@@ -68,6 +66,23 @@ public class DamageArea {
                 }
             }
         }
+    }
+
+    /**
+     * Whether the city style keeps the explosion rolled at {@code coord}.
+     * <p>
+     * Addressed at the explosion's own chunk, not at the chunk asking. Every chunk within the blast
+     * radius evaluates the same explosion, and each reaches it having skipped a different number of
+     * non-intersecting candidates - so a single per-chunk stream gave the same explosion a different
+     * draw in each observer, and a crater was accepted on one side of a chunk border and rejected on
+     * the other. This is the case {@code ChunkGenContext.rng} warns about: a stream drawn a variable
+     * number of times per chunk. Addressed by {@code coord}, every observer agrees.
+     */
+    private boolean isAccepted(ChunkCoord coord, Float chance, Rng.Purpose purpose) {
+        if (chance == null) {
+            return true;
+        }
+        return Rng.at(seed, coord.chunkX(), coord.chunkZ(), purpose).nextFloat() < chance;
     }
 
     /**

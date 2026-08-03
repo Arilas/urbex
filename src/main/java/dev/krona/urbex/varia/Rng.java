@@ -79,7 +79,14 @@ public final class Rng {
         // fail together every time.
         VEGETATION_XMAX,
         VEGETATION_ZMIN,
-        VEGETATION_ZMAX
+        VEGETATION_ZMAX,
+        // Whether a chunk keeps an explosion it is in range of. The roll is addressed at the
+        // explosion's own chunk, not at the chunk observing it: every chunk within the blast
+        // radius must reach the same verdict or the crater stops at a chunk border. The two are
+        // separate constants because a chunk can roll a main and a mini explosion at one address,
+        // and one purpose would make accepting the one imply accepting the other.
+        EXPLOSION_ACCEPT,
+        EXPLOSION_MINI_ACCEPT
     }
 
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
