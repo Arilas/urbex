@@ -14,6 +14,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Config {
 
@@ -28,7 +29,26 @@ public class Config {
             "lostworlds:abyss=biosphere_caves",
     };
     private static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_PROFILES;
-    private static Map<ResourceKey<Level>, String> dimensionProfileCache = null;
+    /**
+     * Dimension -> profile name, built once and then published whole.
+     * <p>
+     * Reached from worker threads: {@code LostCityFeature.place} and {@code StructureSuppressor}
+     * both call {@link #getProfileForDimension} during generation, and since the per-dimension
+     * generation lock was removed nothing serialises them. It is {@code volatile} so a reader
+     * either sees {@code null} or sees a map that is already complete, and a
+     * {@code ConcurrentHashMap} because {@link #registerLostCityDimension} can still add to it
+     * after publication.
+     * <p>
+     * The build happens in {@link #buildProfileCache} into a local map, and the field is assigned
+     * last. Two threads racing here therefore build two identical maps from the same config and
+     * the same saved data and the loser's is simply dropped - where the old plain {@code HashMap}
+     * let both threads interleave puts into two different maps while one was still being filled,
+     * and an entry lost that way means a dimension silently generates no cities at all.
+     * <p>
+     * Deliberately not {@code computeIfAbsent}: this cache is reachable from generation, and the
+     * mapping function reads config and level saved data rather than being a cheap pure function.
+     */
+    private static volatile Map<ResourceKey<Level>, String> dimensionProfileCache = null;
 
     // Profile as selected by the client
     public static String profileFromClient = null;
@@ -75,73 +95,89 @@ public class Config {
     public static void registerLostCityDimension(ServerLevel level, ResourceKey<Level> type, String profile) {
         String profileForDimension = getProfileForDimension(level, type);
         if (profileForDimension == null) {
-            dimensionProfileCache.put(type, profile);
+            // getProfileForDimension has published a cache by the time it returns, so read the
+            // field once rather than twice - a concurrent reset() must not turn this into an NPE.
+            Map<ResourceKey<Level>, String> cache = dimensionProfileCache;
+            if (cache != null) {
+                cache.put(type, profile);
+            }
         }
     }
 
     public static String getProfileForDimension(ServerLevel level, ResourceKey<Level> type) {
-        if (dimensionProfileCache == null) {
-            dimensionProfileCache = new HashMap<>();
-            for (String dp : DIMENSION_PROFILES.get()) {
-                String[] split = dp.split("=");
-                if (split.length != 2) {
-                    Urbex.getLogger().error("Bad format for config value: '{}'!", dp);
-                } else {
-                    ResourceKey<Level> dimensionType = ResourceKey.create(Registries.DIMENSION, Identifier.parse(split[0]));
-                    String profileName = split[1];
-                    LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
-                    if (profile != null) {
-                        dimensionProfileCache.put(dimensionType, profileName);
-                    } else {
-                        Urbex.getLogger().error("Cannot find profile: {} for dimension {}!", profileName, split[0]);
-                    }
-                }
-            }
+        Map<ResourceKey<Level>, String> cache = dimensionProfileCache;
+        if (cache == null) {
+            cache = buildProfileCache(level);
+            // Published last, and only once it is complete. See the field's comment.
+            dimensionProfileCache = cache;
+        }
+        return cache.get(type);
+    }
 
-            LostData data = LostData.getData(level);
-            String selectedProfile = "";
-            String selectedJson = "";
-            if (Config.profileFromClient != null && !Config.profileFromClient.isEmpty()) {
-                if (Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty()) {
-                    selectedJson = Config.jsonFromClient;
-                }
-                selectedProfile = Config.profileFromClient;
-                // Remember the profile selected by the client in SavedData
-                data.setProfile(selectedProfile, selectedJson);
+    private static Map<ResourceKey<Level>, String> buildProfileCache(ServerLevel level) {
+        Map<ResourceKey<Level>, String> cache = new ConcurrentHashMap<>();
+        for (String dp : DIMENSION_PROFILES.get()) {
+            String[] split = dp.split("=");
+            if (split.length != 2) {
+                Urbex.getLogger().error("Bad format for config value: '{}'!", dp);
             } else {
-                // Check if SavedData has a profile selected
-                selectedProfile = data.getSelectedProfile();
-                selectedJson = data.getSelectedJson();
-                // If this is also empty get from config for the overworld
-                if (level.dimension() == Level.OVERWORLD) {
-                    if (selectedJson.isEmpty()) {
-                        selectedJson = Config.SELECTED_CUSTOM_JSON.get();
-                    }
-                    if (selectedProfile.isEmpty()) {
-                        selectedProfile = Config.SELECTED_PROFILE.get();
-                    }
-                }
-            }
-
-            if (!selectedProfile.isEmpty()) {
-                dimensionProfileCache.put(Level.OVERWORLD, selectedProfile);
-                if (!selectedJson.isEmpty()) {
-                    LostCityProfile profile = new LostCityProfile("customized", selectedJson);
-                    if (!ProfileSetup.STANDARD_PROFILES.containsKey("customized")) {
-                        ProfileSetup.STANDARD_PROFILES.put("customized", new LostCityProfile("customized", false));
-                    }
-                    ProfileSetup.STANDARD_PROFILES.get("customized").copyFrom(profile);
-                }
-            }
-
-            String profile = getProfileForDimension(level, Level.OVERWORLD);
-            if (profile != null && !profile.isEmpty()) {
-                if (ProfileSetup.STANDARD_PROFILES.get(profile).GENERATE_NETHER) {
-                    dimensionProfileCache.put(Level.NETHER, "cavern");
+                ResourceKey<Level> dimensionType = ResourceKey.create(Registries.DIMENSION, Identifier.parse(split[0]));
+                String profileName = split[1];
+                LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
+                if (profile != null) {
+                    cache.put(dimensionType, profileName);
+                } else {
+                    Urbex.getLogger().error("Cannot find profile: {} for dimension {}!", profileName, split[0]);
                 }
             }
         }
-        return dimensionProfileCache.get(type);
+
+        LostData data = LostData.getData(level);
+        String selectedProfile = "";
+        String selectedJson = "";
+        if (Config.profileFromClient != null && !Config.profileFromClient.isEmpty()) {
+            if (Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty()) {
+                selectedJson = Config.jsonFromClient;
+            }
+            selectedProfile = Config.profileFromClient;
+            // Remember the profile selected by the client in SavedData
+            data.setProfile(selectedProfile, selectedJson);
+        } else {
+            // Check if SavedData has a profile selected
+            selectedProfile = data.getSelectedProfile();
+            selectedJson = data.getSelectedJson();
+            // If this is also empty get from config for the overworld
+            if (level.dimension() == Level.OVERWORLD) {
+                if (selectedJson.isEmpty()) {
+                    selectedJson = Config.SELECTED_CUSTOM_JSON.get();
+                }
+                if (selectedProfile.isEmpty()) {
+                    selectedProfile = Config.SELECTED_PROFILE.get();
+                }
+            }
+        }
+
+        if (!selectedProfile.isEmpty()) {
+            cache.put(Level.OVERWORLD, selectedProfile);
+            if (!selectedJson.isEmpty()) {
+                LostCityProfile profile = new LostCityProfile("customized", selectedJson);
+                if (!ProfileSetup.STANDARD_PROFILES.containsKey("customized")) {
+                    ProfileSetup.STANDARD_PROFILES.put("customized", new LostCityProfile("customized", false));
+                }
+                ProfileSetup.STANDARD_PROFILES.get("customized").copyFrom(profile);
+            }
+        }
+
+        // Read the half-built map directly. This used to call back into getProfileForDimension,
+        // which worked only because the field was assigned before it was filled; now that the
+        // field is published last, that call would not terminate.
+        String profile = cache.get(Level.OVERWORLD);
+        if (profile != null && !profile.isEmpty()) {
+            if (ProfileSetup.STANDARD_PROFILES.get(profile).GENERATE_NETHER) {
+                cache.put(Level.NETHER, "cavern");
+            }
+        }
+        return cache;
     }
 
     /**
@@ -220,7 +256,7 @@ public class Config {
 
         SELECTED_PROFILE = SERVER_BUILDER.define("selectedProfile", "");
         SELECTED_CUSTOM_JSON = SERVER_BUILDER.define("selectedCustomJson", "");
-        TODO_QUEUE_SIZE = SERVER_BUILDER.comment("The size of the todo queues for the lost city generator").defineInRange("todoQueueSize", 20, 1, 100000);
+        TODO_QUEUE_SIZE = SERVER_BUILDER.comment("The size of the todo queues for the Urbex city generator").defineInRange("todoQueueSize", 20, 1, 100000);
         FORCE_SAPLING_GROWTH = SERVER_BUILDER.comment("If this is true then saplings will grow into trees during generation. This is more expensive").define("forceSaplingGrowth", true);
         CACHE_CLEANUP_SECONDS = SERVER_BUILDER.comment("Time in seconds after which cached chunk data is evicted").defineInRange("cacheCleanupSeconds", 300, 1, 86400);
         AVOID_STRUCTURES = SERVER_BUILDER
