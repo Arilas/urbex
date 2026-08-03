@@ -40,9 +40,6 @@ public final class LotSubdivider {
     /** How far the split position may drift from the midpoint, as a fraction of the side being cut. */
     private static final double SPLIT_JITTER_FRACTION = 0.2;
 
-    /** Three points per side, offset in from the corners so no sample lands exactly on another side's probe. */
-    private static final double[] SIDE_SAMPLE_FRACTIONS = {0.2, 0.5, 0.8};
-
     /** A leaf narrower than this on either axis cannot survive the 1-block shrink on every side. */
     private static final int MIN_LEAF_SIDE_BLOCKS = 3;
 
@@ -95,7 +92,9 @@ public final class LotSubdivider {
             }
 
             Rect footprint = shrink(leaf);
-            int waterSides = computeWaterSides(footprint, t, p.probeDistanceBlocks());
+            // Step 4b of the brief. Shared with RoadsideLots - see WaterFrontage's doc for why this
+            // is a full per-side scan rather than the three-point probe that used to live here.
+            int waterSides = WaterFrontage.sidesOf(footprint, t, p.probeDistanceBlocks());
             int groundHeight = t.heightAt(centre.x(), centre.z());
 
             // Placeholder id and sizeClass: Planner rebuilds every lot once it has seen the whole
@@ -283,50 +282,5 @@ public final class LotSubdivider {
         double cx = ax + t * dx, cz = az + t * dz;
         double ddx = p.x() - cx, ddz = p.z() - cz;
         return Math.sqrt(ddx * ddx + ddz * ddz);
-    }
-
-    /**
-     * Step 4b of the brief: probes three points along each of the footprint's four sides,
-     * {@code probeDistance} blocks beyond that side, and sets the side's bit if any sample is water.
-     * Three samples rather than one so a river meeting the lot at an angle, touching only part of a
-     * side, is still caught.
-     */
-    private static int computeWaterSides(Rect footprint, TerrainSampler t, int probeDistance) {
-        int mask = 0;
-        if (sideTouchesWater(footprint, t, probeDistance, 0, -1)) {
-            mask |= WaterShape.NORTH;
-        }
-        if (sideTouchesWater(footprint, t, probeDistance, 1, 0)) {
-            mask |= WaterShape.EAST;
-        }
-        if (sideTouchesWater(footprint, t, probeDistance, 0, 1)) {
-            mask |= WaterShape.SOUTH;
-        }
-        if (sideTouchesWater(footprint, t, probeDistance, -1, 0)) {
-            mask |= WaterShape.WEST;
-        }
-        return mask;
-    }
-
-    /** {@code (dx, dz)} points outward from the side being probed: north is -z, east is +x, etc. */
-    private static boolean sideTouchesWater(Rect footprint, TerrainSampler t, int probeDistance, int dx, int dz) {
-        if (dz != 0) {
-            int z = dz < 0 ? footprint.minZ() - probeDistance : footprint.maxZ() + probeDistance;
-            for (double frac : SIDE_SAMPLE_FRACTIONS) {
-                int x = (int) Math.round(footprint.minX() + frac * (footprint.maxX() - footprint.minX()));
-                if (t.isWaterAt(x, z)) {
-                    return true;
-                }
-            }
-        } else {
-            int x = dx < 0 ? footprint.minX() - probeDistance : footprint.maxX() + probeDistance;
-            for (double frac : SIDE_SAMPLE_FRACTIONS) {
-                int z = (int) Math.round(footprint.minZ() + frac * (footprint.maxZ() - footprint.minZ()));
-                if (t.isWaterAt(x, z)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }

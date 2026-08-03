@@ -11,6 +11,7 @@ import dev.krona.urbex.plan.terrain.CliffTerrain;
 import dev.krona.urbex.plan.terrain.CoastTerrain;
 import dev.krona.urbex.plan.terrain.FlatTerrain;
 import dev.krona.urbex.plan.terrain.HillTerrain;
+import dev.krona.urbex.plan.terrain.MeanderTerrain;
 import dev.krona.urbex.plan.terrain.RiverTerrain;
 
 import java.io.IOException;
@@ -160,7 +161,7 @@ public final class PlanJson {
     public static void main(String[] args) throws IOException {
         if (args.length < 3 || args.length > 4) {
             System.err.println("usage: PlanJson <seed> <settlementClass> <outputPath> [terrain]");
-            System.err.println("  terrain: flat (default), hill, river, coast or cliff");
+            System.err.println("  terrain: flat (default), hill, river, meander, coast or cliff");
             System.exit(1);
             return;
         }
@@ -190,10 +191,11 @@ public final class PlanJson {
             case "flat" -> new FlatTerrain(64);
             case "hill" -> new HillTerrain(64, 96, 128);
             case "river" -> new RiverTerrain(64, 0, 24);
+            case "meander" -> new MeanderTerrain(64, 0, 40.0, 55.0, 24);
             case "coast" -> new CoastTerrain(64, 64);
             case "cliff" -> new CliffTerrain(64, 20, 0);
             default -> throw new IllegalArgumentException("unknown terrain: " + name
-                    + " (expected flat, hill, river, coast or cliff)");
+                    + " (expected flat, hill, river, meander, coast or cliff)");
         };
     }
 }

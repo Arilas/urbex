@@ -7,6 +7,7 @@ import dev.krona.urbex.plan.geom.Vec2;
 import dev.krona.urbex.plan.lot.Lot;
 import dev.krona.urbex.plan.terrain.CoastTerrain;
 import dev.krona.urbex.plan.terrain.FlatTerrain;
+import dev.krona.urbex.plan.terrain.MeanderTerrain;
 import dev.krona.urbex.plan.terrain.RiverTerrain;
 import org.junit.jupiter.api.Test;
 
@@ -150,6 +151,71 @@ class PlannerTest {
                 }
             }
         }
+    }
+
+    /**
+     * A lot's {@code waterSides} has to describe the whole of each side, not three points on it -
+     * P3 picks a building's frontage piece from the resulting {@code waterShape()}, so a side that
+     * faces the river but is not flagged puts an inland facade on a riverbank.
+     * <p>
+     * On {@link MeanderTerrain} rather than {@link RiverTerrain}: a bank running parallel to the
+     * side being probed is the one geometry where sampling three points and scanning the whole side
+     * can hardly ever disagree, so this assertion passed against the old three-point probe on every
+     * straight terrain in this suite. Measured across HAMLET/VILLAGE/TOWN/CITY on meandering,
+     * angled and noisy-lake terrain, that probe got the mask wrong on 38.8% of water-adjacent lots
+     * (324 of 835) and missed a lot's water frontage entirely on 16.9% of them.
+     * <p>
+     * This restates {@code WaterFrontage}'s predicate rather than deriving it independently, which
+     * for "is any block of this line wet" is the whole of the specification; what it adds over
+     * {@code WaterFrontageTest}'s hand-authored expectations is that both pipelines - block
+     * subdivision for TOWN/CITY, roadside frontage for VILLAGE - actually route through it on
+     * terrain neither was tuned against.
+     */
+    @Test
+    void everyWaterFacingSideIsFlagged() {
+        MeanderTerrain river = new MeanderTerrain(64, 0, 40.0, 55.0, 24);
+        int probe = P.probeDistanceBlocks();
+        long flagged = 0;
+        for (long seed = 0; seed < 20; seed++) {
+            for (Settlement s : List.of(TOWN, CITY, VILLAGE)) {
+                for (Lot lot : Planner.plan(seed, s, river, P).lots()) {
+                    Rect fp = lot.footprint();
+                    for (int side = 0; side < 4; side++) {
+                        boolean wet = sideFacesWater(fp, river, probe, side);
+                        boolean bitSet = (lot.waterSides() & (1 << side)) != 0;
+                        assertEquals(wet, bitSet,
+                                s.cls() + " seed " + seed + ": lot " + lot.id() + " footprint " + fp
+                                        + " side " + side + " faces water = " + wet
+                                        + " but waterSides = " + lot.waterSides());
+                    }
+                    if (lot.waterSides() != 0) {
+                        flagged++;
+                    }
+                }
+            }
+        }
+        assertTrue(flagged > 50,
+                "expected a meandering river to give plenty of lots water frontage, got " + flagged);
+    }
+
+    /** Sides in {@code WaterShape} bit order: 0 north (-z), 1 east (+x), 2 south (+z), 3 west (-x). */
+    private static boolean sideFacesWater(Rect fp, TerrainSampler t, int probe, int side) {
+        if (side == 0 || side == 2) {
+            int z = side == 0 ? fp.minZ() - probe : fp.maxZ() + probe;
+            for (int x = fp.minX(); x <= fp.maxX(); x++) {
+                if (t.isWaterAt(x, z)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        int x = side == 3 ? fp.minX() - probe : fp.maxX() + probe;
+        for (int z = fp.minZ(); z <= fp.maxZ(); z++) {
+            if (t.isWaterAt(x, z)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test

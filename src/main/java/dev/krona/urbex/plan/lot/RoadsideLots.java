@@ -38,9 +38,6 @@ import java.util.List;
  */
 public final class RoadsideLots {
 
-    /** Same three offsets {@link LotSubdivider} uses for both its dryness and water-side probes. */
-    private static final double[] SAMPLE_FRACTIONS = {0.2, 0.5, 0.8};
-
     /**
      * {@code sizeClass} for every roadside lot. {@code Planner.finalizeLots} ranks block-subdivision
      * lots into tertiles because that pipeline actually produces a range of areas (a block's
@@ -168,7 +165,9 @@ public final class RoadsideLots {
                     continue;
                 }
 
-                int waterSides = computeWaterSides(footprint, t, p.probeDistanceBlocks());
+                // Step 5 of the brief: the exact water-side scan LotSubdivider uses, shared rather
+                // than copied - see WaterFrontage's doc for what the copy here used to get wrong.
+                int waterSides = WaterFrontage.sidesOf(footprint, t, p.probeDistanceBlocks());
                 Vec2 lotCentre = footprint.center();
                 int groundHeight = t.heightAt(lotCentre.x(), lotCentre.z());
                 // Step 1: OUTER unless the lot is actually near water, in which case WATERFRONT. Lot
@@ -316,45 +315,6 @@ public final class RoadsideLots {
         for (Vec2 c : corners) {
             if (DistrictMap.waterWithin(c, t, DistrictMap.WATERFRONT_RADIUS_BLOCKS)) {
                 return true;
-            }
-        }
-        return false;
-    }
-
-    /** Step 5 of the brief: the exact water-side probe {@code LotSubdivider.computeWaterSides} uses. */
-    private static int computeWaterSides(Rect footprint, TerrainSampler t, int probeDistance) {
-        int mask = 0;
-        if (sideTouchesWater(footprint, t, probeDistance, 0, -1)) {
-            mask |= WaterShape.NORTH;
-        }
-        if (sideTouchesWater(footprint, t, probeDistance, 1, 0)) {
-            mask |= WaterShape.EAST;
-        }
-        if (sideTouchesWater(footprint, t, probeDistance, 0, 1)) {
-            mask |= WaterShape.SOUTH;
-        }
-        if (sideTouchesWater(footprint, t, probeDistance, -1, 0)) {
-            mask |= WaterShape.WEST;
-        }
-        return mask;
-    }
-
-    private static boolean sideTouchesWater(Rect footprint, TerrainSampler t, int probeDistance, int dx, int dz) {
-        if (dz != 0) {
-            int z = dz < 0 ? footprint.minZ() - probeDistance : footprint.maxZ() + probeDistance;
-            for (double frac : SAMPLE_FRACTIONS) {
-                int x = (int) Math.round(footprint.minX() + frac * (footprint.maxX() - footprint.minX()));
-                if (t.isWaterAt(x, z)) {
-                    return true;
-                }
-            }
-        } else {
-            int x = dx < 0 ? footprint.minX() - probeDistance : footprint.maxX() + probeDistance;
-            for (double frac : SAMPLE_FRACTIONS) {
-                int z = (int) Math.round(footprint.minZ() + frac * (footprint.maxZ() - footprint.minZ()));
-                if (t.isWaterAt(x, z)) {
-                    return true;
-                }
             }
         }
         return false;
