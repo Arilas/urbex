@@ -6,13 +6,14 @@ import dev.krona.urbex.plan.geom.Vec2;
 /**
  * Which settlement, if any, covers a chunk.
  * <p>
- * Classes are tested largest first, so where two classes' cells would both produce a settlement
- * covering this chunk, the larger wins and the smaller is simply never reported. That per-chunk rule
- * is not, on its own, enough: a smaller settlement's cell can straddle the edge of a bigger one, so
- * only part of the smaller settlement's footprint is ever shadowed chunk-by-chunk while the rest
- * still gets reported, leaving its bounding box touching the bigger one's. {@link #candidateFor} closes
- * that gap by discarding a smaller candidate outright &mdash; everywhere, not just at the shared
- * chunks &mdash; whenever its bounds touch any strictly larger class's bounds anywhere nearby.
+ * A naive per-chunk rule &mdash; try classes largest first, and let the larger one win any chunk
+ * both would cover &mdash; is not enough on its own: a smaller settlement's cell can straddle the
+ * edge of a bigger one, so only part of the smaller settlement's footprint would ever be shadowed
+ * chunk-by-chunk while the rest still got reported, leaving its bounding box touching the bigger
+ * one's. {@link #shadowedByLargerClass} closes that gap by discarding a smaller candidate outright
+ * &mdash; everywhere, not just at the shared chunks &mdash; whenever its bounds touch a class larger
+ * than it anywhere nearby, recursively, so a class that would itself be discarded can never shadow
+ * anything either.
  */
 public final class SettlementMap {
 
@@ -27,7 +28,14 @@ public final class SettlementMap {
             SettlementClass.HAMLET
     };
 
-    /** The settlement covering this chunk, or {@code null}. */
+    /**
+     * The settlement covering this chunk, or {@code null}.
+     * <p>
+     * The {@code LARGEST_FIRST} iteration order is not load-bearing: {@link #shadowedByLargerClass}
+     * already resolves each candidate against every strictly-larger class on its own, independent of
+     * the order classes are tried in here. Largest-first is kept only because it lets this loop
+     * return as soon as it finds a match, without changing which settlement, if any, that is.
+     */
     public static Settlement at(long seed, int chunkX, int chunkZ, PlanParams params) {
         for (SettlementClass cls : LARGEST_FIRST) {
             Settlement s = candidateFor(seed, chunkX, chunkZ, cls);
@@ -40,14 +48,19 @@ public final class SettlementMap {
 
     /**
      * The settlement of {@code cls} owned by the cell containing this chunk, or {@code null} &mdash;
-     * either because that cell rolled no settlement, or because the raw candidate's bounds touch a
-     * strictly larger class's bounds and is therefore fully shadowed (see class doc).
+     * either because that cell rolled no settlement, or because the candidate is shadowed by a
+     * strictly larger class (see class doc). Delegates to {@link #resolvedCandidateForCell} once the
+     * chunk coordinate has been reduced to this class's own cell coordinate.
      */
     private static Settlement candidateFor(long seed, int chunkX, int chunkZ, SettlementClass cls) {
         int cell = cls.cellSizeChunks();
         int cellX = Math.floorDiv(chunkX, cell);
         int cellZ = Math.floorDiv(chunkZ, cell);
+        return resolvedCandidateForCell(seed, cellX, cellZ, cls);
+    }
 
+    /** The raw candidate for {@code cls} in this cell, or {@code null} if it does not exist or is shadowed. */
+    private static Settlement resolvedCandidateForCell(long seed, int cellX, int cellZ, SettlementClass cls) {
         Settlement candidate = rawCandidateForCell(seed, cellX, cellZ, cls);
         if (candidate == null || shadowedByLargerClass(seed, candidate, cls)) {
             return null;
@@ -79,13 +92,19 @@ public final class SettlementMap {
     }
 
     /**
-     * Whether {@code candidate}'s bounds touch a raw (unmasked) candidate of any class larger than
-     * {@code cls}. A candidate's footprint is tiny next to a larger class's cell, so at most a
-     * handful of that larger lattice's cells can possibly reach it; every one of them is checked.
-     * Using each larger class's raw candidate (rather than its own possibly-shadowed result) is
-     * still correct: if that larger candidate is itself shadowed by something bigger still, this
-     * candidate is shadowed by that same bigger class directly, since every strictly larger class is
-     * checked independently here.
+     * Whether {@code candidate}'s bounds touch the <em>resolved</em> candidate of any class larger
+     * than {@code cls} &mdash; i.e. one that would itself survive {@link #resolvedCandidateForCell},
+     * not merely one that rolled into existence. A candidate's footprint is tiny next to a larger
+     * class's cell, so at most a handful of that larger lattice's cells can possibly reach it; every
+     * one of them is checked.
+     * <p>
+     * This recurses into {@link #resolvedCandidateForCell} rather than the raw candidate on purpose:
+     * a larger candidate that would itself be shadowed by something bigger still is never reported by
+     * {@link #at}, so it must not be allowed to shadow anything either &mdash; otherwise a three-level
+     * chain (X touches Y, Y is shadowed by Z, X does not touch Z) would discard X for no reason, even
+     * though Y was never going to be reported anyway. The recursion always terminates: each call only
+     * ever descends into classes strictly larger than its own, and there are five classes total, so
+     * the call stack is at most four deep (from {@code HAMLET} up through {@code METROPOLIS}).
      */
     private static boolean shadowedByLargerClass(long seed, Settlement candidate, SettlementClass cls) {
         Rect bounds = candidate.boundsChunks();
@@ -100,7 +119,7 @@ public final class SettlementMap {
             int maxCellZ = Math.floorDiv(bounds.maxZ(), bigCell);
             for (int cellX = minCellX; cellX <= maxCellX; cellX++) {
                 for (int cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
-                    Settlement other = rawCandidateForCell(seed, cellX, cellZ, bigger);
+                    Settlement other = resolvedCandidateForCell(seed, cellX, cellZ, bigger);
                     if (other != null && other.boundsChunks().intersects(bounds)) {
                         return true;
                     }
