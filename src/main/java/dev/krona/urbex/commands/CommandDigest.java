@@ -28,8 +28,16 @@ import java.util.Random;
 /**
  * Generates a square of chunks in a chosen order and prints two hashes of the result.
  * <p>
- * {@code DRIVERDIGEST} is the acceptance signal: it covers exactly the positions this mod wrote,
- * and nothing else. Generating the same seed in two different orders must produce the same value.
+ * {@code DRIVERDIGEST} is the acceptance signal: it covers the positions this mod wrote
+ * <em>through {@link ChunkDriver}</em>, and nothing else. Generating the same seed in two
+ * different orders must produce the same value.
+ * <p>
+ * It does <em>not</em> cover writes that bypass the driver and go straight to the world - today
+ * the vine generation in {@code ChunkFixer} and the post-todo callbacks in
+ * {@code LostCityTerrainFeature}, both of which call {@code setBlock} on the level. Those blocks
+ * are never recorded, so order-dependence on those paths cannot be detected by this command at
+ * all. Treat a matching DRIVERDIGEST as evidence about the driven paths only. Issue #20 tracks a
+ * known order-dependence on the vine path that this command is structurally blind to.
  * <p>
  * {@code DIGEST} hashes every non-air block in every chunk. It is kept as a loose tripwire only.
  * It cannot be used as an acceptance signal, because it also hashes vanilla's ore blobs and

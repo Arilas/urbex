@@ -38,9 +38,17 @@ public class ChunkDriver {
 
     // ---------------------------------------------------------------------------------------
     // Write recording. Off in normal play; /urbex digest switches it on around a generation run
-    // so it can hash exactly what this mod placed, rather than the whole chunk. Hashing a whole
-    // chunk also hashes vanilla's ore blobs and underwater vegetation, which bleed across chunk
-    // borders and so disagree between two runs even with this mod switched off entirely.
+    // so it can hash what this mod placed *through this driver*, rather than the whole chunk.
+    // Hashing a whole chunk also hashes vanilla's ore blobs and underwater vegetation, which
+    // bleed across chunk borders and so disagree between two runs even with this mod switched
+    // off entirely.
+    //
+    // What this does NOT cover: writes this mod makes straight to the world, bypassing the
+    // driver. Those are invisible here and so invisible to the digest. Today that is the vine
+    // generation in ChunkFixer (world.setBlock in createVineStrip) and the post-todo callbacks
+    // run out of BuildingInfo.getPostTodo, which write through the WorldGenLevel. Any
+    // order-dependence on those paths is structurally unobservable to /urbex digest - see issue
+    // #20 for the vine case, which is known to be order-dependent and cannot be caught here.
     //
     // Only the touched *positions* are recorded, never the states. The digest reads each final
     // state back from the world once generation is over, so a position written three times
