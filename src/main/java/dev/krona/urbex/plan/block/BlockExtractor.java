@@ -22,12 +22,19 @@ import java.util.Set;
  * out counter-clockwise (positive signed area) and the outer face of each connected component comes
  * out clockwise (negative), so the outer face is discarded by its winding.
  * <p>
- * <b>Planarity is assumed, not verified.</b> {@link dev.krona.urbex.plan.road.ArterialGrowth} snaps
- * to nearby nodes rather than crossing edges, so crossings should not occur, but nothing here
- * detects one. If two roads did cross without a node at the crossing, the traversal would still
- * terminate and still produce closed rings, but those rings could overlap in space and one of them
- * could enclose another; the winding assertion in {@link #assertOuterFaceIsTheLargest} is the only
- * tripwire, and it only catches the case where a bogus face grows larger than the true boundary.
+ * <b>Planarity is assumed here, not verified here.</b> It is established upstream, by
+ * {@code Planarizer}, which splits every proper crossing so that two roads only ever meet at a node.
+ * Nothing in this class checks that. If two roads did cross with no node at the crossing, the
+ * traversal would still terminate and still produce closed rings, but those rings could overlap in
+ * space and one could enclose another; the winding assertion in
+ * {@link #assertOuterFaceIsTheLargest} is the only tripwire, and it only catches the case where a
+ * bogus face grows larger than the true boundary. That assertion is what originally found growth
+ * emitting crossing ring chords, before {@code Planarizer} existed.
+ * <p>
+ * Two residuals are known to remain upstream and are documented on {@code Planarizer}: non-incident
+ * collinear overlap, and a node lying on the interior of an edge it is not an endpoint of. Neither
+ * throws here — the traversal degrades rather than failing — and neither is currently produced by
+ * growth.
  * <p>
  * Everything here is deterministic. Bearings are compared with exact integer arithmetic rather than
  * {@link Math#atan2}, so the ordering cannot shift with a platform's floating-point library, and the
@@ -39,9 +46,20 @@ public final class BlockExtractor {
     private BlockExtractor() {
     }
 
+    /**
+     * Every face the traversal walks, before any filtering, each as a ring of node positions.
+     * <p>
+     * Package-private because the tests need to see the walk itself, not just what survives it.
+     * Whether a dead-end spur was absorbed into the face alongside it or was walked into a separate
+     * zero-area face of its own is invisible from {@link #extract}, since the area filter discards
+     * the second either way — and those are very different traversals.
+     */
+    static List<List<Vec2>> walkFaceRings(RoadGraph graph) {
+        return HalfEdges.of(graph).walkFaces();
+    }
+
     public static List<CityBlock> extract(RoadGraph graph, PlanParams params) {
-        HalfEdges halfEdges = HalfEdges.of(graph);
-        List<List<Vec2>> faces = halfEdges.walkFaces();
+        List<List<Vec2>> faces = walkFaceRings(graph);
 
         assertOuterFaceIsTheLargest(faces);
 
@@ -110,8 +128,12 @@ public final class BlockExtractor {
         }
     }
 
-    /** Twice the signed area of an arbitrary ring, including degenerate ones a Polygon would reject. */
-    private static long signedDoubleArea(List<Vec2> ring) {
+    /**
+     * Twice the signed area of an arbitrary ring, including degenerate ones a Polygon would reject.
+     * Package-private alongside {@link #walkFaceRings} so the tests can classify a raw face without
+     * having to build a Polygon the constructor would refuse.
+     */
+    static long signedDoubleArea(List<Vec2> ring) {
         long total = 0;
         for (int i = 0; i < ring.size(); i++) {
             Vec2 a = ring.get(i);
