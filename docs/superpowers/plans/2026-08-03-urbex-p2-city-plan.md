@@ -1887,6 +1887,363 @@ each lies in exactly one block, none sits under water."
 
 ---
 
+### Task 5b: Small settlements — spine growth and roadside lots
+
+Added during execution. Hamlets and villages generated nothing: their radii (16 and 32 blocks) are
+smaller than one road segment (48), so no spoke ever took a first step and both classes emitted a
+lone centre node. The owner's ruling: the two smallest tiers are too small, and they should not be
+miniature cities — *"instead of ring roads, it would be a main road with some additional branches"*,
+with generation of them toggleable.
+
+That has a consequence the rest of the plan does not cover. **A main road with branches is a tree.**
+It encloses no faces, so `BlockExtractor` returns nothing and the lot pipeline — which subdivides
+enclosed blocks — produces nothing either. Small settlements need lots derived from *road frontage*
+instead.
+
+**Files:**
+- Modify: `plan/SettlementClass.java` (resize the two smallest), `plan/PlanParams.java` (spine and
+  toggle fields), `plan/Planner.java` (dispatch by class)
+- Create: `plan/road/SpineGrowth.java`, `plan/lot/RoadsideLots.java`
+- Test: `src/test/java/dev/krona/urbex/plan/road/SpineGrowthTest.java`,
+  `plan/lot/RoadsideLotsTest.java`
+
+**Interfaces:**
+- Consumes: `Hash`, `PlanPurpose`, `Vec2`, `Rect`, `TerrainSampler`, `RoadGraph`/`RoadEdge`/
+  `RoadClass`, `BridgeDetector`, `Settlement`, `PlanParams`, `District`, `Lot`, `WaterShape`.
+- Produces:
+  - `SpineGrowth.grow(long seed, Settlement s, TerrainSampler t, PlanParams p) -> RoadGraph`
+  - `RoadsideLots.place(long seed, RoadGraph g, Settlement s, TerrainSampler t, PlanParams p) -> List<Lot>`
+  - `SettlementClass.usesSpine()` — true for the two smallest classes
+  - `PlanParams.smallSettlementsEnabled()`, `spineSegmentLengthBlocks()`, `branchChance()`,
+    `branchLengthSegments()`, `roadsideSetbackBlocks()`, `roadsideLotDepthBlocks()`
+
+- [ ] **Step 1: Resize the two smallest classes and add the toggle**
+
+In `SettlementClass`, hamlet becomes 4 chunks extent and village 8. Both cell sizes already satisfy
+the `cellSizeChunks >= extentChunks * 2` assertion (24 and 48), so no cell change is needed — verify
+that rather than assuming it. Add `usesSpine()` returning true for `HAMLET` and `VILLAGE`.
+
+Add to `PlanParams.defaults()`: `smallSettlementsEnabled` true, `spineSegmentLengthBlocks` 16,
+`branchChance` 0.45f, `branchLengthSegments` 2, `roadsideSetbackBlocks` 3, `roadsideLotDepthBlocks` 14.
+
+When `smallSettlementsEnabled` is false, `SettlementMap` must not report spine-class settlements at
+all — a disabled feature should leave empty countryside, not empty settlement bounds that still
+suppress smaller neighbours through the shadowing rule.
+
+- [ ] **Step 2: Write the failing tests**
+
+```java
+package dev.krona.urbex.plan.road;
+
+import dev.krona.urbex.plan.PlanParams;
+import dev.krona.urbex.plan.Settlement;
+import dev.krona.urbex.plan.SettlementClass;
+import dev.krona.urbex.plan.geom.Vec2;
+import dev.krona.urbex.plan.terrain.CliffTerrain;
+import dev.krona.urbex.plan.terrain.FlatTerrain;
+import dev.krona.urbex.plan.terrain.RiverTerrain;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class SpineGrowthTest {
+
+    private static final PlanParams P = PlanParams.defaults();
+    private static final Settlement HAMLET = new Settlement(SettlementClass.HAMLET, 0, 0);
+    private static final Settlement VILLAGE = new Settlement(SettlementClass.VILLAGE, 0, 0);
+
+    @Test
+    void everySmallSettlementActuallyGrowsARoad() {
+        // The bug this task exists to fix: both classes previously emitted a lone centre node.
+        for (long seed = 0; seed < 100; seed++) {
+            assertTrue(SpineGrowth.grow(seed, HAMLET, new FlatTerrain(64), P).edges().size() >= 1,
+                    "hamlet seed " + seed + " grew no road at all");
+            assertTrue(SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P).edges().size() >= 2,
+                    "village seed " + seed + " grew fewer than two roads");
+        }
+    }
+
+    @Test
+    void growthIsDeterministic() {
+        assertEquals(SpineGrowth.grow(7L, VILLAGE, new FlatTerrain(64), P),
+                SpineGrowth.grow(7L, VILLAGE, new FlatTerrain(64), P));
+    }
+
+    @Test
+    void differentSeedsGrowDifferentSpines() {
+        assertTrue(!SpineGrowth.grow(1L, VILLAGE, new FlatTerrain(64), P)
+                .equals(SpineGrowth.grow(2L, VILLAGE, new FlatTerrain(64), P)));
+    }
+
+    @Test
+    void theSpineIsConnected() {
+        for (long seed = 0; seed < 100; seed++) {
+            assertTrue(SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P).isConnected(),
+                    "village seed " + seed + " grew a disconnected spine");
+        }
+    }
+
+    @Test
+    void everyNodeStaysInsideTheSettlement() {
+        for (long seed = 0; seed < 100; seed++) {
+            RoadGraph g = SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P);
+            Vec2 c = VILLAGE.centerBlock();
+            int r = VILLAGE.radiusBlocks();
+            for (RoadNode n : g.nodes()) {
+                assertTrue(Math.abs(n.pos().x() - c.x()) <= r && Math.abs(n.pos().z() - c.z()) <= r,
+                        "seed " + seed + " put node " + n.pos() + " outside the settlement");
+            }
+        }
+    }
+
+    @Test
+    void aVillageOutgrowsAHamlet() {
+        int hamlet = 0;
+        int village = 0;
+        for (long seed = 0; seed < 50; seed++) {
+            hamlet += SpineGrowth.grow(seed, HAMLET, new FlatTerrain(64), P).edges().size();
+            village += SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P).edges().size();
+        }
+        assertTrue(village > hamlet, "village total " + village + " did not exceed hamlet " + hamlet);
+    }
+
+    @Test
+    void aSpineHasNoCycles() {
+        // A spine is a tree by design. If it ever closes a loop, block extraction would start
+        // finding faces and the roadside lot path would silently stop being the right one.
+        for (long seed = 0; seed < 100; seed++) {
+            RoadGraph g = SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P);
+            assertEquals(g.nodes().size() - 1, g.edges().size(),
+                    "village seed " + seed + " is not a tree: "
+                            + g.nodes().size() + " nodes, " + g.edges().size() + " edges");
+        }
+    }
+
+    @Test
+    void noSpineRoadClimbsACliff() {
+        CliffTerrain cliff = new CliffTerrain(64, 40, 0);
+        for (long seed = 0; seed < 50; seed++) {
+            RoadGraph g = SpineGrowth.grow(seed, VILLAGE, cliff, P);
+            for (RoadEdge e : g.edges()) {
+                if (e.bridge()) {
+                    continue;
+                }
+                Vec2 a = g.nodeAt(e.fromId()).pos();
+                Vec2 b = g.nodeAt(e.toId()).pos();
+                assertTrue(Math.abs(cliff.heightAt(a.x(), a.z()) - cliff.heightAt(b.x(), b.z()))
+                                <= P.maxSlopePerSegment(),
+                        "seed " + seed + " ran a spine road up a cliff");
+            }
+        }
+    }
+
+    @Test
+    void spineBridgesAreStillDerived() {
+        for (long seed = 0; seed < 50; seed++) {
+            RoadGraph g = SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P);
+            for (RoadEdge e : g.edges()) {
+                assertTrue(!e.bridge(), "seed " + seed + " built a spine bridge over dry ground");
+            }
+        }
+        RiverTerrain river = new RiverTerrain(64, 0, 20);
+        boolean sawBridge = false;
+        for (long seed = 0; seed < 200 && !sawBridge; seed++) {
+            for (RoadEdge e : SpineGrowth.grow(seed, VILLAGE, river, P).edges()) {
+                sawBridge |= e.bridge();
+            }
+        }
+        assertTrue(sawBridge, "no village spine ever bridged a river running through it");
+    }
+}
+```
+
+```java
+package dev.krona.urbex.plan.lot;
+
+import dev.krona.urbex.plan.PlanParams;
+import dev.krona.urbex.plan.Settlement;
+import dev.krona.urbex.plan.SettlementClass;
+import dev.krona.urbex.plan.geom.Vec2;
+import dev.krona.urbex.plan.road.RoadGraph;
+import dev.krona.urbex.plan.road.SpineGrowth;
+import dev.krona.urbex.plan.terrain.FlatTerrain;
+import dev.krona.urbex.plan.terrain.RiverTerrain;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class RoadsideLotsTest {
+
+    private static final PlanParams P = PlanParams.defaults();
+    private static final Settlement VILLAGE = new Settlement(SettlementClass.VILLAGE, 0, 0);
+
+    private static List<Lot> lots(long seed) {
+        FlatTerrain flat = new FlatTerrain(64);
+        RoadGraph g = SpineGrowth.grow(seed, VILLAGE, flat, P);
+        return RoadsideLots.place(seed, g, VILLAGE, flat, P);
+    }
+
+    @Test
+    void aVillageGetsLots() {
+        for (long seed = 0; seed < 50; seed++) {
+            assertTrue(!lots(seed).isEmpty(), "village seed " + seed + " produced no lots");
+        }
+    }
+
+    @Test
+    void lotsNeverOverlap() {
+        for (long seed = 0; seed < 50; seed++) {
+            List<Lot> l = lots(seed);
+            for (int i = 0; i < l.size(); i++) {
+                for (int j = i + 1; j < l.size(); j++) {
+                    assertTrue(!l.get(i).footprint().intersects(l.get(j).footprint()),
+                            "seed " + seed + ": lots " + i + " and " + j + " overlap");
+                }
+            }
+        }
+    }
+
+    @Test
+    void everyLotFrontsARealRoad() {
+        for (long seed = 0; seed < 50; seed++) {
+            RoadGraph g = SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P);
+            for (Lot lot : RoadsideLots.place(seed, g, VILLAGE, new FlatTerrain(64), P)) {
+                assertTrue(lot.frontingEdgeIndex() >= 0
+                                && lot.frontingEdgeIndex() < g.edges().size(),
+                        "seed " + seed + ": lot " + lot.id() + " fronts onto no road");
+            }
+        }
+    }
+
+    @Test
+    void noLotSitsOnTheRoadItFronts() {
+        // The setback is what stops a building being placed in the carriageway.
+        for (long seed = 0; seed < 50; seed++) {
+            RoadGraph g = SpineGrowth.grow(seed, VILLAGE, new FlatTerrain(64), P);
+            for (Lot lot : RoadsideLots.place(seed, g, VILLAGE, new FlatTerrain(64), P)) {
+                var e = g.edges().get(lot.frontingEdgeIndex());
+                Vec2 a = g.nodeAt(e.fromId()).pos();
+                Vec2 b = g.nodeAt(e.toId()).pos();
+                assertTrue(distanceToSegment(lot.footprint().center(), a, b) >= P.roadsideSetbackBlocks(),
+                        "seed " + seed + ": lot " + lot.id() + " sits on its own road");
+            }
+        }
+    }
+
+    @Test
+    void noLotSitsUnderWater() {
+        RiverTerrain river = new RiverTerrain(64, 0, 20);
+        for (long seed = 0; seed < 50; seed++) {
+            RoadGraph g = SpineGrowth.grow(seed, VILLAGE, river, P);
+            for (Lot lot : RoadsideLots.place(seed, g, VILLAGE, river, P)) {
+                Vec2 c = lot.footprint().center();
+                assertTrue(!river.isWaterAt(c.x(), c.z()),
+                        "seed " + seed + ": lot " + lot.id() + " sits in the river");
+            }
+        }
+    }
+
+    @Test
+    void placementIsDeterministic() {
+        assertEquals(lots(9L), lots(9L));
+    }
+
+    private static double distanceToSegment(Vec2 p, Vec2 a, Vec2 b) {
+        double dx = b.x() - a.x();
+        double dz = b.z() - a.z();
+        double len2 = dx * dx + dz * dz;
+        if (len2 == 0) {
+            return Math.hypot(p.x() - a.x(), p.z() - a.z());
+        }
+        double t = Math.max(0, Math.min(1, ((p.x() - a.x()) * dx + (p.z() - a.z()) * dz) / len2));
+        return Math.hypot(p.x() - (a.x() + t * dx), p.z() - (a.z() + t * dz));
+    }
+}
+```
+
+- [ ] **Step 3: Run and watch them fail**
+
+```bash
+./gradlew test --tests 'dev.krona.urbex.plan.road.SpineGrowthTest' --tests 'dev.krona.urbex.plan.lot.RoadsideLotsTest'
+```
+Expected: FAIL — `SpineGrowth` and `RoadsideLots` do not exist.
+
+- [ ] **Step 4: Implement `SpineGrowth`**
+
+A main road with branches, stated precisely:
+
+1. Pick a spine bearing from `PlanPurpose.SPOKE_ANGLE` at the settlement's centre chunk. Place the
+   centre node.
+2. Walk outward from the centre in both directions along that bearing, in steps of
+   `spineSegmentLengthBlocks`, using the same candidate scoring `ArterialGrowth` uses — consider the
+   current bearing and ±15° and ±30°, reject candidates exceeding `maxSlopePerSegment` unless over
+   water, take the lowest-scoring survivor. Stop at the settlement radius.
+3. At each spine node after the first, roll `branchChance` from `PlanPurpose.SPOKE_STEP` addressed at
+   that node's position. On a hit, grow a branch perpendicular to the local spine direction (side
+   chosen from the same draw) for `branchLengthSegments` steps, with the same scoring and stop rules.
+4. **Never snap to an existing node.** The spine must stay a tree — `aSpineHasNoCycles` enforces it —
+   because roadside lot placement is the correct derivation only for a tree. If you find yourself
+   wanting to close a loop, the settlement wants `ArterialGrowth` instead.
+5. Spine edges are `RoadClass.COLLECTOR`; branches are `RoadClass.LOCAL`.
+6. Call `BridgeDetector.mark(graph, terrain, params, centreNodeId)` before returning, exactly as
+   `ArterialGrowth` does, so bridges stay derived rather than rolled.
+
+- [ ] **Step 5: Implement `RoadsideLots`**
+
+For each edge, walk its length in steps of the lot width and place a lot on each side:
+
+1. Lot width comes from `District` as usual; a spine settlement is `OUTER` throughout unless the
+   waterfront rule applies, so use the outer size.
+2. A lot's near edge sits `roadsideSetbackBlocks` from the road centreline; its depth is
+   `roadsideLotDepthBlocks`.
+3. Reject a lot whose footprint leaves the settlement bounds, is not fully dry (probe a 3×3 grid, the
+   same test `LotSubdivider` uses), or intersects an already-placed lot. Rejecting rather than
+   shrinking keeps the invariant structural.
+4. `frontingEdgeIndex` is the edge the lot was placed against — known by construction here, which is
+   the one genuine advantage this path has over block subdivision.
+5. `waterSides` is computed exactly as `LotSubdivider` does, so `WaterShape` works identically for
+   both settlement shapes.
+
+- [ ] **Step 6: Dispatch by class in `Planner`**
+
+`Planner.plan` branches on `settlement.cls().usesSpine()`: spine classes take
+`SpineGrowth` + `RoadsideLots` and produce a `CityPlan` with an empty block list; the rest keep the
+existing `ArterialGrowth` + `BlockExtractor` + `DistrictMap` + `LotSubdivider` path. `CityPlan` needs
+no new shape — a spine plan simply has no blocks, which is exactly what a tree means.
+
+- [ ] **Step 7: Run everything and commit**
+
+```bash
+./gradlew test
+```
+Expected: PASS, including the existing suite. `PlannerTest`'s invariants must hold for spine classes
+too — every lot fronts a road, lots never overlap, none sits under water.
+
+```bash
+git add -A
+git commit -m "feat(plan): spine growth and roadside lots for small settlements
+
+Hamlets and villages generated nothing: their radii were smaller than one
+road segment, so no spoke ever took a first step. Both are enlarged and now
+take their own generator - a main road with branches rather than a miniature
+ring-road city.
+
+A spine is a tree, so it encloses no faces and the block-subdivision path
+yields nothing. Small settlements therefore derive lots from road frontage
+instead, which also means a lot's fronting road is known by construction
+rather than found by search.
+
+Generation of small settlements is toggleable; when disabled they are not
+placed at all, so they leave countryside rather than empty bounds that would
+still suppress neighbours."
+```
+
+---
+
 ### Task 6: JSON, the viewer, and the plan digest
 
 **Files:**
