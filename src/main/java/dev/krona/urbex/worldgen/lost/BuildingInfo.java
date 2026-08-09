@@ -1,11 +1,11 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.*;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
@@ -29,19 +29,19 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-import static dev.krona.urbex.worldgen.LostCityTerrainFeature.FLOORHEIGHT;
+import static dev.krona.urbex.worldgen.CityGenerator.FLOORHEIGHT;
 
 public class BuildingInfo {
 
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
-    public final LostCityProfile profile;       // Profile cactive for this chunk: can be different in city sphere worlds
+    public final UrbexProfile profile;       // Profile cactive for this chunk: can be different in city sphere worlds
 
     public final boolean outsideChunk;  // Only used for citysphere worlds and when this chunk is outside
     public int groundLevel;
     public final int waterLevel;
 
-    // Volatile: LostCityTerrainFeature.generate() clears this when it finds a blacklisted structure
+    // Volatile: CityGenerator.generate() clears this when it finds a blacklisted structure
     // in the chunk, after the info is already in the shared cache and visible to other threads.
     public volatile boolean isCity;
     public boolean hasBuilding;
@@ -283,22 +283,22 @@ public class BuildingInfo {
     }
 
     // Version for usage inside the gui
-    public static boolean hasBuildingGui(int chunkX, int chunkZ, IDimensionInfo provider, LostChunkCharacteristics characteristics) {
+    public static boolean hasBuildingGui(int chunkX, int chunkZ, IDimensionInfo provider, ChunkCharacteristics characteristics) {
 //        Random rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
 //        rand.nextFloat();       // Compatibility?
 
         return characteristics.couldHaveBuilding;
     }
 
-    public static LostChunkCharacteristics getChunkCharacteristicsGui(ChunkCoord key, IDimensionInfo provider) {
-//        LostChunkCharacteristics cached = CITY_INFO_MAP.get(key);
+    public static ChunkCharacteristics getChunkCharacteristicsGui(ChunkCoord key, IDimensionInfo provider) {
+//        ChunkCharacteristics cached = CITY_INFO_MAP.get(key);
 //        if (cached != null) {
 //            return cached;
 //        }
         int chunkX = key.chunkX();
         int chunkZ = key.chunkZ();
-        LostCityProfile profile = getProfile(key, provider);
-        LostChunkCharacteristics characteristics = new LostChunkCharacteristics();
+        UrbexProfile profile = getProfile(key, provider);
+        ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
         characteristics.isCity = isCityRaw(key, provider, profile);
         characteristics.cityLevel = getCityLevelGui(key, provider);
@@ -314,15 +314,15 @@ public class BuildingInfo {
      * them simply loses the putIfAbsent below. Locking here would be a deadlock waiting to happen -
      * this method reaches its neighbours' city styles, which reach back here.
      */
-    public static LostChunkCharacteristics getChunkCharacteristics(ChunkCoord coord, IDimensionInfo provider) {
-        LostChunkCharacteristics cached = provider.caches().characteristics.get(coord);
+    public static ChunkCharacteristics getChunkCharacteristics(ChunkCoord coord, IDimensionInfo provider) {
+        ChunkCharacteristics cached = provider.caches().characteristics.get(coord);
         if (cached != null) {
             return cached;
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        LostCityProfile profile = getProfile(coord, provider);
-        LostChunkCharacteristics characteristics = new LostChunkCharacteristics();
+        UrbexProfile profile = getProfile(coord, provider);
+        ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
         WorldGenLevel world = provider.getWorld();
         characteristics.isCity = isCityRaw(coord, provider, profile);
@@ -372,7 +372,7 @@ public class BuildingInfo {
         characteristics.cityStyle = cityStyle;
 
         if (characteristics.multiPos.isMulti() && !characteristics.multiPos.isTopLeft()) {
-            LostChunkCharacteristics topleft = getTopLeftCityInfo(characteristics, coord, provider);
+            ChunkCharacteristics topleft = getTopLeftCityInfo(characteristics, coord, provider);
 //                characteristics.multiBuilding = topleft.multiBuilding;
             if (characteristics.multiBuilding != null) {
                 String b = characteristics.multiBuilding.getBuilding(characteristics.multiPos.x(), characteristics.multiPos.z());
@@ -407,20 +407,20 @@ public class BuildingInfo {
             }
         }
 
-        LostChunkCharacteristics raced = provider.caches().characteristics.putIfAbsent(coord, characteristics);
+        ChunkCharacteristics raced = provider.caches().characteristics.putIfAbsent(coord, characteristics);
         return raced != null ? raced : characteristics;
     }
 
     // Change city status
     public static void setCityRaw(ChunkCoord coord, IDimensionInfo provider, boolean isCity) {
-        LostChunkCharacteristics characteristics = getChunkCharacteristics(coord, provider);
+        ChunkCharacteristics characteristics = getChunkCharacteristics(coord, provider);
         characteristics.isCity = isCity;
     }
 
     /**
      * Don't use the cache as we're busy building the cache.
      */
-    public static boolean isCityRaw(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static boolean isCityRaw(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         if (isVoidChunk(coord, provider)) {
             // If we have a void chunk then no city here
             return false;
@@ -440,7 +440,7 @@ public class BuildingInfo {
         return getChunkCharacteristics(coord, provider).isCity;
     }
 
-    private static boolean checkBuildingPossibility(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile, MultiPos section, int cityLevel, RandomSource rand) {
+    private static boolean checkBuildingPossibility(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile, MultiPos section, int cityLevel, RandomSource rand) {
         boolean b;
         float bc = rand.nextFloat();
 
@@ -492,7 +492,7 @@ public class BuildingInfo {
     /**
      * Initialize the chunk characteristics with the multi building information
      */
-    private static void initMultiBuildingSection(LostChunkCharacteristics characteristics, ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    private static void initMultiBuildingSection(ChunkCharacteristics characteristics, ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         // If a chunk is occupied according to City then there is a predefined building or street here.
         // Try to look for it
         if (City.isChunkOccupied(provider, coord)) {
@@ -531,7 +531,7 @@ public class BuildingInfo {
         return getBuildingInfo(key, provider);
     }
 
-    private static int getAverageCityLevel(LostChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
+    private static int getAverageCityLevel(ChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
         int level = 0;
         MultiPos mp = thisone.multiPos;
         int topX = coord.chunkX() - mp.x();
@@ -545,7 +545,7 @@ public class BuildingInfo {
         return level / (mp.w() * mp.h());
     }
 
-    private static int getTopLeftCityLevel(LostChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
+    private static int getTopLeftCityLevel(ChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
         MultiPos mp = thisone.multiPos;
         int topX = coord.chunkX() - mp.x();
         int topZ = coord.chunkZ() - mp.z();
@@ -553,7 +553,7 @@ public class BuildingInfo {
         return getCityLevel(key, provider);
     }
 
-    private static LostChunkCharacteristics getTopLeftCityInfo(LostChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
+    private static ChunkCharacteristics getTopLeftCityInfo(ChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
         if (thisone.multiPos.isTopLeft()) {
             return thisone;
         }
@@ -561,15 +561,15 @@ public class BuildingInfo {
         return getChunkCharacteristics(key, provider);
     }
 
-    public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         return Highway.getXHighwayLevel(coord, provider, profile) >= 0 || Highway.getZHighwayLevel(coord, provider, profile) >= 0;
     }
 
-    public static boolean hasRailway(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static boolean hasRailway(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         return Railway.getRailChunkType(coord, provider, profile).getType() != RailChunkType.NONE;
     }
 
-    public static boolean hasRailwayAtSurface(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static boolean hasRailwayAtSurface(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         RailChunkType type = Railway.getRailChunkType(coord, provider, profile).getType();
         return type.isSurface() || type.isStation();
     }
@@ -611,7 +611,7 @@ public class BuildingInfo {
     /**
      * Find the correct profile for this chunk. This takes space sphere worlds into account
      */
-    public static LostCityProfile getProfile(ChunkCoord coord, IDimensionInfo provider) {
+    public static UrbexProfile getProfile(ChunkCoord coord, IDimensionInfo provider) {
         if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres())) {
             if (CitySphere.intersectsWithCitySphere(coord, provider)) {
                 return provider.getProfile();
@@ -698,7 +698,7 @@ public class BuildingInfo {
         outsideChunk = (provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && !CitySphere.intersectsWithCitySphere(key, provider);
         profile = getProfile(key, provider);
 
-        LostChunkCharacteristics characteristics = getChunkCharacteristics(key, provider);
+        ChunkCharacteristics characteristics = getChunkCharacteristics(key, provider);
 
         cityLevel = characteristics.cityLevel;
         buildingType = characteristics.buildingType;
@@ -1159,7 +1159,7 @@ public class BuildingInfo {
         }
     }
 
-    private static int getCityLevelNormal(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    private static int getCityLevelNormal(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         ChunkHeightmap heightmap = provider.getHeightmap(coord);
         int height = heightmap.getHeight();
         if (profile.USE_AVG_HEIGHTMAP && Config.HEIGHT_SAMPLE_SIZE.get() > 2) {
@@ -1205,7 +1205,7 @@ public class BuildingInfo {
         return getLevelBasedOnHeight(h, provider.getProfile());
     }
 
-    private static int getLevelBasedOnHeight(int height, LostCityProfile profile) {
+    private static int getLevelBasedOnHeight(int height, UrbexProfile profile) {
         if (height < profile.CITY_LEVEL0_HEIGHT) {
             return 0;
         } else if (height < profile.CITY_LEVEL1_HEIGHT) {
@@ -1475,7 +1475,7 @@ public class BuildingInfo {
         if (provider.getProfile().isSpace() && hasMonorail()) {
             return false;
         }
-        return i.cityLevel < cityLevel || LostCityTerrainFeature.isWaterBiome(provider, i.coord);
+        return i.cityLevel < cityLevel || CityGenerator.isWaterBiome(provider, i.coord);
     }
 
 
@@ -1801,23 +1801,23 @@ public class BuildingInfo {
             if (h < provider.getWorld().getMaxY() + 1) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
-                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
-                        h + LostCityTerrainFeature.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_UPPER));
+                        h + CityGenerator.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
+                        h + CityGenerator.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_UPPER));
                 return desiredMaxHeight1;
             }
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx, cz - 1));
-            getZmax().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx, cz + 1));
+            getZmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx, cz - 1));
+            getZmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL1(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL1(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL1(provider.getSeed(), cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx + 1, cz + 1));
 
             desiredMaxHeight1 = minMax;
         }
@@ -1863,16 +1863,16 @@ public class BuildingInfo {
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx, cz - 1));
-            getZmax().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx, cz + 1));
+            getZmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx, cz - 1));
+            getZmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL2(minMax, 20 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL2(minMax, 25 + LostCityTerrainFeature.getHeightOffsetL2(provider.getSeed(), cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx + 1, cz + 1));
             desiredTerrainCorrectionHeights = minMax;
         }
         return desiredTerrainCorrectionHeights;

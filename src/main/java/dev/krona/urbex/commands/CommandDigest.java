@@ -23,7 +23,7 @@ import dev.krona.urbex.worldgen.DigestRunner;
  * <p>
  * It does <em>not</em> cover writes that bypass the driver and go straight to the world - today
  * the vine generation in {@code ChunkFixer} and the post-todo callbacks in
- * {@code LostCityTerrainFeature}, both of which call {@code setBlock} on the level. Those blocks
+ * {@code CityGenerator}, both of which call {@code setBlock} on the level. Those blocks
  * are never recorded, so order-dependence on those paths cannot be detected by this command at
  * all. Treat a matching DRIVERDIGEST as evidence about the driven paths only. Issue #20 tracks a
  * known order-dependence on the vine path that this command is structurally blind to.

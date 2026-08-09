@@ -1,7 +1,7 @@
 package dev.krona.urbex.gui.elements;
 
 import dev.krona.urbex.config.Configuration;
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +25,7 @@ class PercentageSliderElementTest {
 
     @Test
     void productionBindingAppliesAndSynchronizesSnappedProfileValue() {
-        LostCityProfile profile = new LostCityProfile("slider-binding", true);
+        UrbexProfile profile = new UrbexProfile("slider-binding", true);
 
         float applied = PercentageSliderElement.apply(profile, "lostcity.lightingDensity", 0.376);
         float synchronizedValue = PercentageSliderElement.read(
@@ -38,7 +38,7 @@ class PercentageSliderElementTest {
 
     @Test
     void densityTooltipsComeFromApprovedProfileComments() {
-        Configuration configuration = new LostCityProfile("slider-tooltips", true).toConfiguration();
+        Configuration configuration = new UrbexProfile("slider-tooltips", true).toConfiguration();
 
         assertEquals("Chance that an optional decorative-light marker places a light",
                 PercentageSliderElement.comment(configuration, "lostcity.lightingDensity").getString());

@@ -27,7 +27,7 @@ public class StructureSuppressor {
         if (!Config.STRUCTURES_YIELD_TO_CITIES.get()) {
             return false;
         }
-        LostCityFeature feature = Registration.lostCityFeature();
+        CityFeature feature = Registration.cityFeature();
         if (feature == null) {
             return false;
         }
@@ -47,10 +47,10 @@ public class StructureSuppressor {
         int ground = info.getCityGroundLevel();
         // One extra floor of slack at both ends so a structure does not clip the roof or
         // undermine the lowest cellar.
-        int top = ground + (info.hasBuilding ? info.getNumFloors() * LostCityTerrainFeature.FLOORHEIGHT : 0)
-                + LostCityTerrainFeature.FLOORHEIGHT;
-        int bottom = ground - info.getNumCellars() * LostCityTerrainFeature.FLOORHEIGHT
-                - LostCityTerrainFeature.FLOORHEIGHT;
+        int top = ground + (info.hasBuilding ? info.getNumFloors() * CityGenerator.FLOORHEIGHT : 0)
+                + CityGenerator.FLOORHEIGHT;
+        int bottom = ground - info.getNumCellars() * CityGenerator.FLOORHEIGHT
+                - CityGenerator.FLOORHEIGHT;
         // Structures that pass well under the city (ancient cities, mineshafts, deep
         // ruined portals) never conflict with it, so leave those alone.
         return structureBox.maxY() >= bottom && structureBox.minY() <= top;

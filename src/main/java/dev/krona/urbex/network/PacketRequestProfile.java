@@ -27,7 +27,7 @@ public record PacketRequestProfile(ResourceKey<Level> dimension) implements Cust
     public void handle() {
         // @todo 1.14
 //            ServerPlayerEntity player = ctx.get().getSender();
-//            LostCityProfile profile = WorldTypeTools.getProfile(WorldTools.getWorld(dimension));
+//            UrbexProfile profile = WorldTypeTools.getProfile(WorldTools.getWorld(dimension));
 //            PacketHandler.INSTANCE.sendTo(new PacketRequestProfile(dimension, profile.getName()), player.connection.netManager, NetworkDirection.PLAY_TO_CLIENT);
     }
 }

@@ -5,7 +5,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.cityassets.MultiBuilding;
 import net.minecraft.resources.Identifier;
 
-public class LostChunkCharacteristics {
+public class ChunkCharacteristics {
     // Volatile: setCityRaw() flips this from the thread generating that chunk, after the object is
     // already in the shared cache, and neighbouring chunks on other threads read it.
     public volatile boolean isCity;

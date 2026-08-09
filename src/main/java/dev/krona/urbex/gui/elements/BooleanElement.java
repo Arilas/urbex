@@ -1,18 +1,18 @@
 package dev.krona.urbex.gui.elements;
 
 import dev.krona.urbex.config.Configuration;
-import dev.krona.urbex.gui.GuiLCConfig;
+import dev.krona.urbex.gui.UrbexConfigScreen;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 
 public class BooleanElement extends GuiElement {
 
-    private final GuiLCConfig gui;
+    private final UrbexConfigScreen gui;
     private String label = null;
     private final ButtonExt field;
     private final String attribute;
 
-    public BooleanElement(GuiLCConfig gui, String page, int x, int y, String attribute) {
+    public BooleanElement(UrbexConfigScreen gui, String page, int x, int y, String attribute) {
         super(page, x, y);
         this.gui = gui;
         this.attribute = attribute;

@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.varia.Rng;
@@ -249,7 +249,7 @@ public class CitySphere {
      */
     private static float getSphereRadius(ChunkCoord center, IDimensionInfo provider, RandomSource rand) {
         PredefinedCity city = City.getPredefinedCity(provider.getWorld(), center);
-        LostCityProfile profile = provider.getProfile();
+        UrbexProfile profile = provider.getProfile();
         if (city != null) {
             return city.getRadius() * profile.CITYSPHERE_FACTOR;
         }
@@ -357,7 +357,7 @@ public class CitySphere {
         return (cx-x)*(cx-x) + (cz-z)*(cz-z);
     }
 
-    private static boolean isOnSphereGrid(LostCityProfile profile, int chunkX, int chunkZ) {
+    private static boolean isOnSphereGrid(UrbexProfile profile, int chunkX, int chunkZ) {
         if (profile.CITYSPHERE_32GRID) {
             return (chunkX & 0x1f) == 8 && (chunkZ & 0x1f) == 8;
         } else {
@@ -374,7 +374,7 @@ public class CitySphere {
         RandomSource rand = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.SPHERE);
         // This information is for city spheres. This information is only relevant
         // in the chunk representing the center of the city
-        LostCityProfile profile = provider.getProfile();
+        UrbexProfile profile = provider.getProfile();
 
         // First compute the base properties (chance, radius, center position)
         boolean baseEnabled = predef != null || (rand.nextFloat() < profile.CITYSPHERE_CHANCE && isOnSphereGrid(profile, chunkX, chunkZ));

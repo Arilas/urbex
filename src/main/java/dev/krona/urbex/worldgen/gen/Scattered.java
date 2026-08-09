@@ -1,13 +1,13 @@
 package dev.krona.urbex.worldgen.gen;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredReference;
@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Scattered {
-    public static boolean avoidScattered(LostCityTerrainFeature feature, BuildingInfo info) {
+    public static boolean avoidScattered(CityGenerator feature, BuildingInfo info) {
         if (info.isCity) {
             return true;
         }
@@ -37,7 +37,7 @@ public class Scattered {
         return Highway.hasHighway(info.coord, feature.provider, feature.profile);
     }
 
-    public static void generateScattered(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings) {
+    public static void generateScattered(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, ScatteredSettings scatteredSettings) {
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
         IDimensionInfo provider = feature.provider;
@@ -125,7 +125,7 @@ public class Scattered {
             Building building = AssetRegistries.BUILDINGS.getOrThrow(provider.getWorld(), buildingName);
             int lowestLevel = scatteredLevel(feature, scattered, minheight, maxheight, avgheight);
             if (lowestLevel < -4000) {
-                LostCityProfile profile = feature.provider.getProfile();
+                UrbexProfile profile = feature.provider.getProfile();
                 if (profile.isCavern()) {
                     lowestLevel = profile.GROUNDLEVEL;
                 } else {
@@ -144,7 +144,7 @@ public class Scattered {
     }
 
     @Nullable
-    private static ScatteredReference selectRandomScattered(LostCityTerrainFeature feature, ChunkCoord areaAnchor, ScatteredSettings scatteredSettings, RandomSource rand) {
+    private static ScatteredReference selectRandomScattered(CityGenerator feature, ChunkCoord areaAnchor, ScatteredSettings scatteredSettings, RandomSource rand) {
         List<ScatteredReference> list = scatteredSettings.getList();
         if (list.isEmpty()) {
             return null;
@@ -186,7 +186,7 @@ public class Scattered {
      * function of the area (all inputs derive from the area coordinate), which is what makes
      * caching it per area sound.
      */
-    private static AreaScan scanArea(LostCityTerrainFeature feature, ScatteredReference reference, int tlChunkX, int tlChunkZ, int w, int h) {
+    private static AreaScan scanArea(CityGenerator feature, ScatteredReference reference, int tlChunkX, int tlChunkZ, int w, int h) {
         IDimensionInfo provider = feature.provider;
         int minheight = Integer.MAX_VALUE;
         int maxheight = Integer.MIN_VALUE;
@@ -230,7 +230,7 @@ public class Scattered {
         return new AreaScan(true, minheight, maxheight, avgheight / (w * h));
     }
 
-    private static boolean isValidScatterBiome(LostCityTerrainFeature feature, ScatteredReference reference, ChunkCoord coord) {
+    private static boolean isValidScatterBiome(CityGenerator feature, ScatteredReference reference, ChunkCoord coord) {
         if (reference.getBiomeMatcher() != null) {
             BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, coord);
             return reference.getBiomeMatcher().test(biome.getMainBiome());
@@ -238,7 +238,7 @@ public class Scattered {
         return true;
     }
 
-    private static void generateScatteredBuilding(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, Building building, RandomSource rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
+    private static void generateScatteredBuilding(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, Building building, RandomSource rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
         IDimensionInfo provider = feature.provider;
 
         int height = lowestLevel;
@@ -322,14 +322,14 @@ public class Scattered {
                 }
             }
 
-            height = feature.generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+            height = feature.generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
             if (part2 != null) {
-                feature.generatePart(ctx, info, part2, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+                feature.generatePart(ctx, info, part2, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
             }
         }
     }
 
-    private static int scatteredLevel(LostCityTerrainFeature feature, ScatteredBuilding scattered, int minimum, int maximum, int average) {
+    private static int scatteredLevel(CityGenerator feature, ScatteredBuilding scattered, int minimum, int maximum, int average) {
         int seaLevel = ((ServerChunkCache) feature.provider.getWorld().getChunkSource()).getGenerator().getSeaLevel();
         return pickLevel(scattered.getTerrainheight(), minimum, maximum, average, seaLevel) + scattered.getHeightoffset();
     }

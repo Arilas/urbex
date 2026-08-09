@@ -1,11 +1,11 @@
 package dev.krona.urbex.gui;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.gui.elements.*;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.LostCityFeature;
+import dev.krona.urbex.worldgen.CityFeature;
 import dev.krona.urbex.worldgen.lost.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Random;
 import net.minecraft.network.chat.Component;
 
-public class GuiLCConfig extends Screen {
+public class UrbexConfigScreen extends Screen {
 
     private final Screen parent;
 
@@ -47,18 +47,18 @@ public class GuiLCConfig extends Screen {
     private DoubleElement perlinOffsetElement;
     private DoubleElement perlinInnerScaleElement;
 
-    private final LostCitySetup localSetup = new LostCitySetup(this::refreshPreview);
+    private final ClientProfileSetup localSetup = new ClientProfileSetup(this::refreshPreview);
 
-    public GuiLCConfig(Screen parent) {
+    public UrbexConfigScreen(Screen parent) {
         super(Component.literal("Urbex Configuration"));
         this.parent = parent;
-        localSetup.copyFrom(LostCitySetup.CLIENT_SETUP);
+        localSetup.copyFrom(ClientProfileSetup.CLIENT_SETUP);
     }
 
-    public static void selectProfile(String profileName, @Nullable LostCityProfile profile) {
+    public static void selectProfile(String profileName, @Nullable UrbexProfile profile) {
         Config.profileFromClient = profileName;
 
-        LostCityFeature.globalDimensionInfoDirtyCounter++;
+        CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
 
         if (profile != null) {
@@ -67,7 +67,7 @@ public class GuiLCConfig extends Screen {
         }
     }
 
-    public LostCitySetup getLocalSetup() {
+    public ClientProfileSetup getLocalSetup() {
         return localSetup;
     }
 
@@ -289,7 +289,7 @@ public class GuiLCConfig extends Screen {
         });
     }
 
-    private void renderPreviewTransports(GuiGraphicsExtractor graphics, LostCityProfile profile) {
+    private void renderPreviewTransports(GuiGraphicsExtractor graphics, UrbexProfile profile) {
         renderPreviewMap(graphics, profile, true);
         NullDimensionInfo diminfo = new NullDimensionInfo(profile, seed);
         for (int z = 0; z < NullDimensionInfo.PREVIEW_HEIGHT; z++) {
@@ -318,7 +318,7 @@ public class GuiLCConfig extends Screen {
         }
     }
 
-    private void renderPreviewCity(GuiGraphicsExtractor graphics, LostCityProfile profile, boolean showDamage) {
+    private void renderPreviewCity(GuiGraphicsExtractor graphics, UrbexProfile profile, boolean showDamage) {
         int base = 50 + 120;
         int leftRender = this.width - 157;
         graphics.fill(leftRender, 50, leftRender + 150, base, 0xff0099bb);
@@ -412,7 +412,7 @@ public class GuiLCConfig extends Screen {
         return color;
     }
 
-    private void renderPreviewMap(GuiGraphicsExtractor graphics, LostCityProfile profile, boolean soft) {
+    private void renderPreviewMap(GuiGraphicsExtractor graphics, UrbexProfile profile, boolean soft) {
         NullDimensionInfo diminfo = new NullDimensionInfo(profile, seed);
         for (int z = 0; z < NullDimensionInfo.PREVIEW_HEIGHT; z++) {
             for (int x = 0; x < NullDimensionInfo.PREVIEW_WIDTH; x++) {
@@ -431,7 +431,7 @@ public class GuiLCConfig extends Screen {
                 };
                 graphics.fill(sx, sz, sx + 3, sz + 3, 0xff000000 + soften(color, soft));
                 ChunkCoord coord = new ChunkCoord(diminfo.dimension(), x, z);
-                LostChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristicsGui(coord, diminfo);
+                ChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristicsGui(coord, diminfo);
                 if (characteristics.isCity) {
                     color = 0x995555;
                     if (BuildingInfo.hasBuildingGui(x, z, diminfo, characteristics)) {
@@ -478,8 +478,8 @@ public class GuiLCConfig extends Screen {
 
     private void done() {
         refreshPreview();
-        LostCitySetup.CLIENT_SETUP.copyFrom(localSetup);
-        LostCityProfile customizedProfile = localSetup.getCustomizedProfile();
+        ClientProfileSetup.CLIENT_SETUP.copyFrom(localSetup);
+        UrbexProfile customizedProfile = localSetup.getCustomizedProfile();
         if ("customized".equals(localSetup.getProfile()) && customizedProfile != null) {
             ProfileSetup.STANDARD_PROFILES.get("customized").copyFrom(customizedProfile);
             selectProfile(localSetup.getProfile(), customizedProfile);
@@ -488,7 +488,7 @@ public class GuiLCConfig extends Screen {
         }
 
         Minecraft.getInstance().gui.setScreen(parent);
-        LostCityFeature.globalDimensionInfoDirtyCounter++;
+        CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
     }
 

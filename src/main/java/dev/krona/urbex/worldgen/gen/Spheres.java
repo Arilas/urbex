@@ -1,13 +1,13 @@
 package dev.krona.urbex.worldgen.gen;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkFixer;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.CitySphere;
 import net.minecraft.core.BlockPos;
@@ -18,9 +18,9 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 
 public class Spheres {
 
-    public static void generateSpheres(LostCityTerrainFeature feature, WorldGenRegion region, ChunkAccess chunk) {
+    public static void generateSpheres(CityGenerator feature, WorldGenRegion region, ChunkAccess chunk) {
         IDimensionInfo provider = feature.provider;
-        LostCityProfile profile = feature.profile;
+        UrbexProfile profile = feature.profile;
         // Do the city spheres
         if (profile.isSpace() || profile.isSpheres()) {
             int chunkX = chunk.getPos().x();
@@ -49,11 +49,11 @@ public class Spheres {
         }
     }
 
-    private static void fillSphere(ChunkGenContext ctx, LostCityTerrainFeature feature, int centerx, int centery, int centerz, int radius,
+    private static void fillSphere(ChunkGenContext ctx, CityGenerator feature, int centerx, int centery, int centerz, int radius,
                                    BlockState glass, BlockState sideBlock) {
         IDimensionInfo provider = feature.provider;
         ChunkDriver driver = ctx.driver;
-        LostCityProfile profile = feature.profile;
+        UrbexProfile profile = feature.profile;
         BlockState air = Blocks.AIR.defaultBlockState();
         double sqradius = radius * radius;
         double sqradiusOffset = (radius - 2) * (radius - 2);

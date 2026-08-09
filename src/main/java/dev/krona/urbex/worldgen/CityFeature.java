@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.ServerEventHandlers;
@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
+public class CityFeature extends Feature<NoneFeatureConfiguration> {
 
     /**
      * On dedicated servers the dimensionInfo cache is no problem. The server starts only once
@@ -34,7 +34,7 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
     public static volatile int globalDimensionInfoDirtyCounter = 0;
     private volatile int dimensionInfoDirtyCounter = -1;
 
-    public LostCityFeature() {
+    public CityFeature() {
         super(NoneFeatureConfiguration.CODEC);
     }
 
@@ -66,7 +66,7 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
         }
         ChunkPos center = chunk.getPos();
         Holder<Biome> biome = region.getBiome(center.getMiddleBlockPosition(60));
-        if (biome.is(LostTags.IS_VOID)) {
+        if (biome.is(UrbexTags.IS_VOID)) {
             return false;
         }
 
@@ -77,7 +77,7 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
         // and the region arrives as an argument instead of being written onto the shared
         // IDimensionInfo. So Urbex generation runs on the worker pool in parallel with the
         // rest of worldgen again, as it did before the driver became shared.
-        LostCityTerrainFeature feature = diminfo.getFeature();
+        CityGenerator feature = diminfo.getFeature();
         try {
             feature.generate(region, chunk);
         } catch (Exception e) {
@@ -102,11 +102,11 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
         }
         String profileName = Config.getProfileForDimension(world.getLevel(), type);
         if (profileName != null) {
-            LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
+            UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
             if (profile == null) {
                 return null;
             }
-            LostCityProfile outsideProfile = profile.CITYSPHERE_OUTSIDE_PROFILE == null ? null : ProfileSetup.STANDARD_PROFILES.get(profile.CITYSPHERE_OUTSIDE_PROFILE);
+            UrbexProfile outsideProfile = profile.CITYSPHERE_OUTSIDE_PROFILE == null ? null : ProfileSetup.STANDARD_PROFILES.get(profile.CITYSPHERE_OUTSIDE_PROFILE);
             // Built outside the map. Two threads may both build one for the same dimension the
             // first time a chunk is generated - the loser's is simply dropped, caches and all.
             IDimensionInfo diminfo = new DefaultDimensionInfo(world, profile, outsideProfile);

@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import net.minecraft.core.BlockPos;
 import org.junit.jupiter.api.Test;
 
@@ -11,7 +11,7 @@ class SpecialMarkerPolicyTest {
 
     @Test
     void lootAdmissionUsesDensityWhileSpawnerAdmissionDoesNot() {
-        LostCityProfile profile = new LostCityProfile("marker-policy", true);
+        UrbexProfile profile = new UrbexProfile("marker-policy", true);
         BlockPos marker = new BlockPos(12, 70, -4);
         profile.GENERATE_SPAWNERS = true;
 

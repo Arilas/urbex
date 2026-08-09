@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.core.BlockPos;
@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.RailShape;
 
 public class Corridors {
-    public static void generateCorridors(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, boolean xRail, boolean zRail) {
+    public static void generateCorridors(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, boolean xRail, boolean zRail) {
         BlockState air = Blocks.AIR.defaultBlockState();
         BlockState base = info.profile.getBaseBlock();
         BlockState railx = Blocks.RAIL.defaultBlockState().setValue(RailBlock.SHAPE, RailShape.EAST_WEST);
@@ -45,7 +45,7 @@ public class Corridors {
                         Character glowstoneChar = info.getCityStyle().getGlowstoneBlock();
                         BlockState glowstone = glowstoneChar == null ? Blocks.GLOWSTONE.defaultBlockState() : ctx.paletteHere(palette, glowstoneChar);
                         driver.add(glowstone);
-                        LostCityTerrainFeature.updateNeeded(info, pos, Block.UPDATE_CLIENTS);
+                        CityGenerator.updateNeeded(info, pos, Block.UPDATE_CLIENTS);
                     } else {
                         BlockState roof = ctx.paletteHere(palette, corridorRoofBlock);
                         driver.add(roof).add(roof);

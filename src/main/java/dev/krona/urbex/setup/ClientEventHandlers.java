@@ -1,9 +1,9 @@
 package dev.krona.urbex.setup;
 
-import dev.krona.urbex.gui.GuiLCConfig;
-import dev.krona.urbex.gui.LostCitySetup;
+import dev.krona.urbex.gui.UrbexConfigScreen;
+import dev.krona.urbex.gui.ClientProfileSetup;
 import dev.krona.urbex.gui.RecreateProfileRestore;
-import dev.krona.urbex.worldgen.LostCityFeature;
+import dev.krona.urbex.worldgen.CityFeature;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
@@ -28,22 +28,22 @@ public class ClientEventHandlers {
                     lastCreateWorldScreen = new java.lang.ref.WeakReference<>(createWorldScreen);
                     RecreateProfileRestore.consumePending();
                 }
-                Button lostCitiesButton = Button.builder(Component.literal("Cities"), b ->
-                        Minecraft.getInstance().gui.setScreen(new GuiLCConfig(createWorldScreen))
+                Button citiesButton = Button.builder(Component.literal("Cities"), b ->
+                        Minecraft.getInstance().gui.setScreen(new UrbexConfigScreen(createWorldScreen))
                 ).bounds(screen.width - 100, 40, 70, 20).build();
-                lostCitiesButton.visible = false;
-                Screens.getWidgets(screen).add(lostCitiesButton);
+                citiesButton.visible = false;
+                Screens.getWidgets(screen).add(citiesButton);
                 // Only show the button while the "More" tab is active
                 ScreenEvents.afterTick(screen).register(s ->
-                        lostCitiesButton.visible = createWorldScreen.tabManager.getCurrentTab() instanceof CreateWorldScreen.MoreTab);
+                        citiesButton.visible = createWorldScreen.tabManager.getCurrentTab() instanceof CreateWorldScreen.MoreTab);
             }
         });
 
         // Clean up client-side state when leaving a world/server
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            LostCitySetup.CLIENT_SETUP.reset();
+            ClientProfileSetup.CLIENT_SETUP.reset();
             Config.reset();
-            LostCityFeature.globalDimensionInfoDirtyCounter++;
+            CityFeature.globalDimensionInfoDirtyCounter++;
         });
     }
 }

@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.Transform;
@@ -13,7 +13,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.state.BlockState;
 
 public class Highways {
-    public static void generateHighways(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
+    public static void generateHighways(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
         int levelX = Highway.getXHighwayLevel(info.coord, info.provider, info.profile);
         int levelZ = Highway.getZHighwayLevel(info.coord, info.provider, info.profile);
         if (levelX == levelZ && levelX >= 0) {
@@ -42,21 +42,21 @@ public class Highways {
         return !st.is(BlockTags.LEAVES) && !st.is(BlockTags.LOGS);
     }
 
-    private static void generateHighwayPart(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, int level, Transform transform, BuildingInfo adjacent1, BuildingInfo adjacent2, boolean bidirectional) {
+    private static void generateHighwayPart(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, int level, Transform transform, BuildingInfo adjacent1, BuildingInfo adjacent2, boolean bidirectional) {
         ChunkDriver driver = ctx.driver;
-        int highwayGroundLevel = info.groundLevel + level * LostCityTerrainFeature.FLOORHEIGHT;
+        int highwayGroundLevel = info.groundLevel + level * CityGenerator.FLOORHEIGHT;
         HighwayParts highwayParts = info.provider.getWorldStyle().getPartSelector().highwayParts();
 
         BuildingPart part;
         if (info.isTunnel(level)) {
             // We know we need a tunnel
             part = AssetRegistries.PARTS.getOrThrow(info.provider.getWorld(), feature.getRandomPart(ctx, highwayParts.tunnel(bidirectional)));
-            feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
+            feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
         } else {
             if (info.isCity && level <= adjacent1.cityLevel && level <= adjacent2.cityLevel && adjacent1.isCity && adjacent2.isCity) {
                 // Simple highway in the city
                 part = AssetRegistries.PARTS.getOrThrow(info.provider.getWorld(), feature.getRandomPart(ctx, highwayParts.open(bidirectional)));
-                int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
+                int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
                 // Clear a bit more above the highway
                 if (!info.profile.isCavern()) {
                     int clearheight = 15;
@@ -69,7 +69,7 @@ public class Highways {
                 }
             } else {
                 part = AssetRegistries.PARTS.getOrThrow(info.provider.getWorld(), feature.getRandomPart(ctx, highwayParts.bridge(bidirectional)));
-                int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, LostCityTerrainFeature.HardAirSetting.WATERLEVEL);
+                int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
                 // Clear a bit more above the highway
                 if (!info.profile.isCavern()) {
                     int clearheight = 15;
@@ -93,7 +93,7 @@ public class Highways {
             int z1 = transform.rotateZ(0, 15);
             driver.current(x1, highwayGroundLevel - 1, z1);
             for (int y = 0; y < 40; y++) {
-                if (LostCityTerrainFeature.isEmpty(driver.getBlock())) {
+                if (CityGenerator.isEmpty(driver.getBlock())) {
                     driver.block(sup);
                 } else {
                     break;
@@ -105,7 +105,7 @@ public class Highways {
             int z2 = transform.rotateZ(0, 0);
             driver.current(x2, highwayGroundLevel - 1, z2);
             for (int y = 0; y < 40; y++) {
-                if (LostCityTerrainFeature.isEmpty(driver.getBlock())) {
+                if (CityGenerator.isEmpty(driver.getBlock())) {
                     driver.block(sup);
                 } else {
                     break;

@@ -1,20 +1,20 @@
 package dev.krona.urbex.gui.elements;
 
 import dev.krona.urbex.config.Configuration;
-import dev.krona.urbex.gui.GuiLCConfig;
+import dev.krona.urbex.gui.UrbexConfigScreen;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 
 public class IntElement extends GuiElement {
 
-    private final GuiLCConfig gui;
+    private final UrbexConfigScreen gui;
     private String label = null;
     private String prefix = null;
     private final EditBox field;
     private final String attribute;
 
-    public IntElement(GuiLCConfig gui, String page, int x, int y, String attribute) {
+    public IntElement(UrbexConfigScreen gui, String page, int x, int y, String attribute) {
         super(page, x, y);
         this.gui = gui;
         this.attribute = attribute;

@@ -1,11 +1,11 @@
 package dev.krona.urbex.gui;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import net.minecraft.core.BlockPos;
@@ -89,16 +89,16 @@ public class NullDimensionInfo implements IDimensionInfo {
             "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
     };
 
-    private final LostCityProfile profile;
+    private final UrbexProfile profile;
     private final WorldStyle style;
     private final Random random;
     private final long seed;
 
     private final Registry<Biome> biomeRegistry;
-    private final LostCityTerrainFeature feature;
+    private final CityGenerator feature;
     private final DimensionCaches caches;
 
-    public NullDimensionInfo(LostCityProfile profile, long seed) {
+    public NullDimensionInfo(UrbexProfile profile, long seed) {
         this.profile = profile;
         this.caches = new DimensionCaches(seed);
         style = new WorldStyle(new WorldStyleRE(
@@ -113,7 +113,7 @@ public class NullDimensionInfo implements IDimensionInfo {
         ));
         this.seed = seed;
         random = new Random(seed);
-        feature = new LostCityTerrainFeature(this, profile);
+        feature = new CityGenerator(this, profile);
         // @todo 1.19.3
 //        biomeRegistry = ServerLifecycleHooks.getCurrentServer().registryAccess().registryOrThrow(Registries.BIOME);
 //        biomeRegistry = RegistryAccess.builtinCopy().registry(Registry.BIOME_REGISTRY).get();
@@ -141,12 +141,12 @@ public class NullDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public LostCityProfile getProfile() {
+    public UrbexProfile getProfile() {
         return profile;
     }
 
     @Override
-    public LostCityProfile getOutsideProfile() {
+    public UrbexProfile getOutsideProfile() {
         return  profile;
     }
 
@@ -161,7 +161,7 @@ public class NullDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public LostCityTerrainFeature getFeature() {
+    public CityGenerator getFeature() {
         return feature;
     }
 

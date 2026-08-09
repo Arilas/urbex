@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
@@ -27,13 +27,13 @@ public final class ChunkGenContext {
     public final ChunkAccess chunk;
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
-    public final LostCityProfile profile;
+    public final UrbexProfile profile;
     public final BuildingInfo info;
     public final CompiledPalette palette;
     public final char street;
     public final NoiseBuffers buffers;
     /**
-     * Scratch for {@link LostCityTerrainFeature#moveDown}'s top-of-column stash. Lives here
+     * Scratch for {@link CityGenerator#moveDown}'s top-of-column stash. Lives here
      * because the feature instance is shared across worldgen worker threads: as an instance
      * field there, two threads in moveDown at once swapped each other's terrain (issue #43).
      */
@@ -45,7 +45,7 @@ public final class ChunkGenContext {
     public final long seed;
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
-                           IDimensionInfo provider, LostCityProfile profile, BuildingInfo info) {
+                           IDimensionInfo provider, UrbexProfile profile, BuildingInfo info) {
         this.region = region;
         this.chunk = chunk;
         this.coord = coord;

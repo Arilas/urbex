@@ -38,7 +38,7 @@ public class ServerEventHandlers {
     public static void cleanUp() {
         Config.resetProfileCache();
         // Everything that used to be cleared here now lives on DimensionCaches, and goes away with
-        // the IDimensionInfo that owns it (LostCityFeature.cleanUp clears that map right after
+        // the IDimensionInfo that owns it (CityFeature.cleanUp clears that map right after
         // calling us). Only the datapack-derived predefined maps are still global.
         City.cleanPredefinedCache();
         // Pending spawn corrections must not leak into the next world of this JVM session

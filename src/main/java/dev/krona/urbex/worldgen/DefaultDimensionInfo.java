@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
@@ -25,23 +25,23 @@ public class DefaultDimensionInfo implements IDimensionInfo {
 
     // The dimension's ServerLevel, not the region of whichever chunk is generating. Final, so it
     // cannot be swapped out from under a worker thread, which is what the per-dimension lock in
-    // LostCityFeature.place used to be protecting.
+    // CityFeature.place used to be protecting.
     private final WorldGenLevel world;
-    private final LostCityProfile profile;
-    private final LostCityProfile profileOutside;
+    private final UrbexProfile profile;
+    private final UrbexProfile profileOutside;
     private final WorldStyle style;
     private final DimensionCaches caches;
 
     private final Registry<Biome> biomeRegistry;
-    private final LostCityTerrainFeature feature;
+    private final CityGenerator feature;
 
-    public DefaultDimensionInfo(WorldGenLevel world, LostCityProfile profile, LostCityProfile profileOutside) {
+    public DefaultDimensionInfo(WorldGenLevel world, UrbexProfile profile, UrbexProfile profileOutside) {
         this.world = world.getLevel();
         this.profile = profile;
         this.profileOutside = profileOutside;
         this.caches = new DimensionCaches(this.world.getSeed());
         style = AssetRegistries.WORLDSTYLES.get(this.world, profile.getWorldStyle());
-        feature = new LostCityTerrainFeature(this, profile);
+        feature = new CityGenerator(this, profile);
         biomeRegistry = this.world.registryAccess().lookupOrThrow(Registries.BIOME);
     }
 
@@ -66,12 +66,12 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public LostCityProfile getProfile() {
+    public UrbexProfile getProfile() {
         return profile;
     }
 
     @Override
-    public LostCityProfile getOutsideProfile() {
+    public UrbexProfile getOutsideProfile() {
         return profileOutside;
     }
 
@@ -81,7 +81,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public LostCityTerrainFeature getFeature() {
+    public CityGenerator getFeature() {
         return feature;
     }
 

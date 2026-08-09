@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
@@ -195,7 +195,7 @@ public class City {
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         RandomSource cityRadiusRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_RADIUS);
-        LostCityProfile profile = provider.getProfile();
+        UrbexProfile profile = provider.getProfile();
         int cityRange = profile.CITY_MAXRADIUS - profile.CITY_MINRADIUS;
         if (cityRange < 1) {
             cityRange = 1;
@@ -227,14 +227,14 @@ public class City {
     }
 
     // Calculate the citystyle based on all surrounding cities
-    public static CityStyle getCityStyle(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static CityStyle getCityStyle(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         // getOrCompute, not computeIfAbsent: this is reached from BuildingInfo
         // .getChunkCharacteristics, which calls it in a 3x3 loop over the neighbours, and computing
         // inside a ConcurrentHashMap bin lock deadlocks on that.
         return provider.caches().cityStyle.getOrCompute(coord, k -> getCityStyleInt(coord, provider, profile));
     }
 
-    private static CityStyle getCityStyleInt(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    private static CityStyle getCityStyleInt(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         List<Pair<Float, String>> styles = new ArrayList<>();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
@@ -291,7 +291,7 @@ public class City {
         return AssetRegistries.CITYSTYLES.get(provider.getWorld(), cityStyleName);
     }
 
-    public static float getCityFactor(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static float getCityFactor(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         ResourceKey<Level> type = provider.getType();
         // If we have a predefined building here we force a high city factor
 
@@ -329,7 +329,7 @@ public class City {
             for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
                 for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
                     ChunkCoord c = new ChunkCoord(type, cx, cz);
-                    LostCityProfile pro = BuildingInfo.getProfile(c, provider);
+                    UrbexProfile pro = BuildingInfo.getProfile(c, provider);
                     // Only count cities that are in the same 'profile' as this one
                     if (pro == profile) {
                         if (isCityCenter(c, provider)) {

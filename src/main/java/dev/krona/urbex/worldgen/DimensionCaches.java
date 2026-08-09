@@ -9,7 +9,7 @@ import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.gen.Scattered;
 import dev.krona.urbex.worldgen.lost.CityRarityMap;
 import dev.krona.urbex.worldgen.lost.CitySphere;
-import dev.krona.urbex.worldgen.lost.LostChunkCharacteristics;
+import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
 import dev.krona.urbex.worldgen.lost.MultiChunk;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class DimensionCaches {
 
     public final TimedCache<ChunkCoord, BuildingInfo> buildingInfo = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
-    public final TimedCache<ChunkCoord, LostChunkCharacteristics> characteristics = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
+    public final TimedCache<ChunkCoord, ChunkCharacteristics> characteristics = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, Integer> cityLevel = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, CityStyle> cityStyle = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, MultiChunk> multiChunk = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);

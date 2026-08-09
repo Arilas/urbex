@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.Orientation;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class Bridges {
 
-    public static void generateBridges(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
+    public static void generateBridges(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
         if (info.getHighwayXLevel() == 0 || info.getHighwayZLevel() == 0) {
             // If there is a highway at level 0 we cannot generate bridge parts. If there
             // is no highway or a highway at level 1 then bridge sections can generate just fine
@@ -29,7 +29,7 @@ public class Bridges {
         }
     }
 
-    private static void generateBridge(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, BuildingPart bt, Orientation orientation) {
+    private static void generateBridge(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, BuildingPart bt, Orientation orientation) {
         CompiledPalette compiledPalette = feature.computePalette(info, bt);
         ChunkDriver driver = ctx.driver;
         for (int x = 0; x < 16; x++) {

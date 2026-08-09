@@ -13,18 +13,18 @@ import net.minecraft.world.level.storage.SavedDataStorage;
 
 import javax.annotation.Nonnull;
 
-public class LostData extends SavedData {
+public class UrbexData extends SavedData {
 
     public static final String NAME = "data";
 
-    private static Codec<LostData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    private static Codec<UrbexData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.fieldOf("profile").forGetter(d -> d.selectedProfile),
             Codec.STRING.fieldOf("json").forGetter(d -> d.selectedJson)
-            ).apply(instance, LostData::new));
+            ).apply(instance, UrbexData::new));
 
-    private static final SavedDataType<LostData> TYPE = new SavedDataType<>(
+    private static final SavedDataType<UrbexData> TYPE = new SavedDataType<>(
             Identifier.fromNamespaceAndPath("urbex", NAME),
-            LostData::new,
+            UrbexData::new,
             CODEC,
             DataFixTypes.SAVED_DATA_COMMAND_STORAGE
     );
@@ -33,7 +33,7 @@ public class LostData extends SavedData {
     private String selectedJson = "";
 
     @Nonnull
-    public static LostData getData(Level level) {
+    public static UrbexData getData(Level level) {
         if (level.isClientSide()) {
             throw new RuntimeException("Don't access this client-side!");
         }
@@ -43,10 +43,10 @@ public class LostData extends SavedData {
         return storage.computeIfAbsent(TYPE);
     }
 
-    public LostData() {
+    public UrbexData() {
     }
 
-    public LostData(String profile, String json) {
+    public UrbexData(String profile, String json) {
         selectedProfile = profile;
         selectedJson = json;
     }

@@ -2,9 +2,9 @@ package dev.krona.urbex.setup;
 
 import com.google.common.collect.Lists;
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
-import dev.krona.urbex.data.LostData;
+import dev.krona.urbex.data.UrbexData;
 import dev.krona.urbex.worldgen.lost.regassets.data.Selectors;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -32,11 +32,11 @@ public class Config {
     /**
      * Dimension -> profile name, built once and then published whole.
      * <p>
-     * Reached from worker threads: {@code LostCityFeature.place} and {@code StructureSuppressor}
+     * Reached from worker threads: {@code CityFeature.place} and {@code StructureSuppressor}
      * both call {@link #getProfileForDimension} during generation, and since the per-dimension
      * generation lock was removed nothing serialises them. It is {@code volatile} so a reader
      * either sees {@code null} or sees a map that is already complete, and a
-     * {@code ConcurrentHashMap} because {@link #registerLostCityDimension} can still add to it
+     * {@code ConcurrentHashMap} because {@link #registerUrbexDimension} can still add to it
      * after publication.
      * <p>
      * The build happens in {@link #buildProfileCache} into a local map, and the field is assigned
@@ -91,7 +91,7 @@ public class Config {
     }
 
     // @todo BAD
-    public static void registerLostCityDimension(ServerLevel level, ResourceKey<Level> type, String profile) {
+    public static void registerUrbexDimension(ServerLevel level, ResourceKey<Level> type, String profile) {
         String profileForDimension = getProfileForDimension(level, type);
         if (profileForDimension == null) {
             // getProfileForDimension has published a cache by the time it returns, so read the
@@ -122,7 +122,7 @@ public class Config {
             } else {
                 ResourceKey<Level> dimensionType = ResourceKey.create(Registries.DIMENSION, Identifier.parse(split[0]));
                 String profileName = split[1];
-                LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
+                UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
                 if (profile != null) {
                     cache.put(dimensionType, profileName);
                 } else {
@@ -131,7 +131,7 @@ public class Config {
             }
         }
 
-        LostData data = LostData.getData(level);
+        UrbexData data = UrbexData.getData(level);
         String selectedProfile = "";
         String selectedJson = "";
         if (Config.profileFromClient != null && !Config.profileFromClient.isEmpty()) {
@@ -159,9 +159,9 @@ public class Config {
         if (!selectedProfile.isEmpty()) {
             cache.put(Level.OVERWORLD, selectedProfile);
             if (!selectedJson.isEmpty()) {
-                LostCityProfile profile = new LostCityProfile("customized", selectedJson);
+                UrbexProfile profile = new UrbexProfile("customized", selectedJson);
                 if (!ProfileSetup.STANDARD_PROFILES.containsKey("customized")) {
-                    ProfileSetup.STANDARD_PROFILES.put("customized", new LostCityProfile("customized", false));
+                    ProfileSetup.STANDARD_PROFILES.put("customized", new UrbexProfile("customized", false));
                 }
                 ProfileSetup.STANDARD_PROFILES.get("customized").copyFrom(profile);
             }

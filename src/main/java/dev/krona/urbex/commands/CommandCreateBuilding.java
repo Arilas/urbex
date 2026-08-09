@@ -26,7 +26,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-import static dev.krona.urbex.worldgen.LostCityTerrainFeature.FLOORHEIGHT;
+import static dev.krona.urbex.worldgen.CityGenerator.FLOORHEIGHT;
 import net.minecraft.network.chat.Component;
 
 public class CommandCreateBuilding implements Command<CommandSourceStack> {
@@ -61,7 +61,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         WorldCoordinates pos = context.getArgument("pos", WorldCoordinates.class);
         BlockPos bottom = pos.getBlockPos(context.getSource());
 
-        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(level);
+        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
