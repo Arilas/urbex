@@ -138,6 +138,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             for (Map.Entry<BlockState, Character> entry : unknowns.entrySet()) {
                 entries.add(new PaletteEntry(Character.toString(entry.getValue()), Optional.of(Tools.stateToString(entry.getKey())),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty(),
                         Optional.empty()));
             }
             PaletteRE paletteRE = new PaletteRE(entries);

@@ -236,6 +236,10 @@ public class ChunkDriver {
         }
     }
 
+    public BlockState getBlockAt(BlockPos pos) {
+        return getBlockSafe(pos);
+    }
+
     private BlockState getBlock(BlockPos p) {
         BlockState state = cache.get(p);
         if (state == null) {

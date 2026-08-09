@@ -65,7 +65,6 @@ public class BuildingInfo {
 
     public final boolean[] connectionAtX;
     public final boolean[] connectionAtZ;
-    public final boolean noLoot;
     public final float ruinHeight;      // The height (as a percentage between 0 and 1) at which we focus the ruin layer. Set to -1 if this building is not ruined
 
     public final int highwayXLevel;     // 0 or 1 if there is a highway at this chunk
@@ -115,10 +114,6 @@ public class BuildingInfo {
     private volatile MinMax desiredTerrainCorrectionHeights = null;
     private volatile MinMax desiredMaxHeight1 = null;
 
-    // A list of todo's. Both are filled while this chunk generates and drained at the end of the
-    // same call, on the same thread - but generatePart() can be handed a neighbour's info, so they
-    // are concurrent rather than relying on that.
-    private final List<BlockPos> torchTodo = Collections.synchronizedList(new ArrayList<>());
     // The todos run after the chunk is driven, and they need the region that is generating - which
     // is not something a cached BuildingInfo can know. So it is handed to them.
     private final Map<BlockPos, Consumer<WorldGenLevel>> postTodo = new ConcurrentHashMap<>();
@@ -149,18 +144,6 @@ public class BuildingInfo {
         public String getBuilding() {
             return building;
         }
-    }
-
-    public void addTorchTodo(BlockPos index) {
-        torchTodo.add(index);
-    }
-
-    public List<BlockPos> getTorchTodo() {
-        return torchTodo;
-    }
-
-    public void clearTorchTodo() {
-        torchTodo.clear();
     }
 
     public void addPostTodo(BlockPos index, Consumer<WorldGenLevel> inf) {
@@ -792,7 +775,6 @@ public class BuildingInfo {
             stairPriority = topleft.stairPriority;
             palette = topleft.palette;
             compiledPalette = topleft.getCompiledPalette();
-            noLoot = topleft.noLoot;
             ruinHeight = topleft.ruinHeight;
         } else {
             PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), key);
@@ -872,9 +854,9 @@ public class BuildingInfo {
             stairType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomStair(rand, this.coord));
             stairPriority = rand.nextFloat();
             createPalette(rand);
+            // Preserve the legacy building stream slot formerly used by buildingWithoutLootChance.
+            rand.nextFloat();
             float r = rand.nextFloat();
-            noLoot = multiBuildingPos.isSingle() && r < profile.BUILDING_WITHOUT_LOOT_CHANCE;
-            r = rand.nextFloat();
             if (rand.nextFloat() < profile.RUIN_CHANCE && (predefinedBuilding == null || !predefinedBuilding.preventRuins())) {
                 ruinHeight = profile.RUIN_MINLEVEL_PERCENT + (profile.RUIN_MAXLEVEL_PERCENT - profile.RUIN_MINLEVEL_PERCENT) * r;
             } else {

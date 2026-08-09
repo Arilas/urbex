@@ -325,7 +325,7 @@ public class LostCityTerrainFeature {
 //            generateMonorails(info);
 //        }
 //
-        fixTorches(ctx, info);
+        placeOptionalLights(ctx, info);
 
         if (info.getDamageArea().hasExplosions()) {
             breakBlocksForDamageNew(ctx, chunkX, chunkZ, info);
@@ -421,32 +421,37 @@ public class LostCityTerrainFeature {
     }
 
 
-    private void fixTorches(ChunkGenContext ctx, BuildingInfo info) {
-        List<BlockPos> torches = info.getTorchTodo();
-        if (torches.isEmpty()) {
+    /** Finalize every optional-light marker admitted by this chunk-generation context. */
+    public void placeOptionalLights(ChunkGenContext ctx, BuildingInfo info) {
+        List<LightTodoQueue.Todo> lights = ctx.drainLightTodo();
+        if (lights.isEmpty()) {
             return;
         }
-
         ChunkDriver driver = ctx.driver;
-        BlockState torchState = Blocks.WALL_TORCH.defaultBlockState();
-        for (BlockPos pos : torches) {
-            int x = pos.getX() & 0xf;
-            int z = pos.getZ() & 0xf;
-            driver.currentAbsolute(pos);
-            if (driver.getBlockDown() != air) {
-                driver.block(Blocks.TORCH.defaultBlockState());
-            } else if (x > 0 && driver.getBlockWest() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.EAST));
-            } else if (x < 15 && driver.getBlockEast() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.WEST));
-            } else if (z > 0 && driver.getBlockNorth() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.SOUTH));
-            } else if (z < 15 && driver.getBlockSouth() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.NORTH));
-            }
-            updateNeeded(info, pos, Block.UPDATE_CLIENTS);
+        LevelReader delegate = (LevelReader) driver.getRegion();
+        LevelReader[] snapshotLevel = new LevelReader[1];
+        List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
+                ctx.coord.chunkX(), ctx.coord.chunkZ(), ctx.seed, lights, driver::getBlockAt,
+                (marker, supportDirection, stateAt) -> {
+                    LevelReader level = snapshotLevel(snapshotLevel, delegate, stateAt);
+                    BlockPos supportPos = marker.relative(supportDirection);
+                    net.minecraft.core.Direction exposedFace = supportDirection.getOpposite();
+                    return stateAt.apply(supportPos).isFaceSturdy(level, supportPos, exposedFace);
+                },
+                (marker, attempt, stateAt) -> attempt.state()
+                        .canSurvive(snapshotLevel(snapshotLevel, delegate, stateAt), marker));
+        for (DeferredLightPlacer.Planned light : planned) {
+            driver.currentAbsolute(light.pos()).block(light.state());
+            updateNeeded(info, light.pos(), Block.UPDATE_CLIENTS);
         }
-        info.clearTorchTodo();
+    }
+
+    private static LevelReader snapshotLevel(LevelReader[] holder, LevelReader delegate,
+                                             java.util.function.Function<BlockPos, BlockState> stateAt) {
+        if (holder[0] == null) {
+            holder[0] = DriverLevelReader.overlay(delegate, stateAt);
+        }
+        return holder[0];
     }
 
     private void doNormalChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
@@ -1815,12 +1820,8 @@ public class LostCityTerrainFeature {
                                         break;
                                 }
                             } else if (inf != null) {
-                                if (inf.isTorch()) {
-                                    if (info.profile.GENERATE_LIGHTING) {
-                                        info.addTorchTodo(driver.getCurrentCopy());
-                                    } else {
-                                        b = air;        // No torches
-                                    }
+                                if (inf.light() != null || inf.isTorch()) {
+                                    b = handleLightMarker(ctx, inf, driver.getCurrentCopy());
                                 } else if (inf.loot() != null && !inf.loot().isEmpty()) {
                                     handleLoot(ctx, info, part, b, inf);
                                 } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
@@ -1854,6 +1855,13 @@ public class LostCityTerrainFeature {
             }
         }
         return oy + part.getSliceCount();
+    }
+
+    public BlockState handleLightMarker(ChunkGenContext ctx, Palette.Info marker, BlockPos pos) {
+        if (DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.LIGHTING_DENSITY)) {
+            ctx.addLightTodo(pos, marker.light());
+        }
+        return air;
     }
 
     public CompiledPalette computePalette(BuildingInfo info, IBuildingPart part) {
@@ -1929,7 +1937,7 @@ public class LostCityTerrainFeature {
     }
 
     private BlockState handleSpawner(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
-        if (info.profile.GENERATE_SPAWNERS && !info.noLoot) {
+        if (SpecialMarkerPolicy.generateSpawner(info.profile)) {
             String mobid = inf.mobId();
             BlockPos pos = info.getRelativePos(rx, oy + y, rz);
             CompoundTag tag = new CompoundTag();
@@ -1954,16 +1962,19 @@ public class LostCityTerrainFeature {
         return b;
     }
 
-    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, BlockState b, Palette.Info inf) {
-        if (!info.noLoot) {
-            BlockPos pos = ctx.driver.getCurrentCopy();
-            info.addPostTodo(pos, inWorld -> {
-                if (!inWorld.getBlockState(pos).isAir()) {
-                    inWorld.setBlock(pos, b, Block.UPDATE_CLIENTS);
-                    generateLoot(info, inWorld, pos, new BuildingInfo.ConditionTodo(inf.loot(), part.getName(), info));
-                }
-            });
+    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part,
+                            BlockState block, Palette.Info marker) {
+        BlockPos pos = ctx.driver.getCurrentCopy();
+        if (!SpecialMarkerPolicy.populateLoot(provider.getSeed(), pos, info.profile)) {
+            return;
         }
+        info.addPostTodo(pos, inWorld -> {
+            if (!inWorld.getBlockState(pos).isAir()) {
+                inWorld.setBlock(pos, block, Block.UPDATE_CLIENTS);
+                generateLoot(info, inWorld, pos,
+                        new BuildingInfo.ConditionTodo(marker.loot(), part.getName(), info));
+            }
+        });
     }
 
     private BlockState handleTodo(ChunkGenContext ctx, BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
@@ -2051,21 +2062,16 @@ public class LostCityTerrainFeature {
     private void generateLoot(BuildingInfo info, LevelAccessor world, BlockPos pos, BuildingInfo.ConditionTodo condition) {
         BlockEntity te = world.getBlockEntity(pos);
         if (te instanceof RandomizableContainerBlockEntity) {
-            if (this.provider.getProfile().GENERATE_LOOT) {
-                // Runs from a post-todo, after generation of this chunk has finished, so it cannot
-                // borrow the context's streams. The chest's own position addresses it instead.
-                RandomSource lootRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
-                createLoot(info, lootRandom, world, pos, condition, this.provider);
-            }
+            // Runs from a post-todo, after generation of this chunk has finished, so it cannot
+            // borrow the context's streams. The chest's own position addresses it instead.
+            RandomSource lootRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
+            createLoot(info, lootRandom, world, pos, condition, this.provider);
         } else if (te == null) {
             ModSetup.getLogger().error("Error setting loot at {},{},{}", pos.getX(), pos.getY(), pos.getZ());
         }
     }
 
     public static void createLoot(BuildingInfo info, RandomSource random, LevelAccessor world, BlockPos pos, BuildingInfo.ConditionTodo todo, IDimensionInfo diminfo) {
-        if (random.nextFloat() < diminfo.getProfile().CHEST_WITHOUT_LOOT_CHANCE) {
-            return;
-        }
         BlockEntity tileentity = world.getBlockEntity(pos);
         if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
             if (todo != null) {

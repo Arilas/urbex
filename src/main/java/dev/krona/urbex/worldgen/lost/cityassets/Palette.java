@@ -66,8 +66,9 @@ public class Palette {
             if (entry.getDamaged() != null) {
                 dmg = Tools.stringToState(entry.getDamaged());
             }
-            Info info = new Info(entry.getMob(), entry.getLoot(), entry.getTorch() == null ? false : entry.getTorch(),
-                    entry.getTag());
+            LightPool light = entry.getLight() == null ? null : LightPool.compile(name, c, entry.getLight());
+            Info info = new Info(entry.getMob(), entry.getLoot(),
+                    entry.getTorch() != null && entry.getTorch(), light, entry.getTag());
 
             if (entry.getBlock() != null) {
                 String block = entry.getBlock();
@@ -104,6 +105,8 @@ public class Palette {
                     }
                 }
                 addMappingViaState(c, blocks, info);
+            } else if (light != null) {
+                palette.put(c, new PE(light.representative(), info));
             } else {
                 throw new RuntimeException("Illegal palette " + name + "!");
             }
@@ -115,9 +118,9 @@ public class Palette {
         return this;
     }
 
-    public record Info(String mobId, String loot, boolean isTorch, CompoundTag tag) {
+    public record Info(String mobId, String loot, boolean isTorch, LightPool light, CompoundTag tag) {
         public boolean isSpecial() {
-            return mobId != null || loot != null || isTorch || tag != null;
+            return mobId != null || loot != null || isTorch || light != null || tag != null;
         }
     }
 

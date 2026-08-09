@@ -8,7 +8,6 @@ import dev.krona.urbex.worldgen.lost.Orientation;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 public class Bridges {
@@ -42,12 +41,8 @@ public class Bridges {
                     BlockState b = ctx.paletteHere(compiledPalette, c);
                     Palette.Info inf = compiledPalette.getInfo(c);
                     if (inf != null) {
-                        if (inf.isTorch()) {
-                            if (info.profile.GENERATE_LIGHTING) {
-                                info.addTorchTodo(driver.getCurrentCopy());
-                            } else {
-                                b = Blocks.AIR.defaultBlockState();        // No torch!
-                            }
+                        if (inf.light() != null || inf.isTorch()) {
+                            b = feature.handleLightMarker(ctx, inf, driver.getCurrentCopy());
                         }
                     }
                     driver.add(b);

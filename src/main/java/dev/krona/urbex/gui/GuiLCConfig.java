@@ -136,6 +136,12 @@ public class GuiLCConfig extends Screen {
         return el;
     }
 
+    private PercentageSliderElement addPercentage(int left, String attribute) {
+        PercentageSliderElement element = new PercentageSliderElement(this, curpage, left, y, attribute);
+        add(element);
+        return element;
+    }
+
     private IntElement addInt(int left, String attribute) {
         IntElement el = new IntElement(this, curpage, left, y, attribute);
         add(el);
@@ -154,8 +160,8 @@ public class GuiLCConfig extends Screen {
     private void initVarious(int left) {
         start("Various");
         addBool(left, "lostcity.generateSpawners").label("Spawners:"); nl();
-        addBool(left, "lostcity.generateLighting").label("Lighting:"); nl();
-        addBool(left, "lostcity.generateLoot").label("Loot:"); nl();
+        addPercentage(left, "lostcity.lightingDensity").label("Lighting:"); nl();
+        addPercentage(left, "lostcity.lootDensity").label("Loot:"); nl();
         addFloat(left, "lostcity.vineChance").label("Vines:"); nl();
         addFloat(left, "lostcity.randomLeafBlockChance").label("Leafs:"); nl();
         nl();

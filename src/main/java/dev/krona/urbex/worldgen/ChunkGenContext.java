@@ -5,9 +5,14 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.chunk.ChunkAccess;
+
+import javax.annotation.Nullable;
+import java.util.List;
 
 /**
  * Everything one chunk's generation needs, built at the start of that generation and discarded at
@@ -26,6 +31,7 @@ public final class ChunkGenContext {
     public final CompiledPalette palette;
     public final char street;
     public final NoiseBuffers buffers;
+    private final LightTodoQueue lightTodo;
 
 
     /** The world seed, for the position-addressed picks that resolve palette characters. */
@@ -45,6 +51,15 @@ public final class ChunkGenContext {
         this.driver.setPrimer(region, chunk);
         this.buffers = new NoiseBuffers();
         this.seed = provider.getSeed();
+        this.lightTodo = new LightTodoQueue(coord.chunkX(), coord.chunkZ());
+    }
+
+    void addLightTodo(BlockPos pos, @Nullable LightPool pool) {
+        lightTodo.add(pos, pool);
+    }
+
+    List<LightTodoQueue.Todo> drainLightTodo() {
+        return lightTodo.closeAndDrain();
     }
 
     /**

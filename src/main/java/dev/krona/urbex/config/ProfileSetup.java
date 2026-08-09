@@ -19,7 +19,8 @@ public class ProfileSetup {
 
     public static final Map<String, LostCityProfile> STANDARD_PROFILES = new HashMap<>();
 
-    private static void initStandardProfiles() {
+    static void initStandardProfiles() {
+        STANDARD_PROFILES.clear();
         LostCityProfile profile;
 
 //        profile = new LostCityProfile("customized", false);
@@ -43,7 +44,7 @@ public class ProfileSetup {
         profile.FOG_DENSITY = 0.02f;
         profile.EXPLOSION_CHANCE = 0;
         profile.MINI_EXPLOSION_CHANCE = 0;
-        profile.GENERATE_LIGHTING = true;
+        profile.LIGHTING_DENSITY = 0.65f;
         profile.RAILWAYS_ENABLED = false;
         profile.GROUNDLEVEL = 40;
         profile.SEALEVEL = 32;
@@ -130,7 +131,7 @@ public class ProfileSetup {
         profile.CITY_LEVEL6_HEIGHT = 100;
         profile.CITY_LEVEL7_HEIGHT = 108;
         profile.BUILDING_CHANCE = .3f;
-        profile.GENERATE_LIGHTING = true;
+        profile.LIGHTING_DENSITY = 0.50f;
         STANDARD_PROFILES.put(profile.getName(), profile);
 
 //        profile = new LostCityProfile("waterbubbles", true);
@@ -164,7 +165,6 @@ public class ProfileSetup {
 //        profile.GENERATE_VILLAGES = false;
 //        profile.GENERATE_STRONGHOLDS = false;
 //        profile.BUILDING_CHANCE = .3f;
-//        profile.GENERATE_LIGHTING = true;
 //        standardProfiles.put(profile.getName(), profile);
 
         profile = new LostCityProfile("biosphere_caves", false);
@@ -211,7 +211,7 @@ public class ProfileSetup {
         profile.CITY_LEVEL6_HEIGHT = 100;
         profile.CITY_LEVEL7_HEIGHT = 108;
         profile.BUILDING_CHANCE = .3f;
-        profile.GENERATE_LIGHTING = true;
+        profile.LIGHTING_DENSITY = 0.65f;
         STANDARD_PROFILES.put(profile.getName(), profile);
 
         profile = new LostCityProfile("biosphere", true);
@@ -258,7 +258,7 @@ public class ProfileSetup {
         profile.CITY_LEVEL6_HEIGHT = 100;
         profile.CITY_LEVEL7_HEIGHT = 108;
         profile.BUILDING_CHANCE = .3f;
-        profile.GENERATE_LIGHTING = true;
+        profile.LIGHTING_DENSITY = 0.50f;
         STANDARD_PROFILES.put(profile.getName(), profile);
 
         profile = new LostCityProfile("rarecities", true);
@@ -300,8 +300,8 @@ public class ProfileSetup {
         profile.setDescription("Safe mode: no spawners, lighting but no loot");
         profile.setIconFile("textures/gui/icon_safe.png");
         profile.GENERATE_SPAWNERS = false;
-        profile.GENERATE_LIGHTING = true;
-        profile.GENERATE_LOOT = false;
+        profile.LIGHTING_DENSITY = 1.00f;
+        profile.LOOT_DENSITY = 0.00f;
         STANDARD_PROFILES.put(profile.getName(), profile);
 
         profile = new LostCityProfile("ancient", true);
@@ -320,6 +320,8 @@ public class ProfileSetup {
         profile.RUIN_CHANCE = 0.9f;
         profile.RUIN_MINLEVEL_PERCENT = 0.0f;
         profile.RUIN_MAXLEVEL_PERCENT = 0.9f;
+        profile.LIGHTING_DENSITY = 0.05f;
+        profile.LOOT_DENSITY = 0.40f;
         STANDARD_PROFILES.put(profile.getName(), profile);
 
         profile = new LostCityProfile("wasteland", true);
@@ -337,6 +339,8 @@ public class ProfileSetup {
         profile.RUIN_MAXLEVEL_PERCENT = 0.9f;
         profile.AVOID_WATER = true;
         profile.AVOID_FOLIAGE = true;
+        profile.LIGHTING_DENSITY = 0.05f;
+        profile.LOOT_DENSITY = 0.40f;
         STANDARD_PROFILES.put(profile.getName(), profile);
 
         profile = new LostCityProfile("atlantis", true);
@@ -397,6 +401,8 @@ public class ProfileSetup {
         profile.RUIN_MINLEVEL_PERCENT = 0.1f;
         profile.RUIN_MAXLEVEL_PERCENT = 0.4f;
         profile.AVOID_FOLIAGE = true;
+        profile.LIGHTING_DENSITY = 0.05f;
+        profile.LOOT_DENSITY = 0.40f;
 //        profile.ALLOWED_BIOME_FACTORS = new String[] { "stone_beach=1", "dead_forest=1", "outback=1", "volcanic_island=1", "wasteland=.3" };
         STANDARD_PROFILES.put(profile.getName(), profile);
 
@@ -422,6 +428,8 @@ public class ProfileSetup {
         profile.RUIN_MINLEVEL_PERCENT = 0.1f;
         profile.RUIN_MAXLEVEL_PERCENT = 0.4f;
         profile.AVOID_FOLIAGE = true;
+        profile.LIGHTING_DENSITY = 0.00f;
+        profile.LOOT_DENSITY = 0.00f;
 //        profile.ALLOWED_BIOME_FACTORS = new String[] { "stone_beach=1", "dead_forest=1", "outback=1", "volcanic_island=1", "wasteland=.3" };
         STANDARD_PROFILES.put(profile.getName(), profile);
 
@@ -434,7 +442,7 @@ public class ProfileSetup {
         profile.CITY_THRESHOLD = .1f;
         profile.CITY_STYLE_THRESHOLD = .4f;
         profile.CITY_STYLE_ALTERNATIVE = "citystyle_border";
-        profile.GENERATE_LIGHTING = true;
+        profile.LIGHTING_DENSITY = 0.35f;
         profile.BUILDING_MAXFLOORS = 9;
         profile.BUILDING_MAXFLOORS_CHANCE = 7;
         profile.BUILDING_CHANCE = .4f;
@@ -444,10 +452,16 @@ public class ProfileSetup {
     public static void setupProfiles() {
         Path configDir = FabricLoader.getInstance().getConfigDir();
         Path profileDir = configDir.resolve("urbex/profiles");
-        Path defaultsDir = profileDir.resolve("defaults");
 
         initStandardProfiles();
+        writeProfileFiles(profileDir);
 
+        Urbex.getLogger().info("Reading profiles from 'config/urbex/profiles'");
+        readProfiles(profileDir);
+    }
+
+    static void writeProfileFiles(Path profileDir) {
+        Path defaultsDir = profileDir.resolve("defaults");
         // defaults/ is regenerated every launch as read-only reference material.
         defaultsDir.toFile().mkdirs();
         for (Map.Entry<String, LostCityProfile> entry : STANDARD_PROFILES.entrySet()) {
@@ -456,14 +470,11 @@ public class ProfileSetup {
 
         // profiles/ belongs to the user. Seed a file only when it is absent; never overwrite.
         for (Map.Entry<String, LostCityProfile> entry : STANDARD_PROFILES.entrySet()) {
-            File target = new File(profileDir.toString(), entry.getKey() + ".json");
+            File target = profileDir.resolve(entry.getKey() + ".json").toFile();
             if (!target.exists()) {
                 writeProfile(profileDir, entry.getKey(), entry.getValue());
             }
         }
-
-        Urbex.getLogger().info("Reading profiles from 'config/urbex/profiles'");
-        readProfiles(profileDir);
     }
 
     private static void writeProfile(Path dir, String name, LostCityProfile profile) {
