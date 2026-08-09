@@ -17,7 +17,7 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 
 import javax.annotation.Nullable;
@@ -50,10 +50,13 @@ public class ChunkDriver {
     // order-dependence on those paths is structurally unobservable to /urbex digest - see issue
     // #20 for the vine case, which is known to be order-dependent and cannot be caught here.
     //
-    // Only the touched *positions* are recorded, never the states. The digest reads each final
-    // state back from the world once generation is over, so a position written three times
-    // contributes once, and the internal path by which two runs reached the same block cannot
-    // change the answer. That is the property under test.
+    // Each touched position is recorded together with the state the driver last wrote there.
+    // A position written three times contributes its last state once, so the internal path by
+    // which two runs reached the same block cannot change the answer - that is the property
+    // under test. The state is captured at write time, NOT read back from the world afterwards:
+    // vanilla decoration from neighbouring chunks (ore blobs and friends) overwrites border
+    // columns in pipeline-timing-dependent order, and a digest that read the final world would
+    // measure vanilla's scheduling instead of this mod's output.
     //
     // Thread safety: a ChunkDriver belongs to one ChunkGenContext, which belongs to one call of
     // LostCityTerrainFeature.generate() on one thread, and never escapes it. So the accumulator
@@ -69,7 +72,12 @@ public class ChunkDriver {
     // ---------------------------------------------------------------------------------------
 
     private static volatile boolean recordingWrites = false;
-    private static final Map<ChunkPos, LongOpenHashSet> RECORDED_WRITES = new ConcurrentHashMap<>();
+    // Position -> the state the driver last wrote there. The state is captured at write time
+    // rather than re-read from the world afterwards: vanilla decoration from neighbouring
+    // chunks (ore blobs and friends) overwrites border columns in pipeline-timing-dependent
+    // order, so a world read would fold vanilla's scheduling into a digest that must measure
+    // only this mod's output (issue #24).
+    private static final Map<ChunkPos, Long2ObjectOpenHashMap<BlockState>> RECORDED_WRITES = new ConcurrentHashMap<>();
 
     public static void startRecordingWrites() {
         RECORDED_WRITES.clear();
@@ -86,13 +94,19 @@ public class ChunkDriver {
 
     /** Positions this mod wrote in {@code pos}, ascending. Empty if the chunk was never driven. */
     public static long[] recordedWrites(ChunkPos pos) {
-        LongOpenHashSet set = RECORDED_WRITES.get(pos);
-        if (set == null) {
+        Long2ObjectOpenHashMap<BlockState> map = RECORDED_WRITES.get(pos);
+        if (map == null) {
             return new long[0];
         }
-        long[] positions = set.toLongArray();
+        long[] positions = map.keySet().toLongArray();
         Arrays.sort(positions);     // canonical order, so hashing cannot see the write order
         return positions;
+    }
+
+    /** The state the driver last wrote at {@code packed}, or null if the position was never recorded. */
+    public static BlockState recordedState(ChunkPos pos, long packed) {
+        Long2ObjectOpenHashMap<BlockState> map = RECORDED_WRITES.get(pos);
+        return map == null ? null : map.get(packed);
     }
 
     public static int recordedChunkCount() {
@@ -104,11 +118,11 @@ public class ChunkDriver {
     }
 
     /** Thread-confined: only ever touched by the single thread driving this chunk. */
-    private LongOpenHashSet recorded;
+    private Long2ObjectOpenHashMap<BlockState> recorded;
     private boolean published;
     private boolean loggedLateWrite;
 
-    private void recordWrite(int x, int y, int z) {
+    private void recordWrite(int x, int y, int z, BlockState state) {
         if (!recordingWrites) {
             return;
         }
@@ -127,15 +141,17 @@ public class ChunkDriver {
                                 + "dropped it; recording it separately. This is a bug - some pass "
                                 + "now runs after actuallyGenerate().", x, y, z);
             }
-            LongOpenHashSet late = new LongOpenHashSet();
-            late.add(BlockPos.asLong(x, y, z));
+            Long2ObjectOpenHashMap<BlockState> late = new Long2ObjectOpenHashMap<>();
+            late.put(BlockPos.asLong(x, y, z), state);
             mergeIntoRecordedWrites(late);
             return;
         }
         if (recorded == null) {
-            recorded = new LongOpenHashSet();
+            recorded = new Long2ObjectOpenHashMap<>();
         }
-        recorded.add(BlockPos.asLong(x, y, z));
+        // put, not putIfAbsent: within one driver, the last write to a position wins - the same
+        // property the old read-the-final-world approach had for driver-internal overwrites
+        recorded.put(BlockPos.asLong(x, y, z), state);
     }
 
     /**
@@ -143,7 +159,7 @@ public class ChunkDriver {
      * generation, from the thread that did the driving.
      */
     private void publishRecordedWrites() {
-        LongOpenHashSet local = recorded;
+        Long2ObjectOpenHashMap<BlockState> local = recorded;
         recorded = null;
         published = true;
         if (local == null || local.isEmpty()) {
@@ -152,17 +168,18 @@ public class ChunkDriver {
         mergeIntoRecordedWrites(local);
     }
 
-    private static void mergeIntoRecordedWrites(LongOpenHashSet local) {
-        Map<ChunkPos, LongOpenHashSet> byChunk = new HashMap<>();
-        for (long packed : local) {
+    private static void mergeIntoRecordedWrites(Long2ObjectOpenHashMap<BlockState> local) {
+        Map<ChunkPos, Long2ObjectOpenHashMap<BlockState>> byChunk = new HashMap<>();
+        for (Long2ObjectOpenHashMap.Entry<BlockState> entry : local.long2ObjectEntrySet()) {
+            long packed = entry.getLongKey();
             ChunkPos key = new ChunkPos(BlockPos.getX(packed) >> 4, BlockPos.getZ(packed) >> 4);
-            byChunk.computeIfAbsent(key, k -> new LongOpenHashSet()).add(packed);
+            byChunk.computeIfAbsent(key, k -> new Long2ObjectOpenHashMap<BlockState>()).put(packed, entry.getValue());
         }
         // Copy-on-merge: whatever is already published stays untouched, so a concurrent reader
-        // never sees a set being mutated underneath it.
-        byChunk.forEach((key, set) -> RECORDED_WRITES.merge(key, set, (existing, added) -> {
-            LongOpenHashSet merged = new LongOpenHashSet(existing);
-            merged.addAll(added);
+        // never sees a map being mutated underneath it.
+        byChunk.forEach((key, map) -> RECORDED_WRITES.merge(key, map, (existing, added) -> {
+            Long2ObjectOpenHashMap<BlockState> merged = new Long2ObjectOpenHashMap<>(existing);
+            merged.putAll(added);
             return merged;
         }));
     }
@@ -213,7 +230,7 @@ public class ChunkDriver {
     private void setBlock(BlockPos p, BlockState state) {
         if (state != null) {
             cache.put(p, state);
-            recordWrite(p.getX(), p.getY(), p.getZ());
+            recordWrite(p.getX(), p.getY(), p.getZ(), state);
         }
     }
 
@@ -330,8 +347,23 @@ public class ChunkDriver {
         return px == cx && pz == cz;
     }
 
+    /**
+     * Shape-updates the in-chunk neighbour at {@code pos} against the newly placed {@code state}
+     * and returns the neighbour's (possibly updated) state for the placed block's own
+     * connection decisions.
+     * <p>
+     * Returns {@code null} - "unknown" - for positions outside the chunk being generated, and
+     * touches nothing. It used to read the neighbouring chunk (whose content depends on whether
+     * that chunk's features ran yet) and even write into it when it happened to be FULL; both
+     * made generated output depend on worker-thread timing - the run-to-run digest divergence
+     * behind issue #24. Border blocks are marked for vanilla postprocessing in
+     * {@link #correct} instead, which recomputes their connections from final neighbour data.
+     */
     private BlockState updateAdjacent(BlockState state, Direction direction, BlockPos pos, ChunkAccess thisChunk) {
-        BlockState adjacent = getBlockSafe(pos);
+        if (!isThisChunk(pos)) {
+            return null;
+        }
+        BlockState adjacent = getBlock(pos);
         if (adjacent.getBlock() instanceof LadderBlock) {
             return adjacent;
         }
@@ -346,23 +378,7 @@ public class ChunkDriver {
             return adjacent;
         }
         if (newAdjacent != adjacent) {
-            // Defensive: the adjacent position may be outside the available region during
-            // parallel world generation. In that case just skip the (cosmetic) update.
-            if (!region.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) {
-                return adjacent;
-            }
-            ChunkAccess chunk;
-            try {
-                chunk = region.getChunk(pos);
-            } catch (RuntimeException e) {
-                return adjacent;
-            }
-            if (chunk == thisChunk) {
-                setBlock(pos, newAdjacent);
-            } else if (chunk.getPersistedStatus().isOrAfter(ChunkStatus.FULL)) {
-                region.setBlock(pos, newAdjacent, Block.UPDATE_CLIENTS);
-                recordWrite(pos.getX(), pos.getY(), pos.getZ());
-            }
+            setBlock(pos, newAdjacent);
         }
         return newAdjacent;
     }
@@ -371,16 +387,26 @@ public class ChunkDriver {
         return state.getBlock() instanceof StairBlock;
     }
 
+    /**
+     * In-chunk cache read; AIR for positions outside the chunk being generated. The constant
+     * placeholder keeps shape decisions deterministic - a real read of the neighbouring chunk
+     * would return different content depending on whether its features ran yet. Border blocks
+     * are marked for postprocessing, which recomputes shapes from the final neighbours.
+     */
+    private BlockState getBlockDeterministic(BlockPos p) {
+        return isThisChunk(p) ? getBlock(p) : Blocks.AIR.defaultBlockState();
+    }
+
     private boolean isDifferentStairs(BlockState state, BlockPos pos, Direction face) {
         BlockPos relative = pos.relative(face);
-        BlockState blockstate = getBlockSafe(relative);
+        BlockState blockstate = getBlockDeterministic(relative);
         return !isBlockStairs(blockstate) || blockstate.getValue(StairBlock.FACING) != state.getValue(StairBlock.FACING) || blockstate.getValue(StairBlock.HALF) != state.getValue(StairBlock.HALF);
     }
 
     private StairsShape getShapeProperty(BlockState state, BlockPos pos) {
         Direction direction = state.getValue(StairBlock.FACING);
         BlockPos relative = pos.relative(direction);
-        BlockState blockstate = getBlockSafe(relative);
+        BlockState blockstate = getBlockDeterministic(relative);
         if (isBlockStairs(blockstate) && state.getValue(StairBlock.HALF) == blockstate.getValue(StairBlock.HALF)) {
             Direction direction1 = blockstate.getValue(StairBlock.FACING);
             if (direction1.getAxis() != state.getValue(StairBlock.FACING).getAxis() && isDifferentStairs(state, pos, direction1.getOpposite())) {
@@ -393,7 +419,7 @@ public class ChunkDriver {
         }
 
         BlockPos relativeOpposite = pos.relative(direction.getOpposite());
-        BlockState blockstate1 = getBlockSafe(relativeOpposite);
+        BlockState blockstate1 = getBlockDeterministic(relativeOpposite);
         if (isBlockStairs(blockstate1) && state.getValue(StairBlock.HALF) == blockstate1.getValue(StairBlock.HALF)) {
             Direction direction2 = blockstate1.getValue(StairBlock.FACING);
             if (direction2.getAxis() != state.getValue(StairBlock.FACING).getAxis() && isDifferentStairs(state, pos, direction2)) {
@@ -413,7 +439,9 @@ public class ChunkDriver {
     }
 
     private static boolean canAttach(BlockState state) {
-        if (state.isAir()) {
+        if (state == null || state.isAir()) {
+            // null: the neighbour is in another chunk and deliberately unknown during
+            // generation - no connection now, postprocessing recomputes it later
             return false;
         }
         if (state.canOcclude()) {
@@ -438,6 +466,15 @@ public class ChunkDriver {
         BlockState eastState = updateAdjacent(state, Direction.WEST, pos.set(cx + 1, cy, cz), thisChunk);
         BlockState northState = updateAdjacent(state, Direction.SOUTH, pos.set(cx, cy, cz - 1), thisChunk);
         BlockState southState = updateAdjacent(state, Direction.NORTH, pos.set(cx, cy, cz + 1), thisChunk);
+
+        // A border block could not see (or update) its out-of-chunk neighbours; have vanilla
+        // recompute its connections from the final neighbour data when the chunk is
+        // postprocessed - the same mechanism vanilla structures use across chunk borders.
+        int lx = cx & 0xf;
+        int lz = cz & 0xf;
+        if (lx == 0 || lx == 15 || lz == 0 || lz == 15) {
+            thisChunk.markPosForPostProcessing(pos.set(cx, cy, cz));
+        }
 
         if (state.getBlock() instanceof CrossCollisionBlock) {
             state = state.setValue(CrossCollisionBlock.WEST, canAttach(westState));
@@ -556,7 +593,7 @@ public class ChunkDriver {
                     }
                 }
                 if (record) {
-                    owner.recordWrite(x, y1, z);
+                    owner.recordWrite(x, y1, z, state);
                 }
                 y1++;
             }
@@ -608,7 +645,7 @@ public class ChunkDriver {
                         cache[sectionIdx].isEmpty = false;
                     }
                     if (record) {
-                        owner.recordWrite(x, y1, z);
+                        owner.recordWrite(x, y1, z, state);
                     }
                 }
                 y1++;

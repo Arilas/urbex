@@ -93,6 +93,15 @@ public final class DigestRunner {
         sorted.sort(Comparator.comparingInt(ChunkPos::x).thenComparingInt(ChunkPos::z));
 
         boolean detail = System.getProperty("urbex.digestCheck.detail") != null;
+        String dumpPath = System.getProperty("urbex.digestCheck.dump");
+        java.io.PrintWriter dump = null;
+        if (dumpPath != null) {
+            try {
+                dump = new java.io.PrintWriter(new java.io.FileWriter(dumpPath));
+            } catch (java.io.IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
         long digest = FNV_OFFSET;
         long driverDigest = FNV_OFFSET;
         long driverBlocks = 0;
@@ -100,13 +109,26 @@ public final class DigestRunner {
             digest = hashChunk(level, pos, digest);
             long[] written = ChunkDriver.recordedWrites(pos);
             driverBlocks += written.length;
-            driverDigest = hashDriverWrites(level, written, driverDigest);
+            driverDigest = hashDriverWrites(level, pos, written, driverDigest);
             if (detail) {
                 // Independent per-chunk digest, for diffing two runs to localize a mismatch
-                long chunkDigest = hashDriverWrites(level, written, FNV_OFFSET);
+                long chunkDigest = hashDriverWrites(level, pos, written, FNV_OFFSET);
                 System.out.printf("CHUNKDIGEST %d %d %016x blocks=%d%n",
                         pos.x(), pos.z(), chunkDigest, written.length);
             }
+            if (dump != null) {
+                BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
+                long[] sortedWrites = written.clone();
+                java.util.Arrays.sort(sortedWrites);
+                for (long packed : sortedWrites) {
+                    mutable.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
+                    dump.printf("%d %d %d %s%n", mutable.getX(), mutable.getY(), mutable.getZ(),
+                            ChunkDriver.recordedState(pos, packed));
+                }
+            }
+        }
+        if (dump != null) {
+            dump.close();
         }
         ChunkDriver.clearRecordedWrites();
 
@@ -115,18 +137,23 @@ public final class DigestRunner {
     }
 
     /**
-     * Hash the final state at each position this mod wrote.
+     * Hash the state this mod last wrote at each position it touched.
      * <p>
-     * The states are read here, once, after every chunk has finished generating - not folded in as
-     * the writes happened. A position overwritten three times therefore contributes its last state
-     * exactly once, and two runs that reach the same blocks by different internal paths agree.
+     * The states come from the driver's own record, captured at write time - deliberately not
+     * read back from the world: vanilla decoration from neighbouring chunks (ore blobs)
+     * overwrites border columns in pipeline-timing-dependent order, and a digest reading the
+     * final world would measure vanilla's scheduling rather than this mod's output. A position
+     * overwritten several times by the driver contributes its last state exactly once, so two
+     * runs that reach the same blocks by different internal paths agree. Block entities are
+     * still read from the world; ores cannot replace containers, so those positions are stable.
      */
-    private static long hashDriverWrites(ServerLevel level, long[] written, long digest) {
+    private static long hashDriverWrites(ServerLevel level, ChunkPos chunkPos, long[] written, long digest) {
         BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
         for (long packed : written) {
             mutable.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
             digest = hashLong(digest, packed);
-            digest = hashString(digest, level.getBlockState(mutable).toString());
+            BlockState recorded = ChunkDriver.recordedState(chunkPos, packed);
+            digest = hashString(digest, recorded == null ? "null" : recorded.toString());
             BlockEntity be = level.getBlockEntity(mutable);
             if (be != null) {
                 digest = hashString(digest, be.saveWithFullMetadata(level.registryAccess()).toString());
