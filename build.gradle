@@ -80,20 +80,6 @@ jar {
     from(rootProject.file('LICENSE'))
 }
 
-// Development tooling for the plan viewer (viewer/plan-viewer.html): dumps one CityPlan as JSON so
-// it can be regenerated for a new seed/class without a full test run. Deliberately not wired into
-// `build`, `jar` or `test` - registering the task lazily like this, and never adding it as a
-// dependency of another task, keeps it out of the artifact that actually ships.
-//
-//   ./gradlew -q runPlanDump --args="1337 TOWN viewer/plan-1337-town.json"
-//   ./gradlew -q runPlanDump --args="1337 CITY viewer/plan-1337-city.json river"
-tasks.register('runPlanDump', JavaExec) {
-    group = 'urbex'
-    description = 'Dumps a CityPlan as JSON for viewer/plan-viewer.html. Dev tooling; excluded from build/jar.'
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'dev.krona.urbex.plan.PlanJson'
-}
-
 processResources {
     def expandProps = [
             'version'              : version,
