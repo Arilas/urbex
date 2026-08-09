@@ -62,7 +62,6 @@ public class Spheres {
         int minY = Math.max(provider.getWorld().getMinY(), centery - radius - 1);
         int maxY = Math.min(provider.getWorld().getMaxY() + 1, centery + radius + 1);
         int seaLevel = Tools.getSeaLevel(provider.getWorld());
-        int outerSeaLevel = -1000;
 
         for (int x = 0; x < 16; x++) {
             double dxdx = (x - centerx) * (x - centerx);
@@ -95,7 +94,7 @@ public class Spheres {
                             if (profile.CITYSPHERE_CLEARABOVE > 0) {
                                 int mY = Math.min(provider.getWorld().getMaxY() + 1, y + profile.CITYSPHERE_CLEARABOVE);
                                 while (yy <= mY) {
-                                    driver.block(yy <= outerSeaLevel ? feature.liquid : air);
+                                    driver.block(air);
                                     driver.incY();
                                     yy++;
                                 }
@@ -103,7 +102,7 @@ public class Spheres {
                             if (profile.CITYSPHERE_CLEARABOVE_UNTIL_AIR) {
                                 // Clear until we hit air
                                 while (driver.getBlock() != air) {
-                                    driver.block(yy <= outerSeaLevel ? feature.liquid : air);
+                                    driver.block(air);
                                     driver.incY();
                                     yy++;
                                 }
@@ -114,7 +113,7 @@ public class Spheres {
                                 driver.current(x, yy, z);
                                 int mY = Math.max(provider.getWorld().getMinY(), bottom - profile.CITYSPHERE_CLEARBELOW);
                                 while (yy >= mY) {
-                                    driver.block(yy <= outerSeaLevel ? feature.liquid : air);
+                                    driver.block(air);
                                     driver.decY();
                                     yy--;
                                 }
@@ -123,7 +122,7 @@ public class Spheres {
                                 // Clear until we hit air or go below build limit
                                 driver.current(x, yy, z);
                                 while (driver.getBlock() != (yy <= seaLevel ? feature.liquid : air) && yy > provider.getWorld().getMinY()) {
-                                    driver.block(yy <= outerSeaLevel ? feature.liquid : air);
+                                    driver.block(air);
                                     driver.decY();
                                     yy--;
                                 }
@@ -137,7 +136,7 @@ public class Spheres {
                     if (profile.isFloating() || profile.isSpace()) {
                         driver.current(x, minY, z);
                         for (int y = minY; y < maxY; y++) {
-                            driver.block(y <= outerSeaLevel ? feature.liquid : air);
+                            driver.block(air);
                             driver.incY();
                         }
                     }

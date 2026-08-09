@@ -77,7 +77,6 @@ public class Config {
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES;
     public static final ModConfigSpec.BooleanValue AVOID_VILLAGES_ADJACENT;
     public static final ModConfigSpec.BooleanValue AVOID_FLATTENING;
-    public static final ModConfigSpec.BooleanValue OPTIMIZED_HEIGHTMAP;
     public static final ModConfigSpec.IntValue HEIGHT_SAMPLE_SIZE;
 
     public static void reset() {
@@ -243,9 +242,6 @@ public class Config {
                 .comment("A list of dimensions with associated city generation profiles (format <dimensionid>=<profilename>")
                 .defineList("dimensionsWithProfiles", Lists.newArrayList(Config.DEFAULT_DIMENSION_PROFILES), s -> s instanceof String);
 
-        OPTIMIZED_HEIGHTMAP = COMMON_BUILDER
-                .comment("If true then a different heightmap generation algorithm is used which should be slightly more efficient. Be careful with this as it might not be 100% compatible with some other terrain generation mods!")
-                .define("optimizedHeightmap", false);
         HEIGHT_SAMPLE_SIZE = COMMON_BUILDER
                 .comment("The size of the chunk grid used for heightmap sampling. Default is 1 which means every chunk is sampled. Higher values will sample less chunks and thus be faster but also less accurate")
                 .defineInRange("heightSampleSize", 3, 1, 100);

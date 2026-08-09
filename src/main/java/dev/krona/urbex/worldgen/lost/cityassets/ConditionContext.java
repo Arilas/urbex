@@ -82,7 +82,9 @@ public abstract class ConditionContext {
         }
         if (element.getBelowPart() != null) {
             Set<String> belowPart = element.getBelowPart();
-            test = combine(test, context -> belowPart.contains(context.getPart()));
+            // context.getBelowPart(), not getPart(): reading the current part made belowpart
+            // an exact duplicate of inpart, so the condition never did what it says (issue #58)
+            test = combine(test, context -> belowPart.contains(context.getBelowPart()));
         }
         if (element.getInpart() != null) {
             Set<String> part = element.getInpart();
@@ -255,6 +257,11 @@ public abstract class ConditionContext {
 
     public String getPart() {
         return part;
+    }
+
+    /** The part generated directly below the current one, or {@code "<none>"} on the first floor. */
+    public String getBelowPart() {
+        return belowPart;
     }
 
     public String getBuilding() {

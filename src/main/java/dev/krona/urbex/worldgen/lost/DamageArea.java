@@ -27,6 +27,8 @@ public class DamageArea {
     private final List<Explosion> explosions = new ArrayList<>();
     private final AABB chunkBox;
     private final LostCityProfile profile;
+    private final int minSectionY;
+    private final int maxSectionY;
 
     private final BlockState air;
 
@@ -37,6 +39,8 @@ public class DamageArea {
         this.chunkZ = chunkZ;
         this.air = Blocks.AIR.defaultBlockState();
         chunkBox = new AABB(chunkX << 4, provider.getWorld().getMinY(), chunkZ << 4, (chunkX << 4) + 15, provider.getWorld().getMaxY() + 1, (chunkZ << 4) + 15);
+        this.minSectionY = provider.getWorld().getMinY() >> 4;
+        this.maxSectionY = provider.getWorld().getMaxY() >> 4;
 
         int offset = (Math.max(info.profile.EXPLOSION_MAXRADIUS, info.profile.MINI_EXPLOSION_MAXRADIUS)+15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
@@ -151,11 +155,6 @@ public class DamageArea {
     }
 
     // Return true if this subchunk (every 16 blocks) is affected by explosions.
-    // The scan below is bounded to subchunks 0..15, i.e. world Y 0-255: explosions below Y 0 or
-    // above Y 255 are invisible to it. This disagrees with chunkBox above, which was widened in
-    // P1a to the level's real min/max Y - chunkBox only gates whether an explosion intersects this
-    // chunk at all and is not consulted here. Tracked as Arilas/urbex#19; not currently reachable
-    // by any shipped profile.
     public boolean hasExplosions(int y) {
         AABB box = new AABB(chunkX << 4, y << 4, chunkZ << 4, (chunkX << 4) + 15, (y << 4) + 15, (chunkZ << 4) + 15);
         for (Explosion explosion : explosions) {
@@ -167,29 +166,9 @@ public class DamageArea {
         return false;
     }
 
-    // Return true if this subchunk is completely destroyed by an explosion
-    public boolean isCompletelyDestroyed(int y) {
-        AABB box = new AABB(chunkX << 4, y * 16, chunkZ << 4, (chunkX << 4) + 15, (y * 16) + 15, (chunkZ << 4) + 15);
-        for (Explosion explosion : explosions) {
-            double dmax = GeometryTools.maxSquaredDistanceBoxPoint(box, explosion.getCenter());
-            int sqdist = explosion.getRadius() * explosion.getRadius();
-            if (dmax <= sqdist) {
-                // The distance at which this explosion is totally fatal (destroys all blocks)
-                double dist = (explosion.getRadius() - 3.0 * explosion.getRadius()) / -3.0;
-                dist *= dist;
-                if (dmax <= dist) {
-                    return true;
-                }
-            }
-        }
-        return false;
-
-    }
-
     // Get the lowest height that is affected by an explosion.
-    // Same Y 0-255 subchunk bound as hasExplosions(int y) above - see its comment. Arilas/urbex#19.
     public int getLowestExplosionHeight() {
-        for (int yy = 0 ; yy < 16 ; yy++) {
+        for (int yy = minSectionY; yy <= maxSectionY; yy++) {
             if (hasExplosions(yy)) {
                 return yy * 16;
             }
@@ -197,10 +176,9 @@ public class DamageArea {
         return -1;
     }
 
-    // Get the lowest height that is affected by an explosion.
-    // Same Y 0-255 subchunk bound as hasExplosions(int y) above - see its comment. Arilas/urbex#19.
+    // Get the highest height that is affected by an explosion.
     public int getHighestExplosionHeight() {
-        for (int yy = 15 ; yy >= 0 ; yy--) {
+        for (int yy = maxSectionY; yy >= minSectionY; yy--) {
             if (hasExplosions(yy)) {
                 return yy * 16 + 15;
             }
@@ -213,6 +191,36 @@ public class DamageArea {
         float damage = 0.0f;
         for (Explosion explosion : explosions) {
             double sq = explosion.getCenter().distToCenterSqr(chunkX * 16.0, explosion.getCenter().getY(), chunkZ * 16.0);
+            if (sq < explosion.getSqradius()) {
+                double d = Math.sqrt(sq);
+                damage += 3.0f * (explosion.getRadius() - d) / explosion.getRadius();
+            }
+        }
+        return damage;
+    }
+
+    /**
+     * The explosions whose blast sphere can reach subchunk {@code sectionY} of this chunk.
+     * The damage loop used to re-walk the complete explosion list for every block of every
+     * Y-level even though this intersection was already known per 16-block band (issue #49).
+     */
+    public List<Explosion> explosionsIntersecting(int sectionY) {
+        AABB box = new AABB(chunkX << 4, sectionY << 4, chunkZ << 4, (chunkX << 4) + 15, (sectionY << 4) + 15, (chunkZ << 4) + 15);
+        List<Explosion> result = new ArrayList<>();
+        for (Explosion explosion : explosions) {
+            double dmin = GeometryTools.squaredDistanceBoxPoint(box, explosion.getCenter());
+            if (dmin <= explosion.getRadius() * explosion.getRadius()) {
+                result.add(explosion);
+            }
+        }
+        return result;
+    }
+
+    /** As {@link #getDamage(int, int, int)}, over a pre-filtered per-section explosion list. */
+    public static float getDamage(List<Explosion> explosions, int x, int y, int z) {
+        float damage = 0.0f;
+        for (Explosion explosion : explosions) {
+            double sq = explosion.getCenter().distToCenterSqr(x, y, z);
             if (sq < explosion.getSqradius()) {
                 double d = Math.sqrt(sq);
                 damage += 3.0f * (explosion.getRadius() - d) / explosion.getRadius();
