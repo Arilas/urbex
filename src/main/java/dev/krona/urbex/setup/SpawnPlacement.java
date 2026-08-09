@@ -1,71 +1,53 @@
 package dev.krona.urbex.setup;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.commands.ModCommands;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.ComponentFactory;
-import dev.krona.urbex.varia.CustomTeleporter;
-import dev.krona.urbex.varia.WorldTools;
-import dev.krona.urbex.worldgen.GlobalTodo;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedSphere;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.AbstractSkullBlock;
-import net.minecraft.world.level.block.BedBlock;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
-import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.EntitySleepEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 
 import javax.annotation.Nonnull;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
 import java.util.function.Predicate;
 
-import static dev.krona.urbex.setup.Registration.LOSTCITY;
+/**
+ * Picks and applies the world spawn for profiles that constrain it (spawn biome, spawn city,
+ * spawn sphere, in/outside buildings). Stateless apart from {@link #spawnPositions}, the pending
+ * spawn corrections applied when the first player joins - cleared on server stop so nothing
+ * leaks between worlds in one client session.
+ */
+public class SpawnPlacement {
 
-public class ForgeEventHandlers {
+    private static final Map<ResourceKey<Level>, BlockPos> spawnPositions = new HashMap<>();
 
-    public static final ForgeEventHandlers INSTANCE = new ForgeEventHandlers();
-
-    private final Map<ResourceKey<Level>, BlockPos> spawnPositions = new HashMap<>();
-
-    public static void register() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> ModCommands.register(dispatcher));
-        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> INSTANCE.onPlayerFirstJoin(handler.player));
-        ServerTickEvents.END_LEVEL_TICK.register(INSTANCE::onWorldTick);
-        ServerLifecycleEvents.SERVER_STARTING.register(server -> cleanUp());
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-            cleanUp();
-            Config.reset();
-        });
-        EntitySleepEvents.ALLOW_SLEEPING.register(INSTANCE::onPlayerSleepInBed);
+    static void reset() {
+        spawnPositions.clear();
     }
 
-    public void onPlayerFirstJoin(ServerPlayer serverPlayer) {
+    public static void onPlayerFirstJoin(ServerPlayer serverPlayer) {
         ServerLevel level = serverPlayer.level();
         ResourceKey<Level> dimKey = level.dimension();
 
@@ -87,27 +69,14 @@ public class ForgeEventHandlers {
         }
     }
 
-    public void onWorldTick(ServerLevel serverLevel) {
-        AssetRegistries.load(serverLevel);
-        GlobalTodo.get(serverLevel).executeAndClearTodo(serverLevel);
-    }
-
-    public static void cleanUp() {
-        Config.resetProfileCache();
-        // Everything that used to be cleared here now lives on DimensionCaches, and goes away with
-        // the IDimensionInfo that owns it (LostCityFeature.cleanUp clears that map right after
-        // calling us). Only the datapack-derived predefined maps are still global.
-        City.cleanPredefinedCache();
-    }
-
     /**
      * Called from MinecraftServerMixin when the initial spawn position is being determined.
      * Returns true if Lost Cities took over spawn placement (the vanilla logic should be skipped).
      */
-    public boolean onCreateSpawnPoint(ServerLevel serverLevel, ServerLevelData settings) {
+    public static boolean onCreateSpawnPoint(ServerLevel serverLevel, ServerLevelData settings) {
         LevelAccessor world = serverLevel;
         {
-            IDimensionInfo dimensionInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(serverLevel);
+            IDimensionInfo dimensionInfo = Registration.lostCityFeature().getDimensionInfo(serverLevel);
             if (dimensionInfo == null) {
                 return false;
             }
@@ -235,17 +204,17 @@ public class ForgeEventHandlers {
         return false;
     }
 
-    private boolean isOutsideBuilding(IDimensionInfo provider, BlockPos pos) {
+    private static boolean isOutsideBuilding(IDimensionInfo provider, BlockPos pos) {
         ChunkCoord coord = new ChunkCoord(provider.getType(), pos.getX() >> 4, pos.getZ() >> 4);
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
         return !(info.isCity() && info.hasBuilding);
     }
 
-    private int getSqRadius(int radius, float pct) {
+    private static int getSqRadius(int radius, float pct) {
         return (int) ((radius * pct) * (radius * pct));
     }
 
-    private BlockPos findSafeSpawnPoint(Level world, IDimensionInfo provider, @Nonnull Predicate<BlockPos> isSuitable,
+    private static BlockPos findSafeSpawnPoint(Level world, IDimensionInfo provider, @Nonnull Predicate<BlockPos> isSuitable,
                                     @Nonnull ServerLevelData serverLevelData) {
         Random rand = new Random(provider.getSeed());
         int radius = provider.getProfile().SPAWN_CHECK_RADIUS;
@@ -280,7 +249,7 @@ public class ForgeEventHandlers {
         }
     }
 
-    private boolean isValidStandingPosition(Level world, BlockPos pos) {
+    static boolean isValidStandingPosition(Level world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
         if (!state.isFaceSturdy(world, pos, Direction.UP)) {
             return false;
@@ -296,137 +265,4 @@ public class ForgeEventHandlers {
 //        return state.canOcclude();
     }
 
-    private boolean isValidSpawnBed(Level world, BlockPos pos) {
-        BlockState state = world.getBlockState(pos);
-        if (!(state.getBlock() instanceof BedBlock)) {
-            return false;
-        }
-        Direction direction = state.getValue(BedBlock.FACING);
-        Block b1 = world.getBlockState(pos.below()).getBlock();
-        Block b2 = world.getBlockState(pos.relative(direction.getOpposite()).below()).getBlock();
-        Block b = BuiltInRegistries.BLOCK.getValue(Identifier.parse(Config.SPECIAL_BED_BLOCK.get()));
-        if (b1 != b || b2 != b) {
-            return false;
-        }
-        // Check if the bed is surrounded by 6 skulls
-        if (!(world.getBlockState(pos.relative(direction)).getBlock() instanceof AbstractSkullBlock)) {   // @todo 1.14 other skulls!
-            return false;
-        }
-        if (!(world.getBlockState(pos.relative(direction.getClockWise())).getBlock() instanceof AbstractSkullBlock)) {
-            return false;
-        }
-        if (!(world.getBlockState(pos.relative(direction.getCounterClockWise())).getBlock() instanceof AbstractSkullBlock)) {
-            return false;
-        }
-        if (!(world.getBlockState(pos.relative(direction.getOpposite(), 2)).getBlock() instanceof AbstractSkullBlock)) {
-            return false;
-        }
-        if (!(world.getBlockState(pos.relative(direction.getOpposite()).relative(direction.getOpposite().getClockWise())).getBlock() instanceof AbstractSkullBlock)) {
-            return false;
-        }
-        if (!(world.getBlockState(pos.relative(direction.getOpposite()).relative(direction.getOpposite().getCounterClockWise())).getBlock() instanceof AbstractSkullBlock)) {
-            return false;
-        }
-        return true;
-    }
-
-    private BlockPos findValidTeleportLocation(Level world, BlockPos start) {
-        int chunkX = start.getX()>>4;
-        int chunkZ = start.getZ()>>4;
-        int y = start.getY();
-        BlockPos pos = findValidTeleportLocation(world, chunkX, chunkZ, y);
-        if (pos != null) {
-            return pos;
-        }
-        for (int r = 1 ; r < 50 ; r++) {
-            for (int i = -r ; i < r ; i++) {
-                pos = findValidTeleportLocation(world, chunkX + i, chunkZ - r, y);
-                if (pos != null) {
-                    return pos;
-                }
-                pos = findValidTeleportLocation(world, chunkX + r, chunkZ + i, y);
-                if (pos != null) {
-                    return pos;
-                }
-                pos = findValidTeleportLocation(world, chunkX + r - i, chunkZ + r, y);
-                if (pos != null) {
-                    return pos;
-                }
-                pos = findValidTeleportLocation(world, chunkX - r, chunkZ + r - i, y);
-                if (pos != null) {
-                    return pos;
-                }
-            }
-        }
-        return null;
-    }
-
-    private BlockPos findValidTeleportLocation(Level world, int chunkX, int chunkZ, int y) {
-        BlockPos bestSpot = null;
-        for (int dy = 0 ; dy < 255 ; dy++) {
-            for (int x = 0 ; x < 16 ; x++) {
-                for (int z = 0 ; z < 16 ; z++) {
-                    if ((y + dy) < 250) {
-                        BlockPos p = new BlockPos((chunkX << 4) + x, y + dy, (chunkZ << 4) + z);
-                        if (isValidSpawnBed(world, p)) {
-                            return p.above();
-                        }
-                        if (bestSpot == null && isValidStandingPosition(world, p)) {
-                            bestSpot = p.above();
-                        }
-                    }
-                    if ((y - dy) > 1) {
-                        BlockPos p = new BlockPos((chunkX << 4) + x, y - dy, (chunkZ << 4) + z);
-                        if (isValidSpawnBed(world, p)) {
-                            return p.above();
-                        }
-                        if (bestSpot == null && isValidStandingPosition(world, p)) {
-                            bestSpot = p.above();
-                        }
-                    }
-                }
-            }
-        }
-        return bestSpot;
-    }
-
-    public Player.BedSleepingProblem onPlayerSleepInBed(Player player, BlockPos bedLocation) {
-        Level world = player.level();
-        if (world.isClientSide()) {
-            return null;
-        }
-        if (bedLocation == null || !isValidSpawnBed(world, bedLocation)) {
-            return null;
-        }
-
-        if (world.dimension() == Registration.DIMENSION) {
-            ServerLevel destWorld = WorldTools.getOverworld(world);
-            BlockPos location = findLocation(bedLocation, destWorld);
-            CustomTeleporter.teleportToDimension(player, destWorld, location);
-            return Player.BedSleepingProblem.OTHER_PROBLEM;
-        } else {
-            ServerLevel destWorld = player.level().getServer().getLevel(Registration.DIMENSION);
-            if (destWorld == null) {
-                player.sendSystemMessage(ComponentFactory.literal("Error finding Urbex dimension: " + LOSTCITY + "!").withStyle(ChatFormatting.RED));
-            } else {
-                BlockPos location = findLocation(bedLocation, destWorld);
-                CustomTeleporter.teleportToDimension(player, destWorld, location);
-            }
-            return Player.BedSleepingProblem.OTHER_PROBLEM;
-        }
-    }
-
-    private BlockPos findLocation(BlockPos bedLocation, ServerLevel destWorld) {
-        BlockPos top = bedLocation.above(5);//destWorld.getHeight(Heightmap.Type.MOTION_BLOCKING, bedLocation).up(10);
-        BlockPos location = top;
-        while (top.getY() > 1 && destWorld.getBlockState(location).isAir()) {
-            location = location.below();
-        }
-//        BlockPos location = findValidTeleportLocation(destWorld, top);
-        if (destWorld.isEmptyBlock(location.below())) {
-            // No place to teleport
-            destWorld.setBlockAndUpdate(bedLocation, Blocks.COBBLESTONE.defaultBlockState());
-        }
-        return location.above(1);
-    }
 }

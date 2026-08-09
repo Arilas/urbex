@@ -5,7 +5,6 @@ import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.gui.elements.*;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.worldgen.LostCityFeature;
 import dev.krona.urbex.worldgen.lost.*;
 import net.minecraft.client.Minecraft;
@@ -22,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import net.minecraft.network.chat.Component;
 
 public class GuiLCConfig extends Screen {
 
@@ -50,7 +50,7 @@ public class GuiLCConfig extends Screen {
     private final LostCitySetup localSetup = new LostCitySetup(this::refreshPreview);
 
     public GuiLCConfig(Screen parent) {
-        super(ComponentFactory.literal("Urbex Configuration"));
+        super(Component.literal("Urbex Configuration"));
         this.parent = parent;
         localSetup.copyFrom(LostCitySetup.CLIENT_SETUP);
     }
@@ -86,28 +86,28 @@ public class GuiLCConfig extends Screen {
         // @todo 1.19.3
 //        this.minecraft.keyboardHandler.setSendRepeatsToGui(true);
 
-        profileButton = addRenderableWidget(new ButtonExt(55, 10, 80, 20, ComponentFactory.literal(localSetup.getProfileLabel()), p -> {
+        profileButton = addRenderableWidget(new ButtonExt(55, 10, 80, 20, Component.literal(localSetup.getProfileLabel()), p -> {
             localSetup.toggleProfile();
             updateValues();
-        }).tooltip(ComponentFactory.literal("Select a standard profile for Urbex worldgen")));
+        }).tooltip(Component.literal("Select a standard profile for Urbex worldgen")));
 
-        worldstyleButton = addRenderableWidget(new ButtonExt(145, 10, 120, 20, ComponentFactory.literal(localSetup.getWorldStyleLabel()), p -> {
+        worldstyleButton = addRenderableWidget(new ButtonExt(145, 10, 120, 20, Component.literal(localSetup.getWorldStyleLabel()), p -> {
             localSetup.toggleWorldStyle();
             updateValues();
-        }).tooltip(ComponentFactory.literal("Select the worldstyle to use for this profile")));
+        }).tooltip(Component.literal("Select the worldstyle to use for this profile")));
 
-        customizeButton = addRenderableWidget(new ButtonExt(275, 10, 70, 20, ComponentFactory.literal("Customize"), p -> {
+        customizeButton = addRenderableWidget(new ButtonExt(275, 10, 70, 20, Component.literal("Customize"), p -> {
             localSetup.customize();
             updateValues();
-        }).tooltip(ComponentFactory.literal("Create a customized version of the currently selected profile")));
-        modeButton = addRenderableWidget(new ButtonExt(355, 10, 70, 20, ComponentFactory.literal(mode), p -> toggleMode())
-            .tooltip(ComponentFactory.literal("Switch between different configuration pages")));
+        }).tooltip(Component.literal("Create a customized version of the currently selected profile")));
+        modeButton = addRenderableWidget(new ButtonExt(355, 10, 70, 20, Component.literal(mode), p -> toggleMode())
+            .tooltip(Component.literal("Switch between different configuration pages")));
 
 
-        addRenderableWidget(Button.builder(ComponentFactory.literal("Done"), p -> done()).bounds(10, this.height - 22, 120, 20).build());
-        addRenderableWidget(Button.builder(ComponentFactory.literal("Cancel"), p -> cancel()).bounds(this.width - 130, this.height - 22, 120, 20).build());
-        addRenderableWidget(new ButtonExt(this.width - 35, 35, 30, 20, ComponentFactory.literal("Rnd"), p -> randomizePreview())
-                .tooltip(ComponentFactory.literal("Randomize the seed for the preview (does not affect the generated world)")));
+        addRenderableWidget(Button.builder(Component.literal("Done"), p -> done()).bounds(10, this.height - 22, 120, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Cancel"), p -> cancel()).bounds(this.width - 130, this.height - 22, 120, 20).build());
+        addRenderableWidget(new ButtonExt(this.width - 35, 35, 30, 20, Component.literal("Rnd"), p -> randomizePreview())
+                .tooltip(Component.literal("Randomize the seed for the preview (does not affect the generated world)")));
 
         initCities(110);
         initBuildings(110);
@@ -225,7 +225,7 @@ public class GuiLCConfig extends Screen {
     private void initCities(int left) {
         start("Cities");
         TextExt info = addRenderableWidget(new TextExt(this, 10, 30, 230, 3, getFont(),
-                ComponentFactory.literal("Cities are the main feature of Urbex. In this page you can control the rarity of them")));
+                Component.literal("Cities are the main feature of Urbex. In this page you can control the rarity of them")));
         add(new WidgetElement(info, curpage, 10, 30));
         nl();
         addDouble(left,120, "cities.cityChance").label("Rarity:"); nl();
@@ -249,7 +249,7 @@ public class GuiLCConfig extends Screen {
             idx = 0;
         }
         mode = MODES.get(idx);
-        modeButton.setMessage(ComponentFactory.literal(mode));
+        modeButton.setMessage(Component.literal(mode));
     }
 
     private GuiElement add(GuiElement el) {
@@ -450,8 +450,8 @@ public class GuiLCConfig extends Screen {
     }
 
     private void refreshButtons() {
-        profileButton.setMessage(ComponentFactory.literal(localSetup.getProfileLabel()));
-        worldstyleButton.setMessage(ComponentFactory.literal(localSetup.getWorldStyleLabel()));
+        profileButton.setMessage(Component.literal(localSetup.getProfileLabel()));
+        worldstyleButton.setMessage(Component.literal(localSetup.getWorldStyleLabel()));
         customizeButton.active = localSetup.isCustomizable();
 
         boolean isCustomized = "customized".equals(localSetup.getProfileLabel());

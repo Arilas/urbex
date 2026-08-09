@@ -1,6 +1,6 @@
 package dev.krona.urbex.mixin;
 
-import dev.krona.urbex.setup.ForgeEventHandlers;
+import dev.krona.urbex.setup.SpawnPlacement;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.progress.LevelLoadListener;
@@ -20,7 +20,7 @@ public class MinecraftServerMixin {
     @Inject(method = "setInitialSpawn", at = @At("HEAD"), cancellable = true)
     private static void urbex$onSetInitialSpawn(ServerLevel level, ServerLevelData levelData, boolean spawnBonusChest,
                                                      boolean isDebug, LevelLoadListener levelLoadListener, CallbackInfo ci) {
-        if (!isDebug && ForgeEventHandlers.INSTANCE.onCreateSpawnPoint(level, levelData)) {
+        if (!isDebug && SpawnPlacement.onCreateSpawnPoint(level, levelData)) {
             ci.cancel();
         }
     }

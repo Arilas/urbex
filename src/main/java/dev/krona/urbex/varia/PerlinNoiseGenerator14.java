@@ -4,6 +4,12 @@ import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 import net.minecraft.world.level.levelgen.synth.SimplexNoise;
 
 // @todo 1.15 copy from 1.14: use the 1.15 version!
+/**
+ * A frozen copy of 1.14-era vanilla noise. Deliberately NOT replaced by the current
+ * vanilla classes: this pins generated output against vanilla noise changes, so existing
+ * worlds keep their terrain across Minecraft updates. Do not swap in the vanilla
+ * equivalents.
+ */
 public class PerlinNoiseGenerator14 {
    private final SimplexNoise[] noiseLevels;
    private final int levels;

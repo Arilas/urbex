@@ -3,7 +3,6 @@ package dev.krona.urbex.setup;
 import dev.krona.urbex.gui.GuiLCConfig;
 import dev.krona.urbex.gui.LostCitySetup;
 import dev.krona.urbex.gui.RecreateProfileRestore;
-import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.worldgen.LostCityFeature;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
@@ -11,6 +10,7 @@ import net.fabricmc.fabric.api.client.screen.v1.Screens;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.network.chat.Component;
 
 public class ClientEventHandlers {
 
@@ -28,7 +28,7 @@ public class ClientEventHandlers {
                     lastCreateWorldScreen = new java.lang.ref.WeakReference<>(createWorldScreen);
                     RecreateProfileRestore.consumePending();
                 }
-                Button lostCitiesButton = Button.builder(ComponentFactory.literal("Cities"), b ->
+                Button lostCitiesButton = Button.builder(Component.literal("Cities"), b ->
                         Minecraft.getInstance().gui.setScreen(new GuiLCConfig(createWorldScreen))
                 ).bounds(screen.width - 100, 40, 70, 20).build();
                 lostCitiesButton.visible = false;

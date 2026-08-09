@@ -13,16 +13,19 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.levelgen.feature.Feature;
 
-import java.util.function.Supplier;
 
 public class Registration {
 
     private static LostCityFeature lostCityFeature;
     private static LostCitySphereFeature lostCitySphereFeature;
 
-    // Kept as Supplier for source compatibility with the NeoForge DeferredHolder usage
-    public static final Supplier<LostCityFeature> LOSTCITY_FEATURE = () -> lostCityFeature;
-    public static final Supplier<LostCitySphereFeature> LOSTCITY_SPHERE_FEATURE = () -> lostCitySphereFeature;
+    public static LostCityFeature lostCityFeature() {
+        return lostCityFeature;
+    }
+
+    public static LostCitySphereFeature lostCitySphereFeature() {
+        return lostCitySphereFeature;
+    }
 
     public static void init() {
         lostCityFeature = Registry.register(BuiltInRegistries.FEATURE,

@@ -4,7 +4,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.setup.Config;
-import dev.krona.urbex.setup.ForgeEventHandlers;
+import dev.krona.urbex.setup.ServerEventHandlers;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
@@ -117,7 +117,7 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
     }
 
     public void cleanUp() {
-        ForgeEventHandlers.cleanUp();
+        ServerEventHandlers.cleanUp();
         AssetRegistries.reset();
         dimensionInfo.clear();
         dimensionInfoDirtyCounter = globalDimensionInfoDirtyCounter;

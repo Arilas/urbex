@@ -8,7 +8,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.editor.EditModeData;
 import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -21,6 +20,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.List;
+import net.minecraft.network.chat.Component;
 
 public class CommandLocatePart implements Command<CommandSourceStack> {
 
@@ -43,13 +43,13 @@ public class CommandLocatePart implements Command<CommandSourceStack> {
         BlockPos start = player.blockPosition();
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
+        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Urbex!"));
+            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
         if (!dimInfo.getProfile().EDITMODE) {
-            context.getSource().sendFailure(ComponentFactory.literal("This world was not created with edit mode enabled. This command is not possible!"));
+            context.getSource().sendFailure(Component.literal("This world was not created with edit mode enabled. This command is not possible!"));
             return 0;
         }
 
@@ -60,7 +60,7 @@ public class CommandLocatePart implements Command<CommandSourceStack> {
             List<EditModeData.PartData> data = EditModeData.getData().getPartData(new ChunkCoord(level.dimension(), mpos.getX(), mpos.getZ()));
             for (EditModeData.PartData pd : data) {
                 if (pd.partName().equals(name.toString())) {
-                    context.getSource().sendSuccess(() -> ComponentFactory.literal("Found at " + ((mpos.getX() << 4) + 8) + "," + pd.y() + "," + ((mpos.getZ() << 4) + 8)), false);
+                    context.getSource().sendSuccess(() -> Component.literal("Found at " + ((mpos.getX() << 4) + 8) + "," + pd.y() + "," + ((mpos.getZ() << 4) + 8)), false);
                     cnt++;
                     if (cnt > 6) {
                         break;

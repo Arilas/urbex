@@ -4,6 +4,12 @@ import net.minecraft.util.RandomSource;
 
 import java.util.Arrays;
 
+/**
+ * A frozen copy of 1.14-era vanilla noise. Deliberately NOT replaced by the current
+ * vanilla classes: this pins generated output against vanilla noise changes, so existing
+ * worlds keep their terrain across Minecraft updates. Do not swap in the vanilla
+ * equivalents.
+ */
 public class NoiseGeneratorPerlin {
     private final NoiseGeneratorSimplex[] noiseLevels;
     private final int levels;

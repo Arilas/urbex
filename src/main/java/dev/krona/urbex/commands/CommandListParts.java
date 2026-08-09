@@ -8,7 +8,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.editor.EditModeData;
 import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -18,6 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 
 import java.util.List;
+import net.minecraft.network.chat.Component;
 
 public class CommandListParts implements Command<CommandSourceStack> {
 
@@ -36,20 +36,20 @@ public class CommandListParts implements Command<CommandSourceStack> {
         BlockPos start = player.blockPosition();
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
+        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Urbex!"));
+            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
         if (!dimInfo.getProfile().EDITMODE) {
-            context.getSource().sendFailure(ComponentFactory.literal("This world was not created with edit mode enabled. This command is not possible!"));
+            context.getSource().sendFailure(Component.literal("This world was not created with edit mode enabled. This command is not possible!"));
             return 0;
         }
 
         ChunkPos cp = ChunkPos.containing(start);
         List<EditModeData.PartData> data = EditModeData.getData().getPartData(new ChunkCoord(level.dimension(), cp.x(), cp.z()));
         for (EditModeData.PartData pd : data) {
-            context.getSource().sendSuccess(() -> ComponentFactory.literal("Found '" + pd.partName() + "' at " + pd.y()), false);
+            context.getSource().sendSuccess(() -> Component.literal("Found '" + pd.partName() + "' at " + pd.y()), false);
         }
         return 0;
     }

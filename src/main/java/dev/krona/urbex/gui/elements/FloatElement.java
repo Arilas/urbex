@@ -2,9 +2,9 @@ package dev.krona.urbex.gui.elements;
 
 import dev.krona.urbex.config.Configuration;
 import dev.krona.urbex.gui.GuiLCConfig;
-import dev.krona.urbex.varia.ComponentFactory;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.Component;
 
 public class FloatElement extends GuiElement {
 
@@ -19,7 +19,7 @@ public class FloatElement extends GuiElement {
         this.gui = gui;
         this.attribute = attribute;
         Float c = gui.getLocalSetup().get().map(h -> (Float) h.toConfiguration().get(attribute)).orElse(0.0f);
-        field = new EditBox(gui.getFont(), x, y, 45, 16, ComponentFactory.literal(Float.toString(c))) {
+        field = new EditBox(gui.getFont(), x, y, 45, 16, Component.literal(Float.toString(c))) {
             // @todo 1.19.3
 //            @Override
 //            public void renderToolTip(PoseStack stack, int x, int y) {

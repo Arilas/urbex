@@ -2,6 +2,12 @@ package dev.krona.urbex.varia;
 
 import net.minecraft.util.RandomSource;
 
+/**
+ * A frozen copy of 1.14-era vanilla noise. Deliberately NOT replaced by the current
+ * vanilla classes: this pins generated output against vanilla noise changes, so existing
+ * worlds keep their terrain across Minecraft updates. Do not swap in the vanilla
+ * equivalents.
+ */
 public class NoiseGeneratorSimplex {
     private static final int[][] GRAD_3 = new int[][]{{1, 1, 0}, {-1, 1, 0}, {1, -1, 0}, {-1, -1, 0}, {1, 0, 1}, {-1, 0, 1}, {1, 0, -1}, {-1, 0, -1}, {0, 1, 1}, {0, -1, 1}, {0, 1, -1}, {0, -1, -1}};
     public static final double SQRT_3 = Math.sqrt(3.0D);

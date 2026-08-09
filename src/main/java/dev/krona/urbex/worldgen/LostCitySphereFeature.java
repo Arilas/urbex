@@ -22,7 +22,7 @@ public class LostCitySphereFeature extends Feature<NoneFeatureConfiguration> {
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();
         if (level instanceof WorldGenRegion) {
-            IDimensionInfo diminfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
+            IDimensionInfo diminfo = Registration.lostCityFeature().getDimensionInfo(level);
             if (diminfo != null) {
                 WorldGenRegion region = (WorldGenRegion) level;
                 ChunkPos center = region.getCenter();

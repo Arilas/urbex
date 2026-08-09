@@ -28,7 +28,7 @@ public class CommandStats implements Command<CommandSourceStack> {
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         // The source's own level, not the player's: this has to work from the server console too,
         // which is where the generation timings are actually read from during a headless run.
-        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(context.getSource().getLevel());
+        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(context.getSource().getLevel());
         if (dimInfo != null) {
             Statistics statistics = dimInfo.getFeature().getStatistics();
             float averageTime = statistics.getAverageTime();

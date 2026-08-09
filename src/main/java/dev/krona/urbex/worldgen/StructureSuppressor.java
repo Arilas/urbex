@@ -27,7 +27,7 @@ public class StructureSuppressor {
         if (!Config.STRUCTURES_YIELD_TO_CITIES.get()) {
             return false;
         }
-        LostCityFeature feature = Registration.LOSTCITY_FEATURE.get();
+        LostCityFeature feature = Registration.lostCityFeature();
         if (feature == null) {
             return false;
         }

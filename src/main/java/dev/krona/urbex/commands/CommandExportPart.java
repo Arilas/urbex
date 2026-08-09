@@ -12,7 +12,6 @@ import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.editor.EditorInfo;
 import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
@@ -68,9 +67,9 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         BlockPos start = editorInfo.getBottomLocation();
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
+        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Urbex!"));
+            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
 
@@ -162,7 +161,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             Path target = ExportPath.resolve(exportDir, filename);
             Files.createDirectories(exportDir);
             Files.writeString(target, json);
-            context.getSource().sendSuccess(() -> ComponentFactory.literal("Exported part to '" + target + "'!"), false);
+            context.getSource().sendSuccess(() -> Component.literal("Exported part to '" + target + "'!"), false);
         } catch (IllegalArgumentException | IOException e) {
             context.getSource().sendFailure(Component.literal("Error writing file '" + filename + "': " + e.getMessage()).withStyle(ChatFormatting.RED));
         }
