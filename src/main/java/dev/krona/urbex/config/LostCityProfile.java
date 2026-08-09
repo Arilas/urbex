@@ -79,8 +79,6 @@ public class LostCityProfile {
 
     public boolean GENERATE_NETHER = false;
     public boolean GENERATE_SPAWNERS = true;
-    @Deprecated(forRemoval = true)
-    public boolean GENERATE_LOOT = true;
     public float LIGHTING_DENSITY = 0.15f;
     public float LOOT_DENSITY = 0.65f;
     public boolean AVOID_WATER = false;
@@ -161,10 +159,6 @@ public class LostCityProfile {
     public int TERRAIN_FIX_UPPER_MIN_OFFSET = -1;
     public int TERRAIN_FIX_UPPER_MAX_OFFSET = 1;
 
-    @Deprecated(forRemoval = true)
-    public float CHEST_WITHOUT_LOOT_CHANCE = .2f;
-    @Deprecated(forRemoval = true)
-    public float BUILDING_WITHOUT_LOOT_CHANCE = .2f;
     public float BUILDING_CHANCE = .3f;
     public int BUILDING_MINFLOORS = 0;
     public int BUILDING_MAXFLOORS = 8;
@@ -453,10 +447,6 @@ public class LostCityProfile {
                 0.0f, 1.0f, "Independent chance that a light marker places a light"));
         LOOT_DENSITY = clampDensity(cfg.getFloat("lootDensity", CATEGORY_LOSTCITY, LOOT_DENSITY,
                 0.0f, 1.0f, "Independent chance that a loot container receives a loot table"));
-
-        GENERATE_LOOT = LOOT_DENSITY > 0.0f;
-        BUILDING_WITHOUT_LOOT_CHANCE = 0.0f;
-        CHEST_WITHOUT_LOOT_CHANCE = 1.0f - LOOT_DENSITY;
     }
 
     private static float clampDensity(float value) {

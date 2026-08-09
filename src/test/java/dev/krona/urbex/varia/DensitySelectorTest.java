@@ -57,6 +57,26 @@ class DensitySelectorTest {
         assertEquals(lootHigh, admitted(reversed, pos -> DensitySelector.loot(9L, pos, 0.75f)));
     }
 
+    @Test
+    void lootAdmissionIsPositionAddressedAndMonotonic() {
+        BlockPos pos = new BlockPos(20, 70, 30);
+        assertEquals(DensitySelector.loot(123L, pos, 0.4f), DensitySelector.loot(123L, pos, 0.4f));
+
+        boolean low = DensitySelector.loot(123L, pos, 0.25f);
+        boolean high = DensitySelector.loot(123L, pos, 0.75f);
+        assertFalse(low && !high);
+
+        boolean foundDifferentContainer = false;
+        for (int x = 21; x < 277; x++) {
+            if (DensitySelector.loot(123L, pos, 0.5f)
+                    != DensitySelector.loot(123L, new BlockPos(x, 70, 30), 0.5f)) {
+                foundDifferentContainer = true;
+                break;
+            }
+        }
+        assertTrue(foundDifferentContainer);
+    }
+
     private static Set<BlockPos> admitted(List<BlockPos> positions, Predicate<BlockPos> predicate) {
         return positions.stream().filter(predicate).collect(Collectors.toSet());
     }

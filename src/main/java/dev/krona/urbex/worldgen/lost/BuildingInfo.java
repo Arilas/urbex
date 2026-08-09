@@ -65,7 +65,6 @@ public class BuildingInfo {
 
     public final boolean[] connectionAtX;
     public final boolean[] connectionAtZ;
-    public final boolean noLoot;
     public final float ruinHeight;      // The height (as a percentage between 0 and 1) at which we focus the ruin layer. Set to -1 if this building is not ruined
 
     public final int highwayXLevel;     // 0 or 1 if there is a highway at this chunk
@@ -776,7 +775,6 @@ public class BuildingInfo {
             stairPriority = topleft.stairPriority;
             palette = topleft.palette;
             compiledPalette = topleft.getCompiledPalette();
-            noLoot = topleft.noLoot;
             ruinHeight = topleft.ruinHeight;
         } else {
             PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), key);
@@ -856,9 +854,9 @@ public class BuildingInfo {
             stairType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomStair(rand, this.coord));
             stairPriority = rand.nextFloat();
             createPalette(rand);
+            // Preserve the legacy building stream slot formerly used by buildingWithoutLootChance.
+            rand.nextFloat();
             float r = rand.nextFloat();
-            noLoot = multiBuildingPos.isSingle() && r < profile.BUILDING_WITHOUT_LOOT_CHANCE;
-            r = rand.nextFloat();
             if (rand.nextFloat() < profile.RUIN_CHANCE && (predefinedBuilding == null || !predefinedBuilding.preventRuins())) {
                 ruinHeight = profile.RUIN_MINLEVEL_PERCENT + (profile.RUIN_MAXLEVEL_PERCENT - profile.RUIN_MINLEVEL_PERCENT) * r;
             } else {

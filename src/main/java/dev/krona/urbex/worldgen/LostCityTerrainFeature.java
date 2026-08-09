@@ -1937,7 +1937,7 @@ public class LostCityTerrainFeature {
     }
 
     private BlockState handleSpawner(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
-        if (info.profile.GENERATE_SPAWNERS && !info.noLoot) {
+        if (info.profile.GENERATE_SPAWNERS) {
             String mobid = inf.mobId();
             BlockPos pos = info.getRelativePos(rx, oy + y, rz);
             CompoundTag tag = new CompoundTag();
@@ -1962,16 +1962,19 @@ public class LostCityTerrainFeature {
         return b;
     }
 
-    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, BlockState b, Palette.Info inf) {
-        if (!info.noLoot) {
-            BlockPos pos = ctx.driver.getCurrentCopy();
-            info.addPostTodo(pos, inWorld -> {
-                if (!inWorld.getBlockState(pos).isAir()) {
-                    inWorld.setBlock(pos, b, Block.UPDATE_CLIENTS);
-                    generateLoot(info, inWorld, pos, new BuildingInfo.ConditionTodo(inf.loot(), part.getName(), info));
-                }
-            });
+    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part,
+                            BlockState block, Palette.Info marker) {
+        BlockPos pos = ctx.driver.getCurrentCopy();
+        if (!DensitySelector.loot(provider.getSeed(), pos, info.profile.LOOT_DENSITY)) {
+            return;
         }
+        info.addPostTodo(pos, inWorld -> {
+            if (!inWorld.getBlockState(pos).isAir()) {
+                inWorld.setBlock(pos, block, Block.UPDATE_CLIENTS);
+                generateLoot(info, inWorld, pos,
+                        new BuildingInfo.ConditionTodo(marker.loot(), part.getName(), info));
+            }
+        });
     }
 
     private BlockState handleTodo(ChunkGenContext ctx, BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
@@ -2059,21 +2062,16 @@ public class LostCityTerrainFeature {
     private void generateLoot(BuildingInfo info, LevelAccessor world, BlockPos pos, BuildingInfo.ConditionTodo condition) {
         BlockEntity te = world.getBlockEntity(pos);
         if (te instanceof RandomizableContainerBlockEntity) {
-            if (this.provider.getProfile().GENERATE_LOOT) {
-                // Runs from a post-todo, after generation of this chunk has finished, so it cannot
-                // borrow the context's streams. The chest's own position addresses it instead.
-                RandomSource lootRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
-                createLoot(info, lootRandom, world, pos, condition, this.provider);
-            }
+            // Runs from a post-todo, after generation of this chunk has finished, so it cannot
+            // borrow the context's streams. The chest's own position addresses it instead.
+            RandomSource lootRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
+            createLoot(info, lootRandom, world, pos, condition, this.provider);
         } else if (te == null) {
             ModSetup.getLogger().error("Error setting loot at {},{},{}", pos.getX(), pos.getY(), pos.getZ());
         }
     }
 
     public static void createLoot(BuildingInfo info, RandomSource random, LevelAccessor world, BlockPos pos, BuildingInfo.ConditionTodo todo, IDimensionInfo diminfo) {
-        if (random.nextFloat() < diminfo.getProfile().CHEST_WITHOUT_LOOT_CHANCE) {
-            return;
-        }
         BlockEntity tileentity = world.getBlockEntity(pos);
         if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
             if (todo != null) {
