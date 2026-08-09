@@ -61,10 +61,11 @@ public class Urbex implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTING.register(server -> ServerAccess.setServer(server));
         ServerLifecycleEvents.SERVER_STOPPED.register(server -> ServerAccess.setServer(null));
 
-        // Feature injection (replaces the NeoForge biome modifier JSONs)
-        BiomeModifications.addFeature(BiomeSelectors.tag(BiomeTags.IS_OVERWORLD),
-                GenerationStep.Decoration.RAW_GENERATION,
-                ResourceKey.create(Registries.PLACED_FEATURE, Identifier.fromNamespaceAndPath(MODID, "city")));
+        // City generation no longer runs as a decoration feature: CarverHookMixin runs it at
+        // the tail of the carver stage, where the terrain cannot yet contain neighbouring
+        // chunks' decoration and output is a pure function of the seed (issue #18). The city
+        // placed-feature JSON is gone with it. Spheres stay a top-layer feature: the shell must
+        // cut through everything that decorated inside it.
         BiomeModifications.addFeature(BiomeSelectors.tag(BiomeTags.IS_OVERWORLD),
                 GenerationStep.Decoration.TOP_LAYER_MODIFICATION,
                 ResourceKey.create(Registries.PLACED_FEATURE, Identifier.fromNamespaceAndPath(MODID, "spheres")));

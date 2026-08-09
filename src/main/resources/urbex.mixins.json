@@ -3,11 +3,11 @@
   "package": "dev.krona.urbex.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "CarverHookMixin",
     "MinecraftServerMixin",
     "StructureStartMixin"
   ],
-  "client": [
-  ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }

@@ -38,39 +38,55 @@ public class LostCityFeature extends Feature<NoneFeatureConfiguration> {
         super(NoneFeatureConfiguration.CODEC);
     }
 
+    /**
+     * The feature entry point is retained so an explicitly-configured datapack feature still
+     * works, but the mod no longer injects it: city generation runs from the end of the carver
+     * stage instead (see {@code CarverHookMixin}). At the decoration stage, a neighbouring
+     * chunk's complete feature pass - ore blobs, border-crossing trees - may or may not have
+     * bled into this chunk yet, so everything Urbex read from the terrain depended on worker
+     * scheduling (issue #18). The pipeline guarantees that no neighbour's features can run
+     * until this chunk finishes CARVERS, so at the carver tail Urbex always sees pure
+     * noise+surface+carver terrain, and every vanilla feature lands strictly after the city.
+     */
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();
-        if (level instanceof WorldGenRegion) {
-            IDimensionInfo diminfo = getDimensionInfo(level);
-            if (diminfo != null) {
-                WorldGenRegion region = (WorldGenRegion) level;
-                ChunkPos center = region.getCenter();
-                Holder<Biome> biome = region.getBiome(center.getMiddleBlockPosition(60));
-                if (biome.is(LostTags.IS_VOID)) {
-                    return false;
-                }
-
-                int chunkX = center.x();
-                int chunkZ = center.z();
-                // No lock. The terrain feature holds no per-chunk state any more (that is on the
-                // ChunkGenContext built inside generate()), the caches it reaches are concurrent,
-                // and the region arrives as an argument instead of being written onto the shared
-                // IDimensionInfo. So Urbex generation runs on the worker pool in parallel with the
-                // rest of worldgen again, as it did before the driver became shared.
-                LostCityTerrainFeature feature = diminfo.getFeature();
-                try {
-                    feature.generate(region, region.getChunk(chunkX, chunkZ));
-                } catch (Exception e) {
-                    Urbex.getLogger().error("Error generating chunk {},{} (profile={}, dimension={})",
-                            chunkX, chunkZ, diminfo.getProfile().getName(), diminfo.getType().identifier(), e);
-                    ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
-                    ErrorLogger.report("There was an error generating a chunk. See log for details!");
-                }
-                return true;
-            }
+        if (level instanceof WorldGenRegion region) {
+            ChunkPos center = region.getCenter();
+            return generateFromPipeline(region, region.getChunk(center.x(), center.z()));
         }
         return false;
+    }
+
+    /** Generates the city content for {@code chunk}. Called from the carver-stage hook. */
+    public boolean generateFromPipeline(WorldGenRegion region, net.minecraft.world.level.chunk.ChunkAccess chunk) {
+        IDimensionInfo diminfo = getDimensionInfo(region);
+        if (diminfo == null) {
+            return false;
+        }
+        ChunkPos center = chunk.getPos();
+        Holder<Biome> biome = region.getBiome(center.getMiddleBlockPosition(60));
+        if (biome.is(LostTags.IS_VOID)) {
+            return false;
+        }
+
+        int chunkX = center.x();
+        int chunkZ = center.z();
+        // No lock. The terrain feature holds no per-chunk state any more (that is on the
+        // ChunkGenContext built inside generate()), the caches it reaches are concurrent,
+        // and the region arrives as an argument instead of being written onto the shared
+        // IDimensionInfo. So Urbex generation runs on the worker pool in parallel with the
+        // rest of worldgen again, as it did before the driver became shared.
+        LostCityTerrainFeature feature = diminfo.getFeature();
+        try {
+            feature.generate(region, chunk);
+        } catch (Exception e) {
+            Urbex.getLogger().error("Error generating chunk {},{} (profile={}, dimension={})",
+                    chunkX, chunkZ, diminfo.getProfile().getName(), diminfo.getType().identifier(), e);
+            ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
+            ErrorLogger.report("There was an error generating a chunk. See log for details!");
+        }
+        return true;
     }
 
     @Nullable
