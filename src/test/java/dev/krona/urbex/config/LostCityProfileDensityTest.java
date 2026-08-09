@@ -54,6 +54,37 @@ class LostCityProfileDensityTest {
     }
 
     @Test
+    void buildingChanceAloneTriggersEnabledLegacyLootMigration() {
+        LostCityProfile profile = profile("""
+                {"lostcity":{"buildingWithoutLootChance":0.25}}
+                """);
+
+        assertEquals(0.60f, profile.LOOT_DENSITY, 0.00001f);
+    }
+
+    @Test
+    void chestChanceAloneTriggersEnabledLegacyLootMigration() {
+        LostCityProfile profile = profile("""
+                {"lostcity":{"chestWithoutLootChance":0.40}}
+                """);
+
+        assertEquals(0.48f, profile.LOOT_DENSITY, 0.00001f);
+    }
+
+    @Test
+    void newLootDensityWinsOverChanceOnlyLegacyKeys() {
+        LostCityProfile profile = profile("""
+                {"lostcity":{
+                  "lootDensity":0.73,
+                  "buildingWithoutLootChance":1.0,
+                  "chestWithoutLootChance":1.0
+                }}
+                """);
+
+        assertEquals(0.73f, profile.LOOT_DENSITY, 0.00001f);
+    }
+
+    @Test
     void newKeysWinIndependentlyOverLegacyKeys() {
         LostCityProfile newLighting = profile("""
                 {"lostcity":{

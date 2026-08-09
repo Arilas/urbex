@@ -1,10 +1,13 @@
 package dev.krona.urbex.gui.elements;
 
 import dev.krona.urbex.config.Configuration;
+import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.gui.GuiLCConfig;
 import dev.krona.urbex.varia.ComponentFactory;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.network.chat.Component;
 
 public class PercentageSliderElement extends GuiElement {
 
@@ -18,9 +21,11 @@ public class PercentageSliderElement extends GuiElement {
         this.gui = gui;
         this.attribute = attribute;
         float initialValue = gui.getLocalSetup().get()
-                .map(profile -> ((Number) profile.toConfiguration().get(attribute)).floatValue())
+                .map(profile -> read(profile.toConfiguration(), attribute))
                 .orElse(0.0f);
         field = new PercentageSlider(x, y, initialValue);
+        gui.getLocalSetup().get().ifPresent(profile -> field.setTooltip(
+                Tooltip.create(comment(profile.toConfiguration(), attribute))));
         gui.addWidget(field);
     }
 
@@ -31,6 +36,24 @@ public class PercentageSliderElement extends GuiElement {
 
     static int percent(float value) {
         return Math.round(snap(value) * 100.0f);
+    }
+
+    static float read(Configuration configuration, String attribute) {
+        return ((Number) configuration.get(attribute)).floatValue();
+    }
+
+    static Component comment(Configuration configuration, String attribute) {
+        return configuration.getValue(attribute).getComment();
+    }
+
+    @SuppressWarnings("unchecked")
+    static float apply(LostCityProfile profile, String attribute, double value) {
+        Configuration configuration = profile.toConfiguration();
+        Configuration.Value<Float> configurationValue = configuration.getValue(attribute);
+        configurationValue.set(snap(value));
+        configurationValue.constrain();
+        profile.copyFromConfiguration(configuration);
+        return configurationValue.get();
     }
 
     public PercentageSliderElement label(String label) {
@@ -48,8 +71,7 @@ public class PercentageSliderElement extends GuiElement {
     @Override
     public void update() {
         gui.getLocalSetup().get().ifPresent(profile -> {
-            Number result = profile.toConfiguration().get(attribute);
-            field.synchronize(result.floatValue());
+            field.synchronize(read(profile.toConfiguration(), attribute));
         });
     }
 
@@ -85,7 +107,6 @@ public class PercentageSliderElement extends GuiElement {
         }
 
         @Override
-        @SuppressWarnings("unchecked")
         protected void applyValue() {
             if (synchronizing) {
                 return;
@@ -95,11 +116,8 @@ public class PercentageSliderElement extends GuiElement {
             value = snapped;
             updateMessage();
             gui.getLocalSetup().get().ifPresent(profile -> {
-                Configuration configuration = profile.toConfiguration();
-                Configuration.Value<Float> configurationValue = configuration.getValue(attribute);
-                configurationValue.set(snapped);
-                configurationValue.constrain();
-                profile.copyFromConfiguration(configuration);
+                value = PercentageSliderElement.apply(profile, attribute, snapped);
+                updateMessage();
                 gui.refreshPreview();
             });
         }

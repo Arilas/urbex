@@ -6,6 +6,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,8 +48,8 @@ public final class LightPool {
         compileGroup(paletteId, marker, Placement.CEILING, settings.ceiling(), candidates, totalWeights);
         compileGroup(paletteId, marker, Placement.FREE, settings.free(), candidates, totalWeights);
         if (candidates.values().stream().allMatch(List::isEmpty)) {
-            throw new IllegalArgumentException("Light pool for palette '" + paletteId + "', marker '" + marker
-                    + "' must define at least one candidate");
+            throw new IllegalArgumentException("Invalid light pool in palette '" + paletteId + "', marker '" + marker
+                    + "': expected at least one candidate in floor, wall, ceiling, or free");
         }
         return new LightPool(candidates, totalWeights);
     }
@@ -89,6 +90,10 @@ public final class LightPool {
         return List.copyOf(ordered);
     }
 
+    public boolean hasCandidates(Placement placement) {
+        return !candidates.get(placement).isEmpty();
+    }
+
     public BlockState representative() {
         return allCandidates.getFirst().state();
     }
@@ -103,23 +108,29 @@ public final class LightPool {
                                      Map<Placement, Integer> totalWeights) {
         List<Candidate> compiled = new ArrayList<>(entries.size());
         int totalWeight = 0;
-        for (LightSettings.Entry entry : entries) {
+        for (int candidateIndex = 0; candidateIndex < entries.size(); candidateIndex++) {
+            LightSettings.Entry entry = entries.get(candidateIndex);
             if (entry.weight() <= 0) {
-                throw invalidCandidate(paletteId, marker, placement, entry.block(), "weight must be positive", null);
+                throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
+                        "weight must be positive", null);
             }
             BlockState state;
             try {
                 state = Tools.stringToState(entry.block());
             } catch (RuntimeException e) {
-                throw invalidCandidate(paletteId, marker, placement, entry.block(), "cannot parse block state", e);
+                throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
+                        "cannot parse block state", e);
             }
             if (state.getLightEmission() <= 0) {
-                throw invalidCandidate(paletteId, marker, placement, entry.block(), "block state emits no light", null);
+                throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
+                        "block state emits no light", null);
             }
+            validatePlacement(paletteId, marker, placement, candidateIndex, entry.block(), state);
             try {
                 totalWeight = Math.addExact(totalWeight, entry.weight());
             } catch (ArithmeticException e) {
-                throw invalidCandidate(paletteId, marker, placement, entry.block(), "total weight exceeds integer range", e);
+                throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
+                        "total weight exceeds integer range", e);
             }
             compiled.add(new Candidate(entry.weight(), state));
         }
@@ -127,10 +138,28 @@ public final class LightPool {
         totalWeights.put(placement, totalWeight);
     }
 
+    private static void validatePlacement(Identifier paletteId, char marker, Placement placement,
+                                          int candidateIndex, String block, BlockState state) {
+        boolean sixWayFacing = state.hasProperty(BlockStateProperties.FACING);
+        boolean horizontalFacing = state.hasProperty(BlockStateProperties.HORIZONTAL_FACING);
+        boolean hanging = state.hasProperty(BlockStateProperties.HANGING);
+        if ((placement == Placement.FLOOR || placement == Placement.CEILING)
+                && horizontalFacing && !sixWayFacing) {
+            throw invalidCandidate(paletteId, marker, placement, candidateIndex, block,
+                    "cannot orient a horizontal-only state toward vertical support", null);
+        }
+        if (placement == Placement.WALL && hanging && !sixWayFacing && !horizontalFacing) {
+            throw invalidCandidate(paletteId, marker, placement, candidateIndex, block,
+                    "cannot orient a hanging-only state to a wall", null);
+        }
+    }
+
     private static IllegalArgumentException invalidCandidate(Identifier paletteId, char marker, Placement placement,
-                                                             String block, String problem, Throwable cause) {
+                                                             int candidateIndex, String block,
+                                                             String problem, Throwable cause) {
         String message = "Invalid light candidate in palette '" + paletteId + "', marker '" + marker
-                + "', placement '" + placement.name().toLowerCase(Locale.ROOT) + "', candidate '" + block + "': " + problem;
+                + "', placement '" + placement.name().toLowerCase(Locale.ROOT) + "', candidate #"
+                + (candidateIndex + 1) + " '" + block + "': " + problem;
         return cause == null ? new IllegalArgumentException(message) : new IllegalArgumentException(message, cause);
     }
 }

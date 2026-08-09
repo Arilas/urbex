@@ -32,8 +32,22 @@ public final class OptionalLightPlacer {
         boolean canPlace(Attempt attempt);
     }
 
+    @FunctionalInterface
+    public interface OpportunitySupport {
+        boolean isPresent(LightPool.Placement placement, @Nullable Direction supportDirection);
+    }
+
     public static Optional<Attempt> select(LightPool pool, RandomSource random, Survival survival) {
+        return select(pool, random, (placement, supportDirection) -> true, survival);
+    }
+
+    public static Optional<Attempt> select(LightPool pool, RandomSource random,
+                                           OpportunitySupport support, Survival survival) {
         for (Opportunity opportunity : OPPORTUNITIES) {
+            if (!pool.hasCandidates(opportunity.placement())
+                    || !support.isPresent(opportunity.placement(), opportunity.supportDirection())) {
+                continue;
+            }
             for (LightPool.Candidate candidate : pool.weightedOrder(opportunity.placement(), random)) {
                 BlockState state = orient(candidate.state(), opportunity.supportDirection());
                 Attempt attempt = new Attempt(state, opportunity.placement(), opportunity.supportDirection());

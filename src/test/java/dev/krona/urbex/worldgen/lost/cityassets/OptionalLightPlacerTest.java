@@ -186,6 +186,32 @@ class OptionalLightPlacerTest {
     }
 
     @Test
+    void unsupportedOpportunityDoesNotConsumeVariantRandomness() {
+        List<LightSettings.Entry> wall = List.of(
+                entry("minecraft:wall_torch[facing=north]"),
+                entry("minecraft:end_rod[facing=north]"));
+        LightPool withUnsupportedFloor = pool(
+                List.of(
+                        entry("minecraft:lantern[hanging=false]"),
+                        entry("minecraft:redstone_torch[lit=true]")),
+                wall, List.of(), List.of());
+        LightPool wallOnly = pool(List.of(), wall, List.of(), List.of());
+        long seed = seedWhoseFirstTwoBinaryDrawsDiffer();
+
+        OptionalLightPlacer.Attempt expected = OptionalLightPlacer.select(
+                wallOnly, RandomSource.create(seed),
+                (placement, supportDirection) -> true,
+                attempt -> true).orElseThrow();
+        OptionalLightPlacer.Attempt actual = OptionalLightPlacer.select(
+                withUnsupportedFloor, RandomSource.create(seed),
+                (placement, supportDirection) -> placement != LightPool.Placement.FLOOR,
+                attempt -> true).orElseThrow();
+
+        assertEquals(expected.state(), actual.state());
+        assertEquals(LightPool.Placement.WALL, actual.placement());
+    }
+
+    @Test
     void legacyTorchCanPlaceOnFloor() {
         OptionalLightPlacer.Attempt selected = select(LightPool.legacyTorch(),
                 attempt -> attempt.placement() == LightPool.Placement.FLOOR).orElseThrow();
@@ -240,6 +266,16 @@ class OptionalLightPlacerTest {
 
     private static LightSettings.Entry entry(String block) {
         return new LightSettings.Entry(1, block);
+    }
+
+    private static long seedWhoseFirstTwoBinaryDrawsDiffer() {
+        for (long seed = 0; seed < 1_000; seed++) {
+            RandomSource random = RandomSource.create(seed);
+            if (random.nextInt(2) != random.nextInt(2)) {
+                return seed;
+            }
+        }
+        throw new AssertionError("Could not find a discriminating RandomSource seed");
     }
 
     private static void assertJsonOrderRotation(List<Block> actual) {

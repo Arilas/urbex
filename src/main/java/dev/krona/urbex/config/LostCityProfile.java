@@ -431,8 +431,10 @@ public class LostCityProfile {
                     ? 1.0f : 0.0f;
         }
 
-        if (!cfg.hasKey(CATEGORY_LOSTCITY, "lootDensity")
-                && cfg.hasKey(CATEGORY_LOSTCITY, "generateLoot")) {
+        boolean hasLegacyLoot = cfg.hasKey(CATEGORY_LOSTCITY, "generateLoot")
+                || cfg.hasKey(CATEGORY_LOSTCITY, "buildingWithoutLootChance")
+                || cfg.hasKey(CATEGORY_LOSTCITY, "chestWithoutLootChance");
+        if (!cfg.hasKey(CATEGORY_LOSTCITY, "lootDensity") && hasLegacyLoot) {
             boolean enabled = cfg.getBoolean("generateLoot", CATEGORY_LOSTCITY, true, "Legacy loot switch");
             float buildingWithout = cfg.hasKey(CATEGORY_LOSTCITY, "buildingWithoutLootChance")
                     ? cfg.getFloat("buildingWithoutLootChance", CATEGORY_LOSTCITY, 0.2f, 0.0f, 1.0f, "Legacy building exclusion")
@@ -444,9 +446,9 @@ public class LostCityProfile {
         }
 
         LIGHTING_DENSITY = clampDensity(cfg.getFloat("lightingDensity", CATEGORY_LOSTCITY, LIGHTING_DENSITY,
-                0.0f, 1.0f, "Independent chance that a light marker places a light"));
+                0.0f, 1.0f, "Chance that an optional decorative-light marker places a light"));
         LOOT_DENSITY = clampDensity(cfg.getFloat("lootDensity", CATEGORY_LOSTCITY, LOOT_DENSITY,
-                0.0f, 1.0f, "Independent chance that a loot container receives a loot table"));
+                0.0f, 1.0f, "Chance that a marked container receives a loot table"));
     }
 
     private static float clampDensity(float value) {

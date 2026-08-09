@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -55,21 +54,37 @@ class LightPoolTest {
     }
 
     @Test
-    void codecRejectsPoolWithoutCandidates() {
-        DataResult<LightSettings> result = parseSettings("""
-                {"floor":[],"wall":[],"ceiling":[],"free":[]}
+    void paletteCompilationRejectsPoolWithoutCandidatesWithResourceAndMarkerContext() {
+        PaletteRE palette = decodePalette("""
+                {"palette":[{"char":"L","light":{
+                  "floor":[],"wall":[],"ceiling":[],"free":[]
+                }}]}
                 """);
 
-        assertFalse(result.result().isPresent());
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new Palette(palette));
+        assertTrue(error.getMessage().contains("urbex:test_lights"));
+        assertTrue(error.getMessage().contains("marker 'L'"));
+        assertTrue(error.getMessage().contains("floor, wall, ceiling, or free"));
     }
 
     @Test
-    void codecRejectsZeroWeight() {
-        DataResult<LightSettings> result = parseSettings("""
-                {"floor":[{"weight":0,"block":"minecraft:torch"}]}
-                """);
+    void paletteCompilationRejectsNonpositiveWeightWithFullCandidateContext() {
+        for (int weight : List.of(0, -3)) {
+            PaletteRE palette = decodePalette("""
+                    {"palette":[{"char":"L","light":{
+                      "floor":[{"weight":%d,"block":"minecraft:torch"}]
+                    }}]}
+                    """.formatted(weight));
 
-        assertFalse(result.result().isPresent());
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                    () -> new Palette(palette));
+            assertTrue(error.getMessage().contains("urbex:test_lights"));
+            assertTrue(error.getMessage().contains("marker 'L'"));
+            assertTrue(error.getMessage().contains("placement 'floor'"));
+            assertTrue(error.getMessage().contains("candidate #1 'minecraft:torch'"));
+            assertTrue(error.getMessage().contains("weight must be positive"));
+        }
     }
 
     @Test
@@ -89,12 +104,44 @@ class LightPoolTest {
     @Test
     void compileAcceptsWeakNonzeroCustomLight() {
         LightSettings settings = decodeSettings("""
-                {"free":[{"weight":1,"block":"minecraft:redstone_torch[lit=true]"}]}
+                {"floor":[{"weight":1,"block":"minecraft:redstone_torch[lit=true]"}]}
                 """);
 
         LightPool pool = LightPool.compile(PALETTE_ID, 'L', settings);
         LightPool.Candidate candidate = pool.allCandidates().iterator().next();
         assertTrue(candidate.state().getLightEmission() > 0);
+    }
+
+    @Test
+    void compileRejectsHorizontalOnlyStateInVerticalPlacement() {
+        for (LightPool.Placement placement : List.of(LightPool.Placement.FLOOR, LightPool.Placement.CEILING)) {
+            LightSettings settings = placement == LightPool.Placement.FLOOR
+                    ? new LightSettings(
+                    List.of(new LightSettings.Entry(1, "minecraft:wall_torch[facing=north]")),
+                    List.of(), List.of(), List.of())
+                    : new LightSettings(
+                    List.of(), List.of(),
+                    List.of(new LightSettings.Entry(1, "minecraft:wall_torch[facing=north]")),
+                    List.of());
+
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                    () -> LightPool.compile(PALETTE_ID, 'L', settings));
+            assertTrue(error.getMessage().contains("placement '" + placement.name().toLowerCase() + "'"));
+            assertTrue(error.getMessage().contains("cannot orient a horizontal-only state"));
+        }
+    }
+
+    @Test
+    void compileRejectsHangingOnlyStateInWallPlacement() {
+        LightSettings settings = new LightSettings(
+                List.of(),
+                List.of(new LightSettings.Entry(1, "minecraft:lantern[hanging=false]")),
+                List.of(), List.of());
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> LightPool.compile(PALETTE_ID, 'L', settings));
+        assertTrue(error.getMessage().contains("placement 'wall'"));
+        assertTrue(error.getMessage().contains("cannot orient a hanging-only state to a wall"));
     }
 
     @Test
@@ -249,5 +296,11 @@ class LightPoolTest {
 
     private static DataResult<LightSettings> parseSettings(String json) {
         return LightSettings.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
+    }
+
+    private static PaletteRE decodePalette(String json) {
+        DataResult<PaletteRE> result = PaletteRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
+        assertTrue(result.result().isPresent(), () -> result.error().map(Object::toString).orElse("unknown decode error"));
+        return result.result().orElseThrow().setRegistryName(PALETTE_ID);
     }
 }

@@ -325,7 +325,7 @@ public class LostCityTerrainFeature {
 //            generateMonorails(info);
 //        }
 //
-        fixLights(ctx, info);
+        placeOptionalLights(ctx, info);
 
         if (info.getDamageArea().hasExplosions()) {
             breakBlocksForDamageNew(ctx, chunkX, chunkZ, info);
@@ -421,37 +421,37 @@ public class LostCityTerrainFeature {
     }
 
 
-    private void fixLights(ChunkGenContext ctx, BuildingInfo info) {
+    /** Finalize every optional-light marker admitted by this chunk-generation context. */
+    public void placeOptionalLights(ChunkGenContext ctx, BuildingInfo info) {
         List<LightTodoQueue.Todo> lights = ctx.drainLightTodo();
         if (lights.isEmpty()) {
             return;
         }
         ChunkDriver driver = ctx.driver;
-        LevelReader level = DriverLevelReader.overlay((LevelReader) driver.getRegion(), driver::getBlockAt);
-        for (LightTodoQueue.Todo todo : lights) {
-            BlockPos pos = todo.pos();
-            LightPool pool = todo.pool() == null ? LightPool.legacyTorch() : todo.pool();
-            RandomSource random = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(),
-                    Rng.Purpose.LIGHTING_VARIANT);
-            OptionalLightPlacer.select(pool, random, attempt -> canPlaceLight(driver, level, pos, attempt))
-                    .ifPresent(attempt -> {
-                        driver.currentAbsolute(pos).block(attempt.state());
-                        updateNeeded(info, pos, Block.UPDATE_CLIENTS);
-                    });
+        LevelReader delegate = (LevelReader) driver.getRegion();
+        LevelReader[] snapshotLevel = new LevelReader[1];
+        List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
+                ctx.coord.chunkX(), ctx.coord.chunkZ(), ctx.seed, lights, driver::getBlockAt,
+                (marker, supportDirection, stateAt) -> {
+                    LevelReader level = snapshotLevel(snapshotLevel, delegate, stateAt);
+                    BlockPos supportPos = marker.relative(supportDirection);
+                    net.minecraft.core.Direction exposedFace = supportDirection.getOpposite();
+                    return stateAt.apply(supportPos).isFaceSturdy(level, supportPos, exposedFace);
+                },
+                (marker, attempt, stateAt) -> attempt.state()
+                        .canSurvive(snapshotLevel(snapshotLevel, delegate, stateAt), marker));
+        for (DeferredLightPlacer.Planned light : planned) {
+            driver.currentAbsolute(light.pos()).block(light.state());
+            updateNeeded(info, light.pos(), Block.UPDATE_CLIENTS);
         }
     }
 
-    private static boolean canPlaceLight(ChunkDriver driver, LevelReader level, BlockPos marker,
-                                         OptionalLightPlacer.Attempt attempt) {
-        net.minecraft.core.Direction supportDirection = attempt.supportDirection();
-        if (supportDirection != null) {
-            BlockPos supportPos = marker.relative(supportDirection);
-            net.minecraft.core.Direction exposedFace = supportDirection.getOpposite();
-            if (!driver.getBlockAt(supportPos).isFaceSturdy(level, supportPos, exposedFace)) {
-                return false;
-            }
+    private static LevelReader snapshotLevel(LevelReader[] holder, LevelReader delegate,
+                                             java.util.function.Function<BlockPos, BlockState> stateAt) {
+        if (holder[0] == null) {
+            holder[0] = DriverLevelReader.overlay(delegate, stateAt);
         }
-        return attempt.state().canSurvive(level, marker);
+        return holder[0];
     }
 
     private void doNormalChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
@@ -1937,7 +1937,7 @@ public class LostCityTerrainFeature {
     }
 
     private BlockState handleSpawner(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
-        if (info.profile.GENERATE_SPAWNERS) {
+        if (SpecialMarkerPolicy.generateSpawner(info.profile)) {
             String mobid = inf.mobId();
             BlockPos pos = info.getRelativePos(rx, oy + y, rz);
             CompoundTag tag = new CompoundTag();
@@ -1965,7 +1965,7 @@ public class LostCityTerrainFeature {
     private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part,
                             BlockState block, Palette.Info marker) {
         BlockPos pos = ctx.driver.getCurrentCopy();
-        if (!DensitySelector.loot(provider.getSeed(), pos, info.profile.LOOT_DENSITY)) {
+        if (!SpecialMarkerPolicy.populateLoot(provider.getSeed(), pos, info.profile)) {
             return;
         }
         info.addPostTodo(pos, inWorld -> {

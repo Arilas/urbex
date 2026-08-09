@@ -43,6 +43,7 @@ public class Spheres {
                 Monorails.generateMonorails(ctx, feature, info);
             }
 
+            feature.placeOptionalLights(ctx, info);
             ctx.driver.actuallyGenerate(chunk);
             ChunkFixer.fix(provider, coord, region);
         }
