@@ -25,6 +25,10 @@ public class ModSetup {
 
         // The server config (selectedProfile) is only loaded by server start, so validation
         // has to happen here rather than in preInit - failing loudly beats NPEing during world init.
-        ServerLifecycleEvents.SERVER_STARTING.register(server -> Config.validateSelectedProfiles());
+        ServerLifecycleEvents.SERVER_STARTING.register(server -> {
+            // Overrides first: validation must see the world's own selectedProfile
+            Config.applyWorldOverrides(server);
+            Config.validateSelectedProfiles();
+        });
     }
 }

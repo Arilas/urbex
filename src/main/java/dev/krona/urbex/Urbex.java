@@ -1,6 +1,5 @@
 package dev.krona.urbex;
 
-import fuzs.forgeconfigapiport.fabric.api.v5.ConfigRegistry;
 import dev.krona.urbex.network.PacketRequestProfile;
 import dev.krona.urbex.network.PacketReturnProfileToClient;
 import dev.krona.urbex.setup.*;
@@ -18,7 +17,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
-import net.neoforged.fml.config.ModConfig;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -44,10 +42,7 @@ public class Urbex implements ModInitializer {
         File dir = new File(configPath + File.separator + "urbex");
         dir.mkdirs();
 
-        // Forge Config API Port keeps the NeoForge ModConfigSpec API intact on Fabric
-        ConfigRegistry.INSTANCE.register(MODID, ModConfig.Type.CLIENT, Config.CLIENT_CONFIG, "urbex/client.toml");
-        ConfigRegistry.INSTANCE.register(MODID, ModConfig.Type.COMMON, Config.COMMON_CONFIG, "urbex/common.toml");
-        ConfigRegistry.INSTANCE.register(MODID, ModConfig.Type.SERVER, Config.SERVER_CONFIG);
+        Config.loadGlobal(configPath);
 
         setup.preInit();
         setup.init();
