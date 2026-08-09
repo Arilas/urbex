@@ -35,7 +35,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         BlockPos position = player.blockPosition();
-        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo((WorldGenLevel) player.level());
+        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo((WorldGenLevel) player.level());
         if (dimInfo != null) {
             ChunkCoord coord = new ChunkCoord(dimInfo.getType(), position.getX() >> 4, position.getZ() >> 4);
             BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);

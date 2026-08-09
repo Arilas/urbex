@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.DensitySelector;
 import net.minecraft.core.BlockPos;
 
@@ -10,11 +10,11 @@ final class SpecialMarkerPolicy {
     private SpecialMarkerPolicy() {
     }
 
-    static boolean populateLoot(long seed, BlockPos marker, LostCityProfile profile) {
+    static boolean populateLoot(long seed, BlockPos marker, UrbexProfile profile) {
         return DensitySelector.loot(seed, marker, profile.LOOT_DENSITY);
     }
 
-    static boolean generateSpawner(LostCityProfile profile) {
+    static boolean generateSpawner(UrbexProfile profile) {
         return profile.GENERATE_SPAWNERS;
     }
 }

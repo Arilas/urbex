@@ -16,7 +16,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-import static dev.krona.urbex.setup.Registration.LOSTCITY;
+import static dev.krona.urbex.setup.Registration.CITY_ID;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -76,7 +76,7 @@ public class BedTeleport {
         } else {
             ServerLevel destWorld = player.level().getServer().getLevel(Registration.DIMENSION);
             if (destWorld == null) {
-                player.sendSystemMessage(Component.literal("Error finding Urbex dimension: " + LOSTCITY + "!").withStyle(ChatFormatting.RED));
+                player.sendSystemMessage(Component.literal("Error finding Urbex dimension: " + CITY_ID + "!").withStyle(ChatFormatting.RED));
             } else {
                 BlockPos location = findLocation(bedLocation, destWorld);
                 CustomTeleporter.teleportToDimension(player, destWorld, location);

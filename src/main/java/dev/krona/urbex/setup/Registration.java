@@ -2,8 +2,8 @@ package dev.krona.urbex.setup;
 
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.worldgen.LostCityFeature;
-import dev.krona.urbex.worldgen.LostCitySphereFeature;
+import dev.krona.urbex.worldgen.CityFeature;
+import dev.krona.urbex.worldgen.SphereFeature;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -16,26 +16,26 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 
 public class Registration {
 
-    private static LostCityFeature lostCityFeature;
-    private static LostCitySphereFeature lostCitySphereFeature;
+    private static CityFeature cityFeature;
+    private static SphereFeature sphereFeature;
 
-    public static LostCityFeature lostCityFeature() {
-        return lostCityFeature;
+    public static CityFeature cityFeature() {
+        return cityFeature;
     }
 
-    public static LostCitySphereFeature lostCitySphereFeature() {
-        return lostCitySphereFeature;
+    public static SphereFeature sphereFeature() {
+        return sphereFeature;
     }
 
     public static void init() {
-        lostCityFeature = Registry.register(BuiltInRegistries.FEATURE,
-                Identifier.fromNamespaceAndPath(Urbex.MODID, "city"), new LostCityFeature());
-        lostCitySphereFeature = Registry.register(BuiltInRegistries.FEATURE,
-                Identifier.fromNamespaceAndPath(Urbex.MODID, "spheres"), new LostCitySphereFeature());
+        cityFeature = Registry.register(BuiltInRegistries.FEATURE,
+                Identifier.fromNamespaceAndPath(Urbex.MODID, "city"), new CityFeature());
+        sphereFeature = Registry.register(BuiltInRegistries.FEATURE,
+                Identifier.fromNamespaceAndPath(Urbex.MODID, "spheres"), new SphereFeature());
     }
 
-    public static final Identifier LOSTCITY = Identifier.fromNamespaceAndPath(Urbex.MODID, "city");
+    public static final Identifier CITY_ID = Identifier.fromNamespaceAndPath(Urbex.MODID, "city");
 
-    public static final ResourceKey<DimensionType> DIMENSION_TYPE = ResourceKey.create(Registries.DIMENSION_TYPE, LOSTCITY);
-    public static final ResourceKey<Level> DIMENSION = ResourceKey.create(Registries.DIMENSION, LOSTCITY);
+    public static final ResourceKey<DimensionType> DIMENSION_TYPE = ResourceKey.create(Registries.DIMENSION_TYPE, CITY_ID);
+    public static final ResourceKey<Level> DIMENSION = ResourceKey.create(Registries.DIMENSION, CITY_ID);
 }

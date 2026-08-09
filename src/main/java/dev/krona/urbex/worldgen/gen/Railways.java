@@ -4,7 +4,7 @@ import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
@@ -16,24 +16,24 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 public class Railways {
-    public static void generateRailwayDungeons(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
+    public static void generateRailwayDungeons(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
         if (info.railDungeon == null) {
             return;
         }
         if (info.getZmin().getRailInfo().getType() == RailChunkType.HORIZONTAL ||
                 info.getZmax().getRailInfo().getType() == RailChunkType.HORIZONTAL) {
-            int height = info.groundLevel + Railway.RAILWAY_LEVEL_OFFSET * LostCityTerrainFeature.FLOORHEIGHT;
-            feature.generatePart(ctx, info, info.railDungeon, Transform.ROTATE_NONE, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+            int height = info.groundLevel + Railway.RAILWAY_LEVEL_OFFSET * CityGenerator.FLOORHEIGHT;
+            feature.generatePart(ctx, info, info.railDungeon, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         }
     }
 
-    public static void generateRailways(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, Railway.RailChunkInfo railInfo, ChunkHeightmap heightmap) {
+    public static void generateRailways(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, Railway.RailChunkInfo railInfo, ChunkHeightmap heightmap) {
         IDimensionInfo provider = feature.provider;
         ChunkDriver driver = ctx.driver;
         BlockState liquid = feature.liquid;
         BlockState air = Blocks.AIR.defaultBlockState();
         RailwayParts railwayParts = provider.getWorldStyle().getPartSelector().railwayParts();
-        int height = info.groundLevel + railInfo.getLevel() * LostCityTerrainFeature.FLOORHEIGHT;
+        int height = info.groundLevel + railInfo.getLevel() * CityGenerator.FLOORHEIGHT;
         RailChunkType type = railInfo.getType();
         BuildingPart part;
         Transform transform = Transform.ROTATE_NONE;
@@ -130,7 +130,7 @@ public class Railways {
                 part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsFlat()));
                 break;
         }
-        int h = feature.generatePart(ctx, info, part, transform, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+        int h = feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         if (clearUpper) {
             int maxh = heightmap.getHeight() + 4;
             if (h < maxh) {
@@ -243,12 +243,12 @@ public class Railways {
         if (needsStaircase) {
             part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationStaircase()));
             for (int i = railInfo.getLevel() + 1; i < info.cityLevel; i++) {
-                height = info.groundLevel + i * LostCityTerrainFeature.FLOORHEIGHT;
-                feature.generatePart(ctx, info, part, transform, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+                height = info.groundLevel + i * CityGenerator.FLOORHEIGHT;
+                feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
             }
-            height = info.groundLevel + info.cityLevel * LostCityTerrainFeature.FLOORHEIGHT;
+            height = info.groundLevel + info.cityLevel * CityGenerator.FLOORHEIGHT;
             part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationStaircaseSurface()));
-            feature.generatePart(ctx, info, part, transform, 0, height, 0, LostCityTerrainFeature.HardAirSetting.AIR);
+            feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         }
     }
 }

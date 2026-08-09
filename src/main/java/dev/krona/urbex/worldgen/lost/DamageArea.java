@@ -1,12 +1,12 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.GeometryTools;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.LostTags;
+import dev.krona.urbex.worldgen.UrbexTags;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -26,7 +26,7 @@ public class DamageArea {
     private final int chunkZ;
     private final List<Explosion> explosions = new ArrayList<>();
     private final AABB chunkBox;
-    private final LostCityProfile profile;
+    private final UrbexProfile profile;
     private final int minSectionY;
     private final int maxSectionY;
 
@@ -95,11 +95,11 @@ public class DamageArea {
      * damaged before it depends on what was already in the world.
      */
     public BlockState damageBlock(BlockState b, IDimensionInfo provider, int x, int y, int z, float damage, CompiledPalette palette, BlockState liquidChar) {
-        if (Tools.hasTag(b.getBlock(), LostTags.NOT_BREAKABLE_TAG)) {
+        if (Tools.hasTag(b.getBlock(), UrbexTags.NOT_BREAKABLE_TAG)) {
             return b;
         }
 
-        if (Tools.hasTag(b.getBlock(), LostTags.EASY_BREAKABLE_TAG)) {
+        if (Tools.hasTag(b.getBlock(), UrbexTags.EASY_BREAKABLE_TAG)) {
             damage *= 2.5f;    // As if this block gets double the damage
         }
         if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {

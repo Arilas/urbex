@@ -1,8 +1,8 @@
 package dev.krona.urbex.gui.elements;
 
 import dev.krona.urbex.config.Configuration;
-import dev.krona.urbex.config.LostCityProfile;
-import dev.krona.urbex.gui.GuiLCConfig;
+import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.gui.UrbexConfigScreen;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Tooltip;
@@ -10,12 +10,12 @@ import net.minecraft.network.chat.Component;
 
 public class PercentageSliderElement extends GuiElement {
 
-    private final GuiLCConfig gui;
+    private final UrbexConfigScreen gui;
     private final String attribute;
     private final PercentageSlider field;
     private String label = null;
 
-    public PercentageSliderElement(GuiLCConfig gui, String page, int x, int y, String attribute) {
+    public PercentageSliderElement(UrbexConfigScreen gui, String page, int x, int y, String attribute) {
         super(page, x, y);
         this.gui = gui;
         this.attribute = attribute;
@@ -46,7 +46,7 @@ public class PercentageSliderElement extends GuiElement {
     }
 
     @SuppressWarnings("unchecked")
-    static float apply(LostCityProfile profile, String attribute, double value) {
+    static float apply(UrbexProfile profile, String attribute, double value) {
         Configuration configuration = profile.toConfiguration();
         Configuration.Value<Float> configurationValue = configuration.getValue(attribute);
         configurationValue.set(snap(value));

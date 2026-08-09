@@ -1,7 +1,7 @@
 package dev.krona.urbex.gui;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
@@ -18,22 +18,22 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-public class LostCitySetup {
+public class ClientProfileSetup {
 
-    public static final LostCitySetup CLIENT_SETUP = new LostCitySetup(() -> {});
+    public static final ClientProfileSetup CLIENT_SETUP = new ClientProfileSetup(() -> {});
 
     private List<String> profiles = null;
 
     private String profile = null;
-    private LostCityProfile customizedProfile = null;
+    private UrbexProfile customizedProfile = null;
 
     private final Runnable refreshPreview;
 
-    public LostCitySetup(Runnable refreshPreview) {
+    public ClientProfileSetup(Runnable refreshPreview) {
         this.refreshPreview = refreshPreview;
     }
 
-    public LostCityProfile getCustomizedProfile() {
+    public UrbexProfile getCustomizedProfile() {
         return customizedProfile;
     }
 
@@ -79,14 +79,14 @@ public class LostCitySetup {
         refreshPreview.run();
     }
 
-    public void copyFrom(LostCitySetup other) {
+    public void copyFrom(ClientProfileSetup other) {
         this.profile = other.profile;
         this.customizedProfile = other.customizedProfile;
     }
 
     /**
      * Restores a profile selection read from an existing world's saved data, for the vanilla
-     * Re-Create flow (issue #85). Mirrors what {@link GuiLCConfig#selectProfile} publishes so
+     * Re-Create flow (issue #85). Mirrors what {@link UrbexConfigScreen#selectProfile} publishes so
      * the restored choice reaches the server even if the Cities screen is never opened.
      */
     public void restoreFromSavedData(String profileName, String json) {
@@ -94,14 +94,14 @@ public class LostCitySetup {
             return;
         }
         if (json != null && !json.isEmpty()) {
-            customizedProfile = new LostCityProfile("customized", false);
-            customizedProfile.copyFrom(new LostCityProfile("customized", json));
+            customizedProfile = new UrbexProfile("customized", false);
+            customizedProfile.copyFrom(new UrbexProfile("customized", json));
             ProfileSetup.STANDARD_PROFILES.put("customized", customizedProfile);
             profile = "customized";
-            GuiLCConfig.selectProfile("customized", customizedProfile);
+            UrbexConfigScreen.selectProfile("customized", customizedProfile);
         } else if (ProfileSetup.STANDARD_PROFILES.containsKey(profileName)) {
             profile = profileName;
-            GuiLCConfig.selectProfile(profileName, null);
+            UrbexConfigScreen.selectProfile(profileName, null);
         } else {
             Urbex.getLogger().warn("Re-created world used unknown Urbex profile '{}'; ignoring", profileName);
         }
@@ -112,8 +112,8 @@ public class LostCitySetup {
         if (profile == null) {
             throw new IllegalStateException("Cannot happen!");
         }
-        customizedProfile = new LostCityProfile("customized", false);
-        LostCityProfile original = ProfileSetup.STANDARD_PROFILES.get(profile);
+        customizedProfile = new UrbexProfile("customized", false);
+        UrbexProfile original = ProfileSetup.STANDARD_PROFILES.get(profile);
         ProfileSetup.STANDARD_PROFILES.put("customized", customizedProfile);
         profiles.add("customized");
         customizedProfile.copyFrom(original);
@@ -121,7 +121,7 @@ public class LostCitySetup {
         refreshPreview.run();
     }
 
-    public Optional<LostCityProfile> get() {
+    public Optional<UrbexProfile> get() {
         if (profile == null) {
             return Optional.empty();
         } else if ("customized".equals(profile)) {
@@ -162,8 +162,8 @@ public class LostCitySetup {
         PackRepository repository = Minecraft.getInstance().getResourcePackRepository();
         CloseableResourceManager resourceManager = new MultiPackResourceManager(PackType.SERVER_DATA, repository.openAllSelected());
         Map<Identifier, Resource> map = resourceManager.listResources("urbex/worldstyles", s -> s.toString().endsWith(".json"));
-        List<String> styles = map.keySet().stream().map(LostCitySetup::worldStyleToName).collect(Collectors.toList());
-        String current = get().map(LostCityProfile::getWorldStyle).orElse("<none>");
+        List<String> styles = map.keySet().stream().map(ClientProfileSetup::worldStyleToName).collect(Collectors.toList());
+        String current = get().map(UrbexProfile::getWorldStyle).orElse("<none>");
         int idx = styles.indexOf(current);
         if (idx == -1) {
             idx = 0;

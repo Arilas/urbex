@@ -41,7 +41,7 @@ class ProfileSetupDensityTest {
 
         assertEquals(EXPECTED.size(), ProfileSetup.STANDARD_PROFILES.size());
         for (Map.Entry<String, float[]> entry : EXPECTED.entrySet()) {
-            LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(entry.getKey());
+            UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(entry.getKey());
             assertNotNull(profile, entry.getKey());
             assertArrayEquals(entry.getValue(), new float[]{profile.LIGHTING_DENSITY, profile.LOOT_DENSITY}, entry.getKey());
         }

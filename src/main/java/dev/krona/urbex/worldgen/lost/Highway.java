@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 
 import dev.krona.urbex.worldgen.IDimensionInfo;
@@ -11,7 +11,7 @@ import java.util.function.Function;
 
 public class Highway {
 
-    public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         if (getXHighwayLevel(coord, provider, profile) >= 0) {
             return true;
         }
@@ -25,7 +25,7 @@ public class Highway {
      * Returns -1 if there is no highway in X direction that goes through this chunk.
      * Returns 0 or 1 if there is a highway (at that city level) going through this chunk.
      */
-    public static int getXHighwayLevel(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static int getXHighwayLevel(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         return getHighwayLevel(provider, profile, provider.caches().xHighwayLevel,
                 cp -> hasXHighway(provider, cp, profile), Orientation.X, coord);
     }
@@ -34,12 +34,12 @@ public class Highway {
      * Returns -1 if there is no highway in Z direction that goes through this chunk.
      * Returns 0 or 1 if there is a highway (at that city level) going through this chunk.
      */
-    public static int getZHighwayLevel(ChunkCoord coord, IDimensionInfo provider, LostCityProfile profile) {
+    public static int getZHighwayLevel(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         return getHighwayLevel(provider, profile, provider.caches().zHighwayLevel,
                 cp -> hasZHighway(provider, cp, profile), Orientation.Z, coord);
     }
 
-    private static int getHighwayLevel(IDimensionInfo provider, LostCityProfile profile, Map<ChunkCoord, Integer> cache, Function<ChunkCoord, Boolean> hasHighway, Orientation orientation, ChunkCoord cp) {
+    private static int getHighwayLevel(IDimensionInfo provider, UrbexProfile profile, Map<ChunkCoord, Integer> cache, Function<ChunkCoord, Boolean> hasHighway, Orientation orientation, ChunkCoord cp) {
         Integer known = cache.get(cp);
         if (known != null) {
             return known;
@@ -111,12 +111,12 @@ public class Highway {
         return -1;
     }
 
-    private static boolean hasXHighway(IDimensionInfo provider, ChunkCoord cp, LostCityProfile profile) {
+    private static boolean hasXHighway(IDimensionInfo provider, ChunkCoord cp, UrbexProfile profile) {
         return provider.caches().highwayPerlinX.getValue(cp.chunkX() / profile.HIGHWAY_MAINPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_SECONDARYPERLIN_SCALE)
                 > profile.HIGHWAY_PERLIN_FACTOR;
     }
 
-    private static boolean hasZHighway(IDimensionInfo provider, ChunkCoord cp, LostCityProfile profile) {
+    private static boolean hasZHighway(IDimensionInfo provider, ChunkCoord cp, UrbexProfile profile) {
         return provider.caches().highwayPerlinZ.getValue(cp.chunkX() / profile.HIGHWAY_SECONDARYPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_MAINPERLIN_SCALE)
                 > profile.HIGHWAY_PERLIN_FACTOR;
     }

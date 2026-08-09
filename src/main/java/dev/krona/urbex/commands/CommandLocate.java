@@ -41,7 +41,7 @@ public class CommandLocate implements Command<CommandSourceStack> {
         BlockPos start = player.blockPosition();
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(level);
+        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;

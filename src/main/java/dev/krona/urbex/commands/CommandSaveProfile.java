@@ -10,7 +10,7 @@ import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.config.ProfileSetup;
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -36,7 +36,7 @@ public class CommandSaveProfile implements Command<CommandSourceStack> {
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = context.getArgument("profile", String.class);
-        LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(name);
+        UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(name);
         if (profile == null) {
             context.getSource().sendSuccess(() -> Component.literal(ChatFormatting.RED + "Could not find profile '" + name + "'!"), true);
             return 0;

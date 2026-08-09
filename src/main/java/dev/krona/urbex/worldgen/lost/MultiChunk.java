@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Counter;
@@ -172,7 +172,7 @@ public class MultiChunk {
         }
     }
 
-    private boolean canPlaceBuilding(ChunkCoord topleft, IDimensionInfo provider, LostCityProfile profile, CityStyle buildingCityStyle, MultiBuilding building,
+    private boolean canPlaceBuilding(ChunkCoord topleft, IDimensionInfo provider, UrbexProfile profile, CityStyle buildingCityStyle, MultiBuilding building,
                                      int cityLevel, int maxCellars, int x, int z) {
         int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
         int correctStyle = 0;

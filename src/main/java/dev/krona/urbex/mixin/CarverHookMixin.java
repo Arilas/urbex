@@ -1,7 +1,7 @@
 package dev.krona.urbex.mixin;
 
 import dev.krona.urbex.setup.Registration;
-import dev.krona.urbex.worldgen.LostCityFeature;
+import dev.krona.urbex.worldgen.CityFeature;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.biome.BiomeManager;
@@ -27,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * after the city, deterministically.
  * <p>
  * Applied to both generator types that implement carving; dimensions without an Urbex profile
- * return immediately inside {@link LostCityFeature#generateFromPipeline}.
+ * return immediately inside {@link CityFeature#generateFromPipeline}.
  */
 @Mixin({NoiseBasedChunkGenerator.class, FlatLevelSource.class})
 public class CarverHookMixin {
@@ -36,7 +36,7 @@ public class CarverHookMixin {
     private void urbex$generateCity(WorldGenRegion region, long seed, RandomState randomState,
                                     BiomeManager biomeManager, StructureManager structureManager,
                                     ChunkAccess chunk, CallbackInfo ci) {
-        LostCityFeature feature = Registration.lostCityFeature();
+        CityFeature feature = Registration.cityFeature();
         if (feature != null) {
             feature.generateFromPipeline(region, chunk);
         }

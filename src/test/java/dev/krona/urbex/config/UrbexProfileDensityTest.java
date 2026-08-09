@@ -7,14 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class LostCityProfileDensityTest {
+class UrbexProfileDensityTest {
 
     @Test
     void migratesLegacyLightingBoolean() {
-        LostCityProfile on = profile("""
+        UrbexProfile on = profile("""
                 {"lostcity":{"generateLighting":true}}
                 """);
-        LostCityProfile off = profile("""
+        UrbexProfile off = profile("""
                 {"lostcity":{"generateLighting":false}}
                 """);
         assertEquals(1.0f, on.LIGHTING_DENSITY);
@@ -23,7 +23,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void migratesLegacyLootProbability() {
-        LostCityProfile profile = profile("""
+        UrbexProfile profile = profile("""
                 {"lostcity":{
                   "generateLoot":true,
                   "buildingWithoutLootChance":0.25,
@@ -35,7 +35,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void migratesDisabledLegacyLootToZero() {
-        LostCityProfile profile = profile("""
+        UrbexProfile profile = profile("""
                 {"lostcity":{
                   "generateLoot":false,
                   "buildingWithoutLootChance":0.0,
@@ -47,7 +47,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void legacyLootDefaultsMigrateToPoint64() {
-        LostCityProfile profile = profile("""
+        UrbexProfile profile = profile("""
                 {"lostcity":{"generateLoot":true}}
                 """);
         assertEquals(0.64f, profile.LOOT_DENSITY, 0.00001f);
@@ -55,7 +55,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void buildingChanceAloneTriggersEnabledLegacyLootMigration() {
-        LostCityProfile profile = profile("""
+        UrbexProfile profile = profile("""
                 {"lostcity":{"buildingWithoutLootChance":0.25}}
                 """);
 
@@ -64,7 +64,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void chestChanceAloneTriggersEnabledLegacyLootMigration() {
-        LostCityProfile profile = profile("""
+        UrbexProfile profile = profile("""
                 {"lostcity":{"chestWithoutLootChance":0.40}}
                 """);
 
@@ -73,7 +73,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void newLootDensityWinsOverChanceOnlyLegacyKeys() {
-        LostCityProfile profile = profile("""
+        UrbexProfile profile = profile("""
                 {"lostcity":{
                   "lootDensity":0.73,
                   "buildingWithoutLootChance":1.0,
@@ -86,7 +86,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void newKeysWinIndependentlyOverLegacyKeys() {
-        LostCityProfile newLighting = profile("""
+        UrbexProfile newLighting = profile("""
                 {"lostcity":{
                   "lightingDensity":0.35,
                   "generateLighting":false,
@@ -98,7 +98,7 @@ class LostCityProfileDensityTest {
         assertEquals(0.35f, newLighting.LIGHTING_DENSITY);
         assertEquals(0.0f, newLighting.LOOT_DENSITY);
 
-        LostCityProfile newLoot = profile("""
+        UrbexProfile newLoot = profile("""
                 {"lostcity":{
                   "generateLighting":true,
                   "lootDensity":0.70,
@@ -113,7 +113,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void serializesOnlyDensityKeys() {
-        JsonObject lostcity = new LostCityProfile("test", true).toJson(false).getAsJsonObject("lostcity");
+        JsonObject lostcity = new UrbexProfile("test", true).toJson(false).getAsJsonObject("lostcity");
         assertTrue(lostcity.has("lightingDensity"));
         assertTrue(lostcity.has("lootDensity"));
         assertFalse(lostcity.has("generateLighting"));
@@ -124,7 +124,7 @@ class LostCityProfileDensityTest {
 
     @Test
     void clampsAndRoundTripsDensities() {
-        LostCityProfile clamped = profile("""
+        UrbexProfile clamped = profile("""
                 {"lostcity":{"lightingDensity":-0.25,"lootDensity":1.25}}
                 """);
         assertEquals(0.0f, clamped.LIGHTING_DENSITY);
@@ -132,12 +132,12 @@ class LostCityProfileDensityTest {
 
         clamped.LIGHTING_DENSITY = 0.37f;
         clamped.LOOT_DENSITY = 0.82f;
-        LostCityProfile roundTripped = profile(clamped.toJson(false).toString());
+        UrbexProfile roundTripped = profile(clamped.toJson(false).toString());
         assertEquals(0.37f, roundTripped.LIGHTING_DENSITY);
         assertEquals(0.82f, roundTripped.LOOT_DENSITY);
     }
 
-    private static LostCityProfile profile(String json) {
-        return new LostCityProfile("legacy", json);
+    private static UrbexProfile profile(String json) {
+        return new UrbexProfile("legacy", json);
     }
 }

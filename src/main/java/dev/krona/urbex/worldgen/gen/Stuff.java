@@ -5,7 +5,7 @@ import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
-import dev.krona.urbex.worldgen.LostCityTerrainFeature;
+import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
@@ -30,7 +30,7 @@ public class Stuff {
     // palettes. Report each such combination once instead of on every city chunk.
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
-    public static void generateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info) {
+    public static void generateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
         // Each stuff object gets its own address, and within it each placement attempt gets its
         // own, derived from the loop indices. An attempt therefore draws the same values however
         // many attempts before it were abandoned - and whether an attempt is abandoned depends on
@@ -70,7 +70,7 @@ public class Stuff {
      * describes the pre-city vanilla terrain (issue #46) - seesky filters answered about a
      * world that no longer existed.
      */
-    private static boolean seesSky(ChunkDriver driver, LostCityTerrainFeature feature, int x, int y, int z) {
+    private static boolean seesSky(ChunkDriver driver, CityGenerator feature, int x, int y, int z) {
         int maxY = feature.provider.getWorld().getMaxY();
         for (int yy = y; yy <= maxY; yy++) {
             if (!driver.getBlock(x, yy, z).isAir()) {
@@ -115,7 +115,7 @@ public class Stuff {
         return true;
     }
 
-    private static void actuallyGenerateStuff(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, int stuffOrdinal, boolean inBuilding) {
+    private static void actuallyGenerateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, int stuffOrdinal, boolean inBuilding) {
         StuffSettingsRE settings = stuff.getSettings();
         String blocks = settings.getColumn();
         if (!columnResolves(stuff, blocks, palette)) {
@@ -130,14 +130,14 @@ public class Stuff {
         if (minheight == null) {
             minheight = info.groundLevel;
             if (inBuilding && info.hasBuilding) {
-                int lowestLevel = info.getCityGroundLevel() - info.cellars * LostCityTerrainFeature.FLOORHEIGHT;
+                int lowestLevel = info.getCityGroundLevel() - info.cellars * CityGenerator.FLOORHEIGHT;
                 minheight = lowestLevel;
             }
         }
         if (maxheight == null) {
             maxheight = minheight + 20;
             if (inBuilding && info.hasBuilding) {
-                maxheight = info.getCityGroundLevel() + info.getNumFloors() * LostCityTerrainFeature.FLOORHEIGHT + 10; // 10 margine above highest floor
+                maxheight = info.getCityGroundLevel() + info.getNumFloors() * CityGenerator.FLOORHEIGHT + 10; // 10 margine above highest floor
             }
         }
         int mincount = settings.getMincount();

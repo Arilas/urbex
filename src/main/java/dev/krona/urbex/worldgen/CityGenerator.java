@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.editor.EditModeData;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.ModSetup;
@@ -54,7 +54,7 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-public class LostCityTerrainFeature {
+public class CityGenerator {
 
     public static final int FLOORHEIGHT = 6;
 
@@ -83,12 +83,12 @@ public class LostCityTerrainFeature {
     private final Set<BlockState> randomDirtSet;
 
     public final IDimensionInfo provider;
-    public final LostCityProfile profile;
+    public final UrbexProfile profile;
 
     private final Statistics statistics = new Statistics();
     private final Map<Block, BlockEntityType> typeCache = new ConcurrentHashMap<>();
 
-    public LostCityTerrainFeature(IDimensionInfo provider, LostCityProfile profile) {
+    public CityGenerator(IDimensionInfo provider, UrbexProfile profile) {
         this.provider = provider;
         this.profile = profile;
 //        int waterLevel = provider.getWorld() == null ? 65 : Tools.getSeaLevel(provider.getWorld());// profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
@@ -118,12 +118,12 @@ public class LostCityTerrainFeature {
         }
 
         statesNeedingLightingUpdate = new HashSet<>();
-        for (Holder<Block> bh : Tools.getBlocksForTag(LostTags.LIGHTS_TAG)) {
+        for (Holder<Block> bh : Tools.getBlocksForTag(UrbexTags.LIGHTS_TAG)) {
             addStates(bh.value(), statesNeedingLightingUpdate);
         }
 
         statesNeedingPoiUpdate = new HashSet<>();
-        for (Holder<Block> bh : Tools.getBlocksForTag(LostTags.NEEDSPOI_TAG)) {
+        for (Holder<Block> bh : Tools.getBlocksForTag(UrbexTags.NEEDSPOI_TAG)) {
             addStates(bh.value(), statesNeedingPoiUpdate);
         }
 
@@ -728,7 +728,7 @@ public class LostCityTerrainFeature {
         if (isEmpty(state)) {
             return true;
         }
-        return Tools.hasTag(state.getBlock(), LostTags.FOLIAGE_TAG);
+        return Tools.hasTag(state.getBlock(), UrbexTags.FOLIAGE_TAG);
     }
 
     /**
@@ -2012,7 +2012,7 @@ public class LostCityTerrainFeature {
     }
 
     private BlockState transformBlockState(Transform transform, BlockState b) {
-        if (Tools.hasTag(b.getBlock(), LostTags.ROTATABLE_TAG)) {
+        if (Tools.hasTag(b.getBlock(), UrbexTags.ROTATABLE_TAG)) {
             // Vanilla structure order: mirror first, then rotate. The mirror used to be
             // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
             // the wrong way (issue #45).
@@ -2093,7 +2093,6 @@ public class LostCityTerrainFeature {
                 String randomValue = AssetRegistries.CONDITIONS.getOrThrow(world, lootTable).getRandomValue(random, conditionContext);
 //                ((LockableLootTileEntity) tileentity).setLootTable(Identifier.fromNamespaceAndPath(randomValue), random.nextLong());
 //                tileentity.markDirty();
-//                if (LostCityConfiguration.DEBUG) {
 //                    Urbex.setup.getLogger().debug("createLootChest: loot=" + randomValue + " pos=" + pos.toString());
 //                }
                 rcbe.setLootTable(ResourceKey.create(Registries.LOOT_TABLE, Identifier.parse(randomValue)));

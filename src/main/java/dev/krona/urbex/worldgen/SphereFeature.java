@@ -12,9 +12,9 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
 import net.minecraft.world.level.levelgen.feature.configurations.NoneFeatureConfiguration;
 
-public class LostCitySphereFeature extends Feature<NoneFeatureConfiguration> {
+public class SphereFeature extends Feature<NoneFeatureConfiguration> {
 
-    public LostCitySphereFeature() {
+    public SphereFeature() {
         super(NoneFeatureConfiguration.CODEC);
     }
 
@@ -22,20 +22,20 @@ public class LostCitySphereFeature extends Feature<NoneFeatureConfiguration> {
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
         WorldGenLevel level = context.level();
         if (level instanceof WorldGenRegion) {
-            IDimensionInfo diminfo = Registration.lostCityFeature().getDimensionInfo(level);
+            IDimensionInfo diminfo = Registration.cityFeature().getDimensionInfo(level);
             if (diminfo != null) {
                 WorldGenRegion region = (WorldGenRegion) level;
                 ChunkPos center = region.getCenter();
                 Holder<Biome> biome = region.getBiome(center.getMiddleBlockPosition(60));
-                if (biome.is(LostTags.IS_VOID)) {
+                if (biome.is(UrbexTags.IS_VOID)) {
                     return false;
                 }
 
                 int chunkX = center.x();
                 int chunkZ = center.z();
-                // See LostCityFeature.place: no shared mutable state left to guard.
-                LostCityTerrainFeature feature = diminfo.getFeature();
-                // Same treatment as LostCityFeature.place: an exception thrown out of here
+                // See CityFeature.place: no shared mutable state left to guard.
+                CityGenerator feature = diminfo.getFeature();
+                // Same treatment as CityFeature.place: an exception thrown out of here
                 // propagates into vanilla's feature loop and kills generation of the whole chunk,
                 // so it is logged with the same context and swallowed instead.
                 try {

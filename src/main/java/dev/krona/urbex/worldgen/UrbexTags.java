@@ -7,7 +7,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 
-public class LostTags {
+public class UrbexTags {
 
     public static final Identifier FOLIAGE = Identifier.fromNamespaceAndPath(Urbex.MODID, "foliage");
     public static final TagKey<Block> FOLIAGE_TAG = TagKey.create(Registries.BLOCK, FOLIAGE);

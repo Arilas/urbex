@@ -1,7 +1,7 @@
 package dev.krona.urbex.setup;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.LostCityProfile;
+import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.*;
@@ -76,11 +76,11 @@ public class SpawnPlacement {
     public static boolean onCreateSpawnPoint(ServerLevel serverLevel, ServerLevelData settings) {
         LevelAccessor world = serverLevel;
         {
-            IDimensionInfo dimensionInfo = Registration.lostCityFeature().getDimensionInfo(serverLevel);
+            IDimensionInfo dimensionInfo = Registration.cityFeature().getDimensionInfo(serverLevel);
             if (dimensionInfo == null) {
                 return false;
             }
-            LostCityProfile profile = dimensionInfo.getProfile();
+            UrbexProfile profile = dimensionInfo.getProfile();
 
             Predicate<BlockPos> isSuitable = pos -> true;
             boolean needsCheck = false;
@@ -231,7 +231,7 @@ public class SpawnPlacement {
                 }
 
                 ChunkCoord coord = new ChunkCoord(provider.getType(), x >> 4, z >> 4);
-                LostCityProfile profile = BuildingInfo.getProfile(coord, provider);
+                UrbexProfile profile = BuildingInfo.getProfile(coord, provider);
 
                 for (int y = profile.GROUNDLEVEL-5 ; y < 125 ; y++) {
                     BlockPos pos = new BlockPos(x, y, z);

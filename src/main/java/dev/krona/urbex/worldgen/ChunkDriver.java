@@ -60,7 +60,7 @@ public class ChunkDriver {
     // measure vanilla's scheduling instead of this mod's output.
     //
     // Thread safety: a ChunkDriver belongs to one ChunkGenContext, which belongs to one call of
-    // LostCityTerrainFeature.generate() on one thread, and never escapes it. So the accumulator
+    // CityGenerator.generate() on one thread, and never escapes it. So the accumulator
     // is a plain, unsynchronised, thread-confined set - no lock is taken per block written.
     //
     // It crosses to other threads exactly once, at the end of actuallyGenerate(): the local set is
