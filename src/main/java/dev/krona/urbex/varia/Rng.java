@@ -93,7 +93,10 @@ public final class Rng {
         // the corner could never have one facing without the other.
         VINES_EAST,
         VINES_NORTH,
-        VINES_SOUTH
+        VINES_SOUTH,
+        LIGHTING_DENSITY,
+        LIGHTING_VARIANT,
+        LOOT_DENSITY
     }
 
     private static final long GOLDEN_GAMMA = 0x9E3779B97F4A7C15L;
