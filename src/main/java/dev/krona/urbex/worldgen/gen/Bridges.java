@@ -42,7 +42,7 @@ public class Bridges {
                     Palette.Info inf = compiledPalette.getInfo(c);
                     if (inf != null) {
                         if (inf.light() != null || inf.isTorch()) {
-                            b = feature.handleLightMarker(info, inf, driver.getCurrentCopy());
+                            b = feature.handleLightMarker(ctx, inf, driver.getCurrentCopy());
                         }
                     }
                     driver.add(b);

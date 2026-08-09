@@ -115,12 +115,6 @@ public class BuildingInfo {
     private volatile MinMax desiredTerrainCorrectionHeights = null;
     private volatile MinMax desiredMaxHeight1 = null;
 
-    // A list of todo's. Both are filled while this chunk generates and drained at the end of the
-    // same call, on the same thread - but generatePart() can be handed a neighbour's info, so they
-    // are concurrent rather than relying on that.
-    public record LightTodo(BlockPos pos, @Nullable LightPool pool) { }
-
-    private final List<LightTodo> lightTodo = Collections.synchronizedList(new ArrayList<>());
     // The todos run after the chunk is driven, and they need the region that is generating - which
     // is not something a cached BuildingInfo can know. So it is handed to them.
     private final Map<BlockPos, Consumer<WorldGenLevel>> postTodo = new ConcurrentHashMap<>();
@@ -151,18 +145,6 @@ public class BuildingInfo {
         public String getBuilding() {
             return building;
         }
-    }
-
-    public void addLightTodo(BlockPos pos, @Nullable LightPool pool) {
-        lightTodo.add(new LightTodo(pos, pool));
-    }
-
-    public List<LightTodo> getLightTodo() {
-        return lightTodo;
-    }
-
-    public void clearLightTodo() {
-        lightTodo.clear();
     }
 
     public void addPostTodo(BlockPos index, Consumer<WorldGenLevel> inf) {

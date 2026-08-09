@@ -422,13 +422,13 @@ public class LostCityTerrainFeature {
 
 
     private void fixLights(ChunkGenContext ctx, BuildingInfo info) {
-        List<BuildingInfo.LightTodo> lights = info.getLightTodo();
+        List<LightTodoQueue.Todo> lights = ctx.drainLightTodo();
         if (lights.isEmpty()) {
             return;
         }
         ChunkDriver driver = ctx.driver;
         LevelReader level = DriverLevelReader.overlay((LevelReader) driver.getRegion(), driver::getBlockAt);
-        for (BuildingInfo.LightTodo todo : lights) {
+        for (LightTodoQueue.Todo todo : lights) {
             BlockPos pos = todo.pos();
             LightPool pool = todo.pool() == null ? LightPool.legacyTorch() : todo.pool();
             RandomSource random = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(),
@@ -439,7 +439,6 @@ public class LostCityTerrainFeature {
                         updateNeeded(info, pos, Block.UPDATE_CLIENTS);
                     });
         }
-        info.clearLightTodo();
     }
 
     private static boolean canPlaceLight(ChunkDriver driver, LevelReader level, BlockPos marker,
@@ -1822,7 +1821,7 @@ public class LostCityTerrainFeature {
                                 }
                             } else if (inf != null) {
                                 if (inf.light() != null || inf.isTorch()) {
-                                    b = handleLightMarker(info, inf, driver.getCurrentCopy());
+                                    b = handleLightMarker(ctx, inf, driver.getCurrentCopy());
                                 } else if (inf.loot() != null && !inf.loot().isEmpty()) {
                                     handleLoot(ctx, info, part, b, inf);
                                 } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
@@ -1858,9 +1857,9 @@ public class LostCityTerrainFeature {
         return oy + part.getSliceCount();
     }
 
-    public BlockState handleLightMarker(BuildingInfo info, Palette.Info marker, BlockPos pos) {
-        if (DensitySelector.lighting(provider.getSeed(), pos, info.profile.LIGHTING_DENSITY)) {
-            info.addLightTodo(pos, marker.light());
+    public BlockState handleLightMarker(ChunkGenContext ctx, Palette.Info marker, BlockPos pos) {
+        if (DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.LIGHTING_DENSITY)) {
+            ctx.addLightTodo(pos, marker.light());
         }
         return air;
     }
