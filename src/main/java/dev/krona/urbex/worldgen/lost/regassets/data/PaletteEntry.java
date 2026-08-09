@@ -26,6 +26,7 @@ public class PaletteEntry {
                     Codec.STRING.optionalFieldOf("mob").forGetter(l -> Optional.ofNullable(l.getMob())),
                     Codec.STRING.optionalFieldOf("loot").forGetter(l -> Optional.ofNullable(l.getLoot())),
                     Codec.BOOL.optionalFieldOf("torch").forGetter(l -> Optional.ofNullable(l.getTorch())),
+                    LightSettings.CODEC.optionalFieldOf("light").forGetter(entry -> Optional.ofNullable(entry.getLight())),
                     CompoundTag.CODEC.optionalFieldOf("tag").forGetter(l -> Optional.ofNullable(l.getTag()))
             ).apply(instance, PaletteEntry::new));
 
@@ -42,6 +43,7 @@ public class PaletteEntry {
     private String mob;
     private String loot;
     private Boolean torch;
+    private LightSettings light;
     private CompoundTag tag;
 
     public PaletteEntry() {
@@ -101,6 +103,10 @@ public class PaletteEntry {
         return torch;
     }
 
+    public LightSettings getLight() {
+        return light;
+    }
+
     public CompoundTag getTag() {
         return tag;
     }
@@ -135,6 +141,7 @@ public class PaletteEntry {
     public PaletteEntry(String chr, Optional<String> block, Optional<String> variant, Optional<String> frompalette,
                         Optional<List<BlockEntry>> blocks, Optional<String> damaged,
                         Optional<String> mob, Optional<String> loot, Optional<Boolean> torch,
+                        Optional<LightSettings> light,
                         Optional<CompoundTag> tag) {
         this.chr = chr.intern();
         this.block = block.map(String::intern).orElse(null);
@@ -145,6 +152,7 @@ public class PaletteEntry {
         this.mob = mob.map(String::intern).orElse(null);
         this.loot = loot.map(String::intern).orElse(null);
         this.torch = torch.orElse(null);
+        this.light = light.orElse(null);
         this.tag = deduplicateTag(tag.orElse(null));
     }
 
@@ -160,6 +168,7 @@ public class PaletteEntry {
                 ", mob='" + mob + '\'' +
                 ", loot='" + loot + '\'' +
                 ", torch=" + torch +
+                ", light=" + light +
                 ", tag=" + tag +
                 '}';
     }

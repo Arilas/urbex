@@ -8,6 +8,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.DefaultedRegistry;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -46,7 +47,10 @@ public class Tools {
     public static BlockState stringToState(String s) {
         if (s.contains("[")) {
             try {
-                BlockStateParser.BlockResult parser = BlockStateParser.parseForBlock(WorldTools.getOverworld().holderLookup(Registries.BLOCK), new StringReader(s), false);
+                HolderLookup<Block> blocks = ServerAccess.getServer() == null
+                        ? BuiltInRegistries.BLOCK
+                        : WorldTools.getOverworld().holderLookup(Registries.BLOCK);
+                BlockStateParser.BlockResult parser = BlockStateParser.parseForBlock(blocks, new StringReader(s), false);
                 return parser.blockState();
             } catch (CommandSyntaxException e) {
                 throw new RuntimeException(e);
