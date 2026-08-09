@@ -81,8 +81,6 @@ public class LostCityProfile {
     public boolean GENERATE_SPAWNERS = true;
     @Deprecated(forRemoval = true)
     public boolean GENERATE_LOOT = true;
-    @Deprecated(forRemoval = true)
-    public boolean GENERATE_LIGHTING = false;
     public float LIGHTING_DENSITY = 0.15f;
     public float LOOT_DENSITY = 0.65f;
     public boolean AVOID_WATER = false;
@@ -456,7 +454,6 @@ public class LostCityProfile {
         LOOT_DENSITY = clampDensity(cfg.getFloat("lootDensity", CATEGORY_LOSTCITY, LOOT_DENSITY,
                 0.0f, 1.0f, "Independent chance that a loot container receives a loot table"));
 
-        GENERATE_LIGHTING = LIGHTING_DENSITY > 0.0f;
         GENERATE_LOOT = LOOT_DENSITY > 0.0f;
         BUILDING_WITHOUT_LOOT_CHANCE = 0.0f;
         CHEST_WITHOUT_LOOT_CHANCE = 1.0f - LOOT_DENSITY;

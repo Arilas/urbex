@@ -325,7 +325,7 @@ public class LostCityTerrainFeature {
 //            generateMonorails(info);
 //        }
 //
-        fixTorches(ctx, info);
+        fixLights(ctx, info);
 
         if (info.getDamageArea().hasExplosions()) {
             breakBlocksForDamageNew(ctx, chunkX, chunkZ, info);
@@ -421,32 +421,38 @@ public class LostCityTerrainFeature {
     }
 
 
-    private void fixTorches(ChunkGenContext ctx, BuildingInfo info) {
-        List<BlockPos> torches = info.getTorchTodo();
-        if (torches.isEmpty()) {
+    private void fixLights(ChunkGenContext ctx, BuildingInfo info) {
+        List<BuildingInfo.LightTodo> lights = info.getLightTodo();
+        if (lights.isEmpty()) {
             return;
         }
-
         ChunkDriver driver = ctx.driver;
-        BlockState torchState = Blocks.WALL_TORCH.defaultBlockState();
-        for (BlockPos pos : torches) {
-            int x = pos.getX() & 0xf;
-            int z = pos.getZ() & 0xf;
-            driver.currentAbsolute(pos);
-            if (driver.getBlockDown() != air) {
-                driver.block(Blocks.TORCH.defaultBlockState());
-            } else if (x > 0 && driver.getBlockWest() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.EAST));
-            } else if (x < 15 && driver.getBlockEast() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.WEST));
-            } else if (z > 0 && driver.getBlockNorth() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.SOUTH));
-            } else if (z < 15 && driver.getBlockSouth() != air) {
-                driver.block(torchState.setValue(WallTorchBlock.FACING, net.minecraft.core.Direction.NORTH));
-            }
-            updateNeeded(info, pos, Block.UPDATE_CLIENTS);
+        LevelReader level = DriverLevelReader.overlay((LevelReader) driver.getRegion(), driver::getBlockAt);
+        for (BuildingInfo.LightTodo todo : lights) {
+            BlockPos pos = todo.pos();
+            LightPool pool = todo.pool() == null ? LightPool.legacyTorch() : todo.pool();
+            RandomSource random = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(),
+                    Rng.Purpose.LIGHTING_VARIANT);
+            OptionalLightPlacer.select(pool, random, attempt -> canPlaceLight(driver, level, pos, attempt))
+                    .ifPresent(attempt -> {
+                        driver.currentAbsolute(pos).block(attempt.state());
+                        updateNeeded(info, pos, Block.UPDATE_CLIENTS);
+                    });
         }
-        info.clearTorchTodo();
+        info.clearLightTodo();
+    }
+
+    private static boolean canPlaceLight(ChunkDriver driver, LevelReader level, BlockPos marker,
+                                         OptionalLightPlacer.Attempt attempt) {
+        net.minecraft.core.Direction supportDirection = attempt.supportDirection();
+        if (supportDirection != null) {
+            BlockPos supportPos = marker.relative(supportDirection);
+            net.minecraft.core.Direction exposedFace = supportDirection.getOpposite();
+            if (!driver.getBlockAt(supportPos).isFaceSturdy(level, supportPos, exposedFace)) {
+                return false;
+            }
+        }
+        return attempt.state().canSurvive(level, marker);
     }
 
     private void doNormalChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
@@ -1815,12 +1821,8 @@ public class LostCityTerrainFeature {
                                         break;
                                 }
                             } else if (inf != null) {
-                                if (inf.isTorch()) {
-                                    if (info.profile.GENERATE_LIGHTING) {
-                                        info.addTorchTodo(driver.getCurrentCopy());
-                                    } else {
-                                        b = air;        // No torches
-                                    }
+                                if (inf.light() != null || inf.isTorch()) {
+                                    b = handleLightMarker(info, inf, driver.getCurrentCopy());
                                 } else if (inf.loot() != null && !inf.loot().isEmpty()) {
                                     handleLoot(ctx, info, part, b, inf);
                                 } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
@@ -1854,6 +1856,13 @@ public class LostCityTerrainFeature {
             }
         }
         return oy + part.getSliceCount();
+    }
+
+    public BlockState handleLightMarker(BuildingInfo info, Palette.Info marker, BlockPos pos) {
+        if (DensitySelector.lighting(provider.getSeed(), pos, info.profile.LIGHTING_DENSITY)) {
+            info.addLightTodo(pos, marker.light());
+        }
+        return air;
     }
 
     public CompiledPalette computePalette(BuildingInfo info, IBuildingPart part) {

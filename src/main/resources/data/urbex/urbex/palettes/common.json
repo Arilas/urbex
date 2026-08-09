@@ -12,12 +12,32 @@
     },
     {
       "char": "T",
-      "block": "minecraft:wall_torch[facing=north]",
-      "torch": true
+      "light": {
+        "floor": [
+          { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
+          { "weight": 3, "block": "minecraft:torch" },
+          { "weight": 1, "block": "minecraft:end_rod[facing=up]" }
+        ],
+        "wall": [
+          { "weight": 8, "block": "minecraft:wall_torch[facing=north]" },
+          { "weight": 2, "block": "minecraft:end_rod[facing=north]" }
+        ],
+        "ceiling": [
+          { "weight": 8, "block": "minecraft:lantern[hanging=true]" },
+          { "weight": 2, "block": "minecraft:end_rod[facing=down]" }
+        ]
+      }
     },
     {
       "char": "h",
-      "block": "minecraft:glowstone"
+      "light": {
+        "free": [
+          { "weight": 6, "block": "minecraft:glowstone" },
+          { "weight": 2, "block": "minecraft:sea_lantern" },
+          { "weight": 1, "block": "minecraft:shroomlight" },
+          { "weight": 1, "block": "minecraft:ochre_froglight" }
+        ]
+      }
     },
     {
       "char": "g",

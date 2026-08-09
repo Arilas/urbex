@@ -57,6 +57,11 @@ public class Tools {
             }
         }
 
+        Identifier requested = Identifier.parse(s);
+        if (BuiltInRegistries.BLOCK.containsKey(requested)) {
+            return BuiltInRegistries.BLOCK.getValue(requested).defaultBlockState();
+        }
+
         String converted = BlockStateData.upgradeBlock(s);
         Block value = BuiltInRegistries.BLOCK.getValue(Identifier.parse(converted));
         if (value == null) {

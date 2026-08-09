@@ -165,7 +165,6 @@ public class ProfileSetup {
 //        profile.GENERATE_VILLAGES = false;
 //        profile.GENERATE_STRONGHOLDS = false;
 //        profile.BUILDING_CHANCE = .3f;
-//        profile.GENERATE_LIGHTING = true;
 //        standardProfiles.put(profile.getName(), profile);
 
         profile = new LostCityProfile("biosphere_caves", false);
