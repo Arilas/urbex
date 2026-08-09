@@ -7,7 +7,9 @@
     "MinecraftServerMixin",
     "StructureStartMixin"
   ],
-  "client": [],
+  "client": [
+    "WorldListEntryMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

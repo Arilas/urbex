@@ -2,6 +2,7 @@ package dev.krona.urbex.setup;
 
 import dev.krona.urbex.gui.GuiLCConfig;
 import dev.krona.urbex.gui.LostCitySetup;
+import dev.krona.urbex.gui.RecreateProfileRestore;
 import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.worldgen.LostCityFeature;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -13,12 +14,20 @@ import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 
 public class ClientEventHandlers {
 
+    private static java.lang.ref.WeakReference<CreateWorldScreen> lastCreateWorldScreen = null;
+
     public static void register() {
         // Inject the "Cities" button into the world creation screen.
         // (The decorative config icon that was blitted in ScreenEvent.Render.Post on NeoForge
         // has been dropped; Fabric's screen API in 26.2 has no direct post-render hook.)
         ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (screen instanceof CreateWorldScreen createWorldScreen) {
+                // A genuinely new screen, not a rebuild of the same one after a window resize:
+                // consume a profile stashed by the Re-Create flow (issue #85)
+                if (lastCreateWorldScreen == null || lastCreateWorldScreen.get() != createWorldScreen) {
+                    lastCreateWorldScreen = new java.lang.ref.WeakReference<>(createWorldScreen);
+                    RecreateProfileRestore.consumePending();
+                }
                 Button lostCitiesButton = Button.builder(ComponentFactory.literal("Cities"), b ->
                         Minecraft.getInstance().gui.setScreen(new GuiLCConfig(createWorldScreen))
                 ).bounds(screen.width - 100, 40, 70, 20).build();

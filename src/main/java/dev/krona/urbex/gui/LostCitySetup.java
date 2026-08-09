@@ -85,6 +85,30 @@ public class LostCitySetup {
         this.customizedProfile = other.customizedProfile;
     }
 
+    /**
+     * Restores a profile selection read from an existing world's saved data, for the vanilla
+     * Re-Create flow (issue #85). Mirrors what {@link GuiLCConfig#selectProfile} publishes so
+     * the restored choice reaches the server even if the Cities screen is never opened.
+     */
+    public void restoreFromSavedData(String profileName, String json) {
+        if (profileName == null || profileName.isEmpty()) {
+            return;
+        }
+        if (json != null && !json.isEmpty()) {
+            customizedProfile = new LostCityProfile("customized", false);
+            customizedProfile.copyFrom(new LostCityProfile("customized", json));
+            ProfileSetup.STANDARD_PROFILES.put("customized", customizedProfile);
+            profile = "customized";
+            GuiLCConfig.selectProfile("customized", customizedProfile);
+        } else if (ProfileSetup.STANDARD_PROFILES.containsKey(profileName)) {
+            profile = profileName;
+            GuiLCConfig.selectProfile(profileName, null);
+        } else {
+            Urbex.getLogger().warn("Re-created world used unknown Urbex profile '{}'; ignoring", profileName);
+        }
+        refreshPreview.run();
+    }
+
     public void customize() {
         if (profile == null) {
             throw new IllegalStateException("Cannot happen!");
