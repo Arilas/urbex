@@ -16,6 +16,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
@@ -123,10 +124,10 @@ public class ChunkDriver {
     private boolean loggedLateWrite;
 
     private void recordWrite(int x, int y, int z, BlockState state) {
-        if (!recordingWrites) {
-            return;
-        }
         if (published) {
+            if (!recordingWrites) {
+                return;
+            }
             // publishRecordedWrites() has already run for this driver, so the accumulator is gone
             // and this position would simply vanish. Nothing reaches here today - updateAdjacent is
             // the only writer that could outlive the placement pass, and it is only ever called
@@ -189,6 +190,8 @@ public class ChunkDriver {
     private ChunkAccess primer;
     private final BlockPos.MutableBlockPos current = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+    /** Reused across every shape update: thread-confined, reseeded per position via Rng.posSeed. */
+    private final XoroshiroRandomSource shapeRandom = new XoroshiroRandomSource(0);
 //    private final Long2ObjectOpenHashMap<BlockState> cache = new Long2ObjectOpenHashMap<>();
     private SectionCache cache;
     private int cx;
@@ -205,30 +208,62 @@ public class ChunkDriver {
         }
     }
 
-    public void actuallyGenerate(ChunkAccess chunk) {
+    /**
+     * Commit what the cache holds to the chunk without finishing the chunk: no corrections, no
+     * heightmaps, no publishing. For the mid-generation flush a part2 floor needs - the write
+     * recorder keeps accumulating across it, so nothing lands on the late-write path any more
+     * (issue #48).
+     */
+    public void flushToChunk(ChunkAccess chunk) {
         BulkSectionAccess bulk = new BulkSectionAccess(region);
         cache.generate(bulk);
         bulk.close();
+        cache.clear();
+    }
 
-        BlockState bedrock = Blocks.BEDROCK.defaultBlockState();
-        for (int x = 0 ; x < 16 ; x++) {
-            for (int z = 0 ; z < 16 ; z++) {
-                int y = cache.heightmap[x][z];
-                if (y > Integer.MIN_VALUE) {
-                    chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING).update(x, y, z, bedrock);
-                    chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES).update(x, y, z, bedrock);
-                    chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.OCEAN_FLOOR).update(x, y, z, bedrock);
-                    chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE).update(x, y, z, bedrock);
-                }
+    public void actuallyGenerate(ChunkAccess chunk) {
+        correctionsPass();
+        flushToChunk(chunk);
+        // Full recompute instead of the old fake-bedrock Heightmap.update calls, which could
+        // only ever raise heights and lied to MOTION_BLOCKING_NO_LEAVES (issue #46). O(chunk),
+        // once, unconditionally correct in both directions.
+        Heightmap.primeHeightmaps(chunk, java.util.EnumSet.of(
+                Heightmap.Types.MOTION_BLOCKING, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                Heightmap.Types.OCEAN_FLOOR, Heightmap.Types.WORLD_SURFACE));
+        publishRecordedWrites();
+    }
+
+    /**
+     * The relocated {@link #correct}: connection properties and neighbour shape updates used to
+     * run for every single write - four updateShape calls and a RandomSource allocation per
+     * block, mostly against half-built state that later writes overwrote (issue #34). Now they
+     * run once per finally-written position, against the finished chunk, in sorted order so the
+     * result cannot depend on write order.
+     */
+    private void correctionsPass() {
+        if (recorded == null || recorded.isEmpty()) {
+            return;
+        }
+        long[] positions = recorded.keySet().toLongArray();
+        Arrays.sort(positions);
+        for (long packed : positions) {
+            current.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
+            BlockState state = getBlock(current);
+            BlockState corrected = correct(state);
+            if (corrected != null && corrected != state) {
+                setBlock(current, corrected);
             }
         }
-
-        cache.clear();
-        publishRecordedWrites();
     }
 
     private void setBlock(BlockPos p, BlockState state) {
         if (state != null) {
+            if (state.getBlock() instanceof StructureVoidBlock) {
+                // Alpha channel: structure void keeps whatever is already there. Filtered at the
+                // write, so every path honours it - the old per-write correct() only caught the
+                // cursor path, and bulk fills placed literal structure_void blocks.
+                return;
+            }
             cache.put(p, state);
             recordWrite(p.getX(), p.getY(), p.getZ(), state);
         }
@@ -370,8 +405,9 @@ public class ChunkDriver {
         BlockState newAdjacent = null;
         try {
             // updateShape hands the block a RandomSource; almost none use it, but the level's own
-            // source is shared across every chunk being generated, so address one on this position.
-            RandomSource shapeRandom = Rng.atPos(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SHAPE);
+            // source is shared across every chunk being generated, so address one on this
+            // position - by reseeding the reused instance, not allocating per block (issue #34)
+            shapeRandom.setSeed(Rng.posSeed(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SHAPE));
             newAdjacent = adjacent.updateShape(region, region, pos, direction, pos.relative(direction), state, shapeRandom);
         } catch (Exception e) {
             // We got an exception. For example for beehives there can potentially be a problem so in this case we just ignore it
@@ -505,14 +541,12 @@ public class ChunkDriver {
 //    }
 
     public ChunkDriver block(BlockState c) {
-//        validate();
-        setBlock(current, correct(c));
+        setBlock(current, c);
         return this;
     }
 
     public ChunkDriver add(BlockState state) {
-//        validate();
-        setBlock(current, correct(state));
+        setBlock(current, state);
         incY();
         return this;
     }
@@ -525,21 +559,9 @@ public class ChunkDriver {
         return getBlock(pos.set(current.getX(), current.getY()-1, current.getZ()));
     }
 
-    public BlockState getBlockEast() {
-        return getBlock(pos.set(current.getX()+1, current.getY(), current.getZ()));
-    }
 
-    public BlockState getBlockWest() {
-        return getBlock(pos.set(current.getX()-1, current.getY(), current.getZ()));
-    }
 
-    public BlockState getBlockSouth() {
-        return getBlock(pos.set(current.getX(), current.getY(), current.getZ()+1));
-    }
 
-    public BlockState getBlockNorth() {
-        return getBlock(pos.set(current.getX(), current.getY(), current.getZ()-1));
-    }
 
 
     public BlockState getBlock(int x, int y, int z) {
@@ -572,7 +594,7 @@ public class ChunkDriver {
 
         // Puts a range of blockstates starting at pos and ending at y2 (inclusive)
         private void putRange(int x, int z, int y1, int y2, BlockState state) {
-            if (state == null) {
+            if (state == null || state.getBlock() instanceof StructureVoidBlock) {
                 return;
             }
             int ystart = y1;
@@ -613,7 +635,7 @@ public class ChunkDriver {
 
         // Puts a range of blockstates starting at pos and ending at y2 (inclusive)
         private void putRange(int x, int z, int y1, int y2, BlockState state, Predicate<BlockState> test) {
-            if (state == null) {
+            if (state == null || state.getBlock() instanceof StructureVoidBlock) {
                 return;
             }
             int ystart = y1;

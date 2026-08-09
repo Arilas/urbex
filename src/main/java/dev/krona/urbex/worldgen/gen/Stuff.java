@@ -63,6 +63,23 @@ public class Stuff {
         return Rng.atSlot(ctx.seed, ctx.coord.chunkX(), ctx.coord.chunkZ(), address, Rng.Purpose.STUFF);
     }
 
+    /**
+     * Whether a straight column of air runs from {@code y} to the top of the world, read
+     * through the driver so it sees what this chunk's generation has actually built. The old
+     * {@code level.canSeeSky} consulted the chunk heightmap, which at this point still
+     * describes the pre-city vanilla terrain (issue #46) - seesky filters answered about a
+     * world that no longer existed.
+     */
+    private static boolean seesSky(ChunkDriver driver, LostCityTerrainFeature feature, int x, int y, int z) {
+        int maxY = feature.provider.getWorld().getMaxY();
+        for (int yy = y; yy <= maxY; yy++) {
+            if (!driver.getBlock(x, yy, z).isAir()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private static boolean testBlock(ChunkDriver driver, BlockMatcher matcher, int x, int y, int z) {
         if (matcher.isAny()) {
             return true;
@@ -134,7 +151,7 @@ public class Stuff {
                 int z = rand.nextInt(16);
                 if (testBlock(driver, settings.getBlockMatcher(), x, y-1, z) && testBlock(driver, settings.getUpperBlockMatcher(), x, y + blocks.length(), z)) {
                     Boolean isSeesky = settings.isSeesky();
-                    if (isSeesky == null || isSeesky == level.canSeeSky(info.getRelativePos(x, y, z))) {
+                    if (isSeesky == null || isSeesky == seesSky(driver, feature, x, y, z)) {
                         // Iterate over all characters of the block
                         boolean ok = true;
                         for (int k = 0; k < blocks.length(); k++) {
