@@ -37,7 +37,7 @@ public class Scattered {
         return Highway.hasHighway(info.coord, feature.provider, feature.profile);
     }
 
-    public static void generateScattered(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings, ChunkHeightmap heightmap) {
+    public static void generateScattered(ChunkGenContext ctx, LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings) {
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
         IDimensionInfo provider = feature.provider;
@@ -53,8 +53,14 @@ public class Scattered {
             return;
         }
 
-        // Find the right type of scattered asset for this area
-        ScatteredReference reference = selectRandomScattered(feature, info, scatteredSettings, scatteredRandom);
+        // Find the right type of scattered asset for this area. The biome pre-filter is keyed
+        // on the area's anchor chunk, never the chunk that happens to be generating: every
+        // chunk of the area must compute the same filtered list and draw the same reference,
+        // or a multi-chunk building disagrees with itself about where it stands (issue #38).
+        ChunkCoord areaAnchor = new ChunkCoord(provider.getType(),
+                ax * scatteredSettings.getAreasize() - 2000000,
+                az * scatteredSettings.getAreasize() - 2000000);
+        ScatteredReference reference = selectRandomScattered(feature, areaAnchor, scatteredSettings, scatteredRandom);
         if (reference == null) {
             // Nothing matches
             return;
@@ -82,55 +88,26 @@ public class Scattered {
             return;
         }
 
-        // First test the conditions for all the relevant chunks (does this need to be cached?)
-        int minheight = Integer.MAX_VALUE;
-        int maxheight = Integer.MIN_VALUE;
-        int avgheight = 0;
-        for (int x = tlChunkX; x < tlChunkX + w; x++) {
-            for (int z = tlChunkZ; z < tlChunkZ + h; z++) {
-                ChunkCoord coord = new ChunkCoord(provider.getType(), x, z);
-                if (!isValidScatterBiome(feature, reference, coord)) {
-                    return;
-                }
-                BuildingInfo tinfo = BuildingInfo.getBuildingInfo(coord, provider);
-                if (avoidScattered(feature, tinfo)) {
-                    return;
-                }
-                if (reference.isNearHighway()) {
-                    if (!Highway.hasHighway(coord.east(), provider, feature.profile) &&
-                            !Highway.hasHighway(coord.west(), provider, feature.profile) &&
-                            !Highway.hasHighway(coord.north(), provider, feature.profile) &&
-                            !Highway.hasHighway(coord.south(), provider, feature.profile)) {
-                        return;
-                    }
-                }
-                // A copy: calculateAccurateHeight writes minHeight/maxHeight, and the cached
-                // instance is shared with every thread generating near this chunk. See #24.
-                ChunkHeightmap hm = new ChunkHeightmap(feature.getHeightmap(coord, provider.getWorld()));
-                int height = hm.getHeight();
-                hm.calculateAccurateHeight(provider.getWorld(), x, z);   // generator-only, no block access
-                if (!reference.isAllowVoid()) {
-                    if (!(feature.profile.isDefault() || feature.profile.isCavern())) {
-                        // We are in a world that can have void chunks. Check if this chunk is a void chunk
-                        if (height <= feature.provider.getWorld().getMinY() + 3) {
-                            return;
-                        }
-                    }
-                }
-                minheight = Math.min(minheight, hm.getMinHeight());
-                maxheight = Math.max(maxheight, hm.getMaxHeight());
-                avgheight += height;
-            }
+        // Test the conditions for all the relevant chunks. Cached on the area: every chunk of
+        // the footprint used to redo the full scan - w*h noise-column samples each, O((w*h)^2)
+        // in total (issue #38). Everything the scan reads is a pure function of the area, so
+        // the first chunk to arrive computes it for all of them.
+        AreaScan scan = provider.caches().scatterAreaScan.getOrCompute(areaAnchor,
+                k -> scanArea(feature, reference, tlChunkX, tlChunkZ, w, h));
+        if (!scan.valid()) {
+            return;
         }
         // Check the height difference
         if (reference.getMaxheightdiff() != null) {
-            int diff = maxheight - minheight;
+            int diff = scan.maxheight() - scan.minheight();
             if (diff > reference.getMaxheightdiff()) {
                 return;
             }
         }
 
-        avgheight /= w * h;
+        int minheight = scan.minheight();
+        int maxheight = scan.maxheight();
+        int avgheight = scan.avgheight();
 
         // We need to generate a part of the building
         if (multiBuilding == null) {
@@ -146,7 +123,7 @@ public class Scattered {
                 buildingName = buildings.get(scatteredRandom.nextInt(buildings.size()));
             }
             Building building = AssetRegistries.BUILDINGS.getOrThrow(provider.getWorld(), buildingName);
-            int lowestLevel = handleScatteredTerrain(feature, scattered, info.coord, heightmap);
+            int lowestLevel = scatteredLevel(feature, scattered, minheight, maxheight, avgheight);
             if (lowestLevel < -4000) {
                 LostCityProfile profile = feature.provider.getProfile();
                 if (profile.isCavern()) {
@@ -157,7 +134,7 @@ public class Scattered {
             }
             generateScatteredBuilding(ctx, feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
         } else {
-            int lowestLevel = handleScatteredTerrainMulti(feature, scattered, info.coord, minheight, maxheight, avgheight);
+            int lowestLevel = scatteredLevel(feature, scattered, minheight, maxheight, avgheight);
             int relx = chunkX - tlChunkX;
             int relz = chunkZ - tlChunkZ;
             String buildingName = multiBuilding.getBuilding(relx, relz);
@@ -167,7 +144,7 @@ public class Scattered {
     }
 
     @Nullable
-    private static ScatteredReference selectRandomScattered(LostCityTerrainFeature feature, BuildingInfo info, ScatteredSettings scatteredSettings, RandomSource rand) {
+    private static ScatteredReference selectRandomScattered(LostCityTerrainFeature feature, ChunkCoord areaAnchor, ScatteredSettings scatteredSettings, RandomSource rand) {
         List<ScatteredReference> list = scatteredSettings.getList();
         if (list.isEmpty()) {
             return null;
@@ -176,7 +153,7 @@ public class Scattered {
         int totalweight = 0;
         List<ScatteredReference> filteredList = new ArrayList<>();
         for (ScatteredReference reference : list) {
-            if (isValidScatterBiome(feature, reference, info.coord)) {
+            if (isValidScatterBiome(feature, reference, areaAnchor)) {
                 totalweight += reference.getWeight();
                 filteredList.add(reference);
             }
@@ -189,13 +166,68 @@ public class Scattered {
         ScatteredReference reference = null;
         for (ScatteredReference scatteredReference : filteredList) {
             int weight = scatteredReference.getWeight();
-            if (rndweight <= weight) {
+            // Strict comparison: <= gave the first entry one extra winning value (issue #38)
+            if (rndweight < weight) {
                 reference = scatteredReference;
                 break;
             }
             rndweight -= weight;
         }
         return reference;
+    }
+
+    /** What the area scan learned about a scatter area: whether it may generate, and its heights. */
+    public record AreaScan(boolean valid, int minheight, int maxheight, int avgheight) {
+        private static final AreaScan INVALID = new AreaScan(false, 0, 0, 0);
+    }
+
+    /**
+     * Validates every chunk of a scatter footprint and gathers its height statistics. Pure
+     * function of the area (all inputs derive from the area coordinate), which is what makes
+     * caching it per area sound.
+     */
+    private static AreaScan scanArea(LostCityTerrainFeature feature, ScatteredReference reference, int tlChunkX, int tlChunkZ, int w, int h) {
+        IDimensionInfo provider = feature.provider;
+        int minheight = Integer.MAX_VALUE;
+        int maxheight = Integer.MIN_VALUE;
+        int avgheight = 0;
+        for (int x = tlChunkX; x < tlChunkX + w; x++) {
+            for (int z = tlChunkZ; z < tlChunkZ + h; z++) {
+                ChunkCoord coord = new ChunkCoord(provider.getType(), x, z);
+                if (!isValidScatterBiome(feature, reference, coord)) {
+                    return AreaScan.INVALID;
+                }
+                BuildingInfo tinfo = BuildingInfo.getBuildingInfo(coord, provider);
+                if (avoidScattered(feature, tinfo)) {
+                    return AreaScan.INVALID;
+                }
+                if (reference.isNearHighway()) {
+                    if (!Highway.hasHighway(coord.east(), provider, feature.profile) &&
+                            !Highway.hasHighway(coord.west(), provider, feature.profile) &&
+                            !Highway.hasHighway(coord.north(), provider, feature.profile) &&
+                            !Highway.hasHighway(coord.south(), provider, feature.profile)) {
+                        return AreaScan.INVALID;
+                    }
+                }
+                // A copy: calculateAccurateHeight writes minHeight/maxHeight, and the cached
+                // instance is shared with every thread generating near this chunk. See #24.
+                ChunkHeightmap hm = new ChunkHeightmap(feature.getHeightmap(coord, provider.getWorld()));
+                int height = hm.getHeight();
+                hm.calculateAccurateHeight(provider.getWorld(), x, z);   // generator-only, no block access
+                if (!reference.isAllowVoid()) {
+                    if (!(feature.profile.isDefault() || feature.profile.isCavern())) {
+                        // We are in a world that can have void chunks. Check if this chunk is a void chunk
+                        if (height <= provider.getWorld().getMinY() + 3) {
+                            return AreaScan.INVALID;
+                        }
+                    }
+                }
+                minheight = Math.min(minheight, hm.getMinHeight());
+                maxheight = Math.max(maxheight, hm.getMaxHeight());
+                avgheight += height;
+            }
+        }
+        return new AreaScan(true, minheight, maxheight, avgheight / (w * h));
     }
 
     private static boolean isValidScatterBiome(LostCityTerrainFeature feature, ScatteredReference reference, ChunkCoord coord) {
@@ -297,25 +329,22 @@ public class Scattered {
         }
     }
 
-    private static int handleScatteredTerrain(LostCityTerrainFeature feature, ScatteredBuilding scattered, ChunkCoord coord, ChunkHeightmap heightmap) {
-        int lowestLevel = switch (scattered.getTerrainheight()) {
-            case LOWEST -> heightmap.getHeight();
-            case AVERAGE -> heightmap.getHeight();
-            case HIGHEST -> heightmap.getHeight();
-            case OCEAN -> ((ServerChunkCache) feature.provider.getWorld().getChunkSource()).getGenerator().getSeaLevel();
-        };
-        lowestLevel += scattered.getHeightoffset();
-        return lowestLevel;
+    private static int scatteredLevel(LostCityTerrainFeature feature, ScatteredBuilding scattered, int minimum, int maximum, int average) {
+        int seaLevel = ((ServerChunkCache) feature.provider.getWorld().getChunkSource()).getGenerator().getSeaLevel();
+        return pickLevel(scattered.getTerrainheight(), minimum, maximum, average, seaLevel) + scattered.getHeightoffset();
     }
 
-    private static int handleScatteredTerrainMulti(LostCityTerrainFeature feature, ScatteredBuilding scattered, ChunkCoord coord, int minimum, int maximum, int average) {
-        int lowestLevel = switch (scattered.getTerrainheight()) {
+    /**
+     * The base level a terrain-height policy asks for. The old multi-chunk switch had the
+     * AVERAGE and HIGHEST arms swapped, and the single-chunk variant returned the same value
+     * for all three (issue #38).
+     */
+    static int pickLevel(ScatteredBuilding.TerrainHeight terrainHeight, int minimum, int maximum, int average, int seaLevel) {
+        return switch (terrainHeight) {
             case LOWEST -> minimum;
-            case AVERAGE -> maximum;
-            case HIGHEST -> average;
-            case OCEAN -> ((ServerChunkCache) feature.provider.getWorld().getChunkSource()).getGenerator().getSeaLevel();
+            case AVERAGE -> average;
+            case HIGHEST -> maximum;
+            case OCEAN -> seaLevel;
         };
-        lowestLevel += scattered.getHeightoffset();
-        return lowestLevel;
     }
 }

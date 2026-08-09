@@ -266,7 +266,10 @@ public class City {
                             if (factor < profile.CITY_STYLE_THRESHOLD) {
                                 styles.add(Pair.of(factor, profile.CITY_STYLE_ALTERNATIVE));
                             } else {
-                                styles.add(Pair.of(factor, getCityStyleForCityCenter(coord, provider)));
+                                // The centre's style, not the observing chunk's: asking at
+                                // `coord` gave every chunk of one city its own roll, so a
+                                // single city had no coherent style (issue #37).
+                                styles.add(Pair.of(factor, getCityStyleForCityCenter(c, provider)));
                             }
                         }
                     }

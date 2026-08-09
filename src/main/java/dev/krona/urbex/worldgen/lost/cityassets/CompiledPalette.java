@@ -33,14 +33,48 @@ public class CompiledPalette {
         addPalettes(palettes);
     }
 
-    private int addEntries(BlockState[] randomBlocks, int idx, BlockState c, int cnt) {
-        for (int i = 0 ; i < cnt ; i++) {
-            if (idx >= randomBlocks.length) {
-                return idx;
+    /**
+     * Distributes {@code slotCount} slots over the entries proportionally to their weights
+     * (largest-remainder rounding, remainder ties to the lowest index).
+     * <p>
+     * Weights used to be absolute slot counts out of 128: a pack whose weights summed below 128
+     * crashed at generation time and one summing above 128 was silently truncated (issue #58).
+     * Weights that already sum to exactly {@code slotCount} come back verbatim, so packs authored
+     * against the old contract generate identically.
+     */
+    public static int[] distributeSlots(int[] weights, int slotCount) {
+        long total = 0;
+        for (int w : weights) {
+            if (w < 0) {
+                throw new IllegalArgumentException("Negative palette weight " + w);
             }
-            randomBlocks[idx++] = c;
+            total += w;
         }
-        return idx;
+        if (total <= 0) {
+            throw new IllegalArgumentException("Palette weights must sum to a positive value");
+        }
+        int[] slots = new int[weights.length];
+        long[] remainders = new long[weights.length];
+        int assigned = 0;
+        for (int i = 0; i < weights.length; i++) {
+            long scaled = (long) weights[i] * slotCount;
+            slots[i] = (int) (scaled / total);
+            remainders[i] = scaled % total;
+            assigned += slots[i];
+        }
+        // Fractional parts sum to exactly the shortfall, so this hands out fewer slots than
+        // there are entries and no entry can win twice.
+        for (int remaining = slotCount - assigned; remaining > 0; remaining--) {
+            int best = 0;
+            for (int i = 1; i < weights.length; i++) {
+                if (remainders[i] > remainders[best]) {
+                    best = i;
+                }
+            }
+            slots[best]++;
+            remainders[best] = -1;
+        }
+        return slots;
     }
 
     private void addPalettes(Palette[] palettes) {
@@ -53,18 +87,24 @@ public class CompiledPalette {
                         palette.put(entry.getKey(), pe.blocks());
                     } else if (pe.blocks() instanceof Pair[]) {
                         Pair<Integer, BlockState>[] r = (Pair<Integer, BlockState>[]) pe.blocks();
+                        int[] weights = new int[r.length];
+                        for (int i = 0; i < r.length; i++) {
+                            weights[i] = r[i].getLeft();
+                        }
+                        int[] slots;
+                        try {
+                            slots = distributeSlots(weights, 128);
+                        } catch (IllegalArgumentException e) {
+                            throw new RuntimeException("Invalid palette entry for '" + entry.getKey() + "': " + e.getMessage());
+                        }
                         BlockState[] randomBlocks = new BlockState[128];
                         int idx = 0;
-                        for (Pair<Integer, BlockState> pair : r) {
-                            idx = addEntries(randomBlocks, idx, pair.getRight(), pair.getLeft());
-                            if (idx >= randomBlocks.length) {
-                                break;
+                        for (int i = 0; i < r.length; i++) {
+                            for (int j = 0; j < slots[i]; j++) {
+                                randomBlocks[idx++] = r[i].getRight();
                             }
                         }
                         palette.put(entry.getKey(), randomBlocks);
-                        if (idx < randomBlocks.length) {
-                            throw new RuntimeException("Invalid palette entry for '" + entry.getKey() + "'! Not enough blocks in the random list (factor should go up to 128)");
-                        }
                     } else if (!(pe.blocks() instanceof String)) {
                         if (pe.blocks() == null) {
                             throw new RuntimeException("Invalid palette entry for '" + entry.getKey() + "'!");

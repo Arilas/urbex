@@ -6,6 +6,7 @@ import dev.krona.urbex.varia.PerlinNoiseGenerator14;
 import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.gen.Scattered;
 import dev.krona.urbex.worldgen.lost.CityRarityMap;
 import dev.krona.urbex.worldgen.lost.CitySphere;
 import dev.krona.urbex.worldgen.lost.LostChunkCharacteristics;
@@ -41,6 +42,8 @@ public final class DimensionCaches {
     public final ConcurrentHashMap<ChunkCoord, Integer> xHighwayLevel = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<ChunkCoord, Integer> zHighwayLevel = new ConcurrentHashMap<>();
     public final TimedCache<ChunkCoord, ChunkHeightmap> heightmap = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
+    /** Keyed on the scatter area's anchor chunk, not a real chunk coordinate. */
+    public final TimedCache<ChunkCoord, Scattered.AreaScan> scatterAreaScan = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
 
     /**
      * The city-rarity map is per profile rather than per chunk: a city-sphere dimension asks for
@@ -96,6 +99,7 @@ public final class DimensionCaches {
         xHighwayLevel.clear();
         zHighwayLevel.clear();
         heightmap.clear();
+        scatterAreaScan.clear();
         cityRarity.clear();
     }
 }

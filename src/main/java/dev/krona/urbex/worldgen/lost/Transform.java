@@ -1,34 +1,36 @@
 package dev.krona.urbex.worldgen.lost;
 
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.Mirror;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.state.properties.RailShape;
 
 public enum Transform {
-    ROTATE_NONE(net.minecraft.world.level.block.Rotation.NONE),
-    ROTATE_90(net.minecraft.world.level.block.Rotation.CLOCKWISE_90),
-    ROTATE_180(net.minecraft.world.level.block.Rotation.CLOCKWISE_180),
-    ROTATE_270(net.minecraft.world.level.block.Rotation.COUNTERCLOCKWISE_90),
-    MIRROR_X(net.minecraft.world.level.block.Rotation.CLOCKWISE_180),
-    MIRROR_Z(net.minecraft.world.level.block.Rotation.CLOCKWISE_180),
-    MIRROR_90_X(net.minecraft.world.level.block.Rotation.CLOCKWISE_90);
+    ROTATE_NONE(Rotation.NONE, Mirror.NONE),
+    ROTATE_90(Rotation.CLOCKWISE_90, Mirror.NONE),
+    ROTATE_180(Rotation.CLOCKWISE_180, Mirror.NONE),
+    ROTATE_270(Rotation.COUNTERCLOCKWISE_90, Mirror.NONE),
+    // The mirror/rotation pairs below reproduce the coordinate maps of rotateX/rotateZ in
+    // vanilla's application order (mirror first, then rotate). MIRROR_X flips x (east<->west),
+    // MIRROR_Z flips z (north<->south), MIRROR_90_X is the transpose (x,z)->(z,x).
+    MIRROR_X(Rotation.NONE, Mirror.FRONT_BACK),
+    MIRROR_Z(Rotation.NONE, Mirror.LEFT_RIGHT),
+    MIRROR_90_X(Rotation.CLOCKWISE_90, Mirror.LEFT_RIGHT);
 
-    private final net.minecraft.world.level.block.Rotation mcRotation;
+    private final Rotation mcRotation;
+    private final Mirror mcMirror;
 
-    Transform(net.minecraft.world.level.block.Rotation mcRotation) {
+    Transform(Rotation mcRotation, Mirror mcMirror) {
         this.mcRotation = mcRotation;
+        this.mcMirror = mcMirror;
     }
 
-    public net.minecraft.world.level.block.Rotation getMcRotation() {
+    public Rotation getMcRotation() {
         return mcRotation;
     }
 
-    public static Transform randomRotation() {
-        return switch ((int) (Math.random() * 4)) {
-            case 0 -> ROTATE_NONE;
-            case 1 -> ROTATE_90;
-            case 2 -> ROTATE_180;
-            case 3 -> ROTATE_270;
-            default -> ROTATE_NONE;
-        };
+    public Mirror getMcMirror() {
+        return mcMirror;
     }
 
     public Transform getOpposite() {
@@ -67,147 +69,59 @@ public enum Transform {
         };
     }
 
-    public RailShape transform(RailShape shape) {
-        if (this == ROTATE_NONE) {
-            return shape;
-        }
-        switch (shape) {
-            case NORTH_SOUTH:
-                return (this == ROTATE_90 || this == ROTATE_270 || this == MIRROR_90_X) ? RailShape.EAST_WEST : shape;
-            case EAST_WEST:
-                return (this == ROTATE_90 || this == ROTATE_270) ? RailShape.NORTH_SOUTH : shape;
-            case ASCENDING_EAST:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.ASCENDING_SOUTH;
-                    case MIRROR_90_X:
-                        return RailShape.ASCENDING_NORTH;
-                    case ROTATE_180:
-                        return RailShape.ASCENDING_WEST;
-                    case ROTATE_270:
-                        return RailShape.ASCENDING_NORTH;
-                    case MIRROR_X:
-                        return RailShape.ASCENDING_WEST;
-                }
-                break;
-            case ASCENDING_WEST:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.ASCENDING_NORTH;
-                    case MIRROR_90_X:
-                        return RailShape.ASCENDING_SOUTH;
-                    case ROTATE_180:
-                        return RailShape.ASCENDING_EAST;
-                    case ROTATE_270:
-                        return RailShape.ASCENDING_SOUTH;
-                    case MIRROR_X:
-                        return RailShape.ASCENDING_EAST;
-                }
-                break;
-            case ASCENDING_NORTH:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.ASCENDING_EAST;
-                    case MIRROR_90_X:
-                        return RailShape.ASCENDING_WEST;
-                    case ROTATE_180:
-                        return RailShape.ASCENDING_SOUTH;
-                    case ROTATE_270:
-                        return RailShape.ASCENDING_WEST;
-                    case MIRROR_X:
-                        return RailShape.ASCENDING_SOUTH;
-                    case MIRROR_Z:
-                        return RailShape.ASCENDING_SOUTH;
-                }
-                break;
-            case ASCENDING_SOUTH:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.ASCENDING_WEST;
-                    case MIRROR_90_X:
-                        return RailShape.ASCENDING_EAST;
-                    case ROTATE_180:
-                        return RailShape.ASCENDING_NORTH;
-                    case ROTATE_270:
-                        return RailShape.ASCENDING_EAST;
-                    case MIRROR_X:
-                        return RailShape.ASCENDING_NORTH;
-                    case MIRROR_Z:
-                        return RailShape.ASCENDING_NORTH;
-                }
-                break;
-            case SOUTH_EAST:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.SOUTH_WEST;
-                    case MIRROR_90_X:
-                        return RailShape.NORTH_EAST;
-                    case ROTATE_180:
-                        return RailShape.NORTH_WEST;
-                    case ROTATE_270:
-                        return RailShape.NORTH_EAST;
-                    case MIRROR_X:
-                        return RailShape.SOUTH_WEST;
-                    case MIRROR_Z:
-                        return RailShape.NORTH_EAST;
-                }
-                break;
-            case SOUTH_WEST:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.NORTH_WEST;
-                    case MIRROR_90_X:
-                        return RailShape.SOUTH_EAST;
-                    case ROTATE_180:
-                        return RailShape.NORTH_EAST;
-                    case ROTATE_270:
-                        return RailShape.SOUTH_EAST;
-                    case MIRROR_X:
-                        return RailShape.SOUTH_EAST;
-                    case MIRROR_Z:
-                        return RailShape.NORTH_WEST;
-                }
-                break;
-            case NORTH_WEST:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.NORTH_EAST;
-                    case MIRROR_90_X:
-                        return RailShape.SOUTH_WEST;
-                    case ROTATE_180:
-                        return RailShape.SOUTH_EAST;
-                    case ROTATE_270:
-                        return RailShape.SOUTH_WEST;
-                    case MIRROR_X:
-                        return RailShape.NORTH_EAST;
-                    case MIRROR_Z:
-                        return RailShape.SOUTH_WEST;
-                }
-                break;
-            case NORTH_EAST:
-                switch (this) {
-                    case ROTATE_90:
-                        return RailShape.SOUTH_EAST;
-                    case MIRROR_90_X:
-                        return RailShape.NORTH_WEST;
-                    case ROTATE_180:
-                        return RailShape.SOUTH_WEST;
-                    case ROTATE_270:
-                        return RailShape.NORTH_WEST;
-                    case MIRROR_X:
-                        return RailShape.NORTH_WEST;
-                    case MIRROR_Z:
-                        return RailShape.SOUTH_EAST;
-                }
-                break;
-        }
-        throw new IllegalStateException("Cannot happen!");
+    /**
+     * The horizontal direction this transform sends {@code direction} to. Same geometry as
+     * {@link #rotateX}/{@link #rotateZ}, expressed through the vanilla enums so rails and
+     * rotated/mirrored block states agree on what the transform means.
+     */
+    public Direction transform(Direction direction) {
+        return mcRotation.rotate(mcMirror.mirror(direction));
     }
 
-//    public static void main(String[] args) {
-//        int x;
-//        int z;
-//        x = 4; z = 4;
-//        System.out.println("x,z = " + x +","+z + " -> " +ROTATE_90.rotateX(x, z) +","+ROTATE_90.rotateZ(x,z));
-//    }
+    /**
+     * Rail shapes under this transform, derived from {@link #transform(Direction)} rather than
+     * hand-written tables: the old table had holes that threw (MIRROR_Z on an ascending east/west
+     * rail) and arms that disagreed with the coordinate maps.
+     */
+    public RailShape transform(RailShape shape) {
+        return switch (shape) {
+            case NORTH_SOUTH, EAST_WEST -> straight(transform(axis(shape)));
+            case ASCENDING_EAST -> ascending(transform(Direction.EAST));
+            case ASCENDING_WEST -> ascending(transform(Direction.WEST));
+            case ASCENDING_NORTH -> ascending(transform(Direction.NORTH));
+            case ASCENDING_SOUTH -> ascending(transform(Direction.SOUTH));
+            case SOUTH_EAST -> corner(transform(Direction.SOUTH), transform(Direction.EAST));
+            case SOUTH_WEST -> corner(transform(Direction.SOUTH), transform(Direction.WEST));
+            case NORTH_WEST -> corner(transform(Direction.NORTH), transform(Direction.WEST));
+            case NORTH_EAST -> corner(transform(Direction.NORTH), transform(Direction.EAST));
+        };
+    }
+
+    private static Direction axis(RailShape straight) {
+        return straight == RailShape.NORTH_SOUTH ? Direction.NORTH : Direction.EAST;
+    }
+
+    private static RailShape straight(Direction axis) {
+        return axis.getAxis() == Direction.Axis.Z ? RailShape.NORTH_SOUTH : RailShape.EAST_WEST;
+    }
+
+    private static RailShape ascending(Direction towards) {
+        return switch (towards) {
+            case EAST -> RailShape.ASCENDING_EAST;
+            case WEST -> RailShape.ASCENDING_WEST;
+            case NORTH -> RailShape.ASCENDING_NORTH;
+            case SOUTH -> RailShape.ASCENDING_SOUTH;
+            default -> throw new IllegalArgumentException("Not a horizontal direction: " + towards);
+        };
+    }
+
+    private static RailShape corner(Direction a, Direction b) {
+        Direction northSouth = a.getAxis() == Direction.Axis.Z ? a : b;
+        Direction eastWest = a.getAxis() == Direction.Axis.X ? a : b;
+        if (northSouth == Direction.SOUTH) {
+            return eastWest == Direction.EAST ? RailShape.SOUTH_EAST : RailShape.SOUTH_WEST;
+        } else {
+            return eastWest == Direction.EAST ? RailShape.NORTH_EAST : RailShape.NORTH_WEST;
+        }
+    }
 }

@@ -785,7 +785,7 @@ public class BuildingInfo {
             if (rand.nextDouble() < parkChance) {
                 streetType = StreetType.PARK;
             } else {
-                streetType = StreetType.values()[rand.nextInt(0, BuildingInfo.StreetType.values().length - 2)];
+                streetType = StreetType.randomNonPark(rand);
             }
             float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
             if (rand.nextFloat() < fountainChance) {
@@ -1903,7 +1903,18 @@ public class BuildingInfo {
     public enum StreetType {
         NORMAL,
         FULL,
-        PARK
+        PARK;
+
+        private static final StreetType[] NON_PARK = {NORMAL, FULL};
+
+        /**
+         * An even choice between the non-park street types. PARK is decided separately by the
+         * park chance. The old form, {@code values()[nextInt(values().length - 2)]}, could only
+         * ever yield NORMAL (issue #36).
+         */
+        public static StreetType randomNonPark(RandomSource rand) {
+            return NON_PARK[rand.nextInt(NON_PARK.length)];
+        }
     }
 
 
