@@ -9,6 +9,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
 import javax.annotation.Nullable;
@@ -31,6 +32,12 @@ public final class ChunkGenContext {
     public final CompiledPalette palette;
     public final char street;
     public final NoiseBuffers buffers;
+    /**
+     * Scratch for {@link LostCityTerrainFeature#moveDown}'s top-of-column stash. Lives here
+     * because the feature instance is shared across worldgen worker threads: as an instance
+     * field there, two threads in moveDown at once swapped each other's terrain (issue #43).
+     */
+    public final BlockState[] moveDownBuffer = new BlockState[6];
     private final LightTodoQueue lightTodo;
 
 

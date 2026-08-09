@@ -24,16 +24,16 @@ public class Highways {
             // will clear out what is above it
             if (levelX == 0) {
                 generateHighwayPart(ctx, feature, info, levelX, Transform.ROTATE_NONE, info.getZmin(), info.getZmax(), false);
-                generateHighwayPart(ctx, feature, info, levelZ, Transform.ROTATE_90, info.getXmax(), info.getXmax(), false);
+                generateHighwayPart(ctx, feature, info, levelZ, Transform.ROTATE_90, info.getXmin(), info.getXmax(), false);
             } else {
-                generateHighwayPart(ctx, feature, info, levelZ, Transform.ROTATE_90, info.getXmax(), info.getXmax(), false);
+                generateHighwayPart(ctx, feature, info, levelZ, Transform.ROTATE_90, info.getXmin(), info.getXmax(), false);
                 generateHighwayPart(ctx, feature, info, levelX, Transform.ROTATE_NONE, info.getZmin(), info.getZmax(), false);
             }
         } else {
             if (levelX >= 0) {
                 generateHighwayPart(ctx, feature, info, levelX, Transform.ROTATE_NONE, info.getZmin(), info.getZmax(), false);
             } else if (levelZ >= 0) {
-                generateHighwayPart(ctx, feature, info, levelZ, Transform.ROTATE_90, info.getXmax(), info.getXmax(), false);
+                generateHighwayPart(ctx, feature, info, levelZ, Transform.ROTATE_90, info.getXmin(), info.getXmax(), false);
             }
         }
     }

@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
@@ -252,7 +253,7 @@ public class CitySphere {
         if (city != null) {
             return city.getRadius() * profile.CITYSPHERE_FACTOR;
         }
-        return profile.CITY_MINRADIUS + rand.nextInt(profile.CITY_MAXRADIUS - profile.CITY_MINRADIUS) * profile.CITYSPHERE_FACTOR;
+        return profile.CITY_MINRADIUS + Tools.randomBetween(rand, 0, profile.CITY_MAXRADIUS - profile.CITY_MINRADIUS) * profile.CITYSPHERE_FACTOR;
     }
 
 

@@ -779,11 +779,10 @@ public class LostCityTerrainFeature {
         return maxYTouched;
     }
 
-    private final BlockState[] buffer = new BlockState[6];
-
     // Return the new max height of the chunk in this column. Or Short.MIN_VALUE if nothing was done
     private int moveDown(ChunkGenContext ctx, int x, int z, int height, int maxBuildLimit) {
         ChunkDriver driver = ctx.driver;
+        BlockState[] buffer = ctx.moveDownBuffer;
         int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
         int y = maxBuildLimit-1;
         driver.current(x, y, z);
@@ -2137,11 +2136,13 @@ public class LostCityTerrainFeature {
                 int destroyedBlocks = (int) (blocks * damage);
                 // How many go this direction (approx, based on cardinal directions from building as well as number that simply fall down)
                 destroyedBlocks /= info.profile.DEBRIS_TO_NEARBYCHUNK_FACTOR;
-                int h = adjacentInfo.getMaxHeight() + 10;
+                int startHeight = adjacentInfo.getMaxHeight() + 10;
                 int maxBuildHeight = info.provider.getWorld().getMaxY() + 1;
-                if (h > maxBuildHeight - 1) {
-                    int minBuildHeight = info.provider.getWorld().getMinY();
-                    h = minBuildHeight - 1;
+                int minBuildHeight = info.provider.getWorld().getMinY();
+                if (startHeight > maxBuildHeight - 1) {
+                    // Clamp to the top of the world: the old code clamped an out-of-range start
+                    // to minBuildHeight - 1, dropping debris at bedrock and reading below minY
+                    startHeight = maxBuildHeight - 1;
                 }
 
                 CompiledPalette palette = info.getCompiledPalette();
@@ -2152,8 +2153,12 @@ public class LostCityTerrainFeature {
                     int x = debrisRandom.nextInt(16);
                     int z = debrisRandom.nextInt(16);
                     if (debrisRandom.nextFloat() < locationFactor.apply(x, z)) {
+                        // Fresh drop per debris block: h used to persist across iterations, so
+                        // after the first block sank, every later one started at its level and
+                        // debris piled at one height instead of following the surface (issue #42)
+                        int h = startHeight;
                         driver.current(x, h, z);
-                        while (h > 0 && isEmpty(driver.getBlock())) {
+                        while (h > minBuildHeight && isEmpty(driver.getBlock())) {
                             h--;
                             driver.decY();
                         }

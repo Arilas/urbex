@@ -585,12 +585,23 @@ public class ChunkDriver {
             boolean isAir = state.isAir();
             boolean dirty = false;
             boolean record = recordingWrites;    // read the flag once, not once per block
+            BlockPos.MutableBlockPos worldPos = null;
             while (y1 <= y2) {
                 int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
                 int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
 
                 BlockState st = cache[sectionIdx].section[idx];
-                if (st != state && st != null && test.test(st)) {
+                if (st == null) {
+                    // Fall back to the world for positions this chunk never touched. Skipping
+                    // them made the predicate form a no-op on virgin terrain: the highway
+                    // clear-above passes target vanilla blocks that are never in the cache,
+                    // so highways were not cleared of terrain at all (issue #35).
+                    if (worldPos == null) {
+                        worldPos = new BlockPos.MutableBlockPos();
+                    }
+                    st = owner.region.getBlockState(worldPos.set(cx + px, y1, cz + pz));
+                }
+                if (st != state && test.test(st)) {
                     dirty = true;
                     cache[sectionIdx].section[idx] = state;
                     if (!isAir) {
