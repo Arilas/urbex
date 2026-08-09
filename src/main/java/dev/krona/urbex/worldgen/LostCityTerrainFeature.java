@@ -467,7 +467,7 @@ public class LostCityTerrainFeature {
         ScatteredSettings scatteredSettings = provider.getWorldStyle().getScatteredSettings();
         if (scatteredSettings != null) {
             if (!Scattered.avoidScattered(this, info)) {
-                Scattered.generateScattered(ctx, this, info, scatteredSettings, heightmap);
+                Scattered.generateScattered(ctx, this, info, scatteredSettings);
             }
         }
     }
@@ -1292,9 +1292,11 @@ public class LostCityTerrainFeature {
                     height++;
                 }
             } else {
+                // Local redraw only: writing this back into the shared cached BuildingInfo
+                // clobbered the PARK decision neighbours read through isElevatedParkSection()
+                // and friends, making their output depend on generation order (issue #36).
                 RandomSource rnd = ctx.rng(Rng.Purpose.STREET);
-                info.streetType = BuildingInfo.StreetType.values()[rnd.nextInt(BuildingInfo.StreetType.values().length - 2)];
-                streetType = info.streetType;
+                streetType = BuildingInfo.StreetType.randomNonPark(rnd);
             }
 
             switch (streetType) {
@@ -2016,7 +2018,10 @@ public class LostCityTerrainFeature {
 
     private BlockState transformBlockState(Transform transform, BlockState b) {
         if (Tools.hasTag(b.getBlock(), LostTags.ROTATABLE_TAG)) {
-            b = b.rotate(transform.getMcRotation());
+            // Vanilla structure order: mirror first, then rotate. The mirror used to be
+            // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
+            // the wrong way (issue #45).
+            b = b.mirror(transform.getMcMirror()).rotate(transform.getMcRotation());
         } else if (getRailStates().contains(b)) {
             EnumProperty<RailShape> shapeProperty;
             if (b.getBlock() == Blocks.RAIL) {

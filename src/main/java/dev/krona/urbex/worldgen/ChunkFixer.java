@@ -109,7 +109,7 @@ public class ChunkFixer {
      * {@code VEGETATION}.
      */
     private static float vineRoll(long seed, int x, int y, int z, Rng.Purpose purpose) {
-        return Rng.atPos(seed, x, y, z, purpose).nextFloat();
+        return Rng.floatAtPos(seed, x, y, z, purpose);
     }
 
     /**
@@ -119,7 +119,7 @@ public class ChunkFixer {
      * would have started.
      */
     private static float vineContinueRoll(long seed, int x, int y, int z) {
-        return Rng.atPos(seed, x, y, z, Rng.Purpose.VINES_CONTINUE).nextFloat();
+        return Rng.floatAtPos(seed, x, y, z, Rng.Purpose.VINES_CONTINUE);
     }
 
     private static void createVineStrip(long seed, LevelAccessor world, int bottom, BlockState state, BlockPos pos, BlockPos vineHolderPos) {
