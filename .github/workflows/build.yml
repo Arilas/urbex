@@ -16,6 +16,10 @@ jobs:
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew build --no-daemon
+      - name: Worldgen digest check
+        run: |
+          ./gradlew runDigestCheck --no-daemon | tee digest-check.log
+          grep -q "URBEX-DIGEST-CHECK: OK" digest-check.log
       - uses: actions/upload-artifact@v4
         with:
           name: jar

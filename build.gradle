@@ -49,7 +49,58 @@ loom {
             ideConfigGenerated(true)
             runDir('runs/server')
         }
+        digestCheck {
+            server()
+            setConfigName('Urbex Digest Check')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheck')
+            vmArg '-Durbex.digestCheck=3,rowmajor,100'
+            // Single worker thread: parallel chunk generation is not yet run-to-run
+            // deterministic (issue #24 - shared mutable ChunkHeightmap and friends), so the
+            // regression pin is taken on a serial baseline. Lifting this flag - two parallel
+            // runs agreeing - is the acceptance test for fixing #24.
+            vmArg '-XX:ActiveProcessorCount=1'
+            // Pinned DRIVERDIGEST for seed 1337; regenerate deliberately on world-changing
+            // changes by deleting the file, running runDigestCheck twice (results must match)
+            // and committing the new value.
+            def golden = file('digest.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
     }
+}
+
+// A fresh, fully pinned dedicated-server environment for every digest run: fixed seed, default
+// (noise) world type, the 'default' urbex profile on the overworld, and no watchdog (the check
+// generates its whole chunk square on the server thread).
+tasks.register('prepareDigestCheck') {
+    notCompatibleWithConfigurationCache("writes the run directory")
+    doLast {
+        def dir = file('runs/digestcheck')
+        project.delete(new File(dir, 'world'))
+        dir.mkdirs()
+        new File(dir, 'eula.txt').text = 'eula=true\n'
+        new File(dir, 'server.properties').text = '''\
+level-seed=1337
+online-mode=false
+spawn-protection=0
+view-distance=6
+max-tick-time=-1
+motd=urbex digest check
+'''
+        def cfgDir = new File(dir, 'world/serverconfig')
+        cfgDir.mkdirs()
+        new File(cfgDir, 'urbex-server.toml').text = '''\
+[profiles]
+\tselectedProfile = "default"
+\tselectedCustomJson = ""
+'''
+    }
+}
+
+tasks.matching { it.name == 'runDigestCheck' }.configureEach {
+    dependsOn 'prepareDigestCheck'
 }
 
 dependencies {
