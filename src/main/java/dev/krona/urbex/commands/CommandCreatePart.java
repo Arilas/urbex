@@ -7,7 +7,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.editor.Editor;
 import dev.krona.urbex.setup.Registration;
-import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
@@ -54,9 +53,9 @@ public class CommandCreatePart implements Command<CommandSourceStack> {
 
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
+        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Urbex!"));
+            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
 

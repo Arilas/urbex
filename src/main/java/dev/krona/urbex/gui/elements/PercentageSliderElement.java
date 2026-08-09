@@ -3,7 +3,6 @@ package dev.krona.urbex.gui.elements;
 import dev.krona.urbex.config.Configuration;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.gui.GuiLCConfig;
-import dev.krona.urbex.varia.ComponentFactory;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Tooltip;
@@ -89,7 +88,7 @@ public class PercentageSliderElement extends GuiElement {
         private boolean synchronizing;
 
         private PercentageSlider(int x, int y, float initialValue) {
-            super(x, y, 120, 16, ComponentFactory.literal(percent(initialValue) + "%"), snap(initialValue));
+            super(x, y, 120, 16, Component.literal(percent(initialValue) + "%"), snap(initialValue));
         }
 
         private void synchronize(float value) {
@@ -103,7 +102,7 @@ public class PercentageSliderElement extends GuiElement {
 
         @Override
         protected void updateMessage() {
-            setMessage(ComponentFactory.literal(percent((float) value) + "%"));
+            setMessage(Component.literal(percent((float) value) + "%"));
         }
 
         @Override

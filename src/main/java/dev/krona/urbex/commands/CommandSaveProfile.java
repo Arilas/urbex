@@ -11,7 +11,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.config.LostCityProfile;
-import dev.krona.urbex.varia.ComponentFactory;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -20,6 +19,7 @@ import net.minecraft.commands.Commands;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import net.minecraft.network.chat.Component;
 
 public class CommandSaveProfile implements Command<CommandSourceStack> {
 
@@ -38,7 +38,7 @@ public class CommandSaveProfile implements Command<CommandSourceStack> {
         String name = context.getArgument("profile", String.class);
         LostCityProfile profile = ProfileSetup.STANDARD_PROFILES.get(name);
         if (profile == null) {
-            context.getSource().sendSuccess(() -> ComponentFactory.literal(ChatFormatting.RED + "Could not find profile '" + name + "'!"), true);
+            context.getSource().sendSuccess(() -> Component.literal(ChatFormatting.RED + "Could not find profile '" + name + "'!"), true);
             return 0;
         }
         JsonObject jsonObject = profile.toJson(false);
@@ -50,10 +50,10 @@ public class CommandSaveProfile implements Command<CommandSourceStack> {
             Files.createDirectories(profileDir);
             Files.writeString(target, gson.toJson(jsonObject));
         } catch (IllegalArgumentException | IOException e) {
-            context.getSource().sendSuccess(() -> ComponentFactory.literal(ChatFormatting.RED + "Error saving profile '" + name + "'!"), true);
+            context.getSource().sendSuccess(() -> Component.literal(ChatFormatting.RED + "Error saving profile '" + name + "'!"), true);
             return 0;
         }
-        context.getSource().sendSuccess(() -> ComponentFactory.literal(ChatFormatting.GREEN + "Saved profile to '" + target + "'!"), true);
+        context.getSource().sendSuccess(() -> Component.literal(ChatFormatting.GREEN + "Saved profile to '" + target + "'!"), true);
         return 0;
     }
 }

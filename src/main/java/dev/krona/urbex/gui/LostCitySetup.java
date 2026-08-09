@@ -3,7 +3,6 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.config.ProfileSetup;
-import dev.krona.urbex.varia.ComponentFactory;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -64,11 +63,11 @@ public class LostCitySetup {
 
     public Component getProfileInfo() {
         return get()
-                .map(p -> ComponentFactory.literal(p.getDescription() + "\n").append(
-                        ComponentFactory.literal(p.getExtraDescription() + "\n").withStyle(ChatFormatting.AQUA)).append(
-                        ComponentFactory.literal(p.getWarning()).withStyle(ChatFormatting.RED)
+                .map(p -> Component.literal(p.getDescription() + "\n").append(
+                        Component.literal(p.getExtraDescription() + "\n").withStyle(ChatFormatting.AQUA)).append(
+                        Component.literal(p.getWarning()).withStyle(ChatFormatting.RED)
                 ))
-                .orElse(ComponentFactory.literal("Click here to select an Urbex profile for your world"));
+                .orElse(Component.literal("Click here to select an Urbex profile for your world"));
     }
 
     public String getWorldStyleLabel() {

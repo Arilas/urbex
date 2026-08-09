@@ -20,7 +20,7 @@ public class ModSetup {
     }
 
     public void init() {
-        ForgeEventHandlers.register();
+        ServerEventHandlers.register();
         AssetRegistries.reset();
 
         // The server config (selectedProfile) is only loaded by server start, so validation

@@ -8,7 +8,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.ComponentFactory;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
@@ -28,6 +27,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 import static dev.krona.urbex.worldgen.LostCityTerrainFeature.FLOORHEIGHT;
+import net.minecraft.network.chat.Component;
 
 public class CommandCreateBuilding implements Command<CommandSourceStack> {
 
@@ -52,7 +52,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         Integer cellars = context.getArgument("cellars", Integer.class);
         Building building = AssetRegistries.BUILDINGS.get(context.getSource().getLevel(), name);
         if (building == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("Cannot find building: " + name + "!"));
+            context.getSource().sendFailure(Component.literal("Cannot find building: " + name + "!"));
             return 0;
         }
 
@@ -61,9 +61,9 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         WorldCoordinates pos = context.getArgument("pos", WorldCoordinates.class);
         BlockPos bottom = pos.getBlockPos(context.getSource());
 
-        IDimensionInfo dimInfo = Registration.LOSTCITY_FEATURE.get().getDimensionInfo(level);
+        IDimensionInfo dimInfo = Registration.lostCityFeature().getDimensionInfo(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(ComponentFactory.literal("This dimension doesn't support Urbex!"));
+            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
         ChunkCoord coord = new ChunkCoord(level.dimension(), bottom.getX() >> 4, bottom.getZ() >> 4);

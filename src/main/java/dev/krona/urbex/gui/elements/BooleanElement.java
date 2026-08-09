@@ -2,7 +2,6 @@ package dev.krona.urbex.gui.elements;
 
 import dev.krona.urbex.config.Configuration;
 import dev.krona.urbex.gui.GuiLCConfig;
-import dev.krona.urbex.varia.ComponentFactory;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 
@@ -18,12 +17,12 @@ public class BooleanElement extends GuiElement {
         this.gui = gui;
         this.attribute = attribute;
         Boolean c = gui.getLocalSetup().get().map(h -> (Boolean) h.toConfiguration().get(attribute)).orElse(false);
-        field = new ButtonExt(x, y, 60, 16, c ? ComponentFactory.literal("On") : ComponentFactory.literal("Off"), button -> {
+        field = new ButtonExt(x, y, 60, 16, c ? Component.literal("On") : Component.literal("Off"), button -> {
             Component message = button.getMessage();
             if ("On".equals(message.getString())) { // @todo 1.16 getString() is ugly here!
-                button.setMessage(ComponentFactory.literal("Off"));
+                button.setMessage(Component.literal("Off"));
             } else {
-                button.setMessage(ComponentFactory.literal("On"));
+                button.setMessage(Component.literal("On"));
             }
             gui.getLocalSetup().get().ifPresent(profile -> {
                 Configuration configuration = profile.toConfiguration();
@@ -61,7 +60,7 @@ public class BooleanElement extends GuiElement {
     public void update() {
         gui.getLocalSetup().get().ifPresent(profile -> {
             Boolean result = profile.toConfiguration().get(attribute);
-            field.setMessage(result ? ComponentFactory.literal("On") : ComponentFactory.literal("Off"));
+            field.setMessage(result ? Component.literal("On") : Component.literal("Off"));
         });
     }
 

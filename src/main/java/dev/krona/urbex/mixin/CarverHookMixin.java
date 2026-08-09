@@ -36,7 +36,7 @@ public class CarverHookMixin {
     private void urbex$generateCity(WorldGenRegion region, long seed, RandomState randomState,
                                     BiomeManager biomeManager, StructureManager structureManager,
                                     ChunkAccess chunk, CallbackInfo ci) {
-        LostCityFeature feature = Registration.LOSTCITY_FEATURE.get();
+        LostCityFeature feature = Registration.lostCityFeature();
         if (feature != null) {
             feature.generateFromPipeline(region, chunk);
         }
