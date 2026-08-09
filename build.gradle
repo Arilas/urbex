@@ -55,12 +55,6 @@ loom {
             ideConfigGenerated(false)
             runDir('runs/digestcheck')
             vmArg '-Durbex.digestCheck=3,rowmajor,100'
-            // Single worker thread: even with the driver's own races fixed, urbex still reads
-            // live chunk content that neighbouring chunks' vanilla decoration (ore blobs, border
-            // trees) may or may not have written yet - the decoration-timing dependence tracked
-            // in issue #18. Until that lands, the regression pin is taken on a serial baseline.
-            // Lifting this flag - two parallel fresh runs agreeing - is the acceptance test.
-            vmArg '-XX:ActiveProcessorCount=1'
             // Single worker thread: parallel chunk generation is not yet run-to-run
             // deterministic (issue #24 - shared mutable ChunkHeightmap and friends), so the
             // regression pin is taken on a serial baseline. Lifting this flag - two parallel
