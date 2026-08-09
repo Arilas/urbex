@@ -2280,7 +2280,9 @@ public class LostCityTerrainFeature {
         }
 
         if (!part2Map.isEmpty()) {
-            driver.actuallyGenerate(chunk);
+            // Commit what exists so the part2 floors can see it; corrections, heightmaps and
+            // the write-recorder publish all stay for the real end of generation (issue #48)
+            driver.flushToChunk(chunk);
             for (Pair<Integer, BuildingPart> entry : part2Map) {
                 int h = entry.getKey();
                 BuildingPart part = entry.getValue();

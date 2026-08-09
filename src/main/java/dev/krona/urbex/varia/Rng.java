@@ -160,6 +160,14 @@ public final class Rng {
         return new XoroshiroRandomSource(h);
     }
 
+    /**
+     * The seed {@link #atPos} would construct its source from, for hot loops that
+     * {@code setSeed} one reused {@code XoroshiroRandomSource} instead of allocating per block.
+     */
+    public static long posSeed(long worldSeed, int x, int y, int z, Purpose purpose) {
+        return hashPos(worldSeed, x, y, z, purpose);
+    }
+
     private static long hashPos(long worldSeed, int x, int y, int z, Purpose purpose) {
         long h = mix(worldSeed);
         h = mix(h ^ (x * X_MULTIPLIER));

@@ -12,6 +12,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RngTest {
 
+    @org.junit.jupiter.api.Test
+    void posSeedReseedsToTheSameStreamAtPosAllocates() {
+        // posSeed exists so hot loops can setSeed a reused XoroshiroRandomSource instead of
+        // allocating one per block; the reseeded stream must match atPos exactly.
+        var reused = new net.minecraft.world.level.levelgen.XoroshiroRandomSource(0);
+        reused.setSeed(Rng.posSeed(1337L, 5, 64, -9, Rng.Purpose.SHAPE));
+        var allocated = Rng.atPos(1337L, 5, 64, -9, Rng.Purpose.SHAPE);
+        for (int i = 0; i < 8; i++) {
+            org.junit.jupiter.api.Assertions.assertEquals(allocated.nextLong(), reused.nextLong());
+        }
+    }
+
     private static long[] take(RandomSource source, int n) {
         long[] out = new long[n];
         for (int i = 0; i < n; i++) {
