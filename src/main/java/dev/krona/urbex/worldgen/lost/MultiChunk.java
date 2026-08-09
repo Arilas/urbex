@@ -95,11 +95,13 @@ public class MultiChunk {
             }
         }
 
-        // Get all the desired multibuildings based on the percentage of the city styles and the counter
-        List<MultiBuilding> multiBuildings = new ArrayList<>();
+        // Get all the desired multibuildings based on the percentage of the city styles and the counter.
+        // One list of pairs, not two parallel lists: the size sort below used to reorder only the
+        // buildings, pairing them with the wrong styles (issue #39).
+        record Chosen(MultiBuilding building, CityStyle style) {}
+        List<Chosen> chosen = new ArrayList<>();
         List<CityStyle> styleList = new ArrayList<>(cityStyleCounter.getMap().keySet());
         styleList.sort(Comparator.comparing(CityStyle::getName));
-        List<CityStyle> styleForBuilding = new ArrayList<>();
         for (int i = 0 ; i < cnt ; i++) {
             CityStyle cityStyle = Tools.getRandomFromList(rand, styleList, style -> (float) cityStyleCounter.get(style));
             String multiBuilding = cityStyle.getRandomMultiBuilding(rand, topleft);
@@ -107,16 +109,16 @@ public class MultiChunk {
             if (mb == null) {
                 throw new RuntimeException("Cannot find multibuilding: " + multiBuilding);
             }
-            multiBuildings.add(mb);
-            styleForBuilding.add(cityStyle);
+            chosen.add(new Chosen(mb, cityStyle));
         }
 
         // Sort the multibuildings by size. Largest first
-        multiBuildings.sort((b1, b2) -> Integer.compare(b2.getDimX() + b2.getDimZ(), b1.getDimX() + b1.getDimZ()));
+        chosen.sort((c1, c2) -> Integer.compare(c2.building().getDimX() + c2.building().getDimZ(),
+                c1.building().getDimX() + c1.building().getDimZ()));
 
         // For every building we want to place, try to find a spot
-        for (int i = 0 ; i < multiBuildings.size() ; i++) {
-            MultiBuilding mb = multiBuildings.get(i);
+        for (Chosen ch : chosen) {
+            MultiBuilding mb = ch.building();
             // Find the maximum possible number of cellars for all buildings in this multibuilding
             int maxCellars = 0;
             for (String b : mb.getBuildingSet()) {
@@ -135,7 +137,7 @@ public class MultiChunk {
             for (int att = 0 ; att < attempts ; att++) {
                 int x = rand.nextInt(areasize - dimX + 1);
                 int z = rand.nextInt(areasize - dimZ + 1);
-                if (canPlaceBuilding(topleft, provider, provider.getProfile(), styleForBuilding.get(i), mb, cityLevel, maxCellars, x, z)) {
+                if (canPlaceBuilding(topleft, provider, provider.getProfile(), ch.style(), mb, cityLevel, maxCellars, x, z)) {
                     placeBuilding(mb, x, z);
                     break;
                 }

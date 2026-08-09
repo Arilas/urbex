@@ -114,7 +114,7 @@ public class Railway {
                     boolean cityEast = BuildingInfo.isCityRaw(key.offset(10, 0), provider, profile) ||
                             BuildingInfo.isCityRaw(key.offset(10, - 10), provider, profile) ||
                             BuildingInfo.isCityRaw(key.offset(10, 10), provider, profile);
-                    boolean cityWest = BuildingInfo.isCityRaw(key.offset(10, 0), provider, profile) ||
+                    boolean cityWest = BuildingInfo.isCityRaw(key.offset(- 10, 0), provider, profile) ||
                             BuildingInfo.isCityRaw(key.offset(- 10, - 10), provider, profile) ||
                             BuildingInfo.isCityRaw(key.offset(- 10, 10), provider, profile);
                     if (!cityEast && !cityWest) {

@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.Rng;
+import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.LostCityTerrainFeature;
@@ -124,12 +125,12 @@ public class Stuff {
         }
         int mincount = settings.getMincount();
         int maxcount = settings.getMaxcount();
-        int count = slot(ctx, stuffOrdinal, -1, 0).nextInt(maxcount - mincount) + mincount;
+        int count = Tools.randomBetween(slot(ctx, stuffOrdinal, -1, 0), mincount, maxcount);
         for (int j = 0; j < count; j++) {
             for (int i = 0; i < attempts; i++) {
                 RandomSource rand = slot(ctx, stuffOrdinal, j, i);
                 int x = rand.nextInt(16);
-                int y = rand.nextInt(maxheight - minheight) + minheight;
+                int y = Tools.randomBetween(rand, minheight, maxheight);
                 int z = rand.nextInt(16);
                 if (testBlock(driver, settings.getBlockMatcher(), x, y-1, z) && testBlock(driver, settings.getUpperBlockMatcher(), x, y + blocks.length(), z)) {
                     Boolean isSeesky = settings.isSeesky();

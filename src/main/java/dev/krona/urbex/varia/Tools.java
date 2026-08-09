@@ -70,6 +70,16 @@ public class Tools {
         return value.defaultBlockState();
     }
 
+    /**
+     * {@code min + rand.nextInt(maxExclusive - min)}, degrading to {@code min} when the range is
+     * empty or inverted. Profile and datapack bounds are user-editable; equal min/max used to
+     * reach {@code nextInt(0)} and crash chunk generation (issue #47). Draws exactly one value
+     * when the range is valid, so worlds generated with valid bounds do not shift.
+     */
+    public static int randomBetween(RandomSource rand, int min, int maxExclusive) {
+        return maxExclusive <= min ? min : min + rand.nextInt(maxExclusive - min);
+    }
+
     public static <T> T getRandomFromList(RandomSource random, List<T> list, Function<T, Float> weightGetter) {
         if (list.isEmpty()) {
             return null;

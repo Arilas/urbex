@@ -167,11 +167,14 @@ public class CompiledPalette {
     }
 
     /**
-     * Return true if this is a simple character that can have only one value in the palette
+     * Return true if this is a simple character that can have only one value in the palette.
+     * The palette map only ever holds {@code BlockState} (simple) or {@code BlockState[]}
+     * (weighted); the old {@code instanceof Character} test matched neither, so the bulk-fill
+     * fast path behind this check was dead (issue #33).
      */
     public boolean isSimple(char c) {
         Object o = palette.get(c);
-        return o instanceof Character;
+        return o instanceof BlockState;
     }
 
     /**
@@ -261,7 +264,9 @@ public class CompiledPalette {
                 return Collections.emptySet();
             } else {
                 BlockState[] randomBlocks = (BlockState[]) o;
-                return Set.of(randomBlocks);
+                // Set.copyOf, not Set.of: a weighted array always repeats states, and the
+                // varargs form throws on duplicates (issue #44)
+                return Set.copyOf(Arrays.asList(randomBlocks));
             }
         } catch (Exception e) {
             throw new RuntimeException(e);
