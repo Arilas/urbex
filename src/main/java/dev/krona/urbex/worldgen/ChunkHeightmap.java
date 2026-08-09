@@ -1,12 +1,10 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.config.LandscapeType;
-import dev.krona.urbex.setup.Config;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.RandomState;
 
 /**
@@ -73,21 +71,10 @@ public class ChunkHeightmap {
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
         // Average of height and 4 other points
-        int height0;
-        int height1;
-        int height2;
-        int height3;
-        if (Config.OPTIMIZED_HEIGHTMAP.get()) {
-            height0 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator,cx + 2, cz + 2, region, randomState);
-            height1 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator,cx + 2, cz + 14,region, randomState);
-            height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator,cx + 14, cz + 2, region, randomState);
-            height3 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator,cx + 14, cz + 14, region, randomState);
-        } else {
-            height0 = generator.getBaseHeight(cx + 2, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-            height1 = generator.getBaseHeight(cx + 2, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-            height2 = generator.getBaseHeight(cx + 14, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-            height3 = generator.getBaseHeight(cx + 14, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        }
+        int height0 = generator.getBaseHeight(cx + 2, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height1 = generator.getBaseHeight(cx + 2, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height2 = generator.getBaseHeight(cx + 14, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+        int height3 = generator.getBaseHeight(cx + 14, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
         minHeight = Math.min(height, Math.min(height0, Math.min(height1, Math.min(height2, height3))));
         maxHeight = Math.max(height, Math.max(height0, Math.max(height1, Math.max(height2, height3))));
     }

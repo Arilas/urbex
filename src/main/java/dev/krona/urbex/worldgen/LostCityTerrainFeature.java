@@ -484,11 +484,11 @@ public class LostCityTerrainFeature {
         boolean hasCollectedDamage = false;
         float[][] collectedDamage = new float[16][16];
 
-        // Bounded to subchunks 0..15, i.e. world Y 0-255, matching damageArea.hasExplosions(int y)'s
-        // own bound - explosions below Y 0 or above Y 255 are invisible to this loop. Tracked as
-        // Arilas/urbex#19; not currently reachable by any shipped profile.
-        for (int yy = 0; yy < 16; yy++) {
-            boolean hasExplosions = damageArea.hasExplosions(yy);
+        int minSection = provider.getWorld().getMinY() >> 4;
+        int maxSection = provider.getWorld().getMaxY() >> 4;
+        for (int yy = minSection; yy <= maxSection; yy++) {
+            java.util.List<dev.krona.urbex.worldgen.lost.Explosion> sectionExplosions = damageArea.explosionsIntersecting(yy);
+            boolean hasExplosions = !sectionExplosions.isEmpty();
             for (int y = 0; y < 16; y++) {
                 if (hasExplosions) {
                     int cury = yy * 16 + y;
@@ -497,7 +497,7 @@ public class LostCityTerrainFeature {
                         for (int z = 0; z < 16; z++) {
                             BlockState d = driver.getBlock();
                             if (d != air || cury <= info.waterLevel) {
-                                float damage = damageArea.getDamage(cx + x, cury, cz + z) * damageFactor;
+                                float damage = DamageArea.getDamage(sectionExplosions, cx + x, cury, cz + z) * damageFactor;
                                 if (damage >= 0.001) {
                                     collectedDamage[x][z] += damage;
                                     hasCollectedDamage = true;
@@ -931,18 +931,7 @@ public class LostCityTerrainFeature {
         int cz = chunkZ << 4;
         RandomState randomState = chunkProvider.randomState();
 
-        int height;
-        if (Config.OPTIMIZED_HEIGHTMAP.get()) {
-            height = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
-        } else {
-            height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        }
-//        int height2 = HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
-//        if (Math.abs(height - height2) > 4) {
-//            System.out.println("height1 / height2 = " + height + " / height2 = " + height2 + ", at position " + (cx + 8) + ", " + (cz + 8));
-//            generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-//            HeightGenOpt.getBaseHeight((NoiseBasedChunkGenerator) generator, cx + 8, cz + 8, region, randomState);
-//        }
+        int height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
         heightmap.update(height);
     }
 
@@ -1876,14 +1865,21 @@ public class LostCityTerrainFeature {
     }
 
     private BlockEntityType getTypeForBlock(BlockState state) {
-        return typeCache.computeIfAbsent(state.getBlock(), block -> {
-            for (BlockEntityType<?> type : BuiltInRegistries.BLOCK_ENTITY_TYPE.stream().toList()) {
-                if (type.isValid(state)) {
-                    return type;
-                }
+        // get / compute-outside / putIfAbsent, not computeIfAbsent: the registry walk used to
+        // run inside a ConcurrentHashMap bin lock, stalling every other worldgen thread whose
+        // block hashed into the same bin (issue #25). Racing threads compute the same answer.
+        Block block = state.getBlock();
+        BlockEntityType existing = typeCache.get(block);
+        if (existing != null) {
+            return existing;
+        }
+        for (BlockEntityType<?> type : BuiltInRegistries.BLOCK_ENTITY_TYPE) {
+            if (type.isValid(state)) {
+                BlockEntityType raced = typeCache.putIfAbsent(block, type);
+                return raced != null ? raced : type;
             }
-            return null;
-        });
+        }
+        return null;
     }
 
     private BlockState handleBlockEntity(BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
