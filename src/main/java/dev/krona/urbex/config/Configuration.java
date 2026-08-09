@@ -230,7 +230,8 @@ public class Configuration {
     }
 
     public boolean hasKey(String category, String name) {
-        return categoryMap.get(category).valueMap.containsKey(name);
+        Category values = categoryMap.get(category);
+        return values != null && values.valueMap.containsKey(name);
     }
 
     public Collection<Object> getCategory(String categoryGeneral) {

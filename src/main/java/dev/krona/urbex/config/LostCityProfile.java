@@ -79,8 +79,12 @@ public class LostCityProfile {
 
     public boolean GENERATE_NETHER = false;
     public boolean GENERATE_SPAWNERS = true;
+    @Deprecated(forRemoval = true)
     public boolean GENERATE_LOOT = true;
+    @Deprecated(forRemoval = true)
     public boolean GENERATE_LIGHTING = false;
+    public float LIGHTING_DENSITY = 0.15f;
+    public float LOOT_DENSITY = 0.65f;
     public boolean AVOID_WATER = false;
 
     public float EXPLOSION_CHANCE = .002f;
@@ -159,7 +163,9 @@ public class LostCityProfile {
     public int TERRAIN_FIX_UPPER_MIN_OFFSET = -1;
     public int TERRAIN_FIX_UPPER_MAX_OFFSET = 1;
 
+    @Deprecated(forRemoval = true)
     public float CHEST_WITHOUT_LOOT_CHANCE = .2f;
+    @Deprecated(forRemoval = true)
     public float BUILDING_WITHOUT_LOOT_CHANCE = .2f;
     public float BUILDING_CHANCE = .3f;
     public int BUILDING_MINFLOORS = 0;
@@ -351,8 +357,7 @@ public class LostCityProfile {
         GROUNDLEVEL = cfg.getInt("groundLevel", LostCityProfile.CATEGORY_LOSTCITY, GROUNDLEVEL, 2, 256, "Ground level");
         SEALEVEL = cfg.getInt("seaLevel", LostCityProfile.CATEGORY_LOSTCITY, SEALEVEL, -1, 256, "Sea level (-1 is default)");
 
-        CHEST_WITHOUT_LOOT_CHANCE = cfg.getFloat("chestWithoutLootChance", LostCityProfile.CATEGORY_LOSTCITY, CHEST_WITHOUT_LOOT_CHANCE, 0.0f, 1.0f, "The chance that a chest will have no loot");
-        BUILDING_WITHOUT_LOOT_CHANCE = cfg.getFloat("buildingWithoutLootChance", LostCityProfile.CATEGORY_LOSTCITY, BUILDING_WITHOUT_LOOT_CHANCE, 0.0f, 1.0f, "The chance that a building will have no loot and no spawners");
+        initDensities(cfg);
         BUILDING_CHANCE = cfg.getFloat("buildingChance", LostCityProfile.CATEGORY_LOSTCITY, BUILDING_CHANCE, 0.0f, 1.0f, "The chance that a chunk in a city will have a building. Otherwise it will be a street");
         BUILDING_MINFLOORS = cfg.getInt("buildingMinFloors", LostCityProfile.CATEGORY_LOSTCITY, BUILDING_MINFLOORS, 0, 60, "The minimum number of floors (above ground) for a building (0 means the first floor only)");
         BUILDING_MAXFLOORS = cfg.getInt("buildingMaxFloors", LostCityProfile.CATEGORY_LOSTCITY, BUILDING_MAXFLOORS, 0, 60, "A cap for the amount of floors a city can have (above ground)");
@@ -423,12 +428,42 @@ public class LostCityProfile {
                 "If true then generate a cavern type world in the Nether");
         GENERATE_SPAWNERS = cfg.getBoolean("generateSpawners", LostCityProfile.CATEGORY_LOSTCITY, GENERATE_SPAWNERS,
                 "If true then the buildings will be full of spawners");
-        GENERATE_LOOT = cfg.getBoolean("generateLoot", LostCityProfile.CATEGORY_LOSTCITY, GENERATE_LOOT,
-                "If true the chests in the buildings will contain loot");
-        GENERATE_LIGHTING = cfg.getBoolean("generateLighting", LostCityProfile.CATEGORY_LOSTCITY, GENERATE_LIGHTING,
-                "If true then there will be minimal lighting in the buildings");
         AVOID_WATER = cfg.getBoolean("avoidWater", LostCityProfile.CATEGORY_LOSTCITY, AVOID_WATER,
                 "If true then all water will be avoided (replaced with air)");
+    }
+
+    private void initDensities(Configuration cfg) {
+        if (!cfg.hasKey(CATEGORY_LOSTCITY, "lightingDensity")
+                && cfg.hasKey(CATEGORY_LOSTCITY, "generateLighting")) {
+            LIGHTING_DENSITY = cfg.getBoolean("generateLighting", CATEGORY_LOSTCITY, false, "Legacy lighting switch")
+                    ? 1.0f : 0.0f;
+        }
+
+        if (!cfg.hasKey(CATEGORY_LOSTCITY, "lootDensity")
+                && cfg.hasKey(CATEGORY_LOSTCITY, "generateLoot")) {
+            boolean enabled = cfg.getBoolean("generateLoot", CATEGORY_LOSTCITY, true, "Legacy loot switch");
+            float buildingWithout = cfg.hasKey(CATEGORY_LOSTCITY, "buildingWithoutLootChance")
+                    ? cfg.getFloat("buildingWithoutLootChance", CATEGORY_LOSTCITY, 0.2f, 0.0f, 1.0f, "Legacy building exclusion")
+                    : 0.2f;
+            float chestWithout = cfg.hasKey(CATEGORY_LOSTCITY, "chestWithoutLootChance")
+                    ? cfg.getFloat("chestWithoutLootChance", CATEGORY_LOSTCITY, 0.2f, 0.0f, 1.0f, "Legacy chest exclusion")
+                    : 0.2f;
+            LOOT_DENSITY = enabled ? (1.0f - buildingWithout) * (1.0f - chestWithout) : 0.0f;
+        }
+
+        LIGHTING_DENSITY = clampDensity(cfg.getFloat("lightingDensity", CATEGORY_LOSTCITY, LIGHTING_DENSITY,
+                0.0f, 1.0f, "Independent chance that a light marker places a light"));
+        LOOT_DENSITY = clampDensity(cfg.getFloat("lootDensity", CATEGORY_LOSTCITY, LOOT_DENSITY,
+                0.0f, 1.0f, "Independent chance that a loot container receives a loot table"));
+
+        GENERATE_LIGHTING = LIGHTING_DENSITY > 0.0f;
+        GENERATE_LOOT = LOOT_DENSITY > 0.0f;
+        BUILDING_WITHOUT_LOOT_CHANCE = 0.0f;
+        CHEST_WITHOUT_LOOT_CHANCE = 1.0f - LOOT_DENSITY;
+    }
+
+    private static float clampDensity(float value) {
+        return Math.max(0.0f, Math.min(1.0f, value));
     }
 
     private void initCities(Configuration cfg) {
