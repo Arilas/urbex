@@ -12,13 +12,14 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.config.LostCityProfile;
 import dev.krona.urbex.varia.ComponentFactory;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.PrintWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class CommandSaveProfile implements Command<CommandSourceStack> {
 
@@ -26,7 +27,7 @@ public class CommandSaveProfile implements Command<CommandSourceStack> {
 
     public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
         return Commands.literal("saveprofile")
-                .requires(Commands.hasPermission(Commands.LEVEL_ALL))
+                .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                 .then(Commands.argument("profile", StringArgumentType.word())
                     .executes(CMD));
     }
@@ -42,16 +43,17 @@ public class CommandSaveProfile implements Command<CommandSourceStack> {
         }
         JsonObject jsonObject = profile.toJson(false);
         Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+        Path target;
         try {
-            try (PrintWriter writer = new PrintWriter(new File(name + ".json"))) {
-                writer.print(gson.toJson(jsonObject));
-                writer.flush();
-            }
-        } catch (FileNotFoundException e) {
+            Path profileDir = FabricLoader.getInstance().getConfigDir().resolve("urbex").resolve("profiles");
+            target = ExportPath.resolve(profileDir, name);
+            Files.createDirectories(profileDir);
+            Files.writeString(target, gson.toJson(jsonObject));
+        } catch (IllegalArgumentException | IOException e) {
             context.getSource().sendSuccess(() -> ComponentFactory.literal(ChatFormatting.RED + "Error saving profile '" + name + "'!"), true);
             return 0;
         }
-        context.getSource().sendSuccess(() -> ComponentFactory.literal(ChatFormatting.GREEN + "Saved profile '" + name + "'!"), true);
+        context.getSource().sendSuccess(() -> ComponentFactory.literal(ChatFormatting.GREEN + "Saved profile to '" + target + "'!"), true);
         return 0;
     }
 }

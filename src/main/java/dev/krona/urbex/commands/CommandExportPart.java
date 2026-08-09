@@ -23,6 +23,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -32,10 +33,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 
 public class CommandExportPart implements Command<CommandSourceStack> {
@@ -158,12 +158,13 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         String json = gson.toJson(root);
 
         try {
-            BufferedWriter writer = new BufferedWriter(new FileWriter(filename, StandardCharsets.UTF_8));
-            writer.write(json);
-            writer.close();
-            context.getSource().sendSuccess(() -> ComponentFactory.literal("Exported part to '" + filename + "'!"), false);
-        } catch (IOException e) {
-            context.getSource().sendFailure(Component.literal("Error writing file '" + filename + "'!").withStyle(ChatFormatting.RED));
+            Path exportDir = FabricLoader.getInstance().getConfigDir().resolve("urbex").resolve("exports");
+            Path target = ExportPath.resolve(exportDir, filename);
+            Files.createDirectories(exportDir);
+            Files.writeString(target, json);
+            context.getSource().sendSuccess(() -> ComponentFactory.literal("Exported part to '" + target + "'!"), false);
+        } catch (IllegalArgumentException | IOException e) {
+            context.getSource().sendFailure(Component.literal("Error writing file '" + filename + "': " + e.getMessage()).withStyle(ChatFormatting.RED));
         }
 
         return 0;
