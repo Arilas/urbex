@@ -180,9 +180,14 @@ class SettingsCompletenessTest {
     /**
      * A key naming the right field is not enough: a copy-paste slip like
      * {@code slider("CITY_CHANCE", ..., p -> p.CITY_MINRADIUS, ...)} would pass every other test while silently
-     * orphaning one field and double-exposing another. So for every descriptor, drive a sentinel through the
-     * getter (write the raw field, read it back through the lambda) and the setter (write through the lambda,
-     * read the raw field) and prove both observe the field named by {@link SettingDescriptor#key()}.
+     * orphaning one field and double-exposing another.
+     *
+     * <p>A single sentinel is also not enough: comparing one flipped value against the field's own default lets a
+     * getter that reads a <em>different</em> field slip through whenever that other field's default happens to equal
+     * the sentinel (e.g. a boolean getter mistakenly reading a field whose default is the opposite of this one's).
+     * So this drives TWO distinct sentinels {@code s1 != s2} through each accessor. A lambda bound to the wrong
+     * field returns/holds a value that is constant across both probes, so it cannot equal both distinct sentinels —
+     * catching the mismatch independently of any field's default.</p>
      */
     @Test
     void getterAndSetterObserveTheKeyedField() throws Exception {
@@ -193,77 +198,85 @@ class SettingsCompletenessTest {
             String where = d.key() + (d.general() ? " (general)" : "");
 
             if (t == int.class) {
-                int sentinel = 4242;
-                UrbexProfile getP = fresh();
-                f.setInt(getP, sentinel);
-                assertEquals((double) sentinel, ((Number) d.getter().apply(getP)).doubleValue(), 0.0,
-                        "getter does not read field " + where);
-                UrbexProfile setP = fresh();
-                d.setter().accept(setP, (double) sentinel);
-                assertEquals(sentinel, f.getInt(setP), "setter does not write field " + where);
+                checkNumeric(d, f, where, 4242, 1313);
             } else if (t == float.class) {
-                float sentinel = 137.5f; // exactly representable; survives Double<->float round-trip
-                UrbexProfile getP = fresh();
-                f.setFloat(getP, sentinel);
-                assertEquals((double) sentinel, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4,
-                        "getter does not read field " + where);
-                UrbexProfile setP = fresh();
-                d.setter().accept(setP, (double) sentinel);
-                assertEquals(sentinel, f.getFloat(setP), 1e-4f, "setter does not write field " + where);
+                // exactly representable; survive the Double<->float round-trip
+                checkNumeric(d, f, where, 137.5, 88.25);
             } else if (t == double.class) {
-                double sentinel = 4242.25;
-                UrbexProfile getP = fresh();
-                f.setDouble(getP, sentinel);
-                assertEquals(sentinel, ((Number) d.getter().apply(getP)).doubleValue(), 0.0,
-                        "getter does not read field " + where);
-                UrbexProfile setP = fresh();
-                d.setter().accept(setP, sentinel);
-                assertEquals(sentinel, f.getDouble(setP), 0.0, "setter does not write field " + where);
+                checkNumeric(d, f, where, 4242.25, 1313.75);
             } else if (t == boolean.class) {
-                boolean sentinel = !f.getBoolean(fresh()); // flip the default so the value is distinctive
-                UrbexProfile getP = fresh();
-                f.setBoolean(getP, sentinel);
-                assertEquals(sentinel, d.getter().apply(getP), "getter does not read field " + where);
-                UrbexProfile setP = fresh();
-                d.setter().accept(setP, sentinel);
-                assertEquals(sentinel, f.getBoolean(setP), "setter does not write field " + where);
+                checkObject(d, f, where, Boolean.TRUE, Boolean.FALSE);
             } else if (t == String.class) {
-                String sentinel = "sentinel-" + d.key();
-                UrbexProfile getP = fresh();
-                f.set(getP, sentinel);
-                assertEquals(sentinel, d.getter().apply(getP), "getter does not read field " + where);
-                UrbexProfile setP = fresh();
-                d.setter().accept(setP, sentinel);
-                assertEquals(sentinel, f.get(setP), "setter does not write field " + where);
+                checkObject(d, f, where, "sentinel-a-" + d.key(), "sentinel-b-" + d.key());
             } else if (t == String[].class) {
-                String[] sentinel = {"sentinel-" + d.key(), "b"};
-                UrbexProfile getP = fresh();
-                f.set(getP, sentinel);
-                assertArrayEquals(sentinel, (String[]) d.getter().apply(getP), "getter does not read field " + where);
-                UrbexProfile setP = fresh();
-                d.setter().accept(setP, sentinel);
-                assertArrayEquals(sentinel, (String[]) f.get(setP), "setter does not write field " + where);
+                checkArray(d, f, where,
+                        new String[]{"sentinel-a-" + d.key()},
+                        new String[]{"sentinel-b-" + d.key(), "c"});
             } else if (t.isEnum()) {
-                Object def = f.get(fresh());
-                Object sentinel = null;
-                for (Object c : t.getEnumConstants()) {
-                    if (!c.equals(def)) {
-                        sentinel = c;
-                        break;
-                    }
-                }
-                assertTrue(sentinel != null, "enum field " + where + " has only one constant; no distinctive sentinel");
-                UrbexProfile getP = fresh();
-                f.set(getP, sentinel);
-                assertEquals(sentinel, d.getter().apply(getP), "getter does not read field " + where);
-                UrbexProfile setP = fresh();
-                d.setter().accept(setP, sentinel);
-                assertEquals(sentinel, f.get(setP), "setter does not write field " + where);
+                Object[] constants = t.getEnumConstants();
+                assertTrue(constants.length >= 2,
+                        "enum field " + where + " has fewer than two constants; cannot two-probe");
+                checkObject(d, f, where, constants[0], constants[1]);
             } else {
                 throw new AssertionError("unhandled field type " + t + " for " + where
                         + " — add a sentinel branch");
             }
         }
+    }
+
+    /** Two-probe check for numeric fields, honoring the Double-boxed slider convention. */
+    private static void checkNumeric(SettingDescriptor d, Field f, String where, double s1, double s2) throws Exception {
+        UrbexProfile getP = fresh();
+        f.set(getP, coerce(f.getType(), s1));
+        assertEquals(s1, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4, "getter does not read field " + where);
+        f.set(getP, coerce(f.getType(), s2));
+        assertEquals(s2, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4, "getter does not read field " + where);
+
+        UrbexProfile setP = fresh();
+        d.setter().accept(setP, s1);
+        assertEquals(s1, ((Number) f.get(setP)).doubleValue(), 1e-4, "setter does not write field " + where);
+        d.setter().accept(setP, s2);
+        assertEquals(s2, ((Number) f.get(setP)).doubleValue(), 1e-4, "setter does not write field " + where);
+    }
+
+    private static Object coerce(Class<?> t, double v) {
+        if (t == int.class) {
+            return (int) Math.round(v);
+        }
+        if (t == float.class) {
+            return (float) v;
+        }
+        return v;
+    }
+
+    /** Two-probe check for reference-valued fields compared with {@link Object#equals}. */
+    private static void checkObject(SettingDescriptor d, Field f, String where, Object s1, Object s2) throws Exception {
+        UrbexProfile getP = fresh();
+        f.set(getP, s1);
+        assertEquals(s1, d.getter().apply(getP), "getter does not read field " + where);
+        f.set(getP, s2);
+        assertEquals(s2, d.getter().apply(getP), "getter does not read field " + where);
+
+        UrbexProfile setP = fresh();
+        d.setter().accept(setP, s1);
+        assertEquals(s1, f.get(setP), "setter does not write field " + where);
+        d.setter().accept(setP, s2);
+        assertEquals(s2, f.get(setP), "setter does not write field " + where);
+    }
+
+    /** Two-probe check for {@code String[]} fields compared element-wise. */
+    private static void checkArray(SettingDescriptor d, Field f, String where, String[] s1, String[] s2) throws Exception {
+        UrbexProfile getP = fresh();
+        f.set(getP, s1);
+        assertArrayEquals(s1, (String[]) d.getter().apply(getP), "getter does not read field " + where);
+        f.set(getP, s2);
+        assertArrayEquals(s2, (String[]) d.getter().apply(getP), "getter does not read field " + where);
+
+        UrbexProfile setP = fresh();
+        d.setter().accept(setP, s1);
+        assertArrayEquals(s1, (String[]) f.get(setP), "setter does not write field " + where);
+        d.setter().accept(setP, s2);
+        assertArrayEquals(s2, (String[]) f.get(setP), "setter does not write field " + where);
     }
 
     private static UrbexProfile fresh() {
