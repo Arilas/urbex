@@ -180,11 +180,6 @@ public class NullDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public UrbexProfile getOutsideProfile() {
-        return  profile;
-    }
-
-    @Override
     public WorldStyle getWorldStyle() {
         return style;
     }

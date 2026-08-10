@@ -266,11 +266,6 @@ public class Scattered {
                 }
 
                 @Override
-                public boolean isSphere() {
-                    return CitySphere.isInSphere(info.coord, info.getCenter(0), provider);
-                }
-
-                @Override
                 public Identifier getBiome() {
                     // ctx.region, not provider.getWorld(): the region is what this used to be, back
                     // when IDimensionInfo held a mutable world reference. Not provider.getBiome()

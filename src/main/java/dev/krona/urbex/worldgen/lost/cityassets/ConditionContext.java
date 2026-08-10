@@ -64,14 +64,6 @@ public abstract class ConditionContext {
                 test = combine(test, levelInfo -> !levelInfo.isBuilding());
             }
         }
-        if (element.getIssphere() != null) {
-            boolean ground = element.getIssphere();
-            if (ground) {
-                test = combine(test, ConditionContext::isSphere);
-            } else {
-                test = combine(test, levelInfo -> !levelInfo.isSphere());
-            }
-        }
         if (element.getChunkx() != null) {
             int chunkX = element.getChunkx();
             test = combine(test, context -> chunkX == context.getChunkX());
@@ -154,14 +146,6 @@ public abstract class ConditionContext {
                 test = combine(test, levelInfo -> !levelInfo.isBuilding());
             }
         }
-        if (obj.has("issphere")) {
-            boolean ground = obj.get("issphere").getAsBoolean();
-            if (ground) {
-                test = combine(test, ConditionContext::isSphere);
-            } else {
-                test = combine(test, levelInfo -> !levelInfo.isSphere());
-            }
-        }
         if (obj.has("chunkx")) {
             int chunkX = obj.get("chunkx").getAsInt();
             test = combine(test, context -> chunkX == context.getChunkX());
@@ -234,8 +218,6 @@ public abstract class ConditionContext {
     public boolean isBuilding() {
         return !"<none>".equals(building);
     }
-
-    public abstract boolean isSphere();
 
     public abstract Identifier getBiome();
 

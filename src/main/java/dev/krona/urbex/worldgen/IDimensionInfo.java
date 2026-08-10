@@ -57,8 +57,6 @@ public interface IDimensionInfo {
 
     UrbexProfile getProfile();
 
-    UrbexProfile getOutsideProfile();
-
     WorldStyle getWorldStyle();
 
     CityGenerator getFeature();

@@ -1,6 +1,5 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.LandscapeType;
 import dev.krona.urbex.config.MultiBuildingStreetConflict;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.plan.EffectiveRoad;
@@ -9,7 +8,6 @@ import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
-import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.util.RandomSource;
@@ -73,7 +71,6 @@ class ChunkContentResolverTest {
             int highwayLevel;
             boolean railway;
             Railway.RailChunkInfo railInfo = Railway.RailChunkInfo.NOTHING;
-            float sphereDistance;
             final List<String> consulted = new ArrayList<>();
 
             ChunkContentResolver.ChunkFacts build() {
@@ -85,8 +82,7 @@ class ChunkContentResolverTest {
                         () -> record("hasHighway", highway),
                         () -> record("highwayLevel", highwayLevel),
                         () -> record("hasRailway", railway),
-                        () -> record("railInfo", railInfo),
-                        () -> record("sphereDistance", sphereDistance));
+                        () -> record("railInfo", railInfo));
             }
 
             private <T> T record(String fact, T value) {
@@ -276,35 +272,9 @@ class ChunkContentResolverTest {
             assertEquals(List.of(), facts.consulted, "and consults nothing");
         }
 
-        @Test
-        void theSphereEdgeClampOverridesAnAcceptedCandidate() {
-            UrbexProfile space = profileWithBuildingChance(1.0f);
-            space.LANDSCAPE_TYPE = LandscapeType.SPACE;
-
-            Facts nearTheEdge = new Facts();
-            nearTheEdge.sphereDistance = 0.8f;
-            assertFalse(resolve(space, MultiPos.SINGLE, 0, nearTheEdge),
-                    "the clamp overrules the chain's accepted building");
-
-            Facts wellInside = new Facts();
-            wellInside.sphereDistance = 0.6f;
-            assertTrue(resolve(space, MultiPos.SINGLE, 0, wellInside));
-        }
-
-        @Test
-        void theSphereEdgeClampDoesNotApplyToAMultiBuildingSection() {
-            UrbexProfile space = profileWithBuildingChance(1.0f);
-            space.LANDSCAPE_TYPE = LandscapeType.SPACE;
-
-            Facts facts = new Facts();
-            facts.sphereDistance = 0.9f;
-            assertTrue(resolve(space, new MultiPos(1, 0, 2, 2), 0, facts),
-                    "a multi-building section is not clamped at the sphere edge");
-            assertFalse(facts.consulted.contains("sphereDistance"));
-        }
     }
 
-    /** Pass two: the veto, the sphere-centre override, and the street-type roll. */
+    /** Pass two: the lonely veto, open-lot park roll, and street selection. */
     @Nested
     class PassTwo {
 
@@ -322,7 +292,7 @@ class ChunkContentResolverTest {
                                      ChunkContentResolver.PrefersLonely prefersLonely,
                                      RandomSource rand) {
             return ChunkContentResolver.resolve(TestProfiles.dense(), SEED, rand, true,
-                    couldHaveBuilding, RoadType.NONE, section, COORD, prefersLonely, null, "testbuilding");
+                    couldHaveBuilding, RoadType.NONE, section, COORD, prefersLonely, "testbuilding");
         }
 
         /** As {@link #resolve} but with the road and the open-lot park chance under the test's control. */
@@ -331,7 +301,7 @@ class ChunkContentResolverTest {
             UrbexProfile profile = TestProfiles.dense();
             profile.OPEN_LOT_PARK_CHANCE = openLotParkChance;
             return ChunkContentResolver.resolve(profile, SEED, new XoroshiroRandomSource(5), isCity,
-                    couldHaveBuilding, road, MultiPos.SINGLE, COORD, SOCIABLE, null, "testbuilding");
+                    couldHaveBuilding, road, MultiPos.SINGLE, COORD, SOCIABLE, "testbuilding");
         }
 
         @Test
@@ -457,18 +427,6 @@ class ChunkContentResolverTest {
                     "a multi-building section must consume no layout draws at all");
         }
 
-        @Test
-        void theSphereCentreOverridesTheBuildingRoll() {
-            ChunkContent street = ChunkContentResolver.resolve(TestProfiles.dense(), SEED,
-                    new XoroshiroRandomSource(3), true, true, RoadType.NONE, MultiPos.SINGLE, COORD, SOCIABLE,
-                    CitySphereSettings.CitySphereCenterType.STREET, "testbuilding");
-            assertFalse(street.hasBuilding(), "a STREET sphere centre removes the building");
-
-            ChunkContent building = ChunkContentResolver.resolve(TestProfiles.dense(), SEED,
-                    new XoroshiroRandomSource(3), true, false, RoadType.NONE, MultiPos.SINGLE, COORD, LONELY,
-                    CitySphereSettings.CitySphereCenterType.BUILDING, "testbuilding");
-            assertTrue(building.hasBuilding(), "a BUILDING sphere centre forces a building");
-        }
     }
 
     /**

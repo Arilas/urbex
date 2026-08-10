@@ -11,7 +11,6 @@ import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
-import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 import net.minecraft.core.BlockPos;
@@ -38,9 +37,7 @@ public class BuildingInfo {
 
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
-    public final UrbexProfile profile;       // Profile cactive for this chunk: can be different in city sphere worlds
-
-    public final boolean outsideChunk;  // Only used for citysphere worlds and when this chunk is outside
+    public final UrbexProfile profile;
     public int groundLevel;
     public final int waterLevel;
 
@@ -117,9 +114,6 @@ public class BuildingInfo {
     private volatile Direction stairDirection;
     private volatile boolean actualStairsCalculated = false;
     private volatile Direction actualStairDirection;
-
-    private volatile Boolean horizontalMonorail = null;
-    private volatile Boolean verticalMonorail = null;
 
     private volatile MinMax desiredTerrainCorrectionHeights = null;
     private volatile MinMax desiredMaxHeight1 = null;
@@ -307,7 +301,7 @@ public class BuildingInfo {
 //        }
         int chunkX = key.chunkX();
         int chunkZ = key.chunkZ();
-        UrbexProfile profile = getProfile(key, provider);
+        UrbexProfile profile = provider.getProfile();
         ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
         characteristics.isCity = isCityRaw(key, provider, profile);
@@ -331,7 +325,7 @@ public class BuildingInfo {
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        UrbexProfile profile = getProfile(coord, provider);
+        UrbexProfile profile = provider.getProfile();
         ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
         WorldGenLevel world = provider.getWorld();
@@ -429,12 +423,6 @@ public class BuildingInfo {
         if (isVoidChunk(coord, provider)) {
             // If we have a void chunk then no city here
             return false;
-        } else if (provider.getProfile().isSpace() || provider.getProfile().isSpheres()) {
-            if (CitySphere.onCitySphereBorder(coord, provider)) {
-                return false;
-            } else if (CitySphere.hasMonorailStation(coord, provider)) {
-                return false;
-            }
         }
 
         float cityFactor = City.getCityFactor(coord, provider, profile);
@@ -470,10 +458,7 @@ public class BuildingInfo {
         for (RoadDirection direction : RoadDirection.values()) {
             if (cell.connects(direction)) {
                 ChunkCoord adjacent = coord.offset(direction.stepX(), direction.stepZ());
-                // Same profile only: in a city-sphere world a neighbour that belongs to the outside
-                // profile is a different city, and a road may not lean on it to stay alive.
-                UrbexProfile adjacentProfile = getProfile(adjacent, provider);
-                if (adjacentProfile == profile && isCityRaw(adjacent, provider, adjacentProfile)) {
+                if (isCityRaw(adjacent, provider, profile)) {
                     connectedCityNeighbour = true;
                     break;
                 }
@@ -498,8 +483,7 @@ public class BuildingInfo {
                 () -> hasHighway(coord, provider, profile),
                 () -> Math.max(Highway.getXHighwayLevel(coord, provider, profile), Highway.getZHighwayLevel(coord, provider, profile)),
                 () -> hasRailway(coord, provider, profile),
-                () -> Railway.getRailChunkType(coord, provider, profile),
-                () -> CitySphere.getRelativeDistanceToCityCenter(coord, provider));
+                () -> Railway.getRailChunkType(coord, provider, profile));
     }
 
     /**
@@ -621,21 +605,6 @@ public class BuildingInfo {
         return raced != null ? raced : info;
     }
 
-    /**
-     * Find the correct profile for this chunk. This takes space sphere worlds into account
-     */
-    public static UrbexProfile getProfile(ChunkCoord coord, IDimensionInfo provider) {
-        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres())) {
-            if (CitySphere.intersectsWithCitySphere(coord, provider)) {
-                return provider.getProfile();
-            } else {
-                return provider.getOutsideProfile();
-            }
-        } else {
-            return provider.getProfile();
-        }
-    }
-
     // Only used for editing!
     public void setBuildingType(Building building, int cellars, int floors, int groundLevel) {
         buildingType = building;
@@ -655,11 +624,6 @@ public class BuildingInfo {
                 @Override
                 public boolean isBuilding() {
                     return true;
-                }
-
-                @Override
-                public boolean isSphere() {
-                    return CitySphere.isInSphere(coord, getCenter(0), provider);
                 }
 
                 @Override
@@ -684,11 +648,6 @@ public class BuildingInfo {
                 }
 
                 @Override
-                public boolean isSphere() {
-                    return CitySphere.isInSphere(coord, getCenter(0), provider);
-                }
-
-                @Override
                 public Identifier getBiome() {
                     // provider.getBiome() asks the biome source directly, where the old
                     // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
@@ -708,8 +667,7 @@ public class BuildingInfo {
         this.provider = provider;
         this.coord = key;
 
-        outsideChunk = (provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && !CitySphere.intersectsWithCitySphere(key, provider);
-        profile = getProfile(key, provider);
+        profile = provider.getProfile();
 
         ChunkCharacteristics characteristics = getChunkCharacteristics(key, provider);
 
@@ -722,42 +680,17 @@ public class BuildingInfo {
 
         CityStyle cs = characteristics.cityStyle;
 
-        // The city sphere centre override settles two separate things from one switch: whether this
-        // chunk counts as city at all (here) and whether it may hold a building (in the resolver).
-        CitySphereSettings.CitySphereCenterType centertype = null;
-        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.isCitySphereCenter(coord, provider)) {
-            CitySphereSettings settings = provider.getWorldStyle().getCitysphereSettings();
-            if (settings != null) {
-                centertype = settings.getCenterType();
-            }
-        }
-
-        boolean c = characteristics.isCity;
-        if (centertype != null) {
-            switch (centertype) {
-                case DEFAULT -> {
-                }
-                case STREET, BUILDING -> c = true;
-                case NORMAL -> c = false;
-            }
-        }
-        isCity = c;
+        isCity = characteristics.isCity;
         effectiveRoad = effectiveRoadType(key, provider, profile);
 
         ChunkContent content = ChunkContentResolver.resolve(profile, provider.getSeed(), rand,
                 isCity, characteristics.couldHaveBuilding, effectiveRoad, multiBuildingPos, coord,
                 neighbour -> getChunkCharacteristics(neighbour, provider).buildingType.getPrefersLonely(),
-                centertype, characteristics.buildingType.getName());
+                characteristics.buildingType.getName());
         hasBuilding = content.hasBuilding();
 
-        int wl;
-        if (outsideChunk) {
-            groundLevel = provider.getOutsideProfile().GROUNDLEVEL;
-            wl = provider.getOutsideProfile().SEALEVEL;
-        } else {
-            groundLevel = provider.getProfile().GROUNDLEVEL;
-            wl = provider.getProfile().SEALEVEL;
-        }
+        groundLevel = profile.GROUNDLEVEL;
+        int wl = profile.SEALEVEL;
         waterLevel = wl == -1 ? Tools.getSeaLevel(provider.getWorld()) : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.getWorldStyle().getWorldSettings().railwayAvoidance();
 
@@ -807,15 +740,6 @@ public class BuildingInfo {
             int minfloors = getMinfloors(cs);
             if (f < minfloors) {
                 f = minfloors;
-            }
-
-            if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.intersectsWithCitySphere(key, provider)) {
-                float reldest = CitySphere.getRelativeDistanceToCityCenter(coord, provider);
-                if (reldest > .6f) {
-                    f = Math.max(minfloors, f - 2);
-                } else if (reldest > .5f) {
-                    f = Math.max(minfloors, f - 1);
-                }
             }
 
             int max = provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
@@ -894,11 +818,6 @@ public class BuildingInfo {
                 }
 
                 @Override
-                public boolean isSphere() {
-                    return CitySphere.isInSphere(coord, getCenter(0), provider);
-                }
-
-                @Override
                 public Identifier getBiome() {
                     // provider.getBiome() asks the biome source directly, where the old
                     // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
@@ -920,11 +839,6 @@ public class BuildingInfo {
                 @Override
                 public boolean isBuilding() {
                     return true;
-                }
-
-                @Override
-                public boolean isSphere() {
-                    return CitySphere.isInSphere(coord, getCenter(0), provider);
                 }
 
                 @Override
@@ -977,24 +891,6 @@ public class BuildingInfo {
         } else {
             frontType = null;
         }
-    }
-
-    public boolean hasHorizontalMonorail() {
-        if (horizontalMonorail == null) {
-            horizontalMonorail = CitySphere.hasHorizontalMonorail(coord, provider);
-        }
-        return horizontalMonorail;
-    }
-
-    public boolean hasVerticalMonorail() {
-        if (verticalMonorail == null) {
-            verticalMonorail = CitySphere.hasVerticalMonorail(coord, provider);
-        }
-        return verticalMonorail;
-    }
-
-    public boolean hasMonorail() {
-        return hasHorizontalMonorail() || hasVerticalMonorail();
     }
 
     private int getMaxcellars(CityStyle cs) {
@@ -1100,9 +996,7 @@ public class BuildingInfo {
             }
         }
         int result;
-        if ((provider.getProfile().isSpace() || provider.getProfile().isVoidSpheres())) {
-            result = getCityLevelSpace(key, provider);
-        } else if (provider.getProfile().isFloating()) {
+        if (provider.getProfile().isFloating()) {
             result = getCityLevelFloating(key, provider);
         } else if (provider.getProfile().isCavern()) {
             result =  getCityLevelCavern(key, provider);
@@ -1120,9 +1014,7 @@ public class BuildingInfo {
 
     public static int getCityLevelGui(ChunkCoord key, IDimensionInfo provider) {
         int result;
-        if ((provider.getProfile().isSpace() || provider.getProfile().isVoidSpheres())) {
-            result = getCityLevelSpace(key, provider);
-        } else if (provider.getProfile().isFloating()) {
+        if (provider.getProfile().isFloating()) {
             result = getCityLevelFloating(key, provider);
         } else if (provider.getProfile().isCavern()) {
             result =  getCityLevelCavern(key, provider);
@@ -1137,29 +1029,6 @@ public class BuildingInfo {
         return getCityLevelFloating(coord, provider);
     }
 
-
-    private static int getCityLevelSpace(ChunkCoord coord, IDimensionInfo provider) {
-        if (CitySphere.intersectsWithCitySphere(coord, provider)) {
-            // In the sphere
-            int chunkX = coord.chunkX();
-            int chunkZ = coord.chunkZ();
-            float dist = CitySphere.getRelativeDistanceToCityCenter(coord, provider);
-            // Not SPHERE: getSphereAtCenter draws from that address, and this chunk may be a
-            // sphere centre, which would tie the city level to the sphere's radius.
-            RandomSource rand = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.SPHERE_CITY_LEVEL);
-            if (dist < .3f) {
-                return 2 + rand.nextInt(2);
-            } else if (dist < .4f) {
-                return 1 + rand.nextInt(2);
-            } else if (dist < .6f) {
-                return rand.nextInt(2);
-            } else {
-                return 0;
-            }
-        } else {
-            return getCityLevelNormal(coord, provider, provider.getOutsideProfile());
-        }
-    }
 
     private static int getCityLevelNormal(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
         ChunkHeightmap heightmap = provider.getHeightmap(coord);
@@ -1596,9 +1465,6 @@ public class BuildingInfo {
 
 
     private boolean isSuitableForBridge(IDimensionInfo provider, BuildingInfo i) {
-        if (provider.getProfile().isSpace() && hasMonorail()) {
-            return false;
-        }
         if (i.getPlannedBridge() != null) {
             // A planned span owns this chunk. An opportunistic bridge must not run through it -
             // it would stamp its own part over the planned deck on its way past.
@@ -2080,29 +1946,4 @@ public class BuildingInfo {
         return Math.max(getHighwayXLevel(), getHighwayZLevel());
     }
 
-    @Nullable
-    public static CitySphere getSphereInt(int x, int y, int z, IDimensionInfo provider) {
-        ChunkCoord coord = new ChunkCoord(provider.dimension(), x >> 4, z >> 4);
-        CitySphere sphere = CitySphere.getCitySphere(coord, provider);
-        if (sphere.isEnabled()) {
-            double sqdist = sphere.getCenterPos().distToCenterSqr(x, y, z);
-            if (sqdist <= sphere.getRadius() * sphere.getRadius()) {
-                return sphere;
-            }
-        }
-        return null;
-    }
-
-    @Nullable
-    public static CitySphere getSphereInt(int x, int z, IDimensionInfo provider) {
-        ChunkCoord coord = new ChunkCoord(provider.dimension(), x >> 4, z >> 4);
-        CitySphere sphere = CitySphere.getCitySphere(coord, provider);
-        if (sphere.isEnabled()) {
-            double sqdist = sphere.getCenterPos().distToCenterSqr(x, sphere.getCenterPos().getY(), z);
-            if (sqdist <= sphere.getRadius() * sphere.getRadius()) {
-                return sphere;
-            }
-        }
-        return null;
-    }
 }

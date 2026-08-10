@@ -14,7 +14,7 @@ import javax.annotation.Nullable;
  * @param openLot      true when this is a city chunk with neither a planned road nor a building:
  *                     {@code isCity && !hasBuilding && effectiveRoad == NONE}. Note the middle term
  *                     is the settled verdict rather than the pass-one candidate - a building the
- *                     lonely veto or a STREET sphere centre took away leaves an open lot behind just
+ *                     lonely veto took away leaves an open lot behind just
  *                     as a failed building roll does - and that the {@code isCity} term is what keeps
  *                     the whole wilderness from reporting itself as one enormous vacant lot. Every
  *                     open lot renders through the park surface, so {@code openLot} implies

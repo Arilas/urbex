@@ -19,7 +19,7 @@ public class BelowPartConditionTest {
 
     private static Predicate<ConditionContext> testWith(Set<String> belowPart, Set<String> inpart) {
         ConditionTest test = new ConditionTest(
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.ofNullable(belowPart), Optional.ofNullable(inpart),
                 Optional.empty(), Optional.empty(), Optional.empty());
@@ -34,11 +34,6 @@ public class BelowPartConditionTest {
             @Override
             public boolean isBuilding() {
                 return true;
-            }
-
-            @Override
-            public boolean isSphere() {
-                return false;
             }
 
             @Override

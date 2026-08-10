@@ -15,7 +15,6 @@ public class ConditionTest {
     private final Boolean ground;
     private final Boolean cellar;
     private final Boolean isbuilding;
-    private final Boolean issphere;
     private final Integer floor;
     private final Integer chunkx;
     private final Integer chunkz;
@@ -41,10 +40,6 @@ public class ConditionTest {
 
     public Boolean getIsbuilding() {
         return isbuilding;
-    }
-
-    public Boolean getIssphere() {
-        return issphere;
     }
 
     public Integer getFloor() {
@@ -84,7 +79,6 @@ public class ConditionTest {
             Optional<Boolean> ground,
             Optional<Boolean> cellar,
             Optional<Boolean> isbuilding,
-            Optional<Boolean> issphere,
             Optional<Integer> floor,
             Optional<Integer> chunkx,
             Optional<Integer> chunkz,
@@ -97,7 +91,6 @@ public class ConditionTest {
         this.ground = ground.orElse(null);
         this.cellar = cellar.orElse(null);
         this.isbuilding = isbuilding.orElse(null);
-        this.issphere = issphere.orElse(null);
         this.floor = floor.orElse(null);
         this.chunkx = chunkx.orElse(null);
         this.chunkz = chunkz.orElse(null);
