@@ -112,8 +112,12 @@ public final class PresetSelection {
 
     /**
      * Restores a profile selection read from an existing world's saved data, for the vanilla
-     * Re-Create flow (issue #85). An unknown profile name is logged and leaves the current
-     * selection untouched, matching the old {@code ClientProfileSetup.restoreFromSavedData}.
+     * Re-Create flow (issue #85), and immediately {@link #publish()}es it. Publishing here (rather
+     * than waiting for the Cities tab to be opened) is what makes the restored choice actually
+     * reach the server if the player never opens that tab before creating the world - matching the
+     * old {@code ClientProfileSetup.restoreFromSavedData}, which called
+     * {@code UrbexConfigScreen.selectProfile} inline for exactly this reason. An unknown profile
+     * name is logged and leaves the current selection (and anything already published) untouched.
      */
     public void restore(String profileName, String json) {
         if (profileName == null || profileName.isEmpty()) {
@@ -123,11 +127,13 @@ public final class PresetSelection {
             UrbexProfile copy = new UrbexProfile(CUSTOM_ID, false);
             copy.copyFrom(new UrbexProfile(CUSTOM_ID, json));
             applyCustomized(copy, CUSTOM_ID);
+            publish();
             return;
         }
         UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
         if (profile != null) {
             selected = new Entry(profileName, Component.literal(profileName), false, "", Optional.of(profile));
+            publish();
         } else {
             Urbex.getLogger().warn("Re-created world used unknown Urbex profile '{}'; ignoring", profileName);
         }
@@ -135,14 +141,15 @@ public final class PresetSelection {
 
     /**
      * Publishes the current selection so it reaches world generation - the exact same contract as
-     * the old {@code UrbexConfigScreen.selectProfile}: set {@code Config.profileFromClient} (empty
-     * string for "disabled", meaning no profile override), bump the dirty counter, reset the
-     * profile cache, and for a customized profile also mirror it into
-     * {@code ProfileSetup.STANDARD_PROFILES} and {@code Config.jsonFromClient}.
+     * the old {@code UrbexConfigScreen.selectProfile}: set {@code Config.profileFromClient} ({@code
+     * null} for "disabled", meaning no profile override - verbatim what the old
+     * {@code ClientProfileSetup.getProfile()} produced), bump the dirty counter, reset the profile
+     * cache, and for a customized profile also mirror it into {@code ProfileSetup.STANDARD_PROFILES}
+     * and {@code Config.jsonFromClient}.
      */
     public void publish() {
         Entry entry = selected;
-        Config.profileFromClient = DISABLED_ID.equals(entry.id()) ? "" : entry.id();
+        Config.profileFromClient = DISABLED_ID.equals(entry.id()) ? null : entry.id();
 
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();

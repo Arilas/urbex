@@ -2,6 +2,7 @@ package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.setup.Config;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -14,13 +15,13 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * PresetSelection is pure state (no widgets), so it's exercised directly against a fresh instance
- * per test. STANDARD_PROFILES is a shared static map, so each test seeds it explicitly and restores
- * it afterwards rather than relying on production data (which would make these tests brittle to
- * unrelated profile changes).
+ * per test. STANDARD_PROFILES and Config are shared static state, so each test seeds/resets them
+ * explicitly rather than relying on production data or leftover state from other tests.
  */
 class PresetSelectionTest {
 
@@ -40,11 +41,14 @@ class PresetSelectionTest {
         ProfileSetup.STANDARD_PROFILES.put("alpha", new UrbexProfile("alpha", true));
         ProfileSetup.STANDARD_PROFILES.put("cavern", new UrbexProfile("cavern", true));
         ProfileSetup.STANDARD_PROFILES.put("hidden", new UrbexProfile("hidden", false));
+        ProfileSetup.STANDARD_PROFILES.put("rare", new UrbexProfile("rare", true));
+        Config.reset();
     }
 
     @AfterEach
     void clearProfiles() {
         ProfileSetup.STANDARD_PROFILES.clear();
+        Config.reset();
     }
 
     private static String keyOf(Component component) {
@@ -59,7 +63,7 @@ class PresetSelectionTest {
 
         List<String> ids = selection.entries().stream().map(PresetSelection.Entry::id).toList();
 
-        assertEquals(List.of("disabled", "default", "alpha", "cavern", "zeta"), ids);
+        assertEquals(List.of("disabled", "default", "alpha", "cavern", "rare", "zeta"), ids);
     }
 
     @Test
@@ -69,7 +73,7 @@ class PresetSelectionTest {
 
         List<String> ids = selection.entries().stream().map(PresetSelection.Entry::id).toList();
 
-        assertEquals(List.of("disabled", "default", "alpha", "cavern", "zeta", "customized"), ids);
+        assertEquals(List.of("disabled", "default", "alpha", "cavern", "rare", "zeta", "customized"), ids);
     }
 
     @Test
@@ -90,6 +94,16 @@ class PresetSelectionTest {
         selection.restore("totally-bogus-profile", "");
 
         assertEquals("cavern", selection.selected().id());
+    }
+
+    @Test
+    void restoreWithUnknownProfileLeavesConfigUnpublished() {
+        PresetSelection selection = new PresetSelection();
+
+        selection.restore("totally-bogus-profile", "");
+
+        assertNull(Config.profileFromClient);
+        assertNull(Config.jsonFromClient);
     }
 
     @Test
@@ -117,14 +131,38 @@ class PresetSelectionTest {
         assertTrue(selection.selected().profile().isPresent());
     }
 
+    /**
+     * Issue #85 regression: the Re-Create flow must reach the server even if the player never
+     * opens the Cities tab, so restore() has to publish immediately - not just update the
+     * in-memory selection for a screen that might never open.
+     */
     @Test
-    void disabledEntryPublishesEmptyProfileName() {
+    void restoreOfABuiltInProfilePublishesImmediately() {
+        PresetSelection selection = new PresetSelection();
+
+        selection.restore("rare", "");
+
+        assertEquals("rare", Config.profileFromClient);
+    }
+
+    @Test
+    void restoreWithJsonPublishesImmediately() {
+        PresetSelection selection = new PresetSelection();
+
+        selection.restore("customized", "{\"citychance\":0.9}");
+
+        assertEquals("customized", Config.profileFromClient);
+        assertTrue(Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty());
+    }
+
+    @Test
+    void disabledEntryPublishesNullProfileNameMatchingTheOldContract() {
         PresetSelection selection = new PresetSelection();
         selection.select("cavern");
         selection.select("disabled");
 
         selection.publish();
 
-        assertEquals("", dev.krona.urbex.setup.Config.profileFromClient);
+        assertNull(Config.profileFromClient);
     }
 }

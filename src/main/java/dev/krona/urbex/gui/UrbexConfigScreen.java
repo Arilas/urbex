@@ -3,6 +3,7 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.gui.elements.*;
+import dev.krona.urbex.mixin.CreateWorldScreenAccessor;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.CityFeature;
@@ -59,14 +60,21 @@ public class UrbexConfigScreen extends Screen {
 
     /**
      * The pack list {@link ClientProfileSetup#toggleWorldStyle} scans for {@code urbex/worldstyles}
-     * jsons (issue #66). Ideally this would be the datapack repository the in-progress
-     * {@link CreateWorldScreen} is using (which can carry worldstyles from packs enabled just for
-     * the new world), but that repository is a private field with no public accessor in this MC
-     * version - there's no way to reach it here without reflection or a new Mixin, which this fix
-     * doesn't add. So this always falls back to the client's resource pack repository, which does
-     * still surface Urbex's own bundled worldstyles (Fabric merges mod jar resources into it).
+     * jsons (issue #66). Prefers the datapack repository the in-progress {@link CreateWorldScreen}
+     * is using when {@code parent} is one - exposed via {@link CreateWorldScreenAccessor} since it's
+     * a private field on {@code CreateWorldScreen} - because that can carry worldstyles from packs
+     * enabled just for the new world. That repository is only populated once the player opens the
+     * "Data Packs" screen during creation, so this falls back to the client's resource pack
+     * repository (which still surfaces Urbex's own bundled worldstyles) whenever it's null or
+     * {@code parent} isn't a {@code CreateWorldScreen} at all.
      */
     private PackRepository worldStylePackRepository() {
+        if (parent instanceof CreateWorldScreen createWorldScreen) {
+            PackRepository fromScreen = ((CreateWorldScreenAccessor) createWorldScreen).urbex$getTempDataPackRepository();
+            if (fromScreen != null) {
+                return fromScreen;
+            }
+        }
         return Minecraft.getInstance().getResourcePackRepository();
     }
 
