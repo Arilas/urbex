@@ -4,39 +4,39 @@
   "parts": [
     {
       "top": false,
-      "part": "library10_1"
+      "part": "urbex:library10_1"
     },
     {
       "top": false,
-      "part": "library10_2"
+      "part": "urbex:library10_2"
     },
     {
       "top": false,
-      "part": "library10_3"
+      "part": "urbex:library10_3"
     },
     {
       "top": false,
-      "part": "library10_4"
+      "part": "urbex:library10_4"
     },
     {
       "top": false,
-      "part": "library10_5"
+      "part": "urbex:library10_5"
     },
     {
       "top": true,
-      "part": "top_library_1"
+      "part": "urbex:top_library_1"
     },
     {
       "top": true,
-      "part": "top_library_2"
+      "part": "urbex:top_library_2"
     },
     {
       "top": true,
-      "part": "top_library_3"
+      "part": "urbex:top_library_3"
     },
     {
       "top": true,
-      "part": "top_library_4"
+      "part": "urbex:top_library_4"
     }
   ]
 }

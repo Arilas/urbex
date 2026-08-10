@@ -3,12 +3,12 @@
   "dimz": 2,
   "buildings": [
     [
-      "oilrig00",
-      "oilrig01"
+      "urbex:oilrig00",
+      "urbex:oilrig01"
     ],
     [
-      "oilrig10",
-      "oilrig11"
+      "urbex:oilrig10",
+      "urbex:oilrig11"
     ]
   ]
 }

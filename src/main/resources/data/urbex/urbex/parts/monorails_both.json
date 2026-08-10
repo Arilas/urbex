@@ -5,7 +5,7 @@
       "boolean": true
     }
   ],
-  "refpalette": "rails",
+  "refpalette": "urbex:rails",
   "xsize": 16,
   "zsize": 16,
   "slices": [

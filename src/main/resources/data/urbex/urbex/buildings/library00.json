@@ -4,15 +4,15 @@
   "parts": [
     {
       "top": false,
-      "part": "library00_1"
+      "part": "urbex:library00_1"
     },
     {
       "top": true,
-      "part": "top_library00_1"
+      "part": "urbex:top_library00_1"
     },
     {
       "top": true,
-      "part": "top_library00_2"
+      "part": "urbex:top_library00_2"
     }
   ]
 }

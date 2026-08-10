@@ -3,12 +3,12 @@
   "dimz": 2,
   "buildings": [
     [
-      "shopping_open00",
-      "shopping_open01"
+      "urbex:shopping_open00",
+      "urbex:shopping_open01"
     ],
     [
-      "shopping_open10",
-      "shopping_open11"
+      "urbex:shopping_open10",
+      "urbex:shopping_open11"
     ]
   ]
 }

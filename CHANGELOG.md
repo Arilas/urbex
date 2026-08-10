@@ -10,6 +10,12 @@
 - **Removed the `standard_everywhere` world style.** A backward-compatibility leftover that had
   not been kept up to date. `standard` is the only bundled world style; with a single style the
   world-style dropdown on the Cities tab stays hidden.
+- **The bundled datapack is now fully namespaced.** Every internal asset reference is written
+  `urbex:name` instead of relying on bare-name defaulting, and street/highway/railway/monorail
+  part wiring is declared explicitly in `worldstyles/standard` and `citystyles/citystyle_common`
+  (previously implicit Java defaults). Bare names in third-party datapacks still work and still
+  default to the `urbex` namespace. A new test enforces that every shipped reference is
+  namespaced and resolves.
 
 ## 0.1.0 — 2026-08-03 (alpha preview)
 

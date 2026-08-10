@@ -5,7 +5,7 @@
   "maxfloors": 1,
   "parts": [
     {
-      "part": "cabin"
+      "part": "urbex:cabin"
     }
   ]
 }

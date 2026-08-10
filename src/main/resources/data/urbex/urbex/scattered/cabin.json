@@ -1,5 +1,7 @@
 {
-  "buildings": [ "cabin" ],
+  "buildings": [
+    "urbex:cabin"
+  ],
   "terrainheight": "highest",
   "terrainfix": "none",
   "heightoffset": -3

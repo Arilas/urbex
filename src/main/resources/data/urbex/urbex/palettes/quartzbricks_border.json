@@ -12,12 +12,12 @@
     },
     {
       "char": "#",
-      "variant": "quartz",
+      "variant": "urbex:quartz",
       "damaged": "minecraft:iron_bars"
     },
     {
       "char": "}",
-      "variant": "quartz_rubble",
+      "variant": "urbex:quartz_rubble",
       "damaged": "minecraft:iron_bars"
     }
   ]

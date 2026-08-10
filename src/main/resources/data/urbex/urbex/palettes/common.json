@@ -3,28 +3,49 @@
     {
       "char": "1",
       "block": "minecraft:spawner",
-      "mob": "easymobs"
+      "mob": "urbex:easymobs"
     },
     {
       "char": "4",
       "block": "minecraft:spawner",
-      "mob": "hardmobs"
+      "mob": "urbex:hardmobs"
     },
     {
       "char": "T",
       "light": {
         "floor": [
-          { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
-          { "weight": 3, "block": "minecraft:torch" },
-          { "weight": 1, "block": "minecraft:end_rod[facing=up]" }
+          {
+            "weight": 6,
+            "block": "minecraft:lantern[hanging=false]"
+          },
+          {
+            "weight": 3,
+            "block": "minecraft:torch"
+          },
+          {
+            "weight": 1,
+            "block": "minecraft:end_rod[facing=up]"
+          }
         ],
         "wall": [
-          { "weight": 8, "block": "minecraft:wall_torch[facing=north]" },
-          { "weight": 2, "block": "minecraft:end_rod[facing=north]" }
+          {
+            "weight": 8,
+            "block": "minecraft:wall_torch[facing=north]"
+          },
+          {
+            "weight": 2,
+            "block": "minecraft:end_rod[facing=north]"
+          }
         ],
         "ceiling": [
-          { "weight": 8, "block": "minecraft:lantern[hanging=true]" },
-          { "weight": 2, "block": "minecraft:end_rod[facing=down]" }
+          {
+            "weight": 8,
+            "block": "minecraft:lantern[hanging=true]"
+          },
+          {
+            "weight": 2,
+            "block": "minecraft:end_rod[facing=down]"
+          }
         ]
       }
     },
@@ -32,10 +53,22 @@
       "char": "h",
       "light": {
         "free": [
-          { "weight": 6, "block": "minecraft:glowstone" },
-          { "weight": 2, "block": "minecraft:sea_lantern" },
-          { "weight": 1, "block": "minecraft:shroomlight" },
-          { "weight": 1, "block": "minecraft:ochre_froglight" }
+          {
+            "weight": 6,
+            "block": "minecraft:glowstone"
+          },
+          {
+            "weight": 2,
+            "block": "minecraft:sea_lantern"
+          },
+          {
+            "weight": 1,
+            "block": "minecraft:shroomlight"
+          },
+          {
+            "weight": 1,
+            "block": "minecraft:ochre_froglight"
+          }
         ]
       }
     },
@@ -233,7 +266,7 @@
     {
       "char": "C",
       "block": "minecraft:chest[facing=north]",
-      "loot": "chestloot"
+      "loot": "urbex:chestloot"
     },
     {
       "char": "G",
