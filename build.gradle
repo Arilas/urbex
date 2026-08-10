@@ -77,29 +77,30 @@ loom {
         // blind to both (see the hierarchical-streets Task 5 report). Widening the primary sample
         // to cover them was rejected - radius 15 there is ~20x the generation work of radius 3,
         // and it is the pin for everything else on this branch. This is a separate, disposable
-        // window instead: freshly located on seed 1337 at offset 97, radius 12 (chunks 85..109 on
-        // both axes), which contains BridgeSpan[orientation=X, fromX=86, fromZ=108, toX=90,
-        // toZ=108] - the only mechanically-guarded evidence on this branch that a planned bridge
-        // deck actually renders. A slope was also found nearby (93,116 - ZMAX), but including it
-        // would need the same radius 15 that was rejected above, so it stays uncovered here.
-        digestCheckBridge {
+        // window instead: seed 1337, offset 101, radius 15 (chunks 86..116 on both axes), sized to
+        // be the smallest square covering both known features - the bridge deck at (87,108),
+        // (88,108), (89,108) and the one slope found anywhere in a wide scan of this area, at
+        // (93,116). At 961 chunks it costs 1.54x the 625-chunk window this replaces, and still far
+        // less than the rejected radius-15-at-the-primary-offset alternative, because this window
+        // stays separate from and disposable relative to the primary pin. requireBridge and
+        // requireSlope make DigestRunner's own bridgeChunks/slopeChunks counts (printed on every
+        // run, in DRIVERDIGEST's line) hard gates here: zero of either in the sample fails the
+        // check instead of silently passing. Before accepting a *new* digest-features.golden
+        // (moving code changed this window's output), confirm the window still contains both
+        // features - `/urbex debug` around chunk (88, 108) for the bridge and (93, 116) for the
+        // slope, or a `spanAt`/`getStreetSlopeDirection` probe - and if it does not, relocate the
+        // window (a new offset/radius) rather than just regenerating the hash: a passing check on a
+        // window missing either feature is exactly the silent coverage loss this whole file exists
+        // to prevent.
+        digestCheckFeatures {
             server()
-            setConfigName('Urbex Digest Check (bridge)')
+            setConfigName('Urbex Digest Check (features)')
             ideConfigGenerated(false)
-            runDir('runs/digestcheckbridge')
-            vmArg '-Durbex.digestCheck=12,rowmajor,97'
-            // This window's only reason to exist is covering BridgeSpan[X, (86,108)->(90,108)] -
-            // without that, it is an expensive duplicate of the primary sample above at ~13.8x the
-            // generation work. requireBridge makes DigestRunner's own bridgeChunks count (printed on
-            // every run, in DRIVERDIGEST's line) a hard gate here: zero planned-bridge chunks in the
-            // sample fails the check instead of silently passing. Before accepting a *new*
-            // digest-bridge.golden (moving code changed this window's output), confirm the window
-            // still contains a planned bridge - `/urbex debug` around chunk (88, 108), or a `spanAt`
-            // probe - and if it does not, relocate the window (a new offset/radius) rather than just
-            // regenerating the hash: a passing check on a window with no bridge in it is exactly the
-            // silent coverage loss this whole file exists to prevent.
+            runDir('runs/digestcheckfeatures')
+            vmArg '-Durbex.digestCheck=15,rowmajor,101'
             vmArg '-Durbex.digestCheck.requireBridge'
-            def golden = file('digest-bridge.golden')
+            vmArg '-Durbex.digestCheck.requireSlope'
+            def golden = file('digest-features.golden')
             if (golden.exists()) {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
             }
@@ -136,13 +137,13 @@ motd=urbex digest check
     }
 }
 registerPrepareDigestCheck('prepareDigestCheck', 'runs/digestcheck')
-registerPrepareDigestCheck('prepareDigestCheckBridge', 'runs/digestcheckbridge')
+registerPrepareDigestCheck('prepareDigestCheckFeatures', 'runs/digestcheckfeatures')
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
     dependsOn 'prepareDigestCheck'
 }
-tasks.matching { it.name == 'runDigestCheckBridge' }.configureEach {
-    dependsOn 'prepareDigestCheckBridge'
+tasks.matching { it.name == 'runDigestCheckFeatures' }.configureEach {
+    dependsOn 'prepareDigestCheckFeatures'
 }
 
 dependencies {
