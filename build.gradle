@@ -55,10 +55,14 @@ loom {
             ideConfigGenerated(false)
             runDir('runs/digestcheck')
             vmArg '-Durbex.digestCheck=3,rowmajor,100'
-            // Single worker thread: parallel chunk generation is not yet run-to-run
-            // deterministic (issue #24 - shared mutable ChunkHeightmap and friends), so the
-            // regression pin is taken on a serial baseline. Lifting this flag - two parallel
-            // runs agreeing - is the acceptance test for fixing #24.
+            // This runs on the parallel path, deliberately. Generation used to be pinned to one
+            // core here with -XX:ActiveProcessorCount=1, because a chunk's decoration step could
+            // run before or after its neighbours' passes and output was not run-to-run
+            // reproducible (issue #18). Moving city generation to the tail of applyCarvers fixed
+            // that; 15dba5f2 removed the pin and ran #18's acceptance test - three parallel fresh
+            // runs and one shuffled-order run all agreeing. So this check has been exercising
+            // concurrent generation ever since, which is the point: a regression that only shows
+            // up under worker scheduling has to be able to reach it.
             // Pinned DRIVERDIGEST for seed 1337; regenerate deliberately on world-changing
             // changes by deleting the file, running runDigestCheck twice (results must match)
             // and committing the new value.
@@ -104,9 +108,11 @@ loom {
 }
 
 // A fresh, fully pinned dedicated-server environment for every digest run: fixed seed, default
-// (noise) world type, the 'default' urbex profile on the overworld, and no watchdog (the check
-// generates its whole chunk square on the server thread). Shared by every digest run config, each
-// against its own run directory so the two checks cannot clobber each other's world.
+// (noise) world type, the 'default' urbex profile on the overworld, and no watchdog. The watchdog
+// is off because DigestRunner drives its whole chunk square from the server thread in one blocking
+// loop, holding that thread far past max-tick-time; the generation itself still fans out to the
+// worker pool, so this is not a serial baseline. Shared by every digest run config, each against
+// its own run directory so the two checks cannot clobber each other's world.
 def registerPrepareDigestCheck = { String taskName, String runDirPath ->
     tasks.register(taskName) {
         notCompatibleWithConfigurationCache("writes the run directory")
