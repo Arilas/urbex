@@ -43,8 +43,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The Phase 2 "Customize this preset…" editor: the metadata-driven successor to
- * {@code UrbexConfigScreen}. It works entirely on a private {@link UrbexProfile} copy of the preset it
+ * The Phase 2 "Customize this preset…" editor: the metadata-driven successor to the old
+ * world-creation config screen. It works entirely on a private {@link UrbexProfile} copy of the preset it
  * was opened on, so nothing global is touched until the player presses Done - which is exactly what
  * makes Cancel/ESC a clean discard (issue #65). Layout is a category list on the left, a scrollable
  * column of setting controls in the middle (with a search box on top that filters across categories),

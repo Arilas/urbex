@@ -14,18 +14,18 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Client-side state for "which Urbex preset generates this world", replacing
- * {@link ClientProfileSetup} for the redesigned Cities tab (Task 3 onwards). Pure state - nothing
- * here touches widgets, so it's unit-testable headless. {@link ClientProfileSetup} stays alive
- * for the old editor screen until Phase 2 of the redesign removes it.
+ * Client-side state for "which Urbex preset generates this world", replacing the old editor
+ * screen's client-side profile state for the redesigned Cities tab (Task 3 onwards; that old state
+ * holder was removed in Phase 2). Pure state - nothing here touches widgets, so it's unit-testable
+ * headless.
  * <p>
  * Custom (hand-edited) profiles are never written into {@link ProfileSetup#STANDARD_PROFILES}
  * by this class outside of {@link #publish()} - they live only in the selection itself, supplied
- * by the future editor via {@link #applyCustomized}.
+ * by the customize editor via {@link #applyCustomized}.
  */
 public final class PresetSelection {
 
-    /** The shared client-side selection, mirroring {@link ClientProfileSetup#CLIENT_SETUP}. */
+    /** The shared client-side selection driving the Cities tab and the customize editor. */
     public static final PresetSelection CLIENT = new PresetSelection();
 
     public static final String DISABLED_ID = "disabled";
@@ -67,7 +67,7 @@ public final class PresetSelection {
     /**
      * The full, current list of choices: {@code disabled} first, then public built-in presets
      * ({@code default} first, then alphabetical - same ordering as the old
-     * {@code ClientProfileSetup.toggleProfile}), then the custom entry (if any) last.
+     * the old editor's profile cycling), then the custom entry (if any) last.
      */
     public List<Entry> entries() {
         List<Entry> result = new ArrayList<>();
@@ -212,9 +212,9 @@ public final class PresetSelection {
      * Re-Create flow (issue #85), and immediately {@link #publish()}es it. Publishing here (rather
      * than waiting for the Cities tab to be opened) is what makes the restored choice actually
      * reach the server if the player never opens that tab before creating the world - matching the
-     * old {@code ClientProfileSetup.restoreFromSavedData}, which called
-     * {@code UrbexConfigScreen.selectProfile} inline for exactly this reason. An unknown profile
-     * name is logged and leaves the current selection (and anything already published) untouched.
+     * old editor's restore-from-saved-data path, which selected the profile inline for exactly this
+     * reason. An unknown profile name is logged and leaves the current selection (and anything
+     * already published) untouched.
      */
     public void restore(String profileName, String json) {
         if (profileName == null || profileName.isEmpty()) {
@@ -238,11 +238,10 @@ public final class PresetSelection {
 
     /**
      * Publishes the current selection so it reaches world generation - the exact same contract as
-     * the old {@code UrbexConfigScreen.selectProfile}: set {@code Config.profileFromClient} ({@code
-     * null} for "disabled", meaning no profile override - verbatim what the old
-     * {@code ClientProfileSetup.getProfile()} produced), bump the dirty counter, reset the profile
-     * cache, and for a customized profile also mirror it into {@code ProfileSetup.STANDARD_PROFILES}
-     * and {@code Config.jsonFromClient}.
+     * the old editor's profile selection: set {@code Config.profileFromClient} ({@code null} for
+     * "disabled", meaning no profile override - verbatim what the old editor's client-side profile
+     * state produced), bump the dirty counter, reset the profile cache, and for a customized profile
+     * also mirror it into {@code ProfileSetup.STANDARD_PROFILES} and {@code Config.jsonFromClient}.
      */
     public void publish() {
         Entry entry = selected;

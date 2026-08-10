@@ -250,7 +250,7 @@ public class CitiesTab extends GridLayoutTab {
     /**
      * Opens the Phase 2 {@link CustomizeScreen} on the preset the tab is showing. That screen edits a
      * private copy and only touches {@link PresetSelection} on Done, so there is no cross-editor state
-     * to hand across any more (unlike the old {@code UrbexConfigScreen} this replaced). The reopen flag
+     * to hand across any more (unlike the old world-creation config screen this replaced). The reopen flag
      * is set here so returning from the editor - a {@code setScreen(screen)} that re-runs
      * {@code CreateWorldScreen.init()} - lands the player back on this tab.
      */
@@ -328,8 +328,8 @@ public class CitiesTab extends GridLayoutTab {
     /**
      * The name a profile's {@code worldStyle} field stores for a registry key: the bare path for the
      * mod's own namespace (so {@code urbex:standard} matches the profile default {@code "standard"}),
-     * {@code namespace:path} for any other datapack. Mirrors the old {@code ClientProfileSetup}
-     * worldstyle naming, minus the file-path stripping that a registry key doesn't carry.
+     * {@code namespace:path} for any other datapack. Mirrors the old editor's client-side worldstyle
+     * naming, minus the file-path stripping that a registry key doesn't carry.
      */
     private static String worldStyleName(Identifier key) {
         if (Urbex.MODID.equals(key.getNamespace())) {

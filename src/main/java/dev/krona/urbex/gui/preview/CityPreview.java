@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
  * repeated {@link #update} calls while the player is merely dragging a slider don't recompute
  * anything.
  * <p>
- * "Honest" relative to the old {@code UrbexConfigScreen.renderPreviewMap}: that preview always ran
+ * "Honest" relative to the old editor's preview map renderer: that preview always ran
  * with {@code IDimensionInfo.getWorld() == null}, which silently skipped the worldstyle
  * city-chance multiplier and the CITY_MINHEIGHT/MAXHEIGHT gate in {@code City.getCityFactor} (both
  * guarded on {@code getWorld() != null}). This preview is built with real registry access, so those
@@ -123,8 +123,8 @@ public class CityPreview implements AutoCloseable {
     private void recompute(UrbexProfile profile, long seed) {
         // The datapack-derived predefined-city/street maps are static (shared with real worldgen)
         // and keyed only by chunk coord, not by profile - drop them so a new profile/seed combo
-        // doesn't see another profile's predefined content. Mirrors the old
-        // UrbexConfigScreen.refreshPreview().
+        // doesn't see another profile's predefined content. Mirrors the old editor's preview
+        // refresh.
         City.cleanPredefinedCache();
         NullDimensionInfo diminfo = new NullDimensionInfo(profile, seed, registryAccess);
         for (int z = 0; z < HEIGHT; z++) {

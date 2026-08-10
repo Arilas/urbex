@@ -1,4 +1,4 @@
-package dev.krona.urbex.gui.elements;
+package dev.krona.urbex.gui.settings;
 
 import dev.krona.urbex.config.Configuration;
 import dev.krona.urbex.config.UrbexProfile;
@@ -6,29 +6,29 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-class PercentageSliderElementTest {
+class PercentageSliderMathTest {
 
     @Test
     void snapsToWholePercentAndClamps() {
-        assertEquals(0.00f, PercentageSliderElement.snap(-0.4));
-        assertEquals(0.37f, PercentageSliderElement.snap(0.374));
-        assertEquals(0.38f, PercentageSliderElement.snap(0.376));
-        assertEquals(1.00f, PercentageSliderElement.snap(1.4));
+        assertEquals(0.00f, PercentageSliderMath.snap(-0.4));
+        assertEquals(0.37f, PercentageSliderMath.snap(0.374));
+        assertEquals(0.38f, PercentageSliderMath.snap(0.376));
+        assertEquals(1.00f, PercentageSliderMath.snap(1.4));
     }
 
     @Test
     void formatsNormalizedValuesAsPercent() {
-        assertEquals(0, PercentageSliderElement.percent(0.0f));
-        assertEquals(65, PercentageSliderElement.percent(0.65f));
-        assertEquals(100, PercentageSliderElement.percent(1.0f));
+        assertEquals(0, PercentageSliderMath.percent(0.0f));
+        assertEquals(65, PercentageSliderMath.percent(0.65f));
+        assertEquals(100, PercentageSliderMath.percent(1.0f));
     }
 
     @Test
     void productionBindingAppliesAndSynchronizesSnappedProfileValue() {
         UrbexProfile profile = new UrbexProfile("slider-binding", true);
 
-        float applied = PercentageSliderElement.apply(profile, "lostcity.lightingDensity", 0.376);
-        float synchronizedValue = PercentageSliderElement.read(
+        float applied = PercentageSliderMath.apply(profile, "lostcity.lightingDensity", 0.376);
+        float synchronizedValue = PercentageSliderMath.read(
                 profile.toConfiguration(), "lostcity.lightingDensity");
 
         assertEquals(0.38f, applied);
@@ -41,8 +41,8 @@ class PercentageSliderElementTest {
         Configuration configuration = new UrbexProfile("slider-tooltips", true).toConfiguration();
 
         assertEquals("Chance that an optional decorative-light marker places a light",
-                PercentageSliderElement.comment(configuration, "lostcity.lightingDensity").getString());
+                PercentageSliderMath.comment(configuration, "lostcity.lightingDensity").getString());
         assertEquals("Chance that a marked container receives a loot table",
-                PercentageSliderElement.comment(configuration, "lostcity.lootDensity").getString());
+                PercentageSliderMath.comment(configuration, "lostcity.lootDensity").getString());
     }
 }

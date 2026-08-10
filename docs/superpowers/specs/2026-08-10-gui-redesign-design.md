@@ -1,7 +1,7 @@
 # World-Creation GUI Redesign
 
 Date: 2026-08-10
-Status: approved (brainstorm with maintainer; mockups in `.superpowers/brainstorm/94488-1786320857/content/`)
+Status: approved; Phase 2 (Task 7 deletions) implemented (brainstorm with maintainer; mockups in `.superpowers/brainstorm/94488-1786320857/content/`)
 Supersedes: issue #64 (epic); absorbs #65, #66, #67, #68
 
 ## Goal
