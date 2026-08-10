@@ -4,14 +4,16 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Counts cross-chunk terrain reads made by Urbex during world generation.
+ * Counts cross-chunk terrain access - reads and writes alike - made by Urbex during world
+ * generation.
  *
  * <p>City generation runs at the tail of {@code applyCarvers}, where Minecraft gives a chunk a
- * write radius of 0 - it may touch only itself. Reading a neighbour there is a contract violation:
- * what it sees depends on worker scheduling, so it is a latent source of order-dependent output.
- * Two such reads survived for months because nothing watched for them; this is what watches.
+ * write radius of 0 - it may touch only itself. Reading or writing a neighbour there is a contract
+ * violation: what it sees (or whether a write even lands) depends on worker scheduling, so it is a
+ * latent source of order-dependent output. Two such reads survived for months because nothing
+ * watched for them; this is what watches, and {@code UnsafeReadGateMixin} feeds it from both sides.
  *
- * <p>Only reads whose stack carries an Urbex frame are counted. Vanilla makes cross-chunk reads of
+ * <p>Only access whose stack carries an Urbex frame is counted. Vanilla makes cross-chunk reads of
  * its own that are none of our business and that we could not fix.
  */
 public final class UnsafeReadCounter {

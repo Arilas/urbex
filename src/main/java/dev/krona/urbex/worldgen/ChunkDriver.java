@@ -45,11 +45,15 @@ public class ChunkDriver {
     // off entirely.
     //
     // What this does NOT cover: writes this mod makes straight to the world, bypassing the
-    // driver. Those are invisible here and so invisible to the digest. Today that is the
-    // post-todo callbacks run out of BuildingInfo.getPostTodo, which write through the
-    // WorldGenLevel. The gate introduced in Task 4 covers the residual risk from the other side:
-    // a post-todo write that ever crossed a chunk boundary would resolve the neighbour through
-    // getChunk and be counted.
+    // driver. Those are invisible here and so invisible to the digest. Today that is two things:
+    // the post-todo callbacks run out of BuildingInfo.getPostTodo, which write through the
+    // WorldGenLevel; and the border-block shape updates this class defers to vanilla
+    // postprocessing (see updateAdjacent) - a matching DRIVERDIGEST no longer proves fence, wall
+    // and stair connections at chunk borders are unchanged, because postprocessing writes them
+    // outside the driver. UnsafeReadGateMixin covers the residual risk from a different angle: it
+    // hooks both WorldGenRegion.getChunk and WorldGenRegion.ensureCanWrite, so any read or write
+    // that ever crossed a chunk boundary - post-todo or otherwise - is counted there, whether or
+    // not it is one this comment enumerates.
     //
     // Each touched position is recorded together with the state the driver last wrote there.
     // A position written three times contributes its last state once, so the internal path by

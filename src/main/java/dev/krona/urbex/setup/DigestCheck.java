@@ -103,9 +103,10 @@ public final class DigestCheck {
                             + "the slope this check exists to guard; relocate the window rather than accepting "
                             + "a new golden here)");
                 } else if (failOnUnsafeRead && result.unsafeReads() > 0) {
-                    verdict(FAIL + " (" + result.unsafeReads() + " cross-chunk terrain read(s) from Urbex "
-                            + "during generation, first at " + UnsafeReadCounter.firstSample()
-                            + " - city generation runs at the carver stage, where a chunk may touch only itself)");
+                    verdict(FAIL + " (" + result.unsafeReads() + " cross-chunk terrain read(s) or write(s) from "
+                            + "Urbex during generation, first at " + UnsafeReadCounter.firstSample()
+                            + " - city generation runs at the carver stage, where a chunk may touch only itself; "
+                            + "remove the cross-chunk access rather than widening the write radius)");
                 } else if (expected != null && !expected.trim().toLowerCase(Locale.ROOT).equals(actual)) {
                     verdict(FAIL + String.format(" (expected DRIVERDIGEST=%s, got %s)", expected.trim(), actual));
                 } else {
