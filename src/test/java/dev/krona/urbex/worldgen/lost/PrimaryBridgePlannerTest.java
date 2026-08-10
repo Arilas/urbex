@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
+import dev.krona.urbex.plan.Hash;
 import dev.krona.urbex.varia.ChunkCoord;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
@@ -11,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The two properties a planned bridge lives or dies by: a span is only accepted when the whole run
@@ -154,46 +156,97 @@ class PrimaryBridgePlannerTest {
     void bothSidesOfACrossingAgreeOnTheWinner() {
         long horizontal = 0x1234_5678_9abc_def0L;
         long vertical = 0x0fed_cba9_8765_4321L;
-        assertEquals(PrimaryBridgePlanner.winsCrossing(horizontal, vertical),
-                PrimaryBridgePlanner.winsCrossing(horizontal, vertical),
-                "the rule must not depend on which side asks");
         assertNotEquals(PrimaryBridgePlanner.winsCrossing(horizontal, vertical),
                 PrimaryBridgePlanner.winsCrossing(vertical, horizontal),
                 "exactly one orientation wins");
+        // The comparison is >=, so two spans that ever hashed alike still get a settled answer
+        // rather than both standing down or both building.
+        assertTrue(PrimaryBridgePlanner.winsCrossing(horizontal, horizontal),
+                "a tie is broken deterministically, towards the horizontal span");
     }
 
-    @Test
-    void aCrossingLooksTheSameFromEitherSpan() {
-        // A river crossing a lake: the horizontal span (0,2)-(4,2) and the vertical span (2,0)-(2,4)
-        // both want the chunk at (2,2). Neither side is allowed to reach a different pair of
-        // addresses than the other, whichever of its own chunks does the asking.
-        PrimaryBridgePlanner.ChunkFacts facts = map(
+    /** The plus-shaped lake used by the crossing tests: two spans contending for the chunk at (2,2). */
+    private static PrimaryBridgePlanner.ChunkFacts crossing() {
+        return map(
                 "..P..",
                 "..w..",
                 "PwwwP",
                 "..w..",
                 "..P..");
-        PrimaryBridgePlanner.BridgeSpan horizontal =
-                new PrimaryBridgePlanner.BridgeSpan(Orientation.X, 0, 2, 4, 2);
-        PrimaryBridgePlanner.BridgeSpan vertical =
-                new PrimaryBridgePlanner.BridgeSpan(Orientation.Z, 2, 0, 2, 4);
+    }
+
+    private static final PrimaryBridgePlanner.BridgeSpan HORIZONTAL =
+            new PrimaryBridgePlanner.BridgeSpan(Orientation.X, 0, 2, 4, 2);
+    private static final PrimaryBridgePlanner.BridgeSpan VERTICAL =
+            new PrimaryBridgePlanner.BridgeSpan(Orientation.Z, 2, 0, 2, 4);
+
+    @Test
+    void aCrossingLooksTheSameFromEitherSpan() {
+        // Neither side is allowed to reach a different pair of addresses than the other, whichever
+        // of its own chunks does the asking.
+        PrimaryBridgePlanner.ChunkFacts facts = crossing();
         for (int x = 1; x <= 3; x++) {
-            assertEquals(horizontal, PrimaryBridgePlanner.scanSpan(at(x, 2), Orientation.X, facts, MAX_GAP),
+            assertEquals(HORIZONTAL, PrimaryBridgePlanner.scanSpan(at(x, 2), Orientation.X, facts, MAX_GAP),
                     "every chunk of the horizontal span must find it");
         }
         for (int z = 1; z <= 3; z++) {
-            assertEquals(vertical, PrimaryBridgePlanner.scanSpan(at(2, z), Orientation.Z, facts, MAX_GAP),
+            assertEquals(VERTICAL, PrimaryBridgePlanner.scanSpan(at(2, z), Orientation.Z, facts, MAX_GAP),
                     "every chunk of the vertical span must find it");
         }
         // The chunk under the crossing sees both, and sees exactly the same two spans its
         // neighbours on either arm reconstructed on their own.
-        assertEquals(horizontal, PrimaryBridgePlanner.scanSpan(at(2, 2), Orientation.X, facts, MAX_GAP));
-        assertEquals(vertical, PrimaryBridgePlanner.scanSpan(at(2, 2), Orientation.Z, facts, MAX_GAP));
+        assertEquals(HORIZONTAL, PrimaryBridgePlanner.scanSpan(at(2, 2), Orientation.X, facts, MAX_GAP));
+        assertEquals(VERTICAL, PrimaryBridgePlanner.scanSpan(at(2, 2), Orientation.Z, facts, MAX_GAP));
 
-        long horizontalAddress = PrimaryBridgePlanner.address(SEED, horizontal);
-        long verticalAddress = PrimaryBridgePlanner.address(SEED, vertical);
+        long horizontalAddress = PrimaryBridgePlanner.address(SEED, HORIZONTAL);
+        long verticalAddress = PrimaryBridgePlanner.address(SEED, VERTICAL);
         assertNotEquals(PrimaryBridgePlanner.winsCrossing(horizontalAddress, verticalAddress),
                 PrimaryBridgePlanner.winsCrossing(verticalAddress, horizontalAddress),
                 "one of the two real spans wins and the other loses");
+    }
+
+    @Test
+    void exactlyOneSpanOfACrossingSurvivesAndEveryChunkAgrees() {
+        // The verdict production actually uses. Two decks fighting over one chunk is the failure the
+        // whole crossing rule exists to prevent, so it is asserted directly: one span survives, the
+        // other does not, and every chunk of each - reconstructing its own span first, exactly as
+        // BuildingInfo does - reaches its span's verdict on its own.
+        PrimaryBridgePlanner.ChunkFacts facts = crossing();
+        boolean horizontalSurvives =
+                PrimaryBridgePlanner.survivesCrossings(HORIZONTAL, at(2, 2), facts, SEED, MAX_GAP, 1.0f);
+        boolean verticalSurvives =
+                PrimaryBridgePlanner.survivesCrossings(VERTICAL, at(2, 2), facts, SEED, MAX_GAP, 1.0f);
+        assertNotEquals(horizontalSurvives, verticalSurvives,
+                "exactly one of two spans contending for the same chunk may build a deck");
+
+        for (int x = 1; x <= 3; x++) {
+            PrimaryBridgePlanner.BridgeSpan span =
+                    PrimaryBridgePlanner.scanSpan(at(x, 2), Orientation.X, facts, MAX_GAP);
+            assertEquals(horizontalSurvives,
+                    PrimaryBridgePlanner.survivesCrossings(span, at(x, 2), facts, SEED, MAX_GAP, 1.0f),
+                    "chunk (" + x + ",2) must reach the horizontal span's verdict on its own");
+        }
+        for (int z = 1; z <= 3; z++) {
+            PrimaryBridgePlanner.BridgeSpan span =
+                    PrimaryBridgePlanner.scanSpan(at(2, z), Orientation.Z, facts, MAX_GAP);
+            assertEquals(verticalSurvives,
+                    PrimaryBridgePlanner.survivesCrossings(span, at(2, z), facts, SEED, MAX_GAP, 1.0f),
+                    "chunk (2," + z + ") must reach the vertical span's verdict on its own");
+        }
+    }
+
+    @Test
+    void aRivalWhoseRollFailsDoesNotContestTheCrossing() {
+        // The acceptance roll gates the rival, not just the span itself: below the lower of the two
+        // spans' unit values neither is accepted, so neither contests the other and both come
+        // through survivesCrossings. (spanAt would then reject both on their own rolls - this
+        // isolates what the chance does to the crossing.)
+        PrimaryBridgePlanner.ChunkFacts facts = crossing();
+        float lower = Math.min(Hash.unit(PrimaryBridgePlanner.address(SEED, HORIZONTAL)),
+                Hash.unit(PrimaryBridgePlanner.address(SEED, VERTICAL)));
+        assertTrue(PrimaryBridgePlanner.survivesCrossings(HORIZONTAL, at(2, 2), facts, SEED, MAX_GAP, lower),
+                "a rival whose roll failed is not a rival");
+        assertTrue(PrimaryBridgePlanner.survivesCrossings(VERTICAL, at(2, 2), facts, SEED, MAX_GAP, lower),
+                "and the same holds from the other side");
     }
 }

@@ -134,14 +134,29 @@ public final class PrimaryBridgePlanner {
     /**
      * The span identity: the two endpoints, sorted, plus the orientation. Sorting is what makes a
      * scan from either end produce the same address, and hence the same roll.
+     *
+     * <p>The orientation rides in the slot rather than in the key. Deriving a second key by adding
+     * the ordinal to {@link GridPurpose#PLANNED_BRIDGE} would borrow the number one past it, and the
+     * next constant appended to that enum - which is its documented safe edit - would silently
+     * inherit the Z-oriented bridge's stream.
+     *
+     * <p>The slot is three disjoint bit fields, so it is injective: the low 31 bits of {@code maxX}
+     * at bit 33, the low 31 bits of {@code maxZ} at bit 1, the orientation in bit 0, with bit 32
+     * left clear so the two coordinate fields cannot run into each other. Thirty-one bits identify
+     * a chunk coordinate exactly - a chunk coordinate is a block coordinate shifted right by four,
+     * so it cannot reach 2^27 even before Minecraft's world border caps it four orders of magnitude
+     * lower - and no two distinct {@code (maxX, maxZ, orientation)} triples can therefore share a
+     * slot.
      */
     static long address(long seed, BridgeSpan span) {
         int minX = Math.min(span.fromX(), span.toX());
         int minZ = Math.min(span.fromZ(), span.toZ());
         int maxX = Math.max(span.fromX(), span.toX());
         int maxZ = Math.max(span.fromZ(), span.toZ());
-        return Hash.atSlot(seed, minX, minZ, ((long) maxX << 32) ^ (maxZ & 0xffffffffL),
-                GridPurpose.PLANNED_BRIDGE.key() + span.orientation().ordinal());
+        long slot = ((maxX & 0x7fffffffL) << 33)
+                | ((maxZ & 0x7fffffffL) << 1)
+                | span.orientation().ordinal();
+        return Hash.atSlot(seed, minX, minZ, slot, GridPurpose.PLANNED_BRIDGE.key());
     }
 
     /**
@@ -239,9 +254,12 @@ public final class PrimaryBridgePlanner {
      * not asked, because that question is not well founded. The cost is that a three-way contest can
      * leave a chunk with no bridge at all and both spans withdrawn, which reads as a primary road
      * that simply stops at the water, exactly as it did before bridges existed.
+     *
+     * <p>Package-private so a test can put two real spans across one another and check that exactly
+     * one of them comes out. Only {@code anyChunkInSpan}'s dimension key is read.
      */
-    private static boolean survivesCrossings(BridgeSpan span, ChunkCoord anyChunkInSpan, ChunkFacts facts,
-                                             long seed, int maxGapLength, float chance) {
+    static boolean survivesCrossings(BridgeSpan span, ChunkCoord anyChunkInSpan, ChunkFacts facts,
+                                     long seed, int maxGapLength, float chance) {
         long ourAddress = address(seed, span);
         Orientation crossing = span.orientation().getOpposite();
         boolean alongX = span.orientation() == Orientation.X;
