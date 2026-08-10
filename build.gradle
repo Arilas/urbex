@@ -90,11 +90,7 @@ motd=urbex digest check
 '''
         def cfgDir = new File(dir, 'world/serverconfig')
         cfgDir.mkdirs()
-        new File(cfgDir, 'urbex-server.toml').text = '''\
-[profiles]
-\tselectedProfile = "default"
-\tselectedCustomJson = ""
-'''
+        new File(cfgDir, 'urbex.json').text = '{ "selectedProfile": "default" }\n'
     }
 }
 
@@ -107,7 +103,6 @@ dependencies {
     compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
-    implementation "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:${forge_config_api_port_version}"
 }
 
 dependencies {

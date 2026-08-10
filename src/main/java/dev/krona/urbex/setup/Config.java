@@ -1,89 +1,182 @@
 package dev.krona.urbex.setup;
 
-import com.google.common.collect.Lists;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.config.UrbexConfig;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.data.UrbexData;
-import dev.krona.urbex.worldgen.lost.regassets.data.Selectors;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraft.world.level.storage.LevelResource;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
+/**
+ * Configuration access. Values come from the codec-backed {@link UrbexConfig}: the global
+ * {@code config/urbex/urbex.json}, optionally overridden per world by
+ * {@code <world>/serverconfig/urbex.json}. Legacy Forge Config API Port TOML files are read
+ * once and migrated (issue #75).
+ * <p>
+ * The public surface is kept supplier-shaped ({@code Config.X.get()}) so the many call sites
+ * did not have to change when the ModConfigSpec backing was removed.
+ */
 public class Config {
 
-    public static final String CATEGORY_PROFILES = "profiles";
-    public static final String CATEGORY_GENERAL = "general";
     public static final boolean DEBUG = false;
 
-    public static ModConfigSpec.ConfigValue<String> SPECIAL_BED_BLOCK;// = "minecraft:diamond_block";
+    /** The currently active config: global, with the running world's overrides applied. */
+    private static volatile UrbexConfig active = UrbexConfig.DEFAULT;
+    /** The global config alone, restored when a world's overrides are dropped. */
+    private static volatile UrbexConfig global = UrbexConfig.DEFAULT;
 
-    private static final String[] DEFAULT_DIMENSION_PROFILES = new String[] {
-            "urbex:city=biosphere",
-            "lostworlds:abyss=biosphere_caves",
-    };
-    private static final ModConfigSpec.ConfigValue<List<? extends String>> DIMENSION_PROFILES;
+    public static final Supplier<String> SPECIAL_BED_BLOCK = () -> active.specialBedBlock();
+    public static final Supplier<String> SELECTED_PROFILE = () -> active.selectedProfile();
+    public static final Supplier<String> SELECTED_CUSTOM_JSON = () -> active.selectedCustomJson();
+    public static final Supplier<Integer> TODO_QUEUE_SIZE = () -> active.todoQueueSize();
+    public static final Supplier<Boolean> FORCE_SAPLING_GROWTH = () -> active.forceSaplingGrowth();
+    public static final Supplier<Integer> CACHE_CLEANUP_SECONDS = () -> active.cacheCleanupSeconds();
+    public static final Supplier<Integer> HEIGHT_SAMPLE_SIZE = () -> active.heightSampleSize();
+    public static final Supplier<Boolean> AVOID_STRUCTURES_ADJACENT = () -> active.avoidStructuresAdjacent();
+    public static final Supplier<Boolean> AVOID_SURFACE_STRUCTURES = () -> active.avoidSurfaceStructures();
+    public static final Supplier<Boolean> STRUCTURES_YIELD_TO_CITIES = () -> active.structuresYieldToCities();
+    public static final Supplier<Boolean> AVOID_VILLAGES = () -> active.avoidVillages();
+    public static final Supplier<Boolean> AVOID_VILLAGES_ADJACENT = () -> active.avoidVillagesAdjacent();
+    public static final Supplier<Boolean> AVOID_FLATTENING = () -> active.avoidFlattening();
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+
+    /**
+     * Loads the global config from {@code config/urbex/urbex.json}, migrating the legacy
+     * {@code common.toml} on first run. Called once from mod init.
+     */
+    public static void loadGlobal(Path configDir) {
+        Path dir = configDir.resolve("urbex");
+        Path file = dir.resolve("urbex.json");
+        JsonObject json = null;
+        if (Files.exists(file)) {
+            json = readJson(file);
+        } else {
+            Path legacy = dir.resolve("common.toml");
+            if (Files.exists(legacy)) {
+                json = readLegacyToml(legacy);
+                Urbex.getLogger().info("Migrating legacy config {} to {}", legacy, file);
+            }
+        }
+        if (json != null) {
+            Optional<UrbexConfig> parsed = UrbexConfig.fromJson(json);
+            if (parsed.isPresent()) {
+                global = parsed.get();
+            } else {
+                Urbex.getLogger().error("Invalid config in {} - using defaults. Fix or delete the file.", file);
+            }
+        }
+        active = global;
+        // Write back the full, normalized file so every available option is visible
+        try {
+            Files.createDirectories(dir);
+            Files.writeString(file, GSON.toJson(UrbexConfig.toJson(global)));
+        } catch (IOException e) {
+            Urbex.getLogger().error("Could not write {}", file, e);
+        }
+    }
+
+    /**
+     * Applies {@code <world>/serverconfig/urbex.json} (or the legacy
+     * {@code urbex-server.toml}) over the global config. Called at SERVER_STARTING, before any
+     * worldgen; the merge is per-key, so a world file only carries what it changes.
+     */
+    public static void applyWorldOverrides(MinecraftServer server) {
+        UrbexConfig result = global;
+        Path dir = server.getWorldPath(LevelResource.ROOT).resolve("serverconfig");
+        Path file = dir.resolve("urbex.json");
+        JsonObject overrides = null;
+        if (Files.exists(file)) {
+            overrides = readJson(file);
+        } else {
+            Path legacy = dir.resolve("urbex-server.toml");
+            if (Files.exists(legacy)) {
+                overrides = readLegacyToml(legacy);
+                Urbex.getLogger().info("Migrating legacy world config {} to {}", legacy, file);
+                try {
+                    Files.createDirectories(dir);
+                    Files.writeString(file, GSON.toJson(overrides));
+                } catch (IOException e) {
+                    Urbex.getLogger().error("Could not write {}", file, e);
+                }
+            }
+        }
+        if (overrides != null && !overrides.isEmpty()) {
+            JsonObject merged = UrbexConfig.merge(UrbexConfig.toJson(global), overrides);
+            Optional<UrbexConfig> parsed = UrbexConfig.fromJson(merged);
+            if (parsed.isPresent()) {
+                result = parsed.get();
+                Urbex.getLogger().info("Applied {} world config override(s) from {}", overrides.size(), file);
+            } else {
+                Urbex.getLogger().error("Invalid world config in {} - ignoring it.", file);
+            }
+        }
+        active = result;
+        AVOID_STRUCTURES_SET = null;
+        resetProfileCache();
+    }
+
+    private static JsonObject readJson(Path file) {
+        try (Reader reader = Files.newBufferedReader(file)) {
+            return JsonParser.parseReader(reader).getAsJsonObject();
+        } catch (Exception e) {
+            Urbex.getLogger().error("Could not read {}", file, e);
+            return null;
+        }
+    }
+
+    private static JsonObject readLegacyToml(Path file) {
+        try {
+            return dev.krona.urbex.config.LegacyToml.toJson(Files.readAllLines(file));
+        } catch (IOException e) {
+            Urbex.getLogger().error("Could not read {}", file, e);
+            return null;
+        }
+    }
+
     /**
      * Dimension -> profile name, built once and then published whole.
      * <p>
-     * Reached from worker threads: {@code CityFeature.place} and {@code StructureSuppressor}
-     * both call {@link #getProfileForDimension} during generation, and since the per-dimension
-     * generation lock was removed nothing serialises them. It is {@code volatile} so a reader
-     * either sees {@code null} or sees a map that is already complete, and a
+     * Reached from worker threads: {@code CityFeature} and {@code StructureSuppressor} both call
+     * {@link #getProfileForDimension} during generation, and nothing serialises them. It is
+     * {@code volatile} so a reader either sees {@code null} or a complete map, and a
      * {@code ConcurrentHashMap} because {@link #registerUrbexDimension} can still add to it
-     * after publication.
-     * <p>
-     * The build happens in {@link #buildProfileCache} into a local map, and the field is assigned
-     * last. Two threads racing here therefore build two identical maps from the same config and
-     * the same saved data and the loser's is simply dropped - where the old plain {@code HashMap}
-     * let both threads interleave puts into two different maps while one was still being filled,
-     * and an entry lost that way means a dimension silently generates no cities at all.
-     * <p>
-     * Deliberately not {@code computeIfAbsent}: this cache is reachable from generation, and the
-     * mapping function reads config and level saved data rather than being a cheap pure function.
+     * after publication. Racing builders produce identical maps; the loser's is dropped.
      */
     private static volatile Map<ResourceKey<Level>, String> dimensionProfileCache = null;
 
     // Profile as selected by the client
     public static String profileFromClient = null;
     public static String jsonFromClient = null;
-    public static final ModConfigSpec.ConfigValue<String> SELECTED_PROFILE;
-    public static final ModConfigSpec.ConfigValue<String> SELECTED_CUSTOM_JSON;
-    public static final ModConfigSpec.IntValue TODO_QUEUE_SIZE;
-    public static final ModConfigSpec.BooleanValue FORCE_SAPLING_GROWTH;
-    public static final ModConfigSpec.IntValue CACHE_CLEANUP_SECONDS;
 
-    private static final String[] DEF_AVOID_STRUCTURES = new String[] {
-            "minecraft:mansion",
-            "minecraft:jungle_pyramid",
-            "minecraft:desert_pyramid",
-            "minecraft:igloo",
-            "minecraft:swamp_huts",
-            "minecraft:pillager_outpost"
-    };
-    private static final ModConfigSpec.ConfigValue<List<? extends String>> AVOID_STRUCTURES;
-    // Lazily filled from AVOID_STRUCTURES by cacheAvoidedStructures(). Must start out null:
+    // Lazily filled from avoidStructures by cacheAvoidedStructures(). Must start out null:
     // that method only fills the set when it is still null.
     private static Set<Identifier> AVOID_STRUCTURES_SET = null;
-    public static final ModConfigSpec.BooleanValue AVOID_STRUCTURES_ADJACENT;
-    public static final ModConfigSpec.BooleanValue AVOID_SURFACE_STRUCTURES;
-    public static final ModConfigSpec.BooleanValue STRUCTURES_YIELD_TO_CITIES;
-    public static final ModConfigSpec.BooleanValue AVOID_VILLAGES;
-    public static final ModConfigSpec.BooleanValue AVOID_VILLAGES_ADJACENT;
-    public static final ModConfigSpec.BooleanValue AVOID_FLATTENING;
-    public static final ModConfigSpec.IntValue HEIGHT_SAMPLE_SIZE;
 
     public static void reset() {
         profileFromClient = null;
         jsonFromClient = null;
         dimensionProfileCache = null;
         AVOID_STRUCTURES_SET = null;
+        active = global;
     }
 
     public static void resetProfileCache() {
@@ -115,7 +208,7 @@ public class Config {
 
     private static Map<ResourceKey<Level>, String> buildProfileCache(ServerLevel level) {
         Map<ResourceKey<Level>, String> cache = new ConcurrentHashMap<>();
-        for (String dp : DIMENSION_PROFILES.get()) {
+        for (String dp : active.dimensionsWithProfiles()) {
             String[] split = dp.split("=");
             if (split.length != 2) {
                 Urbex.getLogger().error("Bad format for config value: '{}'!", dp);
@@ -185,9 +278,7 @@ public class Config {
      * later in {@link #getProfileForDimension} during world init.
      *
      * Must run after {@link ProfileSetup#setupProfiles()} has populated {@code STANDARD_PROFILES}
-     * (which includes any user profile JSON files under config/urbex/profiles/, not just the
-     * built-in ones) - i.e. from {@code ServerLifecycleEvents.SERVER_STARTING} or later, once the
-     * server config (selectedProfile) has also been loaded.
+     * and after {@link #applyWorldOverrides} so the world's selectedProfile is in effect.
      */
     public static void validateSelectedProfiles() {
         String selected = SELECTED_PROFILE.get();
@@ -196,7 +287,7 @@ public class Config {
                     "Unknown Urbex profile '" + selected + "'. Valid profiles: "
                     + String.join(", ", new TreeSet<>(ProfileSetup.STANDARD_PROFILES.keySet())));
         }
-        for (String dp : DIMENSION_PROFILES.get()) {
+        for (String dp : active.dimensionsWithProfiles()) {
             String[] split = dp.split("=");
             if (split.length == 2) {
                 String profileName = split[1];
@@ -222,72 +313,11 @@ public class Config {
 
     private static void cacheAvoidedStructures() {
         if (AVOID_STRUCTURES_SET == null) {
-            AVOID_STRUCTURES_SET = new HashSet<>();
-            for (String s : AVOID_STRUCTURES.get()) {
-                AVOID_STRUCTURES_SET.add(Identifier.parse(s));
+            Set<Identifier> set = new HashSet<>();
+            for (String s : active.avoidStructures()) {
+                set.add(Identifier.parse(s));
             }
+            AVOID_STRUCTURES_SET = set;
         }
     }
-
-    private static final ModConfigSpec.Builder COMMON_BUILDER = new ModConfigSpec.Builder();
-    private static final ModConfigSpec.Builder CLIENT_BUILDER = new ModConfigSpec.Builder();
-    private static final ModConfigSpec.Builder SERVER_BUILDER = new ModConfigSpec.Builder();
-
-    static {
-        COMMON_BUILDER.comment("General settings").push(CATEGORY_PROFILES);
-        CLIENT_BUILDER.comment("General settings").push(CATEGORY_PROFILES);
-        SERVER_BUILDER.comment("General settings").push(CATEGORY_PROFILES);
-
-        DIMENSION_PROFILES = COMMON_BUILDER
-                .comment("A list of dimensions with associated city generation profiles (format <dimensionid>=<profilename>")
-                .defineList("dimensionsWithProfiles", Lists.newArrayList(Config.DEFAULT_DIMENSION_PROFILES), s -> s instanceof String);
-
-        HEIGHT_SAMPLE_SIZE = COMMON_BUILDER
-                .comment("The size of the chunk grid used for heightmap sampling. Default is 1 which means every chunk is sampled. Higher values will sample less chunks and thus be faster but also less accurate")
-                .defineInRange("heightSampleSize", 3, 1, 100);
-
-        SPECIAL_BED_BLOCK = SERVER_BUILDER
-                .comment("Block to put underneath a bed so that it qualifies as a teleporter bed")
-                .define("specialBedBlock", "minecraft:diamond_block");
-
-        SELECTED_PROFILE = SERVER_BUILDER.define("selectedProfile", "");
-        SELECTED_CUSTOM_JSON = SERVER_BUILDER.define("selectedCustomJson", "");
-        TODO_QUEUE_SIZE = SERVER_BUILDER.comment("The size of the todo queues for the Urbex city generator").defineInRange("todoQueueSize", 20, 1, 100000);
-        FORCE_SAPLING_GROWTH = SERVER_BUILDER.comment("If this is true then saplings will grow into trees during generation. This is more expensive").define("forceSaplingGrowth", true);
-        CACHE_CLEANUP_SECONDS = SERVER_BUILDER.comment("Time in seconds after which cached chunk data is evicted").defineInRange("cacheCleanupSeconds", 300, 1, 86400);
-        AVOID_STRUCTURES = SERVER_BUILDER
-                .comment("List of structures to avoid when generating cities (for example to avoid generating a city in a woodland mansion)")
-                .defineList("avoidStructures", Lists.newArrayList(DEF_AVOID_STRUCTURES), s -> s instanceof String);
-        AVOID_STRUCTURES_ADJACENT = SERVER_BUILDER
-                .comment("If true then also avoid generating the structures mentioned in 'avoidStructures' in chunks adjacent to the chunk with the structure")
-                .define("avoidStructuresAdjacent", false);
-        AVOID_SURFACE_STRUCTURES = SERVER_BUILDER
-                .comment("If true then avoid generating cities in chunks with any structure that generates at the 'surface_structures' step, without having to list them all in 'avoidStructures'. Useful with structure mods. Underground structures (mineshafts, strongholds, ...) are not affected")
-                .define("avoidSurfaceStructures", false);
-        STRUCTURES_YIELD_TO_CITIES = SERVER_BUILDER
-                .comment("If true then structures are not placed in the chunks and at the heights a city occupies, so the city wins instead of being built over. A structure at the edge of a city keeps the part that falls outside it. Structures that pass well below the city (ancient cities, mineshafts, ...) are not affected")
-                .define("structuresYieldToCities", false);
-        AVOID_VILLAGES_ADJACENT = SERVER_BUILDER
-                .comment("If true then also avoid generating cities in chunks adjacent to the chunks with villages")
-                .define("avoidVillagesAdjacent", false);
-        AVOID_VILLAGES = SERVER_BUILDER
-                .comment("If true then avoid generating cities in chunks with villages")
-                .define("avoidVillages", true);
-        AVOID_FLATTENING = SERVER_BUILDER
-                .comment("If true then avoid flattening the terrain around the city in case there was a structure that was avoided")
-                .define("avoidFlattening", true);
-
-        SERVER_BUILDER.pop();
-        COMMON_BUILDER.pop();
-        CLIENT_BUILDER.pop();
-
-        COMMON_CONFIG = COMMON_BUILDER.build();
-        CLIENT_CONFIG = CLIENT_BUILDER.build();
-        SERVER_CONFIG = SERVER_BUILDER.build();
-    }
-
-    public static final ModConfigSpec COMMON_CONFIG;
-    public static final ModConfigSpec CLIENT_CONFIG;
-    public static final ModConfigSpec SERVER_CONFIG;
-
 }
