@@ -200,10 +200,11 @@ public class CityPreview implements AutoCloseable {
         // doesn't see another profile's predefined content. Mirrors the old editor's preview
         // refresh.
         City.cleanPredefinedCache();
-        NullDimensionInfo diminfo = new NullDimensionInfo(profile, seed, registryAccess);
         switch (mode) {
-            case MAP -> renderMap(diminfo);
-            case TRANSPORT -> renderTransport(diminfo, profile);
+            // Only the map/transport samplers walk a NullDimensionInfo; CITY renders straight from the profile,
+            // so it does not pay to build one there.
+            case MAP -> renderMap(new NullDimensionInfo(profile, seed, registryAccess));
+            case TRANSPORT -> renderTransport(new NullDimensionInfo(profile, seed, registryAccess), profile);
             case CITY -> renderCity(profile, seed);
         }
         uploadTexture();

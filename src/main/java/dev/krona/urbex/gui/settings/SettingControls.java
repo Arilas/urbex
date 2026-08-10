@@ -400,9 +400,10 @@ public final class SettingControls {
      * {@link LabeledTextField} composite as {@link ControlKind#TEXT} (label left, editable box right), but the
      * box holds a number: the current value is formatted in, and every edit parses back to a {@link Double}
      * (the Task 4 boxing convention shared with sliders) before the descriptor's setter narrows it to the
-     * field's real type. Non-numeric or partial input (empty, a lone sign, letters) is rejected — the setter is
-     * simply not called, so the field keeps its last valid value. {@link SettingDescriptor#integerOnly()} makes
-     * an {@code int}-backed field reject decimals as well.
+     * field's real type. Non-numeric, out-of-range or partial input (empty, a lone sign, letters, a value past
+     * the descriptor's {@code [min, max]}, or — for an {@code int} field — a value beyond the {@code int} range)
+     * is rejected: the setter is simply not called, so the field keeps its last valid value.
+     * {@link SettingDescriptor#integerOnly()} makes an {@code int}-backed field reject decimals as well.
      */
     private static AbstractWidget createNumber(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
         Font font = Minecraft.getInstance().font;
@@ -415,12 +416,12 @@ public final class SettingControls {
         box.setMaxLength(32);
         box.setValue(formatNumber(initialValue, integerOnly));
         box.setResponder(text -> {
-            Double parsed = parseNumber(text, integerOnly);
+            Double parsed = validateNumber(text, integerOnly, d.min(), d.max());
             if (parsed != null) {
                 d.setter().accept(target, parsed);
                 onChanged.run();
             }
-            // else: unparseable or partial input — keep the last valid value (do not write the field).
+            // else: unparseable, partial or out-of-range input — keep the last valid value (do not write the field).
         });
 
         LabeledTextField field = new LabeledTextField(font, label, box, width, HEIGHT);
@@ -440,24 +441,53 @@ public final class SettingControls {
     }
 
     /**
-     * Parses the box text to a boxed {@link Double}, or {@code null} when the text is not a complete number the
-     * setter can accept. {@code integerOnly} fields reject any fractional part (so "3.5" into an {@code int}
-     * field is refused rather than silently rounded); decimal fields accept any finite value.
+     * Parses and validates the box text, returning a boxed {@link Double} the setter may safely accept, or
+     * {@code null} when the text is not a complete, in-range number. This is the whole safety contract of a
+     * NUMBER field, so it is deliberately pure and package-private (no GL, no widget state) — the headless
+     * {@code NumberFieldValidationTest} drives it directly.
+     *
+     * <p>Rejection (returns {@code null}, so the caller leaves the field untouched):</p>
+     * <ul>
+     *     <li>empty, blank, or a lone sign ({@code "-"} / {@code "+"}) — a partial edit in progress;</li>
+     *     <li>anything not parseable as a number, or a non-finite {@code double};</li>
+     *     <li>for an {@code integerOnly} field: any fractional part, and any magnitude outside the {@code int}
+     *         range — this is what stops e.g. {@code "3000000000"} from silently wrapping negative through the
+     *         setter's {@code (int)} narrowing;</li>
+     *     <li>any value outside the descriptor's {@code [min, max]} accepted range (the config validation
+     *         bounds) — so a NUMBER field never writes past its own declared range.</li>
+     * </ul>
      */
-    private static Double parseNumber(String text, boolean integerOnly) {
+    static Double validateNumber(String text, boolean integerOnly, double min, double max) {
+        if (text == null) {
+            return null;
+        }
         String trimmed = text.strip();
         if (trimmed.isEmpty() || trimmed.equals("-") || trimmed.equals("+")) {
             return null;
         }
+        double parsed;
         try {
             if (integerOnly) {
-                return (double) Long.parseLong(trimmed);
+                // Long.parseLong rejects any fractional part outright; the int-range guard below rejects a value
+                // that parses but would overflow the int field.
+                long asLong = Long.parseLong(trimmed);
+                if (asLong < Integer.MIN_VALUE || asLong > Integer.MAX_VALUE) {
+                    return null;
+                }
+                parsed = asLong;
+            } else {
+                parsed = Double.parseDouble(trimmed);
+                if (Double.isNaN(parsed) || Double.isInfinite(parsed)) {
+                    return null;
+                }
             }
-            double parsed = Double.parseDouble(trimmed);
-            return (Double.isNaN(parsed) || Double.isInfinite(parsed)) ? null : parsed;
         } catch (NumberFormatException e) {
             return null;
         }
+        if (parsed < min || parsed > max) {
+            return null;
+        }
+        return parsed;
     }
 
     /**

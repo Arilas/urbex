@@ -74,10 +74,15 @@ public final class Settings {
          * no natural maximum, million-block distances, huge attempt counts, or a power-of-two bit mask. Values box as
          * {@link Double} exactly like {@link #slider}; {@code integerOnly} makes the box reject decimals for
          * {@code int}-backed fields.
+         *
+         * <p>{@code min}/{@code max} still carry the field's real accepted range (the config validation bounds it
+         * was mined from) even though there is no slider track: {@link SettingControls} refuses to write a typed
+         * value outside them, so a NUMBER field can never corrupt the profile with an out-of-range (or, for an
+         * {@code int} field, an overflowing) value.</p>
          */
-        private void number(String key, SettingCategory cat, boolean integerOnly,
+        private void number(String key, SettingCategory cat, double min, double max, boolean integerOnly,
                             Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
-            add(key, cat, ControlKind.NUMBER, 0, 0, 0, false, integerOnly, getter, setter);
+            add(key, cat, ControlKind.NUMBER, min, max, 0, false, integerOnly, getter, setter);
         }
 
         /**
@@ -150,11 +155,11 @@ public final class Settings {
         // Open-ended noise parameters: CityRarityMap multiplies coordinates by these (getValue(cx/scale, ...)
         // * innerScale - offset), so there is no natural maximum a slider could pin. Typed fields instead.
         r.section("rarity_map");
-        r.number("CITY_PERLIN_SCALE", SettingCategory.CITIES, false,
+        r.number("CITY_PERLIN_SCALE", SettingCategory.CITIES, -1000000, 1000000, false,
                 p -> p.CITY_PERLIN_SCALE, (p, v) -> p.CITY_PERLIN_SCALE = (Double) v);
-        r.number("CITY_PERLIN_INNERSCALE", SettingCategory.CITIES, false,
+        r.number("CITY_PERLIN_INNERSCALE", SettingCategory.CITIES, -1000000, 1000000, false,
                 p -> p.CITY_PERLIN_INNERSCALE, (p, v) -> p.CITY_PERLIN_INNERSCALE = (Double) v);
-        r.number("CITY_PERLIN_OFFSET", SettingCategory.CITIES, false,
+        r.number("CITY_PERLIN_OFFSET", SettingCategory.CITIES, -1000000, 1000000, false,
                 p -> p.CITY_PERLIN_OFFSET, (p, v) -> p.CITY_PERLIN_OFFSET = (Double) v);
         r.slider("CITY_THRESHOLD", SettingCategory.CITIES, 0.0, 1.0, 0.01,
                 p -> (double) p.CITY_THRESHOLD, (p, v) -> p.CITY_THRESHOLD = ((Double) v).floatValue());
@@ -162,9 +167,9 @@ public final class Settings {
         // Distance-based spawn scaling: block distances up to millions (0 = disabled, so a slider would pin the
         // default uselessly) paired with the multiplier applied past each ring.
         r.section("spawn_scaling");
-        r.number("CITY_SPAWN_DISTANCE1", SettingCategory.CITIES, true,
+        r.number("CITY_SPAWN_DISTANCE1", SettingCategory.CITIES, 0, 10000000, true,
                 p -> (double) p.CITY_SPAWN_DISTANCE1, (p, v) -> p.CITY_SPAWN_DISTANCE1 = (int) Math.round((Double) v));
-        r.number("CITY_SPAWN_DISTANCE2", SettingCategory.CITIES, true,
+        r.number("CITY_SPAWN_DISTANCE2", SettingCategory.CITIES, 0, 10000000, true,
                 p -> (double) p.CITY_SPAWN_DISTANCE2, (p, v) -> p.CITY_SPAWN_DISTANCE2 = (int) Math.round((Double) v));
         r.slider("CITY_SPAWN_MULTIPLIER1", SettingCategory.CITIES, 0.0, 1.0, 0.01,
                 p -> p.CITY_SPAWN_MULTIPLIER1, (p, v) -> p.CITY_SPAWN_MULTIPLIER1 = (Double) v);
@@ -285,10 +290,12 @@ public final class Settings {
         r.toggle("EXPLOSIONS_IN_CITIES_ONLY", SettingCategory.DAMAGE,
                 p -> p.EXPLOSIONS_IN_CITIES_ONLY, (p, v) -> p.EXPLOSIONS_IN_CITIES_ONLY = (Boolean) v);
 
+        // Mini explosions are much smaller than the full-size ones (defaults 5/12), so their radii get a smaller
+        // dedicated cap than the 1..256 above, keeping the default off the left edge.
         r.section("mini_explosions");
-        r.slider("MINI_EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 256, 1,
+        r.slider("MINI_EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 100, 1,
                 p -> (double) p.MINI_EXPLOSION_MINRADIUS, (p, v) -> p.MINI_EXPLOSION_MINRADIUS = (int) Math.round((Double) v));
-        r.slider("MINI_EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 256, 1,
+        r.slider("MINI_EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 100, 1,
                 p -> (double) p.MINI_EXPLOSION_MAXRADIUS, (p, v) -> p.MINI_EXPLOSION_MAXRADIUS = (int) Math.round((Double) v));
         r.slider("MINI_EXPLOSION_MINHEIGHT", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.MINI_EXPLOSION_MINHEIGHT, (p, v) -> p.MINI_EXPLOSION_MINHEIGHT = (int) Math.round((Double) v));
@@ -313,7 +320,7 @@ public final class Settings {
                 p -> (double) p.HIGHWAY_SECONDARYPERLIN_SCALE, (p, v) -> p.HIGHWAY_SECONDARYPERLIN_SCALE = ((Double) v).floatValue());
         r.slider("HIGHWAY_PERLIN_FACTOR", SettingCategory.TRANSPORT, -100.0, 100.0, 0.1,
                 p -> (double) p.HIGHWAY_PERLIN_FACTOR, (p, v) -> p.HIGHWAY_PERLIN_FACTOR = ((Double) v).floatValue());
-        r.number("HIGHWAY_DISTANCE_MASK", SettingCategory.TRANSPORT, true,
+        r.number("HIGHWAY_DISTANCE_MASK", SettingCategory.TRANSPORT, 0, Integer.MAX_VALUE, true,
                 p -> (double) p.HIGHWAY_DISTANCE_MASK, (p, v) -> p.HIGHWAY_DISTANCE_MASK = (int) Math.round((Double) v));
         r.toggle("HIGHWAY_SUPPORTS", SettingCategory.TRANSPORT,
                 p -> p.HIGHWAY_SUPPORTS, (p, v) -> p.HIGHWAY_SUPPORTS = (Boolean) v);
@@ -405,13 +412,14 @@ public final class Settings {
         r.toggle("FORCE_SPAWN_IN_BUILDING", SettingCategory.SPAWN,
                 p -> p.FORCE_SPAWN_IN_BUILDING, (p, v) -> p.FORCE_SPAWN_IN_BUILDING = (Boolean) v);
 
-        // Attempt count up to a million; a slider pins the default (20000) in a sliver of the track.
+        // The spawn-search knobs all run to large validation ceilings (radii to 100000, attempts to a million)
+        // with defaults sitting in a sliver of any slider track, so all three are typed NUMBER fields.
         r.section("search");
-        r.slider("SPAWN_CHECK_RADIUS", SettingCategory.SPAWN, 1, 5000, 1,
+        r.number("SPAWN_CHECK_RADIUS", SettingCategory.SPAWN, 1, 100000, true,
                 p -> (double) p.SPAWN_CHECK_RADIUS, (p, v) -> p.SPAWN_CHECK_RADIUS = (int) Math.round((Double) v));
-        r.slider("SPAWN_RADIUS_INCREASE", SettingCategory.SPAWN, 1, 5000, 1,
+        r.number("SPAWN_RADIUS_INCREASE", SettingCategory.SPAWN, 1, 100000, true,
                 p -> (double) p.SPAWN_RADIUS_INCREASE, (p, v) -> p.SPAWN_RADIUS_INCREASE = (int) Math.round((Double) v));
-        r.number("SPAWN_CHECK_ATTEMPTS", SettingCategory.SPAWN, true,
+        r.number("SPAWN_CHECK_ATTEMPTS", SettingCategory.SPAWN, 1, 1000000, true,
                 p -> (double) p.SPAWN_CHECK_ATTEMPTS, (p, v) -> p.SPAWN_CHECK_ATTEMPTS = (int) Math.round((Double) v));
 
         // ==== ADVANCED =======================================================
