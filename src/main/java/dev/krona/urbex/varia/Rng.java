@@ -24,9 +24,6 @@ public final class Rng {
     /** One independent stream per consumer. Never reorder or remove constants: doing so changes every world. */
     public enum Purpose {
         BUILDING,
-        /** No longer drawn from: the street-type re-roll it fed died with the road field. Kept because
-         *  removing it would renumber everything below and change every world. */
-        STREET,
         MULTI,
         PARTS,
         RUINS,
@@ -38,16 +35,9 @@ public final class Rng {
         LOOT,
         VEGETATION,
         DAMAGE,
-        VINES,
         CITY_CENTER,
         CITY_RADIUS,
         CITY_STYLE,
-        // RESERVED - do not delete, even though nothing calls Rng with it today. The ordinal is
-        // part of the hash (see at()/atPos()/atSlot(): purpose.ordinal() feeds the mix), so
-        // removing this constant would shift RAILWAY and everything after it by one and silently
-        // change every world ever generated. If highway placement ever needs an addressed stream
-        // again, reuse this constant rather than appending a new one.
-        HIGHWAY,
         RAILWAY,
         SPHERE,
         SCATTERED,
@@ -64,11 +54,9 @@ public final class Rng {
         DAMAGE_VARIANT,
         // Each of these splits a second, logically independent decision off an address that
         // already had one. Two decisions sharing an address and a purpose read the same draw, so
-        // one becomes a monotone function of the other - a sphere's block from its radius, a
-        // vine's length from where vines start.
+        // one becomes a monotone function of the other - a sphere's block from its radius.
         SPHERE_BLOCKS,
         SPHERE_CITY_LEVEL,
-        VINES_CONTINUE,
         TERRAIN_FIX_LOWER,
         TERRAIN_FIX_UPPER,
         CITY_STYLE_LOCAL,
@@ -90,13 +78,6 @@ public final class Rng {
         // and one purpose would make accepting the one imply accepting the other.
         EXPLOSION_ACCEPT,
         EXPLOSION_MINI_ACCEPT,
-        // generateVines runs four wall passes. The west pass keeps VINES; the other three take
-        // their own constant because the west and north passes address the same block at a chunk's
-        // NW corner column - one purpose there would make the two facings the identical roll, so
-        // the corner could never have one facing without the other.
-        VINES_EAST,
-        VINES_NORTH,
-        VINES_SOUTH,
         LIGHTING_DENSITY,
         LIGHTING_VARIANT,
         LOOT_DENSITY,
