@@ -111,6 +111,14 @@ and `/urbex debug` all bind to `RoadField`, never to the grid implementation. Th
 **no registry and no mode enum**: hard replace means exactly one implementation is wired, and a
 future terrain-aware planner replaces it by construction rather than by configuration.
 
+> **Amended 2026-08-10, streets follow-up review (#106).** Two things above are now stale.
+> `RoadCell.density` is `double` in the shipped record, not `float` as written above. And "that is
+> the entire contract" undersold `RoadField`: the interface gained a second method since this
+> section was written, `typeAt(int chunkX, int chunkZ)` — a default that returns
+> `at(chunkX, chunkZ).type()` for the many callers that need only the road class, which
+> implementations may override for a cheaper answer as long as it agrees with `at(...).type()`. The
+> contract is `at` plus `typeAt`, not `at` alone.
+
 ### 3.2 Package layout
 
 The pure module reuses `dev.krona.urbex.plan`, the root P3 established for dependency-free planning
@@ -174,7 +182,10 @@ Per chunk:
 2. `effective = EffectiveRoad.resolve(raw, isCityRaw(here), anyConnectedNeighbourIsCityRaw, overriddenByHigherPrecedence)`.
    The neighbour test removes isolated one-chunk stubs at city protrusions and consults only
    lower-level raw city membership, so height, biome, rarity, sphere, void and city-factor clipping
-   are all preserved without depending on final building decisions.
+   are all preserved without depending on final building decisions. At its sole call site
+   (`BuildingInfo.effectiveRoadType`), `overriddenByHigherPrecedence` is hardcoded `false` — a
+   multi-building's precedence over a road never reaches `EffectiveRoad` this way. That precedence
+   is enforced downstream instead, by `ChunkContentResolver`'s `!hasBuilding` check on the chunk.
 3. `ChunkContentResolver` walks the precedence order and returns `ChunkContent`.
 4. `BuildingInfo` consumes it. `MultiChunk.canPlaceBuilding()` queries the **raw** field.
 
