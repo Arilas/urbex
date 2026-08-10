@@ -212,7 +212,7 @@ public class CityPreview implements AutoCloseable {
                 // so it does not pay to build one there.
                 case MAP -> renderMap(new NullDimensionInfo(profile, seed, registryAccess));
                 case TRANSPORT -> renderTransport(new NullDimensionInfo(profile, seed, registryAccess), profile);
-                case ROADS -> renderRoads(new NullDimensionInfo(profile, seed, registryAccess));
+                case ROADS -> renderRoads(new NullDimensionInfo(profile, seed, registryAccess), profile);
                 case CITY -> renderCity(profile, seed);
             }
         } catch (IllegalArgumentException e) {
@@ -293,26 +293,37 @@ public class CityPreview implements AutoCloseable {
      * over the top: one opaque colour per {@link RoadType} (see {@link #roadColour}), so the grid's
      * shape - primary spine, secondary fill, tertiary stubs - reads before any chunk generates.
      * <p>
-     * Samples {@link dev.krona.urbex.plan.RoadField#typeAt} rather than {@code at} - thousands of
-     * chunks are sampled per frame, and {@code at} pays for the block-layout build (and its
-     * candidate-list sort) this mode has no use for.
+     * Classifies through {@link BuildingInfo#effectiveRoadType} rather than
+     * {@link dev.krona.urbex.plan.RoadField#typeAt}. That is deliberate: {@code effectiveRoadType} is
+     * the exact "raw field clipped to the city mask" computation real generation renders from (city
+     * membership plus the connected-neighbour check that removes isolated one-chunk stubs at a city
+     * mask's protrusions), and it is a pure function of coordinate, dimension and profile - it takes
+     * no random draw and reads nothing about buildings. An earlier version of this method gated the
+     * road-field query on {@link BuildingInfo#hasBuildingGui}, meaning to skip chunks a building
+     * claims; that predicate is an <em>independent</em> {@code BUILDING_CHANCE} coin flip with no
+     * correlation to the real per-chunk content decision (see below), so it silently recoloured
+     * roughly a {@code BUILDING_CHANCE} fraction of genuine road chunks as background - the mode
+     * misrepresenting the very grid it exists to show. Do not resurrect it.
      * <p>
-     * A chunk an accepted multi-building has claimed is drawn as a building, never as a road:
-     * {@link BuildingInfo#getEffectiveRoadType()} still reports the class the raw field assigned
-     * there - the multi wins the content decision, not the field - so painting straight from the road
-     * type would draw a road through the building. Excluding it needs the same
-     * {@link BuildingInfo#hasBuildingGui} check {@link #sampleColor} already uses to choose
-     * {@link #BUILDING_COLOR} over {@link #CITY_COLOR}, so a building chunk here simply gets no
-     * overlay and the dimmed base (already the right colour) shows through.
+     * <b>What this still cannot know:</b> whether an accepted multi-building has claimed a chunk that
+     * the raw field still calls a road (the trap Task 4's review found in
+     * {@code BuildingInfo.getEffectiveRoadType()} - the field never learns about the content
+     * decision, on purpose, to keep that decision graph acyclic). Real generation resolves multi-
+     * building placement through {@link dev.krona.urbex.worldgen.lost.MultiChunk}, which reaches a
+     * live {@code WorldGenLevel} to look up building assets; this preview runs off
+     * {@link NullDimensionInfo} with no server, so that placement is not something it can reproduce
+     * without touching generation-path code to add a registry-only asset lookup - out of this mode's
+     * scope. So: a chunk an accepted multi-building will claim in the real world may still show a
+     * road colour here. Unlike the predicate this replaced, that is an honest, narrow gap (multi-
+     * building footprints only, not a random fraction of the whole grid), not a defect masquerading
+     * as a guarantee.
      */
-    private void renderRoads(NullDimensionInfo diminfo) {
+    private void renderRoads(NullDimensionInfo diminfo, UrbexProfile profile) {
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));
                 ChunkCoord c = new ChunkCoord(diminfo.dimension(), x, z);
-                ChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristicsGui(c, diminfo);
-                boolean roadable = characteristics.isCity && !BuildingInfo.hasBuildingGui(x, z, diminfo, characteristics);
-                RoadType type = roadable ? diminfo.roadField().typeAt(x, z) : RoadType.NONE;
+                RoadType type = BuildingInfo.effectiveRoadType(c, diminfo, profile);
                 colors[z * WIDTH + x] = blend(base, roadColour(type));
             }
         }
