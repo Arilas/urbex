@@ -383,6 +383,16 @@ public class ChunkDriver {
     }
 
     /**
+     * True when this position sits on the edge of its own chunk, so at least one of its four
+     * horizontal neighbours lives in the next chunk along.
+     */
+    private static boolean isOnChunkBoundary(BlockPos pos) {
+        int lx = pos.getX() & 0xf;
+        int lz = pos.getZ() & 0xf;
+        return lx == 0 || lx == 15 || lz == 0 || lz == 15;
+    }
+
+    /**
      * Shape-updates the in-chunk neighbour at {@code pos} against the newly placed {@code state}
      * and returns the neighbour's (possibly updated) state for the placed block's own
      * connection decisions.
@@ -400,6 +410,17 @@ public class ChunkDriver {
         }
         BlockState adjacent = getBlock(pos);
         if (adjacent.getBlock() instanceof LadderBlock) {
+            return adjacent;
+        }
+        if (isOnChunkBoundary(pos)) {
+            // updateShape consults this block's own outward neighbour, which lives in the next
+            // chunk. At the carver stage the write radius is 0, so that read is forbidden - and
+            // the neighbour is not finished anyway. Defer instead: vanilla recomputes the
+            // connections from final neighbour data when the chunk is postprocessed, the same
+            // mechanism vanilla structures use across chunk borders. Marking here rather than
+            // relying on correct()'s mark is deliberate: that one only fires for positions the
+            // driver itself writes, and this position may be untouched terrain.
+            thisChunk.markPosForPostProcessing(pos.immutable());
             return adjacent;
         }
         BlockState newAdjacent = null;
