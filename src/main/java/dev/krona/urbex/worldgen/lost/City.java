@@ -345,8 +345,11 @@ public class City {
             }
         }
 
-        if (factor > 0.0001 && provider.getWorld() != null) {
-            // Check if the terrain is not too low or high for building
+        if (factor > 0.0001 && provider.registryAccess() != null) {
+            // Check if the terrain is not too low or high for building. Gated on registry access
+            // rather than a real WorldGenLevel so the world-creation preview (registry access
+            // present, world null) applies this too - real worldgen always has both, so this is
+            // unchanged there.
             ChunkHeightmap heightmap = provider.getHeightmap(coord);
             if (heightmap == null) {
                 return 0;
@@ -359,8 +362,8 @@ public class City {
             }
         }
 
-        if (factor > 0.0001 && provider.getWorld() != null) {
-            WorldStyle worldStyle = AssetRegistries.WORLDSTYLES.get(provider.getWorld(), profile.getWorldStyle());
+        if (factor > 0.0001 && provider.registryAccess() != null) {
+            WorldStyle worldStyle = AssetRegistries.WORLDSTYLES.get(provider.registryAccess(), profile.getWorldStyle());
             float multiplier = worldStyle.getCityChanceMultiplier(provider, coord);
             factor *= multiplier;
         }

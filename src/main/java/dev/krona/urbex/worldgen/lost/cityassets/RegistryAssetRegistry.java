@@ -4,6 +4,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.worldgen.lost.regassets.IAsset;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
@@ -84,6 +85,45 @@ public class RegistryAssetRegistry<T, R> {
         }
         if (t instanceof CityStyle cs) {
             cs.init(level);
+        }
+        return t;
+    }
+
+    /**
+     * Same lookup as {@link #get(CommonLevelAccessor, Identifier)}, but for callers that only have
+     * registry access and no {@link CommonLevelAccessor} - the world-creation preview, chiefly, via
+     * {@code NullDimensionInfo}. Assets that need {@code CityStyle.init(level)} aren't supported
+     * through this path; none of the current preview call sites resolve a CityStyle this way.
+     */
+    @Nullable
+    public T get(RegistryAccess access, String name) {
+        if (name == null) {
+            return null;
+        }
+        return get(access, DataTools.fromName(name));
+    }
+
+    @Nullable
+    public T get(RegistryAccess access, Identifier name) {
+        if (access == null || name == null) {
+            return null;
+        }
+        T t = assets.get(name);
+        if (t == null) {
+            try {
+                Registry<R> registry = access.lookupOrThrow(registryKey);
+                R value = registry.getValueOrThrow(ResourceKey.create(registryKey, name));
+                if (value instanceof IAsset asset) {
+                    asset.setRegistryName(name);
+                }
+                t = assetConstructor.apply(value);
+            } catch (Exception e) {
+                throw new RuntimeException("Error getting resource " + name + "!", e);
+            }
+            T raced = assets.putIfAbsent(name, t);
+            if (raced != null) {
+                t = raced;
+            }
         }
         return t;
     }

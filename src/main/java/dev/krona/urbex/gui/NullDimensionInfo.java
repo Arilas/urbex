@@ -1,5 +1,6 @@
 package dev.krona.urbex.gui;
 
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
@@ -11,6 +12,8 @@ import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
@@ -19,6 +22,7 @@ import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Random;
@@ -94,11 +98,25 @@ public class NullDimensionInfo implements IDimensionInfo {
     private final Random random;
     private final long seed;
 
+    private final RegistryAccess registryAccess;
+    @Nullable
     private final Registry<Biome> biomeRegistry;
     private final CityGenerator feature;
     private final DimensionCaches caches;
 
+    /**
+     * @deprecated No registry access means {@link #getBiome} can't resolve a real biome and the
+     * {@code IDimensionInfo#registryAccess()}-gated rules in {@code City} (worldstyle city-chance
+     * multiplier, CITY_MINHEIGHT/MAXHEIGHT gating) stay off, same as before this constructor
+     * existed. Kept only so existing no-registry callers keep compiling; prefer
+     * {@link #NullDimensionInfo(UrbexProfile, long, RegistryAccess)}.
+     */
+    @Deprecated
     public NullDimensionInfo(UrbexProfile profile, long seed) {
+        this(profile, seed, null);
+    }
+
+    public NullDimensionInfo(UrbexProfile profile, long seed, @Nullable RegistryAccess registryAccess) {
         this.profile = profile;
         this.caches = new DimensionCaches(seed);
         style = new WorldStyle(new WorldStyleRE(
@@ -114,10 +132,8 @@ public class NullDimensionInfo implements IDimensionInfo {
         this.seed = seed;
         random = new Random(seed);
         feature = new CityGenerator(this, profile);
-        // @todo 1.19.3
-//        biomeRegistry = ServerLifecycleHooks.getCurrentServer().registryAccess().registryOrThrow(Registries.BIOME);
-//        biomeRegistry = RegistryAccess.builtinCopy().registry(Registry.BIOME_REGISTRY).get();
-        biomeRegistry = null;
+        this.registryAccess = registryAccess;
+        biomeRegistry = registryAccess != null ? registryAccess.lookupOrThrow(Registries.BIOME) : null;
     }
 
     @Override
@@ -128,6 +144,12 @@ public class NullDimensionInfo implements IDimensionInfo {
     @Override
     public WorldGenLevel getWorld() {
         return null;
+    }
+
+    @Nullable
+    @Override
+    public RegistryAccess registryAccess() {
+        return registryAccess;
     }
 
     @Override
@@ -219,8 +241,19 @@ public class NullDimensionInfo implements IDimensionInfo {
 //        return biomes;
 //    }
 
+    @Nullable
     @Override
     public Holder<Biome> getBiome(BlockPos pos) {
+        if (biomeRegistry == null) {
+            // #67: no registry access (the deprecated no-registry constructor) means there's no
+            // registry to resolve even a plains fallback from - dereferencing it unconditionally is
+            // what used to NPE here. Every caller currently reachable without registry access
+            // (BuildingInfo.getChunkCharacteristicsGui and friends) never dereferences this result:
+            // the registryAccess()-gated rules in City that do read biomes only run when we're not
+            // in this branch.
+            Urbex.LOGGER.warn("NullDimensionInfo.getBiome() called without registry access; returning null.");
+            return null;
+        }
         ChunkPos cp = ChunkPos.containing(pos);
         char b = getBiomeChar(cp.x(), cp.z());
         ResourceKey<Biome> biome = switch (b) {
@@ -233,6 +266,7 @@ public class NullDimensionInfo implements IDimensionInfo {
             // @todo 1.18
             case '*' -> Biomes.BEACH;
             case 'd' -> Biomes.DESERT;
+            // Plains fallback for anything unmapped, same as the old default branch.
             default -> Biomes.PLAINS;
         };
         return biomeRegistry.getOrThrow(biome);
@@ -240,6 +274,8 @@ public class NullDimensionInfo implements IDimensionInfo {
 
     @Override
     public ResourceKey<Level> dimension() {
-        return null;
+        // Agrees with getType(): both name the overworld. dimension() used to return null here,
+        // which disagreed with getType() and tripped up anything that assumed the two matched (#67).
+        return Level.OVERWORLD;
     }
 }
