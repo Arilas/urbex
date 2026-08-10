@@ -316,10 +316,10 @@ class GridRoadFieldTest {
 
     @Test
     void demandingMoreSecondaryRoadsThanFitYieldsFewerRatherThanThrowing() {
-        // A default-width primary block (8 wide, since primaryForceEvery=4 caps the search at
-        // one forced candidate away in the worst case) cannot possibly fit 128 roads at
-        // minimumRoadSeparation=4; the count must fall back to whatever actually fits instead of
-        // throwing or returning the full demand.
+        // A default-width primary block (8..32 wide: candidates are primarySpacingX=8 apart, and
+        // primaryForceEvery=4 caps how many can be skipped before the fourth candidate is forced
+        // active) cannot possibly fit 128 roads at minimumRoadSeparation=4; the count must fall
+        // back to whatever actually fits instead of throwing or returning the full demand.
         GridSettings crowded = new GridSettings(8, 8, 0.45f, 4, 128, 128, 128, 128, 4, 3, 0.40f, 2, 5);
         GridRoadField f = new GridRoadField(1337L, "urbex:test", crowded);
 

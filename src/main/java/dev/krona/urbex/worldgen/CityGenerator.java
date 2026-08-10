@@ -1695,6 +1695,12 @@ public class CityGenerator {
      */
     private void generateStreetSlopeSection(ChunkGenContext ctx, BuildingInfo info, int height, Direction slopeDirection) {
         StreetParts parts = getStreetParts(info);
+        // A style with no stair part has opted out of slopes the same way an empty connector list
+        // opts out of connectors below: asset gaps degrade rather than crash. Without this guard,
+        // getRandomPart would call List.get on an empty list and throw.
+        if (parts.stair().isEmpty()) {
+            return;
+        }
         BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.stair()));
         if (part != null) {
             generatePart(ctx, info, part, slopeDirection.getRotation(), 0, height, 0, HardAirSetting.VOID);

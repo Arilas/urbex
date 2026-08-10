@@ -25,6 +25,14 @@ public record RoadCell(RoadType type,
         secondaryZ = List.copyOf(secondaryZ);
     }
 
+    /**
+     * No caller in this codebase today - every consumer here branches on {@link #type} directly,
+     * since it also needs to know <em>which</em> road class. Kept anyway as part of {@link RoadField}'s
+     * public data contract, alongside {@link #connects}: a future second {@code RoadField}
+     * implementation's own consumers, or a test, get the "is this a road at all" predicate without
+     * repeating {@code type() != RoadType.NONE} against a record whose fields beyond {@code type} are
+     * explicitly diagnostic-only.
+     */
     public boolean isRoad() {
         return type != RoadType.NONE;
     }
