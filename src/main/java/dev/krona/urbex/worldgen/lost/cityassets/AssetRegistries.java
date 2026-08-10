@@ -74,6 +74,12 @@ public class AssetRegistries {
         if (loadedPredefined) {
             return;
         }
+        if (level == null) {
+            // Nothing to load without a level (the world-creation preview, chiefly - its
+            // NullDimensionInfo.getWorld() is always null). Don't latch the "loaded" flag on a
+            // no-op: a real level arriving later must still get its predefined cities/spheres (#67).
+            return;
+        }
         PREDEFINED_CITIES.loadAll(level);
         PREDEFINED_SPHERES.loadAll(level);
         loadedPredefined = true;

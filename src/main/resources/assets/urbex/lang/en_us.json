@@ -1,0 +1,15 @@
+{
+  "urbex.tab.cities": "Cities",
+  "urbex.preview.legend.city": "City",
+  "urbex.preview.legend.building": "Building",
+  "urbex.preview.legend.water": "Water",
+  "urbex.preview.unavailable": "No preview available",
+  "urbex.preview.reroll": "⟳ New preview seed",
+  "urbex.preview.seed_locked": "The preview follows the world seed you typed. Clear the Seed field to roll preview seeds.",
+  "urbex.preset.disabled": "Disabled",
+  "urbex.preset.disabled.info": "Urbex leaves this world alone: no cities, no ruins, no highways.",
+  "urbex.preset.custom": "Custom",
+  "urbex.preset.custom_prefix": "✎ ",
+  "urbex.preset.custom_suffix": " (based on %s)",
+  "urbex.screen.customize": "Customize this preset…"
+}

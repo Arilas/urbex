@@ -3,6 +3,7 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.gui.elements.*;
+import dev.krona.urbex.mixin.CreateWorldScreenAccessor;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.CityFeature;
@@ -15,6 +16,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.server.packs.repository.PackRepository;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -55,6 +58,26 @@ public class UrbexConfigScreen extends Screen {
         localSetup.copyFrom(ClientProfileSetup.CLIENT_SETUP);
     }
 
+    /**
+     * The pack list {@link ClientProfileSetup#toggleWorldStyle} scans for {@code urbex/worldstyles}
+     * jsons (issue #66). Prefers the datapack repository the in-progress {@link CreateWorldScreen}
+     * is using when {@code parent} is one - exposed via {@link CreateWorldScreenAccessor} since it's
+     * a private field on {@code CreateWorldScreen} - because that can carry worldstyles from packs
+     * enabled just for the new world. That repository is only populated once the player opens the
+     * "Data Packs" screen during creation, so this falls back to the client's resource pack
+     * repository (which still surfaces Urbex's own bundled worldstyles) whenever it's null or
+     * {@code parent} isn't a {@code CreateWorldScreen} at all.
+     */
+    private PackRepository worldStylePackRepository() {
+        if (parent instanceof CreateWorldScreen createWorldScreen) {
+            PackRepository fromScreen = ((CreateWorldScreenAccessor) createWorldScreen).urbex$getTempDataPackRepository();
+            if (fromScreen != null) {
+                return fromScreen;
+            }
+        }
+        return Minecraft.getInstance().getResourcePackRepository();
+    }
+
     public static void selectProfile(String profileName, @Nullable UrbexProfile profile) {
         Config.profileFromClient = profileName;
 
@@ -92,7 +115,7 @@ public class UrbexConfigScreen extends Screen {
         }).tooltip(Component.literal("Select a standard profile for Urbex worldgen")));
 
         worldstyleButton = addRenderableWidget(new ButtonExt(145, 10, 120, 20, Component.literal(localSetup.getWorldStyleLabel()), p -> {
-            localSetup.toggleWorldStyle();
+            localSetup.toggleWorldStyle(worldStylePackRepository());
             updateValues();
         }).tooltip(Component.literal("Select the worldstyle to use for this profile")));
 
@@ -487,9 +510,34 @@ public class UrbexConfigScreen extends Screen {
             selectProfile(localSetup.getProfile(), null);
         }
 
+        syncToPresetSelection(customizedProfile);
+
         Minecraft.getInstance().gui.setScreen(parent);
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
+    }
+
+    /**
+     * Mirrors what this (old) editor just committed into {@link PresetSelection}, so the Cities tab
+     * shows the same thing when the screen it returns to re-initialises. Phase 2 of the GUI
+     * redesign replaces this editor with one that edits {@code PresetSelection} directly and this
+     * bridge goes away with it; until then the two must not be allowed to disagree about which
+     * preset generates the world.
+     * <p>
+     * Only the selection is mirrored, never {@code publish()}ed: {@link #selectProfile} above has
+     * already written the identical {@code Config} state (see {@code PresetSelection.publish}).
+     */
+    private void syncToPresetSelection(@Nullable UrbexProfile customizedProfile) {
+        String profileName = localSetup.getProfile();
+        if ("customized".equals(profileName) && customizedProfile != null) {
+            // The old setup discards which preset a customization started from, so the lineage is
+            // recorded as "unknown" rather than invented.
+            PresetSelection.CLIENT.applyCustomized(customizedProfile, PresetSelection.CUSTOM_ID);
+        } else if (profileName == null) {
+            PresetSelection.CLIENT.select(PresetSelection.DISABLED_ID);
+        } else {
+            PresetSelection.CLIENT.select(profileName);
+        }
     }
 
     @Override

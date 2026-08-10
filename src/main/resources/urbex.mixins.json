@@ -8,6 +8,8 @@
     "StructureStartMixin"
   ],
   "client": [
+    "CreateWorldScreenAccessor",
+    "CreateWorldScreenTabMixin",
     "WorldListEntryMixin"
   ],
   "injectors": {

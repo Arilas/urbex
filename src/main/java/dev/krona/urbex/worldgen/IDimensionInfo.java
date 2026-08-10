@@ -5,6 +5,7 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
@@ -27,6 +28,19 @@ public interface IDimensionInfo {
      * and the level would go looking for the rest.
      */
     WorldGenLevel getWorld();
+
+    /**
+     * Registry access for this dimension, or {@code null} if none is available. Real dimensions
+     * always have one (it comes straight off {@link #getWorld()}); {@code NullDimensionInfo} is the
+     * one implementor that can have registry access - and so be able to evaluate registry-backed
+     * worldgen rules - while still having no {@link WorldGenLevel} to hand out, which is what makes
+     * this a separate question from "is {@link #getWorld()} null".
+     */
+    @Nullable
+    default RegistryAccess registryAccess() {
+        WorldGenLevel world = getWorld();
+        return world != null ? world.registryAccess() : null;
+    }
 
     /** The per-dimension caches. Dropped with the dimension. */
     DimensionCaches caches();

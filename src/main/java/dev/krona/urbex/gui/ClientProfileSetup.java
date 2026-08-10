@@ -4,7 +4,6 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.config.ProfileSetup;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.PackType;
@@ -84,30 +83,6 @@ public class ClientProfileSetup {
         this.customizedProfile = other.customizedProfile;
     }
 
-    /**
-     * Restores a profile selection read from an existing world's saved data, for the vanilla
-     * Re-Create flow (issue #85). Mirrors what {@link UrbexConfigScreen#selectProfile} publishes so
-     * the restored choice reaches the server even if the Cities screen is never opened.
-     */
-    public void restoreFromSavedData(String profileName, String json) {
-        if (profileName == null || profileName.isEmpty()) {
-            return;
-        }
-        if (json != null && !json.isEmpty()) {
-            customizedProfile = new UrbexProfile("customized", false);
-            customizedProfile.copyFrom(new UrbexProfile("customized", json));
-            ProfileSetup.STANDARD_PROFILES.put("customized", customizedProfile);
-            profile = "customized";
-            UrbexConfigScreen.selectProfile("customized", customizedProfile);
-        } else if (ProfileSetup.STANDARD_PROFILES.containsKey(profileName)) {
-            profile = profileName;
-            UrbexConfigScreen.selectProfile(profileName, null);
-        } else {
-            Urbex.getLogger().warn("Re-created world used unknown Urbex profile '{}'; ignoring", profileName);
-        }
-        refreshPreview.run();
-    }
-
     public void customize() {
         if (profile == null) {
             throw new IllegalStateException("Cannot happen!");
@@ -115,7 +90,14 @@ public class ClientProfileSetup {
         customizedProfile = new UrbexProfile("customized", false);
         UrbexProfile original = ProfileSetup.STANDARD_PROFILES.get(profile);
         ProfileSetup.STANDARD_PROFILES.put("customized", customizedProfile);
-        profiles.add("customized");
+        // profiles is only the toggle-button's cycle cache, and it is built lazily by
+        // toggleProfile(). Since the Cities tab can now hand this class a profile without the
+        // player ever having pressed that button, it may legitimately still be null here - it used
+        // to be impossible, so this was an unguarded NPE. The contains() check likewise stops a
+        // second customize() from pushing a duplicate entry into the cycle.
+        if (profiles != null && !profiles.contains("customized")) {
+            profiles.add("customized");
+        }
         customizedProfile.copyFrom(original);
         profile = "customized";
         refreshPreview.run();
@@ -158,11 +140,26 @@ public class ClientProfileSetup {
         return path;
     }
 
-    public void toggleWorldStyle() {
-        PackRepository repository = Minecraft.getInstance().getResourcePackRepository();
-        CloseableResourceManager resourceManager = new MultiPackResourceManager(PackType.SERVER_DATA, repository.openAllSelected());
-        Map<Identifier, Resource> map = resourceManager.listResources("urbex/worldstyles", s -> s.toString().endsWith(".json"));
-        List<String> styles = map.keySet().stream().map(ClientProfileSetup::worldStyleToName).collect(Collectors.toList());
+    /**
+     * Cycles the current profile's world style to the next one found under
+     * {@code urbex/worldstyles} in {@code repository}'s selected packs (issue #66).
+     * <p>
+     * {@code repository} is a parameter rather than always {@code Minecraft.getInstance()
+     * .getResourcePackRepository()} so the caller can prefer a more relevant pack list (e.g. the
+     * data packs enabled for the world being created) when one is reachable; see
+     * {@link UrbexConfigScreen}'s call site for the fallback.
+     */
+    public void toggleWorldStyle(PackRepository repository) {
+        List<String> styles;
+        try (CloseableResourceManager resourceManager = new MultiPackResourceManager(PackType.SERVER_DATA, repository.openAllSelected())) {
+            Map<Identifier, Resource> map = resourceManager.listResources("urbex/worldstyles", s -> s.toString().endsWith(".json"));
+            styles = map.keySet().stream().map(ClientProfileSetup::worldStyleToName).collect(Collectors.toList());
+        }
+        if (styles.isEmpty()) {
+            // No worldstyle jsons visible in the selected packs at all - nothing to cycle to.
+            refreshPreview.run();
+            return;
+        }
         String current = get().map(UrbexProfile::getWorldStyle).orElse("<none>");
         int idx = styles.indexOf(current);
         if (idx == -1) {
