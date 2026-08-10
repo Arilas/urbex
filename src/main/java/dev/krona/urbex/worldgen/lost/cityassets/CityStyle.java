@@ -344,6 +344,7 @@ public class CityStyle {
                 stuffTags.addAll(inheritFrom.stuffTags);
                 buildingSelector.addAll(inheritFrom.buildingSelector);
                 bridgeSelector.addAll(inheritFrom.bridgeSelector);
+                largeBridgeSelector.addAll(inheritFrom.largeBridgeSelector);
                 parkSelector.addAll(inheritFrom.parkSelector);
                 fountainSelector.addAll(inheritFrom.fountainSelector);
                 stairSelector.addAll(inheritFrom.stairSelector);
@@ -358,6 +359,12 @@ public class CityStyle {
                 }
                 if (streetParts == StreetParts.DEFAULT) {
                     streetParts = inheritFrom.streetParts;
+                }
+                if (largeStreetParts == StreetParts.DEFAULT) {
+                    largeStreetParts = inheritFrom.largeStreetParts;
+                }
+                if (tertiaryStreetParts == StreetParts.DEFAULT) {
+                    tertiaryStreetParts = inheritFrom.tertiaryStreetParts;
                 }
                 if (minFloorCount == null) {
                     minFloorCount = inheritFrom.minFloorCount;
