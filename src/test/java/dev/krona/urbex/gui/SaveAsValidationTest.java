@@ -1,7 +1,10 @@
 package dev.krona.urbex.gui;
 
+import dev.krona.urbex.config.ProfileSetup;
+import dev.krona.urbex.config.UrbexProfile;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -101,5 +104,31 @@ class SaveAsValidationTest {
         // front stops a preset that would save invisibly.
         Set<String> taken = Set.of("disabled", "customized");
         assertEquals("urbex.saveas.err.taken", errKey(SaveAsDialog.validateName("customized", taken)));
+    }
+
+    /**
+     * Pins the union in {@link CustomizeScreen#takenSaveNames()} in place: the two reserved ids aren't in
+     * STANDARD_PROFILES, so if the union that adds them were dropped this fails - the round-2 validateName
+     * cases above wouldn't (they hand-build the taken set and only exercise the generic contains-branch).
+     */
+    @Test
+    void takenSaveNamesUnionsReservedIdsWithRegisteredProfiles() {
+        ProfileSetup.STANDARD_PROFILES.clear();
+        try {
+            ProfileSetup.STANDARD_PROFILES.put("default", new UrbexProfile("default", true));
+
+            Set<String> taken = CustomizeScreen.takenSaveNames();
+
+            assertTrue(taken.contains("default"), "must include registered profiles");
+            assertTrue(taken.contains("disabled"), "must include the reserved DISABLED_ID");
+            assertTrue(taken.contains("customized"), "must include the reserved CUSTOM_ID");
+        } finally {
+            ProfileSetup.STANDARD_PROFILES.clear();
+        }
+    }
+
+    @AfterEach
+    void clearProfiles() {
+        ProfileSetup.STANDARD_PROFILES.clear();
     }
 }

@@ -332,13 +332,23 @@ public class CustomizeScreen extends Screen {
         this.minecraft.gui.setScreen(parent);
     }
 
-    private void openSaveAs() {
+    /**
+     * The names a Save-as must reject: every registered profile plus the two reserved selection ids
+     * ({@code disabled}, {@code customized}) that aren't in {@code STANDARD_PROFILES} but must not be
+     * savable - {@code disabled} would double-list against the built-in Disabled row, and
+     * {@code customized} is the transient marker {@code PresetSelection.entries()} never lists as a
+     * saved file (so it would save invisibly). Package-visible so a headless test pins the union in
+     * place: dropping either reserved id here regresses the guard.
+     */
+    static Set<String> takenSaveNames() {
         Set<String> taken = new HashSet<>(ProfileSetup.STANDARD_PROFILES.keySet());
-        // The two reserved selection ids aren't in STANDARD_PROFILES but must not be savable: "disabled"
-        // would double-list against the built-in Disabled row, and "customized" is the transient marker
-        // that entries() never lists as a saved file (so it would save invisibly).
         taken.add(PresetSelection.DISABLED_ID);
         taken.add(PresetSelection.CUSTOM_ID);
+        return taken;
+    }
+
+    private void openSaveAs() {
+        Set<String> taken = takenSaveNames();
         SaveAsDialog[] holder = new SaveAsDialog[1];
         holder[0] = new SaveAsDialog(this, taken, name -> {
             if (!performSave(name)) {
