@@ -107,6 +107,12 @@ public class BuildingInfo {
     private volatile BuildingPart xBridgeType = null;
     private volatile BuildingPart zBridgeType = null;
 
+    private volatile boolean plannedBridgeCalculated = false;
+    private volatile PrimaryBridgePlanner.BridgeSpan plannedBridge;
+
+    private volatile boolean streetSlopeCalculated = false;
+    private volatile Direction streetSlopeDirection;
+
     private volatile boolean stairsCalculated = false;
     private volatile Direction stairDirection;
     private volatile boolean actualStairsCalculated = false;
@@ -1248,8 +1254,86 @@ public class BuildingInfo {
         return effectiveRoad == RoadType.PRIMARY;
     }
 
+    /** A chunk that renders a planned road of some class, rather than a lot, a park or a building. */
+    private boolean isPlannedRoadSection() {
+        return isCity && !hasBuilding && effectiveRoad != RoadType.NONE;
+    }
+
+    /** A planned road below primary: the only roads allowed to slope. */
+    private boolean isMinorRoadSection() {
+        return isPlannedRoadSection() && effectiveRoad != RoadType.PRIMARY;
+    }
+
     public boolean isStreetOrParkSection() {
         return isCity && !hasBuilding;
+    }
+
+    /**
+     * The higher edge of a full-chunk street slope, or {@code null} when this chunk keeps its
+     * ordinary flat street part.
+     *
+     * <p>Slopes are deliberately narrow in scope. Only a minor road can slope - a primary carries a
+     * centre line and a width that the single stair asset does not reproduce - and only where the
+     * route through the chunk is unambiguous: exactly one neighbour one city level up, the same
+     * minor road continuing straight behind the transition and straight on past it, and no
+     * same-level branch off either end. Everything else stays flat, so bends and junctions never
+     * turn into a ramp nobody can read.
+     */
+    @Nullable
+    public Direction getStreetSlopeDirection() {
+        if (streetSlopeCalculated) {
+            return streetSlopeDirection;
+        }
+        Direction direction = computeStreetSlopeDirection();
+        // Value first, then the flag: a reader that sees the flag set must see the value.
+        streetSlopeDirection = direction;
+        streetSlopeCalculated = true;
+        return direction;
+    }
+
+    @Nullable
+    private Direction computeStreetSlopeDirection() {
+        if (!isMinorRoadSection()) {
+            return null;
+        }
+        Direction slopeDirection = null;
+        for (Direction direction : Direction.VALUES) {
+            BuildingInfo adjacent = direction.get(this);
+            if (adjacent.isMinorRoadSection() && adjacent.cityLevel == cityLevel + 1) {
+                if (slopeDirection != null) {
+                    // Two ways up out of one chunk: which one the ramp should face is not decided.
+                    return null;
+                }
+                slopeDirection = direction;
+            }
+        }
+        if (slopeDirection == null) {
+            return null;
+        }
+
+        BuildingInfo upper = slopeDirection.get(this);
+        BuildingInfo approach = slopeDirection.getOpposite().get(this);
+        if (!approach.isMinorRoadSection() || approach.cityLevel != cityLevel) {
+            return null;
+        }
+        BuildingInfo departure = slopeDirection.get(upper);
+        if (!departure.isMinorRoadSection() || departure.cityLevel != upper.cityLevel) {
+            return null;
+        }
+
+        for (Direction direction : Direction.VALUES) {
+            if (direction != slopeDirection && direction != slopeDirection.getOpposite()) {
+                BuildingInfo side = direction.get(this);
+                if (side.isPlannedRoadSection() && side.cityLevel == cityLevel) {
+                    return null;
+                }
+                BuildingInfo upperSide = direction.get(upper);
+                if (upperSide.isPlannedRoadSection() && upperSide.cityLevel == upper.cityLevel) {
+                    return null;
+                }
+            }
+        }
+        return slopeDirection;
     }
 
     public boolean isElevatedParkSection() {
@@ -1274,7 +1358,9 @@ public class BuildingInfo {
             return stairDirection;
         }
         Direction direction = null;
-        if (streetType != StreetType.PARK && !hasBuilding && isCity) {
+        // A sloped chunk already carries the whole level change across its full width. The narrow
+        // stair decoration on top of it would be a second, contradictory way up.
+        if (getStreetSlopeDirection() == null && streetType != StreetType.PARK && !hasBuilding && isCity) {
             if (cityLevel == getXmin().cityLevel - 1 && !getXmin().hasBuilding && getXmin().isCity) {
                 direction = Direction.XMIN;
             } else if (cityLevel == getXmax().cityLevel - 1 && !getXmax().hasBuilding && getXmax().isCity) {
@@ -1318,6 +1404,23 @@ public class BuildingInfo {
     }
 
 
+    /**
+     * The planned primary bridge claiming this chunk, or {@code null}. Memoized because the border
+     * pass asks for it once per edge column, and because the ordinary bridge scan below must agree
+     * with the deck that actually renders.
+     */
+    @Nullable
+    public PrimaryBridgePlanner.BridgeSpan getPlannedBridge() {
+        if (plannedBridgeCalculated) {
+            return plannedBridge;
+        }
+        PrimaryBridgePlanner.BridgeSpan result = PrimaryBridgePlanner.spanAt(coord, provider).orElse(null);
+        // Value first, then the flag.
+        plannedBridge = result;
+        plannedBridgeCalculated = true;
+        return result;
+    }
+
     public BuildingPart hasBridge(IDimensionInfo provider, Orientation orientation) {
         return switch (orientation) {
             case X -> hasXBridge(provider);
@@ -1349,6 +1452,14 @@ public class BuildingInfo {
     }
 
     private BuildingPart computeXBridge(IDimensionInfo provider) {
+        PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
+        if (planned != null) {
+            // A planned span settles this chunk for both orientations. Falling through to the
+            // opportunistic scan below when the span runs the other way would let an ordinary bridge
+            // claim the chunk first and cancel the planned one.
+            return planned.orientation() == Orientation.X
+                    ? PrimaryBridgePlanner.deckPart(planned, coord, provider) : null;
+        }
         if (!xBridge) {
             return null;
         }
@@ -1409,6 +1520,11 @@ public class BuildingInfo {
     }
 
     private BuildingPart computeZBridge(IDimensionInfo provider) {
+        PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
+        if (planned != null) {
+            return planned.orientation() == Orientation.Z
+                    ? PrimaryBridgePlanner.deckPart(planned, coord, provider) : null;
+        }
         if (!zBridge) {
             return null;
         }
@@ -1481,6 +1597,11 @@ public class BuildingInfo {
 
     private boolean isSuitableForBridge(IDimensionInfo provider, BuildingInfo i) {
         if (provider.getProfile().isSpace() && hasMonorail()) {
+            return false;
+        }
+        if (i.getPlannedBridge() != null) {
+            // A planned span owns this chunk. An opportunistic bridge must not run through it -
+            // it would stamp its own part over the planned deck on its way past.
             return false;
         }
         return i.cityLevel < cityLevel || CityGenerator.isWaterBiome(provider, i.coord);
@@ -1568,11 +1689,18 @@ public class BuildingInfo {
         if (!i2.doesRoadExtendTo()) {
             return false;
         }
-        if (Math.abs(i1.cityLevel - i2.cityLevel) <= 0 /* @todo temporary, should be <= 1 */) {
-            // We allow a road difference of 1 maximum
+        if (i1.cityLevel == i2.cityLevel) {
             return true;
         }
-        return false;
+        // A one-level difference only connects where a slope actually bridges it. Reading the slope
+        // rather than merely allowing a difference of one is what keeps the upper road drawing
+        // through to its edge exactly over the ramp, and ending in a kerb everywhere else.
+        Direction slope1 = i1.getStreetSlopeDirection();
+        if (slope1 != null && slope1.get(i1).coord.equals(i2.coord)) {
+            return true;
+        }
+        Direction slope2 = i2.getStreetSlopeDirection();
+        return slope2 != null && slope2.get(i2).coord.equals(i1.coord);
     }
 
     /**

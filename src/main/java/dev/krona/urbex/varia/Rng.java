@@ -99,7 +99,10 @@ public final class Rng {
         VINES_SOUTH,
         LIGHTING_DENSITY,
         LIGHTING_VARIANT,
-        LOOT_DENSITY
+        LOOT_DENSITY,
+        // The deck a planned primary bridge uses. Addressed at the span's lower endpoint rather
+        // than at the chunk being generated, so every chunk of one span draws the same part.
+        LARGE_BRIDGE
     }
 
     /**

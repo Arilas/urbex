@@ -986,7 +986,8 @@ public class CityGenerator {
         int levelZ = info.getHighwayZLevel();
         if (!building) {
             Railway.RailChunkInfo railInfo = info.getRailInfo();
-            if (levelX < 0 && levelZ < 0 && !railInfo.getType().isSurface()) {
+            if (levelX < 0 && levelZ < 0 && !railInfo.getType().isSurface()
+                    && info.getStreetSlopeDirection() == null) {
                 generateStreetDecorations(ctx, info);
             }
         }
@@ -1261,6 +1262,7 @@ public class CityGenerator {
 //                clearToMax(info, heightmap, height);
 //            }
 
+            Direction streetSlopeDirection = info.getStreetSlopeDirection();
             BuildingInfo.StreetType streetType = info.streetType;
             boolean elevated = info.isElevatedParkSection();
             if (elevated) {
@@ -1286,29 +1288,40 @@ public class CityGenerator {
             // used to clobber the PARK decision neighbours read through isElevatedParkSection()
             // (issue #36).
             switch (streetType) {
-                case NORMAL -> generateNormalStreetSection(ctx, info, height);
+                case NORMAL -> {
+                    if (streetSlopeDirection == null) {
+                        generateNormalStreetSection(ctx, info, height);
+                    } else {
+                        generateStreetSlopeSection(ctx, info, height, streetSlopeDirection);
+                    }
+                }
                 case PARK -> generateParkSection(ctx, info, height, elevated);
             }
             height++;
 
-            if (streetType == BuildingInfo.StreetType.PARK || info.fountainType != null) {
-                BuildingPart part;
-                if (streetType == BuildingInfo.StreetType.PARK) {
-                    part = info.parkType;
-                } else {
-                    part = info.fountainType;
+            // A sloped chunk is a ramp from end to end. Everything that would stand on the surface -
+            // a fountain, a park part, vegetation, a building front reaching out over the pavement -
+            // is suppressed, because on a ramp it would sit in mid-air or in the middle of the route.
+            if (streetSlopeDirection == null) {
+                if (streetType == BuildingInfo.StreetType.PARK || info.fountainType != null) {
+                    BuildingPart part;
+                    if (streetType == BuildingInfo.StreetType.PARK) {
+                        part = info.parkType;
+                    } else {
+                        part = info.fountainType;
+                    }
+                    if (part != null) {
+                        generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
+                    }
                 }
-                if (part != null) {
-                    generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
-                }
+
+                generateRandomVegetation(ctx, info, height);
+
+                generateFrontPart(ctx, info, height, info.getXmin(), Transform.ROTATE_NONE);
+                generateFrontPart(ctx, info, height, info.getZmin(), Transform.ROTATE_90);
+                generateFrontPart(ctx, info, height, info.getXmax(), Transform.ROTATE_180);
+                generateFrontPart(ctx, info, height, info.getZmax(), Transform.ROTATE_270);
             }
-
-            generateRandomVegetation(ctx, info, height);
-
-            generateFrontPart(ctx, info, height, info.getXmin(), Transform.ROTATE_NONE);
-            generateFrontPart(ctx, info, height, info.getZmin(), Transform.ROTATE_90);
-            generateFrontPart(ctx, info, height, info.getXmax(), Transform.ROTATE_180);
-            generateFrontPart(ctx, info, height, info.getZmax(), Transform.ROTATE_270);
         }
 
         generateBorders(ctx, info, canDoStreetOrPark, heightmap);
@@ -1676,6 +1689,18 @@ public class CityGenerator {
         return roadConnection || bridgeConnection;
     }
 
+    /**
+     * The whole chunk as one ramp. The stair part is authored rising towards {@code XMIN}, so the
+     * direction of the higher edge is exactly its rotation.
+     */
+    private void generateStreetSlopeSection(ChunkGenContext ctx, BuildingInfo info, int height, Direction slopeDirection) {
+        StreetParts parts = getStreetParts(info);
+        BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.stair()));
+        if (part != null) {
+            generatePart(ctx, info, part, slopeDirection.getRotation(), 0, height, 0, HardAirSetting.VOID);
+        }
+    }
+
     private void generateNormalStreetSection(ChunkGenContext ctx, BuildingInfo info, int height) {
         StreetParts parts = getStreetParts(info);
         boolean xmin = hasStreetPartConnection(info, info.getXmin(), info.getXmin().hasXBridge(provider) != null);
@@ -1773,6 +1798,30 @@ public class CityGenerator {
         for (Direction direction : Direction.VALUES) {
             if (direction.atSide(x, z)) {
                 BuildingInfo adjacent = direction.get(info);
+                // A lower neighbour sloping up towards this chunk needs the retaining wall opened,
+                // but only across the ramp itself: the stair part's z1/z2 band, rotated to this
+                // edge. The rest of the wall stays, or the level change would read as a gap.
+                if (adjacent.getStreetSlopeDirection() == direction.getOpposite()) {
+                    StreetParts slopeParts = getStreetParts(adjacent);
+                    if (!slopeParts.stair().isEmpty()) {
+                        BuildingPart slope = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), slopeParts.stair().get(0));
+                        if (slope != null) {
+                            Integer z1 = slope.getMetaInteger(BuildingPart.META_Z_1);
+                            Integer z2 = slope.getMetaInteger(BuildingPart.META_Z_2);
+                            if (z1 != null && z2 != null) {
+                                Transform transform = direction.getOpposite().getRotation();
+                                int xx1 = transform.rotateX(15, z1);
+                                int zz1 = transform.rotateZ(15, z1);
+                                int xx2 = transform.rotateX(15, z2);
+                                int zz2 = transform.rotateZ(15, z2);
+                                if (x >= Math.min(xx1, xx2) && x <= Math.max(xx1, xx2)
+                                        && z >= Math.min(zz1, zz2) && z <= Math.max(zz1, zz2)) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
                 if (adjacent.getActualStairDirection() == direction.getOpposite()) {
                     BuildingPart stairType = adjacent.stairType;
                     if (stairType != null) {
