@@ -96,7 +96,7 @@ public final class Rng {
 
     /**
      * As {@link #at} but keyed on a block position, for consumers that vary within a chunk
-     * (per-block vine placement, per-spawner mob choice).
+     * (deferred light placement, per-spawner mob choice).
      */
     public static RandomSource atPos(long worldSeed, int x, int y, int z, Purpose purpose) {
         return new XoroshiroRandomSource(hashPos(worldSeed, x, y, z, purpose));

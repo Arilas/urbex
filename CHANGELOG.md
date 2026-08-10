@@ -74,6 +74,26 @@
   vine-facing states. Because the guard never fired within the profiled generation window, this
   removal does not itself move block placement in already-generated chunks; as always, the mod makes
   no promise that a world regenerates identically after an update.
+- **Every city layout moved.** Alongside the five vine constants above, `Rng.Purpose` also dropped
+  `STREET` and `HIGHWAY`, two constants already dead before this branch, taking the enum from 51
+  entries to 44. Every consumer addresses its stream as `purpose.ordinal() + 1`, so every constant
+  after `BUILDING` shifted address, and with it every random stream downstream of one — which is
+  effectively all of city generation. This is the largest user-visible effect of this branch: every
+  city in every world lays out differently past the point this change lands, not only at chunk
+  borders. As always, the mod makes no promise that an existing world regenerates identically after
+  an update.
+- **Border fences, walls and stairs resolve their connections one step later.** `ChunkDriver` used
+  to read — and, when the neighbour happened to already be FULL, write into — the neighbouring chunk
+  to compute a border block's connection state; which of two adjacent chunks a worker thread
+  generated first could change the result. Border positions are now marked for vanilla's own
+  postprocessing pass instead, the same mechanism vanilla structures use across chunk borders, so
+  the connection is computed once from every neighbour's final state rather than mid-generation.
+- **Worldgen no longer logs cross-chunk read errors.** The two fixes above were the entire source of
+  the `Detected unsafe terrain read during worldgen` spam in the log: a fixed digest window that
+  logged 88 such warnings before this branch logs zero after it. A permanent gate
+  (`UnsafeReadGateMixin`, enforced on every digest run via `-Durbex.digestCheck.failOnUnsafeRead`)
+  now fails the check if a future change reintroduces a cross-chunk read or write anywhere in city
+  generation.
 - **Worlds generate differently past the already-generated chunk border, again.** As with `0.1.0`,
   this is expected and permitted: the mod makes no promise that an existing world regenerates
   identically after an update, and the road field changes what every city chunk resolves to.

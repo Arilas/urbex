@@ -220,7 +220,7 @@ In `updateAdjacent`, after the existing `LadderBlock` early return and before th
         }
 ```
 
-`pos.immutable()` matters — `correct()` passes a shared `MutableBlockPos` that it reuses for every call, so marking the mutable instance would record whatever position it held last.
+`pos.immutable()` is unnecessary, not load-bearing: `ProtoChunk.markPosForPostProcessing` packs the position to a `short` via `packOffsetCoordinates` before returning, so it never retains the `BlockPos` reference past the call - marking the shared mutable instance directly would be just as safe. Harmless either way, so leave the call as written; this note exists only so the reasoning is not copied forward as if the copy were required.
 
 - [ ] **Step 4: Verify the unsafe reads from this site are gone**
 
@@ -262,7 +262,7 @@ neighbours that are untouched terrain and so never become current."
 
 **Interfaces:**
 - Consumes: Task 1 having removed every use of the five vine purposes.
-- Produces: a `Purpose` enum of 43 constants where the ordinals of everything after `BUILDING` have shifted.
+- Produces: a `Purpose` enum of 44 constants where the ordinals of everything after `BUILDING` have shifted.
 
 - [ ] **Step 1: Confirm exactly which constants are dead**
 
@@ -285,7 +285,7 @@ Keep the surrounding discipline intact: the javadoc explaining that two logicall
 - [ ] **Step 3: Run `RngTest` and read the failures**
 
 Run: `./gradlew test --tests 'dev.krona.urbex.varia.RngTest'`
-Expected: FAIL, on `PURPOSE_COUNT` (50 → 43), `LAST_PURPOSE`, `PURPOSE_ORDER`, and **both** `GOLDEN` and `GOLDEN_LAST`.
+Expected: FAIL, on `PURPOSE_COUNT` (51 → 44), `LAST_PURPOSE`, `PURPOSE_ORDER`, and **both** `GOLDEN` and `GOLDEN_LAST`.
 
 `GOLDEN` moving is the part that is easy to miss: it pins `Rng.at(42L, 100, -100, Purpose.RUINS)`, and `STREET` at ordinal 1 sits before `RUINS` at ordinal 4, so compacting shifts `RUINS` to 3.
 

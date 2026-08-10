@@ -3,7 +3,6 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import net.minecraft.world.level.WorldGenLevel;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
 
 public class ChunkFixer {
 

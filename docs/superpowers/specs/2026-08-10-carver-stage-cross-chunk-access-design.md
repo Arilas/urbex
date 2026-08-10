@@ -112,7 +112,7 @@ covers it.
 
 ## 5. Part C — compact `Rng.Purpose`
 
-`Purpose` has 50 constants. Two are dead today — `STREET` and `HIGHWAY` — and Part A makes five more
+`Purpose` has 51 constants. Two are dead today — `STREET` and `HIGHWAY` — and Part A makes five more
 dead: `VINES`, `VINES_CONTINUE`, `VINES_EAST`, `VINES_NORTH`, `VINES_SOUTH`. Delete all seven.
 
 Re-pin `RngTest`'s `PURPOSE_COUNT`, `LAST_PURPOSE`, `PURPOSE_ORDER`, `GOLDEN_LAST` — **and
@@ -190,9 +190,11 @@ chunk pairs.
 - **Vines are gone, and nothing replaces them.** The datapack path in §3 is what becomes *possible*,
   not a plan: the mod is unreleased and internal, so there are no third-party datapacks and nobody
   is going to author building-side vines. Buildings will simply have no vines until someone decides
-  they want them badly enough to paint them into an asset. Border vines have been absent since
-  `15dba5f2` regardless; this removes the in-chunk ones too, which is a real if modest visual loss
-  taken deliberately in exchange for deleting a subsystem whose main surface never worked.
+  they want them badly enough to paint them into an asset. This is not a visual loss, modest or
+  otherwise: all four vine passes, not just the border-crossing ones, sat inside the same
+  `ChunkStatus.FEATURES` guard measured in §1.2 at 179 evaluations and 0 passes over the digest
+  window, so the subsystem was rendering nothing anywhere in a chunk-sized building, in-chunk
+  included, before this removal - matching what the CHANGELOG entry for this removal says.
 - **Border block connections resolve one step later.** If a block's postprocessing path does not
   produce the same result as an immediate `updateShape`, the difference will show at chunk borders.
   The in-game check exists for this.
