@@ -339,8 +339,9 @@ public class BuildingInfo {
             characteristics.cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(characteristics, coord, provider) : getAverageCityLevel(characteristics, coord, provider);
         }
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
-        characteristics.couldHaveBuilding = ChunkContentResolver.couldHaveBuilding(coord, provider, profile,
-                characteristics.isCity, characteristics.multiPos, characteristics.cityLevel, rand);
+        characteristics.couldHaveBuilding = ChunkContentResolver.couldHaveBuilding(profile,
+                characteristics.isCity, characteristics.multiPos, characteristics.cityLevel, rand,
+                chunkFacts(coord, provider, profile));
 
         CityStyle cityStyle;
         // If this is a street we find other chunks connected to this and pick the cityStyle
@@ -431,6 +432,24 @@ public class BuildingInfo {
 
     public static boolean isCity(ChunkCoord coord, IDimensionInfo provider) {
         return getChunkCharacteristics(coord, provider).isCity;
+    }
+
+    /**
+     * The world lookups {@link ChunkContentResolver#couldHaveBuilding} may need, each still behind a
+     * supplier so the decision keeps its short-circuiting: consulting {@link Highway} or
+     * {@link Railway} for a chunk whose building roll already failed would be new work, and
+     * {@code Railway}'s chunk types are mutable state.
+     */
+    private static ChunkContentResolver.ChunkFacts chunkFacts(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+        return new ChunkContentResolver.ChunkFacts(
+                () -> City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord) != null,
+                () -> City.getPredefinedStreet(provider.getWorld(), coord) != null,
+                () -> City.getCityStyle(coord, provider, profile),
+                () -> hasHighway(coord, provider, profile),
+                () -> Math.max(Highway.getXHighwayLevel(coord, provider, profile), Highway.getZHighwayLevel(coord, provider, profile)),
+                () -> hasRailway(coord, provider, profile),
+                () -> Railway.getRailChunkType(coord, provider, profile),
+                () -> CitySphere.getRelativeDistanceToCityCenter(coord, provider));
     }
 
     /**

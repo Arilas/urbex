@@ -2,22 +2,47 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
-import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
-import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.util.RandomSource;
 
 import javax.annotation.Nullable;
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
 /**
  * Owns the order in which candidate content claims a city chunk. Stated once, here, rather than
  * being implicit in {@link BuildingInfo}'s control flow.
  *
- * <p>Precedence, strongest first: hard exclusions and sphere/infrastructure constraints, predefined
- * buildings and multi-buildings, predefined streets, accepted random multi-buildings, ordinary
- * single-building chance with the lonely-building veto, and finally a non-building fallback.
+ * <h2>The order</h2>
+ * {@link #couldHaveBuilding} walks a chain of full stops. The first one that matches decides, and
+ * nothing after it is consulted:
+ * <ol>
+ *   <li>a <b>predefined building</b> at this chunk - building, no further tests;</li>
+ *   <li>a <b>predefined street</b> at this chunk - no building. Note this beats a multi-building
+ *       section: a predefined street wins over a multi, not the other way round;</li>
+ *   <li>a chunk belonging to an <b>accepted multi-building</b> section - building;</li>
+ *   <li>the <b>ordinary building-chance roll</b> - no building when the roll fails;</li>
+ *   <li><b>highway headroom</b> - above a highway, a building only if the city level clears it;</li>
+ *   <li><b>railway headroom</b> - never above an underground station, otherwise only if the city
+ *       level clears the rails;</li>
+ *   <li>the <b>general case</b> - building. The chain's fallback is a building, not a street: a
+ *       chunk becomes a street by failing the roll or tripping a constraint, never by falling off
+ *       the end.</li>
+ * </ol>
+ *
+ * <h2>The overrides</h2>
+ * Three things are <em>not</em> steps in that chain. They are applied afterwards and overrule
+ * whatever it decided:
+ * <ul>
+ *   <li>the <b>sphere-edge clamp</b> (pass one): a single chunk more than .7 of the way out from a
+ *       city sphere's centre loses its building whatever the chain said;</li>
+ *   <li>the <b>lonely-building veto</b> (pass two): a neighbour whose building type prefers to stand
+ *       alone can take this chunk's building away;</li>
+ *   <li>the <b>city-sphere-centre override</b> (pass two), which has the last word of all: STREET
+ *       removes the building, BUILDING forces one back on.</li>
+ * </ul>
  *
  * <h2>Why the order runs in two passes</h2>
  * The order cannot be evaluated in one go, and the split is not cosmetic:
@@ -28,18 +53,18 @@ import javax.annotation.Nullable;
  *       city-style majority vote, and the preview).</li>
  *   <li>{@link #resolve} is the <em>final</em> verdict. It runs while a {@link BuildingInfo} is
  *       being constructed, on the {@link dev.krona.urbex.varia.Rng.Purpose#BUILDING_LAYOUT} stream,
- *       because the lonely-building veto reads the four neighbours' candidate verdicts - so it
- *       cannot itself live in the pass those neighbours are computed by without recursing forever.
- *       </li>
+ *       because the lonely-building veto reads the four neighbours' {@link ChunkCharacteristics} -
+ *       so it cannot itself live in the pass those neighbours are computed by without recursing
+ *       forever.</li>
  * </ul>
  *
  * <h2>Draw discipline</h2>
  * Both methods draw from an addressed {@link RandomSource} whose sequence is part of every world
  * ever generated. Two rules follow, and both are load-bearing for anyone adding a branch here:
  * <ul>
- *   <li>{@code couldHaveBuilding} takes its single draw <em>first</em>, before any branch, so a new
- *       exclusion can be inserted anywhere in the chain without moving the stream.</li>
- *   <li>{@code resolve} rolls the street type <em>unconditionally</em> - even for a chunk that ends
+ *   <li>{@link #couldHaveBuilding} takes its single draw <em>first</em>, before any branch, so a new
+ *       stop can be inserted anywhere in the chain without moving the stream.</li>
+ *   <li>{@link #resolve} rolls the street type <em>unconditionally</em> - even for a chunk that ends
  *       up holding a building, whose street type is then never rendered. Skipping the roll for
  *       building chunks would shift every later draw on the layout stream. The one case that
  *       genuinely does not roll is a non-top-left multi-building chunk, which inherits its rendering
@@ -61,16 +86,53 @@ public final class ChunkContentResolver {
         float at(ChunkCoord neighbour);
     }
 
+    /** A {@code float}-valued supplier; {@link java.util.function.DoubleSupplier} would widen. */
+    @FunctionalInterface
+    public interface FloatSupplier {
+        float get();
+    }
+
+    /**
+     * The world facts pass one consults, each behind its own supplier.
+     *
+     * <p>Every one of these is lazy on purpose, and that laziness is behaviour, not style. The chain
+     * short-circuits: a chunk whose building-chance roll fails never asks whether it sits on a
+     * highway. Evaluating these eagerly would consult {@link Highway} and {@link Railway} for chunks
+     * that never do so today - {@code Railway}'s chunk types are mutable state, and the highway
+     * extent scan is expensive. It also keeps the resolver free of {@code IDimensionInfo}: the
+     * decision is a pure function of these values, so a test can supply them directly.
+     *
+     * @param hasPredefinedBuilding        a predefined building starts at this chunk's top-left
+     * @param hasPredefinedStreet          a predefined street occupies this chunk
+     * @param cityStyle                    this chunk's style, which may override the building chance
+     * @param hasHighway                   a highway runs through this chunk at any level
+     * @param maxHighwayLevel              the higher of this chunk's two highway levels
+     * @param hasRailway                   a railway runs through this chunk
+     * @param railInfo                     this chunk's railway type and level
+     * @param relativeDistanceToCityCenter how far out of its city sphere this chunk sits, 0 to 1
+     */
+    public record ChunkFacts(BooleanSupplier hasPredefinedBuilding,
+                             BooleanSupplier hasPredefinedStreet,
+                             Supplier<CityStyle> cityStyle,
+                             BooleanSupplier hasHighway,
+                             IntSupplier maxHighwayLevel,
+                             BooleanSupplier hasRailway,
+                             Supplier<Railway.RailChunkInfo> railInfo,
+                             FloatSupplier relativeDistanceToCityCenter) {
+    }
+
     /**
      * Pass one: can this chunk hold a building at all? Cached in {@link ChunkCharacteristics} and
      * read by neighbouring chunks, so it must not depend on any neighbour's own verdict.
+     *
+     * <p>Note the short-circuit on {@code isCity}: a chunk outside a city takes no draw at all.
      */
-    public static boolean couldHaveBuilding(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile,
-                                            boolean isCity, MultiPos section, int cityLevel, RandomSource rand) {
-        boolean couldHaveBuilding = isCity && checkBuildingPossibility(coord, provider, profile, section, cityLevel, rand);
+    public static boolean couldHaveBuilding(UrbexProfile profile, boolean isCity, MultiPos section,
+                                            int cityLevel, RandomSource rand, ChunkFacts facts) {
+        boolean couldHaveBuilding = isCity && checkBuildingPossibility(profile, section, cityLevel, rand, facts);
         if ((profile.isSpace() || profile.isSpheres()) && section.isSingle()) {
             // Minimize cities at the edge of the city in an orb
-            float dist = CitySphere.getRelativeDistanceToCityCenter(coord, provider);
+            float dist = facts.relativeDistanceToCityCenter().get();
             if (dist > .7f) {
                 couldHaveBuilding = false;
             }
@@ -78,20 +140,18 @@ public final class ChunkContentResolver {
         return couldHaveBuilding;
     }
 
-    private static boolean checkBuildingPossibility(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile, MultiPos section, int cityLevel, RandomSource rand) {
+    private static boolean checkBuildingPossibility(UrbexProfile profile, MultiPos section, int cityLevel, RandomSource rand, ChunkFacts facts) {
         boolean b;
         float bc = rand.nextFloat();
 
-        PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord);
-        if (predefinedBuilding != null) {
+        if (facts.hasPredefinedBuilding().getAsBoolean()) {
             return true;    // We don't need other tests
         }
-        PredefinedStreet predefinedStreet = City.getPredefinedStreet(provider.getWorld(), coord);
-        if (predefinedStreet != null) {
+        if (facts.hasPredefinedStreet().getAsBoolean()) {
             return false;   // No building here
         }
 
-        CityStyle style = City.getCityStyle(coord, provider, profile);
+        CityStyle style = facts.cityStyle().get();
         float buildingChance = profile.BUILDING_CHANCE;
         if (style.getBuildingChance() != null) {
             buildingChance = style.getBuildingChance();
@@ -103,15 +163,15 @@ public final class ChunkContentResolver {
         } else if (bc >= buildingChance) {
             // Random says we should have no building here
             b = false;
-        } else if (BuildingInfo.hasHighway(coord, provider, profile)) {
+        } else if (facts.hasHighway().getAsBoolean()) {
             // We are above a highway. Check if we have room for a building
-            int maxh = Math.max(Highway.getXHighwayLevel(coord, provider, profile), Highway.getZHighwayLevel(coord, provider, profile));
+            int maxh = facts.maxHighwayLevel().getAsInt();
             b = cityLevel > maxh + 1;       // Allow a building if it is higher than the maximum highway + one
             // Later we will take care to make sure we don't have too many cellars
             // Note that for easy of coding we still disallow multi-buildings above highways
-        } else if (BuildingInfo.hasRailway(coord, provider, profile)) {
+        } else if (facts.hasRailway().getAsBoolean()) {
             // We are above a railway. Check if we have room for a building
-            Railway.RailChunkInfo info = Railway.getRailChunkType(coord, provider, profile);
+            Railway.RailChunkInfo info = facts.railInfo().get();
             if (info.getType() == RailChunkType.STATION_UNDERGROUND) {
                 b = false;  // No building directly above the underground station
             } else {

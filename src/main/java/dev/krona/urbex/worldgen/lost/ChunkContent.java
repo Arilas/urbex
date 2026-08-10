@@ -11,7 +11,9 @@ import javax.annotation.Nullable;
  *                     null for the non-top-left chunks of a multi-building, which inherit every
  *                     rendering decision from their top-left chunk rather than rolling their own
  * @param buildingName the selected building asset, null when {@code !hasBuilding}
- * @param openLot      true when this is a failed-building-roll lot rather than a nominated park
+ * @param openLot      true when this is a city chunk with neither a planned road nor a building.
+ *                     Hardcoded false until the planned-road system lands, at which point it becomes
+ *                     {@code !couldHaveBuilding && effectiveRoad == NONE}
  */
 public record ChunkContent(boolean hasBuilding,
                            @Nullable BuildingInfo.StreetType streetType,
