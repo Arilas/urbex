@@ -89,14 +89,17 @@ class GridRoadFieldTest {
 
     @Test
     void thereIsNoSeamAtCoordinateZero() {
+        // Containment, not just non-inverted bounds: truncating division instead of floorDiv would
+        // still leave eastX >= westX, but it would assign a chunk to a block it isn't inside.
         GridRoadField f = field(1337L);
-        for (int z = -64; z < 64; z++) {
-            RoadCell minusOne = f.at(-1, z);
-            RoadCell zero = f.at(0, z);
-            assertTrue(minusOne.eastX() >= minusOne.westX(),
-                    "primary block bounds inverted at x=-1, z=" + z);
-            assertTrue(zero.eastX() >= zero.westX(),
-                    "primary block bounds inverted at x=0, z=" + z);
+        for (int x = -64; x < 64; x++) {
+            for (int z = -64; z < 64; z++) {
+                RoadCell cell = f.at(x, z);
+                assertTrue(cell.westX() <= x && x < cell.eastX(),
+                        "chunk x=" + x + " outside its primary block [" + cell.westX() + "," + cell.eastX() + ")");
+                assertTrue(cell.northZ() <= z && z < cell.southZ(),
+                        "chunk z=" + z + " outside its primary block [" + cell.northZ() + "," + cell.southZ() + ")");
+            }
         }
     }
 }
