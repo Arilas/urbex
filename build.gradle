@@ -55,6 +55,12 @@ loom {
             ideConfigGenerated(false)
             runDir('runs/digestcheck')
             vmArg '-Durbex.digestCheck=3,rowmajor,100'
+            // Two Urbex cross-chunk terrain reads at the carver stage - where a chunk may touch
+            // only itself - survived for months because nothing watched for them (see
+            // UnsafeReadGateMixin, UnsafeReadCounter). This gate is not window-specific like
+            // requireBridge/requireSlope below: any window should be free of Urbex cross-chunk
+            // reads, so both digest runs set it.
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
             // This runs on the parallel path, deliberately. Generation used to be pinned to one
             // core here with -XX:ActiveProcessorCount=1, because a chunk's decoration step could
             // run before or after its neighbours' passes and output was not run-to-run
@@ -100,6 +106,8 @@ loom {
             vmArg '-Durbex.digestCheck=15,rowmajor,101'
             vmArg '-Durbex.digestCheck.requireBridge'
             vmArg '-Durbex.digestCheck.requireSlope'
+            // See the digestCheck block above: not window-specific, so both runs set it.
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
             def golden = file('digest-features.golden')
             if (golden.exists()) {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"

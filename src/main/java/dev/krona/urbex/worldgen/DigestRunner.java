@@ -49,15 +49,20 @@ public final class DigestRunner {
      *                     slope - the only mechanical proof the full-chunk {@code street_stair}
      *                     part renders at all - announces itself instead of moving silently; see
      *                     {@code digestCheckFeatures} in {@code build.gradle}.
+     * @param unsafeReads  how many cross-chunk terrain reads Urbex made during this run (see
+     *                     {@link UnsafeReadCounter}). City generation runs at the carver stage,
+     *                     where a chunk may touch only itself; a non-zero count here is a
+     *                     contract violation, not a style preference, and {@code DigestCheck}
+     *                     fails on it whenever asked to.
      */
     public record Result(long driverDigest, long fullDigest, long driverBlocks, int drivenChunks,
-                         int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks) {
+                         int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks, long unsafeReads) {
 
         public String driverLine(String order, int offset) {
             return String.format(
-                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d",
+                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d unsafeReads=%d",
                     driverDigest, driverBlocks, drivenChunks, chunkCount, order, offset, elapsedMs, bridgeChunks,
-                    slopeChunks);
+                    slopeChunks, unsafeReads);
         }
 
         public String fullLine(String order, int offset) {
@@ -92,6 +97,7 @@ public final class DigestRunner {
     public static Result run(ServerLevel level, int radius, String order, int offset) {
         List<ChunkPos> chunks = chunkSquare(radius, order, offset);
 
+        UnsafeReadCounter.reset();
         long start = System.currentTimeMillis();
         int recordedChunks;
         ChunkDriver.startRecordingWrites();
@@ -103,6 +109,7 @@ public final class DigestRunner {
             ChunkDriver.stopRecordingWrites();
             recordedChunks = ChunkDriver.recordedChunkCount();
         }
+        long unsafeReads = UnsafeReadCounter.count();
 
         // Hash in a canonical order so only generation order can affect the result.
         List<ChunkPos> sorted = new ArrayList<>(chunks);
@@ -153,7 +160,7 @@ public final class DigestRunner {
 
         long elapsed = System.currentTimeMillis() - start;
         return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed, bridgeChunks,
-                slopeChunks);
+                slopeChunks, unsafeReads);
     }
 
     /**
