@@ -20,6 +20,10 @@ jobs:
         run: |
           ./gradlew runDigestCheck --no-daemon | tee digest-check.log
           grep -q "URBEX-DIGEST-CHECK: OK" digest-check.log
+      - name: Worldgen digest check (bridge)
+        run: |
+          ./gradlew runDigestCheckBridge --no-daemon | tee digest-check-bridge.log
+          grep -q "URBEX-DIGEST-CHECK: OK" digest-check-bridge.log
       - uses: actions/upload-artifact@v4
         with:
           name: jar

@@ -23,6 +23,14 @@ public final class DigestCheck {
 
     public static final String PROP = "urbex.digestCheck";
     public static final String PROP_EXPECTED = "urbex.digestCheck.expected";
+    /**
+     * When present (value is not consulted, only presence), the check fails if the sampled square
+     * contains zero chunks with a planned primary bridge deck. Set on the {@code digestCheckBridge}
+     * run configuration only - that window's entire reason to exist is being the one mechanical
+     * proof a bridge deck renders, so a future change that moves the window off it must fail loudly
+     * here rather than silently pinning a golden hash for a window that has stopped covering one.
+     */
+    public static final String PROP_REQUIRE_BRIDGE = "urbex.digestCheck.requireBridge";
     public static final String OK = "URBEX-DIGEST-CHECK: OK";
     public static final String FAIL = "URBEX-DIGEST-CHECK: FAIL";
 
@@ -59,6 +67,7 @@ public final class DigestCheck {
         }
         Spec spec = Spec.parse(value);
         String expected = System.getProperty(PROP_EXPECTED);
+        boolean requireBridge = System.getProperty(PROP_REQUIRE_BRIDGE) != null;
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             try {
@@ -71,6 +80,10 @@ public final class DigestCheck {
                 String actual = String.format("%016x", result.driverDigest());
                 if (result.driverBlocks() == 0) {
                     verdict(FAIL + " (no driver writes recorded - is an urbex profile configured for the overworld?)");
+                } else if (requireBridge && result.bridgeChunks() == 0) {
+                    verdict(FAIL + " (sample window contains zero planned-bridge chunks - it no longer covers "
+                            + "the bridge this check exists to guard; relocate the window rather than accepting "
+                            + "a new golden here)");
                 } else if (expected != null && !expected.trim().toLowerCase(Locale.ROOT).equals(actual)) {
                     verdict(FAIL + String.format(" (expected DRIVERDIGEST=%s, got %s)", expected.trim(), actual));
                 } else {

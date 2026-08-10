@@ -1,8 +1,10 @@
 package dev.krona.urbex.gui.preview;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.gui.NullDimensionInfo;
+import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
@@ -27,17 +29,20 @@ import java.util.Random;
  * repeated {@link #update} calls while the player is merely dragging a slider don't recompute
  * anything.
  * <p>
- * Three {@link Mode modes} share the same texture pipeline (compute an {@link #WIDTH}x{@link #HEIGHT}
+ * Four {@link Mode modes} share the same texture pipeline (compute an {@link #WIDTH}x{@link #HEIGHT}
  * {@code int[]}, upload it as a {@link DynamicTexture}, blit it aspect-fit with a legend strip below):
  * <ul>
  *   <li>{@link Mode#MAP} - the region map (city / building / water / terrain per chunk). Used by the
- *       Cities tab and by every editor category that isn't building- or transport-specific.</li>
+ *       Cities tab and by every editor category that isn't building-, transport- or road-specific.</li>
  *   <li>{@link Mode#CITY} - a close-up side-elevation of one city's building layout (floors above the
  *       ground line, cellars below) with the explosion damage overlaid on top, so the building shape
  *       and its destruction read together in one view (the old editor's separate Buildings + Damage
  *       modes combined).</li>
  *   <li>{@link Mode#TRANSPORT} - the region map (dimmed) with the highway and rail network drawn over
  *       it.</li>
+ *   <li>{@link Mode#ROADS} - the region map (dimmed) with the road field drawn over it, one colour per
+ *       {@link RoadType} class, so the primary/secondary/tertiary grid can be judged before a single
+ *       chunk generates.</li>
  * </ul>
  * "Honest" relative to the old editor's preview map renderer: that preview always ran
  * with {@code IDimensionInfo.getWorld() == null}, which silently skipped the worldstyle
@@ -48,14 +53,16 @@ import java.util.Random;
  */
 public class CityPreview implements AutoCloseable {
 
-    /** Which of the three views {@link #update} should render. Folded into the cache key. */
+    /** Which of the four views {@link #update} should render. Folded into the cache key. */
     public enum Mode {
         /** The region map: city / building / water / terrain, one pixel per chunk. */
         MAP,
         /** One city's building elevation (floors + cellars) with explosion damage overlaid. */
         CITY,
         /** The region map, dimmed, with the highway and rail network drawn on top. */
-        TRANSPORT
+        TRANSPORT,
+        /** The region map, dimmed, with the road field drawn on top: one colour per road class. */
+        ROADS
     }
 
     public static final int WIDTH = NullDimensionInfo.PREVIEW_WIDTH;
@@ -68,7 +75,7 @@ public class CityPreview implements AutoCloseable {
     private static final int SWATCH_SIZE = 8;
     private static final int SWATCH_GAP = 6;
 
-    // Region-map palette (MAP mode, and the dimmed base of TRANSPORT mode).
+    // Region-map palette (MAP mode, and the dimmed base of TRANSPORT and ROADS modes).
     private static final int CITY_COLOR = 0xff995555;
     private static final int BUILDING_COLOR = 0xffffffff;
     private static final int WATER_COLOR = 0xff000066;
@@ -194,19 +201,42 @@ public class CityPreview implements AutoCloseable {
     }
 
     private void recompute(UrbexProfile profile, long seed, Mode mode) {
-        this.mode = mode;
         // The datapack-derived predefined-city/street maps are static (shared with real worldgen)
         // and keyed only by chunk coord, not by profile - drop them so a new profile/seed combo
         // doesn't see another profile's predefined content. Mirrors the old editor's preview
         // refresh.
         City.cleanPredefinedCache();
+
+        // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
+        // the profile, so it does not pay to build one there - and this construction is the only site
+        // in this method that can throw: GridSettings.fromProfile validates the road settings, and a
+        // profile can be momentarily self-contradictory. The road settings come in min/max pairs held
+        // by two independent sliders, so dragging a minimum up necessarily passes through states where
+        // it exceeds its maximum. GridSettings refuses those, correctly - a world must never be
+        // generated from numbers nobody wrote - but the editor is where the player is still writing
+        // them, and taking the screen down mid-drag is no way to say so. Keep showing the last good
+        // preview until the profile makes sense again; a profile still inconsistent at world creation
+        // fails there, with the field named. The catch is narrowed to just this construction so a bug
+        // in a renderer's own math is never silently swallowed as "the profile is invalid".
+        NullDimensionInfo diminfo = null;
+        if (mode != Mode.CITY) {
+            try {
+                diminfo = new NullDimensionInfo(profile, seed, registryAccess);
+            } catch (IllegalArgumentException e) {
+                // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
+                // good render. Leaving `mode` alone too keeps the legend describing the image actually
+                // on screen.
+                Urbex.LOGGER.debug("Preview not recomputed - profile is not currently valid: {}", e.getMessage());
+                return;
+            }
+        }
         switch (mode) {
-            // Only the map/transport samplers walk a NullDimensionInfo; CITY renders straight from the profile,
-            // so it does not pay to build one there.
-            case MAP -> renderMap(new NullDimensionInfo(profile, seed, registryAccess));
-            case TRANSPORT -> renderTransport(new NullDimensionInfo(profile, seed, registryAccess), profile);
+            case MAP -> renderMap(diminfo);
+            case TRANSPORT -> renderTransport(diminfo, profile);
+            case ROADS -> renderRoads(diminfo, profile);
             case CITY -> renderCity(profile, seed);
         }
+        this.mode = mode;
         uploadTexture();
     }
 
@@ -260,6 +290,64 @@ public class CityPreview implements AutoCloseable {
                 colors[z * WIDTH + x] = overlay == 0 ? base : blend(base, overlay);
             }
         }
+    }
+
+    // ---- ROADS -----------------------------------------------------------
+
+    /**
+     * The region map dimmed exactly as {@link #renderTransport} dims it, with the road field painted
+     * over the top: one opaque colour per {@link RoadType} (see {@link #roadColour}), so the grid's
+     * shape - primary spine, secondary fill, tertiary stubs - reads before any chunk generates.
+     * <p>
+     * Classifies through {@link BuildingInfo#effectiveRoadType} rather than
+     * {@link dev.krona.urbex.plan.RoadField#typeAt}. That is deliberate: {@code effectiveRoadType} is
+     * the exact "raw field clipped to the city mask" computation real generation renders from (city
+     * membership plus the connected-neighbour check that removes isolated one-chunk stubs at a city
+     * mask's protrusions), and it is a pure function of coordinate, dimension and profile - it takes
+     * no random draw and reads nothing about buildings. An earlier version of this method gated the
+     * road-field query on {@link BuildingInfo#hasBuildingGui}, meaning to skip chunks a building
+     * claims; that predicate is an <em>independent</em> {@code BUILDING_CHANCE} coin flip with no
+     * correlation to the real per-chunk content decision (see below), so it silently recoloured
+     * roughly a {@code BUILDING_CHANCE} fraction of genuine road chunks as background - the mode
+     * misrepresenting the very grid it exists to show. Do not resurrect it.
+     * <p>
+     * <b>What this still cannot know:</b> whether an accepted multi-building has claimed a chunk that
+     * the raw field still calls a road (the trap Task 4's review found in
+     * {@code BuildingInfo.getEffectiveRoadType()} - the field never learns about the content
+     * decision, on purpose, to keep that decision graph acyclic). Real generation resolves multi-
+     * building placement through {@link dev.krona.urbex.worldgen.lost.MultiChunk}, which reaches a
+     * live {@code WorldGenLevel} to look up building assets; this preview runs off
+     * {@link NullDimensionInfo} with no server, so that placement is not something it can reproduce
+     * without touching generation-path code to add a registry-only asset lookup - out of this mode's
+     * scope. So: a chunk an accepted multi-building will claim in the real world may still show a
+     * road colour here. Unlike the predicate this replaced, that is an honest, narrow gap (multi-
+     * building footprints only, not a random fraction of the whole grid), not a defect masquerading
+     * as a guarantee.
+     */
+    private void renderRoads(NullDimensionInfo diminfo, UrbexProfile profile) {
+        for (int z = 0; z < HEIGHT; z++) {
+            for (int x = 0; x < WIDTH; x++) {
+                int base = soften(sampleColor(diminfo, x, z));
+                ChunkCoord c = new ChunkCoord(diminfo.dimension(), x, z);
+                RoadType type = BuildingInfo.effectiveRoadType(c, diminfo, profile);
+                colors[z * WIDTH + x] = blend(base, roadColour(type));
+            }
+        }
+    }
+
+    /**
+     * One opaque colour per road class, brightest for the highest-precedence class so the hierarchy
+     * reads at a glance; fully transparent for {@link RoadType#NONE} so {@link #blend} is a no-op and
+     * a non-road chunk simply keeps whatever the dimmed base map already drew there. Package-private
+     * static so the mapping is testable without a game.
+     */
+    static int roadColour(RoadType type) {
+        return switch (type) {
+            case PRIMARY -> 0xFFE8E8E8;
+            case SECONDARY -> 0xFFA8A8A8;
+            case TERTIARY -> 0xFF6C6C6C;
+            case NONE -> 0;
+        };
     }
 
     // ---- CITY ----------------------------------------------------------------
@@ -444,6 +532,11 @@ public class CityPreview implements AutoCloseable {
                 cx = renderSwatch(g, font, cx, y, HIGHWAY_COLOR, Component.translatable("urbex.preview.legend.highway"));
                 cx = renderSwatch(g, font, cx, y, RAIL_COLOR, Component.translatable("urbex.preview.legend.rail"));
                 renderSwatch(g, font, cx, y, CITY_COLOR, Component.translatable("urbex.preview.legend.city"));
+            }
+            case ROADS -> {
+                cx = renderSwatch(g, font, cx, y, roadColour(RoadType.PRIMARY), Component.translatable("urbex.preview.legend.primary"));
+                cx = renderSwatch(g, font, cx, y, roadColour(RoadType.SECONDARY), Component.translatable("urbex.preview.legend.secondary"));
+                renderSwatch(g, font, cx, y, roadColour(RoadType.TERTIARY), Component.translatable("urbex.preview.legend.tertiary"));
             }
         }
     }

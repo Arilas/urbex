@@ -1,6 +1,10 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.EffectiveRoad;
+import dev.krona.urbex.plan.RoadCell;
+import dev.krona.urbex.plan.RoadDirection;
+import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.*;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
@@ -9,7 +13,6 @@ import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
-import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -57,6 +60,7 @@ public class BuildingInfo {
     private final float stairPriority;      // A random number that indicates if this chunk should get a stair if there are competing stairs around it. The highest wins
     public final BuildingPart railDungeon;    // Dungeon next to rails. Will only generate if there are actually rails next to it
     public StreetType streetType;
+    private final RoadType effectiveRoad;   // The planned road this chunk renders, NONE for most chunks
 
     private int floors;
     public int cellars;
@@ -102,6 +106,12 @@ public class BuildingInfo {
     private volatile boolean zBridgeTypeCalculated = false;
     private volatile BuildingPart xBridgeType = null;
     private volatile BuildingPart zBridgeType = null;
+
+    private volatile boolean plannedBridgeCalculated = false;
+    private volatile PrimaryBridgePlanner.BridgeSpan plannedBridge;
+
+    private volatile boolean streetSlopeCalculated = false;
+    private volatile Direction streetSlopeDirection;
 
     private volatile boolean stairsCalculated = false;
     private volatile Direction stairDirection;
@@ -340,14 +350,9 @@ public class BuildingInfo {
             characteristics.cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(characteristics, coord, provider) : getAverageCityLevel(characteristics, coord, provider);
         }
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
-        characteristics.couldHaveBuilding = characteristics.isCity && checkBuildingPossibility(coord, provider, profile, characteristics.multiPos, characteristics.cityLevel, rand);
-        if ((profile.isSpace() || profile.isSpheres()) && characteristics.multiPos.isSingle()) {
-            // Minimize cities at the edge of the city in an orb
-            float dist = CitySphere.getRelativeDistanceToCityCenter(coord, provider);
-            if (dist > .7f) {
-                characteristics.couldHaveBuilding = false;
-            }
-        }
+        characteristics.couldHaveBuilding = ChunkContentResolver.couldHaveBuilding(profile,
+                characteristics.isCity, characteristics.multiPos, characteristics.cityLevel, rand,
+                chunkFacts(coord, provider, profile));
 
         CityStyle cityStyle;
         // If this is a street we find other chunks connected to this and pick the cityStyle
@@ -440,53 +445,61 @@ public class BuildingInfo {
         return getChunkCharacteristics(coord, provider).isCity;
     }
 
-    private static boolean checkBuildingPossibility(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile, MultiPos section, int cityLevel, RandomSource rand) {
-        boolean b;
-        float bc = rand.nextFloat();
-
-        PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord);
-        if (predefinedBuilding != null) {
-            return true;    // We don't need other tests
+    /**
+     * The road a chunk actually renders: the raw {@link dev.krona.urbex.plan.RoadField} clipped to
+     * the city mask. A road needs its own chunk to be raw city and at least one chunk it connects to
+     * to be raw city as well, which is what removes the isolated one-chunk stubs a city mask's
+     * protrusions would otherwise leave behind.
+     *
+     * <p>Static and raw-city-only on purpose. This is consulted while the chunk characteristics are
+     * still being computed, so it may not read anything that depends on a building decision - its
+     * own or a neighbour's - or the decision graph stops being acyclic.
+     */
+    public static RoadType effectiveRoadType(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+        // The city test comes first, and it is not a matter of taste. Every chunk in the world builds
+        // a BuildingInfo, and the great majority of them are wilderness; asking the road field first
+        // would build the block layout five times over - once for this chunk and once per neighbour
+        // probe, each one sorting a candidate list with a comparator that hashes twice per comparison
+        // - only for the clip below to throw the answer away. EffectiveRoad.resolve returns NONE for
+        // a non-city chunk whatever the field said, so hoisting the test cannot change the answer.
+        if (!isCityRaw(coord, provider, profile)) {
+            return RoadType.NONE;
         }
-        PredefinedStreet predefinedStreet = City.getPredefinedStreet(provider.getWorld(), coord);
-        if (predefinedStreet != null) {
-            return false;   // No building here
-        }
-
-        CityStyle style = City.getCityStyle(coord, provider, profile);
-        float buildingChance = profile.BUILDING_CHANCE;
-        if (style.getBuildingChance() != null) {
-            buildingChance = style.getBuildingChance();
-        }
-
-        if (section.isMulti()) {
-            // Part of multi-building. We have checked everything above
-            b = true;
-        } else if (bc >= buildingChance) {
-            // Random says we should have no building here
-            b = false;
-        } else if (hasHighway(coord, provider, profile)) {
-            // We are above a highway. Check if we have room for a building
-            int maxh = Math.max(Highway.getXHighwayLevel(coord, provider, profile), Highway.getZHighwayLevel(coord, provider, profile));
-            b = cityLevel > maxh + 1;       // Allow a building if it is higher than the maximum highway + one
-            // Later we will take care to make sure we don't have too many cellars
-            // Note that for easy of coding we still disallow multi-buildings above highways
-        } else if (hasRailway(coord, provider, profile)) {
-            // We are above a railway. Check if we have room for a building
-            Railway.RailChunkInfo info = Railway.getRailChunkType(coord, provider, profile);
-            if (info.getType() == RailChunkType.STATION_UNDERGROUND) {
-                b = false;  // No building directly above the underground station
-            } else {
-                int maxh = info.getLevel();
-                b = cityLevel > maxh + 1;       // Allow a building if it is higher than the maximum railway + one
-                // Later we will take care to make sure we don't have too many cellars
-                // Note that for easy of coding we still disallow multi-buildings above railways
+        RoadCell cell = provider.roadField().at(coord.chunkX(), coord.chunkZ());
+        boolean connectedCityNeighbour = false;
+        for (RoadDirection direction : RoadDirection.values()) {
+            if (cell.connects(direction)) {
+                ChunkCoord adjacent = coord.offset(direction.stepX(), direction.stepZ());
+                // Same profile only: in a city-sphere world a neighbour that belongs to the outside
+                // profile is a different city, and a road may not lean on it to stay alive.
+                UrbexProfile adjacentProfile = getProfile(adjacent, provider);
+                if (adjacentProfile == profile && isCityRaw(adjacent, provider, adjacentProfile)) {
+                    connectedCityNeighbour = true;
+                    break;
+                }
             }
-        } else {
-            // General case
-            b = true;
         }
-        return b;
+        // isCity is true: the early return above is the only way past this point.
+        return EffectiveRoad.resolve(cell.type(), true, connectedCityNeighbour, false);
+    }
+
+    /**
+     * The world lookups {@link ChunkContentResolver#couldHaveBuilding} may need, each still behind a
+     * supplier so the decision keeps its short-circuiting: consulting {@link Highway} or
+     * {@link Railway} for a chunk whose building roll already failed would be new work, and
+     * {@code Railway}'s chunk types are mutable state.
+     */
+    private static ChunkContentResolver.ChunkFacts chunkFacts(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+        return new ChunkContentResolver.ChunkFacts(
+                () -> City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord) != null,
+                () -> City.getPredefinedStreet(provider.getWorld(), coord) != null,
+                () -> City.getCityStyle(coord, provider, profile),
+                () -> effectiveRoadType(coord, provider, profile),
+                () -> hasHighway(coord, provider, profile),
+                () -> Math.max(Highway.getXHighwayLevel(coord, provider, profile), Highway.getZHighwayLevel(coord, provider, profile)),
+                () -> hasRailway(coord, provider, profile),
+                () -> Railway.getRailChunkType(coord, provider, profile),
+                () -> CitySphere.getRelativeDistanceToCityCenter(coord, provider));
     }
 
     /**
@@ -707,44 +720,35 @@ public class BuildingInfo {
 
         RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_LAYOUT);
 
-        boolean b = characteristics.couldHaveBuilding;
-        if (b && multiBuildingPos.isSingle()) {
-            if (rand.nextFloat() < getChunkCharacteristics(coord.west(), provider).buildingType.getPrefersLonely()) {
-                b = false;
-            } else if (rand.nextFloat() < getChunkCharacteristics(coord.east(), provider).buildingType.getPrefersLonely()) {
-                b = false;
-            } else if (rand.nextFloat() < getChunkCharacteristics(coord.north(), provider).buildingType.getPrefersLonely()) {
-                b = false;
-            } else if (rand.nextFloat() < getChunkCharacteristics(coord.south(), provider).buildingType.getPrefersLonely()) {
-                b = false;
+        CityStyle cs = characteristics.cityStyle;
+
+        // The city sphere centre override settles two separate things from one switch: whether this
+        // chunk counts as city at all (here) and whether it may hold a building (in the resolver).
+        CitySphereSettings.CitySphereCenterType centertype = null;
+        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.isCitySphereCenter(coord, provider)) {
+            CitySphereSettings settings = provider.getWorldStyle().getCitysphereSettings();
+            if (settings != null) {
+                centertype = settings.getCenterType();
             }
         }
 
         boolean c = characteristics.isCity;
-        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.isCitySphereCenter(coord, provider)) {
-            CitySphereSettings settings = provider.getWorldStyle().getCitysphereSettings();
-            if (settings != null) {
-                CitySphereSettings.CitySphereCenterType centertype = settings.getCenterType();
-                switch (centertype) {
-                    case DEFAULT -> {
-                    }
-                    case STREET -> {
-                        c = true;
-                        b = false;
-                    }
-                    case BUILDING -> {
-                        c = true;
-                        b = true;
-                    }
-                    case NORMAL -> {
-                        c = false;
-                    }
+        if (centertype != null) {
+            switch (centertype) {
+                case DEFAULT -> {
                 }
+                case STREET, BUILDING -> c = true;
+                case NORMAL -> c = false;
             }
         }
-
         isCity = c;
-        hasBuilding = b;
+        effectiveRoad = effectiveRoadType(key, provider, profile);
+
+        ChunkContent content = ChunkContentResolver.resolve(profile, provider.getSeed(), rand,
+                isCity, characteristics.couldHaveBuilding, effectiveRoad, multiBuildingPos, coord,
+                neighbour -> getChunkCharacteristics(neighbour, provider).buildingType.getPrefersLonely(),
+                centertype, characteristics.buildingType.getName());
+        hasBuilding = content.hasBuilding();
 
         int wl;
         if (outsideChunk) {
@@ -756,8 +760,6 @@ public class BuildingInfo {
         }
         waterLevel = wl == -1 ? Tools.getSeaLevel(provider.getWorld()) : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.getWorldStyle().getWorldSettings().railwayAvoidance();
-
-        CityStyle cs = characteristics.cityStyle;
 
         // In a multi building we copy all information from the top-left chunk
         if (multiBuildingPos.isMulti() && !multiBuildingPos.isTopLeft()) {
@@ -781,19 +783,19 @@ public class BuildingInfo {
             highwayXLevel = Highway.getXHighwayLevel(key, provider, profile);
             highwayZLevel = Highway.getZHighwayLevel(key, provider, profile);
 
-            float parkChance = cs.getParkChance() != null ? cs.getParkChance() : profile.PARK_CHANCE;
-            if (rand.nextDouble() < parkChance) {
-                streetType = StreetType.PARK;
-            } else {
-                streetType = StreetType.randomNonPark(rand);
-            }
+            streetType = content.streetType();
             float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
             if (rand.nextFloat() < fountainChance) {
                 fountainType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomFountain(rand, this.coord));
             } else {
                 fountainType = null;
             }
-            parkType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand, this.coord));
+            // The selection draw is unconditional so the layout stream never depends on the outcome;
+            // only whether the chosen part is kept follows the open-lot park chance. A road, a
+            // building or anything outside a city keeps nothing: the park surface is an open lot's,
+            // and a part with no lot under it would sit on the carriageway.
+            BuildingPart park = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand, this.coord));
+            parkType = content.parkPart() ? park : null;
             float cityFactor = City.getCityFactor(coord, provider, profile);
 
             int maxfloors = getMaxfloors(cs);
@@ -1240,8 +1242,98 @@ public class BuildingInfo {
         };
     }
 
+    /**
+     * The road this chunk renders, or {@link RoadType#NONE}. Settled in the constructor, from the
+     * same {@link #effectiveRoadType} the content decision used, so the two can never disagree.
+     */
+    public RoadType getEffectiveRoadType() {
+        return effectiveRoad;
+    }
+
+    public boolean isPrimaryRoad() {
+        return effectiveRoad == RoadType.PRIMARY;
+    }
+
+    /** A chunk that renders a planned road of some class, rather than a lot, a park or a building. */
+    private boolean isPlannedRoadSection() {
+        return isCity && !hasBuilding && effectiveRoad != RoadType.NONE;
+    }
+
+    /** A planned road below primary: the only roads allowed to slope. */
+    private boolean isMinorRoadSection() {
+        return isPlannedRoadSection() && effectiveRoad != RoadType.PRIMARY;
+    }
+
     public boolean isStreetOrParkSection() {
         return isCity && !hasBuilding;
+    }
+
+    /**
+     * The higher edge of a full-chunk street slope, or {@code null} when this chunk keeps its
+     * ordinary flat street part.
+     *
+     * <p>Slopes are deliberately narrow in scope. Only a minor road can slope - a primary carries a
+     * centre line and a width that the single stair asset does not reproduce - and only where the
+     * route through the chunk is unambiguous: exactly one neighbour one city level up, the same
+     * minor road continuing straight behind the transition and straight on past it, and no
+     * same-level branch off either end. Everything else stays flat, so bends and junctions never
+     * turn into a ramp nobody can read.
+     */
+    @Nullable
+    public Direction getStreetSlopeDirection() {
+        if (streetSlopeCalculated) {
+            return streetSlopeDirection;
+        }
+        Direction direction = computeStreetSlopeDirection();
+        // Value first, then the flag: a reader that sees the flag set must see the value.
+        streetSlopeDirection = direction;
+        streetSlopeCalculated = true;
+        return direction;
+    }
+
+    @Nullable
+    private Direction computeStreetSlopeDirection() {
+        if (!isMinorRoadSection()) {
+            return null;
+        }
+        Direction slopeDirection = null;
+        for (Direction direction : Direction.VALUES) {
+            BuildingInfo adjacent = direction.get(this);
+            if (adjacent.isMinorRoadSection() && adjacent.cityLevel == cityLevel + 1) {
+                if (slopeDirection != null) {
+                    // Two ways up out of one chunk: which one the ramp should face is not decided.
+                    return null;
+                }
+                slopeDirection = direction;
+            }
+        }
+        if (slopeDirection == null) {
+            return null;
+        }
+
+        BuildingInfo upper = slopeDirection.get(this);
+        BuildingInfo approach = slopeDirection.getOpposite().get(this);
+        if (!approach.isMinorRoadSection() || approach.cityLevel != cityLevel) {
+            return null;
+        }
+        BuildingInfo departure = slopeDirection.get(upper);
+        if (!departure.isMinorRoadSection() || departure.cityLevel != upper.cityLevel) {
+            return null;
+        }
+
+        for (Direction direction : Direction.VALUES) {
+            if (direction != slopeDirection && direction != slopeDirection.getOpposite()) {
+                BuildingInfo side = direction.get(this);
+                if (side.isPlannedRoadSection() && side.cityLevel == cityLevel) {
+                    return null;
+                }
+                BuildingInfo upperSide = direction.get(upper);
+                if (upperSide.isPlannedRoadSection() && upperSide.cityLevel == upper.cityLevel) {
+                    return null;
+                }
+            }
+        }
+        return slopeDirection;
     }
 
     public boolean isElevatedParkSection() {
@@ -1266,7 +1358,9 @@ public class BuildingInfo {
             return stairDirection;
         }
         Direction direction = null;
-        if (streetType != StreetType.PARK && !hasBuilding && isCity) {
+        // A sloped chunk already carries the whole level change across its full width. The narrow
+        // stair decoration on top of it would be a second, contradictory way up.
+        if (getStreetSlopeDirection() == null && streetType != StreetType.PARK && !hasBuilding && isCity) {
             if (cityLevel == getXmin().cityLevel - 1 && !getXmin().hasBuilding && getXmin().isCity) {
                 direction = Direction.XMIN;
             } else if (cityLevel == getXmax().cityLevel - 1 && !getXmax().hasBuilding && getXmax().isCity) {
@@ -1310,6 +1404,23 @@ public class BuildingInfo {
     }
 
 
+    /**
+     * The planned primary bridge claiming this chunk, or {@code null}. Memoized because the border
+     * pass asks for it once per edge column, and because the ordinary bridge scan below must agree
+     * with the deck that actually renders.
+     */
+    @Nullable
+    public PrimaryBridgePlanner.BridgeSpan getPlannedBridge() {
+        if (plannedBridgeCalculated) {
+            return plannedBridge;
+        }
+        PrimaryBridgePlanner.BridgeSpan result = PrimaryBridgePlanner.spanAt(coord, provider).orElse(null);
+        // Value first, then the flag.
+        plannedBridge = result;
+        plannedBridgeCalculated = true;
+        return result;
+    }
+
     public BuildingPart hasBridge(IDimensionInfo provider, Orientation orientation) {
         return switch (orientation) {
             case X -> hasXBridge(provider);
@@ -1341,6 +1452,14 @@ public class BuildingInfo {
     }
 
     private BuildingPart computeXBridge(IDimensionInfo provider) {
+        PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
+        if (planned != null) {
+            // A planned span settles this chunk for both orientations. Falling through to the
+            // opportunistic scan below when the span runs the other way would let an ordinary bridge
+            // claim the chunk first and cancel the planned one.
+            return planned.orientation() == Orientation.X
+                    ? PrimaryBridgePlanner.deckPart(planned, coord, provider) : null;
+        }
         if (!xBridge) {
             return null;
         }
@@ -1401,6 +1520,11 @@ public class BuildingInfo {
     }
 
     private BuildingPart computeZBridge(IDimensionInfo provider) {
+        PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
+        if (planned != null) {
+            return planned.orientation() == Orientation.Z
+                    ? PrimaryBridgePlanner.deckPart(planned, coord, provider) : null;
+        }
         if (!zBridge) {
             return null;
         }
@@ -1473,6 +1597,11 @@ public class BuildingInfo {
 
     private boolean isSuitableForBridge(IDimensionInfo provider, BuildingInfo i) {
         if (provider.getProfile().isSpace() && hasMonorail()) {
+            return false;
+        }
+        if (i.getPlannedBridge() != null) {
+            // A planned span owns this chunk. An opportunistic bridge must not run through it -
+            // it would stamp its own part over the planned deck on its way past.
             return false;
         }
         return i.cityLevel < cityLevel || CityGenerator.isWaterBiome(provider, i.coord);
@@ -1560,11 +1689,18 @@ public class BuildingInfo {
         if (!i2.doesRoadExtendTo()) {
             return false;
         }
-        if (Math.abs(i1.cityLevel - i2.cityLevel) <= 0 /* @todo temporary, should be <= 1 */) {
-            // We allow a road difference of 1 maximum
+        if (i1.cityLevel == i2.cityLevel) {
             return true;
         }
-        return false;
+        // A one-level difference only connects where a slope actually bridges it. Reading the slope
+        // rather than merely allowing a difference of one is what keeps the upper road drawing
+        // through to its edge exactly over the ramp, and ending in a kerb everywhere else.
+        Direction slope1 = i1.getStreetSlopeDirection();
+        if (slope1 != null && slope1.get(i1).coord.equals(i2.coord)) {
+            return true;
+        }
+        Direction slope2 = i2.getStreetSlopeDirection();
+        return slope2 != null && slope2.get(i2).coord.equals(i1.coord);
     }
 
     /**
@@ -1900,21 +2036,15 @@ public class BuildingInfo {
     }
 
 
+    /**
+     * How a chunk with no building renders: a planned road is {@link #NORMAL} paving, an open lot is
+     * the {@link #PARK} grass surface. Nothing else decides between them - in particular the open-lot
+     * park chance does not, it only furnishes a lot that is already grass. There is no third surface:
+     * the old {@code FULL} type was reachable only from a coin flip the road field replaced.
+     */
     public enum StreetType {
         NORMAL,
-        FULL,
-        PARK;
-
-        private static final StreetType[] NON_PARK = {NORMAL, FULL};
-
-        /**
-         * An even choice between the non-park street types. PARK is decided separately by the
-         * park chance. The old form, {@code values()[nextInt(values().length - 2)]}, could only
-         * ever yield NORMAL (issue #36).
-         */
-        public static StreetType randomNonPark(RandomSource rand) {
-            return NON_PARK[rand.nextInt(NON_PARK.length)];
-        }
+        PARK
     }
 
 

@@ -986,7 +986,8 @@ public class CityGenerator {
         int levelZ = info.getHighwayZLevel();
         if (!building) {
             Railway.RailChunkInfo railInfo = info.getRailInfo();
-            if (levelX < 0 && levelZ < 0 && !railInfo.getType().isSurface()) {
+            if (levelX < 0 && levelZ < 0 && !railInfo.getType().isSurface()
+                    && info.getStreetSlopeDirection() == null) {
                 generateStreetDecorations(ctx, info);
             }
         }
@@ -1261,6 +1262,7 @@ public class CityGenerator {
 //                clearToMax(info, heightmap, height);
 //            }
 
+            Direction streetSlopeDirection = info.getStreetSlopeDirection();
             BuildingInfo.StreetType streetType = info.streetType;
             boolean elevated = info.isElevatedParkSection();
             if (elevated) {
@@ -1279,39 +1281,47 @@ public class CityGenerator {
                 if (parkElevation) {
                     height++;
                 }
-            } else {
-                // Local redraw only: writing this back into the shared cached BuildingInfo
-                // clobbered the PARK decision neighbours read through isElevatedParkSection()
-                // and friends, making their output depend on generation order (issue #36).
-                RandomSource rnd = ctx.rng(Rng.Purpose.STREET);
-                streetType = BuildingInfo.StreetType.randomNonPark(rnd);
             }
 
+            // No re-roll here any more. The content decision is authoritative: a planned road is
+            // NORMAL, an open lot is whatever its addressed park roll said, and re-rolling was what
+            // used to clobber the PARK decision neighbours read through isElevatedParkSection()
+            // (issue #36).
             switch (streetType) {
-                case NORMAL -> generateNormalStreetSection(ctx, info, height);
-                case FULL -> generateFullStreetSection(ctx, info, height);
+                case NORMAL -> {
+                    if (streetSlopeDirection == null) {
+                        generateNormalStreetSection(ctx, info, height);
+                    } else {
+                        generateStreetSlopeSection(ctx, info, height, streetSlopeDirection);
+                    }
+                }
                 case PARK -> generateParkSection(ctx, info, height, elevated);
             }
             height++;
 
-            if (streetType == BuildingInfo.StreetType.PARK || info.fountainType != null) {
-                BuildingPart part;
-                if (streetType == BuildingInfo.StreetType.PARK) {
-                    part = info.parkType;
-                } else {
-                    part = info.fountainType;
+            // A sloped chunk is a ramp from end to end. Everything that would stand on the surface -
+            // a fountain, a park part, vegetation, a building front reaching out over the pavement -
+            // is suppressed, because on a ramp it would sit in mid-air or in the middle of the route.
+            if (streetSlopeDirection == null) {
+                if (streetType == BuildingInfo.StreetType.PARK || info.fountainType != null) {
+                    BuildingPart part;
+                    if (streetType == BuildingInfo.StreetType.PARK) {
+                        part = info.parkType;
+                    } else {
+                        part = info.fountainType;
+                    }
+                    if (part != null) {
+                        generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
+                    }
                 }
-                if (part != null) {
-                    generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
-                }
+
+                generateRandomVegetation(ctx, info, height);
+
+                generateFrontPart(ctx, info, height, info.getXmin(), Transform.ROTATE_NONE);
+                generateFrontPart(ctx, info, height, info.getZmin(), Transform.ROTATE_90);
+                generateFrontPart(ctx, info, height, info.getXmax(), Transform.ROTATE_180);
+                generateFrontPart(ctx, info, height, info.getZmax(), Transform.ROTATE_270);
             }
-
-            generateRandomVegetation(ctx, info, height);
-
-            generateFrontPart(ctx, info, height, info.getXmin(), Transform.ROTATE_NONE);
-            generateFrontPart(ctx, info, height, info.getZmin(), Transform.ROTATE_90);
-            generateFrontPart(ctx, info, height, info.getXmax(), Transform.ROTATE_180);
-            generateFrontPart(ctx, info, height, info.getZmax(), Transform.ROTATE_270);
         }
 
         generateBorders(ctx, info, canDoStreetOrPark, heightmap);
@@ -1646,20 +1656,63 @@ public class CityGenerator {
         }
     }
 
-    private void generateFullStreetSection(ChunkGenContext ctx, BuildingInfo info, int height) {
-        StreetParts parts = info.getCityStyle().getStreetParts();
-        BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.full()));
+    /**
+     * The part family a chunk's road class draws from. A style that defines no tertiary family falls
+     * back to its ordinary streets, which {@link dev.krona.urbex.worldgen.lost.cityassets.CityStyle}
+     * handles; a chunk with no planned road (an open lot rendered as paving) also uses the ordinary
+     * family, because that is the narrowest surface available.
+     */
+    private static StreetParts getStreetParts(BuildingInfo info) {
+        return switch (info.getEffectiveRoadType()) {
+            case PRIMARY -> info.getCityStyle().getLargeStreetParts();
+            case TERTIARY -> info.getCityStyle().getTertiaryStreetParts();
+            case SECONDARY, NONE -> info.getCityStyle().getStreetParts();
+        };
+    }
+
+    /**
+     * Whether the street part on {@code info} should reach the edge it shares with {@code adjacent}.
+     *
+     * <p>On a primary road only another primary counts as a road connection. A secondary or tertiary
+     * street still meets the primary's surface - that is what the connector overlay is for - but it
+     * must not turn the primary into a bend or a junction, which would aim its quartz centre line
+     * down a minor street.
+     *
+     * <p>A bridge still connects, primary or not: a bridge carries the road onward, so ignoring it
+     * would end the road in a kerb with the bridge starting a chunk later out of nothing.
+     */
+    private static boolean hasStreetPartConnection(BuildingInfo info, BuildingInfo adjacent, boolean bridgeConnection) {
+        boolean roadConnection = BuildingInfo.hasRoadConnection(info, adjacent);
+        if (info.isPrimaryRoad()) {
+            return (roadConnection && adjacent.isPrimaryRoad()) || bridgeConnection;
+        }
+        return roadConnection || bridgeConnection;
+    }
+
+    /**
+     * The whole chunk as one ramp. The stair part is authored rising towards {@code XMIN}, so the
+     * direction of the higher edge is exactly its rotation.
+     */
+    private void generateStreetSlopeSection(ChunkGenContext ctx, BuildingInfo info, int height, Direction slopeDirection) {
+        StreetParts parts = getStreetParts(info);
+        // A style with no stair part has opted out of slopes the same way an empty connector list
+        // opts out of connectors below: asset gaps degrade rather than crash. Without this guard,
+        // getRandomPart would call List.get on an empty list and throw.
+        if (parts.stair().isEmpty()) {
+            return;
+        }
+        BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.stair()));
         if (part != null) {
-            generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.VOID);
+            generatePart(ctx, info, part, slopeDirection.getRotation(), 0, height, 0, HardAirSetting.VOID);
         }
     }
 
     private void generateNormalStreetSection(ChunkGenContext ctx, BuildingInfo info, int height) {
-        StreetParts parts = info.getCityStyle().getStreetParts();
-        boolean xmin = BuildingInfo.hasRoadConnection(info, info.getXmin()) || (info.getXmin().hasXBridge(provider) != null);
-        boolean xmax = BuildingInfo.hasRoadConnection(info, info.getXmax()) || (info.getXmax().hasXBridge(provider) != null);
-        boolean zmin = BuildingInfo.hasRoadConnection(info, info.getZmin()) || (info.getZmin().hasZBridge(provider) != null);
-        boolean zmax = BuildingInfo.hasRoadConnection(info, info.getZmax()) || (info.getZmax().hasZBridge(provider) != null);
+        StreetParts parts = getStreetParts(info);
+        boolean xmin = hasStreetPartConnection(info, info.getXmin(), info.getXmin().hasXBridge(provider) != null);
+        boolean xmax = hasStreetPartConnection(info, info.getXmax(), info.getXmax().hasXBridge(provider) != null);
+        boolean zmin = hasStreetPartConnection(info, info.getZmin(), info.getZmin().hasZBridge(provider) != null);
+        boolean zmax = hasStreetPartConnection(info, info.getZmax(), info.getZmax().hasZBridge(provider) != null);
         int cnt = (xmin ? 1 : 0) + (xmax ? 1 : 0) + (zmin ? 1 : 0) + (zmax ? 1 : 0);
         Transform transform = Transform.ROTATE_NONE;
         BuildingPart part = switch (cnt) {
@@ -1717,6 +1770,33 @@ public class CityGenerator {
         };
         if (part != null) {
             generatePart(ctx, info, part, transform, 0, height, 0, HardAirSetting.VOID);
+            generateMinorStreetConnectors(ctx, info, parts, height);
+        }
+    }
+
+    /**
+     * Where a minor street runs up against a primary road, overlay a connector on the primary so the
+     * two surfaces meet instead of ending in a kerb. Only primaries carry these - a minor street
+     * meeting another minor street is an ordinary junction the topology already covers. A style with
+     * an empty connector list has opted out; that is a choice, not a missing asset, so no warning.
+     */
+    private void generateMinorStreetConnectors(ChunkGenContext ctx, BuildingInfo info, StreetParts parts, int height) {
+        if (!info.isPrimaryRoad() || parts.connector().isEmpty()) {
+            return;
+        }
+        generateMinorStreetConnector(ctx, info, info.getXmin(), parts, height, Transform.ROTATE_NONE);
+        generateMinorStreetConnector(ctx, info, info.getXmax(), parts, height, Transform.ROTATE_180);
+        generateMinorStreetConnector(ctx, info, info.getZmin(), parts, height, Transform.ROTATE_90);
+        generateMinorStreetConnector(ctx, info, info.getZmax(), parts, height, Transform.ROTATE_270);
+    }
+
+    private void generateMinorStreetConnector(ChunkGenContext ctx, BuildingInfo info, BuildingInfo adjacent,
+                                              StreetParts parts, int height, Transform transform) {
+        if (BuildingInfo.hasRoadConnection(info, adjacent) && !adjacent.isPrimaryRoad()) {
+            BuildingPart connector = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.connector()));
+            if (connector != null) {
+                generatePart(ctx, info, connector, transform, 0, height, 0, HardAirSetting.VOID);
+            }
         }
     }
 
@@ -1724,6 +1804,30 @@ public class CityGenerator {
         for (Direction direction : Direction.VALUES) {
             if (direction.atSide(x, z)) {
                 BuildingInfo adjacent = direction.get(info);
+                // A lower neighbour sloping up towards this chunk needs the retaining wall opened,
+                // but only across the ramp itself: the stair part's z1/z2 band, rotated to this
+                // edge. The rest of the wall stays, or the level change would read as a gap.
+                if (adjacent.getStreetSlopeDirection() == direction.getOpposite()) {
+                    StreetParts slopeParts = getStreetParts(adjacent);
+                    if (!slopeParts.stair().isEmpty()) {
+                        BuildingPart slope = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), slopeParts.stair().get(0));
+                        if (slope != null) {
+                            Integer z1 = slope.getMetaInteger(BuildingPart.META_Z_1);
+                            Integer z2 = slope.getMetaInteger(BuildingPart.META_Z_2);
+                            if (z1 != null && z2 != null) {
+                                Transform transform = direction.getOpposite().getRotation();
+                                int xx1 = transform.rotateX(15, z1);
+                                int zz1 = transform.rotateZ(15, z1);
+                                int xx2 = transform.rotateX(15, z2);
+                                int zz2 = transform.rotateZ(15, z2);
+                                if (x >= Math.min(xx1, xx2) && x <= Math.max(xx1, xx2)
+                                        && z >= Math.min(zz1, zz2) && z <= Math.max(zz1, zz2)) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
                 if (adjacent.getActualStairDirection() == direction.getOpposite()) {
                     BuildingPart stairType = adjacent.stairType;
                     if (stairType != null) {

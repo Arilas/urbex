@@ -65,16 +65,22 @@ class DatapackReferenceIntegrityTest {
                 if (sel != null) {
                     for (Map.Entry<String, String> e : Map.of(
                             "buildings", "buildings", "multibuildings", "multibuildings",
-                            "bridges", "parts", "parks", "parts", "fountains", "parts",
+                            "bridges", "parts", "largebridges", "parts", "parks", "parts", "fountains", "parts",
                             "stairs", "parts", "fronts", "parts", "raildungeons", "parts").entrySet()) {
                         forEachObject(sel.get(e.getKey()), o -> ref(src, o.get("value"), e.getValue()));
                     }
                 }
                 JsonObject sb = asObject(d.get("streetblocks"));
-                JsonObject sbParts = sb == null ? null : asObject(sb.get("parts"));
-                if (sbParts != null) {
-                    for (Map.Entry<String, JsonElement> e : sbParts.entrySet()) {
-                        refListOrString(src, e.getValue(), "parts");
+                if (sb != null) {
+                    // "tertiaryparts" is optional by design (falls back to "parts" when absent),
+                    // so this must tolerate a missing key rather than require it.
+                    for (String partsKey : List.of("parts", "largeparts", "tertiaryparts")) {
+                        JsonObject sbParts = asObject(sb.get(partsKey));
+                        if (sbParts != null) {
+                            for (Map.Entry<String, JsonElement> e : sbParts.entrySet()) {
+                                refListOrString(src, e.getValue(), "parts");
+                            }
+                        }
                     }
                 }
             }

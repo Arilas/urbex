@@ -20,6 +20,7 @@ public class CityStyle {
 
     private final List<ObjectSelector> buildingSelector = new ArrayList<>();
     private final List<ObjectSelector> bridgeSelector = new ArrayList<>();
+    private final List<ObjectSelector> largeBridgeSelector = new ArrayList<>();
     private final List<ObjectSelector> parkSelector = new ArrayList<>();
     private final List<ObjectSelector> fountainSelector = new ArrayList<>();
     private final List<ObjectSelector> stairSelector = new ArrayList<>();
@@ -27,6 +28,8 @@ public class CityStyle {
     private final List<ObjectSelector> railDungeonSelector = new ArrayList<>();
     private final List<ObjectSelector> multiBuildingSelector = new ArrayList<>();
     private StreetParts streetParts = StreetParts.DEFAULT;
+    private StreetParts largeStreetParts = StreetParts.DEFAULT;
+    private StreetParts tertiaryStreetParts = StreetParts.DEFAULT;
 
     // Building settings
     private Integer minFloorCount;
@@ -46,7 +49,6 @@ public class CityStyle {
     private Character wallBlock;
 
     // Park settings
-    private Float parkChance;
     private Boolean avoidFoliage;
     private Boolean parkBorder;
     private Boolean parkElevation;
@@ -108,7 +110,6 @@ public class CityStyle {
             railMainBlock = s.getRailMainBlock();
         });
         object.getParkSettings().ifPresent(s -> {
-            parkChance = s.getParkChance();
             avoidFoliage = s.getAvoidFoliage();
             parkBorder = s.getParkBorder();
             parkElevation = s.getParkElevation();
@@ -131,6 +132,8 @@ public class CityStyle {
             wallBlock = s.getWallBlock();
             streetWidth = s.getStreetWidth();
             streetParts = s.getParts();
+            largeStreetParts = s.getLargeParts();
+            tertiaryStreetParts = s.getTertiaryParts();
         });
         object.getGeneralSettings().ifPresent(s -> {
             glowstoneBlock = s.getGlowstoneBlock();
@@ -140,6 +143,7 @@ public class CityStyle {
         });
         object.getSelectors().ifPresent(s -> {
             s.getBridgeSelector().ifPresent(bridgeSelector::addAll);
+            s.getLargeBridgeSelector().ifPresent(largeBridgeSelector::addAll);
             s.getBuildingSelector().ifPresent(buildingSelector::addAll);
             s.getFountainSelector().ifPresent(fountainSelector::addAll);
             s.getFrontSelector().ifPresent(frontSelector::addAll);
@@ -174,6 +178,16 @@ public class CityStyle {
         return streetParts;
     }
 
+    /** Primary roads fall back to the secondary-road family when a style does not define their own. */
+    public StreetParts getLargeStreetParts() {
+        return largeStreetParts == StreetParts.DEFAULT ? streetParts : largeStreetParts;
+    }
+
+    /** Tertiary roads fall back to the secondary-road family when a style does not define their own. */
+    public StreetParts getTertiaryStreetParts() {
+        return tertiaryStreetParts == StreetParts.DEFAULT ? streetParts : tertiaryStreetParts;
+    }
+
     public Integer getMinFloorCount() {
         return minFloorCount;
     }
@@ -193,8 +207,6 @@ public class CityStyle {
     public Float getBuildingChance() {
         return buildingChance;
     }
-
-    public Float getParkChance() { return parkChance; }
 
     public Float getFrontChance() { return frontChance; }
 
@@ -329,6 +341,7 @@ public class CityStyle {
                 stuffTags.addAll(inheritFrom.stuffTags);
                 buildingSelector.addAll(inheritFrom.buildingSelector);
                 bridgeSelector.addAll(inheritFrom.bridgeSelector);
+                largeBridgeSelector.addAll(inheritFrom.largeBridgeSelector);
                 parkSelector.addAll(inheritFrom.parkSelector);
                 fountainSelector.addAll(inheritFrom.fountainSelector);
                 stairSelector.addAll(inheritFrom.stairSelector);
@@ -344,6 +357,12 @@ public class CityStyle {
                 if (streetParts == StreetParts.DEFAULT) {
                     streetParts = inheritFrom.streetParts;
                 }
+                if (largeStreetParts == StreetParts.DEFAULT) {
+                    largeStreetParts = inheritFrom.largeStreetParts;
+                }
+                if (tertiaryStreetParts == StreetParts.DEFAULT) {
+                    tertiaryStreetParts = inheritFrom.tertiaryStreetParts;
+                }
                 if (minFloorCount == null) {
                     minFloorCount = inheritFrom.minFloorCount;
                 }
@@ -358,9 +377,6 @@ public class CityStyle {
                 }
                 if (buildingChance == null) {
                     buildingChance = inheritFrom.buildingChance;
-                }
-                if (parkChance == null) {
-                    parkChance = inheritFrom.parkChance;
                 }
                 if (fountainChance == null) {
                     fountainChance = inheritFrom.fountainChance;
@@ -490,6 +506,13 @@ public class CityStyle {
 
     public String getRandomBridge(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, bridgeSelector, pos);
+    }
+
+    public String getRandomLargeBridge(RandomSource random, ChunkCoord pos) {
+        if (largeBridgeSelector.isEmpty()) {
+            return getRandomBridge(random, pos);
+        }
+        return getRandomFromList(random, largeBridgeSelector, pos);
     }
 
     public String getRandomFountain(RandomSource random, ChunkCoord pos) {

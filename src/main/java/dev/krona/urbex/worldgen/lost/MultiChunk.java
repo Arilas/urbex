@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Counter;
@@ -185,6 +186,15 @@ public class MultiChunk {
                 if (City.isChunkOccupied(provider, coord)) {
                     return false;
                 }
+                // The RAW road, never BuildingInfo.getEffectiveRoadType(). Effective roads depend on
+                // city membership, which is fine, but routing this through BuildingInfo would make
+                // multi-building acceptance depend on BuildingInfo, which depends on multi-building
+                // acceptance. Predefined multi-buildings never reach here at all.
+                RoadType rawRoad = provider.roadField().typeAt(coord.chunkX(), coord.chunkZ());
+                if (profile.MULTI_BUILDING_STREET_CONFLICT.roadBlocks(rawRoad)) {
+                    return false;
+                }
+
                 Railway.RailChunkInfo railChunkInfo = Railway.getRailChunkType(coord, provider, profile);
                 RailChunkType type = railChunkInfo.getType();
                 boolean atSurface = type.isSurface() || type.isStation();

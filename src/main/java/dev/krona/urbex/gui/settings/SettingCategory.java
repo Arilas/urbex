@@ -9,6 +9,13 @@ import java.util.Locale;
  * {@link #GENERAL} is the real home of a curated handful of the most impactful knobs (city chance, radii,
  * floors, ruin/explosion chances, loot &amp; lighting density, landscape type); those are removed from their
  * former categories so the same control never appears twice.</p>
+ *
+ * <p>{@link #ROADS} and {@link #TRANSPORT} split what used to be one crowded tab along the line each
+ * category's own preview actually draws: {@link #TRANSPORT} keeps highways and railways (its overlay's
+ * network), and {@link #ROADS} owns the hierarchical street grid - primary/secondary/tertiary roads and
+ * planned bridges, including {@code MULTI_BUILDING_STREET_CONFLICT} - previewed by
+ * {@code CityPreview.Mode.ROADS}. See {@code CustomizeScreen#modeForCategory} for the category-to-preview
+ * wiring.</p>
  */
 public enum SettingCategory {
     GENERAL,
@@ -16,6 +23,7 @@ public enum SettingCategory {
     BUILDINGS,
     DAMAGE,
     TRANSPORT,
+    ROADS,
     SPHERES,
     TERRAIN,
     SPAWN,

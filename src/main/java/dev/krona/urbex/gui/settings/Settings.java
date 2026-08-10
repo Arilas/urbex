@@ -1,6 +1,7 @@
 package dev.krona.urbex.gui.settings;
 
 import dev.krona.urbex.config.LandscapeType;
+import dev.krona.urbex.config.MultiBuildingStreetConflict;
 import dev.krona.urbex.config.UrbexProfile;
 import net.minecraft.client.resources.language.I18n;
 
@@ -244,8 +245,8 @@ public final class Settings {
 
         // Parks, bridges, corridors and fountains: the non-building structures that fill the streets between them.
         r.section("features");
-        r.slider("PARK_CHANCE", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
-                p -> (double) p.PARK_CHANCE, (p, v) -> p.PARK_CHANCE = ((Double) v).floatValue());
+        r.slider("OPEN_LOT_PARK_CHANCE", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
+                p -> (double) p.OPEN_LOT_PARK_CHANCE, (p, v) -> p.OPEN_LOT_PARK_CHANCE = ((Double) v).floatValue());
         r.slider("CORRIDOR_CHANCE", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
                 p -> (double) p.CORRIDOR_CHANCE, (p, v) -> p.CORRIDOR_CHANCE = ((Double) v).floatValue());
         r.slider("BRIDGE_CHANCE", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
@@ -315,6 +316,10 @@ public final class Settings {
                 p -> (double) p.DEBRIS_TO_NEARBYCHUNK_FACTOR, (p, v) -> p.DEBRIS_TO_NEARBYCHUNK_FACTOR = (int) Math.round((Double) v));
 
         // ==== TRANSPORT ======================================================
+        // The networks the Transport preview overlay actually draws: highways and railways (city
+        // spheres' monorail settings stay under SPHERES, next to the rest of that landscape's knobs).
+        // The hierarchical street grid below has its own ROADS tab and its own preview.
+        //
         // A power-of-two-minus-1 bit mask (config ceiling Integer.MAX_VALUE, default 7); only a handful of masks
         // are valid, so a slider is meaningless. Typed field instead.
         r.section("highways");
@@ -349,6 +354,55 @@ public final class Settings {
                 p -> p.RAILWAY_STATIONS_ENABLED, (p, v) -> p.RAILWAY_STATIONS_ENABLED = (Boolean) v);
         r.toggle("RAILWAY_SURFACE_STATIONS_ENABLED", SettingCategory.TRANSPORT,
                 p -> p.RAILWAY_SURFACE_STATIONS_ENABLED, (p, v) -> p.RAILWAY_SURFACE_STATIONS_ENABLED = (Boolean) v);
+
+        // ==== ROADS ==========================================================
+        // The hierarchical road field: primary corridors, the secondary streets filling the blocks between
+        // them, the access-road stubs inside those, and how primaries cross water. Every slider's own
+        // min/max mirrors GridSettings' per-field validation exactly - but three pairs of these sliders
+        // are independent controls over what GridSettings treats as one min/max pair (secondary count X,
+        // secondary count Z, tertiary length), so dragging one past the other is a reachable, momentarily
+        // inconsistent state that GridSettings' compact constructor correctly rejects. CityPreview.recompute
+        // catches exactly that IllegalArgumentException and keeps showing the last good preview rather than
+        // going blank mid-drag; a profile still inconsistent at world creation fails there, field named.
+        r.section("roads_primary");
+        r.slider("PRIMARY_ROAD_SPACING_X", SettingCategory.ROADS, 8, 128, 1,
+                p -> (double) p.PRIMARY_ROAD_SPACING_X, (p, v) -> p.PRIMARY_ROAD_SPACING_X = (int) Math.round((Double) v));
+        r.slider("PRIMARY_ROAD_SPACING_Z", SettingCategory.ROADS, 8, 128, 1,
+                p -> (double) p.PRIMARY_ROAD_SPACING_Z, (p, v) -> p.PRIMARY_ROAD_SPACING_Z = (int) Math.round((Double) v));
+        r.slider("PRIMARY_ROAD_OPTIONAL_CHANCE", SettingCategory.ROADS, 0.0, 1.0, 0.01,
+                p -> (double) p.PRIMARY_ROAD_OPTIONAL_CHANCE, (p, v) -> p.PRIMARY_ROAD_OPTIONAL_CHANCE = ((Double) v).floatValue());
+        r.slider("PRIMARY_ROAD_FORCE_EVERY", SettingCategory.ROADS, 1, 16, 1,
+                p -> (double) p.PRIMARY_ROAD_FORCE_EVERY, (p, v) -> p.PRIMARY_ROAD_FORCE_EVERY = (int) Math.round((Double) v));
+
+        r.section("roads_secondary");
+        r.slider("SECONDARY_ROAD_MIN_COUNT_X", SettingCategory.ROADS, 0, 128, 1,
+                p -> (double) p.SECONDARY_ROAD_MIN_COUNT_X, (p, v) -> p.SECONDARY_ROAD_MIN_COUNT_X = (int) Math.round((Double) v));
+        r.slider("SECONDARY_ROAD_MAX_COUNT_X", SettingCategory.ROADS, 0, 128, 1,
+                p -> (double) p.SECONDARY_ROAD_MAX_COUNT_X, (p, v) -> p.SECONDARY_ROAD_MAX_COUNT_X = (int) Math.round((Double) v));
+        r.slider("SECONDARY_ROAD_MIN_COUNT_Z", SettingCategory.ROADS, 0, 128, 1,
+                p -> (double) p.SECONDARY_ROAD_MIN_COUNT_Z, (p, v) -> p.SECONDARY_ROAD_MIN_COUNT_Z = (int) Math.round((Double) v));
+        r.slider("SECONDARY_ROAD_MAX_COUNT_Z", SettingCategory.ROADS, 0, 128, 1,
+                p -> (double) p.SECONDARY_ROAD_MAX_COUNT_Z, (p, v) -> p.SECONDARY_ROAD_MAX_COUNT_Z = (int) Math.round((Double) v));
+        r.slider("MINIMUM_ROAD_SEPARATION", SettingCategory.ROADS, 2, 32, 1,
+                p -> (double) p.MINIMUM_ROAD_SEPARATION, (p, v) -> p.MINIMUM_ROAD_SEPARATION = (int) Math.round((Double) v));
+        r.slider("MINIMUM_ROAD_EDGE_DISTANCE", SettingCategory.ROADS, 2, 32, 1,
+                p -> (double) p.MINIMUM_ROAD_EDGE_DISTANCE, (p, v) -> p.MINIMUM_ROAD_EDGE_DISTANCE = (int) Math.round((Double) v));
+
+        r.section("roads_tertiary");
+        r.slider("TERTIARY_ROAD_CHANCE", SettingCategory.ROADS, 0.0, 1.0, 0.01,
+                p -> (double) p.TERTIARY_ROAD_CHANCE, (p, v) -> p.TERTIARY_ROAD_CHANCE = ((Double) v).floatValue());
+        r.slider("TERTIARY_ROAD_MIN_LENGTH", SettingCategory.ROADS, 1, 32, 1,
+                p -> (double) p.TERTIARY_ROAD_MIN_LENGTH, (p, v) -> p.TERTIARY_ROAD_MIN_LENGTH = (int) Math.round((Double) v));
+        r.slider("TERTIARY_ROAD_MAX_LENGTH", SettingCategory.ROADS, 1, 32, 1,
+                p -> (double) p.TERTIARY_ROAD_MAX_LENGTH, (p, v) -> p.TERTIARY_ROAD_MAX_LENGTH = (int) Math.round((Double) v));
+
+        r.section("roads_bridges");
+        r.slider("PLANNED_PRIMARY_BRIDGE_CHANCE", SettingCategory.ROADS, 0.0, 1.0, 0.01,
+                p -> (double) p.PLANNED_PRIMARY_BRIDGE_CHANCE, (p, v) -> p.PLANNED_PRIMARY_BRIDGE_CHANCE = ((Double) v).floatValue());
+        r.slider("PLANNED_PRIMARY_BRIDGE_MAX_LENGTH", SettingCategory.ROADS, 1, 64, 1,
+                p -> (double) p.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH, (p, v) -> p.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = (int) Math.round((Double) v));
+        r.cycle("MULTI_BUILDING_STREET_CONFLICT", SettingCategory.ROADS,
+                p -> p.MULTI_BUILDING_STREET_CONFLICT, (p, v) -> p.MULTI_BUILDING_STREET_CONFLICT = (MultiBuildingStreetConflict) v);
 
         // ==== SPHERES ========================================================
         // City spheres (the 'space' landscape).

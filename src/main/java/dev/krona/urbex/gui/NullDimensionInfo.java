@@ -2,6 +2,9 @@ package dev.krona.urbex.gui;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.RoadField;
+import dev.krona.urbex.plan.grid.GridRoadField;
+import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.DimensionCaches;
@@ -103,6 +106,7 @@ public class NullDimensionInfo implements IDimensionInfo {
     private final Registry<Biome> biomeRegistry;
     private final CityGenerator feature;
     private final DimensionCaches caches;
+    private final RoadField roadField;
 
     /**
      * @deprecated No registry access means {@link #getBiome} can't resolve a real biome and the
@@ -134,6 +138,9 @@ public class NullDimensionInfo implements IDimensionInfo {
         feature = new CityGenerator(this, profile);
         this.registryAccess = registryAccess;
         biomeRegistry = registryAccess != null ? registryAccess.lookupOrThrow(Registries.BIOME) : null;
+        // The preview's own seed and dimension, so the roads it draws are the roads the world will
+        // have. Same construction as DefaultDimensionInfo; there is no server to ask.
+        roadField = new GridRoadField(seed, getType().identifier().toString(), GridSettings.fromProfile(profile));
     }
 
     @Override
@@ -155,6 +162,11 @@ public class NullDimensionInfo implements IDimensionInfo {
     @Override
     public DimensionCaches caches() {
         return caches;
+    }
+
+    @Override
+    public RoadField roadField() {
+        return roadField;
     }
 
     @Override

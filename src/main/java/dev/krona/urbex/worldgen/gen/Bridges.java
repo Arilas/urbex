@@ -32,9 +32,15 @@ public class Bridges {
     private static void generateBridge(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, BuildingPart bt, Orientation orientation) {
         CompiledPalette compiledPalette = feature.computePalette(info, bt);
         ChunkDriver driver = ctx.driver;
+        // The opportunistic bridge parts are authored one block above the street surface, as a deck
+        // slung over a gap. A planned primary bridge is the road itself carried onward, so its deck
+        // sits at the street surface and its markings line up with the road at either end.
+        int bridgeLevel = info.getPlannedBridge() != null
+                ? info.profile.GROUNDLEVEL
+                : info.profile.GROUNDLEVEL + 1;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                driver.current(x, info.profile.GROUNDLEVEL + 1, z);
+                driver.current(x, bridgeLevel, z);
                 int l = 0;
                 while (l < bt.getSliceCount()) {
                     Character c = orientation == Orientation.X ? bt.getPaletteChar(x, l, z) : bt.getPaletteChar(z, l, x); // @todo general rotation system?
@@ -54,11 +60,16 @@ public class Bridges {
         Character support = bt.getMetaChar(BuildingPart.META_SUPPORT);
         if (info.profile.BRIDGE_SUPPORTS && support != null) {
             BlockState sup = ctx.paletteAt(compiledPalette, support, 7, info.groundLevel, 7);
+            // Everything below the deck is measured from the deck, not from the ground: the pillar
+            // and the two side lips belong one block under whichever level the deck landed on. Read
+            // off GROUNDLEVEL instead and a planned bridge, whose deck sits a block lower, would
+            // have its supports written straight through its own road surface.
+            int underDeck = bridgeLevel - 1;
             BuildingInfo minDir = orientation.getMinDir().get(info);
             BuildingInfo maxDir = orientation.getMaxDir().get(info);
             if (minDir.hasBridge(info.provider, orientation) != null && maxDir.hasBridge(info.provider, orientation) != null) {
                 // Needs support
-                for (int y = info.waterLevel - 10; y <= info.groundLevel; y++) {
+                for (int y = info.waterLevel - 10; y <= underDeck; y++) {
                     driver.current(7, y, 7).block(sup);
                     driver.current(7, y, 8).block(sup);
                     driver.current(8, y, 7).block(sup);
@@ -69,13 +80,13 @@ public class Bridges {
                 // Connection to the side section
                 if (orientation == Orientation.X) {
                     int x = 0;
-                    driver.current(x, info.profile.GROUNDLEVEL, 6);
+                    driver.current(x, underDeck, 6);
                     for (int z = 6; z <= 9; z++) {
                         driver.block(sup).incZ();
                     }
                 } else {
                     int z = 0;
-                    driver.current(6, info.profile.GROUNDLEVEL, z);
+                    driver.current(6, underDeck, z);
                     for (int x = 6; x <= 9; x++) {
                         driver.block(sup).incX();
                     }
@@ -85,13 +96,13 @@ public class Bridges {
                 // Connection to the side section
                 if (orientation == Orientation.X) {
                     int x = 15;
-                    driver.current(x, info.profile.GROUNDLEVEL, 6);
+                    driver.current(x, underDeck, 6);
                     for (int z = 6; z <= 9; z++) {
                         driver.block(sup).incZ();
                     }
                 } else {
                     int z = 15;
-                    driver.current(6, info.profile.GROUNDLEVEL, z);
+                    driver.current(6, underDeck, z);
                     for (int x = 6; x <= 9; x++) {
                         driver.block(sup).incX();
                     }

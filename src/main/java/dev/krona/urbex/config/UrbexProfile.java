@@ -169,7 +169,24 @@ public class UrbexProfile {
     public float BUILDING_DOORWAYCHANCE = .6f;
     public float BUILDING_FRONTCHANCE = .2f;
 
-    public float PARK_CHANCE = .2f;
+    public int PRIMARY_ROAD_SPACING_X = 8;
+    public int PRIMARY_ROAD_SPACING_Z = 8;
+    public float PRIMARY_ROAD_OPTIONAL_CHANCE = .45f;
+    public int PRIMARY_ROAD_FORCE_EVERY = 4;
+    public int SECONDARY_ROAD_MIN_COUNT_X = 0;
+    public int SECONDARY_ROAD_MAX_COUNT_X = 2;
+    public int SECONDARY_ROAD_MIN_COUNT_Z = 0;
+    public int SECONDARY_ROAD_MAX_COUNT_Z = 2;
+    public int MINIMUM_ROAD_SEPARATION = 4;
+    public int MINIMUM_ROAD_EDGE_DISTANCE = 3;
+    public float TERTIARY_ROAD_CHANCE = .40f;
+    public int TERTIARY_ROAD_MIN_LENGTH = 2;
+    public int TERTIARY_ROAD_MAX_LENGTH = 5;
+    public float PLANNED_PRIMARY_BRIDGE_CHANCE = 1.0f;
+    public int PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = 12;
+    public float OPEN_LOT_PARK_CHANCE = .8f;
+    public MultiBuildingStreetConflict MULTI_BUILDING_STREET_CONFLICT = MultiBuildingStreetConflict.OVERRIDE_MINOR;
+
     public float CORRIDOR_CHANCE = .7f;
     public float BRIDGE_CHANCE = .7f;
     public float FOUNTAIN_CHANCE = .05f;
@@ -362,7 +379,43 @@ public class UrbexProfile {
         BUILDING_MAXCELLARS = cfg.getInt("buildingMaxCellars", UrbexProfile.CATEGORY_CITY_ID, BUILDING_MAXCELLARS, 0, 20, "The maximum number of cellars (below ground). 0 means no cellar");
         BUILDING_DOORWAYCHANCE = cfg.getFloat("buildingDoorwayChance", UrbexProfile.CATEGORY_CITY_ID, BUILDING_DOORWAYCHANCE, 0.0f, 1.0f, "The chance that a doorway will be generated at a side of a building (on any level). Only when possible");
         BUILDING_FRONTCHANCE = cfg.getFloat("buildingFrontChance", UrbexProfile.CATEGORY_CITY_ID, BUILDING_FRONTCHANCE, 0.0f, 1.0f, "The chance that a building will have a 'front' part if this is possible (i.e. adjacent street)");
-        PARK_CHANCE = cfg.getFloat("parkChance", UrbexProfile.CATEGORY_CITY_ID, PARK_CHANCE, 0.0f, 1.0f, "The chance that a non-building section can be a park section");
+
+        PRIMARY_ROAD_SPACING_X = cfg.getInt("primaryRoadSpacingX", UrbexProfile.CATEGORY_CITY_ID, PRIMARY_ROAD_SPACING_X, 8, 128,
+                "Chunks between two candidate primary roads running north/south");
+        PRIMARY_ROAD_SPACING_Z = cfg.getInt("primaryRoadSpacingZ", UrbexProfile.CATEGORY_CITY_ID, PRIMARY_ROAD_SPACING_Z, 8, 128,
+                "Chunks between two candidate primary roads running east/west");
+        PRIMARY_ROAD_OPTIONAL_CHANCE = cfg.getFloat("primaryRoadOptionalChance", UrbexProfile.CATEGORY_CITY_ID, PRIMARY_ROAD_OPTIONAL_CHANCE, 0.0f, 1.0f,
+                "The chance that a primary road candidate that is not forced actually becomes a road");
+        PRIMARY_ROAD_FORCE_EVERY = cfg.getInt("primaryRoadForceEvery", UrbexProfile.CATEGORY_CITY_ID, PRIMARY_ROAD_FORCE_EVERY, 1, 16,
+                "Every Nth primary road candidate is always a road, which bounds how far apart two primary roads can be");
+        SECONDARY_ROAD_MIN_COUNT_X = cfg.getInt("secondaryRoadMinCountX", UrbexProfile.CATEGORY_CITY_ID, SECONDARY_ROAD_MIN_COUNT_X, 0, 128,
+                "The minimum number of secondary roads running north/south inside one primary block");
+        SECONDARY_ROAD_MAX_COUNT_X = cfg.getInt("secondaryRoadMaxCountX", UrbexProfile.CATEGORY_CITY_ID, SECONDARY_ROAD_MAX_COUNT_X, 0, 128,
+                "The maximum number of secondary roads running north/south inside one primary block");
+        SECONDARY_ROAD_MIN_COUNT_Z = cfg.getInt("secondaryRoadMinCountZ", UrbexProfile.CATEGORY_CITY_ID, SECONDARY_ROAD_MIN_COUNT_Z, 0, 128,
+                "The minimum number of secondary roads running east/west inside one primary block");
+        SECONDARY_ROAD_MAX_COUNT_Z = cfg.getInt("secondaryRoadMaxCountZ", UrbexProfile.CATEGORY_CITY_ID, SECONDARY_ROAD_MAX_COUNT_Z, 0, 128,
+                "The maximum number of secondary roads running east/west inside one primary block");
+        MINIMUM_ROAD_SEPARATION = cfg.getInt("minimumRoadSeparation", UrbexProfile.CATEGORY_CITY_ID, MINIMUM_ROAD_SEPARATION, 2, 32,
+                "The minimum number of chunks between two secondary roads on the same axis");
+        MINIMUM_ROAD_EDGE_DISTANCE = cfg.getInt("minimumRoadEdgeDistance", UrbexProfile.CATEGORY_CITY_ID, MINIMUM_ROAD_EDGE_DISTANCE, 2, 32,
+                "The minimum number of chunks between a secondary road and the primary road bounding its block");
+        TERTIARY_ROAD_CHANCE = cfg.getFloat("tertiaryRoadChance", UrbexProfile.CATEGORY_CITY_ID, TERTIARY_ROAD_CHANCE, 0.0f, 1.0f,
+                "The chance that a cell between roads receives a short dead-end access road");
+        TERTIARY_ROAD_MIN_LENGTH = cfg.getInt("tertiaryRoadMinLength", UrbexProfile.CATEGORY_CITY_ID, TERTIARY_ROAD_MIN_LENGTH, 1, 32,
+                "The minimum length in chunks of an access road");
+        TERTIARY_ROAD_MAX_LENGTH = cfg.getInt("tertiaryRoadMaxLength", UrbexProfile.CATEGORY_CITY_ID, TERTIARY_ROAD_MAX_LENGTH, 1, 32,
+                "The maximum length in chunks of an access road");
+        PLANNED_PRIMARY_BRIDGE_CHANCE = cfg.getFloat("plannedPrimaryBridgeChance", UrbexProfile.CATEGORY_CITY_ID, PLANNED_PRIMARY_BRIDGE_CHANCE, 0.0f, 1.0f,
+                "The chance that a primary road crossing open water is carried over it by a bridge");
+        PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = cfg.getInt("plannedPrimaryBridgeMaxLength", UrbexProfile.CATEGORY_CITY_ID, PLANNED_PRIMARY_BRIDGE_MAX_LENGTH, 1, 64,
+                "The longest water crossing in chunks that a primary road will bridge");
+        OPEN_LOT_PARK_CHANCE = cfg.getFloat("openLotParkChance", UrbexProfile.CATEGORY_CITY_ID, OPEN_LOT_PARK_CHANCE, 0.0f, 1.0f,
+                "The chance that an open lot (a city chunk with neither a road nor a building) is furnished with a park part. Every open lot is grass regardless; this only decides whether a park part is placed on top of it");
+        MULTI_BUILDING_STREET_CONFLICT = MultiBuildingStreetConflict.byName(
+                cfg.getString("multiBuildingStreetConflict", UrbexProfile.CATEGORY_CITY_ID,
+                        MULTI_BUILDING_STREET_CONFLICT.name(),
+                        "How an accepted multi-building resolves against a planned road under its footprint"));
 
         CORRIDOR_CHANCE = cfg.getFloat("corridorChance", UrbexProfile.CATEGORY_CITY_ID, CORRIDOR_CHANCE, 0.0f, 1.0f, "The chance that a chunk can possibly contain a corridor. " +
                 "There actually being a corridor also depends on the presence of adjacent corridors");
