@@ -11,6 +11,7 @@ import dev.krona.urbex.gui.settings.SettingControls;
 import dev.krona.urbex.gui.settings.SettingDescriptor;
 import dev.krona.urbex.gui.settings.Settings;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -69,6 +70,12 @@ public class CustomizeScreen extends Screen {
     private static final int MIN_PREVIEW_HEIGHT = 60;
     private static final int SETTINGS_ROW_HEIGHT = 26;
     private static final int CATEGORY_ROW_HEIGHT = 18;
+    /**
+     * A section header carries two text lines (bold name + greyed description) plus the entry's own 2px content
+     * padding top and bottom and a little separation above, so it needs more room than a control row. Two
+     * {@code font.lineHeight} lines still fit comfortably at GUI scale 4.
+     */
+    private static final int SETTINGS_HEADER_HEIGHT = 30;
 
     private static final long PREVIEW_DEBOUNCE_MS = 150;
 
@@ -260,7 +267,10 @@ public class CustomizeScreen extends Screen {
     }
 
     private void rebuildControls() {
-        settingsList.rebuild(currentDescriptors());
+        // Section headers only make sense over a category's own ordered groups; a cross-category search is shown
+        // as a flat matching list (no headers), so the query drives whether the list is grouped.
+        boolean grouped = searchText.strip().isEmpty();
+        settingsList.rebuild(currentDescriptors(), grouped);
     }
 
     /**
@@ -526,13 +536,24 @@ public class CustomizeScreen extends Screen {
             this.centerListVertically = false;
         }
 
-        private void rebuild(List<SettingDescriptor> descriptors) {
+        /**
+         * Rebuilds the control column. When {@code grouped} (a category view), a non-selectable
+         * {@link HeaderRow} is inserted before the first setting of each sub-section, so the flat wall of
+         * sliders reads as labelled groups. A search view passes {@code grouped == false} and shows a flat
+         * matching list with no headers.
+         */
+        private void rebuild(List<SettingDescriptor> descriptors, boolean grouped) {
             clearEntries();
             setScrollAmount(0);
             int controlWidth = getRowWidth();
+            String currentSection = null;
             for (SettingDescriptor descriptor : descriptors) {
+                if (grouped && !descriptor.section().equals(currentSection)) {
+                    currentSection = descriptor.section();
+                    addEntry(new HeaderRow(descriptor), SETTINGS_HEADER_HEIGHT);
+                }
                 AbstractWidget control = SettingControls.create(descriptor, copy, CustomizeScreen.this::onSettingChanged, controlWidth);
-                addEntry(new Row(control));
+                addEntry(new ControlRow(control));
             }
         }
 
@@ -541,11 +562,15 @@ public class CustomizeScreen extends Screen {
             return Math.max(0, getWidth() - scrollbarWidth() - 4);
         }
 
-        private final class Row extends ContainerObjectSelectionList.Entry<Row> {
+        /** Common supertype so control rows and header rows can share one list. */
+        private abstract class Row extends ContainerObjectSelectionList.Entry<Row> {
+        }
+
+        private final class ControlRow extends Row {
 
             private final AbstractWidget control;
 
-            private Row(AbstractWidget control) {
+            private ControlRow(AbstractWidget control) {
                 this.control = control;
             }
 
@@ -565,6 +590,56 @@ public class CustomizeScreen extends Screen {
                 control.setX(getContentX());
                 control.setY(getContentY() + Math.max(0, (getContentHeight() - control.getHeight()) / 2));
                 control.extractRenderState(graphics, mouseX, mouseY, partialTick);
+            }
+        }
+
+        /**
+         * A sub-section header: a bold name line over a smaller greyed one-line description. It carries no
+         * interactive child, so {@link #children()} and {@link #narratables()} are empty - which is exactly
+         * what makes {@code ContainerObjectSelectionList} skip it for keyboard focus (its {@code nextFocusPath}
+         * only visits entries with a non-empty {@code children()}) and mouse selection, and keeps it out of the
+         * setting count. It never triggers {@link #onSettingChanged()} or the preview debounce.
+         */
+        private final class HeaderRow extends Row {
+
+            private static final int NAME_COLOR = 0xffffffff;
+            private static final int DESC_COLOR = 0xffa0a0a0;
+
+            private final Component name;
+            private final Component description;
+
+            private HeaderRow(SettingDescriptor descriptor) {
+                this.name = Component.translatable(descriptor.sectionNameKey())
+                        .withStyle(ChatFormatting.BOLD);
+                this.description = Component.translatable(descriptor.sectionDescKey());
+            }
+
+            @Override
+            public List<? extends GuiEventListener> children() {
+                return List.of();
+            }
+
+            @Override
+            public List<? extends NarratableEntry> narratables() {
+                return List.of();
+            }
+
+            @Override
+            public boolean isMouseOver(double mouseX, double mouseY) {
+                return false;
+            }
+
+            @Override
+            public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float partialTick) {
+                Font font = CustomizeScreen.this.font;
+                int x = getContentX();
+                // Push the two text lines to the bottom of the (taller) row so the extra height reads as
+                // separation above the header rather than a gap between its two lines.
+                int descY = getContentY() + getContentHeight() - font.lineHeight;
+                int nameY = descY - font.lineHeight - 1;
+                graphics.text(font, name, x, nameY, NAME_COLOR);
+                String descShown = font.plainSubstrByWidth(description.getString(), getContentWidth());
+                graphics.text(font, descShown, x, descY, DESC_COLOR);
             }
         }
     }

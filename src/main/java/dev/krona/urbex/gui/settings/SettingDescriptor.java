@@ -2,6 +2,7 @@ package dev.krona.urbex.gui.settings;
 
 import dev.krona.urbex.config.UrbexProfile;
 
+import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
@@ -33,6 +34,10 @@ import java.util.function.Function;
  *                    ({@code urbex.setting.<key>} and {@code urbex.setting.<key>.tooltip}).
  * @param category    the tab this descriptor lives under; each field is described by exactly one descriptor
  *                    (no duplicates), so a curated few carry {@link SettingCategory#GENERAL} as their real home.
+ * @param section     the sub-section grouping this descriptor within its category (a stable lowercase id like
+ *                    {@code "placement"} or {@code "rarity_map"}). The editor renders a labelled header above the
+ *                    first setting of each section; sections appear in first-seen (declaration) order. Also the
+ *                    lang-key suffix ({@code urbex.section.<category>.<section>} and {@code ….desc}).
  * @param kind        the control to render.
  * @param min         slider lower bound (mined from the {@code UrbexProfile.init} min argument).
  * @param max         slider upper bound (mined from the {@code UrbexProfile.init} max argument).
@@ -46,6 +51,7 @@ import java.util.function.Function;
 public record SettingDescriptor(
         String key,
         SettingCategory category,
+        String section,
         ControlKind kind,
         double min,
         double max,
@@ -63,5 +69,15 @@ public record SettingDescriptor(
     /** Lang key for this setting's tooltip. */
     public String tooltipKey() {
         return "urbex.setting." + key + ".tooltip";
+    }
+
+    /** Lang key for this descriptor's sub-section name, e.g. {@code urbex.section.cities.rarity_map}. */
+    public String sectionNameKey() {
+        return "urbex.section." + category.name().toLowerCase(Locale.ROOT) + "." + section;
+    }
+
+    /** Lang key for this descriptor's sub-section one-line description. */
+    public String sectionDescKey() {
+        return sectionNameKey() + ".desc";
     }
 }

@@ -238,6 +238,43 @@ class SettingsCompletenessTest {
         assertTrue(missing.isEmpty(), "Missing lang entries in en_us.json: " + missing);
     }
 
+    /**
+     * Every descriptor must be stamped with a non-empty sub-section id: it is what the editor groups by, and an
+     * unstamped descriptor would render loose above the first header (or crash the header lookup). The registry's
+     * {@code Reg} builder already refuses to add a descriptor before a section is opened, so this pins the property
+     * at the data level too.
+     */
+    @Test
+    void everyDescriptorHasANonEmptySection() {
+        Set<String> offenders = new TreeSet<>();
+        for (SettingDescriptor d : Settings.ALL) {
+            if (d.section() == null || d.section().isBlank()) {
+                offenders.add(d.key());
+            }
+        }
+        assertTrue(offenders.isEmpty(), "Descriptors with a null/blank section: " + offenders);
+    }
+
+    /**
+     * Each sub-section renders a header from two lang keys ({@code urbex.section.<category>.<section>} and its
+     * {@code .desc}). A missing entry would show the raw key as the header, so - exactly like the per-setting name
+     * and tooltip check - this asserts both keys exist in en_us.json for every distinct section a descriptor names.
+     */
+    @Test
+    void everySectionHasNameAndDescLang() {
+        JsonObject lang = loadLang();
+        Set<String> missing = new TreeSet<>();
+        for (SettingDescriptor d : Settings.ALL) {
+            if (!lang.has(d.sectionNameKey())) {
+                missing.add(d.sectionNameKey());
+            }
+            if (!lang.has(d.sectionDescKey())) {
+                missing.add(d.sectionDescKey());
+            }
+        }
+        assertTrue(missing.isEmpty(), "Missing section name/desc lang entries in en_us.json: " + missing);
+    }
+
     @Test
     void everyCategoryHasALabel() {
         JsonObject lang = loadLang();
