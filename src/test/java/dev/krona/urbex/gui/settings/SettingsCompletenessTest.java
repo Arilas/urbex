@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -174,6 +175,99 @@ class SettingsCompletenessTest {
             }
         }
         assertTrue(missing.isEmpty(), "Missing category labels in en_us.json: " + missing);
+    }
+
+    /**
+     * A key naming the right field is not enough: a copy-paste slip like
+     * {@code slider("CITY_CHANCE", ..., p -> p.CITY_MINRADIUS, ...)} would pass every other test while silently
+     * orphaning one field and double-exposing another. So for every descriptor, drive a sentinel through the
+     * getter (write the raw field, read it back through the lambda) and the setter (write through the lambda,
+     * read the raw field) and prove both observe the field named by {@link SettingDescriptor#key()}.
+     */
+    @Test
+    void getterAndSetterObserveTheKeyedField() throws Exception {
+        for (SettingDescriptor d : Settings.ALL) {
+            Field f = UrbexProfile.class.getField(d.key());
+            f.setAccessible(true);
+            Class<?> t = f.getType();
+            String where = d.key() + (d.general() ? " (general)" : "");
+
+            if (t == int.class) {
+                int sentinel = 4242;
+                UrbexProfile getP = fresh();
+                f.setInt(getP, sentinel);
+                assertEquals((double) sentinel, ((Number) d.getter().apply(getP)).doubleValue(), 0.0,
+                        "getter does not read field " + where);
+                UrbexProfile setP = fresh();
+                d.setter().accept(setP, (double) sentinel);
+                assertEquals(sentinel, f.getInt(setP), "setter does not write field " + where);
+            } else if (t == float.class) {
+                float sentinel = 137.5f; // exactly representable; survives Double<->float round-trip
+                UrbexProfile getP = fresh();
+                f.setFloat(getP, sentinel);
+                assertEquals((double) sentinel, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4,
+                        "getter does not read field " + where);
+                UrbexProfile setP = fresh();
+                d.setter().accept(setP, (double) sentinel);
+                assertEquals(sentinel, f.getFloat(setP), 1e-4f, "setter does not write field " + where);
+            } else if (t == double.class) {
+                double sentinel = 4242.25;
+                UrbexProfile getP = fresh();
+                f.setDouble(getP, sentinel);
+                assertEquals(sentinel, ((Number) d.getter().apply(getP)).doubleValue(), 0.0,
+                        "getter does not read field " + where);
+                UrbexProfile setP = fresh();
+                d.setter().accept(setP, sentinel);
+                assertEquals(sentinel, f.getDouble(setP), 0.0, "setter does not write field " + where);
+            } else if (t == boolean.class) {
+                boolean sentinel = !f.getBoolean(fresh()); // flip the default so the value is distinctive
+                UrbexProfile getP = fresh();
+                f.setBoolean(getP, sentinel);
+                assertEquals(sentinel, d.getter().apply(getP), "getter does not read field " + where);
+                UrbexProfile setP = fresh();
+                d.setter().accept(setP, sentinel);
+                assertEquals(sentinel, f.getBoolean(setP), "setter does not write field " + where);
+            } else if (t == String.class) {
+                String sentinel = "sentinel-" + d.key();
+                UrbexProfile getP = fresh();
+                f.set(getP, sentinel);
+                assertEquals(sentinel, d.getter().apply(getP), "getter does not read field " + where);
+                UrbexProfile setP = fresh();
+                d.setter().accept(setP, sentinel);
+                assertEquals(sentinel, f.get(setP), "setter does not write field " + where);
+            } else if (t == String[].class) {
+                String[] sentinel = {"sentinel-" + d.key(), "b"};
+                UrbexProfile getP = fresh();
+                f.set(getP, sentinel);
+                assertArrayEquals(sentinel, (String[]) d.getter().apply(getP), "getter does not read field " + where);
+                UrbexProfile setP = fresh();
+                d.setter().accept(setP, sentinel);
+                assertArrayEquals(sentinel, (String[]) f.get(setP), "setter does not write field " + where);
+            } else if (t.isEnum()) {
+                Object def = f.get(fresh());
+                Object sentinel = null;
+                for (Object c : t.getEnumConstants()) {
+                    if (!c.equals(def)) {
+                        sentinel = c;
+                        break;
+                    }
+                }
+                assertTrue(sentinel != null, "enum field " + where + " has only one constant; no distinctive sentinel");
+                UrbexProfile getP = fresh();
+                f.set(getP, sentinel);
+                assertEquals(sentinel, d.getter().apply(getP), "getter does not read field " + where);
+                UrbexProfile setP = fresh();
+                d.setter().accept(setP, sentinel);
+                assertEquals(sentinel, f.get(setP), "setter does not write field " + where);
+            } else {
+                throw new AssertionError("unhandled field type " + t + " for " + where
+                        + " — add a sentinel branch");
+            }
+        }
+    }
+
+    private static UrbexProfile fresh() {
+        return new UrbexProfile("test", true);
     }
 
     private static JsonObject loadLang() {
