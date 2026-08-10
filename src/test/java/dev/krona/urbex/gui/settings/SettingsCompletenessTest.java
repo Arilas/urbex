@@ -20,7 +20,6 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -54,20 +53,22 @@ class SettingsCompletenessTest {
         return fields;
     }
 
-    private static List<SettingDescriptor> homeDescriptors() {
-        List<SettingDescriptor> home = new ArrayList<>();
-        for (SettingDescriptor d : Settings.ALL) {
-            if (!d.general()) {
-                home.add(d);
-            }
-        }
-        return home;
-    }
+    /**
+     * The curated settings whose sole home is {@link SettingCategory#GENERAL} (spec §3): the highest-impact
+     * knobs, removed from their former categories so nothing renders twice. Pinned here so the "no duplication"
+     * model is a checked property, not a comment.
+     */
+    private static final Set<String> GENERAL_KEYS = Set.of(
+            "CITY_CHANCE", "CITY_MINRADIUS", "CITY_MAXRADIUS",
+            "BUILDING_MINFLOORS", "BUILDING_MAXFLOORS", "RUIN_CHANCE",
+            "EXPLOSION_CHANCE", "MINI_EXPLOSION_CHANCE",
+            "LOOT_DENSITY", "LIGHTING_DENSITY", "LANDSCAPE_TYPE"
+    );
 
     @Test
-    void everyEditableFieldHasExactlyOneHomeDescriptor() {
+    void everyEditableFieldHasExactlyOneDescriptor() {
         Map<String, Integer> counts = new HashMap<>();
-        for (SettingDescriptor d : homeDescriptors()) {
+        for (SettingDescriptor d : Settings.ALL) {
             counts.merge(d.key(), 1, Integer::sum);
         }
 
@@ -76,7 +77,7 @@ class SettingsCompletenessTest {
             fieldNames.add(f.getName());
         }
 
-        // Every editable field is described exactly once by a non-general descriptor.
+        // Every editable field is described exactly once - no duplicates (spec §3).
         Set<String> missing = new TreeSet<>();
         Set<String> duplicated = new TreeSet<>();
         for (String name : fieldNames) {
@@ -87,8 +88,8 @@ class SettingsCompletenessTest {
                 duplicated.add(name);
             }
         }
-        assertTrue(missing.isEmpty(), "UrbexProfile fields with no home descriptor: " + missing);
-        assertTrue(duplicated.isEmpty(), "UrbexProfile fields with more than one home descriptor: " + duplicated);
+        assertTrue(missing.isEmpty(), "UrbexProfile fields with no descriptor: " + missing);
+        assertTrue(duplicated.isEmpty(), "UrbexProfile fields with more than one descriptor: " + duplicated);
     }
 
     @Test
@@ -118,28 +119,19 @@ class SettingsCompletenessTest {
     }
 
     @Test
-    void generalDuplicatesReuseAnExistingHomeKey() {
-        Set<String> homeKeys = new HashSet<>();
-        for (SettingDescriptor d : homeDescriptors()) {
-            homeKeys.add(d.key());
+    void generalCategoryHoldsExactlyTheCuratedSet() {
+        Set<String> generalKeys = new TreeSet<>();
+        for (SettingDescriptor d : Settings.byCategory(SettingCategory.GENERAL)) {
+            generalKeys.add(d.key());
         }
-        for (SettingDescriptor d : Settings.ALL) {
-            if (d.general()) {
-                assertEquals(SettingCategory.GENERAL, d.category(),
-                        "general descriptor must sit under the GENERAL category: " + d.key());
-                assertTrue(homeKeys.contains(d.key()),
-                        "general descriptor has no matching home descriptor: " + d.key());
-            } else {
-                assertFalse(d.category() == SettingCategory.GENERAL,
-                        "GENERAL category is reserved for general=true duplicates: " + d.key());
-            }
-        }
+        assertEquals(new TreeSet<>(GENERAL_KEYS), generalKeys,
+                "GENERAL category must hold exactly the curated set (no more, no less)");
     }
 
     @Test
     void sliderBoundsAreSane() {
         for (SettingDescriptor d : Settings.ALL) {
-            if (d.kind() == ControlKind.SLIDER) {
+            if (isSliderLike(d.kind())) {
                 assertTrue(d.min() < d.max(),
                         "slider " + d.key() + " must have min < max (was " + d.min() + ".." + d.max() + ")");
                 if (d.logScale()) {
@@ -148,6 +140,11 @@ class SettingsCompletenessTest {
                 }
             }
         }
+    }
+
+    /** {@link ControlKind#SLIDER} and the {@link ControlKind#CHANCE_PERLIN} composite both carry slider bounds. */
+    private static boolean isSliderLike(ControlKind kind) {
+        return kind == ControlKind.SLIDER || kind == ControlKind.CHANCE_PERLIN;
     }
 
     /**
@@ -162,7 +159,7 @@ class SettingsCompletenessTest {
     void logScaleSlidersRoundTripTheirDefaultValueThroughLogValueMapper() {
         UrbexProfile profile = fresh();
         for (SettingDescriptor d : Settings.ALL) {
-            if (d.kind() == ControlKind.SLIDER && d.logScale()) {
+            if (isSliderLike(d.kind()) && d.logScale()) {
                 LogValueMapper mapper = new LogValueMapper(d.min(), d.max());
                 double defaultValue = (Double) d.getter().apply(profile);
                 double roundTripped = mapper.fromSlider(mapper.toSlider(defaultValue));
@@ -271,7 +268,7 @@ class SettingsCompletenessTest {
             Field f = UrbexProfile.class.getField(d.key());
             f.setAccessible(true);
             Class<?> t = f.getType();
-            String where = d.key() + (d.general() ? " (general)" : "");
+            String where = d.key();
 
             if (t == int.class) {
                 checkNumeric(d, f, where, 4242, 1313);

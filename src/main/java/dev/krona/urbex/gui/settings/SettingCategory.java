@@ -5,10 +5,10 @@ import java.util.Locale;
 /**
  * The tab a {@link SettingDescriptor} lives under in the Phase 2 editor.
  *
- * <p>{@link #GENERAL} is special: it is never the home category of a field. Instead the ~dozen curated
- * "general" descriptors carry it as a second, {@code general=true} copy of an existing field descriptor so
- * the General tab can surface the most impactful knobs without owning any field exclusively. Every field is
- * owned by exactly one of the other eight categories.</p>
+ * <p>Every field is described by exactly one descriptor and so belongs to exactly one category (no duplicates).
+ * {@link #GENERAL} is the real home of a curated handful of the most impactful knobs (city chance, radii,
+ * floors, ruin/explosion chances, loot &amp; lighting density, landscape type); those are removed from their
+ * former categories so the same control never appears twice.</p>
  */
 public enum SettingCategory {
     GENERAL,

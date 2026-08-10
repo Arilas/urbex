@@ -38,7 +38,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -265,23 +264,16 @@ public class CustomizeScreen extends Screen {
     }
 
     /**
-     * The descriptors to show right now: a blank search shows the selected category's set (for GENERAL
-     * that is the curated general duplicates); a non-blank search shows {@link Settings#search} hits
-     * de-duplicated on key, preferring the curated general duplicate over the home descriptor. That
-     * preference matters only for the handful of keys that have both: the general copy carries the
-     * friendlier control (e.g. the log-scale chance sliders with their usable 0.0001↔… range), and
-     * both write the same field, so search surfaces the nicer knob without changing behaviour.
+     * The descriptors to show right now: a blank search shows the selected category's set; a non-blank search
+     * shows {@link Settings#search} hits across all categories. Each field has exactly one descriptor, so no
+     * de-duplication is needed.
      */
     private List<SettingDescriptor> currentDescriptors() {
         String query = searchText.strip();
         if (query.isEmpty()) {
             return Settings.byCategory(selectedCategory);
         }
-        LinkedHashMap<String, SettingDescriptor> byKey = new LinkedHashMap<>();
-        for (SettingDescriptor d : Settings.search(query)) {
-            byKey.merge(d.key(), d, (existing, candidate) -> candidate.general() ? candidate : existing);
-        }
-        return new ArrayList<>(byKey.values());
+        return Settings.search(query);
     }
 
     private void onSettingChanged() {

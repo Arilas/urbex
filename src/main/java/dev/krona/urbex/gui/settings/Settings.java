@@ -13,10 +13,11 @@ import java.util.function.Function;
 /**
  * The complete registry of editable {@link UrbexProfile} settings for the Phase 2 editor.
  *
- * <p>{@link #ALL} holds one {@code general=false} descriptor per editable profile field (its "home" category)
- * plus a handful of {@code general=true} duplicates that also surface on the {@link SettingCategory#GENERAL} tab.
- * The {@code SettingsCompletenessTest} guarantees the home descriptors cover every public {@code UrbexProfile}
- * field exactly once (minus a small, justified excluded set).</p>
+ * <p>{@link #ALL} holds exactly one descriptor per editable profile field — no duplicates. Each field
+ * therefore lives in exactly one {@link SettingCategory}; a curated handful of the most impactful knobs carry
+ * {@link SettingCategory#GENERAL} as their real home (and are absent from their former categories) so the same
+ * control never renders twice. The {@code SettingsCompletenessTest} guarantees the descriptors cover every
+ * public {@code UrbexProfile} field exactly once (minus a small, justified excluded set).</p>
  *
  * <p>See {@link SettingDescriptor} for the boxing convention and the rationale for direct field access.</p>
  */
@@ -32,53 +33,77 @@ public final class Settings {
     private static SettingDescriptor slider(String key, SettingCategory cat, double min, double max, double step,
                                             Function<UrbexProfile, Object> getter,
                                             BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, false, ControlKind.SLIDER, min, max, step, false, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.SLIDER, min, max, step, false, getter, setter);
+    }
+
+    /** A logarithmic slider (min &gt; 0) for the chance knobs where 0.0001 and 0.001 must be distinguishable. */
+    private static SettingDescriptor logSlider(String key, SettingCategory cat, double min, double max, double step,
+                                               Function<UrbexProfile, Object> getter,
+                                               BiConsumer<UrbexProfile, Object> setter) {
+        return new SettingDescriptor(key, cat, ControlKind.SLIDER, min, max, step, true, getter, setter);
+    }
+
+    /**
+     * The {@code CITY_CHANCE}-only composite: a log slider over the positive range plus a "perlin city map"
+     * toggle representing the {@code -1} sentinel (see {@link PerlinCityChance}). The getter/setter stay plain
+     * field access; the widget coordinates the sentinel against the single field.
+     */
+    private static SettingDescriptor chancePerlin(String key, SettingCategory cat, double min, double max, double step,
+                                                  Function<UrbexProfile, Object> getter,
+                                                  BiConsumer<UrbexProfile, Object> setter) {
+        return new SettingDescriptor(key, cat, ControlKind.CHANCE_PERLIN, min, max, step, true, getter, setter);
     }
 
     private static SettingDescriptor toggle(String key, SettingCategory cat,
                                             Function<UrbexProfile, Object> getter,
                                             BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, false, ControlKind.TOGGLE, 0, 0, 0, false, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.TOGGLE, 0, 0, 0, false, getter, setter);
     }
 
     private static SettingDescriptor cycle(String key, SettingCategory cat,
                                            Function<UrbexProfile, Object> getter,
                                            BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, false, ControlKind.CYCLE, 0, 0, 0, false, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.CYCLE, 0, 0, 0, false, getter, setter);
     }
 
     private static SettingDescriptor text(String key, SettingCategory cat,
                                           Function<UrbexProfile, Object> getter,
                                           BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, false, ControlKind.TEXT, 0, 0, 0, false, getter, setter);
-    }
-
-    /** General-tab duplicate that mirrors a home descriptor's control and bounds verbatim. */
-    private static SettingDescriptor generalOf(SettingDescriptor d) {
-        return new SettingDescriptor(d.key(), SettingCategory.GENERAL, true, d.kind(),
-                d.min(), d.max(), d.step(), d.logScale(), d.getter(), d.setter());
-    }
-
-    /** General-tab duplicate that overrides the slider bounds/scale (used for the log-scale chance knobs). */
-    private static SettingDescriptor generalSlider(SettingDescriptor d, double min, double max, double step, boolean logScale) {
-        return new SettingDescriptor(d.key(), SettingCategory.GENERAL, true, ControlKind.SLIDER,
-                min, max, step, logScale, d.getter(), d.setter());
+        return new SettingDescriptor(key, cat, ControlKind.TEXT, 0, 0, 0, false, getter, setter);
     }
 
     private static List<SettingDescriptor> buildAll() {
         List<SettingDescriptor> all = new ArrayList<>();
 
+        // ---- GENERAL --------------------------------------------------------
+        // The curated, highest-impact knobs. These live ONLY here (removed from their former categories) so
+        // the same control never shows twice. The chance knobs use a log scale with min > 0; city chance adds
+        // the perlin-city-map toggle for its -1 sentinel.
+        all.add(chancePerlin("CITY_CHANCE", SettingCategory.GENERAL, 0.0001, 1.0, 0.0001,
+                p -> p.CITY_CHANCE, (p, v) -> p.CITY_CHANCE = (Double) v));
+        all.add(slider("CITY_MINRADIUS", SettingCategory.GENERAL, 1, 2000, 1,
+                p -> (double) p.CITY_MINRADIUS, (p, v) -> p.CITY_MINRADIUS = (int) Math.round((Double) v)));
+        all.add(slider("CITY_MAXRADIUS", SettingCategory.GENERAL, 1, 2000, 1,
+                p -> (double) p.CITY_MAXRADIUS, (p, v) -> p.CITY_MAXRADIUS = (int) Math.round((Double) v)));
+        all.add(slider("BUILDING_MINFLOORS", SettingCategory.GENERAL, 0, 60, 1,
+                p -> (double) p.BUILDING_MINFLOORS, (p, v) -> p.BUILDING_MINFLOORS = (int) Math.round((Double) v)));
+        all.add(slider("BUILDING_MAXFLOORS", SettingCategory.GENERAL, 0, 60, 1,
+                p -> (double) p.BUILDING_MAXFLOORS, (p, v) -> p.BUILDING_MAXFLOORS = (int) Math.round((Double) v)));
+        all.add(slider("RUIN_CHANCE", SettingCategory.GENERAL, 0.0, 1.0, 0.01,
+                p -> (double) p.RUIN_CHANCE, (p, v) -> p.RUIN_CHANCE = ((Double) v).floatValue()));
+        all.add(logSlider("EXPLOSION_CHANCE", SettingCategory.GENERAL, 0.0001, 1.0, 0.0001,
+                p -> (double) p.EXPLOSION_CHANCE, (p, v) -> p.EXPLOSION_CHANCE = ((Double) v).floatValue()));
+        all.add(logSlider("MINI_EXPLOSION_CHANCE", SettingCategory.GENERAL, 0.0001, 1.0, 0.0001,
+                p -> (double) p.MINI_EXPLOSION_CHANCE, (p, v) -> p.MINI_EXPLOSION_CHANCE = ((Double) v).floatValue()));
+        all.add(slider("LOOT_DENSITY", SettingCategory.GENERAL, 0.0, 1.0, 0.01,
+                p -> (double) p.LOOT_DENSITY, (p, v) -> p.LOOT_DENSITY = ((Double) v).floatValue()));
+        all.add(slider("LIGHTING_DENSITY", SettingCategory.GENERAL, 0.0, 1.0, 0.01,
+                p -> (double) p.LIGHTING_DENSITY, (p, v) -> p.LIGHTING_DENSITY = ((Double) v).floatValue()));
+        all.add(cycle("LANDSCAPE_TYPE", SettingCategory.GENERAL,
+                p -> p.LANDSCAPE_TYPE, (p, v) -> p.LANDSCAPE_TYPE = (LandscapeType) v));
+
         // ---- CITIES ---------------------------------------------------------
-        // City placement, rarity, radius, per-level heights and thresholds.
-        SettingDescriptor cityChance = slider("CITY_CHANCE", SettingCategory.CITIES, -1.0, 1.0, 0.001,
-                p -> p.CITY_CHANCE, (p, v) -> p.CITY_CHANCE = (Double) v);
-        all.add(cityChance);
-        SettingDescriptor cityMinRadius = slider("CITY_MINRADIUS", SettingCategory.CITIES, 1, 2000, 1,
-                p -> (double) p.CITY_MINRADIUS, (p, v) -> p.CITY_MINRADIUS = (int) Math.round((Double) v));
-        all.add(cityMinRadius);
-        SettingDescriptor cityMaxRadius = slider("CITY_MAXRADIUS", SettingCategory.CITIES, 1, 2000, 1,
-                p -> (double) p.CITY_MAXRADIUS, (p, v) -> p.CITY_MAXRADIUS = (int) Math.round((Double) v));
-        all.add(cityMaxRadius);
+        // City placement thresholds, per-level heights and spawn distances. (Chance and radii live in GENERAL.)
         all.add(slider("CITY_PERLIN_SCALE", SettingCategory.CITIES, -1000000, 1000000, 0.1,
                 p -> p.CITY_PERLIN_SCALE, (p, v) -> p.CITY_PERLIN_SCALE = (Double) v));
         all.add(slider("CITY_PERLIN_INNERSCALE", SettingCategory.CITIES, -1000000, 1000000, 0.1,
@@ -121,10 +146,8 @@ public final class Settings {
                 p -> (double) p.CITY_MAXHEIGHT, (p, v) -> p.CITY_MAXHEIGHT = (int) Math.round((Double) v)));
 
         // ---- BUILDINGS ------------------------------------------------------
-        // Buildings, ruins, parks, bridges, corridors, foliage/rubble and loot/lighting density.
-        SettingDescriptor ruinChance = slider("RUIN_CHANCE", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
-                p -> (double) p.RUIN_CHANCE, (p, v) -> p.RUIN_CHANCE = ((Double) v).floatValue());
-        all.add(ruinChance);
+        // Buildings, ruins, parks, bridges, corridors and foliage/rubble. (Floors and loot/lighting density
+        // live in GENERAL.)
         all.add(slider("RUIN_MINLEVEL_PERCENT", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
                 p -> (double) p.RUIN_MINLEVEL_PERCENT, (p, v) -> p.RUIN_MINLEVEL_PERCENT = ((Double) v).floatValue()));
         all.add(slider("RUIN_MAXLEVEL_PERCENT", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
@@ -147,12 +170,6 @@ public final class Settings {
                 p -> (double) p.RUBBLE_LEAVE_SCALE, (p, v) -> p.RUBBLE_LEAVE_SCALE = ((Double) v).floatValue()));
         all.add(slider("BUILDING_CHANCE", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
                 p -> (double) p.BUILDING_CHANCE, (p, v) -> p.BUILDING_CHANCE = ((Double) v).floatValue()));
-        SettingDescriptor buildingMinFloors = slider("BUILDING_MINFLOORS", SettingCategory.BUILDINGS, 0, 60, 1,
-                p -> (double) p.BUILDING_MINFLOORS, (p, v) -> p.BUILDING_MINFLOORS = (int) Math.round((Double) v));
-        all.add(buildingMinFloors);
-        SettingDescriptor buildingMaxFloors = slider("BUILDING_MAXFLOORS", SettingCategory.BUILDINGS, 0, 60, 1,
-                p -> (double) p.BUILDING_MAXFLOORS, (p, v) -> p.BUILDING_MAXFLOORS = (int) Math.round((Double) v));
-        all.add(buildingMaxFloors);
         all.add(slider("BUILDING_MINFLOORS_CHANCE", SettingCategory.BUILDINGS, 1, 60, 1,
                 p -> (double) p.BUILDING_MINFLOORS_CHANCE, (p, v) -> p.BUILDING_MINFLOORS_CHANCE = (int) Math.round((Double) v)));
         all.add(slider("BUILDING_MAXFLOORS_CHANCE", SettingCategory.BUILDINGS, 1, 60, 1,
@@ -183,20 +200,11 @@ public final class Settings {
                 p -> (double) p.PARK_STREET_THRESHOLD, (p, v) -> p.PARK_STREET_THRESHOLD = (int) Math.round((Double) v)));
         all.add(toggle("GENERATE_SPAWNERS", SettingCategory.BUILDINGS,
                 p -> p.GENERATE_SPAWNERS, (p, v) -> p.GENERATE_SPAWNERS = (Boolean) v));
-        SettingDescriptor lightingDensity = slider("LIGHTING_DENSITY", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
-                p -> (double) p.LIGHTING_DENSITY, (p, v) -> p.LIGHTING_DENSITY = ((Double) v).floatValue());
-        all.add(lightingDensity);
-        SettingDescriptor lootDensity = slider("LOOT_DENSITY", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
-                p -> (double) p.LOOT_DENSITY, (p, v) -> p.LOOT_DENSITY = ((Double) v).floatValue());
-        all.add(lootDensity);
 
         // ---- DAMAGE ---------------------------------------------------------
-        // Explosions, mini-explosions and debris overflow.
+        // Explosion radii/heights and debris overflow. (Explosion chances live in GENERAL.)
         all.add(slider("DEBRIS_TO_NEARBYCHUNK_FACTOR", SettingCategory.DAMAGE, 1, 10000, 1,
                 p -> (double) p.DEBRIS_TO_NEARBYCHUNK_FACTOR, (p, v) -> p.DEBRIS_TO_NEARBYCHUNK_FACTOR = (int) Math.round((Double) v)));
-        SettingDescriptor explosionChance = slider("EXPLOSION_CHANCE", SettingCategory.DAMAGE, 0.0, 1.0, 0.001,
-                p -> (double) p.EXPLOSION_CHANCE, (p, v) -> p.EXPLOSION_CHANCE = ((Double) v).floatValue());
-        all.add(explosionChance);
         all.add(slider("EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 1000, 1,
                 p -> (double) p.EXPLOSION_MINRADIUS, (p, v) -> p.EXPLOSION_MINRADIUS = (int) Math.round((Double) v)));
         all.add(slider("EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 3000, 1,
@@ -205,9 +213,6 @@ public final class Settings {
                 p -> (double) p.EXPLOSION_MINHEIGHT, (p, v) -> p.EXPLOSION_MINHEIGHT = (int) Math.round((Double) v)));
         all.add(slider("EXPLOSION_MAXHEIGHT", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.EXPLOSION_MAXHEIGHT, (p, v) -> p.EXPLOSION_MAXHEIGHT = (int) Math.round((Double) v)));
-        SettingDescriptor miniExplosionChance = slider("MINI_EXPLOSION_CHANCE", SettingCategory.DAMAGE, 0.0, 1.0, 0.001,
-                p -> (double) p.MINI_EXPLOSION_CHANCE, (p, v) -> p.MINI_EXPLOSION_CHANCE = ((Double) v).floatValue());
-        all.add(miniExplosionChance);
         all.add(slider("MINI_EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 1000, 1,
                 p -> (double) p.MINI_EXPLOSION_MINRADIUS, (p, v) -> p.MINI_EXPLOSION_MINRADIUS = (int) Math.round((Double) v)));
         all.add(slider("MINI_EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 3000, 1,
@@ -276,10 +281,7 @@ public final class Settings {
                 p -> (double) p.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, (p, v) -> p.CITYSPHERE_MONORAIL_HEIGHT_OFFSET = (int) Math.round((Double) v)));
 
         // ---- TERRAIN --------------------------------------------------------
-        // Ground/sea level, terrain-adjustment offsets, bedrock and the landscape type itself.
-        SettingDescriptor landscapeType = cycle("LANDSCAPE_TYPE", SettingCategory.TERRAIN,
-                p -> p.LANDSCAPE_TYPE, (p, v) -> p.LANDSCAPE_TYPE = (LandscapeType) v);
-        all.add(landscapeType);
+        // Ground/sea level, terrain-adjustment offsets and bedrock. (Landscape type lives in GENERAL.)
         all.add(slider("GROUNDLEVEL", SettingCategory.TERRAIN, 2, 256, 1,
                 p -> (double) p.GROUNDLEVEL, (p, v) -> p.GROUNDLEVEL = (int) Math.round((Double) v)));
         all.add(slider("SEALEVEL", SettingCategory.TERRAIN, -1, 256, 1,
@@ -345,25 +347,10 @@ public final class Settings {
         all.add(slider("FOG_DENSITY", SettingCategory.ADVANCED, -1.0, 1.0, 0.01,
                 p -> (double) p.FOG_DENSITY, (p, v) -> p.FOG_DENSITY = ((Double) v).floatValue()));
 
-        // ---- GENERAL (curated duplicates) -----------------------------------
-        // Same field, same getter/setter; a second copy flagged general so the General tab can show the
-        // highest-impact knobs. The chance knobs switch to a log scale with min > 0 here.
-        all.add(generalSlider(cityChance, 0.0001, 1.0, 0.0001, true));
-        all.add(generalOf(cityMinRadius));
-        all.add(generalOf(cityMaxRadius));
-        all.add(generalOf(buildingMinFloors));
-        all.add(generalOf(buildingMaxFloors));
-        all.add(generalOf(ruinChance));
-        all.add(generalSlider(explosionChance, 0.0001, 1.0, 0.0001, true));
-        all.add(generalSlider(miniExplosionChance, 0.0001, 1.0, 0.0001, true));
-        all.add(generalOf(lootDensity));
-        all.add(generalOf(lightingDensity));
-        all.add(generalOf(landscapeType));
-
         return List.copyOf(all);
     }
 
-    /** All descriptors for a tab. For {@link SettingCategory#GENERAL} this is the curated general set. */
+    /** All descriptors for a tab, in declaration order. */
     public static List<SettingDescriptor> byCategory(SettingCategory category) {
         List<SettingDescriptor> result = new ArrayList<>();
         for (SettingDescriptor d : ALL) {
@@ -375,8 +362,8 @@ public final class Settings {
     }
 
     /**
-     * Case-insensitive substring match on the localized display name. Duplicate keys (a home descriptor and its
-     * general duplicate) can both match; callers that want uniqueness should de-duplicate on {@link SettingDescriptor#key()}.
+     * Case-insensitive substring match on the localized display name. Each field has a single descriptor, so
+     * hits are already unique on {@link SettingDescriptor#key()}.
      */
     public static List<SettingDescriptor> search(String localizedQuery) {
         String needle = localizedQuery == null ? "" : localizedQuery.toLowerCase(Locale.ROOT).strip();

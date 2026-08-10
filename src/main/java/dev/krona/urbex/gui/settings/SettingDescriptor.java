@@ -29,9 +29,8 @@ import java.util.function.Function;
  *
  * @param key       the backing {@code UrbexProfile} public field name; also the lang-key suffix
  *                  ({@code urbex.setting.<key>} and {@code urbex.setting.<key>.tooltip}).
- * @param category  the tab this descriptor lives under.
- * @param general   {@code true} for the curated duplicate that also appears on the General tab; the completeness
- *                  test counts each field in exactly one {@code general=false} descriptor.
+ * @param category  the tab this descriptor lives under; each field is described by exactly one descriptor
+ *                  (no duplicates), so a curated few carry {@link SettingCategory#GENERAL} as their real home.
  * @param kind      the control to render.
  * @param min       slider lower bound (mined from the {@code UrbexProfile.init} min argument).
  * @param max       slider upper bound (mined from the {@code UrbexProfile.init} max argument).
@@ -43,7 +42,6 @@ import java.util.function.Function;
 public record SettingDescriptor(
         String key,
         SettingCategory category,
-        boolean general,
         ControlKind kind,
         double min,
         double max,

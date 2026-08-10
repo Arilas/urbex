@@ -41,6 +41,7 @@ public final class SettingControls {
     public static AbstractWidget create(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
         return switch (d.kind()) {
             case SLIDER -> createSlider(d, target, onChanged, width);
+            case CHANCE_PERLIN -> createChancePerlin(d, target, onChanged, width);
             case TOGGLE -> createToggle(d, target, onChanged, width);
             case CYCLE -> createCycle(d, target, onChanged, width);
             case TEXT -> createText(d, target, onChanged, width);
@@ -110,6 +111,183 @@ public final class SettingControls {
         protected void applyValue() {
             descriptor.setter().accept(target, currentValue());
             onChanged.run();
+        }
+    }
+
+    // ---- CHANCE_PERLIN ----------------------------------------------------
+
+    /**
+     * The {@code CITY_CHANCE}-only composite: a "perlin city map" toggle beside a positive-range log slider,
+     * coordinated against the single field via {@link PerlinCityChance}. Toggle on ⇒ field is {@code -1} and
+     * the slider is inert (disabled); toggle off ⇒ field is the slider's current positive value.
+     */
+    private static AbstractWidget createChancePerlin(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+        double field = (Double) d.getter().apply(target);
+        boolean perlinOn = PerlinCityChance.isPerlin(field);
+        double sliderValue = PerlinCityChance.sliderValue(field, d.min());
+
+        LogValueMapper mapper = new LogValueMapper(d.min(), d.max());
+        SliderWidget slider = new SliderWidget(d, target, onChanged, mapper, width,
+                mapper.toSlider(sliderValue), sliderLabel(d, sliderValue));
+        slider.setTooltip(Tooltip.create(Component.translatable(d.tooltipKey())));
+        slider.active = !perlinOn;
+
+        return new PerlinChanceControl(d, target, onChanged, slider, perlinOn, width);
+    }
+
+    /**
+     * Hosts the perlin toggle and the log slider as a single {@link AbstractWidget} so the row model's
+     * one-control-per-row contract holds. The toggle owns the {@code -1} sentinel; the slider only ever
+     * writes a positive value, and only while it is enabled (perlin off) - so the setter never writes a
+     * positive value while perlin is on. Mouse events reach whichever child is under the cursor (each child
+     * ignores clicks outside its own bounds); keyboard events go to the last-focused child.
+     */
+    private static final class PerlinChanceControl extends AbstractWidget {
+
+        /** Gap between toggle and slider; and the toggle's share of the row width. */
+        private static final int GAP = 6;
+        private static final int TOGGLE_WIDTH_PERCENT = 42;
+
+        private final SliderWidget slider;
+        private final CycleButton<Boolean> toggle;
+        private AbstractWidget focusedChild;
+
+        private PerlinChanceControl(SettingDescriptor d, UrbexProfile target, Runnable onChanged,
+                                    SliderWidget slider, boolean perlinOn, int width) {
+            super(0, 0, width, HEIGHT, Component.translatable(d.nameKey()));
+            this.slider = slider;
+            this.toggle = CycleButton
+                    .booleanBuilder(CommonComponents.OPTION_ON, CommonComponents.OPTION_OFF, perlinOn)
+                    .create(0, 0, width, HEIGHT, Component.translatable(d.nameKey() + ".perlin"),
+                            (b, on) -> {
+                                slider.active = !on;
+                                // Perlin on writes -1; perlin off restores the slider's current positive value.
+                                d.setter().accept(target, PerlinCityChance.toField(on, slider.currentValue()));
+                                onChanged.run();
+                            });
+            this.toggle.setTooltip(Tooltip.create(Component.translatable(d.nameKey() + ".perlin.tooltip")));
+            layoutChildren();
+        }
+
+        private int toggleWidth() {
+            return Math.max(0, width * TOGGLE_WIDTH_PERCENT / 100);
+        }
+
+        private void layoutChildren() {
+            int tw = toggleWidth();
+            toggle.setX(getX());
+            toggle.setY(getY());
+            toggle.setWidth(tw);
+            toggle.setHeight(height);
+
+            int sliderX = getX() + tw + GAP;
+            slider.setX(sliderX);
+            slider.setY(getY());
+            slider.setWidth(Math.max(0, getX() + width - sliderX));
+            slider.setHeight(height);
+        }
+
+        @Override
+        public void setX(int x) {
+            super.setX(x);
+            layoutChildren();
+        }
+
+        @Override
+        public void setY(int y) {
+            super.setY(y);
+            layoutChildren();
+        }
+
+        @Override
+        public void setWidth(int w) {
+            super.setWidth(w);
+            layoutChildren();
+        }
+
+        @Override
+        public void setHeight(int h) {
+            super.setHeight(h);
+            layoutChildren();
+        }
+
+        @Override
+        protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+            toggle.extractRenderState(graphics, mouseX, mouseY, partialTick);
+            slider.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput output) {
+            output.add(NarratedElementType.TITLE, getMessage());
+            toggle.updateNarration(output);
+            slider.updateNarration(output);
+        }
+
+        // ---- input routing: mouse by position, keyboard to the focused child ----------------
+
+        @Override
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            if (toggle.mouseClicked(event, doubleClick)) {
+                setFocusedChild(toggle);
+                return true;
+            }
+            if (slider.mouseClicked(event, doubleClick)) {
+                setFocusedChild(slider);
+                return true;
+            }
+            return false;
+        }
+
+        @Override
+        public boolean mouseReleased(MouseButtonEvent event) {
+            boolean handled = toggle.mouseReleased(event);
+            handled |= slider.mouseReleased(event);
+            return handled;
+        }
+
+        @Override
+        public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+            // Only the focused child (the slider being dragged) responds; the other returns false.
+            boolean handled = toggle.mouseDragged(event, dragX, dragY);
+            handled |= slider.mouseDragged(event, dragX, dragY);
+            return handled;
+        }
+
+        @Override
+        public boolean keyPressed(KeyEvent event) {
+            return focusedChild != null && focusedChild.keyPressed(event);
+        }
+
+        @Override
+        public boolean keyReleased(KeyEvent event) {
+            return focusedChild != null && focusedChild.keyReleased(event);
+        }
+
+        @Override
+        public boolean charTyped(CharacterEvent event) {
+            return focusedChild != null && focusedChild.charTyped(event);
+        }
+
+        private void setFocusedChild(AbstractWidget child) {
+            if (focusedChild != child && focusedChild != null) {
+                focusedChild.setFocused(false);
+            }
+            focusedChild = child;
+            child.setFocused(true);
+        }
+
+        @Override
+        public void setFocused(boolean focused) {
+            super.setFocused(focused);
+            if (!focused) {
+                toggle.setFocused(false);
+                slider.setFocused(false);
+                focusedChild = null;
+            } else if (focusedChild == null) {
+                // Default keyboard focus to the interactive child: the slider when enabled, else the toggle.
+                setFocusedChild(slider.active ? slider : toggle);
+            }
         }
     }
 
