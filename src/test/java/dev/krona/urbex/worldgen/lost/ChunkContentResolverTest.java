@@ -538,12 +538,13 @@ class ChunkContentResolverTest {
         void multiChunkReadsTheRawRoadFieldNotTheEffectiveOne() throws IOException {
             Path file = Path.of("src/main/java/dev/krona/urbex/worldgen/lost/MultiChunk.java");
             String source = stripComments(Files.readString(file));
-            assertTrue(source.contains("roadField().typeAt("),
-                    "MultiChunk must read the raw road field via roadField().typeAt(...)");
-            assertFalse(source.contains("getEffectiveRoadType"),
-                    "MultiChunk must never call BuildingInfo.getEffectiveRoadType(...) - doing so would "
-                            + "make multi-building acceptance depend on a content decision that itself "
-                            + "depends on multi-building acceptance");
+            String body = extractMethodBody(source, "private boolean canPlaceBuilding(");
+            assertTrue(body.contains("roadField().typeAt("),
+                    "MultiChunk.canPlaceBuilding must read the raw road field via roadField().typeAt(...)");
+            assertFalse(body.contains("getEffectiveRoadType"),
+                    "MultiChunk.canPlaceBuilding must never call BuildingInfo.getEffectiveRoadType(...) - "
+                            + "doing so would make multi-building acceptance depend on a content decision "
+                            + "that itself depends on multi-building acceptance");
         }
 
         /**
@@ -555,6 +556,36 @@ class ChunkContentResolverTest {
         private static String stripComments(String source) {
             String withoutBlockComments = source.replaceAll("(?s)/\\*.*?\\*/", "");
             return withoutBlockComments.replaceAll("//[^\n]*", "");
+        }
+
+        /**
+         * Scoped to the named method's body, not the whole file: a {@code roadField().typeAt(...)}
+         * call that migrated elsewhere in {@code MultiChunk.java} (leaving {@code canPlaceBuilding}
+         * itself reading the effective road, or nothing at all) would still satisfy a whole-file
+         * substring search vacuously. {@code declarationPrefix} must be specific enough to match the
+         * declaration and not a call site - a bare method name is not, since {@code canPlaceBuilding}
+         * is called (not declared) earlier in this same file. Finds that declaration, then
+         * brace-matches from its opening {@code {} to the corresponding closing one.
+         */
+        private static String extractMethodBody(String source, String declarationPrefix) {
+            int declaration = source.indexOf(declarationPrefix);
+            assertTrue(declaration >= 0, "could not find a declaration matching \"" + declarationPrefix
+                    + "\" to scope the search to");
+            int openBrace = source.indexOf('{', declaration);
+            assertTrue(openBrace >= 0, "could not find the opening brace after \"" + declarationPrefix + "\"");
+            int depth = 0;
+            for (int i = openBrace; i < source.length(); i++) {
+                char c = source.charAt(i);
+                if (c == '{') {
+                    depth++;
+                } else if (c == '}') {
+                    depth--;
+                    if (depth == 0) {
+                        return source.substring(openBrace, i + 1);
+                    }
+                }
+            }
+            throw new AssertionError("unbalanced braces while scanning \"" + declarationPrefix + "\" for its body");
         }
     }
 }
