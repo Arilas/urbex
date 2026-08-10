@@ -105,8 +105,14 @@ public class CityPreview implements AutoCloseable {
             return;
         }
         int mapHeight = Math.max(0, h - LEGEND_HEIGHT);
-        g.blit(texture.getTextureView(), texture.getSampler(), x, y, w, mapHeight, 0f, 0f, 1f, 1f);
-        renderLegend(g, x, y + mapHeight, w);
+        // blit(view, sampler, x0, y0, x1, y1, u0, u1, v0, v1): the int quartet is the *absolute end*
+        // corner (x1, y1), not a width/height - confirmed by decompiling BlitRenderState.getBounds,
+        // which builds its ScreenRectangle as (x0, y0, x1 - x0, y1 - y0). The float quartet groups
+        // as (u0, u1, v0, v1), not (u0, v0, u1, v1) - confirmed against GuiGraphicsExtractor's own
+        // internal 128x128 blit call, which passes (0, 0, 128, 128, 0.0F, 1.0F, 0.0F, 1.0F, -1) to
+        // this same innerBlit. Full-texture UVs are therefore (0, 1, 0, 1), not (0, 0, 1, 1).
+        g.blit(texture.getTextureView(), texture.getSampler(), x, y, x + w, y + mapHeight, 0f, 1f, 0f, 1f);
+        renderLegend(g, x, y + mapHeight);
     }
 
     @Override
@@ -174,7 +180,7 @@ public class CityPreview implements AutoCloseable {
         g.text(font, message, textX, textY, 0xffaaaaaa);
     }
 
-    private static void renderLegend(GuiGraphicsExtractor g, int x, int y, int w) {
+    private static void renderLegend(GuiGraphicsExtractor g, int x, int y) {
         Font font = Minecraft.getInstance().font;
         int cx = x;
         cx = renderSwatch(g, font, cx, y, CITY_COLOR, Component.translatable("urbex.preview.legend.city"));

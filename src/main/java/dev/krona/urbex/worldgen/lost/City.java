@@ -63,7 +63,11 @@ public class City {
 
     public static PredefinedCity getPredefinedCity(CommonLevelAccessor level, ChunkCoord coord) {
         AssetRegistries.loadPredefinedStuff(level);
-        if (!predefinedCityMapReady) {
+        // Guarded on level != null for the same reason as AssetRegistries.loadedPredefined (#67):
+        // a null level (the preview's NullDimensionInfo.getWorld()) means nothing was actually
+        // loaded above, so latching "ready" here would permanently stop a later real level from
+        // ever populating this map.
+        if (!predefinedCityMapReady && level != null) {
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
                 PREDEFINED_CITY_MAP.put(new ChunkCoord(city.getDimension(), city.getChunkX(), city.getChunkZ()), city);
             }
@@ -97,13 +101,17 @@ public class City {
     }
 
     private static void calculateOccupied(IDimensionInfo provider) {
-        if (!occupiedBuildingReady) {
-            calculateMap(provider.getWorld());
+        WorldGenLevel world = provider.getWorld();
+        // Same level != null guard as getPredefinedCity above, and for the same reason: with a
+        // null world (the preview) these bodies run on whatever's currently in the datapack-derived
+        // maps - usually nothing yet - and must not latch "ready" over that.
+        if (!occupiedBuildingReady && world != null) {
+            calculateMap(world);
             for (Map.Entry<ChunkCoord, PredefinedBuilding> entry : PREDEFINED_BUILDING_MAP.entrySet()) {
                 PredefinedBuilding pb = entry.getValue();
                 ChunkCoord root = entry.getKey();
                 if (pb.multi()) {
-                    MultiBuilding building = AssetRegistries.MULTI_BUILDINGS.getOrThrow(provider.getWorld(), pb.building());
+                    MultiBuilding building = AssetRegistries.MULTI_BUILDINGS.getOrThrow(world, pb.building());
                     // Add all occupied chunkcoords for the building to the occupied set
                     for (int x = 0 ; x < building.getDimX() ; x++) {
                         for (int z = 0 ; z < building.getDimZ() ; z++) {
@@ -116,8 +124,8 @@ public class City {
             }
             occupiedBuildingReady = true;
         }
-        AssetRegistries.loadPredefinedStuff(provider.getWorld());
-        if (!occupiedStreetReady) {
+        AssetRegistries.loadPredefinedStuff(world);
+        if (!occupiedStreetReady && world != null) {
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
                 for (PredefinedStreet street : city.getPredefinedStreets()) {
                     OCCUPIED_CHUNKS_STREET.put(new ChunkCoord(city.getDimension(),
@@ -130,7 +138,7 @@ public class City {
 
     private static void calculateMap(CommonLevelAccessor level) {
         AssetRegistries.loadPredefinedStuff(level);
-        if (!predefinedBuildingMapReady) {
+        if (!predefinedBuildingMapReady && level != null) {
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
                 for (PredefinedBuilding building : city.getPredefinedBuildings()) {
                     PREDEFINED_BUILDING_MAP.put(new ChunkCoord(city.getDimension(),
@@ -143,7 +151,7 @@ public class City {
 
     public static PredefinedStreet getPredefinedStreet(CommonLevelAccessor level, ChunkCoord coord) {
         AssetRegistries.loadPredefinedStuff(level);
-        if (!predefinedStreetMapReady) {
+        if (!predefinedStreetMapReady && level != null) {
             for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
                 for (PredefinedStreet street : city.getPredefinedStreets()) {
                     PREDEFINED_STREET_MAP.put(new ChunkCoord(city.getDimension(),
