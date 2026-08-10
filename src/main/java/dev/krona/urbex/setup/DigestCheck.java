@@ -25,12 +25,18 @@ public final class DigestCheck {
     public static final String PROP_EXPECTED = "urbex.digestCheck.expected";
     /**
      * When present (value is not consulted, only presence), the check fails if the sampled square
-     * contains zero chunks with a planned primary bridge deck. Set on the {@code digestCheckBridge}
-     * run configuration only - that window's entire reason to exist is being the one mechanical
-     * proof a bridge deck renders, so a future change that moves the window off it must fail loudly
-     * here rather than silently pinning a golden hash for a window that has stopped covering one.
+     * contains zero chunks with a planned primary bridge deck. Set on the
+     * {@code digestCheckFeatures} run configuration only - that window's entire reason to exist is
+     * being the one mechanical proof a bridge deck renders, so a future change that moves the
+     * window off it must fail loudly here rather than silently pinning a golden hash for a window
+     * that has stopped covering one.
      */
     public static final String PROP_REQUIRE_BRIDGE = "urbex.digestCheck.requireBridge";
+    /**
+     * Same as {@link #PROP_REQUIRE_BRIDGE}, for sloped minor roads instead of bridge decks. Also
+     * set on {@code digestCheckFeatures} - that window covers both features, so both gates apply.
+     */
+    public static final String PROP_REQUIRE_SLOPE = "urbex.digestCheck.requireSlope";
     public static final String OK = "URBEX-DIGEST-CHECK: OK";
     public static final String FAIL = "URBEX-DIGEST-CHECK: FAIL";
 
@@ -68,6 +74,7 @@ public final class DigestCheck {
         Spec spec = Spec.parse(value);
         String expected = System.getProperty(PROP_EXPECTED);
         boolean requireBridge = System.getProperty(PROP_REQUIRE_BRIDGE) != null;
+        boolean requireSlope = System.getProperty(PROP_REQUIRE_SLOPE) != null;
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             try {
@@ -83,6 +90,10 @@ public final class DigestCheck {
                 } else if (requireBridge && result.bridgeChunks() == 0) {
                     verdict(FAIL + " (sample window contains zero planned-bridge chunks - it no longer covers "
                             + "the bridge this check exists to guard; relocate the window rather than accepting "
+                            + "a new golden here)");
+                } else if (requireSlope && result.slopeChunks() == 0) {
+                    verdict(FAIL + " (sample window contains zero sloped-road chunks - it no longer covers "
+                            + "the slope this check exists to guard; relocate the window rather than accepting "
                             + "a new golden here)");
                 } else if (expected != null && !expected.trim().toLowerCase(Locale.ROOT).equals(actual)) {
                     verdict(FAIL + String.format(" (expected DRIVERDIGEST=%s, got %s)", expected.trim(), actual));
