@@ -411,7 +411,7 @@ public class UrbexProfile {
         PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = cfg.getInt("plannedPrimaryBridgeMaxLength", UrbexProfile.CATEGORY_CITY_ID, PLANNED_PRIMARY_BRIDGE_MAX_LENGTH, 1, 64,
                 "The longest water crossing in chunks that a primary road will bridge");
         OPEN_LOT_PARK_CHANCE = cfg.getFloat("openLotParkChance", UrbexProfile.CATEGORY_CITY_ID, OPEN_LOT_PARK_CHANCE, 0.0f, 1.0f,
-                "The chance that a city chunk with neither a road nor a building becomes a park rather than a paved lot");
+                "The chance that an open lot (a city chunk with neither a road nor a building) is furnished with a park part. Every open lot is grass regardless; this only decides whether a park part is placed on top of it");
         MULTI_BUILDING_STREET_CONFLICT = MultiBuildingStreetConflict.byName(
                 cfg.getString("multiBuildingStreetConflict", UrbexProfile.CATEGORY_CITY_ID,
                         MULTI_BUILDING_STREET_CONFLICT.name(),

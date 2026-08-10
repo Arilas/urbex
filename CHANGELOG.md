@@ -18,6 +18,32 @@
   (previously implicit Java defaults). Bare names in third-party datapacks still work and still
   default to the `urbex` namespace. A new test enforces that every shipped reference is
   namespaced and resolves.
+- **Hierarchical streets replace the per-chunk street/park coin flip.** Every dimension now builds
+  one deterministic road field of primary, secondary and tertiary roads, computed once from (seed,
+  dimension id, road settings) rather than decided chunk by chunk. Primaries render through a new
+  wide-road asset family (`urbex:street_large_*`, `urbex:street_stair`) at roughly double the width
+  of an ordinary street, with a `connector` part overlaying every edge where an 8-wide minor road
+  meets a 14-wide primary so the two surfaces meet without a gap. A primary planned across open
+  water is carried on a planned bridge (the city style's `largebridges`, falling back to its
+  ordinary bridge) when a deterministic per-span roll passes; a minor road one level below a
+  same-level neighbour slopes up to meet it (`urbex:street_stair`) instead of stepping. A city
+  chunk with neither a road nor a building is now an open lot - always grass - and is furnished
+  with a weighted park part according to the chance below. All of this is configurable from a new
+  **Roads** tab (spacing, activation and force-interval for primaries; count, separation and edge
+  distance for secondaries; chance and length for tertiaries; chance, max length and the
+  multibuilding/road conflict policy for bridges), with its own preview mode colouring each road
+  class and `/urbex debug` street diagnostics alongside it.
+- **Datapack- and config-breaking removals that come with hierarchical streets.** The city-style
+  `parkchance` override (in `ParkSettings`) is gone with the legacy park-nomination path it tuned -
+  a third-party datapack that sets it should remove the field. The `parkChance` profile setting
+  (`PARK_CHANCE`) is removed; its replacement, `openLotParkChance` (`OPEN_LOT_PARK_CHANCE`), means a
+  different thing - the chance that an open lot is furnished with a park part, not the chance a
+  chunk becomes a park at all - so a config carrying the old key will simply stop taking effect.
+  `StreetType.FULL` and `StreetType.randomNonPark()` are deleted; a planned road is always
+  `StreetType.NORMAL`.
+- **Worlds generate differently past the already-generated chunk border, again.** As with `0.1.0`,
+  this is expected and permitted: the mod makes no promise that an existing world regenerates
+  identically after an update, and the road field changes what every city chunk resolves to.
 
 ## 0.1.0 — 2026-08-03 (alpha preview)
 

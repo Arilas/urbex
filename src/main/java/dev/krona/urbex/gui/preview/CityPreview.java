@@ -206,29 +206,35 @@ public class CityPreview implements AutoCloseable {
         // doesn't see another profile's predefined content. Mirrors the old editor's preview
         // refresh.
         City.cleanPredefinedCache();
-        try {
-            switch (mode) {
-                // Only the map/transport samplers walk a NullDimensionInfo; CITY renders straight from the profile,
-                // so it does not pay to build one there.
-                case MAP -> renderMap(new NullDimensionInfo(profile, seed, registryAccess));
-                case TRANSPORT -> renderTransport(new NullDimensionInfo(profile, seed, registryAccess), profile);
-                case ROADS -> renderRoads(new NullDimensionInfo(profile, seed, registryAccess), profile);
-                case CITY -> renderCity(profile, seed);
+
+        // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
+        // the profile, so it does not pay to build one there - and this construction is the only site
+        // in this method that can throw: GridSettings.fromProfile validates the road settings, and a
+        // profile can be momentarily self-contradictory. The road settings come in min/max pairs held
+        // by two independent sliders, so dragging a minimum up necessarily passes through states where
+        // it exceeds its maximum. GridSettings refuses those, correctly - a world must never be
+        // generated from numbers nobody wrote - but the editor is where the player is still writing
+        // them, and taking the screen down mid-drag is no way to say so. Keep showing the last good
+        // preview until the profile makes sense again; a profile still inconsistent at world creation
+        // fails there, with the field named. The catch is narrowed to just this construction so a bug
+        // in a renderer's own math is never silently swallowed as "the profile is invalid".
+        NullDimensionInfo diminfo = null;
+        if (mode != Mode.CITY) {
+            try {
+                diminfo = new NullDimensionInfo(profile, seed, registryAccess);
+            } catch (IllegalArgumentException e) {
+                // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
+                // good render. Leaving `mode` alone too keeps the legend describing the image actually
+                // on screen.
+                Urbex.LOGGER.debug("Preview not recomputed - profile is not currently valid: {}", e.getMessage());
+                return;
             }
-        } catch (IllegalArgumentException e) {
-            // A profile can be momentarily self-contradictory and there is nothing wrong with that: the
-            // road settings come in min/max pairs held by two independent sliders, so dragging a minimum
-            // up necessarily passes through states where it exceeds its maximum. GridSettings refuses
-            // those, correctly - a world must never be generated from numbers nobody wrote - but the
-            // editor is where the player is still writing them, and taking the screen down mid-drag is
-            // no way to say so. Keep showing the last good preview until the profile makes sense again;
-            // a profile still inconsistent at world creation fails there, with the field named.
-            //
-            // Nothing has been drawn at this point (the throw comes from building the dimension, before
-            // any sampling), so `colors` and `texture` still hold that last good render. Leaving `mode`
-            // alone too keeps the legend describing the image actually on screen.
-            Urbex.LOGGER.debug("Preview not recomputed - profile is not currently valid: {}", e.getMessage());
-            return;
+        }
+        switch (mode) {
+            case MAP -> renderMap(diminfo);
+            case TRANSPORT -> renderTransport(diminfo, profile);
+            case ROADS -> renderRoads(diminfo, profile);
+            case CITY -> renderCity(profile, seed);
         }
         this.mode = mode;
         uploadTexture();

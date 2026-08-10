@@ -178,8 +178,9 @@ public class CityStyle {
         return streetParts;
     }
 
+    /** Primary roads fall back to the secondary-road family when a style does not define their own. */
     public StreetParts getLargeStreetParts() {
-        return largeStreetParts;
+        return largeStreetParts == StreetParts.DEFAULT ? streetParts : largeStreetParts;
     }
 
     /** Tertiary roads fall back to the secondary-road family when a style does not define their own. */

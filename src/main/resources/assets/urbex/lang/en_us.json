@@ -338,7 +338,7 @@
   "urbex.setting.BUILDING_FRONTCHANCE": "Building Frontchance",
   "urbex.setting.BUILDING_FRONTCHANCE.tooltip": "The chance that a building will have a 'front' part if this is possible (i.e. adjacent street)",
   "urbex.setting.OPEN_LOT_PARK_CHANCE": "Open Lot Park Chance",
-  "urbex.setting.OPEN_LOT_PARK_CHANCE.tooltip": "The chance that a city chunk with neither a road nor a building becomes a park rather than a paved lot",
+  "urbex.setting.OPEN_LOT_PARK_CHANCE.tooltip": "The chance that an open lot (a city chunk with neither a road nor a building) is furnished with a park part",
   "urbex.setting.CORRIDOR_CHANCE": "Corridor Chance",
   "urbex.setting.CORRIDOR_CHANCE.tooltip": "The chance that a chunk can possibly contain a corridor. There actually being a corridor also depends on the presence of adjacent corridors",
   "urbex.setting.BRIDGE_CHANCE": "Bridge Chance",

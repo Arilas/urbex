@@ -357,8 +357,13 @@ public final class Settings {
 
         // ==== ROADS ==========================================================
         // The hierarchical road field: primary corridors, the secondary streets filling the blocks between
-        // them, the access-road stubs inside those, and how primaries cross water. Bounds mirror
-        // GridSettings' validation exactly, so no editable combination can fail construction.
+        // them, the access-road stubs inside those, and how primaries cross water. Every slider's own
+        // min/max mirrors GridSettings' per-field validation exactly - but three pairs of these sliders
+        // are independent controls over what GridSettings treats as one min/max pair (secondary count X,
+        // secondary count Z, tertiary length), so dragging one past the other is a reachable, momentarily
+        // inconsistent state that GridSettings' compact constructor correctly rejects. CityPreview.recompute
+        // catches exactly that IllegalArgumentException and keeps showing the last good preview rather than
+        // going blank mid-drag; a profile still inconsistent at world creation fails there, field named.
         r.section("roads_primary");
         r.slider("PRIMARY_ROAD_SPACING_X", SettingCategory.ROADS, 8, 128, 1,
                 p -> (double) p.PRIMARY_ROAD_SPACING_X, (p, v) -> p.PRIMARY_ROAD_SPACING_X = (int) Math.round((Double) v));
