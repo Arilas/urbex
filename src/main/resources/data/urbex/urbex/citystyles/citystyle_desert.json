@@ -1,4 +1,4 @@
 {
-  "style": "desert",
-  "inherit": "citystyle_common"
+  "style": "urbex:desert",
+  "inherit": "urbex:citystyle_common"
 }

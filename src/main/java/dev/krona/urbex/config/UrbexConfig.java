@@ -22,7 +22,6 @@ import java.util.Optional;
 public record UrbexConfig(
         List<String> dimensionsWithProfiles,
         int heightSampleSize,
-        String specialBedBlock,
         String selectedProfile,
         String selectedCustomJson,
         int todoQueueSize,
@@ -37,9 +36,8 @@ public record UrbexConfig(
         boolean avoidFlattening) {
 
     public static final UrbexConfig DEFAULT = new UrbexConfig(
-            List.of("urbex:city=biosphere"),
+            List.of(),
             3,
-            "minecraft:diamond_block",
             "",
             "",
             20,
@@ -57,7 +55,6 @@ public record UrbexConfig(
     public static final Codec<UrbexConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf("dimensionsWithProfiles", DEFAULT.dimensionsWithProfiles()).forGetter(UrbexConfig::dimensionsWithProfiles),
             Codec.intRange(1, 100).optionalFieldOf("heightSampleSize", DEFAULT.heightSampleSize()).forGetter(UrbexConfig::heightSampleSize),
-            Codec.STRING.optionalFieldOf("specialBedBlock", DEFAULT.specialBedBlock()).forGetter(UrbexConfig::specialBedBlock),
             Codec.STRING.optionalFieldOf("selectedProfile", DEFAULT.selectedProfile()).forGetter(UrbexConfig::selectedProfile),
             Codec.STRING.optionalFieldOf("selectedCustomJson", DEFAULT.selectedCustomJson()).forGetter(UrbexConfig::selectedCustomJson),
             Codec.intRange(1, 100000).optionalFieldOf("todoQueueSize", DEFAULT.todoQueueSize()).forGetter(UrbexConfig::todoQueueSize),

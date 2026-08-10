@@ -12,12 +12,12 @@
     },
     {
       "char": "#",
-      "variant": "stonebrick",
+      "variant": "urbex:stonebrick",
       "damaged": "minecraft:iron_bars"
     },
     {
       "char": "}",
-      "variant": "stonebrick_rubble",
+      "variant": "urbex:stonebrick_rubble",
       "damaged": "minecraft:iron_bars"
     }
   ]

@@ -1,4 +1,4 @@
 {
-  "style": "standard",
-  "inherit": "citystyle_common"
+  "style": "urbex:standard",
+  "inherit": "urbex:citystyle_common"
 }

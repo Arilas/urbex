@@ -27,20 +27,16 @@ read them as features of the current build.
 
 ## Usage
 
-By default Urbex generates cities **only in the `urbex:city` dimension**, which the mod adds. An
-ordinary new world will look completely untouched — the overworld is not opted in unless you ask
-for it. If you install the jar and see no cities, this is why.
+Urbex does not generate anything until you opt in. A new world looks completely untouched
+unless you pick a profile.
 
 To get cities:
 
-- **In `urbex:city`** — travel there, or `/execute in urbex:city run tp @s ~ ~ ~`. This dimension
-  uses the `biosphere` profile out of the box.
-- **In the overworld** — on the world-creation screen, open the **More** tab and use the **Cities**
-  button to pick a profile before creating the world. With no profile selected (the default) the
-  overworld generates normally.
-
-Server owners can map further dimensions to profiles with the `dimensionsWithProfiles` config
-option (entries look like `urbex:city=biosphere`).
+- On the world-creation screen, open the **More** tab and use the **Cities** button to pick a
+  profile before creating the world. With no profile selected (the default) the world generates
+  normally.
+- Server owners can map any dimension to a profile with the `dimensionsWithProfiles` config
+  option (entries look like `minecraft:overworld=default`).
 
 ## Status
 

@@ -14,12 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class WorldStyleDialogTest {
 
-    private static final List<String> CHOICES = List.of("standard", "standard_everywhere", "lcmt");
+    private static final List<String> CHOICES = List.of("standard", "floating", "lcmt");
 
     @Test
     void theCurrentStyleSelectsItsOwnRow() {
         assertEquals(0, WorldStyleDialog.preselectIndex(CHOICES, "standard"));
-        assertEquals(1, WorldStyleDialog.preselectIndex(CHOICES, "standard_everywhere"));
+        assertEquals(1, WorldStyleDialog.preselectIndex(CHOICES, "floating"));
         assertEquals(2, WorldStyleDialog.preselectIndex(CHOICES, "lcmt"));
     }
 

@@ -3,12 +3,12 @@
   "dimz": 2,
   "buildings": [
     [
-      "library00",
-      "library01"
+      "urbex:library00",
+      "urbex:library01"
     ],
     [
-      "library10",
-      "library11"
+      "urbex:library10",
+      "urbex:library11"
     ]
   ]
 }

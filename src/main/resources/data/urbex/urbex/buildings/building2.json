@@ -4,39 +4,39 @@
   "parts": [
     {
       "top": false,
-      "part": "building2_1"
+      "part": "urbex:building2_1"
     },
     {
       "top": false,
-      "part": "building2_2"
+      "part": "urbex:building2_2"
     },
     {
       "top": false,
-      "part": "building2_3"
+      "part": "urbex:building2_3"
     },
     {
       "top": false,
-      "part": "building2_4"
+      "part": "urbex:building2_4"
     },
     {
       "top": true,
-      "part": "top1x1_1"
+      "part": "urbex:top1x1_1"
     },
     {
       "top": true,
-      "part": "top1x1_2"
+      "part": "urbex:top1x1_2"
     },
     {
       "top": true,
-      "part": "top1x1_3"
+      "part": "urbex:top1x1_3"
     },
     {
       "top": true,
-      "part": "top1x1_4"
+      "part": "urbex:top1x1_4"
     },
     {
       "top": true,
-      "part": "top1x1_5"
+      "part": "urbex:top1x1_5"
     }
   ]
 }

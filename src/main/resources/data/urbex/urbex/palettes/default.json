@@ -45,17 +45,17 @@
     },
     {
       "char": "v",
-      "variant": "stonebrick",
+      "variant": "urbex:stonebrick",
       "damaged": "minecraft:iron_bars"
     },
     {
       "char": "y",
-      "variant": "stonebrick",
+      "variant": "urbex:stonebrick",
       "damaged": "minecraft:iron_bars"
     },
     {
       "char": "x",
-      "variant": "stonebrick",
+      "variant": "urbex:stonebrick",
       "damaged": "minecraft:iron_bars"
     },
     {

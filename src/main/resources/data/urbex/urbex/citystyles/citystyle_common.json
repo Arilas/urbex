@@ -1,12 +1,23 @@
 {
-  "inherit": "citystyle_config",
-  "stuff_tags": ["rubble"],
+  "inherit": "urbex:citystyle_config",
+  "stuff_tags": [
+    "rubble"
+  ],
   "streetblocks": {
     "border": "y",
     "wall": "w",
     "street": "S",
     "streetbase": "b",
-    "streetvariant": "B"
+    "streetvariant": "B",
+    "parts": {
+      "full": ["urbex:street_full"],
+      "straight": ["urbex:street_straight"],
+      "end": ["urbex:street_end"],
+      "bend": ["urbex:street_bend"],
+      "t": ["urbex:street_t"],
+      "none": ["urbex:street_none"],
+      "all": ["urbex:street_all"]
+    }
   },
   "parkblocks": {
     "elevation": "x"
@@ -27,185 +38,185 @@
     "buildings": [
       {
         "factor": 0.3,
-        "value": "building1"
+        "value": "urbex:building1"
       },
       {
         "factor": 0.4,
-        "value": "building2"
+        "value": "urbex:building2"
       },
       {
         "factor": 0.2,
-        "value": "building3"
+        "value": "urbex:building3"
       },
       {
         "factor": 0.2,
-        "value": "building4"
+        "value": "urbex:building4"
       },
       {
         "factor": 0.3,
-        "value": "building5"
+        "value": "urbex:building5"
       },
       {
         "factor": 0.2,
-        "value": "building6"
+        "value": "urbex:building6"
       },
       {
         "factor": 0.2,
-        "value": "building7"
+        "value": "urbex:building7"
       },
       {
         "factor": 0.4,
-        "value": "building8"
+        "value": "urbex:building8"
       }
     ],
     "multibuildings": [
       {
         "factor": 0.2,
-        "value": "multi1"
+        "value": "urbex:multi1"
       },
       {
         "factor": 0.2,
-        "value": "multi2"
+        "value": "urbex:multi2"
       },
       {
         "factor": 0.12,
-        "value": "multi3"
+        "value": "urbex:multi3"
       },
       {
         "factor": 0.12,
-        "value": "multi4"
+        "value": "urbex:multi4"
       },
       {
         "factor": 0.05,
-        "value": "multi5"
+        "value": "urbex:multi5"
       },
       {
         "factor": 0.07,
-        "value": "library"
+        "value": "urbex:library"
       },
       {
         "factor": 0.07,
-        "value": "center"
+        "value": "urbex:center"
       },
       {
         "factor": 0.05,
-        "value": "townhall"
+        "value": "urbex:townhall"
       },
       {
         "factor": 0.15,
-        "value": "shopping"
+        "value": "urbex:shopping"
       },
       {
         "factor": 0.12,
-        "value": "shopping_open"
+        "value": "urbex:shopping_open"
       },
       {
         "factor": 0.05,
-        "value": "huge1"
+        "value": "urbex:huge1"
       },
       {
         "factor": 0.05,
-        "value": "huge2"
+        "value": "urbex:huge2"
       }
     ],
     "bridges": [
       {
         "factor": 1.0,
-        "value": "bridge_open"
+        "value": "urbex:bridge_open"
       },
       {
         "factor": 1.0,
-        "value": "bridge_covered"
+        "value": "urbex:bridge_covered"
       }
     ],
     "fronts": [
       {
         "factor": 1.0,
-        "value": "building_front1"
+        "value": "urbex:building_front1"
       },
       {
         "factor": 1.0,
-        "value": "building_front2"
+        "value": "urbex:building_front2"
       },
       {
         "factor": 1.0,
-        "value": "building_front3"
+        "value": "urbex:building_front3"
       }
     ],
     "stairs": [
       {
         "factor": 1.0,
-        "value": "stairs1"
+        "value": "urbex:stairs1"
       },
       {
         "factor": 1.0,
-        "value": "stairs2"
+        "value": "urbex:stairs2"
       },
       {
         "factor": 1.0,
-        "value": "stairsnormal"
+        "value": "urbex:stairsnormal"
       },
       {
         "factor": 1.0,
-        "value": "stairsbig"
+        "value": "urbex:stairsbig"
       }
     ],
     "fountains": [
       {
         "factor": 1.0,
-        "value": "fountain1"
+        "value": "urbex:fountain1"
       },
       {
         "factor": 1.0,
-        "value": "fountain2"
+        "value": "urbex:fountain2"
       },
       {
         "factor": 1.0,
-        "value": "fountain3"
+        "value": "urbex:fountain3"
       }
     ],
     "parks": [
       {
         "factor": 1.0,
-        "value": "park_pool"
+        "value": "urbex:park_pool"
       },
       {
         "factor": 1.0,
-        "value": "park_plants"
+        "value": "urbex:park_plants"
       },
       {
         "factor": 1.0,
-        "value": "park_trees"
+        "value": "urbex:park_trees"
       },
       {
         "factor": 1.0,
-        "value": "park_plants_pillars"
+        "value": "urbex:park_plants_pillars"
       },
       {
         "factor": 0.8,
-        "value": "park_fountain1"
+        "value": "urbex:park_fountain1"
       },
       {
         "factor": 0.8,
-        "value": "park_fountain2"
+        "value": "urbex:park_fountain2"
       },
       {
         "factor": 0.3,
-        "value": "park_building"
+        "value": "urbex:park_building"
       },
       {
         "factor": 0.3,
-        "value": "park_building2"
+        "value": "urbex:park_building2"
       }
     ],
     "raildungeons": [
       {
         "factor": 1.0,
-        "value": "rail_dungeon1"
+        "value": "urbex:rail_dungeon1"
       },
       {
         "factor": 1.0,
-        "value": "rail_dungeon2"
+        "value": "urbex:rail_dungeon2"
       }
     ]
   }

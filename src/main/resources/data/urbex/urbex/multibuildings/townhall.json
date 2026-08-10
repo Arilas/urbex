@@ -3,12 +3,12 @@
   "dimz": 2,
   "buildings": [
     [
-      "town00",
-      "town01"
+      "urbex:town00",
+      "urbex:town01"
     ],
     [
-      "town10",
-      "town11"
+      "urbex:town10",
+      "urbex:town11"
     ]
   ]
 }

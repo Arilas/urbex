@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- **Removed the `urbex:city` dimension.** It existed for historical reasons only (it was a plain
+  overworld clone). Cities are enabled by picking a profile on the world-creation Cities tab or
+  via the `dimensionsWithProfiles` config. The sleep-on-a-special-bed teleport and its
+  `specialBedBlock` config option are gone with it, and `dimensionsWithProfiles` now defaults to
+  empty. If an existing world has this dimension generated, leave it (return to the overworld)
+  before upgrading — the dimension disappears and players still inside it will be relocated by
+  vanilla.
+- **Removed the `standard_everywhere` world style.** A backward-compatibility leftover that had
+  not been kept up to date. `standard` is the only bundled world style; with a single style the
+  world-style dropdown on the Cities tab stays hidden.
+- **The bundled datapack is now fully namespaced.** Every internal asset reference is written
+  `urbex:name` instead of relying on bare-name defaulting, and street/highway/railway/monorail
+  part wiring is declared explicitly in `worldstyles/standard` and `citystyles/citystyle_common`
+  (previously implicit Java defaults). Bare names in third-party datapacks still work and still
+  default to the `urbex` namespace. A new test enforces that every shipped reference is
+  namespaced and resolves.
+
 ## 0.1.0 — 2026-08-03 (alpha preview)
 
 First preview release. Forked from Lost Cities 9.4.2 (Fabric/26.2 port) by McJty. See

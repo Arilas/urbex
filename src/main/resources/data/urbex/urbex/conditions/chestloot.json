@@ -13,12 +13,12 @@
     {
       "factor": 20,
       "value": "urbex:chests/raildungeonchest",
-      "inpart": "rail_dungeon1"
+      "inpart": "urbex:rail_dungeon1"
     },
     {
       "factor": 20,
       "value": "urbex:chests/raildungeonchest",
-      "inpart": "rail_dungeon2"
+      "inpart": "urbex:rail_dungeon2"
     },
     {
       "factor": 1,

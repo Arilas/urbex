@@ -1,5 +1,5 @@
 {
-  "outsidestyle": "outside",
+  "outsidestyle": "urbex:outside",
   "settings": {
     "railwayavoidance": "ignore",
     "railpartheight6": 1
@@ -11,13 +11,46 @@
     "correctstylefactor": 0.8,
     "attempts": 50
   },
+  "parts": {
+    "monorails": {
+      "both": "urbex:monorails_both",
+      "vertical": "urbex:monorails_vertical",
+      "station": "urbex:monorails_station"
+    },
+    "highways": {
+      "tunnel": ["urbex:highway_tunnel"],
+      "open": ["urbex:highway_open"],
+      "bridge": ["urbex:highway_bridge"],
+      "tunnel_bi": ["urbex:highway_tunnel_bi"],
+      "open_bi": ["urbex:highway_open_bi"],
+      "bridge_bi": ["urbex:highway_bridge_bi"]
+    },
+    "railways": {
+      "stationunderground": ["urbex:station_underground"],
+      "stationopen": ["urbex:station_open"],
+      "stationopenroof": ["urbex:station_openroof"],
+      "stationundergroundstairs": ["urbex:station_underground_stairs"],
+      "stationstaircase": ["urbex:station_staircase"],
+      "stationstaircasesurface": ["urbex:station_staircase_surface"],
+      "railshorizontal": ["urbex:rails_horizontal"],
+      "railshorizontalend": ["urbex:rails_horizontal_end"],
+      "railshorizontalwater": ["urbex:rails_horizontal_water"],
+      "railsvertical": ["urbex:rails_vertical"],
+      "railsverticalwater": ["urbex:rails_vertical_water"],
+      "rails3split": ["urbex:rails_3split"],
+      "railsbend": ["urbex:rails_bend"],
+      "railsflat": ["urbex:rails_flat"],
+      "railsdown1": ["urbex:rails_down1"],
+      "railsdown2": ["urbex:rails_down2"]
+    }
+  },
   "scattered": {
     "areasize": 8,
     "chance": 0.7,
     "weightnone": 30,
     "list": [
       {
-        "name": "radiotower",
+        "name": "urbex:radiotower",
         "weight": 15,
         "maxheightdiff": 3,
         "biomes": {
@@ -29,7 +62,7 @@
         }
       },
       {
-        "name": "oilrig",
+        "name": "urbex:oilrig",
         "weight": 4,
         "maxheightdiff": 100,
         "biomes": {
@@ -39,7 +72,7 @@
         }
       },
       {
-        "name": "cabin",
+        "name": "urbex:cabin",
         "weight": 10,
         "maxheightdiff": 2,
         "biomes": {
@@ -73,7 +106,7 @@
   "citystyles": [
     {
       "factor": 0.5,
-      "citystyle": "citystyle_standard"
+      "citystyle": "urbex:citystyle_standard"
     },
     {
       "factor": 9.0,
@@ -83,7 +116,7 @@
           "minecraft:badlands"
         ]
       },
-      "citystyle": "citystyle_desert"
+      "citystyle": "urbex:citystyle_desert"
     }
   ]
 }

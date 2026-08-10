@@ -3,31 +3,31 @@
     [
       {
         "factor": 1.0,
-        "palette": "common"
+        "palette": "urbex:common"
       }
     ],
     [
       {
         "factor": 1.0,
-        "palette": "default"
+        "palette": "urbex:default"
       }
     ],
     [
       {
         "factor": 1.0,
-        "palette": "bricks_standard"
+        "palette": "urbex:bricks_standard"
       }
     ],
     [
       {
         "factor": 1.0,
-        "palette": "glass_full"
+        "palette": "urbex:glass_full"
       }
     ],
     [
       {
         "factor": 1.0,
-        "palette": "glass_side_variant_glass"
+        "palette": "urbex:glass_side_variant_glass"
       }
     ]
   ]

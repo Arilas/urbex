@@ -1,5 +1,7 @@
 {
-  "buildings": [ "radiotower" ],
+  "buildings": [
+    "urbex:radiotower"
+  ],
   "terrainheight": "highest",
   "terrainfix": "none",
   "heightoffset": -3

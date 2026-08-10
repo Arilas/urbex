@@ -1,7 +1,7 @@
 {
   "xsize": 16,
   "zsize": 16,
-  "refpalette": "rails",
+  "refpalette": "urbex:rails",
   "slices": [
     [
       "yyyyyyyyyyyyyyyy",
