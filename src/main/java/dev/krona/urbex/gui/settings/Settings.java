@@ -318,7 +318,12 @@ public final class Settings {
                 p -> (double) p.HIGHWAY_MAINPERLIN_SCALE, (p, v) -> p.HIGHWAY_MAINPERLIN_SCALE = ((Double) v).floatValue());
         r.slider("HIGHWAY_SECONDARYPERLIN_SCALE", SettingCategory.TRANSPORT, 1.0, 100.0, 0.1,
                 p -> (double) p.HIGHWAY_SECONDARYPERLIN_SCALE, (p, v) -> p.HIGHWAY_SECONDARYPERLIN_SCALE = ((Double) v).floatValue());
-        r.slider("HIGHWAY_PERLIN_FACTOR", SettingCategory.TRANSPORT, -100.0, 100.0, 0.1,
+        // Threshold compared against the highway perlin output (4-octave PerlinNoiseGenerator14,
+        // default 2.0). Bounded to a non-negative useful band: raising it makes highways rarer, and
+        // the floor of 0.0 keeps the editor from setting a value below the perlin's output range,
+        // which would make every chunk a "highway" (the worldgen scan is bounded regardless, but this
+        // keeps the pathological value out of easy reach). Fine step for precise tuning.
+        r.slider("HIGHWAY_PERLIN_FACTOR", SettingCategory.TRANSPORT, 0.0, 10.0, 0.05,
                 p -> (double) p.HIGHWAY_PERLIN_FACTOR, (p, v) -> p.HIGHWAY_PERLIN_FACTOR = ((Double) v).floatValue());
         r.number("HIGHWAY_DISTANCE_MASK", SettingCategory.TRANSPORT, 0, Integer.MAX_VALUE, true,
                 p -> (double) p.HIGHWAY_DISTANCE_MASK, (p, v) -> p.HIGHWAY_DISTANCE_MASK = (int) Math.round((Double) v));
