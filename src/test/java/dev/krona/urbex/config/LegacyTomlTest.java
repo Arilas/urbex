@@ -29,7 +29,7 @@ public class LegacyTomlTest {
     @Test
     public void readsSingleLineArrays() {
         JsonObject json = LegacyToml.toJson(List.of(
-                "\tdimensionsWithProfiles = [\"urbex:city=biosphere\", \"foo:bar=rare\"]"
+                "\tdimensionsWithProfiles = [\"minecraft:overworld=rare\", \"foo:bar=rare\"]"
         ));
         assertEquals(2, json.get("dimensionsWithProfiles").getAsJsonArray().size());
         assertEquals("foo:bar=rare", json.get("dimensionsWithProfiles").getAsJsonArray().get(1).getAsString());

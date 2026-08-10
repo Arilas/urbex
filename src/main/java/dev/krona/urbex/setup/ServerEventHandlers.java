@@ -5,7 +5,6 @@ import dev.krona.urbex.worldgen.GlobalTodo;
 import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.entity.event.v1.EntitySleepEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
@@ -13,8 +12,8 @@ import net.minecraft.server.level.ServerLevel;
 
 /**
  * The server-side Fabric event wiring. The spawn-placement algorithm lives in
- * {@link SpawnPlacement}, the special-bed teleport in {@link BedTeleport}; this class only
- * registers them. (Formerly {@code ForgeEventHandlers}, a name left over from the port.)
+ * {@link SpawnPlacement}; this class only registers it. (Formerly {@code ForgeEventHandlers},
+ * a name left over from the port.)
  */
 public class ServerEventHandlers {
 
@@ -27,7 +26,6 @@ public class ServerEventHandlers {
             cleanUp();
             Config.reset();
         });
-        EntitySleepEvents.ALLOW_SLEEPING.register(BedTeleport::onPlayerSleepInBed);
     }
 
     private static void onWorldTick(ServerLevel serverLevel) {

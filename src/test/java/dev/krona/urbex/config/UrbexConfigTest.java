@@ -20,7 +20,7 @@ public class UrbexConfigTest {
         assertEquals("", cfg.selectedProfile());
         assertTrue(cfg.avoidVillages());
         assertFalse(cfg.structuresYieldToCities());
-        assertEquals(List.of("urbex:city=biosphere"), cfg.dimensionsWithProfiles());
+        assertEquals(List.of(), cfg.dimensionsWithProfiles());
     }
 
     @Test

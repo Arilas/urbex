@@ -43,7 +43,6 @@ public class Config {
     /** The global config alone, restored when a world's overrides are dropped. */
     private static volatile UrbexConfig global = UrbexConfig.DEFAULT;
 
-    public static final Supplier<String> SPECIAL_BED_BLOCK = () -> active.specialBedBlock();
     public static final Supplier<String> SELECTED_PROFILE = () -> active.selectedProfile();
     public static final Supplier<String> SELECTED_CUSTOM_JSON = () -> active.selectedCustomJson();
     public static final Supplier<Integer> TODO_QUEUE_SIZE = () -> active.todoQueueSize();

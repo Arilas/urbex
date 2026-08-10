@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Removed the `urbex:city` dimension.** It existed for historical reasons only (it was a plain
+  overworld clone). Cities are enabled by picking a profile on the world-creation Cities tab or
+  via the `dimensionsWithProfiles` config. The sleep-on-a-special-bed teleport and its
+  `specialBedBlock` config option are gone with it, and `dimensionsWithProfiles` now defaults to
+  empty.
+
 ## 0.1.0 — 2026-08-03 (alpha preview)
 
 First preview release. Forked from Lost Cities 9.4.2 (Fabric/26.2 port) by McJty. See
