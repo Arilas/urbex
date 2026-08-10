@@ -51,6 +51,29 @@
   decoded with `RecordCodecBuilder`, which reads only the field names it's built from and never
   validates an input object's key set, so a datapack that still declares `"full"` under `parts` or
   `largeparts` has that key silently ignored rather than rejected.
+- **Removed the vine subsystem.** `ChunkFixer.generateVines` guarded all four of its wall passes on
+  the neighbouring chunk having already reached `ChunkStatus.FEATURES` — a status city generation,
+  now running at the carver stage, cannot reach there. Instrumented over the digest window: 179
+  guard evaluations, 0 passes. The subsystem has been dead code since city generation moved to the
+  carver stage (`15dba5f2`); with chunk-sized buildings most vine surface sits at exactly the border
+  this guard blocked, so what still worked before that move was already a small fraction of the
+  intent. It was also the order-dependence tracked as issue #20 (now closed): `createVineStrip`
+  wrote straight to the world instead of through the driver, so whichever neighbouring chunk
+  generated first silently decided the outcome, invisibly to `/urbex digest`. Removed rather than
+  repaired: the generation code (`generateVines`, `createVineStrip`, `vineRoll`,
+  `vineContinueRoll`), the `VINE_CHANCE` profile setting and its GUI slider, and the datapack's
+  `vinewest`/`vineeast`/`vinesouth`/`vinenorth` `WorldSettings` fields are all gone. This is not a
+  breaking change for third-party datapacks: `WorldSettings` is decoded with `RecordCodecBuilder`,
+  the same construction confirmed above for `StreetParts`, which reads only the field names it's
+  built from and never validates an input object's key set — a datapack that still declares
+  `vinewest` (or its siblings) under `settings` has that key silently ignored rather than rejected.
+  A building asset can already paint vines directly into its own design through the ordinary block
+  palette, which accepts any block state at any position in the footprint including the border
+  columns, so an asset can reserve a margin inside itself to hang them in — strictly more expressive
+  than the system it replaces, which offered a single chance for the whole world and only four fixed
+  vine-facing states. Because the guard never fired within the profiled generation window, this
+  removal does not itself move block placement in already-generated chunks; as always, the mod makes
+  no promise that a world regenerates identically after an update.
 - **Worlds generate differently past the already-generated chunk border, again.** As with `0.1.0`,
   this is expected and permitted: the mod makes no promise that an existing world regenerates
   identically after an update, and the road field changes what every city chunk resolves to.

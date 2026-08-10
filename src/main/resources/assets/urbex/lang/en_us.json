@@ -117,8 +117,6 @@
   "urbex.section.advanced.visuals.desc": "Client-side horizon and fog tuning; no effect on generation.",
   "urbex.setting.DEBRIS_TO_NEARBYCHUNK_FACTOR": "Debris To Nearbychunk Factor",
   "urbex.setting.DEBRIS_TO_NEARBYCHUNK_FACTOR.tooltip": "A factor that determines how much debris will overflow from nearby damaged chunks. Bigger numbers mean less debris",
-  "urbex.setting.VINE_CHANCE": "Vine Chance",
-  "urbex.setting.VINE_CHANCE.tooltip": "The chance that a block on the outside of a building will be covered with a vine",
   "urbex.setting.CHANCE_OF_RANDOM_LEAFBLOCKS": "Chance Of Random Leafblocks",
   "urbex.setting.CHANCE_OF_RANDOM_LEAFBLOCKS.tooltip": "Chance that leafblocks will be generated at the border of a building and a street",
   "urbex.setting.THICKNESS_OF_RANDOM_LEAFBLOCKS": "Thickness Of Random Leafblocks",

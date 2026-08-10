@@ -262,10 +262,8 @@ public final class Settings {
         r.slider("PARK_STREET_THRESHOLD", SettingCategory.BUILDINGS, 0, 8, 1,
                 p -> (double) p.PARK_STREET_THRESHOLD, (p, v) -> p.PARK_STREET_THRESHOLD = (int) Math.round((Double) v));
 
-        // Overgrowth and debris: vines, stray leaf blocks, the scattered-structure multiplier and the rubble layer.
+        // Overgrowth and debris: stray leaf blocks, the scattered-structure multiplier and the rubble layer.
         r.section("foliage");
-        r.slider("VINE_CHANCE", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
-                p -> (double) p.VINE_CHANCE, (p, v) -> p.VINE_CHANCE = ((Double) v).floatValue());
         r.slider("CHANCE_OF_RANDOM_LEAFBLOCKS", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
                 p -> (double) p.CHANCE_OF_RANDOM_LEAFBLOCKS, (p, v) -> p.CHANCE_OF_RANDOM_LEAFBLOCKS = ((Double) v).floatValue());
         r.slider("THICKNESS_OF_RANDOM_LEAFBLOCKS", SettingCategory.BUILDINGS, 1, 8, 1,

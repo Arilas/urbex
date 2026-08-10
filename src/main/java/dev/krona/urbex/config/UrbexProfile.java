@@ -41,7 +41,6 @@ public class UrbexProfile {
     private String BASE_BLOCK = "minecraft:stone";
     private BlockState baseBlock = null;
 
-    public float VINE_CHANCE = 0.009f;
     public float CHANCE_OF_RANDOM_LEAFBLOCKS = .1f;
     public int THICKNESS_OF_RANDOM_LEAFBLOCKS = 2;
     public boolean AVOID_FOLIAGE = false;
@@ -330,7 +329,6 @@ public class UrbexProfile {
         TERRAIN_FIX_UPPER_MIN_OFFSET = cfg.getInt("terrainFixUpperMinOffset", UrbexProfile.CATEGORY_CITY_ID, TERRAIN_FIX_UPPER_MIN_OFFSET, -40, 40, "To fix terrain adjacent to cities, this is the minimum offset (relative to city base level) for the upper mesh used to potentially lower the terrain");
         TERRAIN_FIX_UPPER_MAX_OFFSET = cfg.getInt("terrainFixUpperMaxOffset", UrbexProfile.CATEGORY_CITY_ID, TERRAIN_FIX_UPPER_MAX_OFFSET, -40, 40, "To fix terrain adjacent to cities, this is the maximum offset (relative to city base level) for the upper mesh used to potentially lower the terrain");
 
-        VINE_CHANCE = cfg.getFloat("vineChance", UrbexProfile.CATEGORY_CITY_ID, VINE_CHANCE, 0.0f, 1.0f, "The chance that a block on the outside of a building will be covered with a vine");
         CHANCE_OF_RANDOM_LEAFBLOCKS = cfg.getFloat("randomLeafBlockChance", UrbexProfile.CATEGORY_CITY_ID, CHANCE_OF_RANDOM_LEAFBLOCKS, 0.0f, 1.0f, "Chance that leafblocks will be generated at the border of a building and a street");
         THICKNESS_OF_RANDOM_LEAFBLOCKS = cfg.getInt("randomLeafBlockThickness", UrbexProfile.CATEGORY_CITY_ID, THICKNESS_OF_RANDOM_LEAFBLOCKS, 1, 8,
                 "Frequency of leafblocks as seen from the sides of buildings");

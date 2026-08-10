@@ -45,11 +45,11 @@ public class ChunkDriver {
     // off entirely.
     //
     // What this does NOT cover: writes this mod makes straight to the world, bypassing the
-    // driver. Those are invisible here and so invisible to the digest. Today that is the vine
-    // generation in ChunkFixer (world.setBlock in createVineStrip) and the post-todo callbacks
-    // run out of BuildingInfo.getPostTodo, which write through the WorldGenLevel. Any
-    // order-dependence on those paths is structurally unobservable to /urbex digest - see issue
-    // #20 for the vine case, which is known to be order-dependent and cannot be caught here.
+    // driver. Those are invisible here and so invisible to the digest. Today that is the
+    // post-todo callbacks run out of BuildingInfo.getPostTodo, which write through the
+    // WorldGenLevel. The gate introduced in Task 4 covers the residual risk from the other side:
+    // a post-todo write that ever crossed a chunk boundary would resolve the neighbour through
+    // getChunk and be counted.
     //
     // Each touched position is recorded together with the state the driver last wrote there.
     // A position written three times contributes its last state once, so the internal path by

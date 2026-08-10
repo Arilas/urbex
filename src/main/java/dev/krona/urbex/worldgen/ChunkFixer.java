@@ -1,16 +1,9 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
-import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.WorldGenLevel;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 public class ChunkFixer {
 
@@ -21,132 +14,11 @@ public class ChunkFixer {
         info.clearPostTodo();
     }
 
-    private static void generateVines(ChunkCoord coord, LevelAccessor world, IDimensionInfo provider) {
-        long seed = provider.getSeed();
-        float vineChance = provider.getProfile().VINE_CHANCE;
-        if (vineChance < 0.000001) {
-            return;
-        }
-        int chunkX = coord.chunkX();
-        int chunkZ = coord.chunkZ();
-        int cx = chunkX << 4;
-        int cz = chunkZ << 4;
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-
-        int maxHeight = info.getMaxHeight();
-
-        WorldStyle worldStyle = provider.getWorldStyle();
-        WorldSettings worldSettings = worldStyle.getWorldSettings();
-        if (info.hasBuilding) {
-            if (world.getChunk(coord.chunkX() + 1, coord.chunkZ()).getPersistedStatus().isOrAfter(ChunkStatus.FEATURES)) {
-                BuildingInfo adjacent = info.getXmax();
-                int bottom = Math.max(adjacent.getCityGroundLevel() + 3, adjacent.hasBuilding ? adjacent.getMaxHeight() : (adjacent.getCityGroundLevel() + 3));
-                BlockState state = worldSettings.vineWest();
-                for (int z = 0; z < 15; z++) {
-                    for (int y = bottom; y < maxHeight; y++) {
-                        if (vineRoll(seed, cx + 16, y, cz + z, Rng.Purpose.VINES) < vineChance) {
-                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + 16, y, cz + z), new BlockPos(cx + 15, y, cz + z));
-                        }
-                    }
-                }
-            }
-        }
-        if (info.getXmax().hasBuilding) {
-            if (world.getChunk(chunkX + 1, chunkZ).getPersistedStatus().isOrAfter(ChunkStatus.FEATURES)) {
-                BuildingInfo adjacent = info.getXmax();
-                int bottom = Math.max(info.getCityGroundLevel() + 3, info.hasBuilding ? maxHeight : (info.getCityGroundLevel() + 3));
-                BlockState state = worldSettings.vineEast();
-                for (int z = 0; z < 15; z++) {
-                    for (int y = bottom; y < (adjacent.getMaxHeight()); y++) {
-                        if (vineRoll(seed, cx + 15, y, cz + z, Rng.Purpose.VINES_EAST) < vineChance) {
-                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + 15, y, cz + z), new BlockPos(cx + 16, y, cz + z));
-                        }
-                    }
-                }
-            }
-        }
-
-        if (info.hasBuilding) {
-            if (world.getChunk(chunkX, chunkZ + 1).getPersistedStatus().isOrAfter(ChunkStatus.FEATURES)) {
-                BuildingInfo adjacent = info.getZmax();
-                int bottom = Math.max(adjacent.getCityGroundLevel() + 3, adjacent.hasBuilding ? adjacent.getMaxHeight() : (adjacent.getCityGroundLevel() + 3));
-                BlockState state = worldSettings.vineNorth();
-                for (int x = 0; x < 15; x++) {
-                    for (int y = bottom; y < maxHeight; y++) {
-                        if (vineRoll(seed, cx + x, y, cz + 16, Rng.Purpose.VINES_NORTH) < vineChance) {
-                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + x, y, cz + 16), new BlockPos(cx + x, y, cz + 15));
-                        }
-                    }
-                }
-            }
-        }
-        if (info.getZmax().hasBuilding) {
-            if (world.getChunk(chunkX, chunkZ + 1).getPersistedStatus().isOrAfter(ChunkStatus.FEATURES)) {
-                BuildingInfo adjacent = info.getZmax();
-                int bottom = Math.max(info.getCityGroundLevel() + 3, info.hasBuilding ? maxHeight : (info.getCityGroundLevel() + 3));
-                BlockState state = worldSettings.vineSouth();
-                for (int x = 0; x < 15; x++) {
-                    for (int y = bottom; y < (adjacent.getMaxHeight()); y++) {
-                        if (vineRoll(seed, cx + x, y, cz + 15, Rng.Purpose.VINES_SOUTH) < vineChance) {
-                            createVineStrip(seed, world, bottom, state, new BlockPos(cx + x, y, cz + 15), new BlockPos(cx + x, y, cz + 16));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /**
-     * Whether a vine starts here. Addressed by the block it would hang at, so it does not matter
-     * which chunk of a wall the loop reaches first, or how many blocks it looked at before.
-     * <p>
-     * Each of the four wall passes carries its own purpose. The bounds on the loops keep five of
-     * the six pass pairs on disjoint blocks, but not the west pass and the north pass: block
-     * {@code (16a, y, 16b)} is the west pass of chunk {@code (a-1, b)} and the north pass of chunk
-     * {@code (a, b-1)}. Under one purpose those two are the identical roll, so at every chunk's
-     * NW corner column the two facings could never disagree and whichever chunk generated first
-     * decided both. Split the same way {@code VEGETATION_XMAX} and friends were split off
-     * {@code VEGETATION}.
-     */
-    private static float vineRoll(long seed, int x, int y, int z, Rng.Purpose purpose) {
-        return Rng.floatAtPos(seed, x, y, z, purpose);
-    }
-
-    /**
-     * Whether a strip already running continues through this block. A separate purpose from
-     * {@link #vineRoll}: the two ask about the same block, and against thresholds far apart
-     * (vineChance against 0.8), so one address would mean a strip could never stop where a strip
-     * would have started.
-     */
-    private static float vineContinueRoll(long seed, int x, int y, int z) {
-        return Rng.floatAtPos(seed, x, y, z, Rng.Purpose.VINES_CONTINUE);
-    }
-
-    private static void createVineStrip(long seed, LevelAccessor world, int bottom, BlockState state, BlockPos pos, BlockPos vineHolderPos) {
-        if (world.isEmptyBlock(vineHolderPos)) {
-            return;
-        }
-        if (!world.isEmptyBlock(pos)) {
-            return;
-        }
-        world.setBlock(pos, state, 0);
-        pos = pos.below();
-        while (pos.getY() >= bottom && vineContinueRoll(seed, pos.getX(), pos.getY(), pos.getZ()) < .8f) {
-            if (!world.isEmptyBlock(pos)) {
-                return;
-            }
-            world.setBlock(pos, state, 0);
-            pos = pos.below();
-        }
-    }
-
-
-    /**
-     * The region, not {@code info.getWorld()}: both the vines and the post-todos read and write
-     * blocks, and only the region generating this chunk is guaranteed to have the chunks they touch.
+     * The region, not {@code info.getWorld()}: the post-todos read and write blocks, and only the
+     * region generating this chunk is guaranteed to have the chunks they touch.
      */
     public static void fix(IDimensionInfo info, ChunkCoord coord, WorldGenLevel region) {
-        generateVines(coord, region, info);
         executePostTodo(coord, info, region);
     }
 }

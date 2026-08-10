@@ -22,11 +22,11 @@ import dev.krona.urbex.worldgen.DigestRunner;
  * different orders must produce the same value.
  * <p>
  * It does <em>not</em> cover writes that bypass the driver and go straight to the world - today
- * the vine generation in {@code ChunkFixer} and the post-todo callbacks in
- * {@code CityGenerator}, both of which call {@code setBlock} on the level. Those blocks
- * are never recorded, so order-dependence on those paths cannot be detected by this command at
- * all. Treat a matching DRIVERDIGEST as evidence about the driven paths only. Issue #20 tracks a
- * known order-dependence on the vine path that this command is structurally blind to.
+ * the post-todo callbacks in {@code CityGenerator}, which call {@code setBlock} on the level.
+ * Those blocks are never recorded, so order-dependence on that path cannot be detected by this
+ * command at all. Treat a matching DRIVERDIGEST as evidence about the driven paths only. The gate
+ * introduced in Task 4 covers the residual risk from the other side: a post-todo write that ever
+ * crossed a chunk boundary would resolve the neighbour through {@code getChunk} and be counted.
  * <p>
  * {@code DIGEST} hashes every non-air block in every chunk. It is kept as a loose tripwire only.
  * It cannot be used as an acceptance signal, because it also hashes vanilla's ore blobs and
