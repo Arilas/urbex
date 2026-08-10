@@ -1,9 +1,9 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LandscapeType;
+import dev.krona.urbex.config.MultiBuildingStreetConflict;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.plan.EffectiveRoad;
-import dev.krona.urbex.plan.Hash;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
@@ -19,6 +19,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -474,88 +477,84 @@ class ChunkContentResolverTest {
      * Therefore querying roads first or multibuildings first cannot change either answer. This is
      * pinned by a test, not just documented."
      * <p>
-     * Drives the real {@link GridRoadField}, the real {@link EffectiveRoad#resolve}, and the real
-     * {@link dev.krona.urbex.config.MultiBuildingStreetConflict#roadBlocks} rule - the three pieces
-     * the claim is actually about - over a range of chunks, in two evaluation orders. What is out of
-     * reach here is {@link MultiChunk}'s own random building <em>selection</em>, which needs a
-     * datapack-loaded level ({@code AssetRegistries} resolves through {@code CommonLevelAccessor});
-     * {@code ChunkContentResolverTest} deliberately keeps that machinery out (see the class javadoc).
-     * What is reused verbatim instead is {@code MultiChunk.canPlaceBuilding}'s own conflict
-     * <em>rule</em> - {@code MULTI_BUILDING_STREET_CONFLICT.roadBlocks(rawRoad)} against the raw
-     * field, never {@code BuildingInfo}/{@code effectiveRoad} - which is the one piece the
-     * cycle-freedom claim is actually about: a multi-building's acceptance must never be able to
-     * read back a decision the content resolver made.
-     * <p>
-     * {@code isCityRaw} and "this chunk anchors a multi-building footprint" are stood in for with a
-     * deterministic hash rather than the real terrain/city machinery. That changes nothing about
-     * what is under test: cycle-freedom is a claim about whether <em>order</em> can move the answer,
-     * not about what the answer is for any particular chunk.
+     * An order-permutation test over {@link GridRoadField}/{@link EffectiveRoad}/
+     * {@link ChunkContentResolver} was tried first here and rejected on review: all three are
+     * final, field-free, static-only or otherwise stateless, so no permutation of calls into them
+     * can ever disagree with itself - what such a test checks is referential transparency, not
+     * cycle-freedom, and {@code GridRoadFieldTest.queryOrderCannotChangeTheAnswer} already pins
+     * {@link GridRoadField}'s own order-independence far more strongly, over 6,400 real
+     * {@code at()} calls in shuffled order. What actually keeps the design acyclic is a fact about
+     * {@link MultiChunk}'s <em>source</em>, not about any pure function's output, so that is what
+     * is pinned instead:
+     * <ol>
+     *   <li>{@link #multiBuildingAcceptanceWouldDifferIfItReadTheEffectiveRoadInsteadOfTheRawOne}
+     *       shows the substitution the structural guard below forbids is not a no-op - there
+     *       really are chunks in range where
+     *       {@code MULTI_BUILDING_STREET_CONFLICT.roadBlocks} disagrees between the raw and the
+     *       effective road, using the real {@link GridRoadField} and the real
+     *       {@link EffectiveRoad#resolve};</li>
+     *   <li>{@link #multiChunkReadsTheRawRoadFieldNotTheEffectiveOne} pins {@link MultiChunk}'s
+     *       actual source text: it must call {@code roadField().typeAt(...)} and must never call
+     *       {@code BuildingInfo.getEffectiveRoadType(...)} - the one substitution that would
+     *       create the real cycle the comment at {@code MultiChunk.java}'s raw-road read guards
+     *       by hand: multi-building acceptance depending on a content decision that itself
+     *       depends on multi-building acceptance.</li>
+     * </ol>
+     * {@code MultiChunk}'s own random building <em>selection</em> stays out of reach either way -
+     * it needs a datapack-loaded level ({@code AssetRegistries} resolves through
+     * {@code CommonLevelAccessor}, and {@code NullDimensionInfo.getWorld()} is {@code null}) that
+     * this suite deliberately keeps out (see the class javadoc). Both tests below reuse the real
+     * conflict <em>rule</em>, {@code MULTI_BUILDING_STREET_CONFLICT.roadBlocks}, rather than
+     * reimplementing it, and the second reads {@code MultiChunk}'s own file rather than asserting
+     * anything about its behaviour indirectly.
      */
     @Nested
     class CycleFreedom {
 
         @Test
-        void queryingTheRoadFieldFirstAgreesWithQueryingMultiBuildingAcceptanceFirstOverARangeOfChunks() {
+        void multiBuildingAcceptanceWouldDifferIfItReadTheEffectiveRoadInsteadOfTheRawOne() {
             GridRoadField roadField = new GridRoadField(1337L, "urbex:test", GridSettings.defaults());
-            UrbexProfile profile = profileWithBuildingChance(0.5f);
+            MultiBuildingStreetConflict conflict = profileWithBuildingChance(0.5f).MULTI_BUILDING_STREET_CONFLICT;
 
+            int divergences = 0;
             for (int x = -40; x < 40; x++) {
                 for (int z = -40; z < 40; z++) {
                     boolean isCity = Math.floorMod(x * 7 + z * 13, 3) != 0;
-                    boolean anchorsMulti = Math.floorMod(x * 11 - z * 5, 9) == 0;
-
-                    // Order A: the road field, raw then effective, resolved before multi-building
-                    // acceptance is even asked about.
-                    RoadType rawA = roadField.typeAt(x, z);
-                    RoadType effectiveA = EffectiveRoad.resolve(rawA, isCity, isCity, false);
-                    MultiPos sectionA = multiSection(roadField, profile, x, z, anchorsMulti);
-                    boolean verdictA = ChunkContentResolver.couldHaveBuilding(profile, isCity, sectionA, 0,
-                            new XoroshiroRandomSource(seedFor(x, z)), factsWithRoad(effectiveA));
-
-                    // Order B: multi-building acceptance resolved first; the road field is not
-                    // touched again until couldHaveBuilding's own chain would reach it.
-                    MultiPos sectionB = multiSection(roadField, profile, x, z, anchorsMulti);
-                    RoadType rawB = roadField.typeAt(x, z);
-                    RoadType effectiveB = EffectiveRoad.resolve(rawB, isCity, isCity, false);
-                    boolean verdictB = ChunkContentResolver.couldHaveBuilding(profile, isCity, sectionB, 0,
-                            new XoroshiroRandomSource(seedFor(x, z)), factsWithRoad(effectiveB));
-
-                    assertEquals(rawA, rawB, "the raw road answer must not depend on query order at " + x + "," + z);
-                    assertEquals(effectiveA, effectiveB,
-                            "the effective road answer must not depend on query order at " + x + "," + z);
-                    assertEquals(sectionA, sectionB,
-                            "multi-building acceptance must not depend on query order at " + x + "," + z);
-                    assertEquals(verdictA, verdictB,
-                            "the content decision must not depend on query order at " + x + "," + z);
+                    RoadType raw = roadField.typeAt(x, z);
+                    RoadType effective = EffectiveRoad.resolve(raw, isCity, isCity, false);
+                    if (conflict.roadBlocks(raw) != conflict.roadBlocks(effective)) {
+                        divergences++;
+                    }
                 }
             }
+            assertTrue(divergences > 0,
+                    "expected the raw and effective road to disagree on whether a multi-building "
+                            + "conflicts somewhere in range - otherwise MultiChunk reading raw instead of "
+                            + "effective would be an arbitrary choice, not a load-bearing one, and the "
+                            + "structural guard below would be pinning nothing that matters");
         }
 
-        private static long seedFor(int x, int z) {
-            return Hash.at(1337L, x, z, 0L);
+        @Test
+        void multiChunkReadsTheRawRoadFieldNotTheEffectiveOne() throws IOException {
+            Path file = Path.of("src/main/java/dev/krona/urbex/worldgen/lost/MultiChunk.java");
+            String source = stripComments(Files.readString(file));
+            assertTrue(source.contains("roadField().typeAt("),
+                    "MultiChunk must read the raw road field via roadField().typeAt(...)");
+            assertFalse(source.contains("getEffectiveRoadType"),
+                    "MultiChunk must never call BuildingInfo.getEffectiveRoadType(...) - doing so would "
+                            + "make multi-building acceptance depend on a content decision that itself "
+                            + "depends on multi-building acceptance");
         }
 
         /**
-         * {@code MultiChunk.canPlaceBuilding}'s real conflict rule, reading the raw field exactly as
-         * it does - never {@code BuildingInfo}/{@code effectiveRoad}, which is the one thing that
-         * keeps this acyclic.
+         * Comments are stripped before searching, not just the code: the guarded-against read is
+         * itself named in a comment right next to the real one ("The RAW road, never
+         * BuildingInfo.getEffectiveRoadType()."), so a plain substring search over the raw file
+         * would trip on its own warning.
          */
-        private static MultiPos multiSection(GridRoadField roadField, UrbexProfile profile, int x, int z,
-                                             boolean anchorsMulti) {
-            if (!anchorsMulti) {
-                return MultiPos.SINGLE;
-            }
-            RoadType raw = roadField.typeAt(x, z);
-            if (profile.MULTI_BUILDING_STREET_CONFLICT.roadBlocks(raw)) {
-                return MultiPos.SINGLE;
-            }
-            return new MultiPos(0, 0, 1, 1);
-        }
-
-        private static ChunkContentResolver.ChunkFacts factsWithRoad(RoadType road) {
-            return new ChunkContentResolver.ChunkFacts(
-                    () -> false, () -> false, TestProfiles::cityStyle, () -> road,
-                    () -> false, () -> 0, () -> false, () -> Railway.RailChunkInfo.NOTHING, () -> 0f);
+        private static String stripComments(String source) {
+            String withoutBlockComments = source.replaceAll("(?s)/\\*.*?\\*/", "");
+            return withoutBlockComments.replaceAll("//[^\n]*", "");
         }
     }
 }
