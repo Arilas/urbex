@@ -25,19 +25,23 @@ import java.util.function.Function;
  * </ul>
  *
  * <p>{@link #min}, {@link #max}, {@link #step} and {@link #logScale} are only meaningful for {@link ControlKind#SLIDER};
- * other kinds pass {@code 0} bounds. A {@code logScale} slider must have {@code min > 0}.</p>
+ * other kinds pass {@code 0} bounds. A {@code logScale} slider must have {@code min > 0}. {@link #integerOnly} is
+ * only meaningful for {@link ControlKind#NUMBER} (whether the typed box accepts decimals); every other kind passes
+ * {@code false}.</p>
  *
- * @param key       the backing {@code UrbexProfile} public field name; also the lang-key suffix
- *                  ({@code urbex.setting.<key>} and {@code urbex.setting.<key>.tooltip}).
- * @param category  the tab this descriptor lives under; each field is described by exactly one descriptor
- *                  (no duplicates), so a curated few carry {@link SettingCategory#GENERAL} as their real home.
- * @param kind      the control to render.
- * @param min       slider lower bound (mined from the {@code UrbexProfile.init} min argument).
- * @param max       slider upper bound (mined from the {@code UrbexProfile.init} max argument).
- * @param step      slider increment.
- * @param logScale  {@code true} for logarithmic sliders (the chance fields); requires {@code min > 0}.
- * @param getter    reads the boxed current value from a profile.
- * @param setter    writes a boxed value back into a profile.
+ * @param key         the backing {@code UrbexProfile} public field name; also the lang-key suffix
+ *                    ({@code urbex.setting.<key>} and {@code urbex.setting.<key>.tooltip}).
+ * @param category    the tab this descriptor lives under; each field is described by exactly one descriptor
+ *                    (no duplicates), so a curated few carry {@link SettingCategory#GENERAL} as their real home.
+ * @param kind        the control to render.
+ * @param min         slider lower bound (mined from the {@code UrbexProfile.init} min argument).
+ * @param max         slider upper bound (mined from the {@code UrbexProfile.init} max argument).
+ * @param step        slider increment.
+ * @param logScale    {@code true} for logarithmic sliders (the chance fields); requires {@code min > 0}.
+ * @param integerOnly {@code true} for a {@link ControlKind#NUMBER} descriptor backing an {@code int} field, so the
+ *                    typed box rejects decimals; ignored by every other kind.
+ * @param getter      reads the boxed current value from a profile.
+ * @param setter      writes a boxed value back into a profile.
  */
 public record SettingDescriptor(
         String key,
@@ -47,6 +51,7 @@ public record SettingDescriptor(
         double max,
         double step,
         boolean logScale,
+        boolean integerOnly,
         Function<UrbexProfile, Object> getter,
         BiConsumer<UrbexProfile, Object> setter
 ) {

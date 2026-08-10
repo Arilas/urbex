@@ -20,6 +20,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.util.Mth;
 
+import java.math.BigDecimal;
 import java.util.Locale;
 
 /**
@@ -45,6 +46,7 @@ public final class SettingControls {
             case TOGGLE -> createToggle(d, target, onChanged, width);
             case CYCLE -> createCycle(d, target, onChanged, width);
             case TEXT -> createText(d, target, onChanged, width);
+            case NUMBER -> createNumber(d, target, onChanged, width);
         };
     }
 
@@ -389,6 +391,73 @@ public final class SettingControls {
         LabeledTextField field = new LabeledTextField(font, label, box, width, HEIGHT);
         field.setTooltip(Tooltip.create(Component.translatable(d.tooltipKey())));
         return field;
+    }
+
+    // ---- NUMBER ---------------------------------------------------------
+
+    /**
+     * A typed numeric field for open-ended values a slider cannot honestly express. It reuses the same
+     * {@link LabeledTextField} composite as {@link ControlKind#TEXT} (label left, editable box right), but the
+     * box holds a number: the current value is formatted in, and every edit parses back to a {@link Double}
+     * (the Task 4 boxing convention shared with sliders) before the descriptor's setter narrows it to the
+     * field's real type. Non-numeric or partial input (empty, a lone sign, letters) is rejected — the setter is
+     * simply not called, so the field keeps its last valid value. {@link SettingDescriptor#integerOnly()} makes
+     * an {@code int}-backed field reject decimals as well.
+     */
+    private static AbstractWidget createNumber(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+        Font font = Minecraft.getInstance().font;
+        boolean integerOnly = d.integerOnly();
+        double initialValue = (Double) d.getter().apply(target);
+
+        Component label = Component.translatable(d.nameKey());
+        EditBox box = new EditBox(font, 0, 0, width, HEIGHT, label);
+        // Room for large distances/attempt counts and long decimals without silent truncation.
+        box.setMaxLength(32);
+        box.setValue(formatNumber(initialValue, integerOnly));
+        box.setResponder(text -> {
+            Double parsed = parseNumber(text, integerOnly);
+            if (parsed != null) {
+                d.setter().accept(target, parsed);
+                onChanged.run();
+            }
+            // else: unparseable or partial input — keep the last valid value (do not write the field).
+        });
+
+        LabeledTextField field = new LabeledTextField(font, label, box, width, HEIGHT);
+        field.setTooltip(Tooltip.create(Component.translatable(d.tooltipKey())));
+        return field;
+    }
+
+    /** Formats the current value for the box: integers without a fraction, decimals trimmed of trailing zeros. */
+    private static String formatNumber(double value, boolean integerOnly) {
+        if (integerOnly) {
+            return Long.toString(Math.round(value));
+        }
+        if (value == Math.rint(value) && !Double.isInfinite(value)) {
+            return Long.toString((long) value);
+        }
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * Parses the box text to a boxed {@link Double}, or {@code null} when the text is not a complete number the
+     * setter can accept. {@code integerOnly} fields reject any fractional part (so "3.5" into an {@code int}
+     * field is refused rather than silently rounded); decimal fields accept any finite value.
+     */
+    private static Double parseNumber(String text, boolean integerOnly) {
+        String trimmed = text.strip();
+        if (trimmed.isEmpty() || trimmed.equals("-") || trimmed.equals("+")) {
+            return null;
+        }
+        try {
+            if (integerOnly) {
+                return (double) Long.parseLong(trimmed);
+            }
+            double parsed = Double.parseDouble(trimmed);
+            return (Double.isNaN(parsed) || Double.isInfinite(parsed)) ? null : parsed;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**

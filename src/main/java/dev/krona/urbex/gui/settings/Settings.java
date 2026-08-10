@@ -33,14 +33,26 @@ public final class Settings {
     private static SettingDescriptor slider(String key, SettingCategory cat, double min, double max, double step,
                                             Function<UrbexProfile, Object> getter,
                                             BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, ControlKind.SLIDER, min, max, step, false, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.SLIDER, min, max, step, false, false, getter, setter);
     }
 
     /** A logarithmic slider (min &gt; 0) for the chance knobs where 0.0001 and 0.001 must be distinguishable. */
     private static SettingDescriptor logSlider(String key, SettingCategory cat, double min, double max, double step,
                                                Function<UrbexProfile, Object> getter,
                                                BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, ControlKind.SLIDER, min, max, step, true, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.SLIDER, min, max, step, true, false, getter, setter);
+    }
+
+    /**
+     * A typed numeric field for genuinely open-ended values a slider cannot honestly express: noise scales with
+     * no natural maximum, million-block distances, huge attempt counts, or a power-of-two bit mask. Values box as
+     * {@link Double} exactly like {@link #slider}; {@code integerOnly} makes the box reject decimals for
+     * {@code int}-backed fields.
+     */
+    private static SettingDescriptor number(String key, SettingCategory cat, boolean integerOnly,
+                                            Function<UrbexProfile, Object> getter,
+                                            BiConsumer<UrbexProfile, Object> setter) {
+        return new SettingDescriptor(key, cat, ControlKind.NUMBER, 0, 0, 0, false, integerOnly, getter, setter);
     }
 
     /**
@@ -51,25 +63,25 @@ public final class Settings {
     private static SettingDescriptor chancePerlin(String key, SettingCategory cat, double min, double max, double step,
                                                   Function<UrbexProfile, Object> getter,
                                                   BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, ControlKind.CHANCE_PERLIN, min, max, step, true, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.CHANCE_PERLIN, min, max, step, true, false, getter, setter);
     }
 
     private static SettingDescriptor toggle(String key, SettingCategory cat,
                                             Function<UrbexProfile, Object> getter,
                                             BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, ControlKind.TOGGLE, 0, 0, 0, false, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.TOGGLE, 0, 0, 0, false, false, getter, setter);
     }
 
     private static SettingDescriptor cycle(String key, SettingCategory cat,
                                            Function<UrbexProfile, Object> getter,
                                            BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, ControlKind.CYCLE, 0, 0, 0, false, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.CYCLE, 0, 0, 0, false, false, getter, setter);
     }
 
     private static SettingDescriptor text(String key, SettingCategory cat,
                                           Function<UrbexProfile, Object> getter,
                                           BiConsumer<UrbexProfile, Object> setter) {
-        return new SettingDescriptor(key, cat, ControlKind.TEXT, 0, 0, 0, false, getter, setter);
+        return new SettingDescriptor(key, cat, ControlKind.TEXT, 0, 0, 0, false, false, getter, setter);
     }
 
     private static List<SettingDescriptor> buildAll() {
@@ -104,17 +116,20 @@ public final class Settings {
 
         // ---- CITIES ---------------------------------------------------------
         // City placement thresholds, per-level heights and spawn distances. (Chance and radii live in GENERAL.)
-        all.add(slider("CITY_PERLIN_SCALE", SettingCategory.CITIES, -1000000, 1000000, 0.1,
+        // Open-ended noise parameters: CityRarityMap multiplies coordinates by these (getValue(cx/scale, ...)
+        // * innerScale - offset), so there is no natural maximum a slider could pin. Typed fields instead.
+        all.add(number("CITY_PERLIN_SCALE", SettingCategory.CITIES, false,
                 p -> p.CITY_PERLIN_SCALE, (p, v) -> p.CITY_PERLIN_SCALE = (Double) v));
-        all.add(slider("CITY_PERLIN_INNERSCALE", SettingCategory.CITIES, -1000000, 1000000, 0.1,
+        all.add(number("CITY_PERLIN_INNERSCALE", SettingCategory.CITIES, false,
                 p -> p.CITY_PERLIN_INNERSCALE, (p, v) -> p.CITY_PERLIN_INNERSCALE = (Double) v));
-        all.add(slider("CITY_PERLIN_OFFSET", SettingCategory.CITIES, -1000000, 1000000, 0.1,
+        all.add(number("CITY_PERLIN_OFFSET", SettingCategory.CITIES, false,
                 p -> p.CITY_PERLIN_OFFSET, (p, v) -> p.CITY_PERLIN_OFFSET = (Double) v));
         all.add(slider("CITY_THRESHOLD", SettingCategory.CITIES, 0.0, 1.0, 0.01,
                 p -> (double) p.CITY_THRESHOLD, (p, v) -> p.CITY_THRESHOLD = ((Double) v).floatValue()));
-        all.add(slider("CITY_SPAWN_DISTANCE1", SettingCategory.CITIES, 0, 10000000, 1,
+        // Block distances up to millions (0 = disabled); a slider would pin the default (0) uselessly.
+        all.add(number("CITY_SPAWN_DISTANCE1", SettingCategory.CITIES, true,
                 p -> (double) p.CITY_SPAWN_DISTANCE1, (p, v) -> p.CITY_SPAWN_DISTANCE1 = (int) Math.round((Double) v)));
-        all.add(slider("CITY_SPAWN_DISTANCE2", SettingCategory.CITIES, 0, 10000000, 1,
+        all.add(number("CITY_SPAWN_DISTANCE2", SettingCategory.CITIES, true,
                 p -> (double) p.CITY_SPAWN_DISTANCE2, (p, v) -> p.CITY_SPAWN_DISTANCE2 = (int) Math.round((Double) v)));
         all.add(slider("CITY_SPAWN_MULTIPLIER1", SettingCategory.CITIES, 0.0, 1.0, 0.01,
                 p -> p.CITY_SPAWN_MULTIPLIER1, (p, v) -> p.CITY_SPAWN_MULTIPLIER1 = (Double) v));
@@ -140,9 +155,11 @@ public final class Settings {
                 p -> (double) p.CITY_LEVEL6_HEIGHT, (p, v) -> p.CITY_LEVEL6_HEIGHT = (int) Math.round((Double) v)));
         all.add(slider("CITY_LEVEL7_HEIGHT", SettingCategory.CITIES, 1, 384, 1,
                 p -> (double) p.CITY_LEVEL7_HEIGHT, (p, v) -> p.CITY_LEVEL7_HEIGHT = (int) Math.round((Double) v)));
-        all.add(slider("CITY_MINHEIGHT", SettingCategory.CITIES, -1024, 2048, 1,
+        // Gate on the terrain heightmap in City.getCityFactor; the config ceiling (-1024..2048) is far past any
+        // real world Y. Tightened to the vanilla buildable range so the handle tracks meaningful heights.
+        all.add(slider("CITY_MINHEIGHT", SettingCategory.CITIES, -64, 384, 1,
                 p -> (double) p.CITY_MINHEIGHT, (p, v) -> p.CITY_MINHEIGHT = (int) Math.round((Double) v)));
-        all.add(slider("CITY_MAXHEIGHT", SettingCategory.CITIES, -1024, 2048, 1,
+        all.add(slider("CITY_MAXHEIGHT", SettingCategory.CITIES, -64, 384, 1,
                 p -> (double) p.CITY_MAXHEIGHT, (p, v) -> p.CITY_MAXHEIGHT = (int) Math.round((Double) v)));
 
         // ---- BUILDINGS ------------------------------------------------------
@@ -203,19 +220,19 @@ public final class Settings {
 
         // ---- DAMAGE ---------------------------------------------------------
         // Explosion radii/heights and debris overflow. (Explosion chances live in GENERAL.)
-        all.add(slider("DEBRIS_TO_NEARBYCHUNK_FACTOR", SettingCategory.DAMAGE, 1, 10000, 1,
+        all.add(slider("DEBRIS_TO_NEARBYCHUNK_FACTOR", SettingCategory.DAMAGE, 1, 2000, 1,
                 p -> (double) p.DEBRIS_TO_NEARBYCHUNK_FACTOR, (p, v) -> p.DEBRIS_TO_NEARBYCHUNK_FACTOR = (int) Math.round((Double) v)));
-        all.add(slider("EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 1000, 1,
+        all.add(slider("EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.EXPLOSION_MINRADIUS, (p, v) -> p.EXPLOSION_MINRADIUS = (int) Math.round((Double) v)));
-        all.add(slider("EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 3000, 1,
+        all.add(slider("EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.EXPLOSION_MAXRADIUS, (p, v) -> p.EXPLOSION_MAXRADIUS = (int) Math.round((Double) v)));
         all.add(slider("EXPLOSION_MINHEIGHT", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.EXPLOSION_MINHEIGHT, (p, v) -> p.EXPLOSION_MINHEIGHT = (int) Math.round((Double) v)));
         all.add(slider("EXPLOSION_MAXHEIGHT", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.EXPLOSION_MAXHEIGHT, (p, v) -> p.EXPLOSION_MAXHEIGHT = (int) Math.round((Double) v)));
-        all.add(slider("MINI_EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 1000, 1,
+        all.add(slider("MINI_EXPLOSION_MINRADIUS", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.MINI_EXPLOSION_MINRADIUS, (p, v) -> p.MINI_EXPLOSION_MINRADIUS = (int) Math.round((Double) v)));
-        all.add(slider("MINI_EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 3000, 1,
+        all.add(slider("MINI_EXPLOSION_MAXRADIUS", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.MINI_EXPLOSION_MAXRADIUS, (p, v) -> p.MINI_EXPLOSION_MAXRADIUS = (int) Math.round((Double) v)));
         all.add(slider("MINI_EXPLOSION_MINHEIGHT", SettingCategory.DAMAGE, 1, 256, 1,
                 p -> (double) p.MINI_EXPLOSION_MINHEIGHT, (p, v) -> p.MINI_EXPLOSION_MINHEIGHT = (int) Math.round((Double) v)));
@@ -230,13 +247,15 @@ public final class Settings {
                 p -> p.HIGHWAY_REQUIRES_TWO_CITIES, (p, v) -> p.HIGHWAY_REQUIRES_TWO_CITIES = (Boolean) v));
         all.add(slider("HIGHWAY_LEVEL_FROM_CITIES_MODE", SettingCategory.TRANSPORT, 0, 3, 1,
                 p -> (double) p.HIGHWAY_LEVEL_FROM_CITIES_MODE, (p, v) -> p.HIGHWAY_LEVEL_FROM_CITIES_MODE = (int) Math.round((Double) v)));
-        all.add(slider("HIGHWAY_MAINPERLIN_SCALE", SettingCategory.TRANSPORT, 1.0, 1000.0, 0.1,
+        all.add(slider("HIGHWAY_MAINPERLIN_SCALE", SettingCategory.TRANSPORT, 1.0, 200.0, 0.1,
                 p -> (double) p.HIGHWAY_MAINPERLIN_SCALE, (p, v) -> p.HIGHWAY_MAINPERLIN_SCALE = ((Double) v).floatValue()));
-        all.add(slider("HIGHWAY_SECONDARYPERLIN_SCALE", SettingCategory.TRANSPORT, 1.0, 1000.0, 0.1,
+        all.add(slider("HIGHWAY_SECONDARYPERLIN_SCALE", SettingCategory.TRANSPORT, 1.0, 100.0, 0.1,
                 p -> (double) p.HIGHWAY_SECONDARYPERLIN_SCALE, (p, v) -> p.HIGHWAY_SECONDARYPERLIN_SCALE = ((Double) v).floatValue()));
         all.add(slider("HIGHWAY_PERLIN_FACTOR", SettingCategory.TRANSPORT, -100.0, 100.0, 0.1,
                 p -> (double) p.HIGHWAY_PERLIN_FACTOR, (p, v) -> p.HIGHWAY_PERLIN_FACTOR = ((Double) v).floatValue()));
-        all.add(slider("HIGHWAY_DISTANCE_MASK", SettingCategory.TRANSPORT, 0, Integer.MAX_VALUE, 1,
+        // A power-of-two-minus-1 bit mask (config ceiling Integer.MAX_VALUE, default 7); only a handful of masks
+        // are valid, so a slider is meaningless. Typed field instead.
+        all.add(number("HIGHWAY_DISTANCE_MASK", SettingCategory.TRANSPORT, true,
                 p -> (double) p.HIGHWAY_DISTANCE_MASK, (p, v) -> p.HIGHWAY_DISTANCE_MASK = (int) Math.round((Double) v)));
         all.add(toggle("HIGHWAY_SUPPORTS", SettingCategory.TRANSPORT,
                 p -> p.HIGHWAY_SUPPORTS, (p, v) -> p.HIGHWAY_SUPPORTS = (Boolean) v));
@@ -309,11 +328,12 @@ public final class Settings {
                 p -> p.SPAWN_NOT_IN_BUILDING, (p, v) -> p.SPAWN_NOT_IN_BUILDING = (Boolean) v));
         all.add(toggle("FORCE_SPAWN_IN_BUILDING", SettingCategory.SPAWN,
                 p -> p.FORCE_SPAWN_IN_BUILDING, (p, v) -> p.FORCE_SPAWN_IN_BUILDING = (Boolean) v));
-        all.add(slider("SPAWN_CHECK_RADIUS", SettingCategory.SPAWN, 1, 100000, 1,
+        all.add(slider("SPAWN_CHECK_RADIUS", SettingCategory.SPAWN, 1, 5000, 1,
                 p -> (double) p.SPAWN_CHECK_RADIUS, (p, v) -> p.SPAWN_CHECK_RADIUS = (int) Math.round((Double) v)));
-        all.add(slider("SPAWN_RADIUS_INCREASE", SettingCategory.SPAWN, 1, 100000, 1,
+        all.add(slider("SPAWN_RADIUS_INCREASE", SettingCategory.SPAWN, 1, 5000, 1,
                 p -> (double) p.SPAWN_RADIUS_INCREASE, (p, v) -> p.SPAWN_RADIUS_INCREASE = (int) Math.round((Double) v)));
-        all.add(slider("SPAWN_CHECK_ATTEMPTS", SettingCategory.SPAWN, 1, 1000000, 1,
+        // Attempt count up to a million; a slider pins the default (20000) in a sliver of the track.
+        all.add(number("SPAWN_CHECK_ATTEMPTS", SettingCategory.SPAWN, true,
                 p -> (double) p.SPAWN_CHECK_ATTEMPTS, (p, v) -> p.SPAWN_CHECK_ATTEMPTS = (int) Math.round((Double) v)));
 
         // ---- ADVANCED -------------------------------------------------------
