@@ -405,8 +405,9 @@ public class ChunkDriver {
      * touches nothing. It used to read the neighbouring chunk (whose content depends on whether
      * that chunk's features ran yet) and even write into it when it happened to be FULL; both
      * made generated output depend on worker-thread timing - the run-to-run digest divergence
-     * behind issue #24. Border blocks are marked for vanilla postprocessing in
-     * {@link #correct} instead, which recomputes their connections from final neighbour data.
+     * behind issue #24. Border blocks are marked for vanilla postprocessing right here, below,
+     * instead of being shape-updated - which recomputes their connections from final neighbour
+     * data once every chunk involved has finished generating.
      */
     private BlockState updateAdjacent(BlockState state, Direction direction, BlockPos pos, ChunkAccess thisChunk) {
         if (!isThisChunk(pos)) {
@@ -424,7 +425,17 @@ public class ChunkDriver {
             // mechanism vanilla structures use across chunk borders. Marking here rather than
             // relying on correct()'s mark is deliberate: that one only fires for positions the
             // driver itself writes, and this position may be untouched terrain.
-            thisChunk.markPosForPostProcessing(pos.immutable());
+            //
+            // Skip air and LiquidBlock: LevelChunk.postProcessGeneration only calls
+            // updateFromNeighbourShapes for the else branch of "is this a liquid" - a LiquidBlock
+            // position is ticked instead, never shape-updated, so marking one buys nothing and
+            // costs a tick this position would not otherwise have had during generation (e.g.
+            // untouched water at a chunk edge starting to flow into an adjacent excavated street).
+            // Air always resolves back to air, so marking it is pure waste. Neither case loses a
+            // shape update, since neither would have received one anyway.
+            if (!adjacent.isAir() && !(adjacent.getBlock() instanceof LiquidBlock)) {
+                thisChunk.markPosForPostProcessing(pos.immutable());
+            }
             return adjacent;
         }
         BlockState newAdjacent = null;
