@@ -241,7 +241,9 @@ Higher-level bridges need ramp assets and are out of scope.
 ### 6.1 New datapack assets
 
 Ten part JSONs — `street_large_{straight,bend,t,all,end,none,full,connector}`, `street_stair`,
-`bridge_large_open` — plus the `street_large` palette. Vanilla blocks only
+`bridge_large_open` — plus the `street_large` palette. (`street_large_full` was removed in a later
+follow-up pass, #106: `full` is a street style, not a topology, and had been dead since upstream.)
+Vanilla blocks only
 (`minecraft:smooth_stone_slab[type=double]`, `minecraft:smooth_quartz`), so no 26.2 block-name
 work. The built-in large pieces form a 14-block-wide full-height smooth-stone-slab surface that
 retains the normal outermost block on each side, with two centred rows of smooth quartz.
@@ -307,9 +309,12 @@ every new public profile field has a descriptor and lang keys.
 `MultiChunk.canPlaceBuilding()` queries the raw road field before accepting a random candidate:
 
 - `BLOCK_ALL` — primary, secondary and tertiary intersections all reject the candidate
-- `OVERRIDE_MINOR` (default) — only primary intersections reject; accepted complexes suppress
-  secondary and tertiary roads under their footprint
-- `OVERRIDE_ALL` — no road intersection rejects; every covered road is suppressed after acceptance
+- `OVERRIDE_MINOR` (default) — only primary intersections reject; a secondary or tertiary road
+  under an accepted complex's footprint is cut, not suppressed - the chunk holds the building
+  instead of the road, but `BuildingInfo.getEffectiveRoadType()` still reports that road class
+  there, because it is resolved from the raw road field before the building decision is known
+- `OVERRIDE_ALL` — no road intersection rejects; every covered road is cut the same way, whatever
+  its class
 
 Predefined multibuildings bypass the policy and always override automatic roads.
 
