@@ -10,7 +10,6 @@
     "streetbase": "b",
     "streetvariant": "B",
     "parts": {
-      "full": ["urbex:street_full"],
       "straight": ["urbex:street_straight"],
       "end": ["urbex:street_end"],
       "bend": ["urbex:street_bend"],
@@ -19,7 +18,6 @@
       "all": ["urbex:street_all"]
     },
     "largeparts": {
-      "full": "urbex:street_large_full",
       "straight": "urbex:street_large_straight",
       "end": "urbex:street_large_end",
       "bend": "urbex:street_large_bend",

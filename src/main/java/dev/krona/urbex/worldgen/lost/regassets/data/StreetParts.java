@@ -7,12 +7,11 @@ import dev.krona.urbex.varia.Tools;
 import java.util.List;
 import java.util.Optional;
 
-public record StreetParts(List<String> full, List<String> straight, List<String> end, List<String> bend,
+public record StreetParts(List<String> straight, List<String> end, List<String> bend,
                           List<String> t, List<String> none, List<String> all, List<String> connector,
                           List<String> stair) {
 
     public static final Codec<StreetParts> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Tools.listOrStringList("full", "street_full", StreetParts::full),
             Tools.listOrStringList("straight", "street_straight", StreetParts::straight),
             Tools.listOrStringList("end", "street_end", StreetParts::end),
             Tools.listOrStringList("bend", "street_bend", StreetParts::bend),
@@ -25,7 +24,6 @@ public record StreetParts(List<String> full, List<String> straight, List<String>
     );
 
     public static final StreetParts DEFAULT = new StreetParts(
-            List.of("urbex:street_full"),
             List.of("urbex:street_straight"),
             List.of("urbex:street_end"),
             List.of("urbex:street_bend"),
