@@ -66,6 +66,12 @@ public class CitiesTab extends GridLayoutTab {
     private static final int MAX_INFO_ROWS = 5;
     /** Below this the preview is more noise than information - hide it and give the space back. */
     private static final int MIN_PREVIEW_HEIGHT = 40;
+    /**
+     * Caps the preview width so a tall detail panel doesn't blow the little 62x58 map up to fill the
+     * whole column (the live-reported "tall smear"). Mirrors {@code CustomizeScreen}'s preview cap so
+     * both call sites show the map at roughly the same modest size.
+     */
+    private static final int MAX_PREVIEW_WIDTH = 130;
 
     /** The built-in worldStyle every install ships; sorts first in the selector. */
     private static final String STANDARD_STYLE = "standard";
@@ -237,13 +243,22 @@ public class CitiesTab extends GridLayoutTab {
         infoText.setMaxWidth(detailWidth);
         infoText.setMaxRows(infoRows);
 
-        int previewHeight = flexible - infoText.getHeight();
-        if (previewHeight < MIN_PREVIEW_HEIGHT) {
+        // Aspect-fit the 62x58 map (plus the legend strip below it) into the detail column, capped so
+        // it stays a compact map at the top of the panel rather than stretching to fill every pixel
+        // the description leaves free. Without this the widget took the whole flexible height and the
+        // render pass smeared the source into a tall column (BUG 1).
+        int previewSpace = flexible - infoText.getHeight();
+        int availWidth = Math.min(detailWidth, MAX_PREVIEW_WIDTH);
+        int availMapHeight = previewSpace - CityPreview.LEGEND_HEIGHT;
+        int[] map = CityPreview.fitPreview(availWidth, availMapHeight, CityPreview.WIDTH, CityPreview.HEIGHT);
+        int mapWidth = map[0];
+        int mapHeight = map[1];
+        if (mapHeight < MIN_PREVIEW_HEIGHT) {
             previewWidget.visible = false;
             previewWidget.setSize(0, 0);
         } else {
             previewWidget.visible = true;
-            previewWidget.setSize(detailWidth, previewHeight);
+            previewWidget.setSize(mapWidth, mapHeight + CityPreview.LEGEND_HEIGHT);
         }
     }
 
@@ -443,10 +458,11 @@ public class CitiesTab extends GridLayoutTab {
             // switches without any of them needing to know about the preview.
             preview.update(profile, worldStyle, seed);
 
-            // CityPreview draws the map into (width, height - legend) and the legend underneath it,
-            // so a square-ish map means passing a width close to the total height; the legend then
-            // gets the full column width to run along.
-            preview.render(graphics, getX(), getY(), Math.min(getWidth(), getHeight()), getHeight());
+            // resizeChildren() already aspect-fit this widget to (mapWidth, mapHeight + legend) via
+            // CityPreview.fitPreview, so the map keeps its 62:58 ratio - pass the widget's own size
+            // straight through. CityPreview.render draws the map into (width, height - legend) and the
+            // legend strip underneath.
+            preview.render(graphics, getX(), getY(), getWidth(), getHeight());
         }
 
         @Override

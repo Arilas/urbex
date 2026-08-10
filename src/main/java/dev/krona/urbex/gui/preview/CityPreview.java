@@ -35,7 +35,10 @@ public class CityPreview implements AutoCloseable {
     public static final int WIDTH = NullDimensionInfo.PREVIEW_WIDTH;
     public static final int HEIGHT = NullDimensionInfo.PREVIEW_HEIGHT;
 
-    private static final int LEGEND_HEIGHT = 10;
+    /** The fixed-height legend strip {@link #render} draws below the map; public so callers that
+     *  size a host widget can budget for it (the map itself keeps the {@link #WIDTH}:{@link #HEIGHT}
+     *  aspect ratio, the legend is extra). */
+    public static final int LEGEND_HEIGHT = 10;
     private static final int SWATCH_SIZE = 8;
     private static final int SWATCH_GAP = 6;
 
@@ -97,6 +100,27 @@ public class CityPreview implements AutoCloseable {
      */
     public static long seedFromUi(String seedField, long fallbackRandom) {
         return WorldOptions.parseSeed(seedField).orElse(fallbackRandom);
+    }
+
+    /**
+     * The largest {@code (w, h)} that fits a {@code srcW x srcH} map inside an {@code availW x availH}
+     * box while preserving the {@code srcW:srcH} aspect ratio (so the source never smears the way a
+     * free-stretched blit does). Fits to the width first and falls back to the height when that would
+     * overflow, so the result is bounded by both axes. Returns {@code {0, 0}} for any non-positive
+     * input. Pure integer math with no GL or texture dependency, so it is unit-testable headlessly;
+     * callers add {@link #LEGEND_HEIGHT} on top of the returned {@code h} for the legend strip.
+     */
+    public static int[] fitPreview(int availW, int availH, int srcW, int srcH) {
+        if (availW <= 0 || availH <= 0 || srcW <= 0 || srcH <= 0) {
+            return new int[]{0, 0};
+        }
+        int w = availW;
+        int h = Math.round((float) w * srcH / srcW);
+        if (h > availH) {
+            h = availH;
+            w = Math.round((float) h * srcW / srcH);
+        }
+        return new int[]{Math.min(w, availW), Math.min(h, availH)};
     }
 
     public void render(GuiGraphicsExtractor g, int x, int y, int w, int h) {
