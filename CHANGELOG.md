@@ -41,6 +41,16 @@
   chunk becomes a park at all - so a config carrying the old key will simply stop taking effect.
   `StreetType.FULL` and `StreetType.randomNonPark()` are deleted; a planned road is always
   `StreetType.NORMAL`.
+- **Removed the `full` street part.** `full` was a street *style* — a chunk paved corner to corner
+  with no verge — not a topology; `all` is the four-way. It has been unreachable from generation for
+  years upstream, was briefly revived by accident during this fork's Fabric port, and was removed
+  again in the hierarchical-streets backport (#100). This finishes the job: the
+  `street_full`/`street_large_full` assets, their declarations in `citystyle_common`'s `parts` and
+  `largeparts` blocks, and the `full` component of `StreetParts` (record field, codec entry and
+  `DEFAULT`) are gone. This is not a breaking change for third-party datapacks: `StreetParts` is
+  decoded with `RecordCodecBuilder`, which reads only the field names it's built from and never
+  validates an input object's key set, so a datapack that still declares `"full"` under `parts` or
+  `largeparts` has that key silently ignored rather than rejected.
 - **Worlds generate differently past the already-generated chunk border, again.** As with `0.1.0`,
   this is expected and permitted: the mod makes no promise that an existing world regenerates
   identically after an update, and the road field changes what every city chunk resolves to.

@@ -329,13 +329,16 @@ public final class GridRoadField implements RoadField {
             hash ^= value.charAt(i);
             hash *= 0x100000001b3L;
         }
-        return finalize(hash);
+        return mix64(hash);
     }
 
-    private static long finalize(long value) {
-        value = (value ^ (value >>> 30)) * 0xbf58476d1ce4e5b9L;
-        value = (value ^ (value >>> 27)) * 0x94d049bb133111ebL;
-        return value ^ (value >>> 31);
+    /**
+     * splitmix64's avalanche step, shared with {@link Hash#mix} via {@link Hash#avalanche}. Named
+     * {@code mix64} (upstream's name) rather than {@code finalize}, which shadows a name
+     * deprecated for removal on {@link Object}.
+     */
+    private static long mix64(long value) {
+        return Hash.avalanche(value);
     }
 
     private record RawRoad(RoadType type, BlockLayout block, TertiarySegment tertiary) {

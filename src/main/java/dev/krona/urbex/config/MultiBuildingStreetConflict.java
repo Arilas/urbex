@@ -8,9 +8,15 @@ import java.util.Locale;
 public enum MultiBuildingStreetConflict {
     /** Any planned road under the footprint rejects the candidate. */
     BLOCK_ALL,
-    /** Only a primary road rejects; accepted complexes suppress secondary and tertiary roads. */
+    /**
+     * Only a primary road rejects. A secondary or tertiary road under an accepted complex's
+     * footprint is cut, not suppressed: the chunk holds the building instead of the road, but
+     * {@link dev.krona.urbex.worldgen.lost.BuildingInfo#getEffectiveRoadType()} still reports that
+     * road class there, because it is resolved from the raw road field before the building decision
+     * is known.
+     */
     OVERRIDE_MINOR,
-    /** No road rejects; every covered road is suppressed after acceptance. */
+    /** No road rejects; every covered road is cut the same way, whatever its class. */
     OVERRIDE_ALL;
 
     public boolean roadBlocks(RoadType roadType) {

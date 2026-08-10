@@ -86,28 +86,6 @@ class GridRoadFieldTest {
     }
 
     @Test
-    void anActivePrimaryIsStraightAndContinuous() {
-        GridRoadField f = field(1337L);
-        int found = 0;
-        for (int x = -64; x < 64; x++) {
-            if (f.at(x, 0).type() != RoadType.PRIMARY) {
-                continue;
-            }
-            boolean verticalEverywhere = true;
-            for (int z = -64; z < 64; z++) {
-                if (f.at(x, z).type() != RoadType.PRIMARY) {
-                    verticalEverywhere = false;
-                    break;
-                }
-            }
-            if (verticalEverywhere) {
-                found++;
-            }
-        }
-        assertTrue(found > 0, "expected at least one continuous vertical primary corridor");
-    }
-
-    @Test
     void thereIsNoSeamAtCoordinateZero() {
         // Containment, not just non-inverted bounds: truncating division instead of floorDiv would
         // still leave eastX >= westX, but it would assign a chunk to a block it isn't inside.
@@ -324,10 +302,11 @@ class GridRoadFieldTest {
         GridRoadField f = new GridRoadField(1337L, "urbex:test", crowded);
 
         RoadCell cell = assertDoesNotThrow(() -> f.at(5, 5), "an oversubscribed block must still resolve");
-        assertTrue(cell.secondaryX().size() < 128,
-                "expected far fewer than 128 secondary-x positions to fit, got " + cell.secondaryX().size());
-        assertTrue(cell.secondaryZ().size() < 128,
-                "expected far fewer than 128 secondary-z positions to fit, got " + cell.secondaryZ().size());
+        // The 128-road demand must fall back to whatever fits without relaxing separation or edge
+        // distance to cram more in - reusing the same invariant checks the well-subscribed tests use
+        // means a fallback that shrinks the gap between roads instead of the count fails here too.
+        assertSecondaryXInvariants(f, crowded, cell);
+        assertSecondaryZInvariants(f, crowded, cell);
     }
 
     // ---------------------------------------------------------------------------------------

@@ -111,6 +111,14 @@ and `/urbex debug` all bind to `RoadField`, never to the grid implementation. Th
 **no registry and no mode enum**: hard replace means exactly one implementation is wired, and a
 future terrain-aware planner replaces it by construction rather than by configuration.
 
+> **Amended 2026-08-10, streets follow-up review (#106).** Two things above are now stale.
+> `RoadCell.density` is `double` in the shipped record, not `float` as written above. And "that is
+> the entire contract" undersold `RoadField`: the interface gained a second method since this
+> section was written, `typeAt(int chunkX, int chunkZ)` — a default that returns
+> `at(chunkX, chunkZ).type()` for the many callers that need only the road class, which
+> implementations may override for a cheaper answer as long as it agrees with `at(...).type()`. The
+> contract is `at` plus `typeAt`, not `at` alone.
+
 ### 3.2 Package layout
 
 The pure module reuses `dev.krona.urbex.plan`, the root P3 established for dependency-free planning
@@ -178,6 +186,12 @@ Per chunk:
 3. `ChunkContentResolver` walks the precedence order and returns `ChunkContent`.
 4. `BuildingInfo` consumes it. `MultiChunk.canPlaceBuilding()` queries the **raw** field.
 
+> **Amended 2026-08-10, streets follow-up review (#106).** Point 2's
+> `overriddenByHigherPrecedence` reads as a live precedence mechanism, but at its sole call site
+> (`BuildingInfo.effectiveRoadType`) it is hardcoded `false` — a multi-building's precedence over a
+> road never actually reaches `EffectiveRoad` this way. That precedence is enforced downstream
+> instead, by `ChunkContentResolver`'s `!hasBuilding` check on the chunk.
+
 ### 4.1 Cycle-freedom invariant
 
 The planner reads nothing. `EffectiveRoad` reads only `isCityRaw`, which does not depend on
@@ -230,7 +244,9 @@ Higher-level bridges need ramp assets and are out of scope.
 ### 6.1 New datapack assets
 
 Ten part JSONs — `street_large_{straight,bend,t,all,end,none,full,connector}`, `street_stair`,
-`bridge_large_open` — plus the `street_large` palette. Vanilla blocks only
+`bridge_large_open` — plus the `street_large` palette. (`street_large_full` was removed in a later
+follow-up pass, #106: `full` is a street style, not a topology, and had been dead since upstream.)
+Vanilla blocks only
 (`minecraft:smooth_stone_slab[type=double]`, `minecraft:smooth_quartz`), so no 26.2 block-name
 work. The built-in large pieces form a 14-block-wide full-height smooth-stone-slab surface that
 retains the normal outermost block on each side, with two centred rows of smooth quartz.
@@ -301,6 +317,13 @@ every new public profile field has a descriptor and lang keys.
 - `OVERRIDE_ALL` — no road intersection rejects; every covered road is suppressed after acceptance
 
 Predefined multibuildings bypass the policy and always override automatic roads.
+
+> **Amended 2026-08-10, streets follow-up review (#106).** "Suppress"/"suppressed" above described
+> an effect the code does not produce. What actually happens: the multi wins the pass, the chunk
+> holds the building instead of the road, and the road is *cut* -
+> `BuildingInfo.getEffectiveRoadType()` still reports the road class on those chunks, because that
+> value is resolved from the raw road field before the building decision is known. See
+> `MultiBuildingStreetConflict`'s javadoc, corrected the same way in the same review.
 
 ## 7. Failure handling
 
