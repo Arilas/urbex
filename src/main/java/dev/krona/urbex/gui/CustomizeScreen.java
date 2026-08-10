@@ -334,6 +334,11 @@ public class CustomizeScreen extends Screen {
 
     private void openSaveAs() {
         Set<String> taken = new HashSet<>(ProfileSetup.STANDARD_PROFILES.keySet());
+        // The two reserved selection ids aren't in STANDARD_PROFILES but must not be savable: "disabled"
+        // would double-list against the built-in Disabled row, and "customized" is the transient marker
+        // that entries() never lists as a saved file (so it would save invisibly).
+        taken.add(PresetSelection.DISABLED_ID);
+        taken.add(PresetSelection.CUSTOM_ID);
         SaveAsDialog[] holder = new SaveAsDialog[1];
         holder[0] = new SaveAsDialog(this, taken, name -> {
             if (!performSave(name)) {

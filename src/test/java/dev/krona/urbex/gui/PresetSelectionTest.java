@@ -228,6 +228,21 @@ class PresetSelectionTest {
     }
 
     @Test
+    void aUserProfileNamedLikeTheDisabledMarkerDoesNotDoubleListTheDisabledRow() {
+        // A stray on-disk "disabled.json" that slipped past Save-as validation must not add a second
+        // Disabled row alongside the built-in one.
+        ProfileSetup.STANDARD_PROFILES.put("disabled", new UrbexProfile("disabled", false));
+        ProfileSetup.USER_PROFILES.add("disabled");
+
+        PresetSelection selection = new PresetSelection();
+
+        long disabledRows = selection.entries().stream()
+                .filter(e -> "disabled".equals(e.id()))
+                .count();
+        assertEquals(1, disabledRows);
+    }
+
+    @Test
     void disabledEntryPublishesNullProfileNameMatchingTheOldContract() {
         PresetSelection selection = new PresetSelection();
         selection.select("cavern");

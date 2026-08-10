@@ -86,4 +86,20 @@ class SaveAsValidationTest {
     void takenCheckDoesNotFalseTripOnADistinctName() {
         assertFalse(SaveAsDialog.validateName("fresh_name", TAKEN).isPresent());
     }
+
+    @Test
+    void rejectsReservedDisabledIdWhenIncludedInTaken() {
+        // openSaveAs unions the reserved selection ids into taken; "disabled" must be rejected so it
+        // can't double-list against the built-in Disabled row.
+        Set<String> taken = Set.of("disabled", "customized");
+        assertEquals("urbex.saveas.err.taken", errKey(SaveAsDialog.validateName("disabled", taken)));
+    }
+
+    @Test
+    void rejectsReservedCustomizedIdWhenIncludedInTaken() {
+        // "customized" is the transient marker entries() never lists as a saved file; rejecting it up
+        // front stops a preset that would save invisibly.
+        Set<String> taken = Set.of("disabled", "customized");
+        assertEquals("urbex.saveas.err.taken", errKey(SaveAsDialog.validateName("customized", taken)));
+    }
 }

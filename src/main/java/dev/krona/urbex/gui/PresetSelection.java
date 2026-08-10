@@ -79,10 +79,12 @@ public final class PresetSelection {
 
         // Hand-saved custom presets (from the Customize editor's "Save as"), sorted by name, each a
         // first-class row carrying its "based on" provenance. Filtered to ones still registered, and
-        // never the CUSTOM_ID marker itself (that is the transient row below, not a saved file).
+        // never a reserved selection id: CUSTOM_ID is the transient row below (not a saved file), and
+        // DISABLED_ID would double-list against the built-in Disabled row - guard both even against a
+        // stray on-disk file that shouldn't exist.
         List<String> userIds = new ArrayList<>();
         for (String id : ProfileSetup.USER_PROFILES) {
-            if (!CUSTOM_ID.equals(id) && ProfileSetup.STANDARD_PROFILES.containsKey(id)) {
+            if (!CUSTOM_ID.equals(id) && !DISABLED_ID.equals(id) && ProfileSetup.STANDARD_PROFILES.containsKey(id)) {
                 userIds.add(id);
             }
         }
