@@ -152,14 +152,22 @@ public final class Settings {
 
         // ==== CITIES =========================================================
         // City placement thresholds, per-level heights and spawn distances. (Chance and radii live in GENERAL.)
-        // Open-ended noise parameters: CityRarityMap multiplies coordinates by these (getValue(cx/scale, ...)
-        // * innerScale - offset), so there is no natural maximum a slider could pin. Typed fields instead.
+        // The rarity noise is factor = perlinCity.getValue(cx/scale, cz/scale) * innerScale - offset, clamped at 0
+        // and compared to CITY_THRESHOLD. The config allows ±1,000,000 on all three, but the noise output is ~[-1,1]
+        // so every value that meaningfully shapes the map lives in a small band. These are stepped sliders over that
+        // practical band (the defaults 3 / 0.1 / 0.1 land comfortably inside), not the config's degenerate ceiling.
         r.section("rarity_map");
-        r.number("CITY_PERLIN_SCALE", SettingCategory.CITIES, -1000000, 1000000, false,
+        // Coordinate divisor: larger = the noise varies more slowly = larger, rarer city regions. Default 3 sits ~10%
+        // in; up to 25 gives continent-scale regions, 0.5 gives tight ones. Half-unit steps are fine for a divisor.
+        r.slider("CITY_PERLIN_SCALE", SettingCategory.CITIES, 0.5, 25.0, 0.5,
                 p -> p.CITY_PERLIN_SCALE, (p, v) -> p.CITY_PERLIN_SCALE = (Double) v);
-        r.number("CITY_PERLIN_INNERSCALE", SettingCategory.CITIES, -1000000, 1000000, false,
+        // Noise amplitude multiplier: default 0.1 (10% in). 0 flattens the map; ~0.3+ starts clearing the threshold;
+        // >1 makes nearly everywhere a city. 0.01 steps give precise control near the useful low end.
+        r.slider("CITY_PERLIN_INNERSCALE", SettingCategory.CITIES, 0.0, 1.0, 0.01,
                 p -> p.CITY_PERLIN_INNERSCALE, (p, v) -> p.CITY_PERLIN_INNERSCALE = (Double) v);
-        r.number("CITY_PERLIN_OFFSET", SettingCategory.CITIES, -1000000, 1000000, false,
+        // Noise shift (subtracted before the threshold): default 0.1 (mid-track). Symmetric ±1 spans the noise range —
+        // positive raises the city bar, negative lowers it. 0.01 steps match INNERSCALE's resolution.
+        r.slider("CITY_PERLIN_OFFSET", SettingCategory.CITIES, -1.0, 1.0, 0.01,
                 p -> p.CITY_PERLIN_OFFSET, (p, v) -> p.CITY_PERLIN_OFFSET = (Double) v);
         r.slider("CITY_THRESHOLD", SettingCategory.CITIES, 0.0, 1.0, 0.01,
                 p -> (double) p.CITY_THRESHOLD, (p, v) -> p.CITY_THRESHOLD = ((Double) v).floatValue());

@@ -73,6 +73,22 @@ public final class SettingControls {
         return d.min() + clampedT * (d.max() - d.min());
     }
 
+    /**
+     * Snaps a continuous slider value to the nearest multiple of {@code step}, anchored at {@code min} and
+     * clamped to {@code [min, max]}. Anchoring the grid at {@code min} (rather than at 0) means a range whose
+     * lower bound is not itself a multiple of {@code step} — e.g. {@code min = 0.5}, {@code step = 0.5} — still
+     * snaps to on-range values, and it keeps both endpoints reachable. A {@code step <= 0} means "no snapping":
+     * the value passes through unchanged (used by log sliders, whose exponential travel makes a linear step
+     * meaningless). Pure and package-private so {@code SliderStepMathTest} can drive it headlessly.
+     */
+    static double snapToStep(double value, double min, double max, double step) {
+        if (!(step > 0.0)) {
+            return value;
+        }
+        double snapped = min + Math.round((value - min) / step) * step;
+        return Math.max(min, Math.min(max, snapped));
+    }
+
     private static MutableComponent sliderLabel(SettingDescriptor d, double value) {
         return Component.translatable(d.nameKey()).append(Component.literal(": " + LogValueMapper.format(value)));
     }
@@ -101,7 +117,15 @@ public final class SettingControls {
         }
 
         private double currentValue() {
-            return logMapper != null ? logMapper.fromSlider(value) : linearFromSlider(descriptor, value);
+            if (logMapper != null) {
+                // Log sliders travel exponentially, so a linear step is meaningless — snapToStep is a no-op for
+                // step<=0, but log descriptors are read on this branch and left continuous regardless.
+                return logMapper.fromSlider(value);
+            }
+            // Snap in the value-read path so BOTH the written value (applyValue) and the readout label
+            // (updateMessage) reflect the same stepped value.
+            double raw = linearFromSlider(descriptor, value);
+            return snapToStep(raw, descriptor.min(), descriptor.max(), descriptor.step());
         }
 
         @Override
