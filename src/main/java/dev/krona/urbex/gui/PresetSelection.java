@@ -7,6 +7,7 @@ import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.worldgen.CityFeature;
 import net.minecraft.network.chat.Component;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,20 @@ public final class PresetSelection {
     private Entry selected = DISABLED_ENTRY;
     private UrbexProfile customProfile = null;
     private String customBasedOn = "";
+
+    /**
+     * The worldStyle ids the Cities tab currently offers, injected from the live datapack registry
+     * ({@code AssetRegistries.WORLDSTYLES} via the preview's {@code RegistryAccess}) - the enumeration
+     * can't be built headless, so it's supplied rather than read here. Empty until the tab injects it.
+     */
+    private List<String> availableWorldStyles = List.of();
+
+    /**
+     * The player's chosen worldStyle, orthogonal to the preset (spec 1a). {@code null} means "no
+     * override - use the selected preset's own worldStyle"; a non-null value that differs from the
+     * preset's own is published as an editor-style customization at {@link #publish()} time.
+     */
+    private String selectedWorldStyle = null;
 
     public PresetSelection() {
     }
@@ -105,9 +120,72 @@ public final class PresetSelection {
         for (Entry entry : entries()) {
             if (entry.id().equals(id)) {
                 selected = entry;
+                dropInvalidWorldStyle();
                 return;
             }
         }
+    }
+
+    /**
+     * The worldStyle ids the Cities tab renders in its selector, injected from the live registry.
+     * The tab hides the control when this has {@code <= 1} entries (the common "standard-only" case).
+     * Injecting a list that no longer contains the chosen style clears the override back to "use the
+     * preset's own", so a stale choice never survives a registry that dropped it.
+     */
+    public void setAvailableWorldStyles(List<String> ids) {
+        this.availableWorldStyles = ids == null ? List.of() : List.copyOf(ids);
+        dropInvalidWorldStyle();
+    }
+
+    /** What the Cities tab renders in its worldStyle selector; empty until injected. */
+    public List<String> styleChoices() {
+        return availableWorldStyles;
+    }
+
+    /**
+     * Records the player's chosen worldStyle. {@code null} (or the selected preset's own style)
+     * means "no override". Doesn't publish - the caller republishes so the change reaches the server.
+     */
+    public void setWorldStyle(String id) {
+        this.selectedWorldStyle = id;
+    }
+
+    /** The chosen worldStyle override, or {@code null} for "use the selected preset's own". */
+    public String selectedWorldStyle() {
+        return selectedWorldStyle;
+    }
+
+    /**
+     * The worldStyle the current selection actually generates with - the chosen override if any, else
+     * the selected preset's own. Empty for the disabled row (no profile). Drives the preview and the
+     * selector's displayed value, so both follow a preset change even when no override is set.
+     */
+    public String effectiveWorldStyle() {
+        UrbexProfile profile = selected.profile().orElse(null);
+        if (profile == null) {
+            return "";
+        }
+        return selectedWorldStyle != null ? selectedWorldStyle : profile.getWorldStyle();
+    }
+
+    /** Resets a chosen style the current registry no longer offers, so it can't be published stale. */
+    private void dropInvalidWorldStyle() {
+        if (selectedWorldStyle != null && !availableWorldStyles.contains(selectedWorldStyle)) {
+            selectedWorldStyle = null;
+        }
+    }
+
+    /**
+     * The effective worldStyle override for an entry, or {@code null} when the selection publishes
+     * as-is: no chosen style, no profile (the disabled row), or a chosen style that already matches
+     * the preset's own. A non-null result is a style that genuinely differs from the preset default.
+     */
+    @Nullable
+    private String worldStyleOverride(Entry entry) {
+        if (selectedWorldStyle == null || entry.profile().isEmpty()) {
+            return null;
+        }
+        return selectedWorldStyle.equals(entry.profile().get().getWorldStyle()) ? null : selectedWorldStyle;
     }
 
     public Entry selected() {
@@ -125,6 +203,8 @@ public final class PresetSelection {
         selected = DISABLED_ENTRY;
         customProfile = null;
         customBasedOn = "";
+        selectedWorldStyle = null;
+        availableWorldStyles = List.of();
     }
 
     /**
@@ -166,10 +246,16 @@ public final class PresetSelection {
      */
     public void publish() {
         Entry entry = selected;
+        // A chosen worldStyle that differs from the preset's own is an editor-style customization:
+        // it publishes exactly like a hand-edited profile (CUSTOM_ID + full JSON below), so the server
+        // sees the switched style with no special worldStyle plumbing of its own.
+        String worldStyle = worldStyleOverride(entry);
+        boolean publishAsCustom = entry.custom() || worldStyle != null;
+
         // Custom entries (the transient "customized" row and hand-saved user presets alike) publish
         // under CUSTOM_ID with their full JSON below, so the server reconstructs them from the JSON
         // rather than needing the (possibly server-absent) user profile file by name.
-        if (entry.custom()) {
+        if (publishAsCustom) {
             Config.profileFromClient = CUSTOM_ID;
         } else {
             Config.profileFromClient = DISABLED_ID.equals(entry.id()) ? null : entry.id();
@@ -178,12 +264,20 @@ public final class PresetSelection {
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
 
-        if (entry.custom() && entry.profile().isPresent()) {
-            UrbexProfile profile = entry.profile().get();
-            ProfileSetup.STANDARD_PROFILES
-                    .computeIfAbsent(CUSTOM_ID, k -> new UrbexProfile(CUSTOM_ID, false))
-                    .copyFrom(profile);
-            Config.jsonFromClient = profile.toJson(false).toString();
+        if (publishAsCustom && entry.profile().isPresent()) {
+            UrbexProfile source = entry.profile().get();
+            UrbexProfile published = ProfileSetup.STANDARD_PROFILES
+                    .computeIfAbsent(CUSTOM_ID, k -> new UrbexProfile(CUSTOM_ID, false));
+            published.copyFrom(source);
+            if (worldStyle != null) {
+                published.setWorldStyle(worldStyle);
+            }
+            Config.jsonFromClient = published.toJson(false).toString();
+        } else {
+            // A plain preset (or disabled) reaches the server by name only. Clear any JSON a prior
+            // custom/worldStyle publish left behind, or the server would apply that stale JSON on top
+            // of the now-plain profile name.
+            Config.jsonFromClient = null;
         }
     }
 }
