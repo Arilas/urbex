@@ -1,0 +1,64 @@
+package dev.krona.urbex.gui.settings;
+
+import dev.krona.urbex.config.UrbexProfile;
+
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+
+/**
+ * Metadata describing a single editable {@link UrbexProfile} setting: which control renders it, its bounds,
+ * and how to read/write the backing field.
+ *
+ * <p><b>Direct field access, on purpose.</b> The {@link #getter} and {@link #setter} read and write the public
+ * {@code UrbexProfile} field directly (e.g. {@code p -> p.CITY_CHANCE}) rather than routing through the
+ * {@code Configuration} bridge. This is deliberate: it lets issue #75 part 2 delete {@code Configuration} without
+ * having to touch this framework.</p>
+ *
+ * <p><b>Boxing convention.</b> Values crossing the getter/setter boundary are boxed consistently so the Task 5
+ * control layer can coerce them uniformly:</p>
+ * <ul>
+ *     <li>{@link ControlKind#SLIDER} — always {@link Double}, even when the field is an {@code int} or {@code float}.
+ *         The getter widens to {@code Double}; the setter narrows back (rounding for integer fields).</li>
+ *     <li>{@link ControlKind#TOGGLE} — {@link Boolean}.</li>
+ *     <li>{@link ControlKind#CYCLE} — the field's enum type (e.g. {@code LandscapeType}).</li>
+ *     <li>{@link ControlKind#TEXT} — {@link String}, or {@code String[]} for list-valued fields.</li>
+ * </ul>
+ *
+ * <p>{@link #min}, {@link #max}, {@link #step} and {@link #logScale} are only meaningful for {@link ControlKind#SLIDER};
+ * other kinds pass {@code 0} bounds. A {@code logScale} slider must have {@code min > 0}.</p>
+ *
+ * @param key       the backing {@code UrbexProfile} public field name; also the lang-key suffix
+ *                  ({@code urbex.setting.<key>} and {@code urbex.setting.<key>.tooltip}).
+ * @param category  the tab this descriptor lives under.
+ * @param general   {@code true} for the curated duplicate that also appears on the General tab; the completeness
+ *                  test counts each field in exactly one {@code general=false} descriptor.
+ * @param kind      the control to render.
+ * @param min       slider lower bound (mined from the {@code UrbexProfile.init} min argument).
+ * @param max       slider upper bound (mined from the {@code UrbexProfile.init} max argument).
+ * @param step      slider increment.
+ * @param logScale  {@code true} for logarithmic sliders (the chance fields); requires {@code min > 0}.
+ * @param getter    reads the boxed current value from a profile.
+ * @param setter    writes a boxed value back into a profile.
+ */
+public record SettingDescriptor(
+        String key,
+        SettingCategory category,
+        boolean general,
+        ControlKind kind,
+        double min,
+        double max,
+        double step,
+        boolean logScale,
+        Function<UrbexProfile, Object> getter,
+        BiConsumer<UrbexProfile, Object> setter
+) {
+    /** Lang key for this setting's display name. */
+    public String nameKey() {
+        return "urbex.setting." + key;
+    }
+
+    /** Lang key for this setting's tooltip. */
+    public String tooltipKey() {
+        return "urbex.setting." + key + ".tooltip";
+    }
+}
