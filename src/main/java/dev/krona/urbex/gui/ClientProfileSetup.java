@@ -90,7 +90,14 @@ public class ClientProfileSetup {
         customizedProfile = new UrbexProfile("customized", false);
         UrbexProfile original = ProfileSetup.STANDARD_PROFILES.get(profile);
         ProfileSetup.STANDARD_PROFILES.put("customized", customizedProfile);
-        profiles.add("customized");
+        // profiles is only the toggle-button's cycle cache, and it is built lazily by
+        // toggleProfile(). Since the Cities tab can now hand this class a profile without the
+        // player ever having pressed that button, it may legitimately still be null here - it used
+        // to be impossible, so this was an unguarded NPE. The contains() check likewise stops a
+        // second customize() from pushing a duplicate entry into the cycle.
+        if (profiles != null && !profiles.contains("customized")) {
+            profiles.add("customized");
+        }
         customizedProfile.copyFrom(original);
         profile = "customized";
         refreshPreview.run();

@@ -510,9 +510,34 @@ public class UrbexConfigScreen extends Screen {
             selectProfile(localSetup.getProfile(), null);
         }
 
+        syncToPresetSelection(customizedProfile);
+
         Minecraft.getInstance().gui.setScreen(parent);
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
+    }
+
+    /**
+     * Mirrors what this (old) editor just committed into {@link PresetSelection}, so the Cities tab
+     * shows the same thing when the screen it returns to re-initialises. Phase 2 of the GUI
+     * redesign replaces this editor with one that edits {@code PresetSelection} directly and this
+     * bridge goes away with it; until then the two must not be allowed to disagree about which
+     * preset generates the world.
+     * <p>
+     * Only the selection is mirrored, never {@code publish()}ed: {@link #selectProfile} above has
+     * already written the identical {@code Config} state (see {@code PresetSelection.publish}).
+     */
+    private void syncToPresetSelection(@Nullable UrbexProfile customizedProfile) {
+        String profileName = localSetup.getProfile();
+        if ("customized".equals(profileName) && customizedProfile != null) {
+            // The old setup discards which preset a customization started from, so the lineage is
+            // recorded as "unknown" rather than invented.
+            PresetSelection.CLIENT.applyCustomized(customizedProfile, PresetSelection.CUSTOM_ID);
+        } else if (profileName == null) {
+            PresetSelection.CLIENT.select(PresetSelection.DISABLED_ID);
+        } else {
+            PresetSelection.CLIENT.select(profileName);
+        }
     }
 
     @Override

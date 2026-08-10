@@ -1,42 +1,31 @@
 package dev.krona.urbex.setup;
 
-import dev.krona.urbex.gui.UrbexConfigScreen;
 import dev.krona.urbex.gui.ClientProfileSetup;
 import dev.krona.urbex.gui.PresetSelection;
 import dev.krona.urbex.gui.RecreateProfileRestore;
 import dev.krona.urbex.worldgen.CityFeature;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.fabricmc.fabric.api.client.screen.v1.Screens;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
-import net.minecraft.network.chat.Component;
 
 public class ClientEventHandlers {
 
     private static java.lang.ref.WeakReference<CreateWorldScreen> lastCreateWorldScreen = null;
 
     public static void register() {
-        // Inject the "Cities" button into the world creation screen.
-        // (The decorative config icon that was blitted in ScreenEvent.Render.Post on NeoForge
-        // has been dropped; Fabric's screen API in 26.2 has no direct post-render hook.)
-        ScreenEvents.AFTER_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
+        // The Urbex entry point in world creation is the "Cities" tab (added by
+        // CreateWorldScreenTabMixin), not a button any more. What still has to happen here is the
+        // Re-Create handoff (issue #85): the stashed profile must be consumed once per genuinely
+        // new CreateWorldScreen - not on every rebuild of the same screen after a window resize.
+        // BEFORE_INIT, not AFTER_INIT: the tab (and with it the preset list's initial selection) is
+        // built inside CreateWorldScreen.init(), so the restore has to have landed in
+        // PresetSelection by then for a re-created world to show its profile pre-selected.
+        ScreenEvents.BEFORE_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
             if (screen instanceof CreateWorldScreen createWorldScreen) {
-                // A genuinely new screen, not a rebuild of the same one after a window resize:
-                // consume a profile stashed by the Re-Create flow (issue #85)
                 if (lastCreateWorldScreen == null || lastCreateWorldScreen.get() != createWorldScreen) {
                     lastCreateWorldScreen = new java.lang.ref.WeakReference<>(createWorldScreen);
                     RecreateProfileRestore.consumePending();
                 }
-                Button citiesButton = Button.builder(Component.literal("Cities"), b ->
-                        Minecraft.getInstance().gui.setScreen(new UrbexConfigScreen(createWorldScreen))
-                ).bounds(screen.width - 100, 40, 70, 20).build();
-                citiesButton.visible = false;
-                Screens.getWidgets(screen).add(citiesButton);
-                // Only show the button while the "More" tab is active
-                ScreenEvents.afterTick(screen).register(s ->
-                        citiesButton.visible = createWorldScreen.tabManager.getCurrentTab() instanceof CreateWorldScreen.MoreTab);
             }
         });
 
