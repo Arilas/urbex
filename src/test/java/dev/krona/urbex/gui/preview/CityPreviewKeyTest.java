@@ -19,9 +19,25 @@ public class CityPreviewKeyTest {
         CityPreview preview = new CityPreview(null);
 
         // A key seen for the first time always needs a recompute.
-        assertTrue(preview.needsRecompute(7, "standard", 42L));
-        // The exact same (profileJsonHash, worldStyle, seed) triple again: no-op.
-        assertFalse(preview.needsRecompute(7, "standard", 42L));
+        assertTrue(preview.needsRecompute(7, "standard", 42L, CityPreview.Mode.MAP));
+        // The exact same (profileJsonHash, worldStyle, seed, mode) tuple again: no-op.
+        assertFalse(preview.needsRecompute(7, "standard", 42L, CityPreview.Mode.MAP));
+    }
+
+    @Test
+    public void switchingModeAloneForcesARecompute() {
+        CityPreview preview = new CityPreview(null);
+
+        // Same (profile, worldStyle, seed) but a different mode is a different picture, so each of the
+        // three modes must be a distinct cache key that triggers its own recompute - and repeats of
+        // any one of them stay no-ops.
+        assertTrue(preview.needsRecompute(7, "standard", 42L, CityPreview.Mode.MAP));
+        assertTrue(preview.needsRecompute(7, "standard", 42L, CityPreview.Mode.CITY));
+        assertTrue(preview.needsRecompute(7, "standard", 42L, CityPreview.Mode.TRANSPORT));
+        assertFalse(preview.needsRecompute(7, "standard", 42L, CityPreview.Mode.TRANSPORT));
+        // Going back to a mode already keyed elsewhere still recomputes (the key changed from the
+        // last call), confirming mode is a full participant in the key rather than a sticky flag.
+        assertTrue(preview.needsRecompute(7, "standard", 42L, CityPreview.Mode.MAP));
     }
 
     @Test

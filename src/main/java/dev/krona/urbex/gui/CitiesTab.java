@@ -479,8 +479,9 @@ public class CitiesTab extends GridLayoutTab {
             long seed = CityPreview.seedFromUi(screen.getUiState().getSeed(), previewSeedFallback);
             // A no-op unless (profile, worldstyle, seed) actually changed, so driving it from the
             // render pass is what makes the preview follow selection changes, seed edits and tab
-            // switches without any of them needing to know about the preview.
-            preview.update(profile, worldStyle, seed);
+            // switches without any of them needing to know about the preview. The Cities tab always
+            // shows the region map; the per-category city/transport views live in the editor.
+            preview.update(profile, worldStyle, seed, CityPreview.Mode.MAP);
 
             // resizeChildren() already aspect-fit this widget to (mapWidth, mapHeight + legend) via
             // CityPreview.fitPreview, so the map keeps its 62:58 ratio - pass the widget's own size
