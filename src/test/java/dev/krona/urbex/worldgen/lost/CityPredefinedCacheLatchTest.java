@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>
  * AssetRegistries.loadedPredefined is forced true in {@link #resetState()} so that every call here
  * reaches City's own guard directly, without needing real datapack-registered
- * PredefinedCity/PredefinedSphere content just to exercise the flag logic in isolation.
+ * predefined-city content just to exercise the flag logic in isolation.
  * <p>
  * Bootstrapped ({@link Bootstrap#bootStrap()}) because {@code ChunkCoord}/{@code Level.OVERWORLD}
  * and the vanilla registries City touches need it; done in {@code @BeforeAll} rather than a static

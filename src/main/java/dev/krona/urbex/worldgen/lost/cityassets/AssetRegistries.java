@@ -23,7 +23,6 @@ public class AssetRegistries {
     public static final RegistryAssetRegistry<Palette, PaletteRE> PALETTES = new RegistryAssetRegistry<>(CustomRegistries.PALETTE_REGISTRY_KEY, Palette::new);
     public static final RegistryAssetRegistry<ScatteredBuilding, ScatteredRE> SCATTERED = new RegistryAssetRegistry<>(CustomRegistries.SCATTERED_REGISTRY_KEY, ScatteredBuilding::new);
     public static final RegistryAssetRegistry<PredefinedCity, PredefinedCityRE> PREDEFINED_CITIES = new RegistryAssetRegistry<>(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, PredefinedCity::new);
-    public static final RegistryAssetRegistry<PredefinedSphere, PredefinedSphereRE> PREDEFINED_SPHERES = new RegistryAssetRegistry<>(CustomRegistries.PREDEFINEDSPHERES_REGISTRY_KEY, PredefinedSphere::new);
     public static final RegistryAssetRegistry<StuffObject, StuffSettingsRE> STUFF = new RegistryAssetRegistry<>(CustomRegistries.STUFF_REGISTRY_KEY, StuffObject::new);
 
     public static final Map<String, List<StuffObject>> STUFF_BY_TAG = new ConcurrentHashMap<>();
@@ -44,7 +43,6 @@ public class AssetRegistries {
         STYLES.reset();
         PALETTES.reset();
         PREDEFINED_CITIES.reset();
-        PREDEFINED_SPHERES.reset();
         STUFF.reset();
         STUFF_BY_TAG.clear();
         loaded = false;
@@ -77,11 +75,10 @@ public class AssetRegistries {
         if (level == null) {
             // Nothing to load without a level (the world-creation preview, chiefly - its
             // NullDimensionInfo.getWorld() is always null). Don't latch the "loaded" flag on a
-            // no-op: a real level arriving later must still get its predefined cities/spheres (#67).
+            // no-op: a real level arriving later must still get its predefined cities (#67).
             return;
         }
         PREDEFINED_CITIES.loadAll(level);
-        PREDEFINED_SPHERES.loadAll(level);
         loadedPredefined = true;
     }
 }

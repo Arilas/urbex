@@ -315,7 +315,7 @@ public class CustomizeScreen extends Screen {
      * Which preview view a given editor category shows: the Transport category (highways, railways)
      * gets the highway/rail overlay, the Roads category (the hierarchical street grid) gets the
      * road-class grid, the Buildings and Damage categories share the combined city-elevation-plus-
-     * damage close-up, and every other category (General, Cities, Spheres, Terrain, Spawn, Advanced)
+     * damage close-up, and every other category (General, Cities, Terrain, Spawn, Advanced)
      * keeps the region map. Pure and static so the mapping is unit-tested without constructing the
      * (GL) screen.
      */

@@ -17,11 +17,11 @@ public class LegacyTomlTest {
         JsonObject json = LegacyToml.toJson(List.of(
                 "#A comment",
                 "[profiles]",
-                "\tselectedProfile = \"biosphere\"",
+                "\tselectedProfile = \"cavern\"",
                 "\ttodoQueueSize = 50",
                 "\tforceSaplingGrowth = false"
         ));
-        assertEquals("biosphere", json.get("selectedProfile").getAsString());
+        assertEquals("cavern", json.get("selectedProfile").getAsString());
         assertEquals(50, json.get("todoQueueSize").getAsInt());
         assertFalse(json.get("forceSaplingGrowth").getAsBoolean());
     }
