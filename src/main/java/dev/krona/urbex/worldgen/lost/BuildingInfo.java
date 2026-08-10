@@ -450,6 +450,15 @@ public class BuildingInfo {
      * own or a neighbour's - or the decision graph stops being acyclic.
      */
     public static RoadType effectiveRoadType(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+        // The city test comes first, and it is not a matter of taste. Every chunk in the world builds
+        // a BuildingInfo, and the great majority of them are wilderness; asking the road field first
+        // would build the block layout five times over - once for this chunk and once per neighbour
+        // probe, each one sorting a candidate list with a comparator that hashes twice per comparison
+        // - only for the clip below to throw the answer away. EffectiveRoad.resolve returns NONE for
+        // a non-city chunk whatever the field said, so hoisting the test cannot change the answer.
+        if (!isCityRaw(coord, provider, profile)) {
+            return RoadType.NONE;
+        }
         RoadCell cell = provider.roadField().at(coord.chunkX(), coord.chunkZ());
         boolean connectedCityNeighbour = false;
         for (RoadDirection direction : RoadDirection.values()) {
@@ -464,7 +473,8 @@ public class BuildingInfo {
                 }
             }
         }
-        return EffectiveRoad.resolve(cell.type(), isCityRaw(coord, provider, profile), connectedCityNeighbour, false);
+        // isCity is true: the early return above is the only way past this point.
+        return EffectiveRoad.resolve(cell.type(), true, connectedCityNeighbour, false);
     }
 
     /**
