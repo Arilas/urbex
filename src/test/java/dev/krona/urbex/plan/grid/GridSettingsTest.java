@@ -25,6 +25,55 @@ class GridSettingsTest {
     }
 
     @Test
+    void primarySpacingXOutOfRangeIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.PRIMARY_ROAD_SPACING_X = 200;
+        assertNamesTheField(p, "primaryRoadSpacingX");
+    }
+
+    @Test
+    void primarySpacingZOutOfRangeIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.PRIMARY_ROAD_SPACING_Z = 200;
+        assertNamesTheField(p, "primaryRoadSpacingZ");
+    }
+
+    @Test
+    void primaryOptionalChanceOutOfRangeIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.PRIMARY_ROAD_OPTIONAL_CHANCE = 1.5f;
+        assertNamesTheField(p, "primaryRoadOptionalChance");
+    }
+
+    @Test
+    void primaryForceEveryOutOfRangeIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.PRIMARY_ROAD_FORCE_EVERY = 0;
+        assertNamesTheField(p, "primaryRoadForceEvery");
+    }
+
+    @Test
+    void minimumRoadSeparationOutOfRangeIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.MINIMUM_ROAD_SEPARATION = 1;
+        assertNamesTheField(p, "minimumRoadSeparation");
+    }
+
+    @Test
+    void minimumEdgeDistanceOutOfRangeIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.MINIMUM_ROAD_EDGE_DISTANCE = 1;
+        assertNamesTheField(p, "minimumRoadEdgeDistance");
+    }
+
+    @Test
+    void tertiaryChanceOutOfRangeIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.TERTIARY_ROAD_CHANCE = -0.1f;
+        assertNamesTheField(p, "tertiaryRoadChance");
+    }
+
+    @Test
     void anInvertedSecondaryCountOnXIsRejectedByName() {
         UrbexProfile p = profile();
         p.SECONDARY_ROAD_MIN_COUNT_X = 5;

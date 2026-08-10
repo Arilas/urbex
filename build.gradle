@@ -67,20 +67,44 @@ loom {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
             }
         }
+        // A second, narrow sample, added because the primary sample above (radius 3, offset 100)
+        // was confirmed to contain no bridgeable water on a primary line and no qualifying slope,
+        // so it never moved when planned bridges and sloped minor roads were added and CI was
+        // blind to both (see the hierarchical-streets Task 5 report). Widening the primary sample
+        // to cover them was rejected - radius 15 there is ~20x the generation work of radius 3,
+        // and it is the pin for everything else on this branch. This is a separate, disposable
+        // window instead: freshly located on seed 1337 at offset 97, radius 12 (chunks 85..109 on
+        // both axes), which contains BridgeSpan[orientation=X, fromX=86, fromZ=108, toX=90,
+        // toZ=108] - the only mechanically-guarded evidence on this branch that a planned bridge
+        // deck actually renders. A slope was also found nearby (93,116 - ZMAX), but including it
+        // would need the same radius 15 that was rejected above, so it stays uncovered here.
+        digestCheckBridge {
+            server()
+            setConfigName('Urbex Digest Check (bridge)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckbridge')
+            vmArg '-Durbex.digestCheck=12,rowmajor,97'
+            def golden = file('digest-bridge.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
     }
 }
 
 // A fresh, fully pinned dedicated-server environment for every digest run: fixed seed, default
 // (noise) world type, the 'default' urbex profile on the overworld, and no watchdog (the check
-// generates its whole chunk square on the server thread).
-tasks.register('prepareDigestCheck') {
-    notCompatibleWithConfigurationCache("writes the run directory")
-    doLast {
-        def dir = file('runs/digestcheck')
-        project.delete(new File(dir, 'world'))
-        dir.mkdirs()
-        new File(dir, 'eula.txt').text = 'eula=true\n'
-        new File(dir, 'server.properties').text = '''\
+// generates its whole chunk square on the server thread). Shared by every digest run config, each
+// against its own run directory so the two checks cannot clobber each other's world.
+def registerPrepareDigestCheck = { String taskName, String runDirPath ->
+    tasks.register(taskName) {
+        notCompatibleWithConfigurationCache("writes the run directory")
+        doLast {
+            def dir = file(runDirPath)
+            project.delete(new File(dir, 'world'))
+            dir.mkdirs()
+            new File(dir, 'eula.txt').text = 'eula=true\n'
+            new File(dir, 'server.properties').text = '''\
 level-seed=1337
 online-mode=false
 spawn-protection=0
@@ -88,14 +112,20 @@ view-distance=6
 max-tick-time=-1
 motd=urbex digest check
 '''
-        def cfgDir = new File(dir, 'world/serverconfig')
-        cfgDir.mkdirs()
-        new File(cfgDir, 'urbex.json').text = '{ "selectedProfile": "default" }\n'
+            def cfgDir = new File(dir, 'world/serverconfig')
+            cfgDir.mkdirs()
+            new File(cfgDir, 'urbex.json').text = '{ "selectedProfile": "default" }\n'
+        }
     }
 }
+registerPrepareDigestCheck('prepareDigestCheck', 'runs/digestcheck')
+registerPrepareDigestCheck('prepareDigestCheckBridge', 'runs/digestcheckbridge')
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
     dependsOn 'prepareDigestCheck'
+}
+tasks.matching { it.name == 'runDigestCheckBridge' }.configureEach {
+    dependsOn 'prepareDigestCheckBridge'
 }
 
 dependencies {
