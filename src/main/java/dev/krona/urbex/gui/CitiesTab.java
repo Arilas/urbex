@@ -196,21 +196,24 @@ public class CitiesTab extends GridLayoutTab {
     }
 
     /**
-     * Opens the pre-redesign editor on the preset the tab is showing. Phase 2 replaces that screen
-     * (Task 6) with one that edits {@link PresetSelection} directly; until then the two keep
-     * separate state, so the selection has to be handed across explicitly - otherwise
-     * "Customize this preset..." would open on whatever the old editor was last left on.
-     * {@code UrbexConfigScreen.done()} mirrors the result back, so a round trip stays consistent.
+     * Opens the Phase 2 {@link CustomizeScreen} on the preset the tab is showing. That screen edits a
+     * private copy and only touches {@link PresetSelection} on Done, so there is no cross-editor state
+     * to hand across any more (unlike the old {@code UrbexConfigScreen} this replaced). The reopen flag
+     * is set here so returning from the editor - a {@code setScreen(screen)} that re-runs
+     * {@code CreateWorldScreen.init()} - lands the player back on this tab.
      */
     private void openCustomizeEditor() {
         requestReopenOnCitiesTab();
         PresetSelection.Entry entry = PresetSelection.CLIENT.selected();
-        if (!entry.custom() && entry.profile().isPresent()) {
-            // Custom entries are deliberately left alone: ClientProfileSetup still holds the edited
-            // profile that produced them, and setProfile() cannot hand back one it never made.
-            ClientProfileSetup.CLIENT_SETUP.setProfile(entry.id());
+        UrbexProfile profile = entry.profile().orElse(null);
+        if (profile == null) {
+            // The "disabled" entry has no profile to customize; its button is inactive anyway.
+            forgetReopenOnCitiesTab();
+            return;
         }
-        Minecraft.getInstance().gui.setScreen(new UrbexConfigScreen(screen));
+        // A custom entry records where it started from in basedOn; a public preset is its own base.
+        String customizeBaseName = entry.custom() ? entry.basedOn() : entry.id();
+        Minecraft.getInstance().gui.setScreen(new CustomizeScreen(screen, profile, customizeBaseName));
     }
 
     /** Repopulates the detail panel from whatever {@link PresetSelection#CLIENT} currently holds. */
