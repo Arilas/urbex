@@ -1,6 +1,5 @@
 package dev.krona.urbex.data;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -75,7 +74,7 @@ class DatapackReferenceIntegrityTest {
                 JsonObject sbParts = sb == null ? null : asObject(sb.get("parts"));
                 if (sbParts != null) {
                     for (Map.Entry<String, JsonElement> e : sbParts.entrySet()) {
-                        forEachElement(e.getValue(), v -> ref(src, v, "parts"));
+                        refListOrString(src, e.getValue(), "parts");
                     }
                 }
             }
@@ -99,7 +98,7 @@ class DatapackReferenceIntegrityTest {
                         JsonObject g = asObject(parts.get(group));
                         if (g != null) {
                             for (Map.Entry<String, JsonElement> e : g.entrySet()) {
-                                forEachElement(e.getValue(), v -> ref(src, v, "parts"));
+                                refListOrString(src, e.getValue(), "parts");
                             }
                         }
                     }
@@ -164,6 +163,17 @@ class DatapackReferenceIntegrityTest {
         Path target = ROOT.resolve(targetCategory).resolve(name.substring(colon + 1) + ".json");
         if (!Files.isRegularFile(target)) {
             problems.add(src + ": \"" + name + "\" does not resolve to " + target);
+        }
+    }
+
+    private void refListOrString(String src, JsonElement el, String targetCategory) {
+        if (el == null) {
+            return;
+        }
+        if (el.isJsonPrimitive()) {
+            ref(src, el, targetCategory);
+        } else if (el.isJsonArray()) {
+            forEachElement(el, v -> ref(src, v, targetCategory));
         }
     }
 

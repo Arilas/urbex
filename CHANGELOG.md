@@ -6,7 +6,9 @@
   overworld clone). Cities are enabled by picking a profile on the world-creation Cities tab or
   via the `dimensionsWithProfiles` config. The sleep-on-a-special-bed teleport and its
   `specialBedBlock` config option are gone with it, and `dimensionsWithProfiles` now defaults to
-  empty.
+  empty. If an existing world has this dimension generated, leave it (return to the overworld)
+  before upgrading — the dimension disappears and players still inside it will be relocated by
+  vanilla.
 - **Removed the `standard_everywhere` world style.** A backward-compatibility leftover that had
   not been kept up to date. `standard` is the only bundled world style; with a single style the
   world-style dropdown on the Cities tab stays hidden.
