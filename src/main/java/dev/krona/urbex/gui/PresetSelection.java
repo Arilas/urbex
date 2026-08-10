@@ -25,9 +25,6 @@ import java.util.Optional;
  */
 public final class PresetSelection {
 
-    /** The shared client-side selection driving the Cities tab and the customize editor. */
-    public static final PresetSelection CLIENT = new PresetSelection();
-
     public static final String DISABLED_ID = "disabled";
     public static final String CUSTOM_ID = "customized";
 
@@ -42,6 +39,14 @@ public final class PresetSelection {
 
     private static final Entry DISABLED_ENTRY =
             new Entry(DISABLED_ID, Component.translatable("urbex.preset.disabled"), false, "", Optional.empty());
+
+    // Declared AFTER everything its constructor / instance-field initializers depend on (chiefly
+    // DISABLED_ENTRY, which `selected` initializes to). Static fields initialize in declaration order,
+    // so hoisting CLIENT above DISABLED_ENTRY would run the singleton's constructor while DISABLED_ENTRY
+    // is still null, leaving the singleton's `selected` null forever (headless tests miss it because
+    // they build fresh instances only after the class has finished loading). Keep CLIENT last.
+    /** The shared client-side selection driving the Cities tab and the customize editor. */
+    public static final PresetSelection CLIENT = new PresetSelection();
 
     private Entry selected = DISABLED_ENTRY;
     private UrbexProfile customProfile = null;
@@ -189,6 +194,11 @@ public final class PresetSelection {
     }
 
     public Entry selected() {
+        // Belt-and-suspenders against a static-init-order regression (see CLIENT's declaration): never
+        // hand back null, since callers like PresetListWidget dereference selected().id() on first open.
+        if (selected == null) {
+            selected = DISABLED_ENTRY;
+        }
         return selected;
     }
 

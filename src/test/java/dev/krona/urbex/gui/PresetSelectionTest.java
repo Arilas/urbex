@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,6 +61,21 @@ class PresetSelectionTest {
         assertTrue(component.getContents() instanceof TranslatableContents,
                 "expected a translatable component, got: " + component);
         return ((TranslatableContents) component.getContents()).getKey();
+    }
+
+    /**
+     * Static-init-order regression: the {@code CLIENT} singleton is constructed during class init, so
+     * its {@code selected} field initializer reads {@code DISABLED_ENTRY} at that moment. If CLIENT is
+     * declared before DISABLED_ENTRY, that read sees {@code null} and the singleton's selection is null
+     * forever - a real crash on the first Create-New-World open. This must touch the actual singleton,
+     * not a fresh {@code new PresetSelection()} (which captures a fully-initialized DISABLED_ENTRY and
+     * so can never reproduce the bug).
+     */
+    @Test
+    void theClientSingletonHasANonNullDisabledSelectionAfterClassInit() {
+        assertNotNull(PresetSelection.CLIENT.selected(),
+                "the CLIENT singleton must not construct with a null selection");
+        assertEquals(PresetSelection.DISABLED_ID, PresetSelection.CLIENT.selected().id());
     }
 
     @Test
