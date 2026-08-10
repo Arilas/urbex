@@ -150,6 +150,53 @@ class SettingsCompletenessTest {
         }
     }
 
+    /**
+     * {@link SettingControls} builds a {@link LogValueMapper} from every {@code logScale} slider's
+     * {@code (min, max)} at widget-creation time; that class needs GL to instantiate, so it cannot be
+     * exercised directly here. This pins the piece of the data that a widget test would otherwise catch:
+     * every log-scale slider's default value actually lands inside its own {@code (min, max)} and round-trips
+     * cleanly through the mapping the widget will use. {@code sliderBoundsAreSane()} above already covers
+     * {@code min > 0} for log-scale sliders, so it is not repeated here.
+     */
+    @Test
+    void logScaleSlidersRoundTripTheirDefaultValueThroughLogValueMapper() {
+        UrbexProfile profile = fresh();
+        for (SettingDescriptor d : Settings.ALL) {
+            if (d.kind() == ControlKind.SLIDER && d.logScale()) {
+                LogValueMapper mapper = new LogValueMapper(d.min(), d.max());
+                double defaultValue = (Double) d.getter().apply(profile);
+                double roundTripped = mapper.fromSlider(mapper.toSlider(defaultValue));
+                double relativeError = Math.abs((roundTripped - defaultValue) / defaultValue);
+                assertTrue(relativeError < 1e-9,
+                        "log-scale slider " + d.key() + " default " + defaultValue
+                                + " does not round-trip through LogValueMapper(" + d.min() + ", " + d.max()
+                                + "): got " + roundTripped + " (relative error " + relativeError + ")");
+            }
+        }
+    }
+
+    /**
+     * {@link SettingControls} reads a {@code CYCLE} descriptor's enum type off a live value via
+     * {@code getClass().getEnumConstants()} rather than a type token the descriptor doesn't carry (see Task 4's
+     * boxing convention). A cycle button is meaningless with fewer than two options, so this pins that every
+     * such descriptor's field type actually has at least two.
+     */
+    @Test
+    void cycleDescriptorsHaveAtLeastTwoEnumConstants() {
+        UrbexProfile profile = fresh();
+        for (SettingDescriptor d : Settings.ALL) {
+            if (d.kind() == ControlKind.CYCLE) {
+                Object value = d.getter().apply(profile);
+                assertTrue(value != null && value.getClass().isEnum(),
+                        "CYCLE descriptor " + d.key() + " getter did not return an enum value");
+                Object[] constants = value.getClass().getEnumConstants();
+                assertTrue(constants.length >= 2,
+                        "CYCLE descriptor " + d.key() + " enum " + value.getClass().getSimpleName()
+                                + " has fewer than two constants; a cycle button needs at least two");
+            }
+        }
+    }
+
     @Test
     void everyDescriptorHasNameAndTooltipLang() {
         JsonObject lang = loadLang();
