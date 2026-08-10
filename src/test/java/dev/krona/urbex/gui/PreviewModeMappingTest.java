@@ -9,14 +9,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * {@link CustomizeScreen#modeForCategory} is the pure wiring that picks which preview view the editor
  * shows for the category being edited (the widgets that call it are GL code, exercised only manually).
- * Transport -&gt; the highway/rail overlay; Buildings and Damage -&gt; the combined city-elevation-plus-
- * damage close-up; everything else -&gt; the region map.
+ * Transport -&gt; the highway/rail overlay; Roads -&gt; the road-class grid; Buildings and Damage -&gt; the
+ * combined city-elevation-plus-damage close-up; everything else -&gt; the region map.
  */
 class PreviewModeMappingTest {
 
     @Test
     void transportCategoryShowsTheTransportOverlay() {
         assertEquals(CityPreview.Mode.TRANSPORT, CustomizeScreen.modeForCategory(SettingCategory.TRANSPORT));
+    }
+
+    @Test
+    void roadsCategoryShowsTheRoadPreview() {
+        assertEquals(CityPreview.Mode.ROADS, CustomizeScreen.modeForCategory(SettingCategory.ROADS));
     }
 
     @Test
@@ -29,6 +34,7 @@ class PreviewModeMappingTest {
     void everyOtherCategoryKeepsTheRegionMap() {
         for (SettingCategory category : SettingCategory.values()) {
             if (category == SettingCategory.TRANSPORT
+                    || category == SettingCategory.ROADS
                     || category == SettingCategory.BUILDINGS
                     || category == SettingCategory.DAMAGE) {
                 continue;

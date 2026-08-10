@@ -313,14 +313,16 @@ public class CustomizeScreen extends Screen {
 
     /**
      * Which preview view a given editor category shows: the Transport category gets the highway/rail
-     * overlay, the Buildings and Damage categories share the combined city-elevation-plus-damage
-     * close-up, and every other category (General, Cities, Spheres, Terrain, Spawn, Advanced) keeps
-     * the region map. Pure and static so the mapping is unit-tested without constructing the (GL)
-     * screen.
+     * overlay, Roads gets the road-class grid (its settings stay on the Transport tab; this tab exists
+     * only to show what they produce), the Buildings and Damage categories share the combined
+     * city-elevation-plus-damage close-up, and every other category (General, Cities, Spheres, Terrain,
+     * Spawn, Advanced) keeps the region map. Pure and static so the mapping is unit-tested without
+     * constructing the (GL) screen.
      */
     static CityPreview.Mode modeForCategory(SettingCategory category) {
         return switch (category) {
             case TRANSPORT -> CityPreview.Mode.TRANSPORT;
+            case ROADS -> CityPreview.Mode.ROADS;
             case BUILDINGS, DAMAGE -> CityPreview.Mode.CITY;
             default -> CityPreview.Mode.MAP;
         };

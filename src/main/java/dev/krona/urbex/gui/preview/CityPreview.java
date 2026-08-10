@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.gui.NullDimensionInfo;
+import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
@@ -28,17 +29,20 @@ import java.util.Random;
  * repeated {@link #update} calls while the player is merely dragging a slider don't recompute
  * anything.
  * <p>
- * Three {@link Mode modes} share the same texture pipeline (compute an {@link #WIDTH}x{@link #HEIGHT}
+ * Four {@link Mode modes} share the same texture pipeline (compute an {@link #WIDTH}x{@link #HEIGHT}
  * {@code int[]}, upload it as a {@link DynamicTexture}, blit it aspect-fit with a legend strip below):
  * <ul>
  *   <li>{@link Mode#MAP} - the region map (city / building / water / terrain per chunk). Used by the
- *       Cities tab and by every editor category that isn't building- or transport-specific.</li>
+ *       Cities tab and by every editor category that isn't building-, transport- or road-specific.</li>
  *   <li>{@link Mode#CITY} - a close-up side-elevation of one city's building layout (floors above the
  *       ground line, cellars below) with the explosion damage overlaid on top, so the building shape
  *       and its destruction read together in one view (the old editor's separate Buildings + Damage
  *       modes combined).</li>
  *   <li>{@link Mode#TRANSPORT} - the region map (dimmed) with the highway and rail network drawn over
  *       it.</li>
+ *   <li>{@link Mode#ROADS} - the region map (dimmed) with the road field drawn over it, one colour per
+ *       {@link RoadType} class, so the primary/secondary/tertiary grid can be judged before a single
+ *       chunk generates.</li>
  * </ul>
  * "Honest" relative to the old editor's preview map renderer: that preview always ran
  * with {@code IDimensionInfo.getWorld() == null}, which silently skipped the worldstyle
@@ -49,14 +53,16 @@ import java.util.Random;
  */
 public class CityPreview implements AutoCloseable {
 
-    /** Which of the three views {@link #update} should render. Folded into the cache key. */
+    /** Which of the four views {@link #update} should render. Folded into the cache key. */
     public enum Mode {
         /** The region map: city / building / water / terrain, one pixel per chunk. */
         MAP,
         /** One city's building elevation (floors + cellars) with explosion damage overlaid. */
         CITY,
         /** The region map, dimmed, with the highway and rail network drawn on top. */
-        TRANSPORT
+        TRANSPORT,
+        /** The region map, dimmed, with the road field drawn on top: one colour per road class. */
+        ROADS
     }
 
     public static final int WIDTH = NullDimensionInfo.PREVIEW_WIDTH;
@@ -69,7 +75,7 @@ public class CityPreview implements AutoCloseable {
     private static final int SWATCH_SIZE = 8;
     private static final int SWATCH_GAP = 6;
 
-    // Region-map palette (MAP mode, and the dimmed base of TRANSPORT mode).
+    // Region-map palette (MAP mode, and the dimmed base of TRANSPORT and ROADS modes).
     private static final int CITY_COLOR = 0xff995555;
     private static final int BUILDING_COLOR = 0xffffffff;
     private static final int WATER_COLOR = 0xff000066;
@@ -206,6 +212,7 @@ public class CityPreview implements AutoCloseable {
                 // so it does not pay to build one there.
                 case MAP -> renderMap(new NullDimensionInfo(profile, seed, registryAccess));
                 case TRANSPORT -> renderTransport(new NullDimensionInfo(profile, seed, registryAccess), profile);
+                case ROADS -> renderRoads(new NullDimensionInfo(profile, seed, registryAccess));
                 case CITY -> renderCity(profile, seed);
             }
         } catch (IllegalArgumentException e) {
@@ -277,6 +284,53 @@ public class CityPreview implements AutoCloseable {
                 colors[z * WIDTH + x] = overlay == 0 ? base : blend(base, overlay);
             }
         }
+    }
+
+    // ---- ROADS -----------------------------------------------------------
+
+    /**
+     * The region map dimmed exactly as {@link #renderTransport} dims it, with the road field painted
+     * over the top: one opaque colour per {@link RoadType} (see {@link #roadColour}), so the grid's
+     * shape - primary spine, secondary fill, tertiary stubs - reads before any chunk generates.
+     * <p>
+     * Samples {@link dev.krona.urbex.plan.RoadField#typeAt} rather than {@code at} - thousands of
+     * chunks are sampled per frame, and {@code at} pays for the block-layout build (and its
+     * candidate-list sort) this mode has no use for.
+     * <p>
+     * A chunk an accepted multi-building has claimed is drawn as a building, never as a road:
+     * {@link BuildingInfo#getEffectiveRoadType()} still reports the class the raw field assigned
+     * there - the multi wins the content decision, not the field - so painting straight from the road
+     * type would draw a road through the building. Excluding it needs the same
+     * {@link BuildingInfo#hasBuildingGui} check {@link #sampleColor} already uses to choose
+     * {@link #BUILDING_COLOR} over {@link #CITY_COLOR}, so a building chunk here simply gets no
+     * overlay and the dimmed base (already the right colour) shows through.
+     */
+    private void renderRoads(NullDimensionInfo diminfo) {
+        for (int z = 0; z < HEIGHT; z++) {
+            for (int x = 0; x < WIDTH; x++) {
+                int base = soften(sampleColor(diminfo, x, z));
+                ChunkCoord c = new ChunkCoord(diminfo.dimension(), x, z);
+                ChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristicsGui(c, diminfo);
+                boolean roadable = characteristics.isCity && !BuildingInfo.hasBuildingGui(x, z, diminfo, characteristics);
+                RoadType type = roadable ? diminfo.roadField().typeAt(x, z) : RoadType.NONE;
+                colors[z * WIDTH + x] = blend(base, roadColour(type));
+            }
+        }
+    }
+
+    /**
+     * One opaque colour per road class, brightest for the highest-precedence class so the hierarchy
+     * reads at a glance; fully transparent for {@link RoadType#NONE} so {@link #blend} is a no-op and
+     * a non-road chunk simply keeps whatever the dimmed base map already drew there. Package-private
+     * static so the mapping is testable without a game.
+     */
+    static int roadColour(RoadType type) {
+        return switch (type) {
+            case PRIMARY -> 0xFFE8E8E8;
+            case SECONDARY -> 0xFFA8A8A8;
+            case TERTIARY -> 0xFF6C6C6C;
+            case NONE -> 0;
+        };
     }
 
     // ---- CITY ----------------------------------------------------------------
@@ -461,6 +515,11 @@ public class CityPreview implements AutoCloseable {
                 cx = renderSwatch(g, font, cx, y, HIGHWAY_COLOR, Component.translatable("urbex.preview.legend.highway"));
                 cx = renderSwatch(g, font, cx, y, RAIL_COLOR, Component.translatable("urbex.preview.legend.rail"));
                 renderSwatch(g, font, cx, y, CITY_COLOR, Component.translatable("urbex.preview.legend.city"));
+            }
+            case ROADS -> {
+                cx = renderSwatch(g, font, cx, y, roadColour(RoadType.PRIMARY), Component.translatable("urbex.preview.legend.primary"));
+                cx = renderSwatch(g, font, cx, y, roadColour(RoadType.SECONDARY), Component.translatable("urbex.preview.legend.secondary"));
+                renderSwatch(g, font, cx, y, roadColour(RoadType.TERTIARY), Component.translatable("urbex.preview.legend.tertiary"));
             }
         }
     }
