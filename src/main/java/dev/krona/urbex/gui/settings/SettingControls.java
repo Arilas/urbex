@@ -3,15 +3,22 @@ package dev.krona.urbex.gui.settings;
 import dev.krona.urbex.config.UrbexProfile;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.narration.NarratedElementType;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.util.Mth;
 
 import java.util.Locale;
 
@@ -187,14 +194,139 @@ public final class SettingControls {
         Object initialValue = d.getter().apply(target);
         boolean isArray = initialValue instanceof String[];
 
-        EditBox box = new EditBox(font, 0, 0, width, HEIGHT, Component.translatable(d.nameKey()));
+        Component label = Component.translatable(d.nameKey());
+        EditBox box = new EditBox(font, 0, 0, width, HEIGHT, label);
+        // Identifier and comma-joined list values easily run past the EditBox default cap; without a
+        // roomier limit setValue() would silently truncate the populated value (BUG 2b).
+        box.setMaxLength(1024);
         box.setValue(isArray ? String.join(", ", (String[]) initialValue) : (String) initialValue);
         box.setResponder(text -> {
             d.setter().accept(target, isArray ? splitList(text) : text);
             onChanged.run();
         });
-        box.setTooltip(Tooltip.create(Component.translatable(d.tooltipKey())));
-        return box;
+
+        // A bare EditBox renders only its editable content (its message is narration-only), so the
+        // TEXT settings read as unlabeled boxes. Wrap it with a visible label that names the setting
+        // and stays readable even once the field holds a value (BUG 2a).
+        LabeledTextField field = new LabeledTextField(font, label, box, width, HEIGHT);
+        field.setTooltip(Tooltip.create(Component.translatable(d.tooltipKey())));
+        return field;
+    }
+
+    /**
+     * A TEXT setting shown as a readable label on the left and its editable {@link EditBox} on the
+     * right, so the row makes clear <em>which</em> setting it is even when the field holds a value.
+     * It is a single {@link AbstractWidget} to fit the row model's one-control-per-row contract, and
+     * forwards every input event to the box (the only interactive part) so the field focuses, edits
+     * and writes back exactly as a standalone EditBox would.
+     */
+    private static final class LabeledTextField extends AbstractWidget {
+
+        /** Gap between label and field; and the label's share cap (percent of the row width). */
+        private static final int LABEL_GAP = 6;
+        private static final int LABEL_WIDTH_PERCENT = 45;
+
+        private final Font font;
+        private final Component label;
+        private final EditBox box;
+
+        private LabeledTextField(Font font, Component label, EditBox box, int width, int height) {
+            super(0, 0, width, height, label);
+            this.font = font;
+            this.label = label;
+            this.box = box;
+            layoutBox();
+        }
+
+        /** The label reads at its natural width, capped near half the row so the field keeps room. */
+        private int labelRegionWidth() {
+            return Mth.clamp(font.width(label), 0, Math.max(0, width * LABEL_WIDTH_PERCENT / 100));
+        }
+
+        private void layoutBox() {
+            int boxX = getX() + labelRegionWidth() + LABEL_GAP;
+            int boxRight = getX() + width;
+            box.setX(boxX);
+            box.setY(getY());
+            box.setWidth(Math.max(0, boxRight - boxX));
+            box.setHeight(height);
+        }
+
+        @Override
+        public void setX(int x) {
+            super.setX(x);
+            layoutBox();
+        }
+
+        @Override
+        public void setY(int y) {
+            super.setY(y);
+            layoutBox();
+        }
+
+        @Override
+        public void setWidth(int w) {
+            super.setWidth(w);
+            layoutBox();
+        }
+
+        @Override
+        public void setHeight(int h) {
+            super.setHeight(h);
+            layoutBox();
+        }
+
+        @Override
+        protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+            String shown = font.plainSubstrByWidth(label.getString(), labelRegionWidth());
+            int textY = getY() + Math.max(0, (height - font.lineHeight) / 2);
+            graphics.text(font, shown, getX(), textY, 0xffffffff);
+            box.extractRenderState(graphics, mouseX, mouseY, partialTick);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput output) {
+            output.add(NarratedElementType.TITLE, label);
+            output.add(NarratedElementType.HINT, Component.literal(box.getValue()));
+        }
+
+        // ---- input forwarding: the box is the only interactive part -------------------------
+
+        @Override
+        public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+            return box.mouseClicked(event, doubleClick);
+        }
+
+        @Override
+        public boolean mouseReleased(MouseButtonEvent event) {
+            return box.mouseReleased(event);
+        }
+
+        @Override
+        public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+            return box.mouseDragged(event, dragX, dragY);
+        }
+
+        @Override
+        public boolean keyPressed(KeyEvent event) {
+            return box.keyPressed(event);
+        }
+
+        @Override
+        public boolean keyReleased(KeyEvent event) {
+            return box.keyReleased(event);
+        }
+
+        @Override
+        public boolean charTyped(CharacterEvent event) {
+            return box.charTyped(event);
+        }
+
+        @Override
+        public void setFocused(boolean focused) {
+            super.setFocused(focused);
+            box.setFocused(focused);
+        }
     }
 
     private static String[] splitList(String text) {
