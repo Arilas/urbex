@@ -1,7 +1,10 @@
 package dev.krona.urbex.gui;
 
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.gui.preview.CityPreview;
+import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -17,15 +20,21 @@ import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * The "Cities" tab of the vanilla world-creation screen (injected by
@@ -56,6 +65,15 @@ public class CitiesTab extends GridLayoutTab {
     private static final int MAX_INFO_ROWS = 5;
     /** Below this the preview is more noise than information - hide it and give the space back. */
     private static final int MIN_PREVIEW_HEIGHT = 40;
+    /**
+     * Caps the preview width so a tall detail panel doesn't blow the little 62x58 map up to fill the
+     * whole column (the live-reported "tall smear"). Mirrors {@code CustomizeScreen}'s preview cap so
+     * both call sites show the map at roughly the same modest size.
+     */
+    private static final int MAX_PREVIEW_WIDTH = 130;
+
+    /** The built-in worldStyle every install ships; sorts first in the selector. */
+    private static final String STANDARD_STYLE = "standard";
 
     /**
      * The preview owns a GPU texture, and nothing tells a {@link net.minecraft.client.gui.components.tabs.Tab}
@@ -87,6 +105,17 @@ public class CitiesTab extends GridLayoutTab {
     private final Button customizeButton;
 
     /**
+     * The worldStyle selector - {@code null} (and absent from the layout entirely) whenever the
+     * datapacks register at most one style, so the common "standard-only" install shows nothing new.
+     * worldStyle is orthogonal to the preset (spec 1a): switching it never edits or clones a profile.
+     * <p>
+     * A plain {@link Button} that opens the {@link WorldStyleDialog} dropdown on press (vanilla has no
+     * combobox widget); its label shows the effective style, refreshed whenever that changes.
+     */
+    @Nullable
+    private final Button worldStyleButton;
+
+    /**
      * The seed the preview falls back to while the seed field is empty - vanilla's own
      * "no seed typed" case (see {@link CityPreview#seedFromUi}). The reroll button rolls a new one;
      * a typed seed wins over it, which is why the button locks while one is present.
@@ -109,6 +138,12 @@ public class CitiesTab extends GridLayoutTab {
         this.preview = newPreview(previewRegistries(screen));
         this.previewSeedFallback = random.nextLong();
 
+        // The registered worldStyles come from the datapacks enabled for the world being created,
+        // read straight off the load context's registry - the state layer only needs the id list, so
+        // the tab injects it rather than have PresetSelection reach into a registry it can't see.
+        List<String> worldStyles = registeredWorldStyles(screen);
+        PresetSelection.CLIENT.setAvailableWorldStyles(worldStyles);
+
         Font font = Minecraft.getInstance().font;
 
         // Widget sizes here are placeholders only: resizeChildren() derives every one of them from
@@ -123,10 +158,25 @@ public class CitiesTab extends GridLayoutTab {
         this.customizeButton = Button.builder(Component.translatable("urbex.screen.customize"),
                 b -> openCustomizeEditor()).build();
 
+        // Only offer the selector when there's an actual choice to make (more than one registered
+        // style); a single-style install keeps the tab exactly as it was.
+        if (worldStyles.size() > 1) {
+            String initial = PresetSelection.CLIENT.effectiveWorldStyle();
+            if (!worldStyles.contains(initial)) {
+                initial = worldStyles.get(0);
+            }
+            this.worldStyleButton = Button.builder(worldStyleLabel(initial), b -> openWorldStyleDropdown()).build();
+        } else {
+            this.worldStyleButton = null;
+        }
+
         this.layout.columnSpacing(COLUMN_SPACING);
         this.layout.addChild(list, 0, 0);
         LinearLayout detailColumn = this.layout.addChild(LinearLayout.vertical().spacing(ROW_SPACING), 0, 1);
         detailColumn.addChild(nameLabel);
+        if (worldStyleButton != null) {
+            detailColumn.addChild(worldStyleButton);
+        }
         detailColumn.addChild(infoText);
         detailColumn.addChild(previewWidget);
         LinearLayout buttonRow = detailColumn.addChild(LinearLayout.horizontal().spacing(ROW_SPACING));
@@ -177,40 +227,64 @@ public class CitiesTab extends GridLayoutTab {
         customizeButton.setWidth(detailWidth - ROW_SPACING - rerollButton.getWidth());
         customizeButton.setHeight(BUTTON_HEIGHT);
 
-        // Everything the description and the preview have to share, after the name row, the button
-        // row and the three gaps between the four stacked blocks.
-        int flexible = Math.max(0, contentHeight - font.lineHeight - BUTTON_HEIGHT - ROW_SPACING * 3);
+        // Everything the description and the preview have to share, after the fixed-height blocks
+        // (the name row, the button row, and the worldStyle selector when present) and the gaps
+        // between the stacked blocks.
+        int reserved = font.lineHeight + BUTTON_HEIGHT + ROW_SPACING * 3;
+        if (worldStyleButton != null) {
+            worldStyleButton.setWidth(detailWidth);
+            worldStyleButton.setHeight(BUTTON_HEIGHT);
+            reserved += BUTTON_HEIGHT + ROW_SPACING;
+        }
+        int flexible = Math.max(0, contentHeight - reserved);
 
         int infoRows = Mth.clamp(flexible / 2 / font.lineHeight, 1, MAX_INFO_ROWS);
         infoText.setMaxWidth(detailWidth);
         infoText.setMaxRows(infoRows);
 
-        int previewHeight = flexible - infoText.getHeight();
-        if (previewHeight < MIN_PREVIEW_HEIGHT) {
+        // Aspect-fit the 62x58 map (plus the legend strip below it) into the detail column, capped so
+        // it stays a compact map at the top of the panel rather than stretching to fill every pixel
+        // the description leaves free. Without this the widget took the whole flexible height and the
+        // render pass smeared the source into a tall column (BUG 1).
+        int previewSpace = flexible - infoText.getHeight();
+        int availWidth = Math.min(detailWidth, MAX_PREVIEW_WIDTH);
+        int availMapHeight = previewSpace - CityPreview.LEGEND_HEIGHT;
+        int[] map = CityPreview.fitPreview(availWidth, availMapHeight, CityPreview.WIDTH, CityPreview.HEIGHT);
+        int mapWidth = map[0];
+        int mapHeight = map[1];
+        if (mapHeight < MIN_PREVIEW_HEIGHT) {
             previewWidget.visible = false;
             previewWidget.setSize(0, 0);
         } else {
             previewWidget.visible = true;
-            previewWidget.setSize(detailWidth, previewHeight);
+            previewWidget.setSize(mapWidth, mapHeight + CityPreview.LEGEND_HEIGHT);
         }
     }
 
     /**
-     * Opens the pre-redesign editor on the preset the tab is showing. Phase 2 replaces that screen
-     * (Task 6) with one that edits {@link PresetSelection} directly; until then the two keep
-     * separate state, so the selection has to be handed across explicitly - otherwise
-     * "Customize this preset..." would open on whatever the old editor was last left on.
-     * {@code UrbexConfigScreen.done()} mirrors the result back, so a round trip stays consistent.
+     * Opens the Phase 2 {@link CustomizeScreen} on the preset the tab is showing. That screen edits a
+     * private copy and only touches {@link PresetSelection} on Done, so there is no cross-editor state
+     * to hand across any more (unlike the old world-creation config screen this replaced). The reopen flag
+     * is set here so returning from the editor - a {@code setScreen(screen)} that re-runs
+     * {@code CreateWorldScreen.init()} - lands the player back on this tab.
      */
     private void openCustomizeEditor() {
         requestReopenOnCitiesTab();
         PresetSelection.Entry entry = PresetSelection.CLIENT.selected();
-        if (!entry.custom() && entry.profile().isPresent()) {
-            // Custom entries are deliberately left alone: ClientProfileSetup still holds the edited
-            // profile that produced them, and setProfile() cannot hand back one it never made.
-            ClientProfileSetup.CLIENT_SETUP.setProfile(entry.id());
+        UrbexProfile profile = entry.profile().orElse(null);
+        if (profile == null) {
+            // The "disabled" entry has no profile to customize; its button is inactive anyway.
+            forgetReopenOnCitiesTab();
+            return;
         }
-        Minecraft.getInstance().gui.setScreen(new UrbexConfigScreen(screen));
+        // A custom entry records where it started from in basedOn; a public preset is its own base.
+        String customizeBaseName = entry.custom() ? entry.basedOn() : entry.id();
+        // Hand the editor the effective worldStyle (the chosen override if any, else the preset's
+        // own), so its preview equals the outcome and Save-as bakes the switched style, not the
+        // preset's default (spec 1a - otherwise the override is silently lost).
+        String effectiveWorldStyle = PresetSelection.CLIENT.effectiveWorldStyle();
+        Minecraft.getInstance().gui.setScreen(
+                new CustomizeScreen(screen, profile, customizeBaseName, effectiveWorldStyle));
     }
 
     /** Repopulates the detail panel from whatever {@link PresetSelection#CLIENT} currently holds. */
@@ -219,6 +293,15 @@ public class CitiesTab extends GridLayoutTab {
         nameLabel.setMessage(entry.name().copy().withStyle(ChatFormatting.BOLD));
         infoText.setMessage(describe(entry));
         customizeButton.active = !PresetSelection.DISABLED_ID.equals(entry.id());
+        // A preset change may have carried over the chosen style (still valid) or reset it to the new
+        // preset's own; either way the selector's label must show what actually generates. The disabled
+        // row has no style ("" is never a choice), so its button simply keeps its last label.
+        if (worldStyleButton != null) {
+            String effective = PresetSelection.CLIENT.effectiveWorldStyle();
+            if (PresetSelection.CLIENT.styleChoices().contains(effective)) {
+                worldStyleButton.setMessage(worldStyleLabel(effective));
+            }
+        }
         refreshSeedControls();
         if (lastTabArea != null) {
             // The new description is a different number of lines than the old one, so the preview
@@ -226,6 +309,77 @@ public class CitiesTab extends GridLayoutTab {
             // preview and a short one leaves a hole.
             doLayout(lastTabArea);
         }
+    }
+
+    /**
+     * Opens the {@link WorldStyleDialog} dropdown over the create-world screen. Like the customize
+     * editor, it hands the player off to a modal {@code Screen}; returning from it re-runs
+     * {@code CreateWorldScreen.init()}, so the reopen flag brings the player back to this tab (rather
+     * than the Game tab {@code init()}'s tail would otherwise select). The tab is rebuilt on that
+     * return, and its constructor reads {@code effectiveWorldStyle()} for the fresh button label, so
+     * a pick shows up whether or not the in-flight relabel below survives the rebuild.
+     */
+    private void openWorldStyleDropdown() {
+        requestReopenOnCitiesTab();
+        List<String> choices = PresetSelection.CLIENT.styleChoices();
+        String current = PresetSelection.CLIENT.effectiveWorldStyle();
+        Minecraft.getInstance().gui.setScreen(
+                new WorldStyleDialog(screen, choices, current, this::onWorldStyleChanged));
+    }
+
+    /**
+     * Applies a worldStyle the player picked from the dropdown: records it and republishes so the
+     * server sees the switched style (as an editor-style customization when it differs from the
+     * preset's own). The preview reads {@code effectiveWorldStyle()} on its render pass, so it
+     * follows on its own; the selector's own size is unchanged, so no relayout is needed.
+     */
+    private void onWorldStyleChanged(String style) {
+        PresetSelection.CLIENT.setWorldStyle(style);
+        PresetSelection.CLIENT.publish();
+        if (worldStyleButton != null) {
+            worldStyleButton.setMessage(worldStyleLabel(style));
+        }
+    }
+
+    /** The selector's label: the lang-keyed "World Style" prefix followed by the effective style id. */
+    private static Component worldStyleLabel(String style) {
+        return Component.translatable("urbex.tab.worldstyle")
+                .append(": ")
+                .append(Component.literal(style));
+    }
+
+    /**
+     * The registered worldStyle ids, read from the datapack registry loaded for the world being
+     * created (short {@code urbex}-namespace names, others kept as {@code namespace:path}), ordered
+     * {@code standard} first then alphabetical. Empty when the registry isn't reachable yet - the
+     * selector then just stays hidden.
+     */
+    private static List<String> registeredWorldStyles(CreateWorldScreen screen) {
+        RegistryAccess access = screen.getUiState().getSettings().worldgenLoadContext();
+        Optional<Registry<WorldStyleRE>> registry = access.lookup(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
+        if (registry.isEmpty()) {
+            return List.of();
+        }
+        List<String> ids = new ArrayList<>();
+        for (Identifier key : registry.get().keySet()) {
+            ids.add(worldStyleName(key));
+        }
+        ids.sort(Comparator.comparingInt((String s) -> STANDARD_STYLE.equals(s) ? 0 : 1)
+                .thenComparing(Comparator.naturalOrder()));
+        return ids;
+    }
+
+    /**
+     * The name a profile's {@code worldStyle} field stores for a registry key: the bare path for the
+     * mod's own namespace (so {@code urbex:standard} matches the profile default {@code "standard"}),
+     * {@code namespace:path} for any other datapack. Mirrors the old editor's client-side worldstyle
+     * naming, minus the file-path stripping that a registry key doesn't carry.
+     */
+    private static String worldStyleName(Identifier key) {
+        if (Urbex.MODID.equals(key.getNamespace())) {
+            return key.getPath();
+        }
+        return key.getNamespace() + ":" + key.getPath();
     }
 
     private void refreshSeedControls() {
@@ -319,17 +473,21 @@ public class CitiesTab extends GridLayoutTab {
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
             UrbexProfile profile = PresetSelection.CLIENT.selected().profile().orElse(null);
-            String worldStyle = profile == null ? "" : profile.getWorldStyle();
+            // The chosen worldStyle overrides the preset's own for the preview (spec 1a); with no
+            // override this is just the preset's own style. Empty for the disabled row (no profile).
+            String worldStyle = PresetSelection.CLIENT.effectiveWorldStyle();
             long seed = CityPreview.seedFromUi(screen.getUiState().getSeed(), previewSeedFallback);
             // A no-op unless (profile, worldstyle, seed) actually changed, so driving it from the
             // render pass is what makes the preview follow selection changes, seed edits and tab
-            // switches without any of them needing to know about the preview.
-            preview.update(profile, worldStyle, seed);
+            // switches without any of them needing to know about the preview. The Cities tab always
+            // shows the region map; the per-category city/transport views live in the editor.
+            preview.update(profile, worldStyle, seed, CityPreview.Mode.MAP);
 
-            // CityPreview draws the map into (width, height - legend) and the legend underneath it,
-            // so a square-ish map means passing a width close to the total height; the legend then
-            // gets the full column width to run along.
-            preview.render(graphics, getX(), getY(), Math.min(getWidth(), getHeight()), getHeight());
+            // resizeChildren() already aspect-fit this widget to (mapWidth, mapHeight + legend) via
+            // CityPreview.fitPreview, so the map keeps its 62:58 ratio - pass the widget's own size
+            // straight through. CityPreview.render draws the map into (width, height - legend) and the
+            // legend strip underneath.
+            preview.render(graphics, getX(), getY(), getWidth(), getHeight());
         }
 
         @Override

@@ -8,7 +8,6 @@
     "StructureStartMixin"
   ],
   "client": [
-    "CreateWorldScreenAccessor",
     "CreateWorldScreenTabMixin",
     "WorldListEntryMixin"
   ],
