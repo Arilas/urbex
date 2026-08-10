@@ -90,11 +90,20 @@ read/write goes through the existing `Configuration` bridge for now (see Non-goa
 All 131 profile settings get descriptors — none of today's 88 missing settings stay hidden.
 
 **Categories:** `★ General` (curated ~15: city chance, city min/max radius, building
-min/max floors, ruin %, explosion chances, loot & lighting density, world style, landscape
-type) · Cities · Buildings · Damage & ruins · Highways & rails · Spheres · Terrain & water ·
-Spawn · Advanced (everything exotic: per-biome multipliers, noise scales, editmode, …).
-A setting appears in exactly one category; `★ General` entries are *duplicated* references
-to their home-category descriptor, marked so search does not list them twice.
+min/max floors, ruin %, explosion chances, loot & lighting density, landscape type) · Cities ·
+Buildings · Damage & ruins · Highways & rails · Spheres · Terrain & water · Spawn · Advanced
+(everything exotic: per-biome multipliers, noise scales, editmode, …). **No duplication**
+(revised after in-game review): each setting appears in exactly one category. The curated
+common settings live *only* in General — they are removed from their home categories — so the
+same slider never shows twice. `general` is thus each descriptor's real home category, not a
+duplicate flag. (World style is not here; it is the Cities-tab dropdown, §1a.)
+
+**City Chance / explosion chances — the `-1` perlin mode.** `CITY_CHANCE = -1` selects a
+perlin-noise city map (the `largecities` preset uses it) — a mode, not a magnitude. The editor
+shows City Chance as a **log slider over the positive range** (so 0.0001 and 0.001 are
+distinguishable) plus a **"Perlin city map" toggle** that represents `-1`: toggle on ⇒ field is
+`-1` and the slider is inert; toggle off ⇒ field is the slider's positive value. Explosion and
+mini-explosion chances are plain log sliders (no `-1` mode).
 
 **Controls:**
 
