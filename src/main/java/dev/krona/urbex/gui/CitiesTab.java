@@ -265,7 +265,12 @@ public class CitiesTab extends GridLayoutTab {
         }
         // A custom entry records where it started from in basedOn; a public preset is its own base.
         String customizeBaseName = entry.custom() ? entry.basedOn() : entry.id();
-        Minecraft.getInstance().gui.setScreen(new CustomizeScreen(screen, profile, customizeBaseName));
+        // Hand the editor the effective worldStyle (the chosen override if any, else the preset's
+        // own), so its preview equals the outcome and Save-as bakes the switched style, not the
+        // preset's default (spec 1a - otherwise the override is silently lost).
+        String effectiveWorldStyle = PresetSelection.CLIENT.effectiveWorldStyle();
+        Minecraft.getInstance().gui.setScreen(
+                new CustomizeScreen(screen, profile, customizeBaseName, effectiveWorldStyle));
     }
 
     /** Repopulates the detail panel from whatever {@link PresetSelection#CLIENT} currently holds. */

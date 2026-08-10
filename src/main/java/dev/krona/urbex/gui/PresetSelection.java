@@ -66,8 +66,8 @@ public final class PresetSelection {
 
     /**
      * The full, current list of choices: {@code disabled} first, then public built-in presets
-     * ({@code default} first, then alphabetical - same ordering as the old
-     * the old editor's profile cycling), then the custom entry (if any) last.
+     * ({@code default} first, then alphabetical - same ordering as the old editor's profile
+     * cycling), then the custom entry (if any) last.
      */
     public List<Entry> entries() {
         List<Entry> result = new ArrayList<>();

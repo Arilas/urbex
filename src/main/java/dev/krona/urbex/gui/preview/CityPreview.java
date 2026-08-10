@@ -118,6 +118,10 @@ public class CityPreview implements AutoCloseable {
     @Override
     public void close() {
         closeTexture();
+        // Drop the cache key too: leaving it set would make a reused-after-close preview believe its
+        // (now-null) texture is still valid for that (profile, worldStyle, seed) and render
+        // "unavailable" forever. Callers rebuild today, so this only removes the trap.
+        key = null;
     }
 
     private void recompute(UrbexProfile profile, long seed) {

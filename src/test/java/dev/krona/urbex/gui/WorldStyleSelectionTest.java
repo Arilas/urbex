@@ -96,6 +96,37 @@ class WorldStyleSelectionTest {
     }
 
     @Test
+    void customizingWithAnActiveOverrideBakesItIntoTheEditorCopyAndTheSavedJson() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
+        selection.select("default");
+        selection.setWorldStyle("lcmt");
+
+        // What CitiesTab hands the editor: the effective style (the override), not the preset's own.
+        UrbexProfile base = ProfileSetup.STANDARD_PROFILES.get("default");
+        UrbexProfile editorCopy = CustomizeScreen.editorCopy(base, "default", selection.effectiveWorldStyle());
+        assertEquals("lcmt", editorCopy.getWorldStyle());
+
+        // Save-as writes saved.copyFrom(copy).toJson(): the override must survive to disk, not silently
+        // revert to the preset's own "standard".
+        UrbexProfile saved = new UrbexProfile("my_default", false);
+        saved.copyFrom(editorCopy);
+        assertEquals("lcmt", worldStyleOf(saved.toJson(false).toString()));
+    }
+
+    @Test
+    void customizingWithNoOverrideKeepsThePresetOwnStyle() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
+        selection.select("default");
+
+        UrbexProfile base = ProfileSetup.STANDARD_PROFILES.get("default");
+        UrbexProfile editorCopy = CustomizeScreen.editorCopy(base, "default", selection.effectiveWorldStyle());
+
+        assertEquals("standard", editorCopy.getWorldStyle());
+    }
+
+    @Test
     void selectingADifferentPresetKeepsAValidStyleButDropsAnInvalidOne() {
         PresetSelection selection = new PresetSelection();
         selection.setAvailableWorldStyles(List.of("standard", "lcmt"));

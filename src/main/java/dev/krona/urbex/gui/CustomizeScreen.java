@@ -79,6 +79,13 @@ public class CustomizeScreen extends Screen {
     private final String baseName;
     private final UrbexProfile base;
     private final UrbexProfile copy;
+    /**
+     * The effective worldStyle handed over from the Cities tab (spec 1a). Held so "Reset to preset"
+     * restores the base's <em>settings</em> without dropping the orthogonal worldStyle choice -
+     * worldStyle is not an editor setting. Blank means "keep the base's own style".
+     */
+    @Nullable
+    private final String worldStyleOverride;
     private CityPreview preview;
     /** True once {@link #removed()} has closed the preview, so the next {@link #init()} rebuilds it. */
     private boolean previewClosed;
@@ -103,16 +110,33 @@ public class CustomizeScreen extends Screen {
     /** Suppresses the search box responder while the code (not the player) clears it on a category switch. */
     private boolean suppressSearchResponder;
 
-    public CustomizeScreen(Screen parent, UrbexProfile base, String baseName) {
+    public CustomizeScreen(Screen parent, UrbexProfile base, String baseName, @Nullable String worldStyleOverride) {
         super(Component.translatable("urbex.screen.customize.title", baseName));
         this.parent = parent;
         this.createWorldScreen = parent instanceof CreateWorldScreen cws ? cws : null;
         this.base = base;
         this.baseName = baseName == null ? "" : baseName;
-        this.copy = new UrbexProfile(this.baseName + "-copy", false);
-        this.copy.copyFrom(base);
+        this.worldStyleOverride = worldStyleOverride;
+        this.copy = editorCopy(base, this.baseName, worldStyleOverride);
         this.preview = new CityPreview(previewRegistries(createWorldScreen));
         this.previewSeedFallback = random.nextLong();
+    }
+
+    /**
+     * The private working copy the editor edits: a fresh non-public profile seeded from {@code base},
+     * with the effective worldStyle the Cities tab handed over applied on top (spec 1a) so the
+     * editor's live preview, Done, and Save-as all reflect the switched style rather than the preset's
+     * own - otherwise an active override is silently lost when the player customizes or saves. A blank
+     * override keeps the base's own style. Package-visible so a headless test pins the override
+     * plumbing without constructing the (GL) screen.
+     */
+    static UrbexProfile editorCopy(UrbexProfile base, String baseName, @Nullable String worldStyleOverride) {
+        UrbexProfile copy = new UrbexProfile((baseName == null ? "" : baseName) + "-copy", false);
+        copy.copyFrom(base);
+        if (worldStyleOverride != null && !worldStyleOverride.isEmpty()) {
+            copy.setWorldStyle(worldStyleOverride);
+        }
+        return copy;
     }
 
     @Override
@@ -312,7 +336,12 @@ public class CustomizeScreen extends Screen {
     }
 
     private void reset() {
+        // Reset the base's settings, but re-apply the orthogonal worldStyle so a chosen style isn't
+        // silently lost by a settings reset (spec 1a: worldStyle is not an editor setting).
         copy.copyFrom(base);
+        if (worldStyleOverride != null && !worldStyleOverride.isEmpty()) {
+            copy.setWorldStyle(worldStyleOverride);
+        }
         dirty = false;
         rebuildControls();
         schedulePreview();
