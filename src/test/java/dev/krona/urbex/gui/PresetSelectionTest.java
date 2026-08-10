@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,6 +37,8 @@ class PresetSelectionTest {
     @BeforeEach
     void seedProfiles() {
         ProfileSetup.STANDARD_PROFILES.clear();
+        ProfileSetup.USER_PROFILES.clear();
+        ProfileSetup.PROFILE_BASED_ON.clear();
         ProfileSetup.STANDARD_PROFILES.put("zeta", new UrbexProfile("zeta", true));
         ProfileSetup.STANDARD_PROFILES.put("default", new UrbexProfile("default", true));
         ProfileSetup.STANDARD_PROFILES.put("alpha", new UrbexProfile("alpha", true));
@@ -48,6 +51,8 @@ class PresetSelectionTest {
     @AfterEach
     void clearProfiles() {
         ProfileSetup.STANDARD_PROFILES.clear();
+        ProfileSetup.USER_PROFILES.clear();
+        ProfileSetup.PROFILE_BASED_ON.clear();
         Config.reset();
     }
 
@@ -153,6 +158,73 @@ class PresetSelectionTest {
 
         assertEquals("customized", Config.profileFromClient);
         assertTrue(Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty());
+    }
+
+    @Test
+    void userSavedProfilesAppearAsCustomEntriesAfterPublicsWithBasedOnProvenance() {
+        // A hand-saved custom (via the Save-as editor) plus its provenance.
+        ProfileSetup.STANDARD_PROFILES.put("my_wasteland", new UrbexProfile("my_wasteland", false));
+        ProfileSetup.USER_PROFILES.add("my_wasteland");
+        ProfileSetup.PROFILE_BASED_ON.put("my_wasteland", "wasteland");
+
+        PresetSelection selection = new PresetSelection();
+        List<PresetSelection.Entry> entries = selection.entries();
+        List<String> ids = entries.stream().map(PresetSelection.Entry::id).toList();
+
+        // Publics first (disabled, default, then alphabetical), the user custom last. The "hidden"
+        // internal non-public built-in is NOT a user profile, so it stays hidden.
+        assertEquals(List.of("disabled", "default", "alpha", "cavern", "rare", "zeta", "my_wasteland"), ids);
+        assertFalse(ids.contains("hidden"));
+
+        PresetSelection.Entry saved = entries.get(entries.size() - 1);
+        assertTrue(saved.custom());
+        assertEquals("wasteland", saved.basedOn());
+        assertTrue(saved.profile().isPresent());
+    }
+
+    @Test
+    void internalNonPublicBuiltInIsNotListedEvenWhenNotAUserProfile() {
+        // "hidden" is registered non-public but never added to USER_PROFILES: it must not appear.
+        PresetSelection selection = new PresetSelection();
+
+        List<String> ids = selection.entries().stream().map(PresetSelection.Entry::id).toList();
+
+        assertFalse(ids.contains("hidden"));
+    }
+
+    @Test
+    void selectingASavedUserProfilePublishesUnderCustomizedCarryingItsJson() {
+        UrbexProfile saved = new UrbexProfile("my_wasteland", false);
+        saved.CITY_CHANCE = 0.5;
+        ProfileSetup.STANDARD_PROFILES.put("my_wasteland", saved);
+        ProfileSetup.USER_PROFILES.add("my_wasteland");
+        ProfileSetup.PROFILE_BASED_ON.put("my_wasteland", "wasteland");
+
+        PresetSelection selection = new PresetSelection();
+        selection.select("my_wasteland");
+        selection.publish();
+
+        // A custom (user-saved) selection reaches the server as the reconstructable "customized" name
+        // plus its full JSON, not by a name the server might not have on disk.
+        assertEquals("customized", Config.profileFromClient);
+        assertTrue(Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty(),
+                "the saved profile's JSON must travel so the server can rebuild it");
+    }
+
+    @Test
+    void aUserProfileNamedLikeTheCustomMarkerIsNotDoubleListed() {
+        // The transient CUSTOM_ID row is separate from saved files; a file literally named "customized"
+        // must not produce a second row alongside the transient one.
+        ProfileSetup.STANDARD_PROFILES.put("customized", new UrbexProfile("customized", false));
+        ProfileSetup.USER_PROFILES.add("customized");
+
+        PresetSelection selection = new PresetSelection();
+        selection.applyCustomized(new UrbexProfile("customized", false), "default");
+
+        long customizedRows = selection.entries().stream()
+                .filter(e -> "customized".equals(e.id()))
+                .count();
+        assertEquals(1, customizedRows);
     }
 
     @Test

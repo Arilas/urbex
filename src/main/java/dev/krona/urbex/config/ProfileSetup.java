@@ -3,6 +3,7 @@ package dev.krona.urbex.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import dev.krona.urbex.Urbex;
 import net.fabricmc.loader.api.FabricLoader;
 import org.apache.commons.io.FileUtils;
@@ -13,11 +14,25 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class ProfileSetup {
 
     public static final Map<String, UrbexProfile> STANDARD_PROFILES = new HashMap<>();
+
+    /**
+     * The subset of {@link #STANDARD_PROFILES} that came from a user file in
+     * {@code config/urbex/profiles/} rather than from {@link #initStandardProfiles()} - i.e. the
+     * hand-saved custom presets from the Customize editor. These surface as their own selectable rows
+     * in {@code PresetSelection.entries()} (customs, last), which is why they must be told apart from
+     * the internal non-public built-in variants (e.g. {@code void_outside}) that stay hidden.
+     */
+    public static final Set<String> USER_PROFILES = new LinkedHashSet<>();
+
+    /** Provenance for {@link #USER_PROFILES}: the id of the preset each was "saved as" a copy of. */
+    public static final Map<String, String> PROFILE_BASED_ON = new HashMap<>();
 
     static void initStandardProfiles() {
         STANDARD_PROFILES.clear();
@@ -456,8 +471,14 @@ public class ProfileSetup {
         initStandardProfiles();
         writeProfileFiles(profileDir);
 
+        // Names known before any user file is read are the built-ins; anything read from the user dir
+        // whose name isn't among them is a hand-saved custom.
+        Set<String> builtinNames = Set.copyOf(STANDARD_PROFILES.keySet());
+        USER_PROFILES.clear();
+        PROFILE_BASED_ON.clear();
+
         Urbex.getLogger().info("Reading profiles from 'config/urbex/profiles'");
-        readProfiles(profileDir);
+        readProfiles(profileDir, builtinNames);
     }
 
     static void writeProfileFiles(Path profileDir) {
@@ -490,7 +511,7 @@ public class ProfileSetup {
         }
     }
 
-    private static void readProfiles(Path profileDir) {
+    private static void readProfiles(Path profileDir, Set<String> builtinNames) {
         // listFiles is non-recursive and only matches "*.json" names directly inside profileDir,
         // so the "defaults" subdirectory (a directory, not a "*.json" file) is never picked up here.
         File[] files = new File(profileDir.toString()).listFiles((dir, name) -> name.endsWith(".json"));
@@ -503,8 +524,17 @@ public class ProfileSetup {
             try {
                 String json = FileUtils.readFileToString(file, "UTF-8");
                 String[] split = name.split("\\.");
-                UrbexProfile profile = new UrbexProfile(split[0], json);
-                STANDARD_PROFILES.put(split[0], profile);
+                String id = split[0];
+                UrbexProfile profile = new UrbexProfile(id, json);
+                STANDARD_PROFILES.put(id, profile);
+                if (!builtinNames.contains(id)) {
+                    // A file the user (or the Save-as editor) created: a first-class custom preset.
+                    USER_PROFILES.add(id);
+                    JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+                    if (root.has("basedOn")) {
+                        PROFILE_BASED_ON.put(id, root.getAsJsonPrimitive("basedOn").getAsString());
+                    }
+                }
             } catch (IOException e) {
                 Urbex.getLogger().error("Couldn't read profile '{}'!", name);
                 return;

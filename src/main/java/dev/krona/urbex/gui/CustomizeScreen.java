@@ -98,6 +98,8 @@ public class CustomizeScreen extends Screen {
     private SettingsList settingsList;
     private PreviewWidget previewWidget;
     private Button rerollButton;
+    /** The four bottom-bar buttons in display order, repopulated each {@link #init()}. */
+    private final List<AbstractWidget> bottomBar = new ArrayList<>();
     /** Suppresses the search box responder while the code (not the player) clears it on a category switch. */
     private boolean suppressSearchResponder;
 
@@ -155,10 +157,11 @@ public class CustomizeScreen extends Screen {
         }).build();
         addRenderableWidget(rerollButton);
 
-        addRenderableWidget(Button.builder(Component.translatable("urbex.screen.customize.save_as"), b -> openSaveAs()).build());
-        addRenderableWidget(Button.builder(Component.translatable("urbex.screen.customize.reset"), b -> reset()).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> done()).build());
-        addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> cancel()).build());
+        bottomBar.clear();
+        bottomBar.add(addRenderableWidget(Button.builder(Component.translatable("urbex.screen.customize.save_as"), b -> openSaveAs()).build()));
+        bottomBar.add(addRenderableWidget(Button.builder(Component.translatable("urbex.screen.customize.reset"), b -> reset()).build()));
+        bottomBar.add(addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> done()).build()));
+        bottomBar.add(addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> cancel()).build()));
 
         layoutWidgets();
         refreshRerollState();
@@ -217,31 +220,20 @@ public class CustomizeScreen extends Screen {
     }
 
     private void layoutBottomBar(int innerWidth, int y) {
-        List<AbstractWidget> bar = new ArrayList<>();
-        for (GuiEventListener child : this.children()) {
-            if (child instanceof Button button && isBottomBarButton(button)) {
-                bar.add(button);
-            }
-        }
-        // children() preserves insertion order, and the four bar buttons were added Save-as, Reset,
-        // Done, Cancel after the reroll button - filter reroll out (it lives by the preview).
-        int count = bar.size();
+        int count = bottomBar.size();
         if (count == 0) {
             return;
         }
         int buttonWidth = (innerWidth - GAP * (count - 1)) / count;
         int x = MARGIN;
         for (int i = 0; i < count; i++) {
-            AbstractWidget button = bar.get(i);
+            AbstractWidget button = bottomBar.get(i);
+            // The last button absorbs the integer-division remainder so the bar reaches the right margin.
             int w = i == count - 1 ? MARGIN + innerWidth - x : buttonWidth;
             button.setPosition(x, y);
             button.setSize(w, ROW_HEIGHT);
             x += buttonWidth + GAP;
         }
-    }
-
-    private boolean isBottomBarButton(Button button) {
-        return button != rerollButton;
     }
 
     private void rebuildControls() {
@@ -372,10 +364,12 @@ public class CustomizeScreen extends Screen {
             return false;
         }
 
+        // Register as a first-class user profile so it shows same-session (and, via the file above,
+        // after a restart) as its own selectable row with "based on" provenance.
         ProfileSetup.STANDARD_PROFILES.put(name, saved);
-        UrbexProfile selectionCopy = new UrbexProfile(name, false);
-        selectionCopy.copyFrom(saved);
-        PresetSelection.CLIENT.applyCustomized(selectionCopy, baseName);
+        ProfileSetup.USER_PROFILES.add(name);
+        ProfileSetup.PROFILE_BASED_ON.put(name, baseName);
+        PresetSelection.CLIENT.select(name);
         PresetSelection.CLIENT.publish();
         returnToTab();
         return true;

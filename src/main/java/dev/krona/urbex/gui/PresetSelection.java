@@ -77,6 +77,21 @@ public final class PresetSelection {
             result.add(new Entry(id, Component.literal(id), false, "", Optional.of(ProfileSetup.STANDARD_PROFILES.get(id))));
         }
 
+        // Hand-saved custom presets (from the Customize editor's "Save as"), sorted by name, each a
+        // first-class row carrying its "based on" provenance. Filtered to ones still registered, and
+        // never the CUSTOM_ID marker itself (that is the transient row below, not a saved file).
+        List<String> userIds = new ArrayList<>();
+        for (String id : ProfileSetup.USER_PROFILES) {
+            if (!CUSTOM_ID.equals(id) && ProfileSetup.STANDARD_PROFILES.containsKey(id)) {
+                userIds.add(id);
+            }
+        }
+        userIds.sort(String::compareTo);
+        for (String id : userIds) {
+            String basedOn = ProfileSetup.PROFILE_BASED_ON.getOrDefault(id, "");
+            result.add(new Entry(id, Component.literal(id), true, basedOn, Optional.of(ProfileSetup.STANDARD_PROFILES.get(id))));
+        }
+
         if (customProfile != null) {
             result.add(new Entry(CUSTOM_ID, Component.translatable("urbex.preset.custom"), true, customBasedOn, Optional.of(customProfile)));
         }
@@ -149,7 +164,14 @@ public final class PresetSelection {
      */
     public void publish() {
         Entry entry = selected;
-        Config.profileFromClient = DISABLED_ID.equals(entry.id()) ? null : entry.id();
+        // Custom entries (the transient "customized" row and hand-saved user presets alike) publish
+        // under CUSTOM_ID with their full JSON below, so the server reconstructs them from the JSON
+        // rather than needing the (possibly server-absent) user profile file by name.
+        if (entry.custom()) {
+            Config.profileFromClient = CUSTOM_ID;
+        } else {
+            Config.profileFromClient = DISABLED_ID.equals(entry.id()) ? null : entry.id();
+        }
 
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
