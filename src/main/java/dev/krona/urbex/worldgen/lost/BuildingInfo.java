@@ -9,7 +9,6 @@ import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
-import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -340,14 +339,8 @@ public class BuildingInfo {
             characteristics.cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(characteristics, coord, provider) : getAverageCityLevel(characteristics, coord, provider);
         }
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
-        characteristics.couldHaveBuilding = characteristics.isCity && checkBuildingPossibility(coord, provider, profile, characteristics.multiPos, characteristics.cityLevel, rand);
-        if ((profile.isSpace() || profile.isSpheres()) && characteristics.multiPos.isSingle()) {
-            // Minimize cities at the edge of the city in an orb
-            float dist = CitySphere.getRelativeDistanceToCityCenter(coord, provider);
-            if (dist > .7f) {
-                characteristics.couldHaveBuilding = false;
-            }
-        }
+        characteristics.couldHaveBuilding = ChunkContentResolver.couldHaveBuilding(coord, provider, profile,
+                characteristics.isCity, characteristics.multiPos, characteristics.cityLevel, rand);
 
         CityStyle cityStyle;
         // If this is a street we find other chunks connected to this and pick the cityStyle
@@ -438,55 +431,6 @@ public class BuildingInfo {
 
     public static boolean isCity(ChunkCoord coord, IDimensionInfo provider) {
         return getChunkCharacteristics(coord, provider).isCity;
-    }
-
-    private static boolean checkBuildingPossibility(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile, MultiPos section, int cityLevel, RandomSource rand) {
-        boolean b;
-        float bc = rand.nextFloat();
-
-        PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord);
-        if (predefinedBuilding != null) {
-            return true;    // We don't need other tests
-        }
-        PredefinedStreet predefinedStreet = City.getPredefinedStreet(provider.getWorld(), coord);
-        if (predefinedStreet != null) {
-            return false;   // No building here
-        }
-
-        CityStyle style = City.getCityStyle(coord, provider, profile);
-        float buildingChance = profile.BUILDING_CHANCE;
-        if (style.getBuildingChance() != null) {
-            buildingChance = style.getBuildingChance();
-        }
-
-        if (section.isMulti()) {
-            // Part of multi-building. We have checked everything above
-            b = true;
-        } else if (bc >= buildingChance) {
-            // Random says we should have no building here
-            b = false;
-        } else if (hasHighway(coord, provider, profile)) {
-            // We are above a highway. Check if we have room for a building
-            int maxh = Math.max(Highway.getXHighwayLevel(coord, provider, profile), Highway.getZHighwayLevel(coord, provider, profile));
-            b = cityLevel > maxh + 1;       // Allow a building if it is higher than the maximum highway + one
-            // Later we will take care to make sure we don't have too many cellars
-            // Note that for easy of coding we still disallow multi-buildings above highways
-        } else if (hasRailway(coord, provider, profile)) {
-            // We are above a railway. Check if we have room for a building
-            Railway.RailChunkInfo info = Railway.getRailChunkType(coord, provider, profile);
-            if (info.getType() == RailChunkType.STATION_UNDERGROUND) {
-                b = false;  // No building directly above the underground station
-            } else {
-                int maxh = info.getLevel();
-                b = cityLevel > maxh + 1;       // Allow a building if it is higher than the maximum railway + one
-                // Later we will take care to make sure we don't have too many cellars
-                // Note that for easy of coding we still disallow multi-buildings above railways
-            }
-        } else {
-            // General case
-            b = true;
-        }
-        return b;
     }
 
     /**
@@ -707,44 +651,34 @@ public class BuildingInfo {
 
         RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_LAYOUT);
 
-        boolean b = characteristics.couldHaveBuilding;
-        if (b && multiBuildingPos.isSingle()) {
-            if (rand.nextFloat() < getChunkCharacteristics(coord.west(), provider).buildingType.getPrefersLonely()) {
-                b = false;
-            } else if (rand.nextFloat() < getChunkCharacteristics(coord.east(), provider).buildingType.getPrefersLonely()) {
-                b = false;
-            } else if (rand.nextFloat() < getChunkCharacteristics(coord.north(), provider).buildingType.getPrefersLonely()) {
-                b = false;
-            } else if (rand.nextFloat() < getChunkCharacteristics(coord.south(), provider).buildingType.getPrefersLonely()) {
-                b = false;
+        CityStyle cs = characteristics.cityStyle;
+
+        // The city sphere centre override settles two separate things from one switch: whether this
+        // chunk counts as city at all (here) and whether it may hold a building (in the resolver).
+        CitySphereSettings.CitySphereCenterType centertype = null;
+        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.isCitySphereCenter(coord, provider)) {
+            CitySphereSettings settings = provider.getWorldStyle().getCitysphereSettings();
+            if (settings != null) {
+                centertype = settings.getCenterType();
             }
         }
 
         boolean c = characteristics.isCity;
-        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.isCitySphereCenter(coord, provider)) {
-            CitySphereSettings settings = provider.getWorldStyle().getCitysphereSettings();
-            if (settings != null) {
-                CitySphereSettings.CitySphereCenterType centertype = settings.getCenterType();
-                switch (centertype) {
-                    case DEFAULT -> {
-                    }
-                    case STREET -> {
-                        c = true;
-                        b = false;
-                    }
-                    case BUILDING -> {
-                        c = true;
-                        b = true;
-                    }
-                    case NORMAL -> {
-                        c = false;
-                    }
+        if (centertype != null) {
+            switch (centertype) {
+                case DEFAULT -> {
                 }
+                case STREET, BUILDING -> c = true;
+                case NORMAL -> c = false;
             }
         }
-
         isCity = c;
-        hasBuilding = b;
+
+        ChunkContent content = ChunkContentResolver.resolve(profile, cs, rand,
+                characteristics.couldHaveBuilding, multiBuildingPos, coord,
+                neighbour -> getChunkCharacteristics(neighbour, provider).buildingType.getPrefersLonely(),
+                centertype, characteristics.buildingType.getName());
+        hasBuilding = content.hasBuilding();
 
         int wl;
         if (outsideChunk) {
@@ -756,8 +690,6 @@ public class BuildingInfo {
         }
         waterLevel = wl == -1 ? Tools.getSeaLevel(provider.getWorld()) : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.getWorldStyle().getWorldSettings().railwayAvoidance();
-
-        CityStyle cs = characteristics.cityStyle;
 
         // In a multi building we copy all information from the top-left chunk
         if (multiBuildingPos.isMulti() && !multiBuildingPos.isTopLeft()) {
@@ -781,12 +713,7 @@ public class BuildingInfo {
             highwayXLevel = Highway.getXHighwayLevel(key, provider, profile);
             highwayZLevel = Highway.getZHighwayLevel(key, provider, profile);
 
-            float parkChance = cs.getParkChance() != null ? cs.getParkChance() : profile.PARK_CHANCE;
-            if (rand.nextDouble() < parkChance) {
-                streetType = StreetType.PARK;
-            } else {
-                streetType = StreetType.randomNonPark(rand);
-            }
+            streetType = content.streetType();
             float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
             if (rand.nextFloat() < fountainChance) {
                 fountainType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomFountain(rand, this.coord));
