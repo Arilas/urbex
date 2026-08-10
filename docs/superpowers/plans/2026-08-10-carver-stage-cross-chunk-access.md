@@ -19,7 +19,7 @@
 - **`./gradlew test` must pass at the end of every task.** Only the pinned digest values may be stale mid-branch.
 - **The `plan` package must not import Minecraft**; `PlanPurityTest` enforces this.
 - **Datapack references are fully namespaced** (`urbex:name`); `DatapackReferenceIntegrityTest` enforces it.
-- **Never mark an issue closed that is only partly addressed.** #20 has two halves; this work addresses one.
+- **This branch closes both #101 and #20.** #20's defect is vine-specific — order-dependent gating on chunk status — and removing vines removes it. Its mention of post-todo writes is context explaining why the digest could not observe the vine path, not a second defect; it never claims those writes are order-dependent, and the probe found no post-todo frames in any unsafe read.
 
 ## Commands
 
@@ -118,7 +118,11 @@ The CHANGELOG entry depends on this. Read how `WorldSettings.CODEC` is built and
 
 - [ ] **Step 7: Correct the two stale comments**
 
-`ChunkDriver.java:44-56` and `CommandDigest.java:25-29` both name vine generation as a path that bypasses the driver and is therefore invisible to the digest, citing #20. The vine half is gone; **the post-todo writes named alongside it are not**. Reword both so they describe only the surviving path, and keep the #20 reference — that issue remains open for the post-todo half.
+`ChunkDriver.java:44-56` and `CommandDigest.java:25-29` both name vine generation as a path that bypasses the driver and is therefore invisible to the digest, citing #20 as a known order-dependence.
+
+Vines are gone, and #20 goes with them. Post-todo writes still bypass the driver, so the *blind spot* is real and the comments should still describe it — but drop the #20 citation and the "known to be order-dependent" framing, which was only ever true of vines. State it plainly: writes made straight to the world are not recorded by the driver and so are not covered by the digest, and today that is the post-todo callbacks.
+
+Add that the gate introduced in Task 4 covers the residual risk from the other side: a post-todo write that ever crossed a chunk boundary would resolve the neighbour through `getChunk` and be counted.
 
 - [ ] **Step 8: Run the tests**
 
@@ -146,6 +150,8 @@ window, 179 guard evaluations and 0 passes.
 That guard is also the order-dependence tracked in #20 - whether a wall
 got vines depended on which chunk generated first - and it wrote through
 the world rather than the driver, so the digest could never see it.
+
+Closes #20.
 
 With chunk-sized buildings most vine surface is at chunk borders, so what
 remained working was a small fraction of the intent. Removed rather than
@@ -562,9 +568,9 @@ window still containing its bridge and slope."
 
 - [ ] **Step 6: Update the issues**
 
-Close #101 with the before/after unsafe-read counts — the baseline on `main` was 88 occurrences across 8 distinct chunk pairs.
+Close **#101** with the before/after unsafe-read counts — the baseline on `main` was 88 occurrences across 8 distinct chunk pairs.
 
-Comment on #20 but **do not close it**. Its vine half is resolved; the post-todo writes it also names still bypass the driver and remain structurally invisible to the digest. Say which half went and which remains, so the issue's remaining scope is clear.
+Close **#20** as well. Its defect is the chunk-status gating in `ChunkFixer`, which no longer exists; the invisibility it describes was the reason that defect could not be caught, not a second bug. Say so in the closing comment, and record two things for anyone who finds the issue later: post-todo writes still bypass the driver and so remain outside the digest's coverage, and Task 4's gate now catches any write or read that crosses a chunk boundary, which is the failure mode that made the vine bug matter.
 
 ---
 
