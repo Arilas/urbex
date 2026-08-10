@@ -124,21 +124,26 @@ inherit a rule that no longer applies. Keep the surrounding discipline intact: t
 independent decisions must still never share an address and a key, and new consumers still append
 rather than reorder.
 
-## 6. Accepted cost: both safety nets move at once
+## 6. Both safety nets move at once — and that is fine here
 
-This is the one piece of work in this sequence with **no mechanical guard holding still underneath
-it**. `RngTest`'s golden vectors have been the proof for every hash change on this branch, and the
-digest the proof for every generation change. Part C moves the vectors and Parts A and B move the
-digest.
+`RngTest`'s golden vectors have been the proof for every hash change on this branch, and the digest
+the proof for every generation change. Part C moves the vectors while Parts A and B move the digest,
+so for this one change nothing pinned holds still underneath.
 
-Mitigations, in order of value:
+**That matters less than it would sound elsewhere.** The mod is unreleased and entirely internal:
+there are no player worlds to protect, and the only worlds in existence are test worlds that get
+recreated. The goldens exist to catch *unintended* change, and every change here is intended and
+enumerated. Re-pinning them deliberately is the normal operation, not a loss.
 
-1. **Separate commits per part**, so a bisect can attribute a change to a step.
+Structure worth keeping anyway, for reasons that survive the above:
+
+1. **Separate commits per part**, so a bisect can attribute a later surprise to a step.
 2. **The suite green at each step**, so only the pinned values move.
 3. **Both goldens regenerated once, at the end**, each from two agreeing runs. Intermediate commits
-   will carry a stale digest; that is expected on a branch and must not be worked around by
-   regenerating repeatedly.
-4. **The acceptance test below is independent of both goldens**, which is what makes this tolerable.
+   carry a stale digest; that is expected on a branch and must not be worked around by regenerating
+   repeatedly.
+4. **The acceptance test in §7 is independent of both goldens**, so the thing this work is actually
+   for is verified by something neither part can perturb.
 
 ## 7. Verification
 
@@ -148,11 +153,20 @@ injects at `WorldGenRegion.getChunk`, compares the requested chunk against `cent
 `dev.krona.urbex` frames. After the fix, **no trace may carry an Urbex frame.** This measures the
 thing #101 is actually about rather than a proxy for it.
 
-**Make it permanent.** Rather than a throwaway probe, this should become a standing gate in the same
-spirit as `requireBridge` and `requireSlope`: count unsafe reads attributable to Urbex frames during
-a digest run and fail when the count is non-zero. Without it, the next cross-chunk read added
-anywhere in generation reintroduces this silently — which is exactly how it went unnoticed for
-months the first time.
+**It becomes permanent.** The probe graduates into a standing gate, in the same spirit as
+`requireBridge` and `requireSlope`: count unsafe reads whose stack carries a `dev.krona.urbex` frame
+during a digest run, and fail when the count is non-zero. Without it, the next cross-chunk read
+added anywhere in generation reintroduces this silently — which is exactly how it went unnoticed for
+months the first time, and the reason this spec exists at all.
+
+Two constraints on how it is built:
+
+- **It must distinguish our reads from vanilla's.** The probe already saw one violation with no
+  Urbex frames (`writeRadius=-1`), so a plain log grep for the vanilla message would fail on
+  something we neither caused nor can fix. The gate keys on Urbex frames being present.
+- **It must cost nothing in normal play.** The injection sits on `WorldGenRegion.getChunk`, a hot
+  path. Gate it behind a `static final boolean` read once from a system property that only the
+  digest run configurations set, so the JIT can eliminate it everywhere else.
 
 **In-game check.** Fences, walls and stairs at chunk borders now resolve at postprocessing. Confirm
 they still connect correctly across boundaries, and that no vines remain anywhere.
@@ -173,9 +187,12 @@ chunk pairs.
 
 ## 9. Known limitations accepted
 
-- **Border vines are gone and not replaced in-tree.** The migration path is a datapack concern by
-  design. Buildings will look barer at chunk edges than they did before `15dba5f2`, though not
-  barer than they have looked since.
+- **Vines are gone, and nothing replaces them.** The datapack path in §3 is what becomes *possible*,
+  not a plan: the mod is unreleased and internal, so there are no third-party datapacks and nobody
+  is going to author building-side vines. Buildings will simply have no vines until someone decides
+  they want them badly enough to paint them into an asset. Border vines have been absent since
+  `15dba5f2` regardless; this removes the in-chunk ones too, which is a real if modest visual loss
+  taken deliberately in exchange for deleting a subsystem whose main surface never worked.
 - **Border block connections resolve one step later.** If a block's postprocessing path does not
   produce the same result as an immediate `updateShape`, the difference will show at chunk borders.
   The in-game check exists for this.
