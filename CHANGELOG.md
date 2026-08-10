@@ -7,6 +7,9 @@
   via the `dimensionsWithProfiles` config. The sleep-on-a-special-bed teleport and its
   `specialBedBlock` config option are gone with it, and `dimensionsWithProfiles` now defaults to
   empty.
+- **Removed the `standard_everywhere` world style.** A backward-compatibility leftover that had
+  not been kept up to date. `standard` is the only bundled world style; with a single style the
+  world-style dropdown on the Cities tab stays hidden.
 
 ## 0.1.0 — 2026-08-03 (alpha preview)
 
