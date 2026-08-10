@@ -20,7 +20,6 @@ public class ConditionPart extends ConditionTest {
                     Codec.BOOL.optionalFieldOf("ground").forGetter(l -> Optional.ofNullable(l.getGround())),
                     Codec.BOOL.optionalFieldOf("cellar").forGetter(l -> Optional.ofNullable(l.getCellar())),
                     Codec.BOOL.optionalFieldOf("isbuilding").forGetter(l -> Optional.ofNullable(l.getIsbuilding())),
-                    Codec.BOOL.optionalFieldOf("issphere").forGetter(l -> Optional.ofNullable(l.getIssphere())),
                     Codec.INT.optionalFieldOf("floor").forGetter(l -> Optional.ofNullable(l.getFloor())),
                     Codec.INT.optionalFieldOf("chunkx").forGetter(l -> Optional.ofNullable(l.getChunkx())),
                     Codec.INT.optionalFieldOf("chunkz").forGetter(l -> Optional.ofNullable(l.getChunkz())),
@@ -46,7 +45,6 @@ public class ConditionPart extends ConditionTest {
                          Optional<Boolean> ground,
                          Optional<Boolean> cellar,
                          Optional<Boolean> isbuilding,
-                         Optional<Boolean> issphere,
                          Optional<Integer> floor,
                          Optional<Integer> chunkx,
                          Optional<Integer> chunkz,
@@ -55,7 +53,7 @@ public class ConditionPart extends ConditionTest {
                          Optional<Either<List<String>,String>> inbuilding,
                          Optional<Either<List<String>,String>> inbiome,
                          Optional<String> range) {
-        super(top, ground, cellar, isbuilding, issphere, floor, chunkx, chunkz, convertSetOrString(belowpart), convertSetOrString(inpart),
+        super(top, ground, cellar, isbuilding, floor, chunkx, chunkz, convertSetOrString(belowpart), convertSetOrString(inpart),
                 convertSetOrString(inbuilding), convertSetOrString(inbiome), range);
         this.factor = factor;
         this.value = value.intern();

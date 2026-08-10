@@ -129,7 +129,6 @@ public class NullDimensionInfo implements IDimensionInfo {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                Optional.empty(),
                 Collections.emptyList(),
                 Optional.empty()
         ));
@@ -177,11 +176,6 @@ public class NullDimensionInfo implements IDimensionInfo {
     @Override
     public UrbexProfile getProfile() {
         return profile;
-    }
-
-    @Override
-    public UrbexProfile getOutsideProfile() {
-        return  profile;
     }
 
     @Override

@@ -73,12 +73,6 @@ public class Highway {
             return -1;
         }
 
-        // Disable highways that intersect with cityspheres
-        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.intersectsWithCitySphere(cp, provider)) {
-            cache.put(cp, -1);
-            return -1;
-        }
-
         if (hasHighway.apply(cp)) {
             // This is part of a highway. Find the left-most chunk that is still part of this highway
             ChunkCoord lowerEnd = scanHighwayExtent(hasHighway, cp.lower(orientation), orientation, false, MAX_HIGHWAY_SCAN);

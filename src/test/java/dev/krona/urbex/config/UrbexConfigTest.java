@@ -44,10 +44,10 @@ public class UrbexConfigTest {
         JsonObject base = JsonParser.parseString(
                 "{\"selectedProfile\": \"default\", \"todoQueueSize\": 50}").getAsJsonObject();
         JsonObject overlay = JsonParser.parseString(
-                "{\"selectedProfile\": \"biosphere\"}").getAsJsonObject();
+                "{\"selectedProfile\": \"cavern\"}").getAsJsonObject();
         JsonObject merged = UrbexConfig.merge(base, overlay);
         UrbexConfig cfg = UrbexConfig.fromJson(merged).orElseThrow();
-        assertEquals("biosphere", cfg.selectedProfile());   // overlay wins
+        assertEquals("cavern", cfg.selectedProfile());   // overlay wins
         assertEquals(50, cfg.todoQueueSize());              // base survives where overlay is silent
     }
 

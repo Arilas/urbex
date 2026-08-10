@@ -49,7 +49,8 @@ public final class Rng {
         // again, reuse this constant rather than appending a new one.
         HIGHWAY,
         RAILWAY,
-        SPHERE,
+        // Unused slots preserve stable addresses for unrelated consumers below them.
+        RESERVED_19,
         SCATTERED,
         // Added after the first release of this enum. New consumers append here; they never
         // reorder what is above them, so an existing world keeps generating what it did.
@@ -62,12 +63,9 @@ public final class Rng {
         EXPLOSION_MINI,
         RUINS_BARS,
         DAMAGE_VARIANT,
-        // Each of these splits a second, logically independent decision off an address that
-        // already had one. Two decisions sharing an address and a purpose read the same draw, so
-        // one becomes a monotone function of the other - a sphere's block from its radius, a
-        // vine's length from where vines start.
-        SPHERE_BLOCKS,
-        SPHERE_CITY_LEVEL,
+        // Unused slots preserve stable addresses for unrelated consumers below them.
+        RESERVED_30,
+        RESERVED_31,
         VINES_CONTINUE,
         TERRAIN_FIX_LOWER,
         TERRAIN_FIX_UPPER,

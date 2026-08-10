@@ -106,10 +106,9 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
             if (profile == null) {
                 return null;
             }
-            UrbexProfile outsideProfile = profile.CITYSPHERE_OUTSIDE_PROFILE == null ? null : ProfileSetup.STANDARD_PROFILES.get(profile.CITYSPHERE_OUTSIDE_PROFILE);
             // Built outside the map. Two threads may both build one for the same dimension the
             // first time a chunk is generated - the loser's is simply dropped, caches and all.
-            IDimensionInfo diminfo = new DefaultDimensionInfo(world, profile, outsideProfile);
+            IDimensionInfo diminfo = new DefaultDimensionInfo(world, profile);
             IDimensionInfo raced = dimensionInfo.putIfAbsent(type, diminfo);
             return raced != null ? raced : diminfo;
         }

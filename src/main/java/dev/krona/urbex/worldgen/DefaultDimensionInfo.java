@@ -31,7 +31,6 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     // CityFeature.place used to be protecting.
     private final WorldGenLevel world;
     private final UrbexProfile profile;
-    private final UrbexProfile profileOutside;
     private final WorldStyle style;
     private final DimensionCaches caches;
 
@@ -39,10 +38,9 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     private final CityGenerator feature;
     private final RoadField roadField;
 
-    public DefaultDimensionInfo(WorldGenLevel world, UrbexProfile profile, UrbexProfile profileOutside) {
+    public DefaultDimensionInfo(WorldGenLevel world, UrbexProfile profile) {
         this.world = world.getLevel();
         this.profile = profile;
-        this.profileOutside = profileOutside;
         this.caches = new DimensionCaches(this.world.getSeed());
         style = AssetRegistries.WORLDSTYLES.get(this.world, profile.getWorldStyle());
         feature = new CityGenerator(this, profile);
@@ -79,11 +77,6 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     @Override
     public UrbexProfile getProfile() {
         return profile;
-    }
-
-    @Override
-    public UrbexProfile getOutsideProfile() {
-        return profileOutside;
     }
 
     @Override

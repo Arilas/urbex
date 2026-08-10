@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.Arrays;
 import java.util.Optional;
 
 public class UrbexProfile {
@@ -20,7 +21,6 @@ public class UrbexProfile {
     public static final String CATEGORY_CITY_ID = "lostcity";
     public static final String CATEGORY_EXPLOSIONS = "explosions";
     public static final String CATEGORY_CITIES = "cities";
-    public static final String CATEGORY_CITY_SPHERES = "cityspheres";
     public static final String CATEGORY_CLIENT = "client";
 
     private final String name;
@@ -124,23 +124,6 @@ public class UrbexProfile {
 
     public boolean CITY_AVOID_VOID = true;
 
-    public boolean CITYSPHERE_32GRID = false;
-    public float CITYSPHERE_FACTOR = 1.2f;
-    public float CITYSPHERE_CHANCE = 0.7f;
-    public float CITYSPHERE_SURFACE_VARIATION = 1.0f;
-    public float CITYSPHERE_OUTSIDE_SURFACE_VARIATION = 1.0f;
-    public float CITYSPHERE_MONORAIL_CHANCE = 0.8f;
-    public int CITYSPHERE_CLEARABOVE = 0;
-    public int CITYSPHERE_CLEARBELOW = 0;
-    public boolean CITYSPHERE_CLEARABOVE_UNTIL_AIR = false;
-    public boolean CITYSPHERE_CLEARBELOW_UNTIL_AIR = false;
-
-    public int CITYSPHERE_OUTSIDE_GROUNDLEVEL = -1; // DEPRECATED
-
-    public String CITYSPHERE_OUTSIDE_PROFILE = "";
-    public boolean CITYSPHERE_ONLY_PREDEFINED = false;
-    public int CITYSPHERE_MONORAIL_HEIGHT_OFFSET = -2;
-
     public int CITY_LEVEL0_HEIGHT = 75;
     public int CITY_LEVEL1_HEIGHT = 83;
     public int CITY_LEVEL2_HEIGHT = 91;
@@ -209,7 +192,6 @@ public class UrbexProfile {
 
     public String SPAWN_BIOME = "";
     public String SPAWN_CITY = "";
-    public String SPAWN_SPHERE = "";
     public boolean SPAWN_NOT_IN_BUILDING = false;
     public boolean FORCE_SPAWN_IN_BUILDING = false;
     public String[] FORCE_SPAWN_BUILDINGS = new String[0];
@@ -258,18 +240,12 @@ public class UrbexProfile {
         cfg.addCustomCategoryComment(UrbexProfile.CATEGORY_CITY_ID, "Settings related to Urbex city generation for the " + name + " profile");
         cfg.addCustomCategoryComment(UrbexProfile.CATEGORY_EXPLOSIONS, "Settings related to explosions and damage for the " + name + " profile");
         cfg.addCustomCategoryComment(UrbexProfile.CATEGORY_CITIES, "Settings related to city generation for the " + name + " profile");
-        cfg.addCustomCategoryComment(UrbexProfile.CATEGORY_CITY_SPHERES, "Settings related to city sphere generation for the " + name + " profile");
         cfg.addCustomCategoryComment(UrbexProfile.CATEGORY_CLIENT, "Client side settings for the " + name + " profile");
 
         initLostcity(cfg);
         initExplosions(cfg);
         initCities(cfg);
-        initCitySpheres(cfg);
         initClient(cfg);
-    }
-
-    public String getCategoryCitySpheres() {
-        return UrbexProfile.CATEGORY_CITY_SPHERES;
     }
 
     public String getCategoryLostcity() {
@@ -284,24 +260,6 @@ public class UrbexProfile {
         FOG_DENSITY = cfg.getFloat("fogDensity", UrbexProfile.CATEGORY_CLIENT, FOG_DENSITY, -1f, 1f, "This is used client-side (but only if the client has this mod) for the fog density");
     }
 
-    private void initCitySpheres(Configuration cfg) {
-        CITYSPHERE_FACTOR = cfg.getFloat("citySphereFactor", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_FACTOR, 0.1f, 10.0f, "Only used in 'space' landscape. This factor will be multiplied with the radius of the city to calculate the radius of the outer sphere");
-        CITYSPHERE_CHANCE = cfg.getFloat("citySphereChance", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_CHANCE, 0.0f, 1.0f, "The chance that a city sphere will be generated");
-        CITYSPHERE_CLEARABOVE = cfg.getInt("citySphereClearAbove", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_CLEARABOVE, 0, 1024, "Number of blocks to clear above the top city sphere glass (0 is disabled)");
-        CITYSPHERE_CLEARABOVE_UNTIL_AIR = cfg.getBoolean("citySphereClearAboveUntilAir", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_CLEARABOVE_UNTIL_AIR, "If enabled this will additionally clear blocks above what is already cleared by CLEARBOVE until air is reached");
-        CITYSPHERE_CLEARBELOW = cfg.getInt("citySphereClearBelow", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_CLEARBELOW, 0, 1024, "Number of blocks to clear below the top city sphere (0 is disabled)");
-        CITYSPHERE_CLEARBELOW_UNTIL_AIR = cfg.getBoolean("citySphereClearBelowUntilAir", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_CLEARBELOW_UNTIL_AIR, "If enabled this will additionally clear blocks below what is already cleared by CLEARBELOW until air is reached");
-        CITYSPHERE_SURFACE_VARIATION = cfg.getFloat("sphereSurfaceVariation", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_SURFACE_VARIATION, 0.0f, 1.0f, "Smaller numbers make the surface inside a city sphere more varied");
-        CITYSPHERE_OUTSIDE_SURFACE_VARIATION = cfg.getFloat("outsideSurfaceVariation", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_OUTSIDE_SURFACE_VARIATION, 0.0f, 1.0f, "Smaller numbers make the surface outside a city sphere more varied");
-        CITYSPHERE_MONORAIL_CHANCE = cfg.getFloat("monorailChance", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_MONORAIL_CHANCE, 0.0f, 1.0f, "The chance that a city will have a monorail connection in a certain direction. There will only be an actual connection if there is a city in that direction that also wants a monorail");
-        CITYSPHERE_ONLY_PREDEFINED = cfg.getBoolean("onlyPredefined", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_ONLY_PREDEFINED,
-                "If this is true then only predefined spheres are generated");
-        CITYSPHERE_OUTSIDE_GROUNDLEVEL = cfg.getInt("outsideGroundLevel", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_OUTSIDE_GROUNDLEVEL, -1, 256, "Ground level for outside city spheres (DEPRECATED, USE GROUNDLEVEL OF OTHER PROFILE)");
-        CITYSPHERE_OUTSIDE_PROFILE = cfg.getString("outsideProfile", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_OUTSIDE_PROFILE, "An optional profile to use for the outside world");
-        CITYSPHERE_MONORAIL_HEIGHT_OFFSET = cfg.getInt("monorailOffset", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_MONORAIL_HEIGHT_OFFSET, -100, 100, "Offset compared to main height");
-        CITYSPHERE_32GRID = cfg.getBoolean("grid32", UrbexProfile.CATEGORY_CITY_SPHERES, CITYSPHERE_32GRID, "If this is true then city spheres are aligned to a 32x32 grid. Otherwise they are aligned to a 16x16 grid");
-    }
-
     private void initLostcity(Configuration cfg) {
         description = cfg.getString("description", UrbexProfile.CATEGORY_CITY_ID, description, "The description of this profile");
         extraDescription = cfg.getString("extraDescription", UrbexProfile.CATEGORY_CITY_ID, extraDescription, "Additional information");
@@ -314,7 +272,6 @@ public class UrbexProfile {
 
         SPAWN_BIOME = cfg.getString("spawnBiome", UrbexProfile.CATEGORY_CITY_ID, SPAWN_BIOME, "When this is set the player will always spawn in the given biome");
         SPAWN_CITY = cfg.getString("spawnCity", UrbexProfile.CATEGORY_CITY_ID, SPAWN_CITY, "When this is set the player will always spawn in the given predefined city");
-        SPAWN_SPHERE = cfg.getString("spawnSphere", UrbexProfile.CATEGORY_CITY_ID, SPAWN_SPHERE, "When this is set the player will always spawn in the given predefined sphere. If you use <in> the player will always spawn in a random sphere. If you use <out> the player will always spawn outside a sphere");
         SPAWN_NOT_IN_BUILDING = cfg.getBoolean("spawnNotInBuilding", UrbexProfile.CATEGORY_CITY_ID, SPAWN_NOT_IN_BUILDING, "If this is true the player will not spawn in a building. This can be used in combination with the other spawn settings");
         FORCE_SPAWN_IN_BUILDING = cfg.getBoolean("forceSpawnInBuilding", UrbexProfile.CATEGORY_CITY_ID, FORCE_SPAWN_IN_BUILDING, "If this is true the player will spawn in a building. This can be used in combination with the other spawn settings");
         FORCE_SPAWN_BUILDINGS = cfg.getStringList("forceSpawnBuildings", UrbexProfile.CATEGORY_CITY_ID, FORCE_SPAWN_BUILDINGS, "A list of buildings that the player will spawn in if FORCE_SPAWN_IN_BUILDING is true. If this is empty then any building will do. This can be used in combination with 'forceSpawnParts'");
@@ -337,13 +294,11 @@ public class UrbexProfile {
         AVOID_FOLIAGE = cfg.getBoolean("avoidFoliage", UrbexProfile.CATEGORY_CITY_ID, AVOID_FOLIAGE,
                 "If this is true then parks will have no foliage (trees and flowers currently)");
 
-        String type = cfg.getString("landscapeType", UrbexProfile.CATEGORY_CITY_ID, LANDSCAPE_TYPE.getName(),
-                "Type of landscape",
-                new String[] {
-                        LandscapeType.DEFAULT.getName(),
-                        LandscapeType.FLOATING.getName(),
-                        LandscapeType.SPACE.getName(),
-                        LandscapeType.CAVERN.getName() });
+        String[] landscapeNames = Arrays.stream(LandscapeType.values())
+                .map(LandscapeType::getName)
+                .toArray(String[]::new);
+        String type = cfg.getString("landscapeType", UrbexProfile.CATEGORY_CITY_ID,
+                LANDSCAPE_TYPE.getName(), "Type of landscape", landscapeNames);
         LANDSCAPE_TYPE = LandscapeType.getTypeByName(type);
         if (LANDSCAPE_TYPE == null) {
             throw new RuntimeException("Bad landscape type: " + type + "!");
@@ -615,19 +570,7 @@ public class UrbexProfile {
         return LANDSCAPE_TYPE == LandscapeType.FLOATING;
     }
 
-    public boolean isSpace() {
-        return LANDSCAPE_TYPE == LandscapeType.SPACE;
-    }
-
-    public boolean isCavern() { return LANDSCAPE_TYPE == LandscapeType.CAVERN || LANDSCAPE_TYPE == LandscapeType.CAVERNSPHERES; }
-
-    public boolean isVoidSpheres() {
-        return LANDSCAPE_TYPE == LandscapeType.SPHERES;
-    }
-
-    public boolean isSpheres() {
-        return LANDSCAPE_TYPE == LandscapeType.SPHERES || LANDSCAPE_TYPE == LandscapeType.CAVERNSPHERES;
-    }
+    public boolean isCavern() { return LANDSCAPE_TYPE == LandscapeType.CAVERN; }
 
 
     public BlockState getLiquidBlock() {

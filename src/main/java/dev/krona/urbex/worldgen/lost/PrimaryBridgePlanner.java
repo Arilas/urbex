@@ -81,8 +81,7 @@ public final class PrimaryBridgePlanner {
      */
     public static Optional<BridgeSpan> spanAt(ChunkCoord coord, IDimensionInfo provider) {
         // Dimension-wide, not per-chunk: a span's length limit and acceptance chance must be the
-        // same number for every chunk in it, and BuildingInfo.getProfile can hand back the inside
-        // or the outside profile depending on where the chunk falls in a city-sphere world.
+        // same number for every chunk in it.
         UrbexProfile profile = provider.getProfile();
         float chance = profile.PLANNED_PRIMARY_BRIDGE_CHANCE;
         int maxGapLength = profile.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
@@ -116,7 +115,7 @@ public final class PrimaryBridgePlanner {
     @Nullable
     public static BuildingPart deckPart(BridgeSpan span, ChunkCoord anyChunkInSpan, IDimensionInfo provider) {
         ChunkCoord anchor = new ChunkCoord(anyChunkInSpan.dimension(), span.fromX(), span.fromZ());
-        CityStyle style = City.getCityStyle(anchor, provider, BuildingInfo.getProfile(anchor, provider));
+        CityStyle style = City.getCityStyle(anchor, provider, provider.getProfile());
         RandomSource rand = Rng.at(provider.getSeed(), anchor.chunkX(), anchor.chunkZ(), Rng.Purpose.LARGE_BRIDGE);
         String name = style.getRandomLargeBridge(rand, anchor);
         return name == null ? null : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), name);
@@ -293,12 +292,12 @@ public final class PrimaryBridgePlanner {
 
             @Override
             public boolean isCity(ChunkCoord coord) {
-                return BuildingInfo.isCityRaw(coord, provider, BuildingInfo.getProfile(coord, provider));
+                return BuildingInfo.isCityRaw(coord, provider, provider.getProfile());
             }
 
             @Override
             public boolean isEffectivePrimary(ChunkCoord coord) {
-                UrbexProfile profile = BuildingInfo.getProfile(coord, provider);
+                UrbexProfile profile = provider.getProfile();
                 return BuildingInfo.effectiveRoadType(coord, provider, profile) == RoadType.PRIMARY;
             }
 
@@ -314,7 +313,7 @@ public final class PrimaryBridgePlanner {
                 if (CityGenerator.isWaterBiome(provider, coord)) {
                     return true;
                 }
-                int sealevel = BuildingInfo.getProfile(coord, provider).SEALEVEL;
+                int sealevel = provider.getProfile().SEALEVEL;
                 int waterLevel = sealevel == -1 ? Tools.getSeaLevel(provider.getWorld()) : sealevel;
                 return provider.getHeightmap(coord).getHeight() < waterLevel;
             }

@@ -8,7 +8,6 @@ import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.gen.Scattered;
 import dev.krona.urbex.worldgen.lost.CityRarityMap;
-import dev.krona.urbex.worldgen.lost.CitySphere;
 import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
 import dev.krona.urbex.worldgen.lost.MultiChunk;
 import dev.krona.urbex.worldgen.lost.Railway;
@@ -18,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Every cache that used to be a static field on BuildingInfo, City, Highway, Railway, MultiChunk,
- * CitySphere or BiomeInfo. Owned by the dimension, so unloading a world drops them instead of
+ * BiomeInfo. Owned by the dimension, so unloading a world drops them instead of
  * relying on someone remembering to call cleanCache() - and so two dimensions with different
  * profiles can no longer see each other's answers.
  * <p>
@@ -37,7 +36,6 @@ public final class DimensionCaches {
     public final TimedCache<ChunkCoord, CityStyle> cityStyle = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, MultiChunk> multiChunk = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, BiomeInfo> biomeInfo = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
-    public final ConcurrentHashMap<ChunkCoord, CitySphere> citySphere = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<ChunkCoord, Railway.RailChunkInfo> railInfo = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<ChunkCoord, Integer> xHighwayLevel = new ConcurrentHashMap<>();
     public final ConcurrentHashMap<ChunkCoord, Integer> zHighwayLevel = new ConcurrentHashMap<>();
@@ -46,17 +44,8 @@ public final class DimensionCaches {
     public final TimedCache<ChunkCoord, Scattered.AreaScan> scatterAreaScan = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
 
     /**
-     * The city-rarity map is per profile rather than per chunk: a city-sphere dimension asks for
-     * one for its inside profile and one for its outside profile, which can have different perlin
-     * settings, so the key is the settings themselves.
-     * <p>
-     * This is a deliberate behaviour change. The old cache was static and keyed by dimension alone,
-     * so in a dimension whose two profiles disagreed on cityPerlinScale/Offset/InnerScale, whichever
-     * profile asked first silently imposed its field on the other. Shipped content is unaffected:
-     * 'largecities' is the only profile with cityChance &lt; 0 (ProfileSetup.java:431) and it never
-     * sets CITYSPHERE_OUTSIDE_PROFILE, so only one profile ever reaches this map and the key is
-     * constant. A <em>user-authored</em> sphere profile pair with cityChance &lt; 0 and differing
-     * perlin settings will generate differently than it did before - correctly, now.
+     * The city-rarity map is per profile rather than per chunk so independently configured profiles
+     * cannot poison each other's cached answer at the same coordinate.
      */
     public final ConcurrentHashMap<RaritySettings, CityRarityMap> cityRarity = new ConcurrentHashMap<>();
 
@@ -94,7 +83,6 @@ public final class DimensionCaches {
         cityStyle.clear();
         multiChunk.clear();
         biomeInfo.clear();
-        citySphere.clear();
         railInfo.clear();
         xHighwayLevel.clear();
         zHighwayLevel.clear();
