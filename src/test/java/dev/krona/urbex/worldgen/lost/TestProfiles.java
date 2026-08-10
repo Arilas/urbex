@@ -22,7 +22,7 @@ final class TestProfiles {
     static UrbexProfile dense() {
         UrbexProfile profile = new UrbexProfile("test-dense", false);
         profile.BUILDING_CHANCE = 1.0f;
-        profile.PARK_CHANCE = 0.0f;
+        profile.OPEN_LOT_PARK_CHANCE = 0.0f;
         return profile;
     }
 

@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LandscapeType;
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
@@ -60,6 +61,7 @@ class ChunkContentResolverTest {
             boolean predefinedBuilding;
             boolean predefinedStreet;
             CityStyle cityStyle = TestProfiles.cityStyle();
+            RoadType effectiveRoad = RoadType.NONE;
             boolean highway;
             int highwayLevel;
             boolean railway;
@@ -72,6 +74,7 @@ class ChunkContentResolverTest {
                         () -> record("predefinedBuilding", predefinedBuilding),
                         () -> record("predefinedStreet", predefinedStreet),
                         () -> record("cityStyle", cityStyle),
+                        () -> record("effectiveRoad", effectiveRoad),
                         () -> record("hasHighway", highway),
                         () -> record("highwayLevel", highwayLevel),
                         () -> record("hasRailway", railway),
@@ -125,6 +128,46 @@ class ChunkContentResolverTest {
                     "a multi-building section is accepted even when the chance roll could never pass");
             assertFalse(facts.consulted.contains("hasHighway"),
                     "an accepted multi-building section stops the chain before the constraints");
+        }
+
+        @Test
+        void anAcceptedMultiBuildingBeatsAPlannedRoad() {
+            // Whether a road under the footprint should have stopped the multi is settled earlier, by
+            // MULTI_BUILDING_STREET_CONFLICT in MultiChunk. By the time the section exists here it has
+            // already won, so the road is not even asked about.
+            Facts facts = new Facts();
+            facts.effectiveRoad = RoadType.PRIMARY;
+
+            assertTrue(resolve(profileWithBuildingChance(1.0f), new MultiPos(1, 0, 2, 2), 0, facts));
+            assertFalse(facts.consulted.contains("effectiveRoad"),
+                    "an accepted multi-building section decides before the road field is consulted");
+        }
+
+        @Test
+        void aPlannedRoadBeatsTheBuildingChanceRoll() {
+            // A chance of 1.0 would accept every chunk, so a rejection here can only come from the
+            // road branch sitting ahead of the roll.
+            for (RoadType road : new RoadType[]{RoadType.PRIMARY, RoadType.SECONDARY, RoadType.TERTIARY}) {
+                Facts facts = new Facts();
+                facts.effectiveRoad = road;
+                facts.highway = true;
+                facts.highwayLevel = 0;
+
+                assertFalse(resolve(profileWithBuildingChance(1.0f), MultiPos.SINGLE, 9, facts),
+                        "a " + road + " road leaves no room for a building");
+                assertFalse(facts.consulted.contains("hasHighway"),
+                        "the road branch decides, so the constraints below it are never reached");
+            }
+        }
+
+        @Test
+        void aChunkWithNoRoadFallsThroughToTheRoll() {
+            Facts facts = new Facts();
+            facts.effectiveRoad = RoadType.NONE;
+
+            assertFalse(resolve(profileWithBuildingChance(0.0f), MultiPos.SINGLE, 0, facts));
+            assertTrue(facts.consulted.contains("effectiveRoad"),
+                    "the road is consulted even when it turns out not to claim the chunk");
         }
 
         @Test
@@ -266,11 +309,22 @@ class ChunkContentResolverTest {
         /** Every neighbour insists on standing alone, so the veto fires on the first draw. */
         private static final ChunkContentResolver.PrefersLonely LONELY = neighbour -> 1.0f;
 
+        private static final long SEED = 987654321L;
+
         private ChunkContent resolve(boolean couldHaveBuilding, MultiPos section,
                                      ChunkContentResolver.PrefersLonely prefersLonely,
                                      RandomSource rand) {
-            return ChunkContentResolver.resolve(TestProfiles.dense(), TestProfiles.cityStyle(), rand,
-                    couldHaveBuilding, section, COORD, prefersLonely, null, "testbuilding");
+            return ChunkContentResolver.resolve(TestProfiles.dense(), SEED, rand, true,
+                    couldHaveBuilding, RoadType.NONE, section, COORD, prefersLonely, null, "testbuilding");
+        }
+
+        /** As {@link #resolve} but with the road and the open-lot park chance under the test's control. */
+        private ChunkContent resolveOn(RoadType road, float openLotParkChance, boolean isCity,
+                                       boolean couldHaveBuilding) {
+            UrbexProfile profile = TestProfiles.dense();
+            profile.OPEN_LOT_PARK_CHANCE = openLotParkChance;
+            return ChunkContentResolver.resolve(profile, SEED, new XoroshiroRandomSource(5), isCity,
+                    couldHaveBuilding, road, MultiPos.SINGLE, COORD, SOCIABLE, null, "testbuilding");
         }
 
         @Test
@@ -303,24 +357,67 @@ class ChunkContentResolverTest {
         }
 
         @Test
-        void aBuildingChunkStillConsumesTheStreetTypeDraws() {
-            // The street type is meaningless for a building chunk, but the roll must happen anyway:
-            // it sits in the middle of the chunk's layout stream and skipping it would shift every
-            // later draw. Asserting the stream position is the only way to see that - a non-null
-            // street type would also be produced by an implementation that returned a constant.
+        void theStreetTypeCostsNoLayoutDraw() {
+            // The street type is settled from an addressed hash, so the lonely veto is the only thing
+            // in this method that touches the stream. Asserting the stream position is the only way to
+            // see that: a non-null street type would also be produced by an implementation that drew.
             RandomSource used = new XoroshiroRandomSource(7);
             ChunkContent content = resolve(true, MultiPos.SINGLE, SOCIABLE, used);
             assertTrue(content.hasBuilding());
-            assertNotNull(content.streetType());
+            assertNotNull(content.streetType(), "a building chunk settles a street type it never renders");
 
             RandomSource replay = new XoroshiroRandomSource(7);
             for (int i = 0; i < 4; i++) {
                 replay.nextFloat();     // the four lonely-veto draws, none of which fires
             }
-            replay.nextDouble();        // the park chance, which TestProfiles.dense() never passes
-            replay.nextInt(2);          // the even choice between the non-park street types
             assertEquals(replay.nextLong(), used.nextLong(),
-                    "a building chunk must consume the street-type draws like any other chunk");
+                    "the street type must not consume a layout draw");
+        }
+
+        @Test
+        void aChunkWithNoBuildingConsumesNothingAtAll() {
+            // The veto only runs for a candidate that has a building to lose, so a street chunk leaves
+            // the layout stream exactly where it found it.
+            RandomSource used = new XoroshiroRandomSource(11);
+            assertNotNull(resolve(false, MultiPos.SINGLE, LONELY, used).streetType());
+            assertEquals(new XoroshiroRandomSource(11).nextLong(), used.nextLong());
+        }
+
+        @Test
+        void aPlannedRoadIsNeverAPark() {
+            // Even with every open lot demanding a park, paving wins on a road.
+            for (RoadType road : new RoadType[]{RoadType.PRIMARY, RoadType.SECONDARY, RoadType.TERTIARY}) {
+                ChunkContent content = resolveOn(road, 1.0f, true, false);
+                assertEquals(BuildingInfo.StreetType.NORMAL, content.streetType(), "road " + road);
+                assertFalse(content.openLot(), "a road chunk is not an open lot, road " + road);
+            }
+        }
+
+        @Test
+        void anOpenLotTakesItsSurfaceFromTheParkChance() {
+            assertEquals(BuildingInfo.StreetType.PARK, resolveOn(RoadType.NONE, 1.0f, true, false).streetType());
+            assertEquals(BuildingInfo.StreetType.NORMAL, resolveOn(RoadType.NONE, 0.0f, true, false).streetType());
+            assertTrue(resolveOn(RoadType.NONE, 1.0f, true, false).openLot());
+        }
+
+        @Test
+        void onlyACityChunkIsAnOpenLot() {
+            assertFalse(resolveOn(RoadType.NONE, 1.0f, false, false).openLot(),
+                    "wilderness is not a vacant lot");
+        }
+
+        @Test
+        void aBuildingChunkIsNotAnOpenLot() {
+            assertFalse(resolveOn(RoadType.NONE, 1.0f, true, true).openLot());
+        }
+
+        @Test
+        void aVetoedBuildingLeavesAnOpenLotBehind() {
+            // openLot reads the settled verdict, not the pass-one candidate: a chunk whose building a
+            // lonely neighbour took away is as empty as one that failed the roll.
+            ChunkContent content = resolve(true, MultiPos.SINGLE, LONELY, new XoroshiroRandomSource(3));
+            assertFalse(content.hasBuilding());
+            assertTrue(content.openLot());
         }
 
         @Test
@@ -339,13 +436,13 @@ class ChunkContentResolverTest {
 
         @Test
         void theSphereCentreOverridesTheBuildingRoll() {
-            ChunkContent street = ChunkContentResolver.resolve(TestProfiles.dense(), TestProfiles.cityStyle(),
-                    new XoroshiroRandomSource(3), true, MultiPos.SINGLE, COORD, SOCIABLE,
+            ChunkContent street = ChunkContentResolver.resolve(TestProfiles.dense(), SEED,
+                    new XoroshiroRandomSource(3), true, true, RoadType.NONE, MultiPos.SINGLE, COORD, SOCIABLE,
                     CitySphereSettings.CitySphereCenterType.STREET, "testbuilding");
             assertFalse(street.hasBuilding(), "a STREET sphere centre removes the building");
 
-            ChunkContent building = ChunkContentResolver.resolve(TestProfiles.dense(), TestProfiles.cityStyle(),
-                    new XoroshiroRandomSource(3), false, MultiPos.SINGLE, COORD, LONELY,
+            ChunkContent building = ChunkContentResolver.resolve(TestProfiles.dense(), SEED,
+                    new XoroshiroRandomSource(3), true, false, RoadType.NONE, MultiPos.SINGLE, COORD, LONELY,
                     CitySphereSettings.CitySphereCenterType.BUILDING, "testbuilding");
             assertTrue(building.hasBuilding(), "a BUILDING sphere centre forces a building");
         }

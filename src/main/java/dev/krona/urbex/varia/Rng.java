@@ -24,6 +24,8 @@ public final class Rng {
     /** One independent stream per consumer. Never reorder or remove constants: doing so changes every world. */
     public enum Purpose {
         BUILDING,
+        /** No longer drawn from: the street-type re-roll it fed died with the road field. Kept because
+         *  removing it would renumber everything below and change every world. */
         STREET,
         MULTI,
         PARTS,

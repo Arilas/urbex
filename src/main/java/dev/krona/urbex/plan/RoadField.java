@@ -11,4 +11,13 @@ package dev.krona.urbex.plan;
 public interface RoadField {
 
     RoadCell at(int chunkX, int chunkZ);
+
+    /**
+     * Just the road class at a chunk, for the many callers that need nothing else. Implementations
+     * that can answer this more cheaply than building a whole {@link RoadCell} should override it;
+     * the answer must be identical to {@code at(chunkX, chunkZ).type()} either way.
+     */
+    default RoadType typeAt(int chunkX, int chunkZ) {
+        return at(chunkX, chunkZ).type();
+    }
 }

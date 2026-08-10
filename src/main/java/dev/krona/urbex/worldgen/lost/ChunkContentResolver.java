@@ -1,6 +1,9 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.Hash;
+import dev.krona.urbex.plan.RoadType;
+import dev.krona.urbex.plan.grid.GridPurpose;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
@@ -22,7 +25,11 @@ import java.util.function.Supplier;
  *   <li>a <b>predefined building</b> at this chunk - building, no further tests;</li>
  *   <li>a <b>predefined street</b> at this chunk - no building. Note this beats a multi-building
  *       section: a predefined street wins over a multi, not the other way round;</li>
- *   <li>a chunk belonging to an <b>accepted multi-building</b> section - building;</li>
+ *   <li>a chunk belonging to an <b>accepted multi-building</b> section - building. A multi is only
+ *       ever accepted over a road its conflict policy tolerates, so this beating the road below is
+ *       not a road being overrun; see {@link MultiChunk};</li>
+ *   <li>an <b>effective planned road</b> - no building. The road field clipped to the city mask, so
+ *       a road that a city does not actually contain claims nothing;</li>
  *   <li>the <b>ordinary building-chance roll</b> - no building when the roll fails;</li>
  *   <li><b>highway headroom</b> - above a highway, a building only if the city level clears it;</li>
  *   <li><b>railway headroom</b> - never above an underground station, otherwise only if the city
@@ -64,11 +71,11 @@ import java.util.function.Supplier;
  * <ul>
  *   <li>{@link #couldHaveBuilding} takes its single draw <em>first</em>, before any branch, so a new
  *       stop can be inserted anywhere in the chain without moving the stream.</li>
- *   <li>{@link #resolve} rolls the street type <em>unconditionally</em> - even for a chunk that ends
- *       up holding a building, whose street type is then never rendered. Skipping the roll for
- *       building chunks would shift every later draw on the layout stream. The one case that
- *       genuinely does not roll is a non-top-left multi-building chunk, which inherits its rendering
- *       from the top-left chunk and never reaches the roll today.</li>
+ *   <li>{@link #resolve} settles the street type from an <em>addressed</em> hash rather than from the
+ *       layout stream, so it costs no draw and cannot shift one. It is still settled unconditionally -
+ *       even for a chunk that ends up holding a building, whose street type is then never rendered -
+ *       because a neighbour reads the value too. The one case that settles nothing is a non-top-left
+ *       multi-building chunk, which inherits its rendering from the top-left chunk.</li>
  * </ul>
  */
 public final class ChunkContentResolver {
@@ -105,6 +112,11 @@ public final class ChunkContentResolver {
      * @param hasPredefinedBuilding        a predefined building starts at this chunk's top-left
      * @param hasPredefinedStreet          a predefined street occupies this chunk
      * @param cityStyle                    this chunk's style, which may override the building chance
+     * @param effectiveRoad                the planned road this chunk renders, already clipped to the
+     *                                     city mask. Lazy like the rest, and that matters most here:
+     *                                     the road field is the most expensive of these lookups and a
+     *                                     chunk claimed by a predefined building or a multi never
+     *                                     needs it
      * @param hasHighway                   a highway runs through this chunk at any level
      * @param maxHighwayLevel              the higher of this chunk's two highway levels
      * @param hasRailway                   a railway runs through this chunk
@@ -114,6 +126,7 @@ public final class ChunkContentResolver {
     public record ChunkFacts(BooleanSupplier hasPredefinedBuilding,
                              BooleanSupplier hasPredefinedStreet,
                              Supplier<CityStyle> cityStyle,
+                             Supplier<RoadType> effectiveRoad,
                              BooleanSupplier hasHighway,
                              IntSupplier maxHighwayLevel,
                              BooleanSupplier hasRailway,
@@ -160,6 +173,9 @@ public final class ChunkContentResolver {
         if (section.isMulti()) {
             // Part of multi-building. We have checked everything above
             b = true;
+        } else if (facts.effectiveRoad().get() != RoadType.NONE) {
+            // A planned road runs through this chunk, so nothing is built on it
+            b = false;
         } else if (bc >= buildingChance) {
             // Random says we should have no building here
             b = false;
@@ -190,18 +206,21 @@ public final class ChunkContentResolver {
     /**
      * Pass two: settle what actually occupies the chunk.
      *
-     * @param profile               the profile active for this chunk, for the park chance fallback
-     * @param cityStyle             this chunk's style, which may override the park chance
+     * @param profile               the profile active for this chunk, for the open-lot park chance
+     * @param seed                  the world seed, which addresses the open-lot park roll
      * @param rand                  the chunk's {@code BUILDING_LAYOUT} stream, positioned at its start
+     * @param isCity                whether this chunk is city at all, after any sphere-centre override
      * @param couldHaveBuilding     the pass-one verdict from {@link #couldHaveBuilding}
+     * @param effectiveRoad         the planned road this chunk renders, already clipped to the city mask
      * @param section               this chunk's position in a multi-building, or {@link MultiPos#SINGLE}
      * @param coord                 this chunk, used to address the four neighbours of the lonely veto
      * @param prefersLonely         the neighbours' lonely preference, consulted lazily and in order
      * @param sphereCenterType      the city sphere centre override, or null when this chunk is not one
      * @param candidateBuildingName the building asset picked in pass one, returned only if it stands
      */
-    public static ChunkContent resolve(UrbexProfile profile, CityStyle cityStyle, RandomSource rand,
-                                       boolean couldHaveBuilding, MultiPos section, ChunkCoord coord,
+    public static ChunkContent resolve(UrbexProfile profile, long seed, RandomSource rand,
+                                       boolean isCity, boolean couldHaveBuilding, RoadType effectiveRoad,
+                                       MultiPos section, ChunkCoord coord,
                                        PrefersLonely prefersLonely,
                                        @Nullable CitySphereSettings.CitySphereCenterType sphereCenterType,
                                        @Nullable String candidateBuildingName) {
@@ -227,20 +246,26 @@ public final class ChunkContentResolver {
             }
         }
 
-        // Rolled whether or not a building claimed the chunk: see the draw discipline note above.
-        // A non-top-left multi-building chunk copies the top-left's street type instead of rolling,
-        // so it must not touch the stream here either.
+        // A city chunk with no road and no building is an open lot. Note this reads the settled
+        // verdict, not the pass-one candidate: a building the lonely veto took away leaves an open
+        // lot behind exactly like a failed roll does.
+        boolean openLot = isCity && !b && effectiveRoad == RoadType.NONE;
+
+        // Settled whether or not a building claimed the chunk: see the draw discipline note above.
+        // A non-top-left multi-building chunk copies the top-left's street type instead.
         boolean inheritsFromTopLeft = section.isMulti() && !section.isTopLeft();
         BuildingInfo.StreetType streetType = null;
         if (!inheritsFromTopLeft) {
-            float parkChance = cityStyle.getParkChance() != null ? cityStyle.getParkChance() : profile.PARK_CHANCE;
-            if (rand.nextDouble() < parkChance) {
-                streetType = BuildingInfo.StreetType.PARK;
-            } else {
-                streetType = BuildingInfo.StreetType.randomNonPark(rand);
-            }
+            // A planned road is paving and never a park. Everything else renders as an open lot,
+            // and OPEN_LOT_PARK_CHANCE decides whether that lot is green or paved. The roll has its
+            // own GridPurpose key rather than sharing an address with a neighbouring decision, which
+            // would make "is this lot a park" a monotone function of that unrelated decision.
+            boolean park = effectiveRoad == RoadType.NONE
+                    && Hash.unit(Hash.at(seed, coord.chunkX(), coord.chunkZ(), GridPurpose.OPEN_LOT_PARK.key()))
+                            < profile.OPEN_LOT_PARK_CHANCE;
+            streetType = park ? BuildingInfo.StreetType.PARK : BuildingInfo.StreetType.NORMAL;
         }
 
-        return new ChunkContent(b, streetType, b ? candidateBuildingName : null, false);
+        return new ChunkContent(b, streetType, b ? candidateBuildingName : null, openLot);
     }
 }

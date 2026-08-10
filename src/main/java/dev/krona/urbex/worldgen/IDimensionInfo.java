@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import net.minecraft.core.BlockPos;
@@ -44,6 +45,13 @@ public interface IDimensionInfo {
 
     /** The per-dimension caches. Dropped with the dimension. */
     DimensionCaches caches();
+
+    /**
+     * Where the roads are. Built once per dimension from the seed, the dimension id and the
+     * profile's grid settings, so every query is a pure function of the coordinate and two chunks
+     * generated in either order see the same road.
+     */
+    RoadField roadField();
 
     ResourceKey<Level> getType();
 

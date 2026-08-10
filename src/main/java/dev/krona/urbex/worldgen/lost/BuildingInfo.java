@@ -1,6 +1,10 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.EffectiveRoad;
+import dev.krona.urbex.plan.RoadCell;
+import dev.krona.urbex.plan.RoadDirection;
+import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.*;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
@@ -56,6 +60,7 @@ public class BuildingInfo {
     private final float stairPriority;      // A random number that indicates if this chunk should get a stair if there are competing stairs around it. The highest wins
     public final BuildingPart railDungeon;    // Dungeon next to rails. Will only generate if there are actually rails next to it
     public StreetType streetType;
+    private final RoadType effectiveRoad;   // The planned road this chunk renders, NONE for most chunks
 
     private int floors;
     public int cellars;
@@ -435,6 +440,34 @@ public class BuildingInfo {
     }
 
     /**
+     * The road a chunk actually renders: the raw {@link dev.krona.urbex.plan.RoadField} clipped to
+     * the city mask. A road needs its own chunk to be raw city and at least one chunk it connects to
+     * to be raw city as well, which is what removes the isolated one-chunk stubs a city mask's
+     * protrusions would otherwise leave behind.
+     *
+     * <p>Static and raw-city-only on purpose. This is consulted while the chunk characteristics are
+     * still being computed, so it may not read anything that depends on a building decision - its
+     * own or a neighbour's - or the decision graph stops being acyclic.
+     */
+    public static RoadType effectiveRoadType(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+        RoadCell cell = provider.roadField().at(coord.chunkX(), coord.chunkZ());
+        boolean connectedCityNeighbour = false;
+        for (RoadDirection direction : RoadDirection.values()) {
+            if (cell.connects(direction)) {
+                ChunkCoord adjacent = coord.offset(direction.stepX(), direction.stepZ());
+                // Same profile only: in a city-sphere world a neighbour that belongs to the outside
+                // profile is a different city, and a road may not lean on it to stay alive.
+                UrbexProfile adjacentProfile = getProfile(adjacent, provider);
+                if (adjacentProfile == profile && isCityRaw(adjacent, provider, adjacentProfile)) {
+                    connectedCityNeighbour = true;
+                    break;
+                }
+            }
+        }
+        return EffectiveRoad.resolve(cell.type(), isCityRaw(coord, provider, profile), connectedCityNeighbour, false);
+    }
+
+    /**
      * The world lookups {@link ChunkContentResolver#couldHaveBuilding} may need, each still behind a
      * supplier so the decision keeps its short-circuiting: consulting {@link Highway} or
      * {@link Railway} for a chunk whose building roll already failed would be new work, and
@@ -445,6 +478,7 @@ public class BuildingInfo {
                 () -> City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord) != null,
                 () -> City.getPredefinedStreet(provider.getWorld(), coord) != null,
                 () -> City.getCityStyle(coord, provider, profile),
+                () -> effectiveRoadType(coord, provider, profile),
                 () -> hasHighway(coord, provider, profile),
                 () -> Math.max(Highway.getXHighwayLevel(coord, provider, profile), Highway.getZHighwayLevel(coord, provider, profile)),
                 () -> hasRailway(coord, provider, profile),
@@ -692,9 +726,10 @@ public class BuildingInfo {
             }
         }
         isCity = c;
+        effectiveRoad = effectiveRoadType(key, provider, profile);
 
-        ChunkContent content = ChunkContentResolver.resolve(profile, cs, rand,
-                characteristics.couldHaveBuilding, multiBuildingPos, coord,
+        ChunkContent content = ChunkContentResolver.resolve(profile, provider.getSeed(), rand,
+                isCity, characteristics.couldHaveBuilding, effectiveRoad, multiBuildingPos, coord,
                 neighbour -> getChunkCharacteristics(neighbour, provider).buildingType.getPrefersLonely(),
                 centertype, characteristics.buildingType.getName());
         hasBuilding = content.hasBuilding();
@@ -1184,6 +1219,18 @@ public class BuildingInfo {
             case 6 -> Blocks.IRON_DOOR;
             default -> Blocks.OAK_DOOR;
         };
+    }
+
+    /**
+     * The road this chunk renders, or {@link RoadType#NONE}. Settled in the constructor, from the
+     * same {@link #effectiveRoadType} the content decision used, so the two can never disagree.
+     */
+    public RoadType getEffectiveRoadType() {
+        return effectiveRoad;
+    }
+
+    public boolean isPrimaryRoad() {
+        return effectiveRoad == RoadType.PRIMARY;
     }
 
     public boolean isStreetOrParkSection() {
@@ -1846,21 +1893,14 @@ public class BuildingInfo {
     }
 
 
+    /**
+     * How a chunk with no building renders. A planned road is always {@link #NORMAL}; an open lot is
+     * {@link #PARK} or {@link #NORMAL} by the open-lot park chance. There is no third surface: the
+     * old {@code FULL} type was reachable only from a coin flip the road field replaced.
+     */
     public enum StreetType {
         NORMAL,
-        FULL,
-        PARK;
-
-        private static final StreetType[] NON_PARK = {NORMAL, FULL};
-
-        /**
-         * An even choice between the non-park street types. PARK is decided separately by the
-         * park chance. The old form, {@code values()[nextInt(values().length - 2)]}, could only
-         * ever yield NORMAL (issue #36).
-         */
-        public static StreetType randomNonPark(RandomSource rand) {
-            return NON_PARK[rand.nextInt(NON_PARK.length)];
-        }
+        PARK
     }
 
 

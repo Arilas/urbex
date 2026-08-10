@@ -9,7 +9,6 @@ import java.util.Optional;
  * For a city style this object represents settings for parks
  */
 public class ParkSettings {
-    private final Float parkChance;
     private final Boolean avoidFoliage;
     private final Boolean parkBorder;
     private final Boolean parkElevation;
@@ -19,7 +18,6 @@ public class ParkSettings {
 
     public static final Codec<ParkSettings> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.FLOAT.optionalFieldOf("parkchance").forGetter(l -> Optional.ofNullable(l.parkChance)),
                     Codec.BOOL.optionalFieldOf("avoidfoliage").forGetter(l -> Optional.ofNullable(l.avoidFoliage)),
                     Codec.BOOL.optionalFieldOf("parkborder").forGetter(l -> Optional.ofNullable(l.parkBorder)),
                     Codec.BOOL.optionalFieldOf("parkelevation").forGetter(l -> Optional.ofNullable(l.parkElevation)),
@@ -27,8 +25,6 @@ public class ParkSettings {
                     Codec.STRING.optionalFieldOf("elevation").forGetter(l -> DataTools.toNullable(l.parkElevationBlock)),
                     Codec.STRING.optionalFieldOf("grass").forGetter(l -> DataTools.toNullable(l.grassBlock))
             ).apply(instance, ParkSettings::new));
-
-    public Float getParkChance() { return parkChance; }
 
     public Boolean getAvoidFoliage() { return avoidFoliage; }
 
@@ -42,14 +38,12 @@ public class ParkSettings {
 
     public Character getGrassBlock() { return grassBlock; }
 
-    public ParkSettings(Optional<Float> parkChance,
-                        Optional<Boolean> avoidFoliage,
+    public ParkSettings(Optional<Boolean> avoidFoliage,
                         Optional<Boolean> parkBorder,
                         Optional<Boolean> parkElevation,
                         Optional<Integer> parkStreetThreshold,
                         Optional<String> parkElevationBlock,
                         Optional<String> grassBlock) {
-        this.parkChance = parkChance.orElse(null);
         this.avoidFoliage = avoidFoliage.orElse(null);
         this.parkBorder = parkBorder.orElse(null);
         this.parkElevation = parkElevation.orElse(null);

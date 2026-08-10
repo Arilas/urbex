@@ -49,7 +49,6 @@ public class CityStyle {
     private Character wallBlock;
 
     // Park settings
-    private Float parkChance;
     private Boolean avoidFoliage;
     private Boolean parkBorder;
     private Boolean parkElevation;
@@ -111,7 +110,6 @@ public class CityStyle {
             railMainBlock = s.getRailMainBlock();
         });
         object.getParkSettings().ifPresent(s -> {
-            parkChance = s.getParkChance();
             avoidFoliage = s.getAvoidFoliage();
             parkBorder = s.getParkBorder();
             parkElevation = s.getParkElevation();
@@ -208,8 +206,6 @@ public class CityStyle {
     public Float getBuildingChance() {
         return buildingChance;
     }
-
-    public Float getParkChance() { return parkChance; }
 
     public Float getFrontChance() { return frontChance; }
 
@@ -380,9 +376,6 @@ public class CityStyle {
                 }
                 if (buildingChance == null) {
                     buildingChance = inheritFrom.buildingChance;
-                }
-                if (parkChance == null) {
-                    parkChance = inheritFrom.parkChance;
                 }
                 if (fountainChance == null) {
                     fountainChance = inheritFrom.fountainChance;

@@ -1,6 +1,9 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.plan.RoadField;
+import dev.krona.urbex.plan.grid.GridRoadField;
+import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
@@ -34,6 +37,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
 
     private final Registry<Biome> biomeRegistry;
     private final CityGenerator feature;
+    private final RoadField roadField;
 
     public DefaultDimensionInfo(WorldGenLevel world, UrbexProfile profile, UrbexProfile profileOutside) {
         this.world = world.getLevel();
@@ -43,6 +47,8 @@ public class DefaultDimensionInfo implements IDimensionInfo {
         style = AssetRegistries.WORLDSTYLES.get(this.world, profile.getWorldStyle());
         feature = new CityGenerator(this, profile);
         biomeRegistry = this.world.registryAccess().lookupOrThrow(Registries.BIOME);
+        roadField = new GridRoadField(this.world.getSeed(), getType().identifier().toString(),
+                GridSettings.fromProfile(profile));
     }
 
     @Override
@@ -58,6 +64,11 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     @Override
     public DimensionCaches caches() {
         return caches;
+    }
+
+    @Override
+    public RoadField roadField() {
+        return roadField;
     }
 
     @Override

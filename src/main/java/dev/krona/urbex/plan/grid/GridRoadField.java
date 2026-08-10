@@ -45,13 +45,39 @@ public final class GridRoadField implements RoadField {
     public RoadCell at(int chunkX, int chunkZ) {
         RawRoad raw = rawAt(chunkX, chunkZ);
         BlockLayout block = raw.block();
-        boolean north = raw.type() != RoadType.NONE && rawAt(chunkX, chunkZ - 1).type() != RoadType.NONE;
-        boolean south = raw.type() != RoadType.NONE && rawAt(chunkX, chunkZ + 1).type() != RoadType.NONE;
-        boolean west = raw.type() != RoadType.NONE && rawAt(chunkX - 1, chunkZ).type() != RoadType.NONE;
-        boolean east = raw.type() != RoadType.NONE && rawAt(chunkX + 1, chunkZ).type() != RoadType.NONE;
+        boolean isRoad = raw.type() != RoadType.NONE;
+        boolean north = isRoad && typeAt(chunkX, chunkZ - 1) != RoadType.NONE;
+        boolean south = isRoad && typeAt(chunkX, chunkZ + 1) != RoadType.NONE;
+        boolean west = isRoad && typeAt(chunkX - 1, chunkZ) != RoadType.NONE;
+        boolean east = isRoad && typeAt(chunkX + 1, chunkZ) != RoadType.NONE;
         return new RoadCell(raw.type(), north, south, west, east,
                 block.blockX(), block.blockZ(), block.westX(), block.northZ(), block.eastX(), block.southZ(),
                 block.density(), block.secondaryX(), block.secondaryZ(), raw.tertiary());
+    }
+
+    /**
+     * The same classification {@link #rawAt} performs, without the block layout the caller does not
+     * want. A primary road is decided by the chunk's coordinate alone, so answering that case first
+     * skips {@link #blockLayout}: a secondary-position sort whose comparator hashes twice per
+     * comparison, over up to a full primary spacing of candidates per axis. This sits on the
+     * worldgen hot path - {@link #at} probes four neighbours and only reads their class, and the
+     * multi-building conflict check probes every chunk under a footprint.
+     *
+     * <p>Pure and output-identical to {@code rawAt(x, z).type()} by construction: the branch order
+     * is the same and {@code blockLayout} has no side effects, so hoisting the primary test above it
+     * cannot change the answer.
+     */
+    @Override
+    public RoadType typeAt(int chunkX, int chunkZ) {
+        if (isVerticalPrimary(chunkX) || isHorizontalPrimary(chunkZ)) {
+            return RoadType.PRIMARY;
+        }
+        BlockLayout block = blockLayout(chunkX, chunkZ);
+        if (block.secondaryX().contains(chunkX) || block.secondaryZ().contains(chunkZ)) {
+            return RoadType.SECONDARY;
+        }
+        TertiarySegment tertiary = tertiarySegment(block, chunkX, chunkZ);
+        return tertiary != null && tertiary.contains(chunkX, chunkZ) ? RoadType.TERTIARY : RoadType.NONE;
     }
 
     private RawRoad rawAt(int chunkX, int chunkZ) {

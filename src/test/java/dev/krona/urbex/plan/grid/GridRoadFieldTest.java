@@ -66,6 +66,19 @@ class GridRoadFieldTest {
     }
 
     @Test
+    void typeAtAgreesWithTheFullCellEverywhere() {
+        // typeAt skips the block layout for primary roads, which is what makes the four neighbour
+        // probes in at() and the multi-building footprint scan affordable. It is only a shortcut if
+        // it answers identically, so sweep both against each other.
+        GridRoadField f = field(1337L);
+        for (int x = -64; x < 64; x++) {
+            for (int z = -64; z < 64; z++) {
+                assertEquals(f.at(x, z).type(), f.typeAt(x, z), "typeAt disagrees at " + x + "," + z);
+            }
+        }
+    }
+
+    @Test
     void anActivePrimaryIsStraightAndContinuous() {
         GridRoadField f = field(1337L);
         int found = 0;
