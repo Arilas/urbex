@@ -34,6 +34,21 @@ configs; the preview must show what the player will actually get.
 - "Disabled" is an explicit first entry in the preset list (profile = none), not an implicit
   default.
 
+## 1a. Preset vs worldStyle (orthogonal selectors)
+
+A **preset** carries generation *options* (city chance, radii, damage, …). A **worldStyle**
+is a *style* — the block palettes and building sets a city is built from. Upstream bound the
+two together (changing style meant a whole new profile). Urbex separates them:
+
+- The Cities tab shows a **worldStyle dropdown** beside the preset list, **only when more than
+  one worldStyle is registered** (`AssetRegistries.WORLDSTYLES`); with just the built-in
+  `standard` it stays hidden, so the common case is unchanged.
+- Choosing a worldStyle applies it over the selected preset (sets `worldStyle` on the published
+  profile copy and republishes) — so a player picks a preset and freely experiments across
+  Default / LCMT / any datapack-provided style without editing or cloning a profile.
+- Consequently `worldStyle` is **not** an editor setting and not a General descriptor; the
+  editor covers only the preset's generation options. This resolves the Task 4 parked finding.
+
 ## 2. Preset model and extension
 
 **List contents, in order:** Disabled · built-in public profiles (`ProfileSetup`

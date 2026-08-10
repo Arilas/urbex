@@ -126,6 +126,25 @@
 - [ ] **Step 4: Verify.** Tests green; digest unchanged; **manual** at GUI scale 4: search "chance" filters across categories; city-chance slider shows 0.0001↔0.02 usable range; Save as creates the file and the list entry survives a game restart.
 - [ ] **Step 5: Commit** `feat(gui): metadata-driven customize editor`.
 
+### Task 6b: worldStyle selector on the Cities tab
+
+Added after brainstorm refinement (spec §1a): preset and worldStyle are orthogonal. This is a
+Cities-tab feature (independent of the editor); ships in the Phase 2 PR before deletions.
+
+**Files:**
+- Modify: `src/main/java/dev/krona/urbex/gui/CitiesTab.java`, `src/main/java/dev/krona/urbex/gui/PresetSelection.java` (carry a chosen worldStyle over the published profile copy), `src/main/resources/assets/urbex/lang/en_us.json`
+- Test: `src/test/java/dev/krona/urbex/gui/WorldStyleSelectionTest.java`
+
+**Interfaces:**
+- Consumes: `AssetRegistries.WORLDSTYLES` (list registered style ids — verify the accessor: it's a datapack registry, reachable via the preview's RegistryAccess), `PresetSelection.CLIENT`.
+- Produces: `PresetSelection.setWorldStyle(String id)` / `selectedWorldStyle()` — applied onto the published profile copy's `worldStyle` field at publish time; null/`standard` means "leave the preset's own worldStyle".
+
+- [ ] **Step 1: Failing `WorldStyleSelectionTest`** (headless): with the registry mock exposing >1 style, `setWorldStyle("lcmt")` then `publish()` results in `Config.jsonFromClient` carrying `worldStyle=lcmt` over the selected preset; setting it back to the preset default clears the override; a single registered style yields `styleChoices().size()==1` (dropdown suppressed).
+- [ ] **Step 2: `PresetSelection` worldStyle state.** Store the chosen style; on `publish()`, if a non-default style is chosen, produce a customized profile copy with `worldStyle` set and publish it via the existing customized path (reuse `applyCustomized` plumbing so the server sees it exactly like an editor customization). Selecting a different preset keeps the chosen style if that style is still valid, else resets to the preset's own.
+- [ ] **Step 3: Cities-tab dropdown.** A vanilla `CycleButton<String>` (or a compact `ObjectSelectionList` popup if the count is large) above the detail panel, populated from `AssetRegistries.WORLDSTYLES`, **hidden when `size() <= 1`**; label `urbex.tab.worldstyle`; changing it republishes and refreshes the preview (worldStyle already feeds `CityPreview.update`). Lay out within the existing `GridLayout` so scale-4 still fits.
+- [ ] **Step 4: Verify.** `./gradlew build` + tests green; `./gradlew runDigestCheck` unchanged; note the manual check (with a datapack adding a second worldStyle, the dropdown appears and switching it changes the preview).
+- [ ] **Step 5: Commit** `feat(gui): worldStyle selector separate from presets`.
+
 ### Task 7: Deletions and Phase 2 PR
 
 **Files:**
