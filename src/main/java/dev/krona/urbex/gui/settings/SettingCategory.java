@@ -10,11 +10,12 @@ import java.util.Locale;
  * floors, ruin/explosion chances, loot &amp; lighting density, landscape type); those are removed from their
  * former categories so the same control never appears twice.</p>
  *
- * <p>{@link #ROADS} is the one exception to "every category has settings": the sixteen primary/secondary/
- * tertiary/bridge sliders stay under {@link #TRANSPORT} (that placement is settled, not this enum's to
- * revisit), so this tab carries no descriptors of its own. It exists purely to host the road-class preview
- * ({@code CityPreview.Mode.ROADS}) as a first-class, selectable view alongside {@link #TRANSPORT}'s
- * highway/rail overlay - see {@code CustomizeScreen#modeForCategory}.</p>
+ * <p>{@link #ROADS} and {@link #TRANSPORT} split what used to be one crowded tab along the line each
+ * category's own preview actually draws: {@link #TRANSPORT} keeps highways and railways (its overlay's
+ * network), and {@link #ROADS} owns the hierarchical street grid - primary/secondary/tertiary roads and
+ * planned bridges, including {@code MULTI_BUILDING_STREET_CONFLICT} - previewed by
+ * {@code CityPreview.Mode.ROADS}. See {@code CustomizeScreen#modeForCategory} for the category-to-preview
+ * wiring.</p>
  */
 public enum SettingCategory {
     GENERAL,

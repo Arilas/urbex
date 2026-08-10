@@ -276,13 +276,20 @@ Seventeen new fields (sixteen numeric, one enum); one removed. Ranges are upstre
 
 Removed: `parkChance` / `PARK_CHANCE`, and the city-style `parkchance` override in `ParkSettings`.
 
-**GUI placement.** The sixteen road settings go under `SettingCategory.TRANSPORT` in new
-sub-sections (`roads_primary`, `roads_secondary`, `roads_tertiary`, `roads_bridges`), each needing
-`urbex.section.transport.<id>` and `.desc` lang keys. `OPEN_LOT_PARK_CHANCE` takes `PARK_CHANCE`'s
-place under `BUILDINGS`. `MULTI_BUILDING_STREET_CONFLICT` registers via the existing
-`ControlKind.CYCLE` path with `urbex.enum.multibuildingstreetconflict.<value>` keys.
-`SettingsCompletenessTest` enforces that every new public profile field has a descriptor and lang
-keys.
+**GUI placement.** The sixteen road settings and `MULTI_BUILDING_STREET_CONFLICT` go under a new
+`SettingCategory.ROADS`, in sub-sections `roads_primary`, `roads_secondary`, `roads_tertiary` and
+`roads_bridges`, each needing `urbex.section.roads.<id>` and `.desc` lang keys.
+`OPEN_LOT_PARK_CHANCE` takes `PARK_CHANCE`'s place under `BUILDINGS`.
+`MULTI_BUILDING_STREET_CONFLICT` registers via the existing `ControlKind.CYCLE` path with
+`urbex.enum.multibuildingstreetconflict.<value>` keys. `SettingsCompletenessTest` enforces that
+every new public profile field has a descriptor and lang keys.
+
+> **Amended 2026-08-10, after Task 6.** This paragraph originally placed the road settings under
+> `SettingCategory.TRANSPORT`. That was written before the `ROADS` preview mode existed. Since each
+> editor category drives both a tab and the preview shown beside it, leaving the settings on
+> `TRANSPORT` would have produced an empty `ROADS` tab whose only content was a picture of settings
+> living on another tab. `TRANSPORT` keeps highways, railways and monorails — the things its own
+> overlay draws — and `ROADS` owns the street grid it previews.
 
 ### 6.4 Multibuilding conflict policy
 
