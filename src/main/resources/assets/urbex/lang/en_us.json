@@ -2,5 +2,7 @@
   "urbex.preview.legend.city": "City",
   "urbex.preview.legend.building": "Building",
   "urbex.preview.legend.water": "Water",
-  "urbex.preview.unavailable": "No preview available"
+  "urbex.preview.unavailable": "No preview available",
+  "urbex.preset.disabled": "Disabled",
+  "urbex.preset.custom": "Custom"
 }

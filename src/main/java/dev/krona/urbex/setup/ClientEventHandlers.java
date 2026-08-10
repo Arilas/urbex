@@ -2,6 +2,7 @@ package dev.krona.urbex.setup;
 
 import dev.krona.urbex.gui.UrbexConfigScreen;
 import dev.krona.urbex.gui.ClientProfileSetup;
+import dev.krona.urbex.gui.PresetSelection;
 import dev.krona.urbex.gui.RecreateProfileRestore;
 import dev.krona.urbex.worldgen.CityFeature;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -42,6 +43,7 @@ public class ClientEventHandlers {
         // Clean up client-side state when leaving a world/server
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             ClientProfileSetup.CLIENT_SETUP.reset();
+            PresetSelection.CLIENT.reset();
             Config.reset();
             CityFeature.globalDimensionInfoDirtyCounter++;
         });

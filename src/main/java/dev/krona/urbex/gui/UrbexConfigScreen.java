@@ -15,6 +15,8 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.server.packs.repository.PackRepository;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -55,6 +57,19 @@ public class UrbexConfigScreen extends Screen {
         localSetup.copyFrom(ClientProfileSetup.CLIENT_SETUP);
     }
 
+    /**
+     * The pack list {@link ClientProfileSetup#toggleWorldStyle} scans for {@code urbex/worldstyles}
+     * jsons (issue #66). Ideally this would be the datapack repository the in-progress
+     * {@link CreateWorldScreen} is using (which can carry worldstyles from packs enabled just for
+     * the new world), but that repository is a private field with no public accessor in this MC
+     * version - there's no way to reach it here without reflection or a new Mixin, which this fix
+     * doesn't add. So this always falls back to the client's resource pack repository, which does
+     * still surface Urbex's own bundled worldstyles (Fabric merges mod jar resources into it).
+     */
+    private PackRepository worldStylePackRepository() {
+        return Minecraft.getInstance().getResourcePackRepository();
+    }
+
     public static void selectProfile(String profileName, @Nullable UrbexProfile profile) {
         Config.profileFromClient = profileName;
 
@@ -92,7 +107,7 @@ public class UrbexConfigScreen extends Screen {
         }).tooltip(Component.literal("Select a standard profile for Urbex worldgen")));
 
         worldstyleButton = addRenderableWidget(new ButtonExt(145, 10, 120, 20, Component.literal(localSetup.getWorldStyleLabel()), p -> {
-            localSetup.toggleWorldStyle();
+            localSetup.toggleWorldStyle(worldStylePackRepository());
             updateValues();
         }).tooltip(Component.literal("Select the worldstyle to use for this profile")));
 

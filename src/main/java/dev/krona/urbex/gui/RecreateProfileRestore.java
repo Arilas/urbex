@@ -66,7 +66,7 @@ public final class RecreateProfileRestore {
         Pending p = pending;
         pending = null;
         if (p != null) {
-            ClientProfileSetup.CLIENT_SETUP.restoreFromSavedData(p.profile(), p.json());
+            PresetSelection.CLIENT.restore(p.profile(), p.json());
             Urbex.getLogger().info("Restored Urbex profile '{}' for world re-creation", p.profile());
         }
     }
