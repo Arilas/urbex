@@ -84,6 +84,17 @@ loom {
             ideConfigGenerated(false)
             runDir('runs/digestcheckbridge')
             vmArg '-Durbex.digestCheck=12,rowmajor,97'
+            // This window's only reason to exist is covering BridgeSpan[X, (86,108)->(90,108)] -
+            // without that, it is an expensive duplicate of the primary sample above at ~13.8x the
+            // generation work. requireBridge makes DigestRunner's own bridgeChunks count (printed on
+            // every run, in DRIVERDIGEST's line) a hard gate here: zero planned-bridge chunks in the
+            // sample fails the check instead of silently passing. Before accepting a *new*
+            // digest-bridge.golden (moving code changed this window's output), confirm the window
+            // still contains a planned bridge - `/urbex debug` around chunk (88, 108), or a `spanAt`
+            // probe - and if it does not, relocate the window (a new offset/radius) rather than just
+            // regenerating the hash: a passing check on a window with no bridge in it is exactly the
+            // silent coverage loss this whole file exists to prevent.
+            vmArg '-Durbex.digestCheck.requireBridge'
             def golden = file('digest-bridge.golden')
             if (golden.exists()) {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"

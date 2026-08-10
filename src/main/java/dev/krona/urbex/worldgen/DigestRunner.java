@@ -1,5 +1,8 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.setup.Registration;
+import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -34,14 +37,19 @@ public final class DigestRunner {
      * @param driverDigest hash of the final state at each position the mod wrote through
      *                     {@link ChunkDriver} - the acceptance signal
      * @param fullDigest   hash of every non-air block in every chunk - a loose tripwire only
+     * @param bridgeChunks how many sampled chunks carry a planned primary bridge deck (see
+     *                     {@link PrimaryBridgePlanner#spanAt}). Printed so a sample window that
+     *                     stops containing a bridge - the only mechanical proof one renders at
+     *                     all - announces itself instead of moving silently; see
+     *                     {@code digestCheckBridge} in {@code build.gradle}.
      */
     public record Result(long driverDigest, long fullDigest, long driverBlocks, int drivenChunks,
-                         int chunkCount, long elapsedMs) {
+                         int chunkCount, long elapsedMs, int bridgeChunks) {
 
         public String driverLine(String order, int offset) {
             return String.format(
-                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d",
-                    driverDigest, driverBlocks, drivenChunks, chunkCount, order, offset, elapsedMs);
+                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d",
+                    driverDigest, driverBlocks, drivenChunks, chunkCount, order, offset, elapsedMs, bridgeChunks);
         }
 
         public String fullLine(String order, int offset) {
@@ -132,8 +140,31 @@ public final class DigestRunner {
         }
         ChunkDriver.clearRecordedWrites();
 
+        int bridgeChunks = countBridgeChunks(level, sorted);
+
         long elapsed = System.currentTimeMillis() - start;
-        return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed);
+        return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed, bridgeChunks);
+    }
+
+    /**
+     * How many of the sampled chunks carry a planned primary bridge deck. Read-only: queries the
+     * same {@link IDimensionInfo} real generation used for these chunks, after generation, so it
+     * costs no extra draw and cannot perturb either digest. Zero whenever no Urbex profile is
+     * configured for this dimension - the driver-writes check already fails that case loudly.
+     */
+    private static int countBridgeChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
+        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo(level);
+        if (dimInfo == null) {
+            return 0;
+        }
+        int count = 0;
+        for (ChunkPos pos : chunkPositions) {
+            ChunkCoord coord = new ChunkCoord(level.dimension(), pos.x(), pos.z());
+            if (PrimaryBridgePlanner.spanAt(coord, dimInfo).isPresent()) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
