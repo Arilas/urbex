@@ -50,7 +50,7 @@ This spec covers **Spec 1 only**. The other two get their own spec → plan → 
 | P3 planner (`dev.krona.urbex.plan.*`) | **Park it, port behind a seam** | `feat/p3-road-system` stays unmerged and untouched. The port binds to a narrow `RoadField` interface so a terrain-aware planner can replace the grid later without touching the renderer. |
 | Addressed randomness | **Lift P3's `Hash` + a purpose enum** | Upholds the single-addressing-mechanism invariant documented in `Rng.java`, makes upstream's 14 magic salts reviewable named constants, and rescues good work from the parked branch. Accepted cost: our layout is not bit-identical to upstream's for a given seed. |
 | `BuildingInfo` integration | **Extract a content-decision class** | `BuildingInfo` is already 1,978 lines; upstream's equivalent change added 483 to theirs. Extraction shrinks it instead. |
-| Validation bar | **Property tests + preview + digest** | The planner's purity makes invariant tests cheap. This is the discipline P3 lacked. |
+| Validation bar | **Property tests + preview + digest**, sequenced playable-first | The planner's purity makes invariant tests cheap, and this is the discipline P3 lacked. But the bulk of the suite is written after in-game validation rather than before it — see §8.0. |
 | `multiBuildingStreetConflict` control | **Ship as a first-class CYCLE setting** | `ControlKind.CYCLE` already exists end-to-end (registrar, rendering, lang-key convention, completeness assertion). Cost is one registrar line and three lang keys, not new GUI infrastructure. |
 
 ## 2. Goal
@@ -310,6 +310,26 @@ and so do we.
 
 ## 8. Testing
 
+### 8.0 Test sequencing: playable first
+
+The full suite below is the destination, not the starting point. Generation design changes once
+you see it in a real world, and tests written against a design that then changes get rewritten.
+So the tests split in two:
+
+**Written before the first playable build** — only the invariants whose failure would waste
+in-game time by producing garbage that is hard to diagnose from screenshots:
+
+- determinism: same (seed, dimension id, settings) reproduces the field exactly
+- order independence: row-major, reversed and shuffled queries agree
+- primary continuity: an active vertical corridor is `PRIMARY` for every z (and symmetrically)
+- no seam at coordinate zero
+
+**Written after in-game validation** — everything else in §8.1 and §8.2. These pin details that
+tuning may legitimately move, so writing them earlier risks pinning the wrong thing.
+
+This reorders test effort; it does not reduce it. The full suite is a required chunk of the
+implementation plan, gated on in-game feedback rather than dropped.
+
 ### 8.1 Property tests on `GridRoadField`
 
 Pure Java, no Minecraft, milliseconds each. Invariants are taken from upstream's documented
@@ -352,16 +372,26 @@ byte-identical.
 
 ## 9. Sequencing
 
+Ordered to reach a playable build as early as possible, per §8.0.
+
 | Phase | Work | Digest |
 |---|---|---|
 | A | Assets, schema (`StreetParts`, `StreetSettings`, `Selectors`, `CityStyle`), `MultiBuildingStreetConflict` enum + CYCLE registration | unchanged |
 | B | Extract `ChunkContentResolver` from `BuildingInfo` as a behaviour-preserving refactor | **unchanged** |
-| C | Extract `plan.Hash` out of `Rng` (delegating, `RngTest` golden vectors unchanged); seam types, `GridRoadField`, `GridSettings`, `GridPurpose`, `EffectiveRoad` + property tests; not yet wired | unchanged |
-| D | Wire roads, open lots, multibuilding conflict, bridges, slopes; delete legacy park path and `StreetType.FULL`; profile settings + GUI | changes once |
-| E | Road preview mode, `/urbex debug` street diagnostics, containing-multibuilding name | unchanged |
+| C | Extract `plan.Hash` out of `Rng` (delegating, `RngTest` golden vectors unchanged); seam types, `GridRoadField`, `GridSettings`, `GridPurpose`, `EffectiveRoad` + the four smoke invariants of §8.0 | unchanged |
+| D | Wire roads: profile settings + GUI, road field into the content decision, part-family selection and connectors, open lots replacing the legacy park path, multibuilding conflict; delete `PARK_CHANCE`, `parkchance` and `StreetType.FULL`. **First playable build.** | changes once |
+| E | Planned bridges and sloped minor roads. Second in-game look. | changes |
+| F | Road preview mode, `/urbex debug` street diagnostics, containing-multibuilding name | unchanged |
+| G | Full property suite of §8.1 and §8.2, gated on in-game feedback from D and E | unchanged |
 
-Phase B is the risky phase because it touches working code, and it is precisely the phase where an
+Phase B comes before D deliberately: D inserts "effective planned road" into the precedence order,
+so extracting that order first means the insertion happens once rather than twice. B is also the
+one phase that touches working code without adding behaviour, and precisely the phase where an
 unchanged digest proves nothing moved.
+
+Phase E is separated from D so the first playable build arrives without waiting on bridge and slope
+geometry, which are the fiddliest rendering rules in the spec and the most likely to need tuning
+against what the world actually looks like.
 
 ## 10. Known limitations accepted
 
