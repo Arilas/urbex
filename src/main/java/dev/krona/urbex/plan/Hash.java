@@ -62,9 +62,17 @@ public final class Hash {
         return (h >>> 40) * 0x1.0p-24f;
     }
 
-    /** splitmix64 finalizer. */
+    /** splitmix64 finalizer, addressed by advancing the state with the golden-ratio increment first. */
     public static long mix(long z) {
-        z += GOLDEN_GAMMA;
+        return avalanche(z + GOLDEN_GAMMA);
+    }
+
+    /**
+     * splitmix64's avalanche step alone, without the {@code GOLDEN_GAMMA} state advance {@link #mix}
+     * applies first. Shared by {@link #mix} and by {@code GridRoadField}'s stable string hash, which
+     * needs the same bit-mixing over an FNV-1a accumulator that is not itself a mix state to advance.
+     */
+    public static long avalanche(long z) {
         z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
         z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
         return z ^ (z >>> 31);

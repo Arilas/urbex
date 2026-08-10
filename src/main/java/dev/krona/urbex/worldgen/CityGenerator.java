@@ -1715,10 +1715,14 @@ public class CityGenerator {
         boolean zmax = hasStreetPartConnection(info, info.getZmax(), info.getZmax().hasZBridge(provider) != null);
         int cnt = (xmin ? 1 : 0) + (xmax ? 1 : 0) + (zmin ? 1 : 0) + (zmax ? 1 : 0);
         Transform transform = Transform.ROTATE_NONE;
+        // Each part-family list is checked for emptiness before getRandomPart touches it, the same
+        // way parts.stair() and parts.connector() are guarded elsewhere: an empty list is a style
+        // opting out of that part, and getRandomPart would otherwise call List.get on a nextInt(0)
+        // and throw. A null part here is already handled below (no render, no connectors).
         BuildingPart part = switch (cnt) {
-            case 0 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.none()));
+            case 0 -> parts.none().isEmpty() ? null
+                    : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.none()));
             case 1 -> {
-                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.end()));
                 if (xmin) {
                 } else if (xmax) {
                     transform = Transform.ROTATE_180;
@@ -1727,11 +1731,11 @@ public class CityGenerator {
                 } else {
                     transform = Transform.ROTATE_270;
                 }
-                yield p;
+                yield parts.end().isEmpty() ? null
+                        : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.end()));
             }
             case 2 -> {
                 if (xmin == xmax || zmin == zmax) {
-                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.straight()));
                     if (xmin) {
                     } else if (xmax) {
                         transform = Transform.ROTATE_180;
@@ -1740,9 +1744,9 @@ public class CityGenerator {
                     } else {
                         transform = Transform.ROTATE_270;
                     }
-                    yield p;
+                    yield parts.straight().isEmpty() ? null
+                            : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.straight()));
                 } else {
-                    BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.bend()));
                     if (xmin && zmin) {
                     } else if (xmin && zmax) {
                         transform = Transform.ROTATE_270;
@@ -1751,11 +1755,11 @@ public class CityGenerator {
                     } else {
                         transform = Transform.ROTATE_180;
                     }
-                    yield p;
+                    yield parts.bend().isEmpty() ? null
+                            : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.bend()));
                 }
             }
             case 3 -> {
-                BuildingPart p = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.t()));
                 if (!xmin) {
                     transform = Transform.ROTATE_90;
                 } else if (!xmax) {
@@ -1763,9 +1767,11 @@ public class CityGenerator {
                 } else if (!zmin) {
                     transform = Transform.ROTATE_180;
                 }
-                yield p;
+                yield parts.t().isEmpty() ? null
+                        : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.t()));
             }
-            case 4 -> AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.all()));
+            case 4 -> parts.all().isEmpty() ? null
+                    : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.all()));
             default -> throw new RuntimeException("Not possible!");
         };
         if (part != null) {
