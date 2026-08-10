@@ -385,30 +385,46 @@ class ChunkContentResolverTest {
 
         @Test
         void aPlannedRoadIsNeverAPark() {
-            // Even with every open lot demanding a park, paving wins on a road.
+            // Even with the park chance at its maximum, paving wins on a road: the chance furnishes an
+            // open lot and has no say over any other chunk's surface.
             for (RoadType road : new RoadType[]{RoadType.PRIMARY, RoadType.SECONDARY, RoadType.TERTIARY}) {
                 ChunkContent content = resolveOn(road, 1.0f, true, false);
                 assertEquals(BuildingInfo.StreetType.NORMAL, content.streetType(), "road " + road);
                 assertFalse(content.openLot(), "a road chunk is not an open lot, road " + road);
+                assertFalse(content.parkPart(), "a road chunk gets no park part, road " + road);
             }
         }
 
         @Test
-        void anOpenLotTakesItsSurfaceFromTheParkChance() {
-            assertEquals(BuildingInfo.StreetType.PARK, resolveOn(RoadType.NONE, 1.0f, true, false).streetType());
-            assertEquals(BuildingInfo.StreetType.NORMAL, resolveOn(RoadType.NONE, 0.0f, true, false).streetType());
-            assertTrue(resolveOn(RoadType.NONE, 1.0f, true, false).openLot());
+        void everyOpenLotIsGrassWhateverTheParkChanceSays() {
+            // The surface is not up for negotiation. Scattering street parts through the middle of a
+            // city block is the artefact the road field exists to remove, so an open lot renders as a
+            // park at a chance of 0 exactly as it does at 1.
+            for (float chance : new float[]{0.0f, 0.5f, 1.0f}) {
+                ChunkContent content = resolveOn(RoadType.NONE, chance, true, false);
+                assertEquals(BuildingInfo.StreetType.PARK, content.streetType(), "chance " + chance);
+                assertTrue(content.openLot(), "chance " + chance);
+            }
+        }
+
+        @Test
+        void theParkChanceDecidesOnlyWhetherTheLotIsFurnished() {
+            assertTrue(resolveOn(RoadType.NONE, 1.0f, true, false).parkPart());
+            assertFalse(resolveOn(RoadType.NONE, 0.0f, true, false).parkPart());
         }
 
         @Test
         void onlyACityChunkIsAnOpenLot() {
-            assertFalse(resolveOn(RoadType.NONE, 1.0f, false, false).openLot(),
-                    "wilderness is not a vacant lot");
+            ChunkContent wilderness = resolveOn(RoadType.NONE, 1.0f, false, false);
+            assertFalse(wilderness.openLot(), "wilderness is not a vacant lot");
+            assertFalse(wilderness.parkPart(), "and nothing furnishes it");
         }
 
         @Test
         void aBuildingChunkIsNotAnOpenLot() {
-            assertFalse(resolveOn(RoadType.NONE, 1.0f, true, true).openLot());
+            ChunkContent content = resolveOn(RoadType.NONE, 1.0f, true, true);
+            assertFalse(content.openLot());
+            assertFalse(content.parkPart(), "a park part under a building would never be seen");
         }
 
         @Test

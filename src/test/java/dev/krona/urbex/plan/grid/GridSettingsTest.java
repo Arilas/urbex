@@ -3,37 +3,61 @@ package dev.krona.urbex.plan.grid;
 import dev.krona.urbex.config.UrbexProfile;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link GridSettings#fromProfile} is the only adapter between the loosely-checked profile and the
- * strictly-validated settings record, and it is called on every settings-screen keystroke as well as
- * at world load. These pin the two things that makes it safe there.
+ * {@link GridSettings#fromProfile} is the only adapter between the profile and the strictly validated
+ * settings record, and it deliberately does not soften anything on the way through: a profile whose
+ * minimum exceeds its maximum describes a world nobody can generate, and widening the pair here would
+ * hand its author a different world with no diagnostic at all.
  */
 class GridSettingsTest {
 
-    @Test
-    void aFreshProfileProducesUpstreamsDefaults() {
-        assertEquals(GridSettings.defaults(), GridSettings.fromProfile(new UrbexProfile("test", true)));
+    private static UrbexProfile profile() {
+        return new UrbexProfile("test", true);
     }
 
     @Test
-    void aMinimumDraggedPastItsMaximumIsWidenedRatherThanRejected() {
-        // Each of these pairs is two independent sliders, so crossing them is one drag away. The
-        // record's constructor rightly refuses a crossed pair; throwing out of here would take the
-        // settings screen down while the player is still dragging.
-        UrbexProfile profile = new UrbexProfile("test", true);
-        profile.SECONDARY_ROAD_MIN_COUNT_X = 5;
-        profile.SECONDARY_ROAD_MAX_COUNT_X = 1;
-        profile.SECONDARY_ROAD_MIN_COUNT_Z = 7;
-        profile.SECONDARY_ROAD_MAX_COUNT_Z = 0;
-        profile.TERTIARY_ROAD_MIN_LENGTH = 9;
-        profile.TERTIARY_ROAD_MAX_LENGTH = 2;
+    void aFreshProfileProducesUpstreamsDefaults() {
+        assertEquals(GridSettings.defaults(), GridSettings.fromProfile(profile()));
+    }
 
-        GridSettings settings = assertDoesNotThrow(() -> GridSettings.fromProfile(profile));
-        assertEquals(5, settings.secondaryMaxCountX(), "a crossed pair reads as exactly the minimum");
-        assertEquals(7, settings.secondaryMaxCountZ());
-        assertEquals(9, settings.tertiaryMaxLength());
+    @Test
+    void anInvertedSecondaryCountOnXIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.SECONDARY_ROAD_MIN_COUNT_X = 5;
+        p.SECONDARY_ROAD_MAX_COUNT_X = 2;
+        assertNamesTheField(p, "secondaryRoadMinCountX");
+    }
+
+    @Test
+    void anInvertedSecondaryCountOnZIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.SECONDARY_ROAD_MIN_COUNT_Z = 7;
+        p.SECONDARY_ROAD_MAX_COUNT_Z = 0;
+        assertNamesTheField(p, "secondaryRoadMinCountZ");
+    }
+
+    @Test
+    void anInvertedTertiaryLengthIsRejectedByName() {
+        UrbexProfile p = profile();
+        p.TERTIARY_ROAD_MIN_LENGTH = 9;
+        p.TERTIARY_ROAD_MAX_LENGTH = 2;
+        assertNamesTheField(p, "tertiaryRoadMinLength");
+    }
+
+    /**
+     * The message has to name the offending setting, and name it the way its author wrote it: these
+     * reach a player through a failed world load, where the profile JSON key is the only handle they
+     * have on the value. The offending values are included too, so the report is actionable without
+     * opening the file.
+     */
+    private static void assertNamesTheField(UrbexProfile p, String configKey) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> GridSettings.fromProfile(p));
+        assertTrue(e.getMessage().contains(configKey),
+                "message must name the offending profile setting '" + configKey + "', was: " + e.getMessage());
     }
 }

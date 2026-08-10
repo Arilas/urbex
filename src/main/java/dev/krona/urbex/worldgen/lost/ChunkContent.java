@@ -16,10 +16,17 @@ import javax.annotation.Nullable;
  *                     is the settled verdict rather than the pass-one candidate - a building the
  *                     lonely veto or a STREET sphere centre took away leaves an open lot behind just
  *                     as a failed building roll does - and that the {@code isCity} term is what keeps
- *                     the whole wilderness from reporting itself as one enormous vacant lot
+ *                     the whole wilderness from reporting itself as one enormous vacant lot. Every
+ *                     open lot renders through the park surface, so {@code openLot} implies
+ *                     {@code streetType == PARK}
+ * @param parkPart     true when this open lot also receives a weighted park part on that grass.
+ *                     This is the whole of what {@code OPEN_LOT_PARK_CHANCE} decides: it furnishes a
+ *                     lot, it never chooses the lot's surface and never turns the lot into a road.
+ *                     Always false when {@code !openLot}
  */
 public record ChunkContent(boolean hasBuilding,
                            @Nullable BuildingInfo.StreetType streetType,
                            @Nullable String buildingName,
-                           boolean openLot) {
+                           boolean openLot,
+                           boolean parkPart) {
 }

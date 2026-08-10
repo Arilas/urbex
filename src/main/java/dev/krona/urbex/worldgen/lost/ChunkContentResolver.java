@@ -251,21 +251,27 @@ public final class ChunkContentResolver {
         // lot behind exactly like a failed roll does.
         boolean openLot = isCity && !b && effectiveRoad == RoadType.NONE;
 
+        // Every open lot is grass, unconditionally - that is the point of the whole road field. A lot
+        // is what is left over between the planned roads, and rendering some of them as street parts
+        // would scatter road fragments through the middle of city blocks, which is the artefact the
+        // hierarchical roads exist to remove. OPEN_LOT_PARK_CHANCE decides only whether the lot is
+        // furnished with a park part; it never reaches the surface underneath.
+        //
+        // The roll has its own GridPurpose key rather than sharing an address with a neighbouring
+        // decision, which would make "is this lot furnished" a monotone function of that unrelated
+        // decision.
+        boolean parkPart = openLot
+                && Hash.unit(Hash.at(seed, coord.chunkX(), coord.chunkZ(), GridPurpose.OPEN_LOT_PARK.key()))
+                        < profile.OPEN_LOT_PARK_CHANCE;
+
         // Settled whether or not a building claimed the chunk: see the draw discipline note above.
         // A non-top-left multi-building chunk copies the top-left's street type instead.
         boolean inheritsFromTopLeft = section.isMulti() && !section.isTopLeft();
         BuildingInfo.StreetType streetType = null;
         if (!inheritsFromTopLeft) {
-            // A planned road is paving and never a park. Everything else renders as an open lot,
-            // and OPEN_LOT_PARK_CHANCE decides whether that lot is green or paved. The roll has its
-            // own GridPurpose key rather than sharing an address with a neighbouring decision, which
-            // would make "is this lot a park" a monotone function of that unrelated decision.
-            boolean park = effectiveRoad == RoadType.NONE
-                    && Hash.unit(Hash.at(seed, coord.chunkX(), coord.chunkZ(), GridPurpose.OPEN_LOT_PARK.key()))
-                            < profile.OPEN_LOT_PARK_CHANCE;
-            streetType = park ? BuildingInfo.StreetType.PARK : BuildingInfo.StreetType.NORMAL;
+            streetType = openLot ? BuildingInfo.StreetType.PARK : BuildingInfo.StreetType.NORMAL;
         }
 
-        return new ChunkContent(b, streetType, b ? candidateBuildingName : null, openLot);
+        return new ChunkContent(b, streetType, b ? candidateBuildingName : null, openLot, parkPart);
     }
 }

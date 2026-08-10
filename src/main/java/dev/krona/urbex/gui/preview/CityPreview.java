@@ -1,6 +1,7 @@
 package dev.krona.urbex.gui.preview;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.gui.NullDimensionInfo;
 import dev.krona.urbex.varia.ChunkCoord;
@@ -194,19 +195,35 @@ public class CityPreview implements AutoCloseable {
     }
 
     private void recompute(UrbexProfile profile, long seed, Mode mode) {
-        this.mode = mode;
         // The datapack-derived predefined-city/street maps are static (shared with real worldgen)
         // and keyed only by chunk coord, not by profile - drop them so a new profile/seed combo
         // doesn't see another profile's predefined content. Mirrors the old editor's preview
         // refresh.
         City.cleanPredefinedCache();
-        switch (mode) {
-            // Only the map/transport samplers walk a NullDimensionInfo; CITY renders straight from the profile,
-            // so it does not pay to build one there.
-            case MAP -> renderMap(new NullDimensionInfo(profile, seed, registryAccess));
-            case TRANSPORT -> renderTransport(new NullDimensionInfo(profile, seed, registryAccess), profile);
-            case CITY -> renderCity(profile, seed);
+        try {
+            switch (mode) {
+                // Only the map/transport samplers walk a NullDimensionInfo; CITY renders straight from the profile,
+                // so it does not pay to build one there.
+                case MAP -> renderMap(new NullDimensionInfo(profile, seed, registryAccess));
+                case TRANSPORT -> renderTransport(new NullDimensionInfo(profile, seed, registryAccess), profile);
+                case CITY -> renderCity(profile, seed);
+            }
+        } catch (IllegalArgumentException e) {
+            // A profile can be momentarily self-contradictory and there is nothing wrong with that: the
+            // road settings come in min/max pairs held by two independent sliders, so dragging a minimum
+            // up necessarily passes through states where it exceeds its maximum. GridSettings refuses
+            // those, correctly - a world must never be generated from numbers nobody wrote - but the
+            // editor is where the player is still writing them, and taking the screen down mid-drag is
+            // no way to say so. Keep showing the last good preview until the profile makes sense again;
+            // a profile still inconsistent at world creation fails there, with the field named.
+            //
+            // Nothing has been drawn at this point (the throw comes from building the dimension, before
+            // any sampling), so `colors` and `texture` still hold that last good render. Leaving `mode`
+            // alone too keeps the legend describing the image actually on screen.
+            Urbex.LOGGER.debug("Preview not recomputed - profile is not currently valid: {}", e.getMessage());
+            return;
         }
+        this.mode = mode;
         uploadTexture();
     }
 

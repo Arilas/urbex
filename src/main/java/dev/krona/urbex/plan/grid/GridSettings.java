@@ -65,14 +65,12 @@ public record GridSettings(
      * contact with the rest of the mod: it imports a configuration class, not a Minecraft class, so
      * the package stays game-free and its tests keep running headless. Keep it that way.
      *
-     * <p>Each min/max pair is a separate profile field with its own independent editor slider, so a
-     * player can drag a minimum past its maximum. The constructor above rightly refuses that, but a
-     * settings screen is not the place to find out - it builds one of these on every keystroke, and
-     * an exception there takes the screen down mid-edit. So the pairs are widened to meet rather
-     * than rejected: a crossed pair is read as "exactly this many", the same reading
-     * {@code BUILDING_MINFLOORS} past {@code BUILDING_MAXFLOORS} already gets. Every other bound is
-     * enforced field-by-field by the config and by the sliders' own ranges, so nothing else here can
-     * be out of range.
+     * <p>A straight read: the constructor above is the only validation, and it stays strict. A profile
+     * whose {@code secondaryRoadMinCountX} exceeds its {@code secondaryRoadMaxCountX} is a profile
+     * nobody can generate the world they wrote down from, and quietly widening the pair here would
+     * hand them a different world with no diagnostic. Callers that cannot afford the exception -
+     * the settings preview, which rebuilds one of these on every keystroke and can therefore see a
+     * half-finished edit - are the ones that handle it.
      */
     public static GridSettings fromProfile(dev.krona.urbex.config.UrbexProfile profile) {
         return new GridSettings(
@@ -81,13 +79,13 @@ public record GridSettings(
                 profile.PRIMARY_ROAD_OPTIONAL_CHANCE,
                 profile.PRIMARY_ROAD_FORCE_EVERY,
                 profile.SECONDARY_ROAD_MIN_COUNT_X,
-                Math.max(profile.SECONDARY_ROAD_MIN_COUNT_X, profile.SECONDARY_ROAD_MAX_COUNT_X),
+                profile.SECONDARY_ROAD_MAX_COUNT_X,
                 profile.SECONDARY_ROAD_MIN_COUNT_Z,
-                Math.max(profile.SECONDARY_ROAD_MIN_COUNT_Z, profile.SECONDARY_ROAD_MAX_COUNT_Z),
+                profile.SECONDARY_ROAD_MAX_COUNT_Z,
                 profile.MINIMUM_ROAD_SEPARATION,
                 profile.MINIMUM_ROAD_EDGE_DISTANCE,
                 profile.TERTIARY_ROAD_CHANCE,
                 profile.TERTIARY_ROAD_MIN_LENGTH,
-                Math.max(profile.TERTIARY_ROAD_MIN_LENGTH, profile.TERTIARY_ROAD_MAX_LENGTH));
+                profile.TERTIARY_ROAD_MAX_LENGTH);
     }
 }

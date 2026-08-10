@@ -774,7 +774,12 @@ public class BuildingInfo {
             } else {
                 fountainType = null;
             }
-            parkType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand, this.coord));
+            // The selection draw is unconditional so the layout stream never depends on the outcome;
+            // only whether the chosen part is kept follows the open-lot park chance. A road, a
+            // building or anything outside a city keeps nothing: the park surface is an open lot's,
+            // and a part with no lot under it would sit on the carriageway.
+            BuildingPart park = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand, this.coord));
+            parkType = content.parkPart() ? park : null;
             float cityFactor = City.getCityFactor(coord, provider, profile);
 
             int maxfloors = getMaxfloors(cs);
@@ -1894,9 +1899,10 @@ public class BuildingInfo {
 
 
     /**
-     * How a chunk with no building renders. A planned road is always {@link #NORMAL}; an open lot is
-     * {@link #PARK} or {@link #NORMAL} by the open-lot park chance. There is no third surface: the
-     * old {@code FULL} type was reachable only from a coin flip the road field replaced.
+     * How a chunk with no building renders: a planned road is {@link #NORMAL} paving, an open lot is
+     * the {@link #PARK} grass surface. Nothing else decides between them - in particular the open-lot
+     * park chance does not, it only furnishes a lot that is already grass. There is no third surface:
+     * the old {@code FULL} type was reachable only from a coin flip the road field replaced.
      */
     public enum StreetType {
         NORMAL,
