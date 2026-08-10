@@ -1,5 +1,6 @@
 package dev.krona.urbex.setup;
 
+import dev.krona.urbex.gui.CitiesTab;
 import dev.krona.urbex.gui.ClientProfileSetup;
 import dev.krona.urbex.gui.PresetSelection;
 import dev.krona.urbex.gui.RecreateProfileRestore;
@@ -25,7 +26,16 @@ public class ClientEventHandlers {
                 if (lastCreateWorldScreen == null || lastCreateWorldScreen.get() != createWorldScreen) {
                     lastCreateWorldScreen = new java.lang.ref.WeakReference<>(createWorldScreen);
                     RecreateProfileRestore.consumePending();
+                    // A brand new screen, so any "come back on the Cities tab" request left over
+                    // from an editor trip the player abandoned (Escape out of the editor goes to
+                    // the title screen, not back here) is stale. A return from the editor re-inits
+                    // the *same* screen instance and so does not take this branch.
+                    CitiesTab.forgetReopenOnCitiesTab();
                 }
+                // The per-screen event holders are rebuilt on every init, immediately before
+                // BEFORE_INIT fires (fabric-screen-api ScreenMixin), so this re-registers cleanly
+                // rather than stacking up listeners across window resizes.
+                ScreenEvents.remove(createWorldScreen).register(s -> CitiesTab.closeActivePreview());
             }
         });
 

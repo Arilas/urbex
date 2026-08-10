@@ -66,6 +66,15 @@ public class CitiesTab extends GridLayoutTab {
     @Nullable
     private static CityPreview activePreview;
 
+    /**
+     * Set when this tab hands the player off to the old editor, consumed by
+     * {@code CreateWorldScreenTabMixin} at the tail of the next {@code CreateWorldScreen.init()}.
+     * Coming back from that editor goes through {@code setScreen(parent)}, which re-runs
+     * {@code init()} - and its tail calls {@code selectTab(0, false)}, dropping the player on the
+     * Game tab. Without this they would have to find their way back to Cities every time.
+     */
+    private static boolean reopenOnCitiesTab;
+
     private final CreateWorldScreen screen;
     private final CityPreview preview;
     private final RandomSource random = RandomSource.create();
@@ -83,6 +92,16 @@ public class CitiesTab extends GridLayoutTab {
      * a typed seed wins over it, which is why the button locks while one is present.
      */
     private long previewSeedFallback;
+
+    /**
+     * The tab area the last {@link #doLayout} ran against, so a detail-panel refresh can redo the
+     * layout: the description's height is a function of its text ({@code MultiLineTextWidget
+     * .getHeight()} is {@code lineCount * 9}, verified by decompilation), and nothing else re-runs
+     * the layout on selection change - {@code TabManager} only calls {@code doLayout} on
+     * {@code setTabArea}/{@code setCurrentTab}.
+     */
+    @Nullable
+    private ScreenRectangle lastTabArea;
 
     public CitiesTab(CreateWorldScreen screen) {
         super(TITLE);
@@ -124,6 +143,7 @@ public class CitiesTab extends GridLayoutTab {
 
     @Override
     public void doLayout(ScreenRectangle rectangle) {
+        lastTabArea = rectangle;
         resizeChildren(rectangle);
         this.layout.arrangeElements();
         FrameLayout.alignInRectangle(this.layout, rectangle, 0.5F, 0.0F);
@@ -183,6 +203,7 @@ public class CitiesTab extends GridLayoutTab {
      * {@code UrbexConfigScreen.done()} mirrors the result back, so a round trip stays consistent.
      */
     private void openCustomizeEditor() {
+        requestReopenOnCitiesTab();
         PresetSelection.Entry entry = PresetSelection.CLIENT.selected();
         if (!entry.custom() && entry.profile().isPresent()) {
             // Custom entries are deliberately left alone: ClientProfileSetup still holds the edited
@@ -199,6 +220,12 @@ public class CitiesTab extends GridLayoutTab {
         infoText.setMessage(describe(entry));
         customizeButton.active = !PresetSelection.DISABLED_ID.equals(entry.id());
         refreshSeedControls();
+        if (lastTabArea != null) {
+            // The new description is a different number of lines than the old one, so the preview
+            // below it has to move (and resize) with it - otherwise a long blurb draws over the
+            // preview and a short one leaves a hole.
+            doLayout(lastTabArea);
+        }
     }
 
     private void refreshSeedControls() {
@@ -242,11 +269,39 @@ public class CitiesTab extends GridLayoutTab {
     }
 
     private static CityPreview newPreview(@Nullable RegistryAccess registryAccess) {
-        if (activePreview != null) {
-            activePreview.close();
-        }
+        closeActivePreview();
         activePreview = new CityPreview(registryAccess);
         return activePreview;
+    }
+
+    /**
+     * Releases the live preview's GPU texture. Must be called when the {@code CreateWorldScreen}
+     * goes away (see {@code ClientEventHandlers}): otherwise the texture - and, through
+     * {@code CityPreview}'s registry access, the whole frozen {@code RegistryAccess} of a world
+     * that was never created - would stay pinned until the player opened the screen again.
+     */
+    public static void closeActivePreview() {
+        if (activePreview != null) {
+            activePreview.close();
+            activePreview = null;
+        }
+    }
+
+    /** Asks for the next {@code CreateWorldScreen.init()} to land on this tab. */
+    static void requestReopenOnCitiesTab() {
+        reopenOnCitiesTab = true;
+    }
+
+    /** One-shot: true iff the screen is being re-initialised on the way back from the old editor. */
+    public static boolean consumeReopenOnCitiesTab() {
+        boolean requested = reopenOnCitiesTab;
+        reopenOnCitiesTab = false;
+        return requested;
+    }
+
+    /** Drops a pending {@link #reopenOnCitiesTab} that no longer belongs to this screen. */
+    public static void forgetReopenOnCitiesTab() {
+        reopenOnCitiesTab = false;
     }
 
     /**

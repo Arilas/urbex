@@ -5,12 +5,14 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,6 +22,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the move, and profiles that leave a part empty must not get a blank line for it.
  */
 class CitiesTabTest {
+
+    @AfterEach
+    void clearReopenRequest() {
+        // Static one-shot flag; tests must not leak it into each other or into a later run.
+        CitiesTab.forgetReopenOnCitiesTab();
+    }
 
     private static PresetSelection.Entry entryFor(UrbexProfile profile) {
         return new PresetSelection.Entry("test", Component.literal("test"), false, "", Optional.of(profile));
@@ -68,5 +76,27 @@ class CitiesTabTest {
         assertEquals(2, siblings.size(), "expected exactly one newline plus the warning");
         assertEquals("Careful", siblings.get(1).getString());
         assertEquals(TextColor.fromLegacyFormat(ChatFormatting.RED), siblings.get(1).getStyle().getColor());
+    }
+
+    @Test
+    void noReopenIsRequestedUntilTheEditorIsOpened() {
+        assertFalse(CitiesTab.consumeReopenOnCitiesTab(),
+                "a plain Create World screen must not be redirected to the Cities tab");
+    }
+
+    @Test
+    void theReopenRequestIsConsumedExactlyOnce() {
+        // CreateWorldScreen.init() re-runs on every window resize, not only on the way back from
+        // the editor, so a request that stayed set would hijack the tab on every resize.
+        CitiesTab.requestReopenOnCitiesTab();
+        assertTrue(CitiesTab.consumeReopenOnCitiesTab());
+        assertFalse(CitiesTab.consumeReopenOnCitiesTab());
+    }
+
+    @Test
+    void aRequestBelongingToAnAbandonedEditorTripCanBeDropped() {
+        CitiesTab.requestReopenOnCitiesTab();
+        CitiesTab.forgetReopenOnCitiesTab();
+        assertFalse(CitiesTab.consumeReopenOnCitiesTab());
     }
 }
