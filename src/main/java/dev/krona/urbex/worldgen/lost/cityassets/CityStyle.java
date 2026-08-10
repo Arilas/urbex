@@ -20,6 +20,7 @@ public class CityStyle {
 
     private final List<ObjectSelector> buildingSelector = new ArrayList<>();
     private final List<ObjectSelector> bridgeSelector = new ArrayList<>();
+    private final List<ObjectSelector> largeBridgeSelector = new ArrayList<>();
     private final List<ObjectSelector> parkSelector = new ArrayList<>();
     private final List<ObjectSelector> fountainSelector = new ArrayList<>();
     private final List<ObjectSelector> stairSelector = new ArrayList<>();
@@ -27,6 +28,8 @@ public class CityStyle {
     private final List<ObjectSelector> railDungeonSelector = new ArrayList<>();
     private final List<ObjectSelector> multiBuildingSelector = new ArrayList<>();
     private StreetParts streetParts = StreetParts.DEFAULT;
+    private StreetParts largeStreetParts = StreetParts.DEFAULT;
+    private StreetParts tertiaryStreetParts = StreetParts.DEFAULT;
 
     // Building settings
     private Integer minFloorCount;
@@ -131,6 +134,8 @@ public class CityStyle {
             wallBlock = s.getWallBlock();
             streetWidth = s.getStreetWidth();
             streetParts = s.getParts();
+            largeStreetParts = s.getLargeParts();
+            tertiaryStreetParts = s.getTertiaryParts();
         });
         object.getGeneralSettings().ifPresent(s -> {
             glowstoneBlock = s.getGlowstoneBlock();
@@ -140,6 +145,7 @@ public class CityStyle {
         });
         object.getSelectors().ifPresent(s -> {
             s.getBridgeSelector().ifPresent(bridgeSelector::addAll);
+            s.getLargeBridgeSelector().ifPresent(largeBridgeSelector::addAll);
             s.getBuildingSelector().ifPresent(buildingSelector::addAll);
             s.getFountainSelector().ifPresent(fountainSelector::addAll);
             s.getFrontSelector().ifPresent(frontSelector::addAll);
@@ -172,6 +178,15 @@ public class CityStyle {
 
     public StreetParts getStreetParts() {
         return streetParts;
+    }
+
+    public StreetParts getLargeStreetParts() {
+        return largeStreetParts;
+    }
+
+    /** Tertiary roads fall back to the secondary-road family when a style does not define their own. */
+    public StreetParts getTertiaryStreetParts() {
+        return tertiaryStreetParts == StreetParts.DEFAULT ? streetParts : tertiaryStreetParts;
     }
 
     public Integer getMinFloorCount() {
@@ -490,6 +505,13 @@ public class CityStyle {
 
     public String getRandomBridge(RandomSource random, ChunkCoord pos) {
         return getRandomFromList(random, bridgeSelector, pos);
+    }
+
+    public String getRandomLargeBridge(RandomSource random, ChunkCoord pos) {
+        if (largeBridgeSelector.isEmpty()) {
+            return getRandomBridge(random, pos);
+        }
+        return getRandomFromList(random, largeBridgeSelector, pos);
     }
 
     public String getRandomFountain(RandomSource random, ChunkCoord pos) {

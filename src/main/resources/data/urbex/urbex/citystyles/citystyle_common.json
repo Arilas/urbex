@@ -17,6 +17,17 @@
       "t": ["urbex:street_t"],
       "none": ["urbex:street_none"],
       "all": ["urbex:street_all"]
+    },
+    "largeparts": {
+      "full": "urbex:street_large_full",
+      "straight": "urbex:street_large_straight",
+      "end": "urbex:street_large_end",
+      "bend": "urbex:street_large_bend",
+      "t": "urbex:street_large_t",
+      "none": "urbex:street_large_none",
+      "all": "urbex:street_large_all",
+      "connector": "urbex:street_large_connector",
+      "stair": "urbex:street_stair"
     }
   },
   "parkblocks": {
@@ -127,6 +138,12 @@
       {
         "factor": 1.0,
         "value": "urbex:bridge_covered"
+      }
+    ],
+    "largebridges": [
+      {
+        "factor": 1.0,
+        "value": "urbex:bridge_large_open"
       }
     ],
     "fronts": [

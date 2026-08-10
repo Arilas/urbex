@@ -353,5 +353,9 @@
   "urbex.enum.landscapetype.space": "Space",
   "urbex.enum.landscapetype.cavern": "Cavern",
   "urbex.enum.landscapetype.spheres": "City Spheres",
-  "urbex.enum.landscapetype.cavernspheres": "Cavern with spheres"
+  "urbex.enum.landscapetype.cavernspheres": "Cavern with spheres",
+
+  "urbex.enum.multibuildingstreetconflict.block_all": "Block All",
+  "urbex.enum.multibuildingstreetconflict.override_minor": "Override Minor Roads",
+  "urbex.enum.multibuildingstreetconflict.override_all": "Override All Roads"
 }
