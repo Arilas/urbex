@@ -11,7 +11,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.MultiLineTextWidget;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.Tooltip;
@@ -109,9 +108,12 @@ public class CitiesTab extends GridLayoutTab {
      * The worldStyle selector - {@code null} (and absent from the layout entirely) whenever the
      * datapacks register at most one style, so the common "standard-only" install shows nothing new.
      * worldStyle is orthogonal to the preset (spec 1a): switching it never edits or clones a profile.
+     * <p>
+     * A plain {@link Button} that opens the {@link WorldStyleDialog} dropdown on press (vanilla has no
+     * combobox widget); its label shows the effective style, refreshed whenever that changes.
      */
     @Nullable
-    private final CycleButton<String> worldStyleButton;
+    private final Button worldStyleButton;
 
     /**
      * The seed the preview falls back to while the seed field is empty - vanilla's own
@@ -163,10 +165,7 @@ public class CitiesTab extends GridLayoutTab {
             if (!worldStyles.contains(initial)) {
                 initial = worldStyles.get(0);
             }
-            this.worldStyleButton = CycleButton.<String>builder(Component::literal, initial)
-                    .withValues(worldStyles)
-                    .create(Component.translatable("urbex.tab.worldstyle"),
-                            (btn, value) -> onWorldStyleChanged(value));
+            this.worldStyleButton = Button.builder(worldStyleLabel(initial), b -> openWorldStyleDropdown()).build();
         } else {
             this.worldStyleButton = null;
         }
@@ -295,13 +294,12 @@ public class CitiesTab extends GridLayoutTab {
         infoText.setMessage(describe(entry));
         customizeButton.active = !PresetSelection.DISABLED_ID.equals(entry.id());
         // A preset change may have carried over the chosen style (still valid) or reset it to the new
-        // preset's own; either way the selector must show what actually generates. The disabled row
-        // has no style ("" is never a choice), so its button simply keeps its last value.
+        // preset's own; either way the selector's label must show what actually generates. The disabled
+        // row has no style ("" is never a choice), so its button simply keeps its last label.
         if (worldStyleButton != null) {
             String effective = PresetSelection.CLIENT.effectiveWorldStyle();
-            if (PresetSelection.CLIENT.styleChoices().contains(effective)
-                    && !effective.equals(worldStyleButton.getValue())) {
-                worldStyleButton.setValue(effective);
+            if (PresetSelection.CLIENT.styleChoices().contains(effective)) {
+                worldStyleButton.setMessage(worldStyleLabel(effective));
             }
         }
         refreshSeedControls();
@@ -314,7 +312,23 @@ public class CitiesTab extends GridLayoutTab {
     }
 
     /**
-     * Applies a worldStyle the player picked from the selector: records it and republishes so the
+     * Opens the {@link WorldStyleDialog} dropdown over the create-world screen. Like the customize
+     * editor, it hands the player off to a modal {@code Screen}; returning from it re-runs
+     * {@code CreateWorldScreen.init()}, so the reopen flag brings the player back to this tab (rather
+     * than the Game tab {@code init()}'s tail would otherwise select). The tab is rebuilt on that
+     * return, and its constructor reads {@code effectiveWorldStyle()} for the fresh button label, so
+     * a pick shows up whether or not the in-flight relabel below survives the rebuild.
+     */
+    private void openWorldStyleDropdown() {
+        requestReopenOnCitiesTab();
+        List<String> choices = PresetSelection.CLIENT.styleChoices();
+        String current = PresetSelection.CLIENT.effectiveWorldStyle();
+        Minecraft.getInstance().gui.setScreen(
+                new WorldStyleDialog(screen, choices, current, this::onWorldStyleChanged));
+    }
+
+    /**
+     * Applies a worldStyle the player picked from the dropdown: records it and republishes so the
      * server sees the switched style (as an editor-style customization when it differs from the
      * preset's own). The preview reads {@code effectiveWorldStyle()} on its render pass, so it
      * follows on its own; the selector's own size is unchanged, so no relayout is needed.
@@ -322,6 +336,16 @@ public class CitiesTab extends GridLayoutTab {
     private void onWorldStyleChanged(String style) {
         PresetSelection.CLIENT.setWorldStyle(style);
         PresetSelection.CLIENT.publish();
+        if (worldStyleButton != null) {
+            worldStyleButton.setMessage(worldStyleLabel(style));
+        }
+    }
+
+    /** The selector's label: the lang-keyed "World Style" prefix followed by the effective style id. */
+    private static Component worldStyleLabel(String style) {
+        return Component.translatable("urbex.tab.worldstyle")
+                .append(": ")
+                .append(Component.literal(style));
     }
 
     /**
