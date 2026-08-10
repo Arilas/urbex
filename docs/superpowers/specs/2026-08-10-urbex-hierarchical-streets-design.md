@@ -182,12 +182,15 @@ Per chunk:
 2. `effective = EffectiveRoad.resolve(raw, isCityRaw(here), anyConnectedNeighbourIsCityRaw, overriddenByHigherPrecedence)`.
    The neighbour test removes isolated one-chunk stubs at city protrusions and consults only
    lower-level raw city membership, so height, biome, rarity, sphere, void and city-factor clipping
-   are all preserved without depending on final building decisions. At its sole call site
-   (`BuildingInfo.effectiveRoadType`), `overriddenByHigherPrecedence` is hardcoded `false` — a
-   multi-building's precedence over a road never reaches `EffectiveRoad` this way. That precedence
-   is enforced downstream instead, by `ChunkContentResolver`'s `!hasBuilding` check on the chunk.
+   are all preserved without depending on final building decisions.
 3. `ChunkContentResolver` walks the precedence order and returns `ChunkContent`.
 4. `BuildingInfo` consumes it. `MultiChunk.canPlaceBuilding()` queries the **raw** field.
+
+> **Amended 2026-08-10, streets follow-up review (#106).** Point 2's
+> `overriddenByHigherPrecedence` reads as a live precedence mechanism, but at its sole call site
+> (`BuildingInfo.effectiveRoadType`) it is hardcoded `false` — a multi-building's precedence over a
+> road never actually reaches `EffectiveRoad` this way. That precedence is enforced downstream
+> instead, by `ChunkContentResolver`'s `!hasBuilding` check on the chunk.
 
 ### 4.1 Cycle-freedom invariant
 
@@ -309,14 +312,18 @@ every new public profile field has a descriptor and lang keys.
 `MultiChunk.canPlaceBuilding()` queries the raw road field before accepting a random candidate:
 
 - `BLOCK_ALL` — primary, secondary and tertiary intersections all reject the candidate
-- `OVERRIDE_MINOR` (default) — only primary intersections reject; a secondary or tertiary road
-  under an accepted complex's footprint is cut, not suppressed - the chunk holds the building
-  instead of the road, but `BuildingInfo.getEffectiveRoadType()` still reports that road class
-  there, because it is resolved from the raw road field before the building decision is known
-- `OVERRIDE_ALL` — no road intersection rejects; every covered road is cut the same way, whatever
-  its class
+- `OVERRIDE_MINOR` (default) — only primary intersections reject; accepted complexes suppress
+  secondary and tertiary roads under their footprint
+- `OVERRIDE_ALL` — no road intersection rejects; every covered road is suppressed after acceptance
 
 Predefined multibuildings bypass the policy and always override automatic roads.
+
+> **Amended 2026-08-10, streets follow-up review (#106).** "Suppress"/"suppressed" above described
+> an effect the code does not produce. What actually happens: the multi wins the pass, the chunk
+> holds the building instead of the road, and the road is *cut* -
+> `BuildingInfo.getEffectiveRoadType()` still reports the road class on those chunks, because that
+> value is resolved from the raw road field before the building decision is known. See
+> `MultiBuildingStreetConflict`'s javadoc, corrected the same way in the same review.
 
 ## 7. Failure handling
 
