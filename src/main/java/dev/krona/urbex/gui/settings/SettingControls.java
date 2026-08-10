@@ -8,6 +8,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -125,12 +126,20 @@ public final class SettingControls {
     /**
      * The descriptor only knows the getter returns "the enum's boxed type" (Task 4's boxing convention);
      * it carries no {@code Class<? extends Enum>} to build a type-safe {@code CycleButton<E>} from. Reading
-     * {@code getClass().getEnumConstants()} off the current value (per the brief) sidesteps that: every
-     * profile always has a real value here, so there is always a concrete instance to ask.
+     * the constants off the current value (per the brief) sidesteps that: every profile always has a real
+     * value here, so there is always a concrete instance to ask.
      */
     private static AbstractWidget createCycle(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
         Object initialValue = d.getter().apply(target);
-        Object[] constants = initialValue.getClass().getEnumConstants();
+        // getDeclaringClass(), not getClass(): a constant with a class body (a constant-specific anonymous
+        // subclass) would make getClass() return that subclass, whose getEnumConstants() is null;
+        // getDeclaringClass() always resolves to the real enum type regardless. LandscapeType has no such
+        // bodies today, so this only matters defensively for future CYCLE enums.
+        Class<?> enumType = ((Enum<?>) initialValue).getDeclaringClass();
+        Object[] constants = enumType.getEnumConstants();
+        if (constants == null) {
+            throw new IllegalStateException("getDeclaringClass() did not resolve to an enum type: " + enumType);
+        }
         CycleButton<Object> button = CycleButton.builder(SettingControls::enumValueLabel, initialValue)
                 .withValues(constants)
                 .create(0, 0, width, HEIGHT, Component.translatable(d.nameKey()),
@@ -142,9 +151,27 @@ public final class SettingControls {
         return button;
     }
 
-    /** No lang entries exist per enum constant, so this falls back to a title-cased constant name. */
+    /**
+     * {@code urbex.enum.<enum simple name>.<constant name>}, all lowercase - e.g.
+     * {@code urbex.enum.landscapetype.cavernspheres}. General on purpose: any future {@code CYCLE} enum gets
+     * a per-value label for free by following the same naming scheme in the lang file.
+     *
+     * <p>Package-private (not {@code private}) so {@code SettingsCompletenessTest} can assert every CYCLE
+     * descriptor's enum constants resolve to a lang entry without duplicating this formula.</p>
+     */
+    static String enumLangKey(Enum<?> value) {
+        String typeName = value.getDeclaringClass().getSimpleName().toLowerCase(Locale.ROOT);
+        return "urbex.enum." + typeName + "." + value.name().toLowerCase(Locale.ROOT);
+    }
+
+    /** Looks up the per-value lang key; falls back to a title-cased constant name if it isn't present. */
     private static Component enumValueLabel(Object enumConstant) {
-        String raw = ((Enum<?>) enumConstant).name().replace('_', ' ').toLowerCase(Locale.ROOT);
+        Enum<?> value = (Enum<?>) enumConstant;
+        String key = enumLangKey(value);
+        if (Language.getInstance().has(key)) {
+            return Component.translatable(key);
+        }
+        String raw = value.name().replace('_', ' ').toLowerCase(Locale.ROOT);
         return Component.literal(Character.toUpperCase(raw.charAt(0)) + raw.substring(1));
     }
 

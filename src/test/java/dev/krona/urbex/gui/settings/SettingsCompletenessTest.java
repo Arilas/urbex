@@ -177,9 +177,11 @@ class SettingsCompletenessTest {
 
     /**
      * {@link SettingControls} reads a {@code CYCLE} descriptor's enum type off a live value via
-     * {@code getClass().getEnumConstants()} rather than a type token the descriptor doesn't carry (see Task 4's
-     * boxing convention). A cycle button is meaningless with fewer than two options, so this pins that every
-     * such descriptor's field type actually has at least two.
+     * {@code getDeclaringClass()} rather than a type token the descriptor doesn't carry (see Task 4's boxing
+     * convention) - {@code getDeclaringClass()} rather than {@code getClass()} because a constant with a
+     * class body would make {@code getClass()} return an anonymous subclass instead of the enum itself. A
+     * cycle button is meaningless with fewer than two options, so this pins that every such descriptor's
+     * field type actually has at least two.
      */
     @Test
     void cycleDescriptorsHaveAtLeastTwoEnumConstants() {
@@ -187,14 +189,41 @@ class SettingsCompletenessTest {
         for (SettingDescriptor d : Settings.ALL) {
             if (d.kind() == ControlKind.CYCLE) {
                 Object value = d.getter().apply(profile);
-                assertTrue(value != null && value.getClass().isEnum(),
-                        "CYCLE descriptor " + d.key() + " getter did not return an enum value");
-                Object[] constants = value.getClass().getEnumConstants();
-                assertTrue(constants.length >= 2,
-                        "CYCLE descriptor " + d.key() + " enum " + value.getClass().getSimpleName()
+                assertTrue(value instanceof Enum<?>, "CYCLE descriptor " + d.key() + " getter did not return an enum value");
+                Class<?> enumType = ((Enum<?>) value).getDeclaringClass();
+                Object[] constants = enumType.getEnumConstants();
+                assertTrue(constants != null && constants.length >= 2,
+                        "CYCLE descriptor " + d.key() + " enum " + enumType.getSimpleName()
                                 + " has fewer than two constants; a cycle button needs at least two");
             }
         }
+    }
+
+    /**
+     * {@link SettingControls#enumValueLabel} looks up a per-constant lang key
+     * ({@link SettingControls#enumLangKey}) for every CYCLE descriptor's enum value and only falls back to a
+     * title-cased name when that key is absent. The fallback means a missing translation degrades silently at
+     * runtime instead of erroring, so this test is what actually catches it: every enum constant behind a
+     * CYCLE descriptor must have a real lang entry.
+     */
+    @Test
+    void cycleDescriptorEnumConstantsHaveLangLabels() {
+        JsonObject lang = loadLang();
+        UrbexProfile profile = fresh();
+        Set<String> missing = new TreeSet<>();
+        for (SettingDescriptor d : Settings.ALL) {
+            if (d.kind() == ControlKind.CYCLE) {
+                Enum<?> value = (Enum<?>) d.getter().apply(profile);
+                Class<?> enumType = value.getDeclaringClass();
+                for (Object constant : enumType.getEnumConstants()) {
+                    String key = SettingControls.enumLangKey((Enum<?>) constant);
+                    if (!lang.has(key)) {
+                        missing.add(key);
+                    }
+                }
+            }
+        }
+        assertTrue(missing.isEmpty(), "Missing per-value lang entries for CYCLE descriptors in en_us.json: " + missing);
     }
 
     @Test

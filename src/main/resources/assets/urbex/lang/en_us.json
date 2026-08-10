@@ -262,5 +262,12 @@
   "urbex.setting.SPAWN_CHECK_ATTEMPTS": "Spawn Check Attempts",
   "urbex.setting.SPAWN_CHECK_ATTEMPTS.tooltip": "The number of attempts to find a valid spawn location. If this is not enough then this will error",
   "urbex.setting.LANDSCAPE_TYPE": "Landscape Type",
-  "urbex.setting.LANDSCAPE_TYPE.tooltip": "Type of landscape"
+  "urbex.setting.LANDSCAPE_TYPE.tooltip": "Type of landscape",
+
+  "urbex.enum.landscapetype.default": "Default",
+  "urbex.enum.landscapetype.floating": "Floating",
+  "urbex.enum.landscapetype.space": "Space",
+  "urbex.enum.landscapetype.cavern": "Cavern",
+  "urbex.enum.landscapetype.spheres": "City Spheres",
+  "urbex.enum.landscapetype.cavernspheres": "Cavern with spheres"
 }
