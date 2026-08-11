@@ -28,6 +28,11 @@ public class ScatteredBuilding {
      * <p>
      * {@code terrainheight} and {@code terrainfix} are required of the chain rather than of each
      * file, so a variant that only swaps its building list inherits both.
+     * <p>
+     * {@code buildings} and {@code multibuilding} are required as a <em>pair</em>: the resolved
+     * chain must leave at least one, and neither is required on its own, which is the one shape
+     * {@link Resolved#require} cannot state. Left unchecked, a chain declaring neither loaded and
+     * then threw from {@code Scattered.generate} the first time the entry was placed.
      */
     public ScatteredBuilding(List<ScatteredRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
@@ -57,6 +62,10 @@ public class ScatteredBuilding {
         }
         this.buildings = anyBuildings ? List.copyOf(declaredBuildings) : null;
         this.multibuilding = multibuilding;
+        if (this.buildings == null && this.multibuilding == null) {
+            throw new IllegalStateException("'" + name + "' declares neither 'buildings' nor "
+                    + "'multibuilding', and neither does anything it extends");
+        }
         this.terrainheight = Resolved.require(terrainheight, name, "terrainheight");
         this.terrainfix = Resolved.require(terrainfix, name, "terrainfix");
         this.heightoffset = heightoffset;

@@ -17,7 +17,10 @@ import java.util.Optional;
  * <p>
  * {@code terrainheight} and {@code terrainfix} are optional here rather than required, because a
  * variant that only swaps its building list should not have to restate how it sits on the terrain.
- * Requiredness is checked after the chain is resolved, in {@link ScatteredBuilding}.
+ * Requiredness is checked after the chain is resolved, in {@link ScatteredBuilding}: those two
+ * scalars individually, and {@code buildings}/{@code multibuilding} as a pair, of which the
+ * resolved chain must leave at least one - neither is required on its own, so neither can be
+ * required here. Declaring both is allowed; {@code Scattered.generate} takes the multibuilding.
  */
 public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
 

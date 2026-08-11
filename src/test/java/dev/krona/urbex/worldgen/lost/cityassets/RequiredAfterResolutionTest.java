@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingRE;
+import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,11 +32,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * all. But a field nothing in the whole chain declares must still be a load error naming the asset
  * and the field, rather than a null that surfaces as an NPE somewhere in generation, hours later.
  * <p>
- * The three registries covered here are the ones that make the point: {@code stuff} is what
+ * The four registries covered here are the ones that make the point: {@code stuff} is what
  * {@code extends} is most obviously for (a rarer variant of an existing decoration), {@code
  * multibuildings} is where every field used to be required so {@code extends} was purely
- * decorative, and {@code worldstyles} carries {@code outsidestyle}, the scalar the spec names by
- * example.
+ * decorative, {@code worldstyles} carries {@code outsidestyle}, the scalar the spec names by
+ * example, and {@code scattered} is where requiredness spans a <em>pair</em> of fields.
+ * <p>
+ * That last one is the shape {@link Resolved#require} cannot express, and {@code multibuildings}
+ * has the other: a constraint between two fields that are each individually present. Per-field
+ * requiredness leaves both unguarded, so each is checked by hand where the chain is folded.
  */
 class RequiredAfterResolutionTest {
 
@@ -119,6 +125,39 @@ class RequiredAfterResolutionTest {
         assertTrue(e.getMessage().contains("urbex:test_multi"), e.getMessage());
     }
 
+    /**
+     * {@code dimx}/{@code dimz} and {@code buildings} resolve from independent links, so a child
+     * that restates only its size inherits a grid of the ancestor's size. Nothing downstream
+     * re-checks: {@code MultiChunk.placeBuilding} reserves a cell for every {@code xx < getDimX()}
+     * and those coordinates come back to an unguarded {@code buildings.get(x).get(z)}, so without a
+     * check here the contradiction surfaces as an IndexOutOfBoundsException mid-generation.
+     */
+    @Test
+    void multiBuildingGridSmallerThanTheDeclaredSizeIsALoadError() {
+        MultiBuildingRE parent = multiBuilding(Optional.of(1), Optional.of(1),
+                Optional.of(List.of(List.of("urbex:tower"))));
+        MultiBuildingRE child = multiBuilding(Optional.of(2), Optional.of(2), Optional.empty());
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new MultiBuilding(List.of(parent, child)));
+
+        assertTrue(e.getMessage().contains("urbex:test_multi"), e.getMessage());
+        assertTrue(e.getMessage().contains("dimx"), e.getMessage());
+        assertTrue(e.getMessage().contains("2"), e.getMessage());
+    }
+
+    @Test
+    void multiBuildingRowShorterThanTheDeclaredDepthIsALoadError() {
+        MultiBuildingRE entry = multiBuilding(Optional.of(2), Optional.of(2),
+                Optional.of(List.of(List.of("urbex:a", "urbex:b"), List.of("urbex:c"))));
+
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new MultiBuilding(List.of(entry)));
+
+        assertTrue(e.getMessage().contains("urbex:test_multi"), e.getMessage());
+        assertTrue(e.getMessage().contains("dimz"), e.getMessage());
+    }
+
     @Test
     void multiBuildingWithNoGridAnywhereInTheChainIsALoadError() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
@@ -127,6 +166,46 @@ class RequiredAfterResolutionTest {
 
         assertTrue(e.getMessage().contains("buildings"), e.getMessage());
         assertTrue(e.getMessage().contains("urbex:test_multi"), e.getMessage());
+    }
+
+    // ------------------------------------------------------------- scattered
+
+    /**
+     * {@code buildings} and {@code multibuilding} are required of the chain as a pair - at least
+     * one of them has to survive resolution. Neither is required on its own, which is why
+     * {@link Resolved#require} cannot state this and it has to be checked here. A chain declaring
+     * neither used to load and then throw from {@code Scattered.generate} the first time the entry
+     * was placed.
+     */
+    @Test
+    void scatteredWithNeitherBuildingsNorMultiBuildingInTheChainIsALoadError() {
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new ScatteredBuilding(List.of(scattered(Optional.empty(), Optional.empty()))));
+
+        assertTrue(e.getMessage().contains("urbex:test_scattered"), e.getMessage());
+        assertTrue(e.getMessage().contains("buildings"), e.getMessage());
+        assertTrue(e.getMessage().contains("multibuilding"), e.getMessage());
+    }
+
+    @Test
+    void scatteredChildInheritsTheBuildingListItDoesNotDeclare() {
+        ScatteredRE parent = scattered(Optional.of(new Mergeable<>(true, List.of("urbex:cabin"))),
+                Optional.empty());
+        ScatteredRE child = scattered(Optional.empty(), Optional.empty());
+
+        ScatteredBuilding resolved = new ScatteredBuilding(List.of(parent, child));
+
+        assertEquals(List.of("urbex:cabin"), resolved.getBuildings(),
+                "a child that only restates terrain still inherits the chain's building list");
+    }
+
+    @Test
+    void scatteredSatisfiesThePairWithMultiBuildingAlone() {
+        ScatteredBuilding resolved = new ScatteredBuilding(List.of(
+                scattered(Optional.empty(), Optional.of("urbex:oilrig"))));
+
+        assertEquals("urbex:oilrig", resolved.getMultibuilding());
+        assertNull(resolved.getBuildings(), "multibuilding alone is a complete scattered entry");
     }
 
     // ----------------------------------------------------------- worldstyles
@@ -182,6 +261,14 @@ class RequiredAfterResolutionTest {
 
     private static List<String> cityStyleNames(WorldStyle style) {
         return style.cityStyleSelectors().stream().map(pair -> pair.getRight().getRight()).toList();
+    }
+
+    private static ScatteredRE scattered(Optional<Mergeable<String>> buildings,
+                                         Optional<String> multibuilding) {
+        return new ScatteredRE(Optional.empty(), buildings, multibuilding, Optional.empty(),
+                Optional.of(ScatteredBuilding.TerrainHeight.AVERAGE),
+                Optional.of(ScatteredBuilding.TerrainFix.NONE), Optional.empty())
+                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_scattered"));
     }
 
     private static MultiBuildingRE multiBuilding(Optional<Integer> dimX, Optional<Integer> dimZ,
