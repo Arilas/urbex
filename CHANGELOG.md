@@ -16,7 +16,15 @@
   purely decorative. Requiredness has not gone away, it has moved: a field that *nothing* in the
   whole chain declares is a load error naming the asset and the field ("`'urbex:oilrig_burnt'`
   declares no `'terrainfix'`, and neither does anything it extends"), raised while the pack loads
-  rather than surfacing as a null somewhere in generation. Along the way, `buildings` stopped
+  rather than surfacing as a null somewhere in generation. Keeping that promise meant resolving
+  every registered asset up front: `worldstyles`, `multibuildings`, `styles`, `palettes`,
+  `variants`, `conditions` and `scattered` used to be built lazily on first lookup from a worldgen
+  worker, so a broken file in one of them would have failed mid-generation, and one nothing
+  referenced would never have been checked at all. They are resolved at load now alongside `parts`,
+  `buildings` and `stuff`, which does mean a broken third-party asset fails the world even when the
+  player never selects it - the intended trade, and the same rule the rest of the format follows.
+  (`scattered` was also missing from the registry reset, so a datapack reload kept serving stale
+  objects; it is reset with the others now.) Along the way, `buildings` stopped
   encoding "undeclared" as a sentinel: `minfloors`/`maxfloors`/`mincellars`/`maxcellars` no longer
   use `-1` and `preferslonely` no longer uses `0.0` to mean "absent", so a child can now set an
   inherited `preferslonely` of `0.8` back down to `0.0`, or an inherited floor limit back to `-1`
@@ -56,7 +64,8 @@
   wholesale replacements on purpose: `multibuildings.buildings` and `parts.slices` are grids, and a
   half-inherited grid would contradict its own declared dimensions. Nothing in a datapack has to
   change: `extends` is optional everywhere, every previously required key is still accepted, and
-  the only keys that became optional are the three on `parts`. Third-party packs that relied on a
+  the only keys *this* change made optional are the three on `parts` - the entry above then applies
+  the same rule to twenty-two more, across ten registries. Third-party packs that relied on a
   part failing to load when it omitted `xsize`, `zsize` or `slices` now get that error from the
   resolved chain instead of from the codec, with the part named. `DatapackReferenceIntegrityTest`
   checks `extends` in every category rather than only in `citystyles`, so a fourteenth registry

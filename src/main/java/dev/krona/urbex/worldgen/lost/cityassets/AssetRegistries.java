@@ -43,6 +43,7 @@ public class AssetRegistries {
         MULTI_BUILDINGS.reset();
         STYLES.reset();
         PALETTES.reset();
+        SCATTERED.reset();
         PREDEFINED_CITIES.reset();
         STUFF.reset();
         STUFF_BY_TAG.clear();
@@ -51,12 +52,36 @@ public class AssetRegistries {
         loadedPredefined = false;
     }
 
+    /**
+     * Resolves every registered asset in every registry that has required fields.
+     * <p>
+     * Requiredness is checked when a chain is resolved rather than when a file is decoded (see
+     * {@link Resolved}), so an asset that is never resolved is never validated. Everything below
+     * would otherwise be built lazily on first lookup from a worldgen worker thread, which would
+     * turn "this file is missing 'terrainfix'" from a refusal to load the world into an exception
+     * mid-generation - and would never raise it at all for an asset no world happens to reference.
+     * Resolving them all here keeps the rule the design states: fail at load, naming the file.
+     * <p>
+     * This does mean a broken third-party asset fails the world even when the player never selects
+     * it. That is the intended trade, not a side effect.
+     * <p>
+     * Order is deliberate only in one place: {@code VARIANTS} before {@code PALETTES}, because
+     * compiling a palette entry that names a variant reaches into that registry. The lookup is
+     * lazy, so this is tidiness rather than a requirement.
+     */
     public static void load(CommonLevelAccessor level) {
         if (loaded) {
             return;
         }
+        VARIANTS.loadAll(level);
+        PALETTES.loadAll(level);
+        CONDITIONS.loadAll(level);
+        STYLES.loadAll(level);
         PARTS.loadAll(level);
         BUILDINGS.loadAll(level);
+        MULTI_BUILDINGS.loadAll(level);
+        SCATTERED.loadAll(level);
+        WORLDSTYLES.loadAll(level);
         STUFF.loadAll(level);
         STUFF.getIterable().forEach(stuff -> stuff.getSettings().getTags().forEach(tag -> {
             List<StuffObject> list = STUFF_BY_TAG.get(tag);
