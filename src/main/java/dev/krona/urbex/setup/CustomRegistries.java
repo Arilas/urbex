@@ -34,6 +34,8 @@ public class CustomRegistries {
 
     public static final ResourceKey<Registry<StuffSettingsRE>> STUFF_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "stuff"));
 
+    public static final ResourceKey<Registry<PresetRE>> PRESET_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "presets"));
+
     public static void init() {
         // Fabric: register the datapack ("dynamic") registries. These are server-side only
         // (not synced to clients), matching the NeoForge DataPackRegistryEvent behavior
@@ -50,5 +52,6 @@ public class CustomRegistries {
         DynamicRegistries.register(PREDEFINEDCITIES_REGISTRY_KEY, PredefinedCityRE.CODEC);
         DynamicRegistries.register(SCATTERED_REGISTRY_KEY, ScatteredRE.CODEC);
         DynamicRegistries.register(STUFF_REGISTRY_KEY, StuffSettingsRE.CODEC);
+        DynamicRegistries.register(PRESET_REGISTRY_KEY, PresetRE.CODEC);
     }
 }
