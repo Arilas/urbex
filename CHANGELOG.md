@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **A city style's own selector lists now replace the ones it inherits, instead of being appended
+  to them.** `CityStyle.init()` unconditionally `addAll`'d the parent's nine selector lists on top
+  of the child's, with no deduplication, so a style could only ever widen a selection - never
+  narrow one, and never empty one. The bundled `urbex:citystyle_border` is the case that surfaced
+  it: it lists 5 buildings and no multibuildings, but generated with 13 building entries
+  (`building1`-`building5` at double weight plus all three of `citystyle_common`'s that it
+  deliberately omits) and all 12 of the parent's multibuildings. An explicitly empty list was
+  indistinguishable from an absent one, so "none here" was inexpressible. A list the child does not
+  mention still inherits whole, so no style needs to restate what it wants unchanged. This is
+  datapack-visible: a third-party city style that declared a selector list expecting it to add to
+  its parent's now replaces it, and should list what it actually wants. Reachable in the bundled
+  pack only through the `urbex:largecities` preset, which is the one place `cityStyleAlternative`
+  names the border style - so both worldgen digests are unchanged (`414cb71424d5e53f` and
+  `c8267f7b4abfd44e`, `unsafeReads=0`), and the fix is covered by `CityStyleInheritSelectorsTest`
+  instead.
 - **Presets are now datapack-driven.** The old `UrbexProfile`/`Configuration` machinery, its
   `config/urbex/profiles/*.json` files, and the legacy key migrations (`generateLighting`,
   `generateLoot`, `buildingWithoutLootChance`, `chestWithoutLootChance`, `basedOn`) are gone with

@@ -27,6 +27,19 @@ public class CityStyle {
     private final List<ObjectSelector> frontSelector = new ArrayList<>();
     private final List<ObjectSelector> railDungeonSelector = new ArrayList<>();
     private final List<ObjectSelector> multiBuildingSelector = new ArrayList<>();
+
+    /** The nine selector lists a city style can declare, so inheritance can be driven by a loop. */
+    enum Sel {
+        BUILDING, BRIDGE, LARGE_BRIDGE, PARK, FOUNTAIN, STAIR, FRONT, RAIL_DUNGEON, MULTI_BUILDING
+    }
+
+    /**
+     * Which selector lists this style's <em>own</em> file declared. A declared list replaces the
+     * inherited one rather than being appended to it, so a style can narrow a selection - and an
+     * explicitly empty list means empty, which is otherwise inexpressible. Lists the file does not
+     * mention still inherit whole. See {@link #inheritSelectors}.
+     */
+    private final Set<Sel> declared = EnumSet.noneOf(Sel.class);
     private StreetParts streetParts = StreetParts.DEFAULT;
     private StreetParts largeStreetParts = StreetParts.DEFAULT;
     private StreetParts tertiaryStreetParts = StreetParts.DEFAULT;
@@ -132,16 +145,50 @@ public class CityStyle {
             rubbleDirtBlock = s.getRubbleDirtBlock();
         });
         object.getSelectors().ifPresent(s -> {
-            s.getBridgeSelector().ifPresent(bridgeSelector::addAll);
-            s.getLargeBridgeSelector().ifPresent(largeBridgeSelector::addAll);
-            s.getBuildingSelector().ifPresent(buildingSelector::addAll);
-            s.getFountainSelector().ifPresent(fountainSelector::addAll);
-            s.getFrontSelector().ifPresent(frontSelector::addAll);
-            s.getParkSelector().ifPresent(parkSelector::addAll);
-            s.getMultiBuildingSelector().ifPresent(multiBuildingSelector::addAll);
-            s.getRailDungeonSelector().ifPresent(railDungeonSelector::addAll);
-            s.getStairSelector().ifPresent(stairSelector::addAll);
+            declare(Sel.BRIDGE, s.getBridgeSelector());
+            declare(Sel.LARGE_BRIDGE, s.getLargeBridgeSelector());
+            declare(Sel.BUILDING, s.getBuildingSelector());
+            declare(Sel.FOUNTAIN, s.getFountainSelector());
+            declare(Sel.FRONT, s.getFrontSelector());
+            declare(Sel.PARK, s.getParkSelector());
+            declare(Sel.MULTI_BUILDING, s.getMultiBuildingSelector());
+            declare(Sel.RAIL_DUNGEON, s.getRailDungeonSelector());
+            declare(Sel.STAIR, s.getStairSelector());
         });
+    }
+
+    /** Records that this style's own file declared {@code kind}, and takes its entries. */
+    private void declare(Sel kind, Optional<List<ObjectSelector>> values) {
+        values.ifPresent(v -> {
+            declared.add(kind);
+            selectorList(kind).addAll(v);
+        });
+    }
+
+    List<ObjectSelector> selectorList(Sel kind) {
+        return switch (kind) {
+            case BUILDING -> buildingSelector;
+            case BRIDGE -> bridgeSelector;
+            case LARGE_BRIDGE -> largeBridgeSelector;
+            case PARK -> parkSelector;
+            case FOUNTAIN -> fountainSelector;
+            case STAIR -> stairSelector;
+            case FRONT -> frontSelector;
+            case RAIL_DUNGEON -> railDungeonSelector;
+            case MULTI_BUILDING -> multiBuildingSelector;
+        };
+    }
+
+    /**
+     * Takes the parent's entries for every selector list this style's own file did not declare.
+     * Package-private and free of any level lookup so the merge can be tested directly.
+     */
+    void inheritSelectors(CityStyle inheritFrom) {
+        for (Sel kind : Sel.values()) {
+            if (!declared.contains(kind)) {
+                selectorList(kind).addAll(inheritFrom.selectorList(kind));
+            }
+        }
     }
 
     public String getName() {
@@ -317,15 +364,7 @@ public class CityStyle {
                     style = inheritFrom.getStyle();
                 }
                 stuffTags.addAll(inheritFrom.stuffTags);
-                buildingSelector.addAll(inheritFrom.buildingSelector);
-                bridgeSelector.addAll(inheritFrom.bridgeSelector);
-                largeBridgeSelector.addAll(inheritFrom.largeBridgeSelector);
-                parkSelector.addAll(inheritFrom.parkSelector);
-                fountainSelector.addAll(inheritFrom.fountainSelector);
-                stairSelector.addAll(inheritFrom.stairSelector);
-                frontSelector.addAll(inheritFrom.frontSelector);
-                railDungeonSelector.addAll(inheritFrom.railDungeonSelector);
-                multiBuildingSelector.addAll(inheritFrom.multiBuildingSelector);
+                inheritSelectors(inheritFrom);
                 if (explosionChance == null) {
                     explosionChance = inheritFrom.explosionChance;
                 }
