@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.regassets.data;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
@@ -9,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MergeableListCodecTest {
@@ -18,6 +20,11 @@ class MergeableListCodecTest {
     private static Mergeable<String> decode(String json) {
         return CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json))
                 .getOrThrow(msg -> new AssertionError("decode failed: " + msg));
+    }
+
+    private static JsonElement encode(Mergeable<String> m) {
+        return CODEC.encodeStart(JsonOps.INSTANCE, m)
+                .getOrThrow(msg -> new AssertionError("encode failed: " + msg));
     }
 
     @Test
@@ -57,5 +64,35 @@ class MergeableListCodecTest {
         List<String> target = new ArrayList<>(List.of("inherited"));
         Mergeable.apply(target, decode("[]"));
         assertTrue(target.isEmpty());
+    }
+
+    @Test
+    void replacingEncodesToABareArray() {
+        JsonElement encoded = encode(new Mergeable<>(true, List.of("a", "b")));
+
+        assertTrue(encoded.isJsonArray(), "a replacing Mergeable must encode to a bare array, not the object form: " + encoded);
+        assertEquals(JsonParser.parseString("[\"a\", \"b\"]"), encoded);
+    }
+
+    @Test
+    void appendingEncodesToTheObjectFormWithReplaceFalsePresent() {
+        JsonElement encoded = encode(new Mergeable<>(false, List.of("c")));
+
+        assertTrue(encoded.isJsonObject(), "an appending Mergeable must encode to the object form: " + encoded);
+        var obj = encoded.getAsJsonObject();
+        assertTrue(obj.has("replace"), "'replace': false must be written explicitly - if it were ever "
+                + "omitted, decoding would fall back to the field's declared default (true), silently "
+                + "turning an appending Mergeable back into a replacing one: " + encoded);
+        assertFalse(obj.get("replace").getAsBoolean());
+        assertEquals(JsonParser.parseString("[\"c\"]"), obj.get("values"));
+    }
+
+    @Test
+    void bothShapesRoundTripThroughEncodeThenDecode() {
+        Mergeable<String> replacing = new Mergeable<>(true, List.of("a", "b"));
+        Mergeable<String> appending = new Mergeable<>(false, List.of("c", "d"));
+
+        assertEquals(replacing, decode(encode(replacing).toString()));
+        assertEquals(appending, decode(encode(appending).toString()));
     }
 }
