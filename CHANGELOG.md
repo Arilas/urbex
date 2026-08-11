@@ -218,7 +218,7 @@
     `a993b976a935e2eb`, with 21 cobwebs and zero chains in the window; the chain fix alone took it
     to the shipped `88af6b69e7762fbc` by turning 16 of those placements from air into chains. That
     intermediate value is recorded here because it is the measurement the "measured, not inferred"
-    claim above rests on, and it exists in no other file.
+    claim above rests on, and until now it existed only in a scratch workspace.
     The mechanism: `Tools.stringToState` ends at
     `BuiltInRegistries.BLOCK.getValue(id)`, which hands back the registry's *default* value -
     `minecraft:air` - for an unknown id, so its `value == null` guard never fires and a renamed block
