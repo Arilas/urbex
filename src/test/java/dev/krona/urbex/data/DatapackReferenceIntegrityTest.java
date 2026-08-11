@@ -216,6 +216,15 @@ class DatapackReferenceIntegrityTest {
         }
     }
 
+    /**
+     * One reference, an array of them, or the {@code {"replace": false, "values": [...]}} append
+     * form - the third arm every part-wiring field and every mergeable list accepts.
+     * <p>
+     * The object arm was going unchecked: this method used to fall through on anything that was not
+     * a primitive or an array, so a bare or dangling name inside a {@code values} list was invisible
+     * to the whole sweep. Nothing bundled writes that form yet, which is exactly why it needed
+     * covering before the authoring guide documents it.
+     */
     private void refListOrString(String src, JsonElement el, String targetCategory) {
         if (el == null) {
             return;
@@ -224,6 +233,8 @@ class DatapackReferenceIntegrityTest {
             ref(src, el, targetCategory);
         } else if (el.isJsonArray()) {
             forEachElement(el, v -> ref(src, v, targetCategory));
+        } else if (el.isJsonObject()) {
+            refListOrString(src, el.getAsJsonObject().get("values"), targetCategory);
         }
     }
 
@@ -231,8 +242,20 @@ class DatapackReferenceIntegrityTest {
         return el != null && el.isJsonObject() ? el.getAsJsonObject() : null;
     }
 
+    /**
+     * Every element of a list field, whether it was written as a bare array or as the
+     * {@code {"replace": false, "values": [...]}} append form - which {@code citystyles} and every
+     * {@code selectors.*} list accept, and which the array-only version of this silently skipped.
+     */
     private static void forEachElement(JsonElement el, java.util.function.Consumer<JsonElement> fn) {
-        if (el != null && el.isJsonArray()) {
+        if (el == null) {
+            return;
+        }
+        if (el.isJsonObject()) {
+            forEachElement(el.getAsJsonObject().get("values"), fn);
+            return;
+        }
+        if (el.isJsonArray()) {
             for (JsonElement e : el.getAsJsonArray()) {
                 fn.accept(e);
             }

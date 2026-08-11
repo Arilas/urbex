@@ -208,6 +208,12 @@ class AssetsLoadedBeforeGenerationTest {
                 empty(CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY),
                 empty(CustomRegistries.SCATTERED_REGISTRY_KEY),
                 empty(CustomRegistries.WORLDSTYLES_REGISTRY_KEY),
+                // load() reaches these two through loadReachableCityStyles: it enumerates the
+                // preset and predefined-city registries to find every city style something can
+                // select. Empty here, so nothing resolves - but lookupOrThrow needs them present.
+                empty(CustomRegistries.CITYSTYLES_REGISTRY_KEY),
+                empty(CustomRegistries.PRESET_REGISTRY_KEY),
+                empty(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY),
                 stuff.freeze())).freeze();
     }
 

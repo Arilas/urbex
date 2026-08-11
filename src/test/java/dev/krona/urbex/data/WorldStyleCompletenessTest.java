@@ -35,9 +35,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>
  * Since the thirty code-side defaults were deleted, a field no file declares is a load error rather
  * than a silent fallback to Urbex's own parts - so this is the build-time half of that rule. It
- * walks each world style, the city styles it names, and both their {@code extends} chains, and
- * resolves every one of them through the constructors the game itself uses. A shipped file that
- * stops declaring a family fails here, at build time, instead of at someone's world load.
+ * walks each world style, every city style anything in the pack can select, and all their
+ * {@code extends} chains, and resolves every one of them through the constructors the game itself
+ * uses. A shipped file that stops declaring a family fails here, at build time, instead of at
+ * someone's world load.
+ * <p>
+ * "Anything can select" is the same three routes {@code AssetRegistries.loadReachableCityStyles}
+ * enumerates, and the second one is why this is not just the world styles' own lists: the bundled
+ * {@code citystyle_border} is named by no world style at all, only by
+ * {@code presets/largecities.json}'s {@code cities.cityStyleAlternative}. It generates real cities,
+ * and before that route was swept it had no completeness check at build time or at load time - it
+ * passed only by inheriting {@code citystyle_common}'s wiring.
  * <p>
  * It asserts on the <em>union</em> over a chain rather than on any single file, because that is the
  * rule: {@code citystyle_border} declares no {@code parts} of its own and correctly takes
@@ -45,13 +53,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * why the failure wording is {@link Resolved#require}'s rather than this test's - an author who
  * trips the same rule in their own pack has already read that sentence.
  * <p>
- * One place it is deliberately stricter than the runtime rule: a declared but <em>empty</em> list is
- * a legitimate opt-out during generation (see the emptiness guards in
- * {@code CityGenerator.generateNormalStreetSection}), and {@code Resolved.require} accepts one. The
- * bundled pack has no reason to ship one, so here an empty list counts as an unwired field.
+ * An empty list counts as unwired here, and what that means differs by family. For the three street
+ * families an empty list is a real opt-out during generation - {@code CityGenerator} tests each of
+ * them with {@code isEmpty()} before drawing (the {@code parts.stair()} guard at
+ * {@code CityGenerator.java:1631} and the per-shape guards at {@code CityGenerator.java:1653-1703}) -
+ * so for those this test is deliberately one notch stricter than the runtime rule, on the grounds
+ * that the bundled pack has no reason to ship one. For highways and railways it is not a stricter
+ * rule at all but the only check there is: {@code Highways.java:53,58,71} and
+ * {@code Railways.java:50} hand the list straight to {@code getRandomPart} with no emptiness guard,
+ * so {@code "tunnel": []} is a crash during generation. What this task's load-time
+ * {@code Resolved.require} guarantees is <em>non-null</em>, not usable; the gap between the two is
+ * this test, and only for the bundled pack.
  * <p>
- * A city style no world style names is not swept, which is why {@code citystyle_config} - a base
- * that exists to be extended and declares only a street width - is not a failure.
+ * A city style nothing names is not swept, which is why {@code citystyle_config} - a base that exists
+ * to be extended and declares only a street width - is not a failure.
  */
 class WorldStyleCompletenessTest {
 
@@ -82,6 +97,8 @@ class WorldStyleCompletenessTest {
             }
             requireWorldStyleWiring(new WorldStyle(entries));
         }
+
+        cityStylesNamed.addAll(cityStyleAlternatives());
 
         assertFalse(cityStylesNamed.isEmpty(), "no world style names a city style; the sweep found nothing");
         for (String name : cityStylesNamed) {
@@ -165,6 +182,35 @@ class WorldStyleCompletenessTest {
             current = extendsId == null ? null : fileFor(category, extendsId.getAsString());
         }
         return chain;
+    }
+
+    /**
+     * Every {@code cities.cityStyleAlternative} the bundled presets name.
+     * <p>
+     * Read per file rather than through each preset's {@code extends} chain: a value declared
+     * anywhere in a chain is a value some preset resolves to, so the union over the raw files is the
+     * same set of city styles. Same extraction as {@code DatapackReferenceIntegrityTest} does for
+     * namespacing, which is what makes this route findable at all - the preset directory has no
+     * other tie to city styles.
+     */
+    private static List<String> cityStyleAlternatives() throws IOException {
+        List<String> refs = new ArrayList<>();
+        Path presets = ROOT.resolve("presets");
+        if (!Files.isDirectory(presets)) {
+            return refs;
+        }
+        try (Stream<Path> files = Files.walk(presets)) {
+            for (Path file : files.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
+                JsonElement cities = read(file).get("cities");
+                if (cities != null && cities.isJsonObject()) {
+                    JsonElement alternative = cities.getAsJsonObject().get("cityStyleAlternative");
+                    if (alternative != null && alternative.isJsonPrimitive()) {
+                        refs.add(alternative.getAsString());
+                    }
+                }
+            }
+        }
+        return refs;
     }
 
     /** Every {@code citystyles[].citystyle} one file names, whether it replaces or appends. */

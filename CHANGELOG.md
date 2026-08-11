@@ -30,14 +30,19 @@
     could only ever arise from `StreetSettings`' `orElse` on an absent key - a declared block always
     decoded to a fresh object, whatever its contents. It was an opaque way of asking "did this file
     contain the key", not a broken one. What replaces it asks that directly, and per component.
-  - *Where a city style's failure lands.* World styles are validated at world load, because
-    `AssetRegistries.load` resolves that registry eagerly. `CITYSTYLES` is deliberately not in that
-    sweep and is now the one registry with required fields that is left out: resolving every
-    registered city style would forbid a city style that exists only to be extended, and the bundled
-    `citystyle_config` is exactly that - it declares a street width and is complete only through
-    `citystyle_common`, which extends it. So a third-party city style missing its wiring raises when
-    that style is first resolved during generation, not at world load. The bundled pack's own
-    completeness is pinned at build time instead, by `WorldStyleCompletenessTest`.
+  - *City styles are now validated at world load too, by reachability.* Making the wiring required
+    created a failure that could only be raised too late: `CITYSTYLES` was not in
+    `AssetRegistries.load`'s eager sweep, so a third-party city style with no `parts` would have
+    thrown from a worldgen worker mid-generation, wrapped in a `RuntimeException`, rather than
+    refusing the world. Sweeping *every* registered city style is not the fix - it would forbid a
+    style that exists only to be extended, and the bundled `citystyle_config` is exactly that, a
+    street width and nothing else, complete only through `citystyle_common`. `load` now resolves
+    every city style anything can *select*: the ones a world style's `citystyles` selectors name,
+    every preset's `cities.cityStyleAlternative`, and every predefined city's `citystyle`. Roots
+    nothing names drop out for free. That third route matters for the bundled pack itself -
+    `citystyle_border` is named by no world style at all, only by `presets/largecities.json`, and it
+    generates real cities. `WorldStyleCompletenessTest` follows the same three routes, so the
+    build-time sweep and the load-time sweep cover the same set.
   - *Two ids moved out of Java and into the pack, and nothing moved in the world.*
     `citystyle_common`'s `parts` block never declared `connector` or `stair`, so both came from the
     Java defaults - `urbex:street_large_connector` and `urbex:street_stair` - and `stair` was in
@@ -45,11 +50,19 @@
     same values. Both goldens are unchanged (`88af6b69e7762fbc`, `7c297c1e4ec1ce38`, `unsafeReads=0`),
     which is the check that no default silently in use was replaced by a different value.
   - *Tests.* `NoAssetReferenceDefaultsTest` fails if any wiring field regains a literal default.
-    `WorldStyleCompletenessTest` walks every world style, the city styles it names and both their
-    `extends` chains, resolves each through the constructors the game uses, and requires every wiring
-    field to hold at least one part id - asserting on the union over a chain, so `citystyle_border`
-    declaring no `parts` and taking `citystyle_common`'s is correct rather than a failure, and
-    failing in `Resolved.require`'s own wording so an author meets one convention rather than two.
+    `WorldStyleCompletenessTest` walks every world style, every city style anything can select and
+    all their `extends` chains, resolves each through the constructors the game uses, and requires
+    every wiring field to hold at least one part id - asserting on the union over a chain, so
+    `citystyle_border` declaring no `parts` and taking `citystyle_common`'s is correct rather than a
+    failure, and failing in `Resolved.require`'s own wording so an author meets one convention rather
+    than two. Note what "at least one" buys: for the three street families an empty list is a genuine
+    runtime opt-out that `CityGenerator` guards, so the test is stricter than the rule there on
+    purpose; for highways and railways `Highways` and `Railways` hand the list straight to
+    `getRandomPart`, so `"tunnel": []` crashes generation and this test is the only thing checking it.
+    What the load-time guard promises is non-null, not usable. `DatapackReferenceIntegrityTest` also
+    reads the `{"replace": false, "values": [...]}` form now, in both its list helpers: it used to
+    fall through on an object, so a bare or dangling name inside a `values` list was invisible to the
+    whole reference sweep on all thirty wiring fields and on every mergeable selector list.
     `WiringRequiredTest` covers the three codec arms in both directions, the append opt-in on a
     string part list, and the load errors for a missing and for a half-declared family.
 
