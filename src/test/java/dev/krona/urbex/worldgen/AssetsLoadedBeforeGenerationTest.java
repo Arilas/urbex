@@ -181,8 +181,9 @@ class AssetsLoadedBeforeGenerationTest {
     }
 
     /**
-     * All ten registries {@code AssetRegistries.load} walks, nine of them empty, {@code stuff}
-     * holding a single {@code urbex:cobweb} tagged {@code rubble}.
+     * Every registry {@code AssetRegistries.load} touches - the ten it walks plus the three
+     * {@code loadReachableCityStyles} enumerates - all empty but {@code stuff}, which holds a single
+     * {@code urbex:cobweb} tagged {@code rubble}.
      */
     private static RegistryAccess registriesWithOneRubbleStuff() {
         MappedRegistry<StuffSettingsRE> stuff = new MappedRegistry<>(

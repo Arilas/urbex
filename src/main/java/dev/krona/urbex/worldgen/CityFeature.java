@@ -130,6 +130,16 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
                         "generating with the un-overridden preset '{}'.", type.identifier(), choice.preset(), e);
             }
         }
+        // Route 4 of the four that name a city style (see AssetRegistries.loadReachableCityStyles):
+        // the alternative style can arrive as per-world override JSON rather than from a registry
+        // entry, so the load-time sweep cannot see it - a player types an id into the ADVANCED
+        // settings box and it rides into the world through UrbexData. Checked here instead, once per
+        // dimension and before any chunk work, so an incomplete or missing style refuses the
+        // pipeline naming the dimension rather than throwing from a worker on every chunk. This is
+        // deliberately not fail-soft like the overrides parse above: a malformed payload can be
+        // ignored and the un-overridden preset used, but a style that cannot resolve has no such
+        // fallback - City.getCityStyle would simply hand null on to generation.
+        AssetRegistries.requireCityStyle(world, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
         // Built outside the map. Two threads may both build one for the same dimension the
         // first time a chunk is generated - the loser's is simply dropped, caches and all.
         IDimensionInfo diminfo = new DefaultDimensionInfo(world, preset, choice.worldStyle());

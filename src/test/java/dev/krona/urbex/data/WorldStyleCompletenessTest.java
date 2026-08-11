@@ -40,12 +40,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * uses. A shipped file that stops declaring a family fails here, at build time, instead of at
  * someone's world load.
  * <p>
- * "Anything can select" is the same three routes {@code AssetRegistries.loadReachableCityStyles}
- * enumerates, and the second one is why this is not just the world styles' own lists: the bundled
- * {@code citystyle_border} is named by no world style at all, only by
- * {@code presets/largecities.json}'s {@code cities.cityStyleAlternative}. It generates real cities,
- * and before that route was swept it had no completeness check at build time or at load time - it
- * passed only by inheriting {@code citystyle_common}'s wiring.
+ * "Anything can select" is routes 1-3 of the four {@code AssetRegistries.loadReachableCityStyles}
+ * enumerates - a world style's {@code citystyles}, a preset's {@code cities.cityStyleAlternative},
+ * and a predefined city's {@code citystyle}. Route 2 is why this is not just the world styles' own
+ * lists: the bundled {@code citystyle_border} is named by no world style at all, only by
+ * {@code presets/largecities.json}. It generates real cities, and before that route was swept it had
+ * no completeness check at build time or at load time - it passed only by inheriting
+ * {@code citystyle_common}'s wiring.
+ * <p>
+ * Route 4 has no build-time equivalent and is <b>not</b> covered here: it is a city style id typed
+ * into the customization GUI and carried in per-world override JSON, so it exists in no file in this
+ * repository. {@code CityFeature} checks that one where it builds the preset.
  * <p>
  * It asserts on the <em>union</em> over a chain rather than on any single file, because that is the
  * rule: {@code citystyle_border} declares no {@code parts} of its own and correctly takes
@@ -98,7 +103,8 @@ class WorldStyleCompletenessTest {
             requireWorldStyleWiring(new WorldStyle(entries));
         }
 
-        cityStylesNamed.addAll(cityStyleAlternatives());
+        cityStylesNamed.addAll(namedIn("presets", "cities", "cityStyleAlternative"));
+        cityStylesNamed.addAll(namedIn("predefinedcities", null, "citystyle"));
 
         assertFalse(cityStylesNamed.isEmpty(), "no world style names a city style; the sweep found nothing");
         for (String name : cityStylesNamed) {
@@ -185,27 +191,30 @@ class WorldStyleCompletenessTest {
     }
 
     /**
-     * Every {@code cities.cityStyleAlternative} the bundled presets name.
+     * Every city style named by {@code key} (optionally nested under {@code section}) in every file
+     * of {@code category} - routes 2 and 3.
      * <p>
-     * Read per file rather than through each preset's {@code extends} chain: a value declared
-     * anywhere in a chain is a value some preset resolves to, so the union over the raw files is the
-     * same set of city styles. Same extraction as {@code DatapackReferenceIntegrityTest} does for
-     * namespacing, which is what makes this route findable at all - the preset directory has no
-     * other tie to city styles.
+     * Read per file rather than through each asset's {@code extends} chain: a value declared
+     * anywhere in a chain is a value something in that chain resolves to, so the union over raw
+     * files is a superset of what any resolution can produce, never a subset. A category the pack
+     * does not ship yields nothing, which is the {@code predefinedcities} case today.
      */
-    private static List<String> cityStyleAlternatives() throws IOException {
+    private static List<String> namedIn(String category, String section, String key) throws IOException {
         List<String> refs = new ArrayList<>();
-        Path presets = ROOT.resolve("presets");
-        if (!Files.isDirectory(presets)) {
+        Path dir = ROOT.resolve(category);
+        if (!Files.isDirectory(dir)) {
             return refs;
         }
-        try (Stream<Path> files = Files.walk(presets)) {
+        try (Stream<Path> files = Files.walk(dir)) {
             for (Path file : files.filter(p -> p.toString().endsWith(".json")).sorted().toList()) {
-                JsonElement cities = read(file).get("cities");
-                if (cities != null && cities.isJsonObject()) {
-                    JsonElement alternative = cities.getAsJsonObject().get("cityStyleAlternative");
-                    if (alternative != null && alternative.isJsonPrimitive()) {
-                        refs.add(alternative.getAsString());
+                JsonElement holder = read(file);
+                if (section != null) {
+                    holder = holder.getAsJsonObject().get(section);
+                }
+                if (holder != null && holder.isJsonObject()) {
+                    JsonElement named = holder.getAsJsonObject().get(key);
+                    if (named != null && named.isJsonPrimitive()) {
+                        refs.add(named.getAsString());
                     }
                 }
             }

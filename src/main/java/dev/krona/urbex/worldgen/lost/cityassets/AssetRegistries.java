@@ -5,6 +5,7 @@ import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import net.minecraft.core.Holder;
+import net.minecraft.core.Registry;
 import net.minecraft.world.level.CommonLevelAccessor;
 import net.minecraft.world.level.biome.Biome;
 import org.apache.commons.lang3.tuple.Pair;
@@ -189,21 +190,31 @@ public class AssetRegistries {
      * Resolves every city style anything in the pack can select, so its required fields are checked
      * at world load like every other registry's rather than from a worldgen worker mid-generation.
      * <p>
-     * Three routes name a city style, and this enumerates all three - traced from the two
-     * {@code CITYSTYLES} call sites in the mod, {@code City.java:281} and
-     * {@code BuildingInfo.java:374}, back to where the name they pass comes from:
+     * <b>Four routes name a city style; this sweep covers the three that live in the registries.</b>
+     * They were traced from the two {@code CITYSTYLES} lookup sites in the mod, {@code City.java:282}
+     * and {@code BuildingInfo.java:374}, back to where the name they are handed comes from:
      * <ol>
      * <li>a world style's {@code citystyles} selectors, which is what {@code City.getCityStyleInt}
      *     and {@code getCityStyleForCityCenter} draw from;</li>
      * <li>a preset's {@code cities.cityStyleAlternative}, taken when the city factor falls below
      *     {@code CITY_STYLE_THRESHOLD} ({@code City.java:242,258}) - the route by which the bundled
      *     {@code citystyle_border} is generated, and one no world style mentions;</li>
-     * <li>a predefined city's {@code citystyle} ({@code City.getCityStyleForCityCenter}), which
-     *     overrides the roll for that city entirely.</li>
+     * <li>a predefined city's {@code citystyle} ({@code City.java:209-210}), which overrides the
+     *     roll for that city entirely;</li>
+     * <li><b>the per-world preset <em>overrides</em></b> - the same {@code cityStyleAlternative}
+     *     field, but arriving as override JSON rather than from a registry entry, so nothing here
+     *     can see it. It is user-reachable: {@code CITY_STYLE_ALTERNATIVE} is a free-text box in the
+     *     customization GUI ({@code Settings.java:466}), published or restored through
+     *     {@code UrbexData}, and applied by {@code CityFeature.getDimensionInfo}. That one is
+     *     checked where it is built, by the {@link #requireCityStyle} call in {@code CityFeature}
+     *     right after {@code Presets.applyOverrides} - once per dimension, before any chunk work.</li>
      * </ol>
-     * {@code BuildingInfo}'s call adds no fourth route: the name it looks up is the winner of a
-     * {@code Counter} over styles the surrounding chunks already resolved through route 1 or 2. A
-     * <em>new</em> selection path has to add itself here, or it goes back to failing mid-generation.
+     * {@code BuildingInfo}'s lookup adds no fifth route: the name it passes is the winner of a
+     * {@code Counter} over ids of styles the surrounding chunks already resolved through routes 1-4.
+     * A <em>new</em> selection path has to add itself to this list or to {@code CityFeature}, or it
+     * goes back to failing mid-generation; {@code CityStyleLookupSitesTest} fails the build if a new
+     * lookup <em>site</em> appears, though it cannot see a new name <em>source</em> feeding an
+     * existing one.
      * <p>
      * Presets and predefined cities are read one registry entry at a time rather than through their
      * own {@code extends} resolution, deliberately: a value declared anywhere in a chain is a value
@@ -220,20 +231,45 @@ public class AssetRegistries {
         }
         for (WorldStyle style : WORLDSTYLES.getIterable()) {
             for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selector : style.cityStyleSelectors()) {
-                CITYSTYLES.getOrThrow(level, selector.getRight().getRight());
+                requireCityStyle(level, selector.getRight().getRight(), style.getId());
             }
         }
-        for (PresetRE preset : level.registryAccess().lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY)) {
-            preset.cities().flatMap(CitySettings::cityStyleAlternative)
-                    .filter(name -> !name.isBlank())
-                    .ifPresent(name -> CITYSTYLES.getOrThrow(level, name));
+        Registry<PresetRE> presets = level.registryAccess().lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
+        for (PresetRE preset : presets) {
+            preset.cities().flatMap(CitySettings::cityStyleAlternative).ifPresent(
+                    name -> requireCityStyle(level, name, presets.getKey(preset)));
         }
-        for (PredefinedCityRE city :
-                level.registryAccess().lookupOrThrow(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY)) {
-            String name = city.getCityStyle();
-            if (name != null && !name.isBlank()) {
-                CITYSTYLES.getOrThrow(level, name);
-            }
+        Registry<PredefinedCityRE> cities =
+                level.registryAccess().lookupOrThrow(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY);
+        for (PredefinedCityRE city : cities) {
+            requireCityStyle(level, city.getCityStyle(), cities.getKey(city));
+        }
+    }
+
+    /**
+     * Resolves one city style by name, so a name that does not exist or whose chain leaves a
+     * required field undeclared fails here rather than from a worldgen worker.
+     * <p>
+     * The only place {@code CITYSTYLES} is looked up outside generation, and the entry point route 4
+     * uses: {@code CityFeature.getDimensionInfo} calls it for the preset it has just built, which is
+     * the only form of the alternative-style setting no registry sweep can reach. Blank is not a
+     * name - {@code Preset.CITY_STYLE_ALTERNATIVE} starts as {@code ""} and most presets never set
+     * it - so it resolves nothing rather than failing.
+     * <p>
+     * {@code selectedBy} only shapes the message, and it is the point of the wrapper: the underlying
+     * error names the city style and the field it is missing, which on its own leaves an author
+     * hunting for what pulled that style in.
+     */
+    public static void requireCityStyle(CommonLevelAccessor level, @Nullable String name, Object selectedBy) {
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        try {
+            CITYSTYLES.getOrThrow(level, name);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(
+                    "City style '" + name + "', selected by '" + selectedBy + "', cannot be used: "
+                            + e.getMessage(), e);
         }
     }
 

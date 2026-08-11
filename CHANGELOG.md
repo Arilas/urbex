@@ -41,8 +41,26 @@
     every preset's `cities.cityStyleAlternative`, and every predefined city's `citystyle`. Roots
     nothing names drop out for free. That third route matters for the bundled pack itself -
     `citystyle_border` is named by no world style at all, only by `presets/largecities.json`, and it
-    generates real cities. `WorldStyleCompletenessTest` follows the same three routes, so the
-    build-time sweep and the load-time sweep cover the same set.
+    generates real cities. A fourth route cannot be swept from a registry at all: the same
+    `cityStyleAlternative` field also arrives as per-world *override* JSON, since it is a free-text
+    box in the customization GUI that rides into the world through `UrbexData`. A player typing an
+    incomplete style there - a third-party extend-only base, or bundled `urbex:citystyle_config`
+    itself - would still have crashed from a worker. `CityFeature.getDimensionInfo` now checks that
+    one where it builds the preset, once per dimension and before any chunk work.
+    `WorldStyleCompletenessTest` follows routes 1-3; route 4 exists in no file in the repository, so
+    it has no build-time equivalent, and `CityStyleLookupSitesTest` fails the build if a new
+    city-style lookup site appears without registering with either sweep.
+  - *Two consequences of validating earlier, both intended and neither only about wiring.* A name
+    that does not resolve is now a load failure **in an asset nobody selects**: a world style
+    selector naming a style from an optional datapack the player did not install, or an unselected
+    preset naming a missing style, refuses a world that loaded before. A preset can even name an
+    alternative it could never reach, since `CITY_STYLE_THRESHOLD` defaults to `-1f` and the test at
+    `City.java:241` is `factor < threshold`. That is the same trade `AssetRegistries.load` already
+    documents for the other ten registries - a broken third-party asset fails the world even when
+    nobody selects it - now extended to city styles. And because `getDimensionInfo` is called at
+    `CityFeature.java:67`, outside the per-chunk try/catch below it, a city-style failure on the
+    generation path takes the pipeline down rather than being logged per chunk. That has been true
+    of the other ten registries since the load-timing change above; city styles join them here.
   - *Two ids moved out of Java and into the pack, and nothing moved in the world.*
     `citystyle_common`'s `parts` block never declared `connector` or `stair`, so both came from the
     Java defaults - `urbex:street_large_connector` and `urbex:street_stair` - and `stair` was in
