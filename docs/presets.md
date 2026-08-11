@@ -5,6 +5,12 @@ building shapes, road layout, explosion damage, spawn rules, and so on. Presets 
 datapack JSON — no code, no rebuild, no mod jar changes. Drop a file in the right place, add it to
 a tag, and it shows up in the preset picker.
 
+Presets are one of Urbex's thirteen datapack registries and follow the same rules as the other
+twelve: one `extends` key naming a fully-qualified id in the same registry, chains applied
+root-first, and no bare references anywhere. [`docs/datapacks.md`](datapacks.md) is the guide to
+those shared rules and to the registries this document does not cover; what follows here is what is
+specific to the preset format.
+
 ## What a preset is
 
 A preset is one JSON file registered in the `urbex:presets` dynamic registry, at:

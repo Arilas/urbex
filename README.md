@@ -43,6 +43,10 @@ To get cities:
 Early. See `docs/superpowers/specs/` for the design and `docs/superpowers/plans/` for what is
 being built now.
 
+Writing a datapack: `docs/datapacks.md` is the authoring guide for all thirteen asset registries —
+where files go, how `extends` works, and what a pack must declare. `docs/presets.md` covers the
+preset format specifically.
+
 ## Building
 
     ./gradlew build

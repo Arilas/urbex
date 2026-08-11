@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **Datapack authoring has a guide: `docs/datapacks.md`.** Everything below changes what a
+  third-party pack must write down, and until now the only way to learn the rules was to read the
+  codecs. The guide covers the thirteen registries and where their files go, `extends` and its
+  root-first order, the three merge shapes and the `{"replace": false}` append opt-in, palettes
+  merging per character, `extends` composing with `refpalette` on a part, and the wiring every world
+  style and city style has to declare - with a working example of every registry and a table pairing
+  each load error with its fix. It also writes down what only the source said: that eleven of the
+  thirteen registries resolve **every** registered asset at world load whether or not anything
+  selects it, so an *incomplete* chain root is legal only in `citystyles`; that an empty part list is
+  a real opt-out for the three street families but a generation crash for highways and railways; that
+  a city style's `style` is needed but not checked at load; and that an unknown block id still
+  resolves to air with a warning rather than failing. `README.md` and `docs/presets.md` link to it.
+  - *The examples are checked, not proofread.* `DatapackGuideExamplesTest` decodes every JSON block
+    in the guide through the codec of the registry it is marked as belonging to, and re-encodes the
+    result to catch keys the codec silently ignored - a doc example that would fail to load, or load
+    and quietly do nothing, fails the build instead. It also fails if a registry has no example. This
+    needed `docs/` declared as an input to `:test`: without it a documentation-only edit left the
+    task `UP-TO-DATE`, so neither this test nor `PresetSchemaTest` ran on the change they exist for.
+
 - **Street, highway and railway part wiring must be declared by the datapack; there is no code-side
   default left.** Thirty `Tools.listOrStringList` call sites carried a bare asset name as a fallback,
   so a world style that never mentioned primary roads still generated Urbex's own

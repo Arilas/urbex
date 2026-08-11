@@ -178,6 +178,13 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    // Two tests read files under docs/ - DatapackGuideExamplesTest decodes every JSON example in
+    // docs/datapacks.md, PresetSchemaTest drift-guards docs/schema/preset.schema.json - and docs/ is
+    // on no classpath, so without declaring it Gradle leaves :test UP-TO-DATE after a
+    // documentation-only edit. That is exactly the edit those two exist to catch.
+    inputs.files(fileTree('docs') { include '**/*.md'; include '**/*.json' })
+            .withPropertyName('docs')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {
         events "passed", "skipped", "failed"
     }
