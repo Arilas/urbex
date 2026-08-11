@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.lost.regassets;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,7 +20,7 @@ import java.util.Optional;
  */
 public class MultiBuildingRE implements IAsset<MultiBuildingRE>, Extendable {
 
-    public static final Codec<MultiBuildingRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<MultiBuildingRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.INT.optionalFieldOf("dimx").forGetter(l -> Optional.ofNullable(l.dimX)),
@@ -28,6 +29,9 @@ public class MultiBuildingRE implements IAsset<MultiBuildingRE>, Extendable {
                     // declared grid replaces the inherited one wholesale, and an absent one inherits.
                     Codec.list(Codec.list(Codec.STRING)).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildings))
             ).apply(instance, MultiBuildingRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<MultiBuildingRE> CODEC = RetiredKeys.reject(RAW, "multibuilding");
 
     private Identifier name;
     private final Optional<Identifier> extendsId;

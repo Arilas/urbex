@@ -5,6 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -18,11 +19,14 @@ import java.util.Optional;
  */
 public class VariantRE implements IAsset<VariantRE>, Extendable {
 
-    public static final Codec<VariantRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<VariantRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(BlockEntry.CODEC).optionalFieldOf("blocks").forGetter(l -> Optional.ofNullable(l.blocks))
             ).apply(instance, VariantRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<VariantRE> CODEC = RetiredKeys.reject(RAW, "variant");
 
     private Identifier name;
     private final Optional<Identifier> extendsId;

@@ -5,6 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.cityassets.ScatteredBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringRepresentable;
 import org.jetbrains.annotations.Nullable;
@@ -20,7 +21,7 @@ import java.util.Optional;
  */
 public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
 
-    public static final Codec<ScatteredRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<ScatteredRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(Codec.STRING).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildings)),
@@ -30,6 +31,9 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
                     StringRepresentable.fromEnum(ScatteredBuilding.TerrainFix::values).optionalFieldOf("terrainfix").forGetter(l -> Optional.ofNullable(l.terrainfix)),
                     Codec.INT.optionalFieldOf("heightoffset").forGetter(l -> Optional.ofNullable(l.heightoffset))
             ).apply(instance, ScatteredRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<ScatteredRE> CODEC = RetiredKeys.reject(RAW, "scattered building");
 
     private Identifier name;
     private final Optional<Identifier> extendsId;

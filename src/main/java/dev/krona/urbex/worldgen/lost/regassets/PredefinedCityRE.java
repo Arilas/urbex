@@ -6,6 +6,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,7 +22,7 @@ import java.util.Optional;
  */
 public class PredefinedCityRE implements IAsset<PredefinedCityRE>, Extendable {
 
-    public static final Codec<PredefinedCityRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<PredefinedCityRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("dimension").forGetter(l -> Optional.ofNullable(l.dimension)),
@@ -32,6 +33,9 @@ public class PredefinedCityRE implements IAsset<PredefinedCityRE>, Extendable {
                     Mergeable.codec(PredefinedBuilding.CODEC).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.predefinedBuildings)),
                     Mergeable.codec(PredefinedStreet.CODEC).optionalFieldOf("streets").forGetter(l -> Optional.ofNullable(l.predefinedStreets))
             ).apply(instance, PredefinedCityRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<PredefinedCityRE> CODEC = RetiredKeys.reject(RAW, "predefined city");
 
     private Identifier name;
 

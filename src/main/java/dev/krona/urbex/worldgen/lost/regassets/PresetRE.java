@@ -15,6 +15,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.preset.RoadSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.SpawnSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -52,8 +53,15 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
                     MiscSettings.CODEC.optionalFieldOf("misc").forGetter(PresetRE::misc)
             ).apply(instance, PresetRE::new));
 
-    public static final Codec<PresetRE> CODEC =
-            dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys.warning(RAW, KEYS, "preset");
+    /**
+     * Retired-key rejection outside the unknown-key warning, so {@code inherit}/{@code parent} fail
+     * the decode instead of being reported as one more ignorable typo. Presets are the only registry
+     * where an unknown key is even mentioned - the other twelve drop it silently - which is exactly
+     * why the retired keys cannot be left to that path. See {@link RetiredKeys}.
+     */
+    public static final Codec<PresetRE> CODEC = RetiredKeys.reject(
+            dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys.warning(RAW, KEYS, "preset"),
+            "preset");
 
     private Identifier name;
 

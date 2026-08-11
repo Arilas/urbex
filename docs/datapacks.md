@@ -513,6 +513,14 @@ annotate files freely.
 key and the section it was in, which is the behaviour [`docs/presets.md`](presets.md) documents.
 The other twelve registries have no such check.
 
+**Two keys are the exception to the exception, in all thirteen registries: `inherit` and
+`parent`.** Urbex's inheritance key is `extends` and only `extends`; the other two were deleted, not
+aliased. Because they would otherwise be ignored like any other unknown key, a file using one would
+load as a chain root with no inheritance at all — either quietly generating without what it meant to
+inherit, or failing later with a message about a missing field that names neither key. So they are
+rejected outright, naming the key and its replacement. This matters mostly if you are converting a
+Lost Cities Modern Tweaks pack, where `inherit` *is* the key.
+
 The examples in this guide are machine-checked against the codecs for exactly this: each is decoded
 and then re-encoded, and a key that does not survive the round trip fails the build. A field name
 you read here is one the mod actually reads.
@@ -549,6 +557,7 @@ Three details about that warning:
 | Message | What happened | Fix |
 |---|---|---|
 | `Unqualified datapack reference 'x': references must name their namespace, e.g. 'urbex:x'` | A reference with no `:` | Qualify it. There is no default namespace |
+| `This citystyle declares 'inherit', which Urbex deleted rather than renamed: use 'extends' instead. Left as it is, the key is ignored and this file loads with no inheritance at all.` | A file uses the retired key `inherit` or `parent` | Rename it to `extends`. Lost Cities Modern Tweaks spells this key `inherit`, so a ported pack hits this first |
 | `'extends' cycle: urbexmt:a -> urbexmt:b -> urbexmt:a` | An `extends` chain loops | Break the loop; the whole chain is printed |
 | `Unknown asset 'urbexmt:missing' (referenced from 'urbexmt:child')` | `extends` names an id nothing provides | Check the id, the registry directory, and that the providing pack is enabled |
 | `'urbexmt:x' declares no 'streetblocks.parts.stair', and neither does anything it extends` | A required field is declared nowhere in the chain | Declare it in this file, or in something it extends |

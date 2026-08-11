@@ -4,6 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -18,11 +19,14 @@ import java.util.Optional;
  */
 public class PaletteRE implements IAsset<PaletteRE>, Extendable {
 
-    public static final Codec<PaletteRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<PaletteRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.list(PaletteEntry.CODEC).optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.paletteEntries))
             ).apply(instance, PaletteRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<PaletteRE> CODEC = RetiredKeys.reject(RAW, "palette");
 
     private Identifier name;
     private final Optional<Identifier> extendsId;

@@ -11,7 +11,7 @@ import java.util.Optional;
 
 public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
 
-    public static final Codec<CityStyleRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<CityStyleRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     Codec.FLOAT.optionalFieldOf("explosionchance").forGetter(l -> Optional.ofNullable(l.explosionChance)),
                     Codec.STRING.optionalFieldOf("style").forGetter(l -> Optional.ofNullable(l.style)),
@@ -25,6 +25,9 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
                     StreetSettings.CODEC.optionalFieldOf("streetblocks").forGetter(l -> Optional.ofNullable(l.streetSettings)),
                     Selectors.CODEC.optionalFieldOf("selectors").forGetter(l -> Optional.ofNullable(l.selectors))
             ).apply(instance, CityStyleRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<CityStyleRE> CODEC = RetiredKeys.reject(RAW, "citystyle");
 
     private Identifier name;
 

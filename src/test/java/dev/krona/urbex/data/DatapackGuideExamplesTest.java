@@ -200,6 +200,17 @@ class DatapackGuideExamplesTest {
                 new PaletteRE(Optional.empty(), Optional.of(List.of(empty)))
                         .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "x")))));
 
+        // The retired-key rejection, which is a DataResult error rather than a throw, so it cannot
+        // go through expect(). Taken from the codec that ships, not from RetiredKeys.problem, so the
+        // guide is pinned to what a pack author actually sees.
+        String retired = CityStyleRE.CODEC
+                .parse(JsonOps.INSTANCE, JsonParser.parseString("{\"inherit\":\"urbex:citystyle_common\"}"))
+                .error().orElseThrow(() -> new AssertionError("expected 'inherit' to be rejected"))
+                .message();
+        if (!guide.contains(collapse(retired))) {
+            missing.add(GUIDE + " does not contain: " + retired);
+        }
+
         assertTrue(missing.isEmpty(),
                 () -> missing.size() + " quoted message(s) the guide does not contain verbatim:\n"
                         + String.join("\n", missing));

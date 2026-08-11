@@ -18,7 +18,7 @@ import java.util.Optional;
  */
 public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
 
-    public static final Codec<WorldStyleRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<WorldStyleRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("outsidestyle").forGetter(l -> Optional.ofNullable(l.outsideStyle)),
@@ -29,6 +29,9 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
                     Mergeable.codec(CityStyleSelector.CODEC).optionalFieldOf("citystyles").forGetter(l -> Optional.ofNullable(l.cityStyleSelectors)),
                     Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
             ).apply(instance, WorldStyleRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<WorldStyleRE> CODEC = RetiredKeys.reject(RAW, "worldstyle");
 
     private Identifier name;
     private final Optional<Identifier> extendsId;

@@ -5,6 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,7 +23,7 @@ import java.util.Optional;
  */
 public class BuildingRE implements IAsset<BuildingRE>, Extendable {
 
-    public static final Codec<BuildingRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<BuildingRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
@@ -40,6 +41,9 @@ public class BuildingRE implements IAsset<BuildingRE>, Extendable {
                     Mergeable.codec(PartRef.CODEC).optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.parts)),
                     Mergeable.codec(PartRef.CODEC).optionalFieldOf("parts2").forGetter(l -> Optional.ofNullable(l.parts2))
             ).apply(instance, BuildingRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<BuildingRE> CODEC = RetiredKeys.reject(RAW, "building");
 
 
     private Identifier name;
