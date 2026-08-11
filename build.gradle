@@ -171,6 +171,9 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // Validates docs/schema/preset.schema.json (draft 2020-12) against the shipped presets and
+    // guards it against drifting from the section codecs' KEYS constants; see PresetSchemaTest.
+    testImplementation 'com.networknt:json-schema-validator:1.5.6'
 }
 
 test {

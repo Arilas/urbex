@@ -1,0 +1,808 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Arilas/LostCities/main/docs/schema/preset.schema.json",
+  "title": "Urbex preset",
+  "description": "A datapack-contributed entry for the urbex:presets dynamic registry (data/<namespace>/urbex/presets/<name>.json). Every field is optional: only fields actually present are applied on top of the resolved 'parent' chain, and unset fields fall through to the parent (or, at the root of the chain, to the code defaults in Preset.java). Keys starting with '_' are ignored (blessed pack metadata, e.g. '_comment').",
+  "type": "object",
+  "properties": {
+    "parent": {
+      "type": "string",
+      "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$",
+      "description": "Identifier of another preset in the urbex:presets registry to inherit from. This preset's sections are applied on top of the fully-resolved parent, field by field, so only the fields that differ need to be listed here. Like all Minecraft identifiers, an id with no namespace (no ':') defaults to the 'minecraft' namespace -- presets should always give an explicit namespace (e.g. 'urbex:default'). A parent cycle, or a parent id that does not resolve, is a load-time error."
+    },
+    "description": {
+      "type": "string",
+      "description": "The description of this preset, shown in the profile-selection UI."
+    },
+    "extraDescription": {
+      "type": "string",
+      "description": "Additional information shown alongside the description."
+    },
+    "warning": {
+      "type": "string",
+      "description": "A warning shown to the player, e.g. to recommend a matching Lost Worlds world type."
+    },
+    "icon": {
+      "type": "string",
+      "description": "Path (relative to 'textures/gui/' under the preset's own namespace) of the 64x64 icon to use in the profile-selection screen."
+    },
+    "terrain": {
+      "type": "object",
+      "description": "Ground/sea level, terrain-fix offsets and the base blocks worldgen carves from.",
+      "properties": {
+        "landscapeType": {
+          "type": "string",
+          "enum": ["default", "floating", "cavern"],
+          "description": "Type of landscape."
+        },
+        "groundLevel": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 256,
+          "description": "Ground level."
+        },
+        "seaLevel": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 256,
+          "description": "Sea level (-1 is default)."
+        },
+        "liquidBlock": {
+          "type": "string",
+          "description": "Block to use as a liquid."
+        },
+        "baseBlock": {
+          "type": "string",
+          "description": "Block to use as the worldgen base."
+        },
+        "bedrockLayer": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "description": "The height of the bedrock layer that is generated at the bottom of some world types. Set to 0 to disable this and get default bedrock generation."
+        },
+        "terrainFixLowerMinOffset": {
+          "type": "integer",
+          "minimum": -40,
+          "maximum": 40,
+          "description": "To fix terrain adjacent to cities, this is the minimum offset (relative to city base level) for the lower mesh used to potentially raise the terrain."
+        },
+        "terrainFixLowerMaxOffset": {
+          "type": "integer",
+          "minimum": -40,
+          "maximum": 40,
+          "description": "To fix terrain adjacent to cities, this is the maximum offset (relative to city base level) for the lower mesh used to potentially raise the terrain."
+        },
+        "terrainFixUpperMinOffset": {
+          "type": "integer",
+          "minimum": -40,
+          "maximum": 40,
+          "description": "To fix terrain adjacent to cities, this is the minimum offset (relative to city base level) for the upper mesh used to potentially lower the terrain."
+        },
+        "terrainFixUpperMaxOffset": {
+          "type": "integer",
+          "minimum": -40,
+          "maximum": 40,
+          "description": "To fix terrain adjacent to cities, this is the maximum offset (relative to city base level) for the upper mesh used to potentially lower the terrain."
+        },
+        "oceanCorrectionBorder": {
+          "type": "integer",
+          "minimum": -255,
+          "maximum": 255,
+          "description": "Terrain correction offset that is used for chunks adjacent to city chunks that are in ocean biomes."
+        },
+        "avoidWater": {
+          "type": "boolean",
+          "description": "If true then all water will be avoided (replaced with air)."
+        },
+        "useAvgHeightmap": {
+          "type": "boolean",
+          "description": "City normal level generation is dependent on the surrounding heightmap and uses an average of it. This uses extra performance since it needs to retrieve surrounding city heightmaps. Defaults to true."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "cities": {
+      "type": "object",
+      "description": "City placement (rarity, radius, spawn-distance falloff), city styles and per-level heights.",
+      "properties": {
+        "cityChance": {
+          "type": "number",
+          "minimum": -1.0,
+          "maximum": 1.0,
+          "description": "The chance this chunk will be the center of a city (use -1 for the perlin-noise variant)."
+        },
+        "cityMinRadius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000,
+          "description": "The minimum radius of a city."
+        },
+        "cityMaxRadius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2000,
+          "description": "The maximum radius of a city."
+        },
+        "cityPerlinScale": {
+          "type": "number",
+          "minimum": -1000000,
+          "maximum": 1000000,
+          "description": "The scale for the city rarity perlin map. Used if cityChance == -1."
+        },
+        "cityPerlinOffset": {
+          "type": "number",
+          "minimum": -1000000,
+          "maximum": 1000000,
+          "description": "The offset for the city rarity perlin map. Used if cityChance == -1."
+        },
+        "cityPerlinInnerScale": {
+          "type": "number",
+          "minimum": -1000000,
+          "maximum": 1000000,
+          "description": "The internal scale for the city rarity perlin map. Used if cityChance == -1."
+        },
+        "cityThreshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The center and radius of a city define a sphere. This threshold indicates from which point a city is considered a city; used for both the cityChance and the perlin variants when calculating overlapping city circles."
+        },
+        "citySpawnDistance1": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000,
+          "description": "At this distance from spawn (in blocks) the city factor will be equal to citySpawnMultiplier1. Closer than this, citySpawnMultiplier1 is used."
+        },
+        "citySpawnDistance2": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000,
+          "description": "At this distance from spawn (in blocks) the city factor will be equal to citySpawnMultiplier2, with linear interpolation between citySpawnDistance1 and this. If 0, this distance falloff is disabled."
+        },
+        "citySpawnMultiplier1": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "City factor at citySpawnDistance1."
+        },
+        "citySpawnMultiplier2": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "City factor at citySpawnDistance2."
+        },
+        "cityStyleThreshold": {
+          "type": "number",
+          "minimum": -1.0,
+          "maximum": 1.0,
+          "description": "A city factor below this threshold will use the city style specified in cityStyleAlternative."
+        },
+        "cityStyleAlternative": {
+          "type": "string",
+          "description": "Alternative city style. Used with cityStyleThreshold."
+        },
+        "cityAvoidVoid": {
+          "type": "boolean",
+          "description": "Only used with the floating landscape type: if true an additional detection is done to see if the chunk is void, and in that case the city isn't generated there. Otherwise you might get city chunks on the border of islands which sometimes looks weird."
+        },
+        "cityLevel0Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 0."
+        },
+        "cityLevel1Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 1."
+        },
+        "cityLevel2Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 2."
+        },
+        "cityLevel3Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 3."
+        },
+        "cityLevel4Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 4."
+        },
+        "cityLevel5Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 5."
+        },
+        "cityLevel6Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 6."
+        },
+        "cityLevel7Height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 384,
+          "description": "Below this chunk height cities will be level 7."
+        },
+        "cityMinHeight": {
+          "type": "integer",
+          "minimum": -1024,
+          "maximum": 2048,
+          "description": "Below this height cities will not be generated."
+        },
+        "cityMaxHeight": {
+          "type": "integer",
+          "minimum": -1024,
+          "maximum": 2048,
+          "description": "Above this height cities will not be generated."
+        },
+        "scatteredChanceMultiplier": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 100.0,
+          "description": "Multiplier for the chance a scattered building will generate. With 0 all scattered buildings are disabled."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "buildings": {
+      "type": "object",
+      "description": "Building shape (floors, cellars), doorway/front chances and multi-building behaviour.",
+      "properties": {
+        "buildingChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a chunk in a city will have a building. Otherwise it will be a street."
+        },
+        "buildingMinFloors": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60,
+          "description": "The minimum number of floors (above ground) for a building (0 means the ground floor only)."
+        },
+        "buildingMaxFloors": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60,
+          "description": "A cap for the amount of floors a building can have (above ground)."
+        },
+        "buildingMinFloorsChance": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "The number of floors of a building is: buildingMinFloors + random(buildingMinFloorsChance + (cityFactor + .1) * (buildingMaxFloorsChance - buildingMinFloorsChance))."
+        },
+        "buildingMaxFloorsChance": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "description": "The number of floors of a building is: buildingMinFloors + random(buildingMinFloorsChance + (cityFactor + .1) * (buildingMaxFloorsChance - buildingMinFloorsChance))."
+        },
+        "buildingMinCellars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "description": "The minimum number of cellars (below ground). 0 means no cellar."
+        },
+        "buildingMaxCellars": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "description": "The maximum number of cellars (below ground). 0 means no cellar."
+        },
+        "buildingDoorwayChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a doorway will be generated at a side of a building (on any level), where possible."
+        },
+        "buildingFrontChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a building will have a 'front' part where possible (i.e. adjacent street)."
+        },
+        "multiUseCorner": {
+          "type": "boolean",
+          "description": "Whether a multi-building should use the surrounding average level, or just the top-left corner's level."
+        },
+        "multiBuildingStreetConflict": {
+          "type": "string",
+          "enum": ["block_all", "override_minor", "override_all"],
+          "description": "How an accepted multi-building resolves against a planned road under its footprint. block_all: any planned road rejects the candidate. override_minor: only a primary road rejects (a secondary/tertiary road is cut). override_all: no road rejects; every covered road is cut."
+        },
+        "generateSpawners": {
+          "type": "boolean",
+          "description": "If true then buildings will be full of spawners."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "roads": {
+      "type": "object",
+      "description": "Primary/secondary/tertiary road layout, planned bridges, parks, fountains and corridors.",
+      "properties": {
+        "primaryRoadSpacingX": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 128,
+          "description": "Chunks between two candidate primary roads running north/south."
+        },
+        "primaryRoadSpacingZ": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 128,
+          "description": "Chunks between two candidate primary roads running east/west."
+        },
+        "primaryRoadOptionalChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a primary road candidate that is not forced actually becomes a road."
+        },
+        "primaryRoadForceEvery": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Every Nth primary road candidate is always a road, which bounds how far apart two primary roads can be."
+        },
+        "secondaryRoadMinCountX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 128,
+          "description": "The minimum number of secondary roads running north/south inside one primary block."
+        },
+        "secondaryRoadMaxCountX": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 128,
+          "description": "The maximum number of secondary roads running north/south inside one primary block."
+        },
+        "secondaryRoadMinCountZ": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 128,
+          "description": "The minimum number of secondary roads running east/west inside one primary block."
+        },
+        "secondaryRoadMaxCountZ": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 128,
+          "description": "The maximum number of secondary roads running east/west inside one primary block."
+        },
+        "minimumRoadSeparation": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 32,
+          "description": "The minimum number of chunks between two secondary roads on the same axis."
+        },
+        "minimumRoadEdgeDistance": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 32,
+          "description": "The minimum number of chunks between a secondary road and the primary road bounding its block."
+        },
+        "tertiaryRoadChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a cell between roads receives a short dead-end access road."
+        },
+        "tertiaryRoadMinLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "description": "The minimum length in chunks of an access road."
+        },
+        "tertiaryRoadMaxLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "description": "The maximum length in chunks of an access road."
+        },
+        "plannedPrimaryBridgeChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a primary road crossing open water is carried over it by a bridge."
+        },
+        "plannedPrimaryBridgeMaxLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "The longest water crossing in chunks that a primary road will bridge."
+        },
+        "openLotParkChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that an open lot (a city chunk with neither a road nor a building) is furnished with a park part. Every open lot is grass regardless; this only decides whether a park part is placed on top of it."
+        },
+        "parkElevation": {
+          "type": "boolean",
+          "description": "If true parks get an extra layer of elevation."
+        },
+        "parkBorder": {
+          "type": "boolean",
+          "description": "If true a park's border uses the street block as its base."
+        },
+        "parkStreetThreshold": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8,
+          "description": "How many surrounding streets a chunk needs to generate a park, based on the current chunk's park chance."
+        },
+        "fountainChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a street section contains a fountain."
+        },
+        "corridorChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a chunk can possibly contain a corridor. There actually being a corridor also depends on the presence of adjacent corridors."
+        },
+        "bridgeChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a chunk can possibly contain a bridge. There actually being a bridge also depends on the presence of adjacent bridges and other conditions."
+        },
+        "bridgeSupports": {
+          "type": "boolean",
+          "description": "If true bridges get supports when needed. Disable this if you have bridges that span void chunks."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "highways": {
+      "type": "object",
+      "description": "Highway placement, perlin-noise shaping and support pillars.",
+      "properties": {
+        "highwayRequiresTwoCities": {
+          "type": "boolean",
+          "description": "If true then a highway will only generate if both sides have a valid city. If false then one city is sufficient."
+        },
+        "highwayLevelFromCities": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3,
+          "description": "0 (take height from top-left city), 1 (take minimum height from both cities), 2 (take maximum height from both cities), 3 (take average height)."
+        },
+        "highwayDistanceMask": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647,
+          "description": "Mask to control how far highways can generate. Must be a power of 2 (minus 1). If 0 there are no highways at all."
+        },
+        "highwayMainPerlinScale": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 1000.0,
+          "description": "For highways on a certain axis, this value scales the perlin noise generator on the main axis. Increasing it increases the frequency of highways but makes them smaller."
+        },
+        "highwaySecondaryPerlinScale": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 1000.0,
+          "description": "For highways on a certain axis, this value scales the perlin noise generator on the secondary axis. Increasing it increases the variation of nearby highways."
+        },
+        "highwayPerlinFactor": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100,
+          "description": "The highway perlin noise is compared to this value. 0 gives a 50% chance of a highway being at a spot. Highways only generate on chunks a multiple of 8; a very high value prevents highways from generating."
+        },
+        "highwaySupports": {
+          "type": "boolean",
+          "description": "If true highways get supports when needed. Disable this if you have highways that span void chunks."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "railways": {
+      "type": "object",
+      "description": "Railway lines, stations and railway dungeons.",
+      "properties": {
+        "railwaysEnabled": {
+          "type": "boolean",
+          "description": "If true then railways are enabled. If false they are not (but stations will still generate)."
+        },
+        "railwayStationsEnabled": {
+          "type": "boolean",
+          "description": "If true then railway stations are enabled."
+        },
+        "railwaySurfaceStationsEnabled": {
+          "type": "boolean",
+          "description": "If true then railway surface stations are enabled; otherwise there will only be underground stations."
+        },
+        "railwaysCanEnd": {
+          "type": "boolean",
+          "description": "If true, a place where a station would have been if there was a city above will have an 'ending' rail part when one side of the 'station' has no connections. Useful when cities are rare."
+        },
+        "railwayDungeonChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a chunk next to a railway will have a railway dungeon."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "destruction": {
+      "type": "object",
+      "description": "Ruined buildings, rubble layers and explosion/mini-explosion damage.",
+      "properties": {
+        "ruinChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a building is ruined."
+        },
+        "ruinMinlevelPercent": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "If a building is ruined, this is the minimum start height for the ruin destruction layer."
+        },
+        "ruinMaxlevelPercent": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "If a building is ruined, this is the maximum start height for the ruin destruction layer."
+        },
+        "rubbleLayer": {
+          "type": "boolean",
+          "description": "If true an alternative way to generate dirt/stone/sand + leaf blocks is used that makes the city appear more overgrown."
+        },
+        "rubbleDirtScale": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 100.0,
+          "description": "The scale of the dirt layer. Smaller values make the layer larger. Use 0 to disable."
+        },
+        "rubbleLeaveScale": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 100.0,
+          "description": "The scale of the leaf layer. Smaller values make the layer larger. Use 0 to disable."
+        },
+        "explosionChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a chunk will contain an explosion."
+        },
+        "explosionMinRadius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "The minimum radius of an explosion."
+        },
+        "explosionMaxRadius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3000,
+          "description": "The maximum radius of an explosion."
+        },
+        "explosionMinHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "description": "The minimum height of an explosion."
+        },
+        "explosionMaxHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "description": "The maximum height of an explosion."
+        },
+        "miniExplosionChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "The chance that a chunk will contain a mini explosion."
+        },
+        "miniExplosionMinRadius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "description": "The minimum radius of a mini explosion."
+        },
+        "miniExplosionMaxRadius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3000,
+          "description": "The maximum radius of a mini explosion."
+        },
+        "miniExplosionMinHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "description": "The minimum height of a mini explosion."
+        },
+        "miniExplosionMaxHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "description": "The maximum height of a mini explosion."
+        },
+        "explosionsInCitiesOnly": {
+          "type": "boolean",
+          "description": "If true the center of an explosion can only be in a city (the blast can still affect non-city chunks)."
+        },
+        "debrisToNearbyChunkFactor": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "description": "A factor that determines how much debris overflows from nearby damaged chunks. Bigger numbers mean less debris."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "decoration": {
+      "type": "object",
+      "description": "Foliage/leaf-block decoration, and the light/loot density knobs replacing the old boolean switches.",
+      "properties": {
+        "randomLeafBlockChance": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Chance that leaf blocks will be generated at the border of a building and a street."
+        },
+        "randomLeafBlockThickness": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Frequency of leaf blocks as seen from the sides of buildings."
+        },
+        "avoidFoliage": {
+          "type": "boolean",
+          "description": "If true then parks will have no foliage (currently trees and flowers)."
+        },
+        "lightingDensity": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Chance that an optional decorative-light marker places a light. Every shipped preset sets this explicitly; leaving it unset falls through to the parent chain rather than defaulting to zero."
+        },
+        "lootDensity": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Chance that a marked container receives a loot table."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "spawn": {
+      "type": "object",
+      "description": "Where the player spawns: a fixed biome/city, forced buildings/parts, and the search parameters used to find a spot.",
+      "properties": {
+        "spawnBiome": {
+          "type": "string",
+          "description": "When set, the player will always spawn in the given biome."
+        },
+        "spawnCity": {
+          "type": "string",
+          "description": "When set, the player will always spawn in the given predefined city."
+        },
+        "spawnNotInBuilding": {
+          "type": "boolean",
+          "description": "If true the player will not spawn in a building. Can be combined with the other spawn settings."
+        },
+        "forceSpawnInBuilding": {
+          "type": "boolean",
+          "description": "If true the player will spawn in a building. Can be combined with the other spawn settings."
+        },
+        "forceSpawnBuildings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Buildings the player may spawn in when forceSpawnInBuilding is true. Empty means any building. Can be combined with forceSpawnParts."
+        },
+        "forceSpawnParts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Parts the player may spawn in when forceSpawnInBuilding is true. Empty means any part. Can be combined with forceSpawnBuildings."
+        },
+        "spawnCheckRadius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "description": "The start radius to check for a valid spawn location; increased by spawnRadiusIncrease if no valid spot is found."
+        },
+        "spawnRadiusIncrease": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "description": "The radius increase to use when spawnCheckRadius is not large enough to find a valid spawn location."
+        },
+        "spawnCheckAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "description": "The number of attempts to find a valid spawn location. If this is not enough, world creation errors."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "atmosphere": {
+      "type": "object",
+      "description": "Client-side-only visuals (horizon height, fog color and density). Only applied on clients that also have Urbex installed.",
+      "properties": {
+        "horizon": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 256,
+          "description": "Used client-side (only if the client has this mod) to set the height of the horizon."
+        },
+        "fogRed": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Used client-side (only if the client has this mod) for the fog color."
+        },
+        "fogGreen": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Used client-side (only if the client has this mod) for the fog color."
+        },
+        "fogBlue": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Used client-side (only if the client has this mod) for the fog color."
+        },
+        "fogDensity": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Used client-side (only if the client has this mod) for the fog density."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    },
+    "misc": {
+      "type": "object",
+      "description": "Miscellaneous world-level switches.",
+      "properties": {
+        "editMode": {
+          "type": "boolean",
+          "description": "If true then this world is in edit mode."
+        },
+        "generateNether": {
+          "type": "boolean",
+          "description": "If true then generate a cavern-type world in the Nether."
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": { "^_": {} }
+    }
+  },
+  "additionalProperties": false,
+  "patternProperties": { "^_": {} }
+}
