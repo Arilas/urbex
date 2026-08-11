@@ -9,8 +9,9 @@ package dev.krona.urbex.gui.settings;
  * {@code PercentageSliderMathTest} still pins this exact snapping/rounding behaviour - the current
  * editor ({@code CustomizeScreen} via {@link SettingControls}) drives its own density sliders
  * through {@link LogValueMapper} instead, so nothing in production calls this any more. The
- * {@code UrbexProfile}/{@code Configuration}-binding half of this class (Task 4's predecessor) was
- * removed with the rest of that legacy surface: this package may no longer reference either type.
+ * half of this class that bound to the old runtime-generated profile/config-file types (Task 4's
+ * predecessor) was removed with the rest of that legacy surface: this package may no longer
+ * reference either of those deleted types.
  */
 final class PercentageSliderMath {
 

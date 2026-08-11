@@ -24,7 +24,7 @@ public class ModCommands {
                         .then(CommandDebug.register(dispatcher))
                         .then(CommandStats.register(dispatcher))
                         .then(CommandMap.register(dispatcher))
-                        .then(CommandSaveProfile.register(dispatcher))
+                        .then(CommandSavePreset.register(dispatcher))
                         .then(CommandCreatePart.register(dispatcher))
                         .then(CommandLocatePart.register(dispatcher))
                         .then(CommandLocate.register(dispatcher))

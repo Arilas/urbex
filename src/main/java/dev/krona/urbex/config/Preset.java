@@ -17,11 +17,11 @@ import java.util.Optional;
  * A fully-resolved preset: the runtime settings used by worldgen, produced by walking a
  * {@link PresetRE}'s parent chain onto these code defaults (see {@code Presets.resolve}).
  * <p>
- * Public field names are copied verbatim from the old {@code UrbexProfile} (same names, same
- * types) so that the worldgen consumers migrate by a pure type rename. Exceptions: there is no
- * {@code worldStyle} field (world style selection is now a separate first-class value), no
- * {@code isPublic}, and nothing {@code Configuration}-shaped. {@link #USE_AVG_HEIGHTMAP} defaults
- * to {@code true} here, unlike {@code UrbexProfile}'s {@code false}.
+ * Public field names match the runtime-generated profile format this class replaced (same names,
+ * same types) so that the worldgen consumers migrated by a pure type rename. Exceptions: there is
+ * no {@code worldStyle} field (world style selection is now a separate first-class value), no
+ * {@code isPublic}, and no config-file binding of any kind. {@link #USE_AVG_HEIGHTMAP} defaults
+ * to {@code true} here, unlike the old default of {@code false}.
  */
 public class Preset {
 

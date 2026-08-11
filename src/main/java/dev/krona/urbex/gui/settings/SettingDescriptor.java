@@ -11,9 +11,9 @@ import java.util.function.Function;
  * and how to read/write the backing field.
  *
  * <p><b>Direct field access, on purpose.</b> The {@link #getter} and {@link #setter} read and write the public
- * {@code Preset} field directly (e.g. {@code p -> p.CITY_CHANCE}) rather than routing through the
- * {@code Configuration} bridge. This is deliberate: it lets issue #75 part 2 delete {@code Configuration} without
- * having to touch this framework.</p>
+ * {@code Preset} field directly (e.g. {@code p -> p.CITY_CHANCE}) rather than routing through a config-file
+ * bridge class. This was deliberate: it let issue #75 part 2 delete the old {@code Configuration} bridge
+ * (Task 5) without having to touch this framework.</p>
  *
  * <p><b>Boxing convention.</b> Values crossing the getter/setter boundary are boxed consistently so the Task 5
  * control layer can coerce them uniformly:</p>

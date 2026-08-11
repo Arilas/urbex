@@ -417,9 +417,10 @@ public final class Settings {
         r.toggle("AVOID_WATER", SettingCategory.TERRAIN,
                 p -> p.AVOID_WATER, (p, v) -> p.AVOID_WATER = (Boolean) v);
 
-        // Public on Preset since Task 3 (unlike the old UrbexProfile, where both were private and so
-        // never reachable from any editor) - datapack presets can already override them via the
-        // PresetRE terrain section, so the in-game editor gets parity rather than a silent gap.
+        // Public on Preset since Task 3 (the runtime-generated profile format these replaced kept
+        // both private and so never reachable from any editor) - datapack presets can already
+        // override them via the PresetRE terrain section, so the in-game editor gets parity rather
+        // than a silent gap.
         r.section("blocks");
         r.text("LIQUID_BLOCK", SettingCategory.TERRAIN,
                 p -> p.LIQUID_BLOCK, (p, v) -> p.LIQUID_BLOCK = (String) v);
@@ -468,7 +469,7 @@ public final class Settings {
                 p -> p.SPAWN_BIOME, (p, v) -> p.SPAWN_BIOME = (String) v);
         r.text("SPAWN_CITY", SettingCategory.ADVANCED,
                 p -> p.SPAWN_CITY, (p, v) -> p.SPAWN_CITY = (String) v);
-        // Preset stores these as List<String> (unlike UrbexProfile's String[]); the TEXT control's
+        // Preset stores these as List<String> (the old profile format used String[]); the TEXT control's
         // boxing convention (SettingDescriptor's doc) stays String[] across the getter/setter boundary,
         // so the two are bridged right here rather than changing SettingControls' array handling.
         r.text("FORCE_SPAWN_BUILDINGS", SettingCategory.ADVANCED,

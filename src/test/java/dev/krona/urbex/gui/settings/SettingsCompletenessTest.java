@@ -34,8 +34,9 @@ class SettingsCompletenessTest {
     /**
      * Public {@code Preset} fields that are deliberately NOT surfaced as editable settings. Each needs a
      * one-line justification; keep this list tiny — the point of the test is that almost everything is covered.
-     * {@code worldStyle} needs no entry here (unlike the old {@code UrbexProfile}): Task 4 removed it from
-     * {@link Preset} entirely - worldStyle is a first-class value orthogonal to the preset, not one of its fields.
+     * {@code worldStyle} needs no entry here (unlike the old runtime-generated profile format): Task 4
+     * removed it from {@link Preset} entirely - worldStyle is a first-class value orthogonal to the
+     * preset, not one of its fields.
      */
     private static final Set<String> EXCLUDED = Set.of(
             // Internal world-edit flag toggled by the edit-mode tooling, not a world-generation knob.
@@ -324,7 +325,7 @@ class SettingsCompletenessTest {
             } else if (t == List.class) {
                 // FORCE_SPAWN_BUILDINGS / FORCE_SPAWN_PARTS: List<String> on Preset, but the TEXT
                 // control's boxing convention (SettingDescriptor's doc) is String[] for list-valued
-                // fields, same as it was for UrbexProfile's String[]-backed fields.
+                // fields, same as it was for the old profile format's String[]-backed fields.
                 checkList(d, f, where,
                         new String[]{"sentinel-a-" + d.key()},
                         new String[]{"sentinel-b-" + d.key(), "c"});
