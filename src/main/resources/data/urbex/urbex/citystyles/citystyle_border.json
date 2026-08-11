@@ -1,6 +1,6 @@
 {
   "style": "urbex:standard_border",
-  "inherit": "urbex:citystyle_common",
+  "extends": "urbex:citystyle_common",
   "buildingsettings": {
     "maxfloors": 1,
     "maxcellars": 1,

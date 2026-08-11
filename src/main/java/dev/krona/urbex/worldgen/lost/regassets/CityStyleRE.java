@@ -9,13 +9,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-public class CityStyleRE implements IAsset<CityStyleRE> {
+public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
 
     public static final Codec<CityStyleRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
                     Codec.FLOAT.optionalFieldOf("explosionchance").forGetter(l -> Optional.ofNullable(l.explosionChance)),
                     Codec.STRING.optionalFieldOf("style").forGetter(l -> Optional.ofNullable(l.style)),
-                    Codec.STRING.optionalFieldOf("inherit").forGetter(l -> Optional.ofNullable(l.inherit)),
+                    Identifier.CODEC.optionalFieldOf("extends").forGetter(CityStyleRE::getExtends),
                     Codec.STRING.listOf().optionalFieldOf("stuff_tags").forGetter(l -> Optional.ofNullable(l.stuffTags)),
                     GeneralSettings.CODEC.optionalFieldOf("generalblocks").forGetter(l -> Optional.ofNullable(l.generalSettings)),
                     BuildingSettings.CODEC.optionalFieldOf("buildingsettings").forGetter(l -> Optional.ofNullable(l.buildingSettings)),
@@ -30,7 +30,7 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
 
     private final Float explosionChance;
     private final String style;
-    private final String inherit;
+    private final Optional<Identifier> extendsId;
 
     private final List<String> stuffTags;
 
@@ -46,7 +46,7 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
     public CityStyleRE(
             Optional<Float> explosionChance,
             Optional<String> style,
-            Optional<String> inherit,
+            Optional<Identifier> extendsId,
             Optional<List<String>> stuffTags,
             Optional<GeneralSettings> generalSettings,
             Optional<BuildingSettings> buildingSettings,
@@ -57,7 +57,7 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
             Optional<Selectors> selectors) {
         this.explosionChance = explosionChance.orElse(null);
         this.style = style.orElse(null);
-        this.inherit = inherit.orElse(null);
+        this.extendsId = extendsId;
         this.stuffTags = stuffTags.orElse(null);
         this.generalSettings = generalSettings.orElse(null);
         this.buildingSettings = buildingSettings.orElse(null);
@@ -81,8 +81,9 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
         return style;
     }
 
-    public String getInherit() {
-        return inherit;
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     public Optional<GeneralSettings> getGeneralSettings() {

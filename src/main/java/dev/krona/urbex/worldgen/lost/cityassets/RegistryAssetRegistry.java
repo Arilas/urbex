@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.worldgen.lost.regassets.Extendable;
 import dev.krona.urbex.worldgen.lost.regassets.IAsset;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.core.Registry;
@@ -11,21 +12,23 @@ import net.minecraft.world.level.CommonLevelAccessor;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public class RegistryAssetRegistry<T, R> {
 
     // Registry assets are looked up from every worldgen worker thread. Concurrent, and populated
-    // with get / construct-outside / putIfAbsent rather than computeIfAbsent: constructing a
-    // CityStyle resolves its 'inherit' parent through this same map, which would deadlock inside a
-    // bin lock. Losing the race just means one throwaway copy of an immutable asset.
+    // with get / construct-outside / putIfAbsent rather than computeIfAbsent, to avoid deadlocking
+    // inside a bin lock if constructing T ever re-enters this map. Losing the race just means one
+    // throwaway copy of an immutable asset.
     private final Map<Identifier, T> assets = new ConcurrentHashMap<>();
     private final ResourceKey<Registry<R>> registryKey;
-    private final Function<R, T> assetConstructor;
+    private final Function<List<R>, T> assetConstructor;
 
-    public RegistryAssetRegistry(ResourceKey<Registry<R>> registryKey, Function<R, T> assetConstructor) {
+    public RegistryAssetRegistry(ResourceKey<Registry<R>> registryKey, Function<List<R>, T> assetConstructor) {
         this.registryKey = registryKey;
         this.assetConstructor = assetConstructor;
     }
@@ -70,11 +73,16 @@ public class RegistryAssetRegistry<T, R> {
         if (t == null) {
             try {
                 Registry<R> registry = level.registryAccess().lookupOrThrow(registryKey);
-                R value = registry.getValueOrThrow(ResourceKey.create(registryKey, name));
-                if (value instanceof IAsset asset) {
-                    asset.setRegistryName(name);
-                }
-                t = assetConstructor.apply(value);
+                List<R> chain = ExtendsChain.resolve(name,
+                        key -> {
+                            R entry = registry.getValue(ResourceKey.create(registryKey, key));
+                            if (entry instanceof IAsset asset) {
+                                asset.setRegistryName(key);
+                            }
+                            return entry;
+                        },
+                        entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
+                t = assetConstructor.apply(chain);
             } catch (Exception e) {
                 throw new RuntimeException("Error getting resource " + name + "!", e);
             }
@@ -83,17 +91,13 @@ public class RegistryAssetRegistry<T, R> {
                 t = raced;
             }
         }
-        if (t instanceof CityStyle cs) {
-            cs.init(level);
-        }
         return t;
     }
 
     /**
      * Same lookup as {@link #get(CommonLevelAccessor, Identifier)}, but for callers that only have
      * registry access and no {@link CommonLevelAccessor} - the world-creation preview, chiefly, via
-     * {@code NullDimensionInfo}. Assets that need {@code CityStyle.init(level)} aren't supported
-     * through this path; none of the current preview call sites resolve a CityStyle this way.
+     * {@code NullDimensionInfo}.
      */
     @Nullable
     public T get(RegistryAccess access, String name) {
@@ -112,11 +116,16 @@ public class RegistryAssetRegistry<T, R> {
         if (t == null) {
             try {
                 Registry<R> registry = access.lookupOrThrow(registryKey);
-                R value = registry.getValueOrThrow(ResourceKey.create(registryKey, name));
-                if (value instanceof IAsset asset) {
-                    asset.setRegistryName(name);
-                }
-                t = assetConstructor.apply(value);
+                List<R> chain = ExtendsChain.resolve(name,
+                        key -> {
+                            R entry = registry.getValue(ResourceKey.create(registryKey, key));
+                            if (entry instanceof IAsset asset) {
+                                asset.setRegistryName(key);
+                            }
+                            return entry;
+                        },
+                        entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
+                t = assetConstructor.apply(chain);
             } catch (Exception e) {
                 throw new RuntimeException("Error getting resource " + name + "!", e);
             }
@@ -136,10 +145,16 @@ public class RegistryAssetRegistry<T, R> {
         for (R r : registry) {
             Identifier name = registry.getKey(r);
             if (!assets.containsKey(name)) {
-                if (r instanceof IAsset asset) {
-                    asset.setRegistryName(name);
-                }
-                T t = assetConstructor.apply(r);
+                List<R> chain = ExtendsChain.resolve(name,
+                        key -> {
+                            R entry = registry.getValue(ResourceKey.create(registryKey, key));
+                            if (entry instanceof IAsset asset) {
+                                asset.setRegistryName(key);
+                            }
+                            return entry;
+                        },
+                        entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
+                T t = assetConstructor.apply(chain);
                 assets.putIfAbsent(name, t);
             }
         }

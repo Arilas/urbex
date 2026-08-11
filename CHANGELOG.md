@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **City styles now declare `extends` instead of `inherit`, and their whole ancestor chain resolves
+  once at load time instead of lazily on first use.** `CityStyleRE`'s `inherit` field (a bare
+  string) is gone; it implements the new `Extendable` interface and reads an `extends` field
+  instead, typed as a fully-qualified `Identifier` like every other cross-reference. `CityStyle` is
+  now built once from the whole chain, root-first, via the new pure `ExtendsChain.resolve` (testable
+  without a level - see `ExtendsChainTest`), and never mutates afterward: `CityStyle.init()`, its
+  `volatile initialized` flag, its per-style monitor, and its per-thread `RESOLVING` cycle guard are
+  all gone. A dangling `extends` or a cycle is now a load-time `IllegalStateException` naming every
+  id in the chain, instead of the old guard's silent no-op that left a style half-resolved with no
+  diagnostic. `RegistryAssetRegistry` now builds each asset from `Function<List<R>, T>` (the
+  resolved chain) rather than `Function<R, T>` (the bare leaf), so all twelve dynamic registries
+  route through the same chain resolution; eleven of the twelve still collapse it to just the leaf
+  entry until a later task gives them `extends` support of their own. This is datapack-visible: any
+  city style file, bundled or third-party, using `"inherit"` must rename that key to `"extends"` -
+  the value is unchanged, still a fully-qualified id such as `"urbex:citystyle_common"`. Confirmed
+  worldgen-inert: both digests regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both
+  `unsafeReads=0`), so this is a load-path and format change only.
 - **A city style's own selector lists now replace the ones it inherits, instead of being appended
   to them.** `CityStyle.init()` unconditionally `addAll`'d the parent's nine selector lists on top
   of the child's, with no deduplication, so a style could only ever widen a selection - never

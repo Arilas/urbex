@@ -59,7 +59,7 @@ class DatapackReferenceIntegrityTest {
             case "styles" -> forEachElement(d.get("randompalettes"),
                     row -> forEachObject(row, e -> ref(src, e.get("palette"), "palettes")));
             case "citystyles" -> {
-                ref(src, d.get("inherit"), "citystyles");
+                ref(src, d.get("extends"), "citystyles");
                 ref(src, d.get("style"), "styles");
                 JsonObject sel = asObject(d.get("selectors"));
                 if (sel != null) {

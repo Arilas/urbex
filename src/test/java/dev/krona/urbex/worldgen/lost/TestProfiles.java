@@ -5,6 +5,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
 import net.minecraft.resources.Identifier;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,9 +30,9 @@ final class TestProfiles {
 
     /** A style that overrides nothing, so every chance falls back to the profile. */
     static CityStyle cityStyle() {
-        return new CityStyle(new CityStyleRE(
+        return new CityStyle(List.of(new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty()));
+                Optional.empty(), Optional.empty(), Optional.empty())));
     }
 }
