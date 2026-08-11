@@ -4,6 +4,7 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
 import net.minecraft.resources.Identifier;
@@ -32,13 +33,6 @@ public class CityStyle {
         BUILDING, BRIDGE, LARGE_BRIDGE, PARK, FOUNTAIN, STAIR, FRONT, RAIL_DUNGEON, MULTI_BUILDING
     }
 
-    /**
-     * Which selector lists this style's <em>own</em> file declared. A declared list replaces the
-     * inherited one rather than being appended to it, so a style can narrow a selection - and an
-     * explicitly empty list means empty, which is otherwise inexpressible. Lists the file does not
-     * mention still inherit whole. See {@link #declare}.
-     */
-    private final Set<Sel> declared = EnumSet.noneOf(Sel.class);
     private StreetParts streetParts = StreetParts.DEFAULT;
     private StreetParts largeStreetParts = StreetParts.DEFAULT;
     private StreetParts tertiaryStreetParts = StreetParts.DEFAULT;
@@ -87,9 +81,10 @@ public class CityStyle {
 
     /**
      * Builds a fully resolved style from its {@code extends} chain, root first: each entry
-     * overwrites what its ancestors set, and selector lists an entry declares replace the inherited
-     * ones (see {@link #declare}). Nothing mutates after this returns, so worldgen worker threads
-     * share one immutable instance with no locking.
+     * overwrites what its ancestors set, and a declared selector list replaces the inherited one by
+     * default, or appends to it when the entry opts in with {@code {"replace": false, ...}} (see
+     * {@link #declare}). Nothing mutates after this returns, so worldgen worker threads share one
+     * immutable instance with no locking.
      */
     public CityStyle(List<CityStyleRE> chainRootFirst) {
         CityStyleRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
@@ -230,14 +225,13 @@ public class CityStyle {
         });
     }
 
-    /** A declared list replaces whatever an ancestor put there; an undeclared one leaves it alone. */
-    private void declare(Sel kind, Optional<List<ObjectSelector>> values) {
-        values.ifPresent(v -> {
-            declared.add(kind);
-            List<ObjectSelector> target = selectorList(kind);
-            target.clear();
-            target.addAll(v);
-        });
+    /**
+     * A bare-array declaration replaces whatever an ancestor put there; the {@code {"replace":
+     * false, ...}} object form appends to it instead. A kind the file does not mention at all
+     * leaves the inherited list alone.
+     */
+    private void declare(Sel kind, Optional<Mergeable<ObjectSelector>> values) {
+        values.ifPresent(v -> Mergeable.apply(selectorList(kind), v));
     }
 
     List<ObjectSelector> selectorList(Sel kind) {

@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Selectors;
 import org.junit.jupiter.api.Test;
@@ -12,13 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A city style's own selector lists replace the ones it inherits, rather than being appended to
- * them.
+ * A city style's own selector lists replace the ones it inherits by default, rather than being
+ * appended to them - unless the file opts into appending with {@code {"replace": false, ...}}.
  * <p>
- * The bundled {@code urbex:citystyle_border} is what motivated this: it lists five buildings and no
- * multibuildings, and under the old append rule generated with thirteen building entries (its own
- * five, plus all eight of {@code citystyle_common}'s, so buildings 6-8 appeared at city borders and
- * 1-5 carried double weight) and all twelve of the parent's multibuildings.
+ * The bundled {@code urbex:citystyle_border} is what motivated the replace-by-default rule: it
+ * lists five buildings and no multibuildings, and under the old unconditional-append rule generated
+ * with thirteen building entries (its own five, plus all eight of {@code citystyle_common}'s, so
+ * buildings 6-8 appeared at city borders and 1-5 carried double weight) and all twelve of the
+ * parent's multibuildings.
  * <p>
  * These build a two-entry {@code extends} chain (parent, child) and let {@link CityStyle}'s
  * constructor apply it root-first, rather than reaching for a level to resolve the parent by id -
@@ -34,19 +36,40 @@ class CityStyleInheritSelectorsTest {
         return java.util.Arrays.stream(values).map(CityStyleInheritSelectorsTest::sel).toList();
     }
 
+    /** A bare-array declaration: replaces whatever the chain inherited. Null means undeclared. */
+    private static Optional<Mergeable<ObjectSelector>> replacing(List<ObjectSelector> values) {
+        return Optional.ofNullable(values).map(v -> new Mergeable<>(true, v));
+    }
+
+    /** The {@code {"replace": false, ...}} form: appends to whatever the chain inherited. */
+    private static Optional<Mergeable<ObjectSelector>> appending(List<ObjectSelector> values) {
+        return Optional.of(new Mergeable<>(false, values));
+    }
+
     /** A registry entry declaring only {@code buildings} and {@code multibuildings}; null means undeclared. */
     private static CityStyleRE re(List<ObjectSelector> buildings, List<ObjectSelector> multiBuildings,
                                   List<ObjectSelector> parks) {
+        return reSelectors(replacing(buildings), replacing(multiBuildings), replacing(parks));
+    }
+
+    /** A registry entry declaring only {@code buildings}, exactly as the JSON codec would decode it. */
+    private static CityStyleRE reBuildings(Optional<Mergeable<ObjectSelector>> buildings) {
+        return reSelectors(buildings, Optional.empty(), Optional.empty());
+    }
+
+    private static CityStyleRE reSelectors(Optional<Mergeable<ObjectSelector>> buildings,
+                                            Optional<Mergeable<ObjectSelector>> multiBuildings,
+                                            Optional<Mergeable<ObjectSelector>> parks) {
         Selectors selectors = new Selectors(
-                Optional.ofNullable(buildings),
+                buildings,
                 Optional.empty(),
                 Optional.empty(),
-                Optional.ofNullable(parks),
+                parks,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                Optional.ofNullable(multiBuildings));
+                multiBuildings);
         return new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
@@ -102,5 +125,16 @@ class CityStyleInheritSelectorsTest {
             assertEquals(values(parentResolved, kind), values(merged, kind),
                     "an undeclared " + kind + " should inherit the parent's entries");
         }
+    }
+
+    @Test
+    void appendModeAddsToTheInheritedEntriesInParentOrder() {
+        CityStyleRE parent = reBuildings(replacing(sels("b1", "b2")));
+        CityStyleRE child = reBuildings(appending(sels("b3")));
+
+        CityStyle resolved = new CityStyle(List.of(parent, child));
+
+        assertEquals(List.of("b1", "b2", "b3"), values(resolved, CityStyle.Sel.BUILDING),
+                "appended entries follow the parent's, so parent order is stable");
     }
 }

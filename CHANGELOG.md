@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **A city style's selector lists can now opt into appending to what they inherit, instead of
+  always replacing it.** `CityStyle`'s nine selector fields (`buildings`, `bridges`,
+  `largebridges`, `parks`, `fountains`, `stairs`, `fronts`, `raildungeons`, `multibuildings`) now
+  decode through the new `Mergeable<E>` codec: a bare JSON array still replaces the inherited list,
+  which remains the default and needs nothing extra from a datapack author, but the object form
+  `{"replace": false, "values": [...]}` - the same shape vanilla tag files use - appends the file's
+  own entries after the inherited ones instead, so a style can widen a selection without retyping
+  its parent's. `Selectors`' nine fields changed type from `Optional<List<ObjectSelector>>` to
+  `Optional<Mergeable<ObjectSelector>>` to carry the choice; the bundled datapack still ships only
+  bare arrays, so no shipped file needs a change. A third-party city style that wants the old
+  always-append behavior back for a given list should switch that list to the object form with
+  `"replace": false`. Confirmed worldgen-inert: both digests regenerate unchanged
+  (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
 - **Presets now declare `extends` instead of `parent`, resolved through the same chain walker city
   styles use.** `PresetRE`'s `parent` field is gone; it implements the `Extendable` interface and
   reads an `extends` field instead, like every other cross-reference. `Presets.resolve` no longer
