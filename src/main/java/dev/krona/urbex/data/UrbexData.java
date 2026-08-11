@@ -17,9 +17,13 @@ public class UrbexData extends SavedData {
 
     public static final String NAME = "data";
 
+    // optionalFieldOf, not fieldOf: old worlds stored {profile, json} under different keys. Those
+    // are simply absent here and ignored - a clean break, the world regenerates its selection as
+    // unset rather than crashing on load.
     private static Codec<UrbexData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.STRING.fieldOf("profile").forGetter(d -> d.selectedProfile),
-            Codec.STRING.fieldOf("json").forGetter(d -> d.selectedJson)
+            Codec.STRING.optionalFieldOf("preset", "").forGetter(d -> d.selectedPreset),
+            Codec.STRING.optionalFieldOf("worldStyle", "").forGetter(d -> d.selectedWorldStyle),
+            Codec.STRING.optionalFieldOf("overrides", "").forGetter(d -> d.selectedOverrides)
             ).apply(instance, UrbexData::new));
 
     private static final SavedDataType<UrbexData> TYPE = new SavedDataType<>(
@@ -29,8 +33,9 @@ public class UrbexData extends SavedData {
             DataFixTypes.SAVED_DATA_COMMAND_STORAGE
     );
 
-    private String selectedProfile = "";
-    private String selectedJson = "";
+    private String selectedPreset = "";
+    private String selectedWorldStyle = "";
+    private String selectedOverrides = "";
 
     @Nonnull
     public static UrbexData getData(Level level) {
@@ -46,22 +51,28 @@ public class UrbexData extends SavedData {
     public UrbexData() {
     }
 
-    public UrbexData(String profile, String json) {
-        selectedProfile = profile;
-        selectedJson = json;
+    public UrbexData(String preset, String worldStyle, String overrides) {
+        selectedPreset = preset;
+        selectedWorldStyle = worldStyle;
+        selectedOverrides = overrides;
     }
 
-    public void setProfile(String profile, String json) {
-        selectedProfile = profile;
-        selectedJson = json;
+    public void setChoice(String preset, String worldStyle, String overridesJson) {
+        selectedPreset = preset;
+        selectedWorldStyle = worldStyle;
+        selectedOverrides = overridesJson;
         setDirty();
     }
 
-    public String getSelectedProfile() {
-        return selectedProfile;
+    public String getSelectedPreset() {
+        return selectedPreset;
     }
 
-    public String getSelectedJson() {
-        return selectedJson;
+    public String getSelectedWorldStyle() {
+        return selectedWorldStyle;
+    }
+
+    public String getSelectedOverrides() {
+        return selectedOverrides;
     }
 }

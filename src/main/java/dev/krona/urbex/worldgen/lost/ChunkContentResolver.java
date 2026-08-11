@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.Hash;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.plan.grid.GridPurpose;
@@ -127,12 +127,12 @@ public final class ChunkContentResolver {
      *
      * <p>Note the short-circuit on {@code isCity}: a chunk outside a city takes no draw at all.
      */
-    public static boolean couldHaveBuilding(UrbexProfile profile, boolean isCity, MultiPos section,
+    public static boolean couldHaveBuilding(Preset profile, boolean isCity, MultiPos section,
                                             int cityLevel, RandomSource rand, ChunkFacts facts) {
         return isCity && checkBuildingPossibility(profile, section, cityLevel, rand, facts);
     }
 
-    private static boolean checkBuildingPossibility(UrbexProfile profile, MultiPos section, int cityLevel, RandomSource rand, ChunkFacts facts) {
+    private static boolean checkBuildingPossibility(Preset profile, MultiPos section, int cityLevel, RandomSource rand, ChunkFacts facts) {
         boolean b;
         float bc = rand.nextFloat();
 
@@ -196,7 +196,7 @@ public final class ChunkContentResolver {
      * @param prefersLonely         the neighbours' lonely preference, consulted lazily and in order
      * @param candidateBuildingName the building asset picked in pass one, returned only if it stands
      */
-    public static ChunkContent resolve(UrbexProfile profile, long seed, RandomSource rand,
+    public static ChunkContent resolve(Preset profile, long seed, RandomSource rand,
                                        boolean isCity, boolean couldHaveBuilding, RoadType effectiveRoad,
                                        MultiPos section, ChunkCoord coord,
                                        PrefersLonely prefersLonely,

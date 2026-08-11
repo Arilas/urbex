@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.gen;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.ChunkDriver;
@@ -125,7 +125,7 @@ public class Scattered {
             Building building = AssetRegistries.BUILDINGS.getOrThrow(provider.getWorld(), buildingName);
             int lowestLevel = scatteredLevel(feature, scattered, minheight, maxheight, avgheight);
             if (lowestLevel < -4000) {
-                UrbexProfile profile = feature.provider.getProfile();
+                Preset profile = feature.provider.getProfile();
                 if (profile.isCavern()) {
                     lowestLevel = profile.GROUNDLEVEL;
                 } else {

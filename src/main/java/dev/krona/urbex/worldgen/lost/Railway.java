@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.util.RandomSource;
@@ -97,7 +97,7 @@ public class Railway {
         int chunkZ = key.chunkZ();
         RandomSource randomRailChunkType = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.RAILWAY);
 
-        UrbexProfile profile = provider.getProfile();
+        Preset profile = provider.getProfile();
         RailwayParts railwayParts = provider.getWorldStyle().getPartSelector().railwayParts();
 
         // @todo make all settings based on rand below configurable
@@ -286,7 +286,7 @@ public class Railway {
         return RailChunkInfo.NOTHING;
     }
 
-    private static RailChunkInfo getStationType(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile, float r, int rails, List<String> part) {
+    private static RailChunkInfo getStationType(ChunkCoord coord, IDimensionInfo provider, Preset profile, float r, int rails, List<String> part) {
         int cityLevel = BuildingInfo.getCityLevel(coord, provider);
         if (cityLevel > 2 || !profile.RAILWAY_SURFACE_STATIONS_ENABLED) {
             // We are too high here. We need an underground station
@@ -314,7 +314,7 @@ public class Railway {
         return r < .5f ? new RailChunkInfo(STATION_SURFACE, BI, cityLevel, rails, part) : new RailChunkInfo(STATION_UNDERGROUND, BI, RAILWAY_LEVEL_OFFSET, rails);
     }
 
-    public static RailChunkInfo getRailChunkType(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    public static RailChunkInfo getRailChunkType(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         Map<ChunkCoord, RailChunkInfo> cache = provider.caches().railInfo;
         RailChunkInfo known = cache.get(coord);
         if (known != null) {
@@ -338,7 +338,7 @@ public class Railway {
         provider.caches().railInfo.put(coord, RailChunkInfo.NOTHING);
     }
 
-    private static RailChunkInfo testAdjacentRailChunk(float r, RailChunkInfo adjacent, RailDirection direction, ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    private static RailChunkInfo testAdjacentRailChunk(float r, RailChunkInfo adjacent, RailDirection direction, ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         switch (adjacent.getType()) {
             case NONE:
                 return RailChunkInfo.NOTHING;

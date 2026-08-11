@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
@@ -27,7 +27,7 @@ public final class ChunkGenContext {
     public final ChunkAccess chunk;
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
-    public final UrbexProfile profile;
+    public final Preset profile;
     public final BuildingInfo info;
     public final CompiledPalette palette;
     public final char street;
@@ -45,7 +45,7 @@ public final class ChunkGenContext {
     public final long seed;
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
-                           IDimensionInfo provider, UrbexProfile profile, BuildingInfo info) {
+                           IDimensionInfo provider, Preset profile, BuildingInfo info) {
         this.region = region;
         this.chunk = chunk;
         this.coord = coord;

@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.GeometryTools;
 import dev.krona.urbex.varia.Rng;
@@ -26,7 +26,7 @@ public class DamageArea {
     private final int chunkZ;
     private final List<Explosion> explosions = new ArrayList<>();
     private final AABB chunkBox;
-    private final UrbexProfile profile;
+    private final Preset profile;
     private final int minSectionY;
     private final int maxSectionY;
 

@@ -1,7 +1,7 @@
 package dev.krona.urbex.gui;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
@@ -10,6 +10,7 @@ import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.CityGenerator;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import net.minecraft.core.BlockPos;
@@ -17,6 +18,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
@@ -96,7 +98,7 @@ public class NullDimensionInfo implements IDimensionInfo {
             "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
     };
 
-    private final UrbexProfile profile;
+    private final Preset profile;
     private final WorldStyle style;
     private final Random random;
     private final long seed;
@@ -108,22 +110,20 @@ public class NullDimensionInfo implements IDimensionInfo {
     private final DimensionCaches caches;
     private final RoadField roadField;
 
-    /**
-     * @deprecated No registry access means {@link #getBiome} can't resolve a real biome and the
-     * {@code IDimensionInfo#registryAccess()}-gated rules in {@code City} (worldstyle city-chance
-     * multiplier, CITY_MINHEIGHT/MAXHEIGHT gating) stay off, same as before this constructor
-     * existed. Kept only so existing no-registry callers keep compiling; prefer
-     * {@link #NullDimensionInfo(UrbexProfile, long, RegistryAccess)}.
-     */
-    @Deprecated
-    public NullDimensionInfo(UrbexProfile profile, long seed) {
-        this(profile, seed, null);
-    }
-
-    public NullDimensionInfo(UrbexProfile profile, long seed, @Nullable RegistryAccess registryAccess) {
+    public NullDimensionInfo(Preset profile, Identifier worldStyle, long seed, @Nullable RegistryAccess registryAccess) {
         this.profile = profile;
         this.caches = new DimensionCaches(seed);
-        style = new WorldStyle(new WorldStyleRE(
+        WorldStyle resolved = null;
+        if (registryAccess != null) {
+            try {
+                resolved = AssetRegistries.WORLDSTYLES.get(registryAccess, worldStyle);
+            } catch (RuntimeException e) {
+                // Preview only: fall back to the placeholder below if the chosen style isn't
+                // registered (e.g. a stale GUI worldStyle no longer shipped by any datapack).
+                Urbex.LOGGER.debug("Preview could not resolve worldstyle '{}'; using the placeholder.", worldStyle, e);
+            }
+        }
+        style = resolved != null ? resolved : new WorldStyle(new WorldStyleRE(
                 "standard",
                 Optional.empty(),
                 Optional.empty(),
@@ -139,7 +139,7 @@ public class NullDimensionInfo implements IDimensionInfo {
         biomeRegistry = registryAccess != null ? registryAccess.lookupOrThrow(Registries.BIOME) : null;
         // The preview's own seed and dimension, so the roads it draws are the roads the world will
         // have. Same construction as DefaultDimensionInfo; there is no server to ask.
-        roadField = new GridRoadField(seed, getType().identifier().toString(), GridSettings.fromProfile(profile));
+        roadField = new GridRoadField(seed, getType().identifier().toString(), GridSettings.fromPreset(profile));
     }
 
     @Override
@@ -174,7 +174,7 @@ public class NullDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public UrbexProfile getProfile() {
+    public Preset getProfile() {
         return profile;
     }
 

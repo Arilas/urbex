@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.EffectiveRoad;
 import dev.krona.urbex.plan.RoadCell;
 import dev.krona.urbex.plan.RoadDirection;
@@ -37,7 +37,7 @@ public class BuildingInfo {
 
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
-    public final UrbexProfile profile;
+    public final Preset profile;
     public int groundLevel;
     public final int waterLevel;
 
@@ -301,7 +301,7 @@ public class BuildingInfo {
 //        }
         int chunkX = key.chunkX();
         int chunkZ = key.chunkZ();
-        UrbexProfile profile = provider.getProfile();
+        Preset profile = provider.getProfile();
         ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
         characteristics.isCity = isCityRaw(key, provider, profile);
@@ -325,7 +325,7 @@ public class BuildingInfo {
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        UrbexProfile profile = provider.getProfile();
+        Preset profile = provider.getProfile();
         ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
         WorldGenLevel world = provider.getWorld();
@@ -419,7 +419,7 @@ public class BuildingInfo {
     /**
      * Don't use the cache as we're busy building the cache.
      */
-    public static boolean isCityRaw(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    public static boolean isCityRaw(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         if (isVoidChunk(coord, provider)) {
             // If we have a void chunk then no city here
             return false;
@@ -443,7 +443,7 @@ public class BuildingInfo {
      * still being computed, so it may not read anything that depends on a building decision - its
      * own or a neighbour's - or the decision graph stops being acyclic.
      */
-    public static RoadType effectiveRoadType(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    public static RoadType effectiveRoadType(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         // The city test comes first, and it is not a matter of taste. Every chunk in the world builds
         // a BuildingInfo, and the great majority of them are wilderness; asking the road field first
         // would build the block layout five times over - once for this chunk and once per neighbour
@@ -474,7 +474,7 @@ public class BuildingInfo {
      * {@link Railway} for a chunk whose building roll already failed would be new work, and
      * {@code Railway}'s chunk types are mutable state.
      */
-    private static ChunkContentResolver.ChunkFacts chunkFacts(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    private static ChunkContentResolver.ChunkFacts chunkFacts(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         return new ChunkContentResolver.ChunkFacts(
                 () -> City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord) != null,
                 () -> City.getPredefinedStreet(provider.getWorld(), coord) != null,
@@ -489,7 +489,7 @@ public class BuildingInfo {
     /**
      * Initialize the chunk characteristics with the multi building information
      */
-    private static void initMultiBuildingSection(ChunkCharacteristics characteristics, ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    private static void initMultiBuildingSection(ChunkCharacteristics characteristics, ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         // If a chunk is occupied according to City then there is a predefined building or street here.
         // Try to look for it
         if (City.isChunkOccupied(provider, coord)) {
@@ -558,15 +558,15 @@ public class BuildingInfo {
         return getChunkCharacteristics(key, provider);
     }
 
-    public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         return Highway.getXHighwayLevel(coord, provider, profile) >= 0 || Highway.getZHighwayLevel(coord, provider, profile) >= 0;
     }
 
-    public static boolean hasRailway(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    public static boolean hasRailway(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         return Railway.getRailChunkType(coord, provider, profile).getType() != RailChunkType.NONE;
     }
 
-    public static boolean hasRailwayAtSurface(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    public static boolean hasRailwayAtSurface(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         RailChunkType type = Railway.getRailChunkType(coord, provider, profile).getType();
         return type.isSurface() || type.isStation();
     }
@@ -1030,7 +1030,7 @@ public class BuildingInfo {
     }
 
 
-    private static int getCityLevelNormal(ChunkCoord coord, IDimensionInfo provider, UrbexProfile profile) {
+    private static int getCityLevelNormal(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         ChunkHeightmap heightmap = provider.getHeightmap(coord);
         int height = heightmap.getHeight();
         if (profile.USE_AVG_HEIGHTMAP && Config.HEIGHT_SAMPLE_SIZE.get() > 2) {
@@ -1076,7 +1076,7 @@ public class BuildingInfo {
         return getLevelBasedOnHeight(h, provider.getProfile());
     }
 
-    private static int getLevelBasedOnHeight(int height, UrbexProfile profile) {
+    private static int getLevelBasedOnHeight(int height, Preset profile) {
         if (height < profile.CITY_LEVEL0_HEIGHT) {
             return 0;
         } else if (height < profile.CITY_LEVEL1_HEIGHT) {

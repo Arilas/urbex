@@ -2,6 +2,7 @@ package dev.krona.urbex.gui.preview;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.gui.NullDimensionInfo;
 import dev.krona.urbex.plan.RoadType;
@@ -12,15 +13,20 @@ import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.levelgen.WorldOptions;
 
 import javax.annotation.Nullable;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.List;
 import java.util.Random;
 
 /**
@@ -207,9 +213,15 @@ public class CityPreview implements AutoCloseable {
         // refresh.
         City.cleanPredefinedCache();
 
+        // Worldgen (NullDimensionInfo, City, Highway, Railway, BuildingInfo...) is preset-shaped
+        // now, while this GUI is still the pre-Task-4 UrbexProfile editor - bridge at this one
+        // boundary rather than threading Preset through the whole old editor. See toPreset() below.
+        Preset preset = toPreset(profile);
+        Identifier worldStyle = DataTools.fromName(profile.getWorldStyle());
+
         // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
-        // the profile, so it does not pay to build one there - and this construction is the only site
-        // in this method that can throw: GridSettings.fromProfile validates the road settings, and a
+        // the preset, so it does not pay to build one there - and this construction is the only site
+        // in this method that can throw: GridSettings.fromPreset validates the road settings, and a
         // profile can be momentarily self-contradictory. The road settings come in min/max pairs held
         // by two independent sliders, so dragging a minimum up necessarily passes through states where
         // it exceeds its maximum. GridSettings refuses those, correctly - a world must never be
@@ -221,7 +233,7 @@ public class CityPreview implements AutoCloseable {
         NullDimensionInfo diminfo = null;
         if (mode != Mode.CITY) {
             try {
-                diminfo = new NullDimensionInfo(profile, seed, registryAccess);
+                diminfo = new NullDimensionInfo(preset, worldStyle, seed, registryAccess);
             } catch (IllegalArgumentException e) {
                 // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
                 // good render. Leaving `mode` alone too keeps the legend describing the image actually
@@ -232,12 +244,45 @@ public class CityPreview implements AutoCloseable {
         }
         switch (mode) {
             case MAP -> renderMap(diminfo);
-            case TRANSPORT -> renderTransport(diminfo, profile);
-            case ROADS -> renderRoads(diminfo, profile);
+            case TRANSPORT -> renderTransport(diminfo, preset);
+            case ROADS -> renderRoads(diminfo, preset);
             case CITY -> renderCity(profile, seed);
         }
         this.mode = mode;
         uploadTexture();
+    }
+
+    /**
+     * Field-for-field bridge from the pre-Task-4 editor's {@link UrbexProfile} to the worldgen-side
+     * {@link Preset}: both carry the same public {@code UPPER_SNAKE} settings fields (by design -
+     * see {@link Preset}'s class doc), so this copies every one Preset declares by name via
+     * reflection rather than hand-maintaining a ~90-field mapping that would silently go stale the
+     * moment either class gained a field. {@code FORCE_SPAWN_BUILDINGS}/{@code FORCE_SPAWN_PARTS}
+     * are the one shape difference ({@code String[]} on the old class, {@code List<String>} here)
+     * and are special-cased. Preview-only: Task 4 replaces this editor (and this bridge) with one
+     * that talks {@link Preset} natively.
+     */
+    private static Preset toPreset(UrbexProfile profile) {
+        Preset preset = new Preset(Identifier.fromNamespaceAndPath("urbex", "preview"));
+        for (Field presetField : Preset.class.getFields()) {
+            if (!Modifier.isPublic(presetField.getModifiers()) || Modifier.isStatic(presetField.getModifiers())) {
+                continue;
+            }
+            try {
+                Field profileField = UrbexProfile.class.getDeclaredField(presetField.getName());
+                profileField.setAccessible(true);
+                Object value = profileField.get(profile);
+                if (value instanceof String[] arr) {
+                    value = List.of(arr);
+                }
+                presetField.set(preset, value);
+            } catch (NoSuchFieldException ignored) {
+                // A Preset-only field with no UrbexProfile equivalent; leave Preset's own default.
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException("Could not bridge UrbexProfile field '" + presetField.getName() + "' to Preset", e);
+            }
+        }
+        return preset;
     }
 
     // ---- MAP -----------------------------------------------------------------
@@ -275,7 +320,7 @@ public class CityPreview implements AutoCloseable {
      * old {@code renderPreviewTransports} did with its {@code soft} base), with rail and highway
      * chunks blended over. Highway-over-rail is a distinct grey so an interchange is visible.
      */
-    private void renderTransport(NullDimensionInfo diminfo, UrbexProfile profile) {
+    private void renderTransport(NullDimensionInfo diminfo, Preset profile) {
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));
@@ -324,7 +369,7 @@ public class CityPreview implements AutoCloseable {
      * building footprints only, not a random fraction of the whole grid), not a defect masquerading
      * as a guarantee.
      */
-    private void renderRoads(NullDimensionInfo diminfo, UrbexProfile profile) {
+    private void renderRoads(NullDimensionInfo diminfo, Preset profile) {
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));

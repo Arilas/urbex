@@ -1,7 +1,7 @@
 package dev.krona.urbex.setup;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.*;
@@ -79,7 +79,7 @@ public class SpawnPlacement {
             if (dimensionInfo == null) {
                 return false;
             }
-            UrbexProfile profile = dimensionInfo.getProfile();
+            Preset profile = dimensionInfo.getProfile();
 
             Predicate<BlockPos> isSuitable = pos -> true;
             boolean needsCheck = false;
@@ -107,9 +107,9 @@ public class SpawnPlacement {
             if (profile.SPAWN_NOT_IN_BUILDING) {
                 isSuitable = isSuitable.and(blockPos -> isOutsideBuilding(dimensionInfo, blockPos));
                 needsCheck = true;
-            } else if (profile.FORCE_SPAWN_BUILDINGS.length > 0 || profile.FORCE_SPAWN_PARTS.length > 0) {
-                Set<String> buildings = Set.of(profile.FORCE_SPAWN_BUILDINGS);
-                Set<String> parts = Set.of(profile.FORCE_SPAWN_PARTS);
+            } else if (!profile.FORCE_SPAWN_BUILDINGS.isEmpty() || !profile.FORCE_SPAWN_PARTS.isEmpty()) {
+                Set<String> buildings = Set.copyOf(profile.FORCE_SPAWN_BUILDINGS);
+                Set<String> parts = Set.copyOf(profile.FORCE_SPAWN_PARTS);
                 isSuitable = isSuitable.and(blockPos -> {
                     ChunkCoord coord = new ChunkCoord(dimensionInfo.getType(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
                     BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimensionInfo);
@@ -199,7 +199,7 @@ public class SpawnPlacement {
                 }
 
                 ChunkCoord coord = new ChunkCoord(provider.getType(), x >> 4, z >> 4);
-                UrbexProfile profile = provider.getProfile();
+                Preset profile = provider.getProfile();
 
                 for (int y = profile.GROUNDLEVEL-5 ; y < 125 ; y++) {
                     BlockPos pos = new BlockPos(x, y, z);

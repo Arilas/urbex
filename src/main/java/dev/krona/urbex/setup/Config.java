@@ -5,10 +5,12 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.config.UrbexConfig;
-import dev.krona.urbex.config.UrbexProfile;
-import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.data.UrbexData;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
@@ -38,13 +40,16 @@ public class Config {
 
     public static final boolean DEBUG = false;
 
+    /** {@code preset[@worldstyle]} entries with no explicit worldstyle resolve to this. */
+    public static final Identifier DEFAULT_WORLD_STYLE = Identifier.fromNamespaceAndPath("urbex", "standard");
+
     /** The currently active config: global, with the running world's overrides applied. */
     private static volatile UrbexConfig active = UrbexConfig.DEFAULT;
     /** The global config alone, restored when a world's overrides are dropped. */
     private static volatile UrbexConfig global = UrbexConfig.DEFAULT;
 
-    public static final Supplier<String> SELECTED_PROFILE = () -> active.selectedProfile();
-    public static final Supplier<String> SELECTED_CUSTOM_JSON = () -> active.selectedCustomJson();
+    public static final Supplier<String> SELECTED_PRESET = () -> active.selectedPreset();
+    public static final Supplier<String> SELECTED_WORLD_STYLE = () -> active.selectedWorldStyle();
     public static final Supplier<Integer> TODO_QUEUE_SIZE = () -> active.todoQueueSize();
     public static final Supplier<Boolean> FORCE_SAPLING_GROWTH = () -> active.forceSaplingGrowth();
     public static final Supplier<Integer> CACHE_CLEANUP_SECONDS = () -> active.cacheCleanupSeconds();
@@ -152,151 +157,209 @@ public class Config {
     }
 
     /**
-     * Dimension -> profile name, built once and then published whole.
+     * Dimension -> resolved preset choice, built once and then published whole.
      * <p>
-     * Reached from worker threads: {@code CityFeature} and {@code StructureSuppressor} both call
-     * {@link #getProfileForDimension} during generation, and nothing serialises them. It is
+     * Reached from worker threads: {@code CityFeature} calls {@link #getPresetChoiceForDimension}
+     * during generation, and nothing serialises callers. It is
      * {@code volatile} so a reader either sees {@code null} or a complete map, and a
-     * {@code ConcurrentHashMap} because {@link #registerUrbexDimension} can still add to it
-     * after publication. Racing builders produce identical maps; the loser's is dropped.
+     * {@code ConcurrentHashMap} in case a future caller needs to add to it after publication.
+     * Racing builders produce identical maps; the loser's is dropped.
      */
-    private static volatile Map<ResourceKey<Level>, String> dimensionProfileCache = null;
+    private static volatile Map<ResourceKey<Level>, PresetChoice> dimensionPresetCache = null;
 
-    // Profile as selected by the client
-    public static String profileFromClient = null;
-    public static String jsonFromClient = null;
+    // Selection as published by the client.
+    public static Identifier presetFromClient = null;
+    public static Identifier worldStyleFromClient = null;
+    public static String overridesFromClient = null;
 
     // Lazily filled from avoidStructures by cacheAvoidedStructures(). Must start out null:
     // that method only fills the set when it is still null.
     private static Set<Identifier> AVOID_STRUCTURES_SET = null;
 
     public static void reset() {
-        profileFromClient = null;
-        jsonFromClient = null;
-        dimensionProfileCache = null;
+        presetFromClient = null;
+        worldStyleFromClient = null;
+        overridesFromClient = null;
+        dimensionPresetCache = null;
         AVOID_STRUCTURES_SET = null;
         active = global;
     }
 
     public static void resetProfileCache() {
-        dimensionProfileCache = null;
+        dimensionPresetCache = null;
     }
 
-    // @todo BAD
-    public static void registerUrbexDimension(ServerLevel level, ResourceKey<Level> type, String profile) {
-        String profileForDimension = getProfileForDimension(level, type);
-        if (profileForDimension == null) {
-            // getProfileForDimension has published a cache by the time it returns, so read the
-            // field once rather than twice - a concurrent reset() must not turn this into an NPE.
-            Map<ResourceKey<Level>, String> cache = dimensionProfileCache;
-            if (cache != null) {
-                cache.put(type, profile);
-            }
-        }
-    }
-
-    public static String getProfileForDimension(ServerLevel level, ResourceKey<Level> type) {
-        Map<ResourceKey<Level>, String> cache = dimensionProfileCache;
+    public static PresetChoice getPresetChoiceForDimension(ServerLevel level, ResourceKey<Level> type) {
+        Map<ResourceKey<Level>, PresetChoice> cache = dimensionPresetCache;
         if (cache == null) {
-            cache = buildProfileCache(level);
+            cache = buildPresetCache(level);
             // Published last, and only once it is complete. See the field's comment.
-            dimensionProfileCache = cache;
+            dimensionPresetCache = cache;
         }
         return cache.get(type);
     }
 
-    private static Map<ResourceKey<Level>, String> buildProfileCache(ServerLevel level) {
-        Map<ResourceKey<Level>, String> cache = new ConcurrentHashMap<>();
-        for (String dp : active.dimensionsWithProfiles()) {
-            String[] split = dp.split("=");
-            if (split.length != 2) {
-                Urbex.getLogger().error("Bad format for config value: '{}'!", dp);
-            } else {
-                ResourceKey<Level> dimensionType = ResourceKey.create(Registries.DIMENSION, Identifier.parse(split[0]));
-                String profileName = split[1];
-                UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
-                if (profile != null) {
-                    cache.put(dimensionType, profileName);
-                } else {
-                    Urbex.getLogger().error("Cannot find profile: {} for dimension {}!", profileName, split[0]);
-                }
+    /**
+     * Parses one {@code dimensionsWithPresets} entry: {@code dimension=preset[@worldstyle]}. Bare
+     * (unnamespaced) preset/worldstyle names default to the {@code urbex} namespace. Malformed
+     * entries - wrong arity on either side of {@code =}, or an id that fails to parse - are
+     * logged and rejected rather than thrown, so one bad line in the config doesn't take the
+     * whole list down.
+     */
+    public static Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> parseDimensionPresetEntry(String entry) {
+        String[] split = entry.split("=");
+        if (split.length != 2) {
+            Urbex.getLogger().error("Bad format for config value: '{}'! Expected 'dimension=preset[@worldstyle]'.", entry);
+            return Optional.empty();
+        }
+        ResourceKey<Level> dimensionType;
+        try {
+            dimensionType = ResourceKey.create(Registries.DIMENSION, Identifier.parse(split[0]));
+        } catch (Exception e) {
+            Urbex.getLogger().error("Bad dimension id in config value: '{}'!", entry);
+            return Optional.empty();
+        }
+
+        String presetPart = split[1];
+        String presetName = presetPart;
+        Identifier worldStyle = DEFAULT_WORLD_STYLE;
+        int at = presetPart.indexOf('@');
+        if (at >= 0) {
+            presetName = presetPart.substring(0, at);
+            String stylePart = presetPart.substring(at + 1);
+            try {
+                worldStyle = DataTools.fromName(stylePart);
+            } catch (Exception e) {
+                Urbex.getLogger().error("Bad worldstyle id in config value: '{}'!", entry);
+                return Optional.empty();
             }
+        }
+
+        Identifier presetId;
+        try {
+            presetId = DataTools.fromName(presetName);
+        } catch (Exception e) {
+            Urbex.getLogger().error("Bad preset id in config value: '{}'!", entry);
+            return Optional.empty();
+        }
+
+        return Optional.of(Map.entry(dimensionType, new PresetChoice(presetId, worldStyle, Optional.empty())));
+    }
+
+    /**
+     * Mirrors the old profile-cache build, three-valued now: {@code dimensionsWithPresets}
+     * entries first, then the overworld's own selection - client-published (persisted into
+     * {@link UrbexData}), else the world's saved selection, else (overworld only) the global
+     * config's {@code selectedPreset}/{@code selectedWorldStyle} - which replaces whatever a
+     * config entry put at {@link Level#OVERWORLD}, exactly as the old flow did. Finally, if the
+     * resolved overworld preset has {@code GENERATE_NETHER} set, the nether is pointed at
+     * {@code urbex:cavern}, overriding any explicit nether entry - also unchanged from before.
+     */
+    private static Map<ResourceKey<Level>, PresetChoice> buildPresetCache(ServerLevel level) {
+        Map<ResourceKey<Level>, PresetChoice> cache = new ConcurrentHashMap<>();
+        for (String dp : active.dimensionsWithPresets()) {
+            parseDimensionPresetEntry(dp).ifPresent(e -> cache.put(e.getKey(), e.getValue()));
         }
 
         UrbexData data = UrbexData.getData(level);
-        String selectedProfile = "";
-        String selectedJson = "";
-        if (Config.profileFromClient != null && !Config.profileFromClient.isEmpty()) {
-            if (Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty()) {
-                selectedJson = Config.jsonFromClient;
-            }
-            selectedProfile = Config.profileFromClient;
-            // Remember the profile selected by the client in SavedData
-            data.setProfile(selectedProfile, selectedJson);
+        Identifier selectedPreset = null;
+        Identifier selectedWorldStyle = null;
+        String selectedOverrides = null;
+
+        if (presetFromClient != null) {
+            selectedPreset = presetFromClient;
+            selectedWorldStyle = worldStyleFromClient != null ? worldStyleFromClient : DEFAULT_WORLD_STYLE;
+            selectedOverrides = overridesFromClient;
+            // Remember the client's selection in SavedData.
+            data.setChoice(selectedPreset.toString(), selectedWorldStyle.toString(),
+                    selectedOverrides == null ? "" : selectedOverrides);
         } else {
-            // Check if SavedData has a profile selected
-            selectedProfile = data.getSelectedProfile();
-            selectedJson = data.getSelectedJson();
-            // If this is also empty get from config for the overworld
-            if (level.dimension() == Level.OVERWORLD) {
-                if (selectedJson.isEmpty()) {
-                    selectedJson = Config.SELECTED_CUSTOM_JSON.get();
-                }
-                if (selectedProfile.isEmpty()) {
-                    selectedProfile = Config.SELECTED_PROFILE.get();
+            String savedPreset = data.getSelectedPreset();
+            if (!savedPreset.isEmpty()) {
+                selectedPreset = Identifier.parse(savedPreset);
+                String savedStyle = data.getSelectedWorldStyle();
+                selectedWorldStyle = savedStyle.isEmpty() ? DEFAULT_WORLD_STYLE : Identifier.parse(savedStyle);
+                String savedOverrides = data.getSelectedOverrides();
+                selectedOverrides = savedOverrides.isEmpty() ? null : savedOverrides;
+            } else if (level.dimension() == Level.OVERWORLD) {
+                String globalPreset = Config.SELECTED_PRESET.get();
+                if (globalPreset != null && !globalPreset.isEmpty()) {
+                    selectedPreset = DataTools.fromName(globalPreset);
+                    String globalStyle = Config.SELECTED_WORLD_STYLE.get();
+                    selectedWorldStyle = globalStyle == null || globalStyle.isEmpty()
+                            ? DEFAULT_WORLD_STYLE : DataTools.fromName(globalStyle);
                 }
             }
         }
 
-        if (!selectedProfile.isEmpty()) {
-            cache.put(Level.OVERWORLD, selectedProfile);
-            if (!selectedJson.isEmpty()) {
-                UrbexProfile profile = new UrbexProfile("customized", selectedJson);
-                if (!ProfileSetup.STANDARD_PROFILES.containsKey("customized")) {
-                    ProfileSetup.STANDARD_PROFILES.put("customized", new UrbexProfile("customized", false));
-                }
-                ProfileSetup.STANDARD_PROFILES.get("customized").copyFrom(profile);
-            }
+        if (selectedPreset != null) {
+            cache.put(Level.OVERWORLD, new PresetChoice(selectedPreset, selectedWorldStyle, Optional.ofNullable(selectedOverrides)));
         }
 
         // Read the half-built map directly. This used to call back into getProfileForDimension,
         // which worked only because the field was assigned before it was filled; now that the
         // field is published last, that call would not terminate.
-        String profile = cache.get(Level.OVERWORLD);
-        if (profile != null && !profile.isEmpty()) {
-            if (ProfileSetup.STANDARD_PROFILES.get(profile).GENERATE_NETHER) {
-                cache.put(Level.NETHER, "cavern");
+        PresetChoice overworldChoice = cache.get(Level.OVERWORLD);
+        if (overworldChoice != null) {
+            Preset overworldPreset = Presets.resolve(level.registryAccess(), overworldChoice.preset());
+            if (overworldPreset.GENERATE_NETHER) {
+                cache.put(Level.NETHER, new PresetChoice(
+                        Identifier.fromNamespaceAndPath("urbex", "cavern"), DEFAULT_WORLD_STYLE, Optional.empty()));
             }
         }
         return cache;
     }
 
     /**
-     * Validate that every profile name referenced by config actually exists, so an unknown
-     * profile fails loudly at server start with the list of valid names instead of NPEing
-     * later in {@link #getProfileForDimension} during world init.
+     * Validate that every preset id referenced by config actually exists, so an unknown preset
+     * fails loudly at server start with the list of valid ids instead of blowing up later in
+     * {@link #getPresetChoiceForDimension} during world init. Same for every referenced worldstyle
+     * id.
      *
-     * Must run after {@link ProfileSetup#setupProfiles()} has populated {@code STANDARD_PROFILES}
-     * and after {@link #applyWorldOverrides} so the world's selectedProfile is in effect.
+     * Must run after {@link #applyWorldOverrides} so the world's selectedPreset is in effect.
      */
-    public static void validateSelectedProfiles() {
-        String selected = SELECTED_PROFILE.get();
-        if (selected != null && !selected.isEmpty() && !ProfileSetup.STANDARD_PROFILES.containsKey(selected)) {
-            throw new IllegalStateException(
-                    "Unknown Urbex profile '" + selected + "'. Valid profiles: "
-                    + String.join(", ", new TreeSet<>(ProfileSetup.STANDARD_PROFILES.keySet())));
+    public static void validateSelectedPresets(MinecraftServer server) {
+        Registry<dev.krona.urbex.worldgen.lost.regassets.PresetRE> presets =
+                server.registryAccess().lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
+        Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE> worldStyles =
+                server.registryAccess().lookupOrThrow(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
+
+        String selected = SELECTED_PRESET.get();
+        if (selected != null && !selected.isEmpty()) {
+            requirePreset(presets, DataTools.fromName(selected), "config selectedPreset '" + selected + "'");
         }
-        for (String dp : active.dimensionsWithProfiles()) {
-            String[] split = dp.split("=");
-            if (split.length == 2) {
-                String profileName = split[1];
-                if (!ProfileSetup.STANDARD_PROFILES.containsKey(profileName)) {
-                    throw new IllegalStateException(
-                            "Unknown Urbex profile '" + profileName + "' in dimensionsWithProfiles entry '" + dp
-                            + "'. Valid profiles: " + String.join(", ", new TreeSet<>(ProfileSetup.STANDARD_PROFILES.keySet())));
-                }
-            }
-            // Malformed entries (missing '=') are reported by getProfileForDimension itself; not this method's concern.
+        String selectedStyle = SELECTED_WORLD_STYLE.get();
+        if (selectedStyle != null && !selectedStyle.isEmpty()) {
+            requireWorldStyle(worldStyles, DataTools.fromName(selectedStyle), "config selectedWorldStyle '" + selectedStyle + "'");
+        }
+
+        for (String dp : active.dimensionsWithPresets()) {
+            Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> parsed = parseDimensionPresetEntry(dp);
+            // Malformed entries are reported by parseDimensionPresetEntry itself; not this method's concern.
+            parsed.ifPresent(e -> {
+                requirePreset(presets, e.getValue().preset(), "dimensionsWithPresets entry '" + dp + "'");
+                requireWorldStyle(worldStyles, e.getValue().worldStyle(), "dimensionsWithPresets entry '" + dp + "'");
+            });
+        }
+    }
+
+    private static void requirePreset(Registry<dev.krona.urbex.worldgen.lost.regassets.PresetRE> presets, Identifier id, String context) {
+        if (presets.get(id).isEmpty()) {
+            List<String> valid = new ArrayList<>();
+            presets.keySet().forEach(i -> valid.add(i.toString()));
+            Collections.sort(valid);
+            throw new IllegalStateException("Unknown Urbex preset '" + id + "' (" + context + "). Valid presets: "
+                    + String.join(", ", valid));
+        }
+    }
+
+    private static void requireWorldStyle(Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE> worldStyles, Identifier id, String context) {
+        if (worldStyles.get(id).isEmpty()) {
+            List<String> valid = new ArrayList<>();
+            worldStyles.keySet().forEach(i -> valid.add(i.toString()));
+            Collections.sort(valid);
+            throw new IllegalStateException("Unknown Urbex worldstyle '" + id + "' (" + context + "). Valid worldstyles: "
+                    + String.join(", ", valid));
         }
     }
 

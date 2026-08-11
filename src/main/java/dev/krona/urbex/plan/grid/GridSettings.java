@@ -65,14 +65,14 @@ public record GridSettings(
      * contact with the rest of the mod: it imports a configuration class, not a Minecraft class, so
      * the package stays game-free and its tests keep running headless. Keep it that way.
      *
-     * <p>A straight read: the constructor above is the only validation, and it stays strict. A profile
-     * whose {@code secondaryRoadMinCountX} exceeds its {@code secondaryRoadMaxCountX} is a profile
+     * <p>A straight read: the constructor above is the only validation, and it stays strict. A preset
+     * whose {@code secondaryRoadMinCountX} exceeds its {@code secondaryRoadMaxCountX} is a preset
      * nobody can generate the world they wrote down from, and quietly widening the pair here would
      * hand them a different world with no diagnostic. Callers that cannot afford the exception -
      * the settings preview, which rebuilds one of these on every keystroke and can therefore see a
      * half-finished edit - are the ones that handle it.
      */
-    public static GridSettings fromProfile(dev.krona.urbex.config.UrbexProfile profile) {
+    public static GridSettings fromPreset(dev.krona.urbex.config.Preset profile) {
         return new GridSettings(
                 profile.PRIMARY_ROAD_SPACING_X,
                 profile.PRIMARY_ROAD_SPACING_Z,

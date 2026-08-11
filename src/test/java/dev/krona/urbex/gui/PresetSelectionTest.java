@@ -3,6 +3,7 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.setup.Config;
+import net.minecraft.resources.Identifier;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -123,8 +124,8 @@ class PresetSelectionTest {
 
         selection.restore("totally-bogus-profile", "");
 
-        assertNull(Config.profileFromClient);
-        assertNull(Config.jsonFromClient);
+        assertNull(Config.presetFromClient);
+        assertNull(Config.overridesFromClient);
     }
 
     @Test
@@ -163,7 +164,7 @@ class PresetSelectionTest {
 
         selection.restore("rare", "");
 
-        assertEquals("rare", Config.profileFromClient);
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "rare"), Config.presetFromClient);
     }
 
     @Test
@@ -172,8 +173,11 @@ class PresetSelectionTest {
 
         selection.restore("customized", "{\"citychance\":0.9}");
 
-        assertEquals("customized", Config.profileFromClient);
-        assertTrue(Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty());
+        // Rough mapping (Task 4 replaces this editor with one that speaks Preset natively): the
+        // closest preset id publishes so the server has something valid to resolve, with the old
+        // profile JSON riding along in overridesFromClient (not yet a real PresetRE overlay).
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "customized"), Config.presetFromClient);
+        assertTrue(Config.overridesFromClient != null && !Config.overridesFromClient.isEmpty());
     }
 
     @Test
@@ -220,10 +224,10 @@ class PresetSelectionTest {
         selection.select("my_wasteland");
         selection.publish();
 
-        // A custom (user-saved) selection reaches the server as the reconstructable "customized" name
-        // plus its full JSON, not by a name the server might not have on disk.
-        assertEquals("customized", Config.profileFromClient);
-        assertTrue(Config.jsonFromClient != null && !Config.jsonFromClient.isEmpty(),
+        // Rough mapping: the saved profile's provenance ("wasteland") publishes as the preset id -
+        // the closest real, resolvable preset - with the full JSON riding in overridesFromClient.
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "wasteland"), Config.presetFromClient);
+        assertTrue(Config.overridesFromClient != null && !Config.overridesFromClient.isEmpty(),
                 "the saved profile's JSON must travel so the server can rebuild it");
     }
 
@@ -266,6 +270,6 @@ class PresetSelectionTest {
 
         selection.publish();
 
-        assertNull(Config.profileFromClient);
+        assertNull(Config.presetFromClient);
     }
 }

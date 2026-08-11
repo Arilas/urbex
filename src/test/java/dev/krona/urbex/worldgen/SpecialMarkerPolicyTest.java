@@ -1,7 +1,8 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -11,7 +12,7 @@ class SpecialMarkerPolicyTest {
 
     @Test
     void lootAdmissionUsesDensityWhileSpawnerAdmissionDoesNot() {
-        UrbexProfile profile = new UrbexProfile("marker-policy", true);
+        Preset profile = new Preset(Identifier.fromNamespaceAndPath("urbex", "marker-policy"));
         BlockPos marker = new BlockPos(12, 70, -4);
         profile.GENERATE_SPAWNERS = true;
 

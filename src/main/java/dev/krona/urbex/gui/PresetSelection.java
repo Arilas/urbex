@@ -5,6 +5,7 @@ import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.worldgen.CityFeature;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.network.chat.Component;
 
 import javax.annotation.Nullable;
@@ -247,11 +248,20 @@ public final class PresetSelection {
     }
 
     /**
-     * Publishes the current selection so it reaches world generation - the exact same contract as
-     * the old editor's profile selection: set {@code Config.profileFromClient} ({@code null} for
-     * "disabled", meaning no profile override - verbatim what the old editor's client-side profile
-     * state produced), bump the dirty counter, reset the profile cache, and for a customized profile
-     * also mirror it into {@code ProfileSetup.STANDARD_PROFILES} and {@code Config.jsonFromClient}.
+     * Publishes the current selection so it reaches world generation.
+     * <p>
+     * <b>Rough mapping, not a redesign:</b> this GUI (and {@code ProfileSetup.STANDARD_PROFILES})
+     * still speaks the pre-Task-3 {@link UrbexProfile} shape; {@link Config}'s selection surface
+     * now speaks {@code Preset} ids ({@code presetFromClient}/{@code worldStyleFromClient}) plus an
+     * optional {@code PresetRE} JSON overlay ({@code overridesFromClient}). A hand-edited/custom
+     * {@code UrbexProfile} cannot be losslessly re-expressed as a {@code PresetRE} overlay here (the
+     * two are different shapes) - that conversion is Task 4's job, once this screen is rebuilt
+     * against {@code Preset} natively. Until then: a plain built-in selection publishes its id
+     * cleanly; a customized one publishes the closest named preset id (its {@code basedOn}, so the
+     * server at least generates *something* valid) with the old profile JSON riding in
+     * {@code overridesFromClient} verbatim - not a real {@code PresetRE}, so a customization made
+     * through this screen will not actually reach worldgen as edited. This mirrors the task brief's
+     * accepted "old GUI world-creation flow may be temporarily degraded" note.
      */
     public void publish() {
         Entry entry = selected;
@@ -260,15 +270,6 @@ public final class PresetSelection {
         // sees the switched style with no special worldStyle plumbing of its own.
         String worldStyle = worldStyleOverride(entry);
         boolean publishAsCustom = entry.custom() || worldStyle != null;
-
-        // Custom entries (the transient "customized" row and hand-saved user presets alike) publish
-        // under CUSTOM_ID with their full JSON below, so the server reconstructs them from the JSON
-        // rather than needing the (possibly server-absent) user profile file by name.
-        if (publishAsCustom) {
-            Config.profileFromClient = CUSTOM_ID;
-        } else {
-            Config.profileFromClient = DISABLED_ID.equals(entry.id()) ? null : entry.id();
-        }
 
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
@@ -281,12 +282,16 @@ public final class PresetSelection {
             if (worldStyle != null) {
                 published.setWorldStyle(worldStyle);
             }
-            Config.jsonFromClient = published.toJson(false).toString();
+            String basedOn = entry.basedOn() == null || entry.basedOn().isEmpty() ? "default" : entry.basedOn();
+            Config.presetFromClient = DataTools.fromName(basedOn);
+            Config.worldStyleFromClient = DataTools.fromName(published.getWorldStyle());
+            Config.overridesFromClient = published.toJson(false).toString();
         } else {
-            // A plain preset (or disabled) reaches the server by name only. Clear any JSON a prior
-            // custom/worldStyle publish left behind, or the server would apply that stale JSON on top
-            // of the now-plain profile name.
-            Config.jsonFromClient = null;
+            Config.presetFromClient = DISABLED_ID.equals(entry.id()) ? null : DataTools.fromName(entry.id());
+            Config.worldStyleFromClient = null;
+            // Clear any overlay a prior custom/worldStyle publish left behind, or the server would
+            // try to apply that stale (and wrongly-shaped) JSON on top of the now-plain preset.
+            Config.overridesFromClient = null;
         }
     }
 }

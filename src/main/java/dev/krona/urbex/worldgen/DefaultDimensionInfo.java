@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
@@ -12,6 +12,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.world.level.Level;
@@ -30,7 +31,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     // cannot be swapped out from under a worker thread, which is what the per-dimension lock in
     // CityFeature.place used to be protecting.
     private final WorldGenLevel world;
-    private final UrbexProfile profile;
+    private final Preset profile;
     private final WorldStyle style;
     private final DimensionCaches caches;
 
@@ -38,15 +39,15 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     private final CityGenerator feature;
     private final RoadField roadField;
 
-    public DefaultDimensionInfo(WorldGenLevel world, UrbexProfile profile) {
+    public DefaultDimensionInfo(WorldGenLevel world, Preset preset, Identifier worldStyle) {
         this.world = world.getLevel();
-        this.profile = profile;
+        this.profile = preset;
         this.caches = new DimensionCaches(this.world.getSeed());
-        style = AssetRegistries.WORLDSTYLES.get(this.world, profile.getWorldStyle());
-        feature = new CityGenerator(this, profile);
+        style = AssetRegistries.WORLDSTYLES.get(this.world, worldStyle);
+        feature = new CityGenerator(this, preset);
         biomeRegistry = this.world.registryAccess().lookupOrThrow(Registries.BIOME);
         roadField = new GridRoadField(this.world.getSeed(), getType().identifier().toString(),
-                GridSettings.fromProfile(profile));
+                GridSettings.fromPreset(preset));
     }
 
     @Override
@@ -75,7 +76,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public UrbexProfile getProfile() {
+    public Preset getProfile() {
         return profile;
     }
 

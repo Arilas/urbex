@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.config.UrbexProfile;
 import dev.krona.urbex.setup.Config;
+import net.minecraft.resources.Identifier;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.AfterEach;
@@ -66,9 +67,11 @@ class WorldStyleSelectionTest {
         selection.publish();
 
         // A worldStyle override reaches the server exactly like an editor customization: the
-        // reconstructable "customized" name plus a full JSON that carries the chosen style.
-        assertEquals(PresetSelection.CUSTOM_ID, Config.profileFromClient);
-        assertEquals("lcmt", worldStyleOf(Config.jsonFromClient));
+        // preset id (rough mapping: "default", its own basedOn) plus a full JSON that carries the
+        // chosen style, riding in overridesFromClient.
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), Config.presetFromClient);
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "lcmt"), Config.worldStyleFromClient);
+        assertEquals("lcmt", worldStyleOf(Config.overridesFromClient));
     }
 
     @Test
@@ -83,8 +86,8 @@ class WorldStyleSelectionTest {
         selection.setWorldStyle("standard");
         selection.publish();
 
-        assertEquals("default", Config.profileFromClient);
-        assertNull(Config.jsonFromClient);
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), Config.presetFromClient);
+        assertNull(Config.overridesFromClient);
     }
 
     @Test

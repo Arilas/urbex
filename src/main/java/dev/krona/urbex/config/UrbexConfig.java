@@ -20,10 +20,10 @@ import java.util.Optional;
  * merge happens at the JSON level, so a world file only needs the keys it changes).
  */
 public record UrbexConfig(
-        List<String> dimensionsWithProfiles,
+        List<String> dimensionsWithPresets,
         int heightSampleSize,
-        String selectedProfile,
-        String selectedCustomJson,
+        String selectedPreset,
+        String selectedWorldStyle,
         int todoQueueSize,
         boolean forceSaplingGrowth,
         int cacheCleanupSeconds,
@@ -53,10 +53,10 @@ public record UrbexConfig(
             true);
 
     public static final Codec<UrbexConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.STRING.listOf().optionalFieldOf("dimensionsWithProfiles", DEFAULT.dimensionsWithProfiles()).forGetter(UrbexConfig::dimensionsWithProfiles),
+            Codec.STRING.listOf().optionalFieldOf("dimensionsWithPresets", DEFAULT.dimensionsWithPresets()).forGetter(UrbexConfig::dimensionsWithPresets),
             Codec.intRange(1, 100).optionalFieldOf("heightSampleSize", DEFAULT.heightSampleSize()).forGetter(UrbexConfig::heightSampleSize),
-            Codec.STRING.optionalFieldOf("selectedProfile", DEFAULT.selectedProfile()).forGetter(UrbexConfig::selectedProfile),
-            Codec.STRING.optionalFieldOf("selectedCustomJson", DEFAULT.selectedCustomJson()).forGetter(UrbexConfig::selectedCustomJson),
+            Codec.STRING.optionalFieldOf("selectedPreset", DEFAULT.selectedPreset()).forGetter(UrbexConfig::selectedPreset),
+            Codec.STRING.optionalFieldOf("selectedWorldStyle", DEFAULT.selectedWorldStyle()).forGetter(UrbexConfig::selectedWorldStyle),
             Codec.intRange(1, 100000).optionalFieldOf("todoQueueSize", DEFAULT.todoQueueSize()).forGetter(UrbexConfig::todoQueueSize),
             Codec.BOOL.optionalFieldOf("forceSaplingGrowth", DEFAULT.forceSaplingGrowth()).forGetter(UrbexConfig::forceSaplingGrowth),
             Codec.intRange(1, 86400).optionalFieldOf("cacheCleanupSeconds", DEFAULT.cacheCleanupSeconds()).forGetter(UrbexConfig::cacheCleanupSeconds),

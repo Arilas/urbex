@@ -1,8 +1,9 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
+import net.minecraft.resources.Identifier;
 
 import java.util.Optional;
 
@@ -19,8 +20,8 @@ final class TestProfiles {
     }
 
     /** A profile that always wants a building and never nominates a park. */
-    static UrbexProfile dense() {
-        UrbexProfile profile = new UrbexProfile("test-dense", false);
+    static Preset dense() {
+        Preset profile = new Preset(Identifier.fromNamespaceAndPath("urbex", "test-dense"));
         profile.BUILDING_CHANCE = 1.0f;
         profile.OPEN_LOT_PARK_CHANCE = 0.0f;
         return profile;

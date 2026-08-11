@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.editor.EditModeData;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.ModSetup;
@@ -82,12 +82,12 @@ public class CityGenerator {
     private final Set<BlockState> randomDirtSet;
 
     public final IDimensionInfo provider;
-    public final UrbexProfile profile;
+    public final Preset profile;
 
     private final Statistics statistics = new Statistics();
     private final Map<Block, BlockEntityType> typeCache = new ConcurrentHashMap<>();
 
-    public CityGenerator(IDimensionInfo provider, UrbexProfile profile) {
+    public CityGenerator(IDimensionInfo provider, Preset profile) {
         this.provider = provider;
         this.profile = profile;
 //        int waterLevel = provider.getWorld() == null ? 65 : Tools.getSeaLevel(provider.getWorld());// profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
