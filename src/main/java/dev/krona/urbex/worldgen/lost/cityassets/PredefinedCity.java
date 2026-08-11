@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.core.Registry;
@@ -24,18 +25,26 @@ public class PredefinedCity {
     private final List<PredefinedBuilding> predefinedBuildings = new ArrayList<>();
     private final List<PredefinedStreet> predefinedStreets = new ArrayList<>();
 
-    public PredefinedCity(PredefinedCityRE object) {
-        name = object.getRegistryName();
-        dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(object.getDimension()));
-        chunkX = object.getChunkX();
-        chunkZ = object.getChunkZ();
-        radius = object.getRadius();
-        cityStyle = object.getCityStyle();
-        if (object.getPredefinedBuildings() != null) {
-            predefinedBuildings.addAll(object.getPredefinedBuildings());
-        }
-        if (object.getPredefinedStreets() != null) {
-            predefinedStreets.addAll(object.getPredefinedStreets());
+    /**
+     * Builds a fully resolved predefined city from its {@code extends} chain, root first. Its
+     * scalars are all required, so the leaf's win; the building and street lists go through
+     * {@link Mergeable} so a declared list replaces unless it opts into appending.
+     */
+    public PredefinedCity(List<PredefinedCityRE> chainRootFirst) {
+        PredefinedCityRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
+        name = leaf.getRegistryName();
+        dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(leaf.getDimension()));
+        chunkX = leaf.getChunkX();
+        chunkZ = leaf.getChunkZ();
+        radius = leaf.getRadius();
+        cityStyle = leaf.getCityStyle();
+        for (PredefinedCityRE object : chainRootFirst) {
+            if (object.getPredefinedBuildings() != null) {
+                Mergeable.apply(predefinedBuildings, object.getPredefinedBuildings());
+            }
+            if (object.getPredefinedStreets() != null) {
+                Mergeable.apply(predefinedStreets, object.getPredefinedStreets());
+            }
         }
     }
 

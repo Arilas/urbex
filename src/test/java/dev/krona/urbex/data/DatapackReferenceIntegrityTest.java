@@ -48,6 +48,10 @@ class DatapackReferenceIntegrityTest {
             return;
         }
         String src = file.toString();
+        // Every registry supports "extends", and it always names an asset in that registry's own
+        // directory - so this is checked once here rather than per category, which is what stops a
+        // category being added without its extends being covered.
+        ref(src, d.get("extends"), category);
         switch (category) {
             case "buildings" -> {
                 for (String key : List.of("parts", "parts2")) {
@@ -59,7 +63,6 @@ class DatapackReferenceIntegrityTest {
             case "styles" -> forEachElement(d.get("randompalettes"),
                     row -> forEachObject(row, e -> ref(src, e.get("palette"), "palettes")));
             case "citystyles" -> {
-                ref(src, d.get("extends"), "citystyles");
                 ref(src, d.get("style"), "styles");
                 JsonObject sel = asObject(d.get("selectors"));
                 if (sel != null) {

@@ -2,10 +2,12 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringRepresentable;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -20,13 +22,38 @@ public class ScatteredBuilding {
     private final ScatteredBuilding.TerrainFix terrainfix;
     private final int heightoffset;
 
-    public ScatteredBuilding(ScatteredRE object) {
-        name = object.getRegistryName();
-        this.buildings = object.getBuildings();
-        this.multibuilding = object.getMultibuilding();
-        this.terrainheight = object.getTerrainheight();
-        this.terrainfix = object.getTerrainfix();
-        this.heightoffset = object.getHeightoffset();
+    /**
+     * Builds a fully resolved scattered building from its {@code extends} chain, root first: each
+     * scalar takes the value of the last entry that declares one, and the building list goes
+     * through {@link Mergeable} so a declared list replaces unless it opts into appending.
+     */
+    public ScatteredBuilding(List<ScatteredRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<String> declaredBuildings = new ArrayList<>();
+        boolean anyBuildings = false;
+        String multibuilding = null;
+        int heightoffset = 0;
+        TerrainHeight terrainheight = null;
+        TerrainFix terrainfix = null;
+        for (ScatteredRE object : chainRootFirst) {
+            if (object.getBuildings() != null) {
+                Mergeable.apply(declaredBuildings, object.getBuildings());
+                anyBuildings = true;
+            }
+            if (object.getMultibuilding() != null) {
+                multibuilding = object.getMultibuilding();
+            }
+            if (object.getHeightoffset() != null) {
+                heightoffset = object.getHeightoffset();
+            }
+            terrainheight = object.getTerrainheight();
+            terrainfix = object.getTerrainfix();
+        }
+        this.buildings = anyBuildings ? List.copyOf(declaredBuildings) : null;
+        this.multibuilding = multibuilding;
+        this.terrainheight = terrainheight;
+        this.terrainfix = terrainfix;
+        this.heightoffset = heightoffset;
     }
 
     @Nullable

@@ -16,7 +16,9 @@ import dev.krona.urbex.varia.ServerAccess;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,9 +31,25 @@ public class Palette {
     private final Map<Character, PE> palette = new HashMap<>();
     private final Map<BlockState, BlockState> damaged = new HashMap<>();
 
-    public Palette(PaletteRE object) {
-        name = object.getRegistryName();
-        parsePaletteArray(object);
+    /**
+     * Builds a fully resolved palette from its {@code extends} chain, root first.
+     * <p>
+     * A palette is a keyed collection, so the chain merges <em>by character</em> rather than by
+     * position: entries land in a {@link LinkedHashMap} keyed by their marker, in chain order, so a
+     * descendant that repaints two markers out of thirty overwrites exactly those two and keeps the
+     * other twenty-eight. Appending as a list would double-register a character; replacing as a
+     * list would silently drop everything the child did not restate. Only the surviving entries are
+     * then compiled, so an overridden entry takes its {@code damaged} mapping with it.
+     */
+    public Palette(List<PaletteRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        Map<Character, PaletteEntry> merged = new LinkedHashMap<>();
+        for (PaletteRE re : chainRootFirst) {
+            for (PaletteEntry entry : re.getPaletteEntries()) {
+                merged.put(entry.getChr().charAt(0), entry);
+            }
+        }
+        compile(merged.values());
     }
 
     public Palette(String name) {
@@ -59,8 +77,17 @@ public class Palette {
         return palette;
     }
 
+    /**
+     * Compiles one raw palette entry list into this palette. Used for the inline {@code palette}
+     * blocks a part or building can carry, which are not registry entries and so have no
+     * {@code extends} chain of their own.
+     */
     public void parsePaletteArray(PaletteRE paletteRE) {
-        for (PaletteEntry entry : paletteRE.getPaletteEntries()) {
+        compile(paletteRE.getPaletteEntries());
+    }
+
+    private void compile(Collection<PaletteEntry> entries) {
+        for (PaletteEntry entry : entries) {
             Character c = entry.getChr().charAt(0);
             BlockState dmg = null;
             if (entry.getDamaged() != null) {

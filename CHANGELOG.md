@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- **All thirteen datapack registries now support `extends`, so an author never has to look up which
+  asset types can build on another.** `buildings`, `parts`, `palettes`, `styles`, `multibuildings`,
+  `scattered`, `conditions`, `variants`, `stuff`, `predefinedcities` and `worldstyles` join
+  `citystyles` and `presets`: each takes one fully-qualified id of an asset in its own registry,
+  chains are applied root-first, and a cycle or a dangling id is a load error naming the chain. Two
+  of the eleven are more than a rename. **Palettes merge per character**, not per position: a child
+  that repaints two markers out of thirty overwrites exactly those two and keeps the other
+  twenty-eight, and an overridden entry takes its `damaged` mapping with it rather than leaving it
+  keyed on a block the palette no longer places. **Parts inherit their ancestor's geometry**:
+  `xsize`, `zsize` and `slices` each come from the last file in the chain that declares one, so
+  `{"extends": "urbex:radiotower", "refpalette": "urbexmt:radiotower_rusted"}` is a complete part
+  file. Those three keys are therefore no longer required on a part; a part whose whole chain
+  declares no `slices` (or no `xsize`/`zsize`) is a load error naming the part, and a part
+  declaring a size that contradicts the slices actually in force is a load error naming the part,
+  the declared size and the real width - not the silent truncation it would have been. Ordered list
+  fields across these registries (`buildings.parts`/`parts2`, `parts.meta`,
+  `styles.randompalettes`, `scattered.buildings`, `conditions.values`, `variants.blocks`,
+  `stuff.tags`, `predefinedcities.buildings`/`streets`, `worldstyles.citystyles`/
+  `citybiomemultipliers`) now decode through `Mergeable`, so a bare array still replaces what the
+  chain inherited and `{"replace": false, "values": [...]}` appends to it instead. Two shapes stay
+  wholesale replacements on purpose: `multibuildings.buildings` and `parts.slices` are grids, and a
+  half-inherited grid would contradict its own declared dimensions. Nothing in a datapack has to
+  change: `extends` is optional everywhere, every previously required key is still accepted, and
+  the only keys that became optional are the three on `parts`. Third-party packs that relied on a
+  part failing to load when it omitted `xsize`, `zsize` or `slices` now get that error from the
+  resolved chain instead of from the codec, with the part named. `DatapackReferenceIntegrityTest`
+  checks `extends` in every category rather than only in `citystyles`, so a fourteenth registry
+  cannot skip the check. Confirmed worldgen-inert: both digests regenerate unchanged
+  (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`), so this is a load-path and
+  format change only.
 - **A city style's selector lists can now opt into appending to what they inherit, instead of
   always replacing it.** `CityStyle`'s nine selector fields (`buildings`, `bridges`,
   `largebridges`, `parks`, `fountains`, `stairs`, `fronts`, `raildungeons`, `multibuildings`) now

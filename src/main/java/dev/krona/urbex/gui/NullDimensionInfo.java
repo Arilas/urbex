@@ -13,6 +13,7 @@ import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -29,6 +30,7 @@ import net.minecraft.world.level.biome.Biomes;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
@@ -123,15 +125,16 @@ public class NullDimensionInfo implements IDimensionInfo {
                 Urbex.LOGGER.debug("Preview could not resolve worldstyle '{}'; using the placeholder.", worldStyle, e);
             }
         }
-        style = resolved != null ? resolved : new WorldStyle(new WorldStyleRE(
+        style = resolved != null ? resolved : new WorldStyle(List.of(new WorldStyleRE(
+                Optional.empty(),
                 "standard",
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                Collections.emptyList(),
+                new Mergeable<>(true, Collections.emptyList()),
                 Optional.empty()
-        ));
+        )));
         this.seed = seed;
         random = new Random(seed);
         feature = new CityGenerator(this, profile);

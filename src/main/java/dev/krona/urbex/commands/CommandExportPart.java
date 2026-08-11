@@ -140,7 +140,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
                         Optional.empty(),
                         Optional.empty()));
             }
-            PaletteRE paletteRE = new PaletteRE(entries);
+            PaletteRE paletteRE = new PaletteRE(Optional.empty(), entries);
             DataResult<JsonElement> result = PaletteRE.CODEC.encodeStart(JsonOps.INSTANCE, paletteRE);
             root.add("__comment__", new JsonPrimitive("'missingpalette' represents all blockstates that it couldn't find in the palette. These have to be put in a palette. " +
                     "'exportedpart' is the actual exported part"));
@@ -149,7 +149,8 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             root.add("__comment__", new JsonPrimitive("'exportedpart' is the actual exported part"));
         }
 
-        BuildingPartRE buildingPartRE = new BuildingPartRE(part.getXSize(), part.getZSize(), slices,
+        BuildingPartRE buildingPartRE = new BuildingPartRE(Optional.empty(),
+                Optional.of(part.getXSize()), Optional.of(part.getZSize()), Optional.of(slices),
                 Optional.ofNullable(part.getRefPaletteName()), Optional.empty(), Optional.empty());
         DataResult<JsonElement> result = BuildingPartRE.CODEC.encodeStart(JsonOps.INSTANCE, buildingPartRE);
         root.add("exportedpart", result.result().get());

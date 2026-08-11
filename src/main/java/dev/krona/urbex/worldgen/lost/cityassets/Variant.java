@@ -4,6 +4,7 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
@@ -19,9 +20,17 @@ public class Variant {
     private final Identifier name;
     private final List<Pair<Integer, BlockState>> blocks = new ArrayList<>();
 
-    public Variant(VariantRE object) {
-        name = object.getRegistryName();
-        for (BlockEntry entry : object.getBlocks()) {
+    /**
+     * Builds a fully resolved variant from its {@code extends} chain, root first: a declared
+     * {@code blocks} replaces the inherited list unless it opts into appending.
+     */
+    public Variant(List<VariantRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<BlockEntry> entries = new ArrayList<>();
+        for (VariantRE object : chainRootFirst) {
+            Mergeable.apply(entries, object.getBlocks());
+        }
+        for (BlockEntry entry : entries) {
             BlockState state = Tools.stringToState(entry.block());
             blocks.add(Pair.of(entry.random(), state));
         }

@@ -6,44 +6,46 @@ import dev.krona.urbex.worldgen.lost.regassets.data.*;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import java.util.List;
 import java.util.Optional;
 
-public class WorldStyleRE implements IAsset<WorldStyleRE> {
+public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
 
     public static final Codec<WorldStyleRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
+                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.fieldOf("outsidestyle").forGetter(l -> l.outsideStyle),
-                    MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> l.multiSettings.get()),
-                    WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> l.worldSettings.get()),
+                    MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> Optional.ofNullable(l.multiSettings)),
+                    WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> Optional.ofNullable(l.worldSettings)),
                     ScatteredSettings.CODEC.optionalFieldOf("scattered").forGetter(l -> Optional.ofNullable(l.scatteredSettings)),
-                    PartSelector.CODEC.optionalFieldOf("parts").forGetter(l -> l.partSelector.get()),
-                    Codec.list(CityStyleSelector.CODEC).fieldOf("citystyles").forGetter(l -> l.cityStyleSelectors),
-                    Codec.list(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
+                    PartSelector.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.partSelector)),
+                    Mergeable.codec(CityStyleSelector.CODEC).fieldOf("citystyles").forGetter(l -> l.cityStyleSelectors),
+                    Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
             ).apply(instance, WorldStyleRE::new));
 
     private Identifier name;
+    private final Optional<Identifier> extendsId;
     private final String outsideStyle;
     private final MultiSettings multiSettings;
     private final WorldSettings worldSettings;
     private final ScatteredSettings scatteredSettings;
-    @Nonnull private final PartSelector partSelector;
-    private final List<CityStyleSelector> cityStyleSelectors;
-    private final List<CityBiomeMultiplier> cityBiomeMultipliers;
+    private final PartSelector partSelector;
+    private final Mergeable<CityStyleSelector> cityStyleSelectors;
+    private final Mergeable<CityBiomeMultiplier> cityBiomeMultipliers;
 
-    public WorldStyleRE(String outsideStyle,
+    public WorldStyleRE(Optional<Identifier> extendsId,
+                        String outsideStyle,
                         Optional<MultiSettings> multiSettings,
                         Optional<WorldSettings> worldSettings,
                         Optional<ScatteredSettings> scatteredSettings,
                         Optional<PartSelector> partSelector,
-                        List<CityStyleSelector> cityStyleSelector,
-                        Optional<List<CityBiomeMultiplier>> cityBiomeMultipliers) {
+                        Mergeable<CityStyleSelector> cityStyleSelector,
+                        Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers) {
+        this.extendsId = extendsId;
         this.outsideStyle = outsideStyle;
-        this.multiSettings = multiSettings.orElse(MultiSettings.DEFAULT);
-        this.worldSettings = worldSettings.orElse(WorldSettings.DEFAULT);
+        this.multiSettings = multiSettings.orElse(null);
+        this.worldSettings = worldSettings.orElse(null);
         this.scatteredSettings = scatteredSettings.orElse(null);
-        this.partSelector = partSelector.orElse(PartSelector.DEFAULT);
+        this.partSelector = partSelector.orElse(null);
         this.cityStyleSelectors = cityStyleSelector;
         this.cityBiomeMultipliers = cityBiomeMultipliers.orElse(null);
     }
@@ -52,7 +54,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
         return outsideStyle;
     }
 
-    @Nonnull
+    @Nullable
     public PartSelector getPartSelector() {
         return partSelector;
     }
@@ -62,22 +64,28 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
         return scatteredSettings;
     }
 
-    public List<CityStyleSelector> getCityStyleSelectors() {
+    public Mergeable<CityStyleSelector> getCityStyleSelectors() {
         return cityStyleSelectors;
     }
 
-    public List<CityBiomeMultiplier> getCityBiomeMultipliers() {
+    @Nullable
+    public Mergeable<CityBiomeMultiplier> getCityBiomeMultipliers() {
         return cityBiomeMultipliers;
     }
 
-    @Nonnull
+    @Nullable
     public MultiSettings getMultiSettings() {
         return multiSettings;
     }
 
-    @Nonnull
+    @Nullable
     public WorldSettings getWorldSettings() {
         return worldSettings;
+    }
+
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     @Override

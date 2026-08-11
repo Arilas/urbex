@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
@@ -24,8 +25,8 @@ public class Building {
     private Boolean allowDoors = true;  // true means generation for the door is allowed, adjacent to street and building
     private Boolean allowFillers = true;  // true means generation for the filler is allowed, for cellars
     private Boolean overrideFloors = false;	// This overrides the citystyle/profile all min/max floors, meaning it will ONLY use this building definition's all min/max Floors.
-    private final char fillerBlock;           // Block used to fill/close areas. Usually the block of the building itself
-    private final Character rubbleBlock;      // Block used for destroyed building rubble
+    private char fillerBlock;           // Block used to fill/close areas. Usually the block of the building itself
+    private Character rubbleBlock;      // Block used for destroyed building rubble
     private float prefersLonely = 0.0f; // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
     // See BuildingPart.localPalette: a reference to another palette needs the level to resolve, so
@@ -36,27 +37,63 @@ public class Building {
     private final List<Pair<Predicate<ConditionContext>, String>> parts = new ArrayList<>();
     private final List<Pair<Predicate<ConditionContext>, String>> parts2 = new ArrayList<>();
 
-    public Building(BuildingRE object) {
-        name = object.getRegistryName();
-        minFloors = object.getMinFloors();
-        minCellars = object.getMinCellars();
-        maxFloors = object.getMaxFloors();
-        maxCellars = object.getMaxCellars();
-        allowDoors = object.getAllowDoors();
-        allowFillers = object.getAllowFillers();
-        overrideFloors = object.getOverrideFloors();
-        prefersLonely = object.getPrefersLonely();
-        fillerBlock = object.getFillerBlock();
-        rubbleBlock = object.getRubbleBlock();
-        if (object.getLocalPalette() != null) {
-            localPalette = new Palette("__local__" + object.getRegistryName().getPath());
-            localPalette.parsePaletteArray(object.getLocalPalette()); // @todo get the full palette instead
-        } else if (object.getRefPaletteName() != null) {
-            refPaletteName = object.getRefPaletteName();
+    /**
+     * Builds a fully resolved building from its {@code extends} chain, root first: every scalar
+     * takes the value of the last entry that declares one, so an entry that omits a field does not
+     * blank out what an earlier one set, and the two part lists go through {@link Mergeable} so a
+     * declared list replaces the inherited one unless it opts into appending.
+     */
+    public Building(List<BuildingRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<PartRef> partRefs = new ArrayList<>();
+        List<PartRef> partRefs2 = new ArrayList<>();
+        for (BuildingRE object : chainRootFirst) {
+            if (object.getMinFloors() != -1) {
+                minFloors = object.getMinFloors();
+            }
+            if (object.getMinCellars() != -1) {
+                minCellars = object.getMinCellars();
+            }
+            if (object.getMaxFloors() != -1) {
+                maxFloors = object.getMaxFloors();
+            }
+            if (object.getMaxCellars() != -1) {
+                maxCellars = object.getMaxCellars();
+            }
+            if (object.getAllowDoors() != null) {
+                allowDoors = object.getAllowDoors();
+            }
+            if (object.getAllowFillers() != null) {
+                allowFillers = object.getAllowFillers();
+            }
+            if (object.getOverrideFloors() != null) {
+                overrideFloors = object.getOverrideFloors();
+            }
+            if (object.getPrefersLonely() != 0.0f) {
+                prefersLonely = object.getPrefersLonely();
+            }
+            fillerBlock = object.getFillerBlock();
+            if (object.getRubbleBlock() != null) {
+                rubbleBlock = object.getRubbleBlock();
+            }
+            // refpalette and an inline palette say the same thing two ways, so the later entry's
+            // choice wins outright rather than layering onto the earlier one's.
+            if (object.getLocalPalette() != null) {
+                localPalette = new Palette("__local__" + name.getPath());
+                localPalette.parsePaletteArray(object.getLocalPalette()); // @todo get the full palette instead
+                refPaletteName = null;
+            } else if (object.getRefPaletteName() != null) {
+                refPaletteName = object.getRefPaletteName();
+                localPalette = null;
+            }
+            Mergeable.apply(partRefs, object.getParts());
+            if (object.getParts2() != null) {
+                Mergeable.apply(partRefs2, object.getParts2());
+            }
         }
 
-        readParts(this.parts, object.getParts());
-        readParts(this.parts2, object.getParts2());
+        readParts(this.parts, partRefs);
+        readParts(this.parts2, partRefs2);
     }
 
     public String getName() {

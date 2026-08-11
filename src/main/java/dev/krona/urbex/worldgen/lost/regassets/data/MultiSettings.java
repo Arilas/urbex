@@ -3,8 +3,6 @@ package dev.krona.urbex.worldgen.lost.regassets.data;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
-import java.util.Optional;
-
 public record MultiSettings(int areasize, int minimum, int maximum, float correctStyleFactor, int attempts) {
 
     public static final Codec<MultiSettings> CODEC = RecordCodecBuilder.create(instance ->
@@ -17,13 +15,5 @@ public record MultiSettings(int areasize, int minimum, int maximum, float correc
             ).apply(instance, MultiSettings::new));
 
     public static final MultiSettings DEFAULT = new MultiSettings(10, 1, 5, 0.8f, 50);
-
-    public Optional<MultiSettings> get() {
-        if (this == DEFAULT) {
-            return Optional.empty();
-        } else {
-            return Optional.of(this);
-        }
-    }
 
 }

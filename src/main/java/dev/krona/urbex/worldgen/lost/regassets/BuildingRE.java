@@ -2,17 +2,18 @@ package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
 import java.util.Optional;
 
-public class BuildingRE implements IAsset<BuildingRE> {
+public class BuildingRE implements IAsset<BuildingRE>, Extendable {
 
     public static final Codec<BuildingRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
+                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
                     PaletteRE.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
                     Codec.STRING.fieldOf("filler").forGetter(l -> Character.toString(l.fillerBlock)),
@@ -21,38 +22,42 @@ public class BuildingRE implements IAsset<BuildingRE> {
                     Codec.INT.optionalFieldOf("minfloors").forGetter(l -> l.minFloors == -1 ? Optional.<Integer>empty() : Optional.of(l.minFloors)),
                     Codec.INT.optionalFieldOf("maxcellars").forGetter(l -> l.maxCellars == -1 ? Optional.<Integer>empty() : Optional.of(l.maxCellars)),
                     Codec.INT.optionalFieldOf("maxfloors").forGetter(l -> l.maxFloors == -1 ? Optional.<Integer>empty() : Optional.of(l.maxFloors)),
-                    Codec.BOOL.optionalFieldOf("allowDoors").forGetter(l -> Optional.ofNullable(l.getAllowDoors())),
-                    Codec.BOOL.optionalFieldOf("allowFillers").forGetter(l -> Optional.ofNullable(l.getAllowFillers())),
-                    Codec.BOOL.optionalFieldOf("overrideFloors").forGetter(l -> Optional.ofNullable(l.getOverrideFloors())),
+                    Codec.BOOL.optionalFieldOf("allowDoors").forGetter(l -> Optional.ofNullable(l.allowDoors)),
+                    Codec.BOOL.optionalFieldOf("allowFillers").forGetter(l -> Optional.ofNullable(l.allowFillers)),
+                    Codec.BOOL.optionalFieldOf("overrideFloors").forGetter(l -> Optional.ofNullable(l.overrideFloors)),
                     Codec.FLOAT.optionalFieldOf("preferslonely").forGetter(l -> l.prefersLonely == 0 ? Optional.<Float>empty() : Optional.of(l.prefersLonely)),
-                    Codec.list(PartRef.CODEC).fieldOf("parts").forGetter(l -> l.parts),
-                    Codec.list(PartRef.CODEC).optionalFieldOf("parts2").forGetter(l -> Optional.ofNullable(l.parts2))
+                    Mergeable.codec(PartRef.CODEC).fieldOf("parts").forGetter(l -> l.parts),
+                    Mergeable.codec(PartRef.CODEC).optionalFieldOf("parts2").forGetter(l -> Optional.ofNullable(l.parts2))
             ).apply(instance, BuildingRE::new));
 
 
     private Identifier name;
 
-    private int minFloors = -1;         // -1 means default from level
-    private int minCellars = -1;        // -1 means default frmo level
-    private int maxFloors = -1;         // -1 means default from level
-    private int maxCellars = -1;        // -1 means default frmo level
-    private Boolean allowDoors = true;	// true means generation for the door is allowed, adjacent to street and building
-    private Boolean allowFillers = true;// true means generation for the filler is allowed, for cellars
-    private Boolean overrideFloors = false;	// This overrides the citystyle/profile all min/max floors, meaning it will ONLY use this building definition's all min/max Floors.
+    private final Optional<Identifier> extendsId;
+
+    private final int minFloors;        // -1 means "not declared here"
+    private final int minCellars;       // -1 means "not declared here"
+    private final int maxFloors;        // -1 means "not declared here"
+    private final int maxCellars;       // -1 means "not declared here"
+    private final Boolean allowDoors;	// true means generation for the door is allowed, adjacent to street and building
+    private final Boolean allowFillers; // true means generation for the filler is allowed, for cellars
+    private final Boolean overrideFloors;	// This overrides the citystyle/profile all min/max floors, meaning it will ONLY use this building definition's all min/max Floors.
     private final char fillerBlock;     // Block used to fill/close areas. Usually the block of the building itself
     private final String rubbleBlock;   // Block used for destroyed building rubble
-    private float prefersLonely = 0.0f; // The chance this this building is alone. If 1.0f this building wants to be alone all the time
+    private final float prefersLonely;  // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
     private PaletteRE localPalette = null;
     private final String refPaletteName;
 
-    private final List<PartRef> parts;
-    private final List<PartRef> parts2;
+    private final Mergeable<PartRef> parts;
+    private final Mergeable<PartRef> parts2;
 
-    public BuildingRE(Optional<String> refpalette, Optional<PaletteRE> locpalette, String filler, Optional<String> rubble,
+    public BuildingRE(Optional<Identifier> extendsId,
+                      Optional<String> refpalette, Optional<PaletteRE> locpalette, String filler, Optional<String> rubble,
                       Optional<Integer> minCellars, Optional<Integer> minFloors, Optional<Integer> maxCellars, Optional<Integer> maxFloors,
                       Optional<Boolean> allowDoors, Optional<Boolean> allowFillers, Optional<Boolean> overrideFloors,
-                      Optional<Float> prefersLonely, List<PartRef> partRefs, Optional<List<PartRef>> partRefs2) {
+                      Optional<Float> prefersLonely, Mergeable<PartRef> partRefs, Optional<Mergeable<PartRef>> partRefs2) {
+        this.extendsId = extendsId;
         this.refPaletteName = refpalette.map(String::intern).orElse(null);
         this.localPalette = locpalette.orElse(null);
         this.fillerBlock = filler.charAt(0);
@@ -61,12 +66,17 @@ public class BuildingRE implements IAsset<BuildingRE> {
         this.maxCellars = maxCellars.orElse(-1);
         this.minFloors = minFloors.orElse(-1);
         this.maxFloors = maxFloors.orElse(-1);
-        this.allowDoors = allowDoors.orElse(true);
-        this.allowFillers = allowFillers.orElse(true);
-        this.overrideFloors = overrideFloors.orElse(false);
+        this.allowDoors = allowDoors.orElse(null);
+        this.allowFillers = allowFillers.orElse(null);
+        this.overrideFloors = overrideFloors.orElse(null);
         this.prefersLonely = prefersLonely.orElse(0.0f);
         this.parts = partRefs;
         this.parts2 = partRefs2.orElse(null);
+    }
+
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     @Override
@@ -96,14 +106,17 @@ public class BuildingRE implements IAsset<BuildingRE> {
         return maxCellars;
     }
 
+    @Nullable
     public Boolean getAllowDoors() {
         return allowDoors;
     }
 
+    @Nullable
     public Boolean getAllowFillers() {
         return allowFillers;
     }
 
+    @Nullable
     public Boolean getOverrideFloors() {
         return overrideFloors;
     }
@@ -128,11 +141,12 @@ public class BuildingRE implements IAsset<BuildingRE> {
         return refPaletteName;
     }
 
-    public List<PartRef> getParts() {
+    public Mergeable<PartRef> getParts() {
         return parts;
     }
 
-    public List<PartRef> getParts2() {
+    @Nullable
+    public Mergeable<PartRef> getParts2() {
         return parts2;
     }
 

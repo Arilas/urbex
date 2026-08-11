@@ -30,24 +30,53 @@ public class WorldStyle {
     @Nonnull private final MultiSettings multiSettings;
     @Nonnull private final WorldSettings worldSettings;
 
-    public WorldStyle(WorldStyleRE object) {
-        name = object.getRegistryName();
-        this.scatteredSettings = object.getScatteredSettings();
-        this.partSelector = object.getPartSelector();
-        this.multiSettings = object.getMultiSettings();
-        this.worldSettings = object.getWorldSettings();
-        outsideStyle = object.getOutsideStyle();
-        for (CityStyleSelector selector : object.getCityStyleSelectors()) {
+    /**
+     * Builds a fully resolved world style from its {@code extends} chain, root first: every
+     * settings block takes the value of the last entry that declares one, and the two selector
+     * lists go through {@link Mergeable} so a declared list replaces unless it opts into appending.
+     */
+    public WorldStyle(List<WorldStyleRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        String outside = null;
+        ScatteredSettings scattered = null;
+        PartSelector parts = PartSelector.DEFAULT;
+        MultiSettings multi = MultiSettings.DEFAULT;
+        WorldSettings world = WorldSettings.DEFAULT;
+        List<CityStyleSelector> selectors = new ArrayList<>();
+        List<CityBiomeMultiplier> multipliers = new ArrayList<>();
+        for (WorldStyleRE object : chainRootFirst) {
+            outside = object.getOutsideStyle();
+            if (object.getScatteredSettings() != null) {
+                scattered = object.getScatteredSettings();
+            }
+            if (object.getPartSelector() != null) {
+                parts = object.getPartSelector();
+            }
+            if (object.getMultiSettings() != null) {
+                multi = object.getMultiSettings();
+            }
+            if (object.getWorldSettings() != null) {
+                world = object.getWorldSettings();
+            }
+            Mergeable.apply(selectors, object.getCityStyleSelectors());
+            if (object.getCityBiomeMultipliers() != null) {
+                Mergeable.apply(multipliers, object.getCityBiomeMultipliers());
+            }
+        }
+        this.outsideStyle = outside;
+        this.scatteredSettings = scattered;
+        this.partSelector = parts;
+        this.multiSettings = multi;
+        this.worldSettings = world;
+        for (CityStyleSelector selector : selectors) {
             Predicate<Holder<Biome>> predicate = biomeHolder -> true;
             if (selector.biomeMatcher() != null) {
                 predicate = selector.biomeMatcher();
             }
             cityStyleSelector.add(Pair.of(predicate, Pair.of(selector.factor(), selector.citystyle())));
         }
-        if (object.getCityBiomeMultipliers() != null) {
-            for (CityBiomeMultiplier multiplier : object.getCityBiomeMultipliers()) {
-                cityBiomeMultiplier.add(Pair.of(multiplier.biomeMatcher(), multiplier.multiplier()));
-            }
+        for (CityBiomeMultiplier multiplier : multipliers) {
+            cityBiomeMultiplier.add(Pair.of(multiplier.biomeMatcher(), multiplier.multiplier()));
         }
     }
 

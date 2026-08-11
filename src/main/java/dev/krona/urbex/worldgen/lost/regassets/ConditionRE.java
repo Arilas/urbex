@@ -3,27 +3,36 @@ package dev.krona.urbex.worldgen.lost.regassets;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
+import java.util.Optional;
 
-public class ConditionRE implements IAsset<ConditionRE> {
+public class ConditionRE implements IAsset<ConditionRE>, Extendable {
 
     public static final Codec<ConditionRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.list(ConditionPart.CODEC).fieldOf("values").forGetter(l -> l.values)
+                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    Mergeable.codec(ConditionPart.CODEC).fieldOf("values").forGetter(l -> l.values)
             ).apply(instance, ConditionRE::new));
 
     private Identifier name;
-    private final List<ConditionPart> values;
+    private final Optional<Identifier> extendsId;
+    private final Mergeable<ConditionPart> values;
 
-    public ConditionRE(List<ConditionPart> values) {
+    public ConditionRE(Optional<Identifier> extendsId, Mergeable<ConditionPart> values) {
+        this.extendsId = extendsId;
         this.values = values;
     }
 
-    public List<ConditionPart> getValues() {
+    public Mergeable<ConditionPart> getValues() {
         return values;
+    }
+
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     @Override

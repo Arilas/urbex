@@ -3,28 +3,36 @@ package dev.krona.urbex.worldgen.lost.regassets;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Optional;
 
-public class VariantRE implements IAsset<VariantRE> {
+public class VariantRE implements IAsset<VariantRE>, Extendable {
 
     public static final Codec<VariantRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.list(BlockEntry.CODEC).fieldOf("blocks").forGetter(l -> l.blocks)
+                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    Mergeable.codec(BlockEntry.CODEC).fieldOf("blocks").forGetter(l -> l.blocks)
             ).apply(instance, VariantRE::new));
 
     private Identifier name;
-    private final List<BlockEntry> blocks = new ArrayList<>();
+    private final Optional<Identifier> extendsId;
+    private final Mergeable<BlockEntry> blocks;
 
-    public VariantRE(List<BlockEntry> entries) {
-        blocks.addAll(entries);
+    public VariantRE(Optional<Identifier> extendsId, Mergeable<BlockEntry> entries) {
+        this.extendsId = extendsId;
+        this.blocks = entries;
     }
 
-    public List<BlockEntry> getBlocks() {
+    public Mergeable<BlockEntry> getBlocks() {
         return blocks;
+    }
+
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     @Override

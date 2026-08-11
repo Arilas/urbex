@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import net.minecraft.resources.Identifier;
 import org.apache.commons.lang3.tuple.Pair;
@@ -17,9 +18,17 @@ public class Style {
 
     private final List<List<Pair<Float, String>>> randomPaletteChoices = new ArrayList<>();
 
-    public Style(StyleRE object) {
-        name = object.getRegistryName();
-        for (List<PaletteSelector> array : object.getRandomPaletteChoices()) {
+    /**
+     * Builds a fully resolved style from its {@code extends} chain, root first: a declared
+     * {@code randompalettes} replaces the inherited groups unless it opts into appending.
+     */
+    public Style(List<StyleRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<List<PaletteSelector>> groups = new ArrayList<>();
+        for (StyleRE object : chainRootFirst) {
+            Mergeable.apply(groups, object.getRandomPaletteChoices());
+        }
+        for (List<PaletteSelector> array : groups) {
             List<Pair<Float, String>> palettes = new ArrayList<>();
             for (PaletteSelector selector : array) {
                 float factor = selector.factor();

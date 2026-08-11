@@ -16,7 +16,13 @@ public class MultiBuilding {
     private final List<List<String>> buildings;
     private final Set<String> buildingSet;
 
-    public MultiBuilding(MultiBuildingRE object) {
+    /**
+     * Builds a fully resolved multi-building from its {@code extends} chain, root first. Every
+     * field is required, so the leaf's values win; the grid replaces its ancestor's wholesale
+     * rather than merging, because a half-inherited grid would contradict {@code dimx}/{@code dimz}.
+     */
+    public MultiBuilding(List<MultiBuildingRE> chainRootFirst) {
+        MultiBuildingRE object = chainRootFirst.get(chainRootFirst.size() - 1);
         name = object.getRegistryName();
         this.dimX = object.getDimX();
         this.dimZ = object.getDimZ();

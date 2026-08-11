@@ -2,13 +2,16 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
-import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,32 +50,101 @@ public class BuildingPart implements IBuildingPart {
 
     private final Map<String, Object> metadata = new HashMap<>();
 
-    public BuildingPart(BuildingPartRE object) {
-        name = object.getRegistryName();
-        xSize = object.getxSize();
-        zSize = object.getzSize();
-        slices = object.getSlices();
-        if (object.getLocalPalette() != null) {
+    /**
+     * Builds a fully resolved part from its {@code extends} chain, root first.
+     * <p>
+     * Geometry - {@code slices}, {@code xsize} and {@code zsize} - comes from the last entry in the
+     * chain that declares it, each independently, which is what makes "the radio tower, repainted"
+     * a file holding nothing but an {@code extends} and a {@code refpalette}. Declaring
+     * {@code slices} replaces the inherited ones wholesale; declaring a size that contradicts the
+     * slices actually in force is a load error rather than a silent truncation.
+     */
+    public BuildingPart(List<BuildingPartRE> chainRootFirst) {
+        BuildingPartRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
+        name = leaf.getRegistryName();
+
+        Integer declaredXSize = null;
+        Integer declaredZSize = null;
+        String[] declaredSlices = null;
+        PaletteRE localPaletteRE = null;
+        String refPalette = null;
+        List<PartMeta> meta = new ArrayList<>();
+        for (BuildingPartRE re : chainRootFirst) {
+            if (re.getxSize() != null) {
+                declaredXSize = re.getxSize();
+            }
+            if (re.getzSize() != null) {
+                declaredZSize = re.getzSize();
+            }
+            if (re.getSlices() != null) {
+                declaredSlices = re.getSlices();
+            }
+            // refpalette and an inline palette are two ways to say the same thing, so the later
+            // entry's choice wins outright rather than layering onto the earlier one's.
+            if (re.getLocalPalette() != null) {
+                localPaletteRE = re.getLocalPalette();
+                refPalette = null;
+            } else if (re.getRefPaletteName() != null) {
+                refPalette = re.getRefPaletteName();
+                localPaletteRE = null;
+            }
+            if (re.getMetadata() != null) {
+                Mergeable.apply(meta, re.getMetadata());
+            }
+        }
+
+        if (declaredSlices == null) {
+            throw new IllegalStateException("Part '" + name + "' declares no slices, "
+                    + "and neither does anything it extends");
+        }
+        if (declaredXSize == null || declaredZSize == null) {
+            throw new IllegalStateException("Part '" + name + "' declares no "
+                    + (declaredXSize == null ? "xsize" : "zsize")
+                    + ", and neither does anything it extends");
+        }
+        xSize = declaredXSize;
+        zSize = declaredZSize;
+        checkGeometry(declaredSlices);
+        slices = declaredSlices;
+
+        if (localPaletteRE != null) {
             localPalette = new Palette("__local__" + name.getPath());
-            localPalette.parsePaletteArray(object.getLocalPalette()); // @todo get the full palette instead
-        } else if (object.getRefPaletteName() != null) {
-            refPaletteName = object.getRefPaletteName();
+            localPalette.parsePaletteArray(localPaletteRE); // @todo get the full palette instead
+        } else if (refPalette != null) {
+            refPaletteName = refPalette;
         }
         vslices = buildVslices();
-        if (object.getMetadata() != null) {
-            for (PartMeta meta : object.getMetadata()) {
-                String key = meta.key();
-                if (meta.i() != null) {
-                    metadata.put(key, meta.i());
-                } else if (meta.f() != null) {
-                    metadata.put(key, meta.f());
-                } else if (meta.bool() != null) {
-                    metadata.put(key, meta.bool());
-                } else if (meta.chr() != null) {
-                    metadata.put(key, meta.chr().charAt(0));
-                } else if (meta.str() != null) {
-                    metadata.put(key, meta.str());
-                }
+        for (PartMeta m : meta) {
+            String key = m.key();
+            if (m.i() != null) {
+                metadata.put(key, m.i());
+            } else if (m.f() != null) {
+                metadata.put(key, m.f());
+            } else if (m.bool() != null) {
+                metadata.put(key, m.bool());
+            } else if (m.chr() != null) {
+                metadata.put(key, m.chr().charAt(0));
+            } else if (m.str() != null) {
+                metadata.put(key, m.str());
+            }
+        }
+    }
+
+    /**
+     * Each level holds xSize*zSize characters. A mismatch means a declared size and the slices in
+     * force disagree - typically a child that redeclared one dimension while inheriting geometry.
+     */
+    private void checkGeometry(String[] declaredSlices) {
+        int perLevel = xSize * zSize;
+        for (int y = 0; y < declaredSlices.length; y++) {
+            int actual = declaredSlices[y].length();
+            if (actual != perLevel) {
+                String width = zSize > 0 && actual % zSize == 0
+                        ? (actual / zSize) + " wide"
+                        : actual + " characters over zsize " + zSize;
+                throw new IllegalStateException("Part '" + name + "' declares xsize " + xSize
+                        + " and zsize " + zSize + " but its slices are " + width
+                        + " (level " + y + " holds " + actual + " of " + perLevel + " characters)");
             }
         }
     }

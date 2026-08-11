@@ -4,6 +4,7 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.ConditionRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import org.apache.commons.lang3.tuple.Pair;
@@ -18,9 +19,17 @@ public class Condition {
 
     private final List<Pair<Predicate<ConditionContext>, Pair<Float, String>>> valueSelector = new ArrayList<>();
 
-    public Condition(ConditionRE object) {
-        name = object.getRegistryName();
-        for (ConditionPart cp : object.getValues()) {
+    /**
+     * Builds a fully resolved condition from its {@code extends} chain, root first: a declared
+     * {@code values} replaces the inherited list unless it opts into appending.
+     */
+    public Condition(List<ConditionRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<ConditionPart> values = new ArrayList<>();
+        for (ConditionRE object : chainRootFirst) {
+            Mergeable.apply(values, object.getValues());
+        }
+        for (ConditionPart cp : values) {
             float factor = cp.getFactor();
             String value = cp.getValue();
             Predicate<ConditionContext> test = ConditionContext.parseTest(cp);
