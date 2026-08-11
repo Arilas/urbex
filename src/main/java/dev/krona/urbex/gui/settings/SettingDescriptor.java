@@ -1,19 +1,19 @@
 package dev.krona.urbex.gui.settings;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 
 import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
- * Metadata describing a single editable {@link UrbexProfile} setting: which control renders it, its bounds,
+ * Metadata describing a single editable {@link Preset} setting: which control renders it, its bounds,
  * and how to read/write the backing field.
  *
  * <p><b>Direct field access, on purpose.</b> The {@link #getter} and {@link #setter} read and write the public
- * {@code UrbexProfile} field directly (e.g. {@code p -> p.CITY_CHANCE}) rather than routing through the
- * {@code Configuration} bridge. This is deliberate: it lets issue #75 part 2 delete {@code Configuration} without
- * having to touch this framework.</p>
+ * {@code Preset} field directly (e.g. {@code p -> p.CITY_CHANCE}) rather than routing through a config-file
+ * bridge class. This was deliberate: it let issue #75 part 2 delete the old {@code Configuration} bridge
+ * (Task 5) without having to touch this framework.</p>
  *
  * <p><b>Boxing convention.</b> Values crossing the getter/setter boundary are boxed consistently so the Task 5
  * control layer can coerce them uniformly:</p>
@@ -30,7 +30,7 @@ import java.util.function.Function;
  * only meaningful for {@link ControlKind#NUMBER} (whether the typed box accepts decimals); every other kind passes
  * {@code false}.</p>
  *
- * @param key         the backing {@code UrbexProfile} public field name; also the lang-key suffix
+ * @param key         the backing {@code Preset} public field name; also the lang-key suffix
  *                    ({@code urbex.setting.<key>} and {@code urbex.setting.<key>.tooltip}).
  * @param category    the tab this descriptor lives under; each field is described by exactly one descriptor
  *                    (no duplicates), so a curated few carry {@link SettingCategory#GENERAL} as their real home.
@@ -39,8 +39,8 @@ import java.util.function.Function;
  *                    first setting of each section; sections appear in first-seen (declaration) order. Also the
  *                    lang-key suffix ({@code urbex.section.<category>.<section>} and {@code ….desc}).
  * @param kind        the control to render.
- * @param min         slider lower bound (mined from the {@code UrbexProfile.init} min argument).
- * @param max         slider upper bound (mined from the {@code UrbexProfile.init} max argument).
+ * @param min         slider lower bound (mined from the {@code Preset.init} min argument).
+ * @param max         slider upper bound (mined from the {@code Preset.init} max argument).
  * @param step        slider increment.
  * @param logScale    {@code true} for logarithmic sliders (the chance fields); requires {@code min > 0}.
  * @param integerOnly {@code true} for a {@link ControlKind#NUMBER} descriptor backing an {@code int} field, so the
@@ -58,8 +58,8 @@ public record SettingDescriptor(
         double step,
         boolean logScale,
         boolean integerOnly,
-        Function<UrbexProfile, Object> getter,
-        BiConsumer<UrbexProfile, Object> setter
+        Function<Preset, Object> getter,
+        BiConsumer<Preset, Object> setter
 ) {
     /** Lang key for this setting's display name. */
     public String nameKey() {

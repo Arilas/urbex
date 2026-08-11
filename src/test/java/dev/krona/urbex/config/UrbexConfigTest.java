@@ -17,18 +17,18 @@ public class UrbexConfigTest {
         UrbexConfig cfg = UrbexConfig.fromJson(new JsonObject()).orElseThrow();
         assertEquals(UrbexConfig.DEFAULT, cfg);
         assertEquals(3, cfg.heightSampleSize());
-        assertEquals("", cfg.selectedProfile());
+        assertEquals("", cfg.selectedPreset());
         assertTrue(cfg.avoidVillages());
         assertFalse(cfg.structuresYieldToCities());
-        assertEquals(List.of(), cfg.dimensionsWithProfiles());
+        assertEquals(List.of(), cfg.dimensionsWithPresets());
     }
 
     @Test
     public void jsonFieldsOverrideDefaults() {
         JsonObject json = JsonParser.parseString(
-                "{\"selectedProfile\": \"rare\", \"cacheCleanupSeconds\": 60}").getAsJsonObject();
+                "{\"selectedPreset\": \"rare\", \"cacheCleanupSeconds\": 60}").getAsJsonObject();
         UrbexConfig cfg = UrbexConfig.fromJson(json).orElseThrow();
-        assertEquals("rare", cfg.selectedProfile());
+        assertEquals("rare", cfg.selectedPreset());
         assertEquals(60, cfg.cacheCleanupSeconds());
         assertEquals(20, cfg.todoQueueSize());   // untouched fields keep defaults
     }
@@ -42,12 +42,12 @@ public class UrbexConfigTest {
     @Test
     public void mergeLetsOverlayWinPerKey() {
         JsonObject base = JsonParser.parseString(
-                "{\"selectedProfile\": \"default\", \"todoQueueSize\": 50}").getAsJsonObject();
+                "{\"selectedPreset\": \"default\", \"todoQueueSize\": 50}").getAsJsonObject();
         JsonObject overlay = JsonParser.parseString(
-                "{\"selectedProfile\": \"cavern\"}").getAsJsonObject();
+                "{\"selectedPreset\": \"cavern\"}").getAsJsonObject();
         JsonObject merged = UrbexConfig.merge(base, overlay);
         UrbexConfig cfg = UrbexConfig.fromJson(merged).orElseThrow();
-        assertEquals("cavern", cfg.selectedProfile());   // overlay wins
+        assertEquals("cavern", cfg.selectedPreset());   // overlay wins
         assertEquals(50, cfg.todoQueueSize());              // base survives where overlay is silent
     }
 

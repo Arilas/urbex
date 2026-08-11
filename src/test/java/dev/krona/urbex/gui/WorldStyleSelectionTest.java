@@ -1,11 +1,10 @@
 package dev.krona.urbex.gui;
 
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import dev.krona.urbex.config.ProfileSetup;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.Config;
 import net.minecraft.SharedConstants;
+import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -18,11 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * worldStyle is orthogonal to the chosen preset (spec 1a): a player picks a preset and then freely
- * switches worldStyle without editing or cloning a profile. The enumeration of registered styles
- * needs a live datapack registry that can't be built headless, so the state under test takes the
- * available style ids injected via {@link PresetSelection#setAvailableWorldStyles(List)} - exactly
- * what the Cities tab feeds it from the real registry. Everything else here is pure state.
+ * worldStyle is orthogonal to the chosen preset (spec 1a): since Task 4 a {@link Preset} carries no
+ * worldStyle field of its own at all, so switching styles never edits or clones a preset - it is
+ * simply its own value published alongside {@code Config.presetFromClient}. The enumeration of
+ * registered styles needs a live datapack registry that can't be built headless, so the state under
+ * test takes the available style ids injected via {@link PresetSelection#setAvailableWorldStyles(List)} -
+ * exactly what the Cities tab feeds it from the real registry. Everything else here is pure state.
  */
 class WorldStyleSelectionTest {
 
@@ -33,58 +33,21 @@ class WorldStyleSelectionTest {
     }
 
     @BeforeEach
-    void seedProfiles() {
-        ProfileSetup.STANDARD_PROFILES.clear();
-        ProfileSetup.USER_PROFILES.clear();
-        ProfileSetup.PROFILE_BASED_ON.clear();
-        // Fresh profiles default their worldStyle to "standard".
-        ProfileSetup.STANDARD_PROFILES.put("default", new UrbexProfile("default", true));
-        ProfileSetup.STANDARD_PROFILES.put("alpha", new UrbexProfile("alpha", true));
+    void resetConfig() {
         Config.reset();
     }
 
     @AfterEach
-    void clearProfiles() {
-        ProfileSetup.STANDARD_PROFILES.clear();
-        ProfileSetup.USER_PROFILES.clear();
-        ProfileSetup.PROFILE_BASED_ON.clear();
+    void clearConfig() {
         Config.reset();
     }
 
-    private static String worldStyleOf(String json) {
-        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        return root.getAsJsonObject(UrbexProfile.CATEGORY_CITY_ID).get("worldStyle").getAsString();
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath("urbex", path);
     }
 
-    @Test
-    void choosingANonDefaultStylePublishesACustomizedProfileCarryingIt() {
-        PresetSelection selection = new PresetSelection();
-        selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
-        selection.select("default");
-
-        selection.setWorldStyle("lcmt");
-        selection.publish();
-
-        // A worldStyle override reaches the server exactly like an editor customization: the
-        // reconstructable "customized" name plus a full JSON that carries the chosen style.
-        assertEquals(PresetSelection.CUSTOM_ID, Config.profileFromClient);
-        assertEquals("lcmt", worldStyleOf(Config.jsonFromClient));
-    }
-
-    @Test
-    void settingTheStyleBackToThePresetOwnClearsTheOverride() {
-        PresetSelection selection = new PresetSelection();
-        selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
-        selection.select("default");
-        selection.setWorldStyle("lcmt");
-        selection.publish();
-
-        // The preset "default" owns the "standard" style, so choosing it back is no override.
-        selection.setWorldStyle("standard");
-        selection.publish();
-
-        assertEquals("default", Config.profileFromClient);
-        assertNull(Config.jsonFromClient);
+    private static PresetSelection.Entry entry(String path) {
+        return new PresetSelection.Entry(id(path), Component.literal(path), new Preset(id(path)));
     }
 
     @Test
@@ -96,49 +59,55 @@ class WorldStyleSelectionTest {
     }
 
     @Test
-    void customizingWithAnActiveOverrideBakesItIntoTheEditorCopyAndTheSavedJson() {
+    void withNoOverrideTheEffectiveStyleIsTheDefault() {
         PresetSelection selection = new PresetSelection();
         selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
-        selection.select("default");
-        selection.setWorldStyle("lcmt");
 
-        // What CitiesTab hands the editor: the effective style (the override), not the preset's own.
-        UrbexProfile base = ProfileSetup.STANDARD_PROFILES.get("default");
-        UrbexProfile editorCopy = CustomizeScreen.editorCopy(base, "default", selection.effectiveWorldStyle());
-        assertEquals("lcmt", editorCopy.getWorldStyle());
-
-        // Save-as writes saved.copyFrom(copy).toJson(): the override must survive to disk, not silently
-        // revert to the preset's own "standard".
-        UrbexProfile saved = new UrbexProfile("my_default", false);
-        saved.copyFrom(editorCopy);
-        assertEquals("lcmt", worldStyleOf(saved.toJson(false).toString()));
+        assertEquals("standard", selection.effectiveWorldStyle());
+        assertNull(selection.selectedWorldStyle());
     }
 
     @Test
-    void customizingWithNoOverrideKeepsThePresetOwnStyle() {
+    void choosingAStyleMakesItTheEffectiveOneAndPublishesItVerbatim() {
         PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("default")));
+        selection.select(id("default"));
         selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
-        selection.select("default");
 
-        UrbexProfile base = ProfileSetup.STANDARD_PROFILES.get("default");
-        UrbexProfile editorCopy = CustomizeScreen.editorCopy(base, "default", selection.effectiveWorldStyle());
+        selection.setWorldStyle("lcmt");
 
-        assertEquals("standard", editorCopy.getWorldStyle());
+        assertEquals("lcmt", selection.effectiveWorldStyle());
+
+        selection.publish();
+        // A worldStyle choice publishes as its own Config field - no preset customization involved.
+        assertEquals(id("default"), Config.presetFromClient);
+        assertEquals(id("lcmt"), Config.worldStyleFromClient);
+        assertNull(Config.overridesFromClient);
     }
 
     @Test
-    void selectingADifferentPresetKeepsAValidStyleButDropsAnInvalidOne() {
+    void switchingPresetKeepsAStillValidChosenStyle() {
         PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("default"), entry("alpha")));
+        selection.select(id("default"));
         selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
-        selection.select("default");
         selection.setWorldStyle("lcmt");
 
-        // "lcmt" is still a registered style, so switching preset keeps the chosen style.
-        selection.select("alpha");
+        selection.select(id("alpha"));
+
+        assertEquals("lcmt", selection.selectedWorldStyle(), "the preset and the style are independent choices");
+    }
+
+    @Test
+    void aRegistryThatDropsTheChosenStyleClearsTheOverride() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
+        selection.setWorldStyle("lcmt");
         assertEquals("lcmt", selection.selectedWorldStyle());
 
-        // Now the registry no longer offers "lcmt": the stale choice must reset to "the preset's own".
+        // The registry no longer offers "lcmt": the stale choice must reset to "the default".
         selection.setAvailableWorldStyles(List.of("standard"));
+
         assertNull(selection.selectedWorldStyle());
     }
 }

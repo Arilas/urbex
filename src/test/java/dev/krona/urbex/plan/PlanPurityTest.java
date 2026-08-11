@@ -27,8 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * package exists to guarantee quietly stopped holding.
  *
  * <p>A straight import-line scan needs no special case for the module's one documented reach
- * towards Minecraft-adjacent code: {@link dev.krona.urbex.plan.grid.GridSettings#fromProfile} takes
- * a {@code dev.krona.urbex.config.UrbexProfile} parameter, but writes that type fully-qualified in
+ * towards Minecraft-adjacent code: {@link dev.krona.urbex.plan.grid.GridSettings#fromPreset} takes
+ * a {@code dev.krona.urbex.config.Preset} parameter, but writes that type fully-qualified in
  * the method signature rather than importing it, specifically so a scan like this one has nothing to
  * exclude. There is deliberately no allowlist below - if that ever stops being true, this test is
  * supposed to fail, not learn to ignore the new import.

@@ -43,7 +43,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
         if (dimInfo != null) {
             ChunkCoord coord = new ChunkCoord(dimInfo.getType(), position.getX() >> 4, position.getZ() >> 4);
             BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
-            System.out.println("profile = " + info.profile.getName());
+            System.out.println("profile = " + info.profile.getId());
 //            System.out.println("provider.hasMansion = " + info.provider.hasMansion(info.chunkX, info.chunkZ));
             System.out.println("buildingType = " + info.buildingType.getName());
             System.out.println("floors = " + info.getNumFloors());

@@ -123,7 +123,7 @@ loom {
 }
 
 // A fresh, fully pinned dedicated-server environment for every digest run: fixed seed, default
-// (noise) world type, the 'default' urbex profile on the overworld, and no watchdog. The watchdog
+// (noise) world type, the 'urbex:default' preset on the overworld, and no watchdog. The watchdog
 // is off because DigestRunner drives its whole chunk square from the server thread in one blocking
 // loop, holding that thread far past max-tick-time; the generation itself still fans out to the
 // worker pool, so this is not a serial baseline. Shared by every digest run config, each against
@@ -146,7 +146,7 @@ motd=urbex digest check
 '''
             def cfgDir = new File(dir, 'world/serverconfig')
             cfgDir.mkdirs()
-            new File(cfgDir, 'urbex.json').text = '{ "selectedProfile": "default" }\n'
+            new File(cfgDir, 'urbex.json').text = '{ "selectedPreset": "urbex:default" }\n'
         }
     }
 }
@@ -171,6 +171,9 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:5.11.4')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // Validates docs/schema/preset.schema.json (draft 2020-12) against the shipped presets and
+    // guards it against drifting from the section codecs' KEYS constants; see PresetSchemaTest.
+    testImplementation 'com.networknt:json-schema-validator:1.5.6'
 }
 
 test {

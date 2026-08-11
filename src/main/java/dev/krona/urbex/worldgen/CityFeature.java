@@ -1,11 +1,15 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.UrbexProfile;
-import dev.krona.urbex.config.ProfileSetup;
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.setup.PresetChoice;
 import dev.krona.urbex.setup.ServerEventHandlers;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.WorldGenRegion;
@@ -81,8 +85,8 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         try {
             feature.generate(region, chunk);
         } catch (Exception e) {
-            Urbex.getLogger().error("Error generating chunk {},{} (profile={}, dimension={})",
-                    chunkX, chunkZ, diminfo.getProfile().getName(), diminfo.getType().identifier(), e);
+            Urbex.getLogger().error("Error generating chunk {},{} (preset={}, dimension={})",
+                    chunkX, chunkZ, diminfo.getProfile().getId(), diminfo.getType().identifier(), e);
             ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
             ErrorLogger.report("There was an error generating a chunk. See log for details!");
         }
@@ -100,19 +104,32 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         if (known != null) {
             return known;
         }
-        String profileName = Config.getProfileForDimension(world.getLevel(), type);
-        if (profileName != null) {
-            UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
-            if (profile == null) {
-                return null;
-            }
-            // Built outside the map. Two threads may both build one for the same dimension the
-            // first time a chunk is generated - the loser's is simply dropped, caches and all.
-            IDimensionInfo diminfo = new DefaultDimensionInfo(world, profile);
-            IDimensionInfo raced = dimensionInfo.putIfAbsent(type, diminfo);
-            return raced != null ? raced : diminfo;
+        PresetChoice choice = Config.getPresetChoiceForDimension(world.getLevel(), type);
+        if (choice == null) {
+            return null;
         }
-        return null;
+        Preset preset = Presets.resolve(world.registryAccess(), choice.preset());
+        if (choice.overridesJson().isPresent()) {
+            // Fail-soft, unlike the preset id resolution above: the overrides JSON is either a
+            // client-published payload PresetSelection.publish() encoded itself (trustworthy), or
+            // saved data read back from disk - a corrupted/hand-edited save file must not crash
+            // chunk generation. PresetSelection.restore() already validates before publishing, so
+            // this guard is a backstop against corrupted saved data reaching this far, not the
+            // primary defense.
+            try {
+                PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE,
+                        JsonParser.parseString(choice.overridesJson().get())).getOrThrow();
+                preset = Presets.applyOverrides(preset, re);
+            } catch (Exception e) {
+                Urbex.getLogger().error("Malformed Urbex preset overrides for dimension '{}'; " +
+                        "generating with the un-overridden preset '{}'.", type.identifier(), choice.preset(), e);
+            }
+        }
+        // Built outside the map. Two threads may both build one for the same dimension the
+        // first time a chunk is generated - the loser's is simply dropped, caches and all.
+        IDimensionInfo diminfo = new DefaultDimensionInfo(world, preset, choice.worldStyle());
+        IDimensionInfo raced = dimensionInfo.putIfAbsent(type, diminfo);
+        return raced != null ? raced : diminfo;
     }
 
     public void cleanUp() {

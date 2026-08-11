@@ -1,0 +1,10 @@
+{
+  "parent": "urbex:default",
+  "description": "Cities are rare",
+  "icon": "textures/gui/icon_rarecities.png",
+  "cities": { "cityChance": 0.001 },
+  "destruction": { "ruinChance": 0.0 },
+  "highways": { "highwayRequiresTwoCities": false },
+  "railways": { "railwaysCanEnd": true },
+  "decoration": { "lightingDensity": 0.15 }
+}

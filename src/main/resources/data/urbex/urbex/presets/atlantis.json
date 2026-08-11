@@ -1,0 +1,15 @@
+{
+  "parent": "urbex:default",
+  "description": "Drowned cities, raised waterlevel (to 89)",
+  "warning": "Preferably use this in combination with the Lost Worlds 'atlantis' world type",
+  "icon": "textures/gui/icon_atlantis.png",
+  "terrain": {
+    "seaLevel": 89
+  },
+  "destruction": {
+    "ruinChance": 0.1
+  },
+  "decoration": {
+    "lightingDensity": 0.15
+  }
+}

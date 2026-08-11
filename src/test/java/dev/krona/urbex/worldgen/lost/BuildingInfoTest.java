@@ -1,12 +1,13 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LandscapeType;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import net.minecraft.SharedConstants;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.BeforeAll;
@@ -35,7 +36,7 @@ class BuildingInfoTest {
 
     @Test
     void effectiveRoadTypeIsNoneForANonCityChunkWithoutConsultingTheRoadField() {
-        UrbexProfile profile = new UrbexProfile("test-void", false);
+        Preset profile = new Preset(Identifier.fromNamespaceAndPath("urbex", "test-void"));
         profile.LANDSCAPE_TYPE = LandscapeType.FLOATING;
         ChunkCoord coord = new ChunkCoord(Level.OVERWORLD, 3, 4);
         ChunkHeightmap groundLevelZero = new ChunkHeightmap(LandscapeType.FLOATING, 0);

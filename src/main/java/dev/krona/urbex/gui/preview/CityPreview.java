@@ -1,8 +1,10 @@
 package dev.krona.urbex.gui.preview;
 
+import com.google.gson.JsonElement;
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.gui.NullDimensionInfo;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
@@ -12,12 +14,15 @@ import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
+import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.levelgen.WorldOptions;
 
 import javax.annotation.Nullable;
@@ -115,20 +120,33 @@ public class CityPreview implements AutoCloseable {
     }
 
     /**
-     * Recomputes the preview iff (profile JSON, worldStyle, seed, mode) differs from the last call.
-     * {@code profile == null} clears whatever is showing (nothing selected yet).
+     * Recomputes the preview iff (preset content, worldStyle, seed, mode) differs from the last call.
+     * {@code preset == null} clears whatever is showing (nothing selected yet). {@code worldStyle} is
+     * a bare or {@code namespace:path} style id (the Cities tab / Customize editor's own convention),
+     * resolved against the registry the preview was built with.
      */
-    public void update(@Nullable UrbexProfile profile, String worldStyle, long seed, Mode mode) {
-        if (profile == null) {
+    public void update(@Nullable Preset preset, String worldStyle, long seed, Mode mode) {
+        if (preset == null) {
             key = null;
             closeTexture();
             return;
         }
-        int profileJsonHash = profile.toJson(false).toString().hashCode();
-        if (!needsRecompute(profileJsonHash, worldStyle, seed, mode)) {
+        if (!needsRecompute(presetHash(preset), worldStyle, seed, mode)) {
             return;
         }
-        recompute(profile, seed, mode);
+        recompute(preset, worldStyle, seed, mode);
+    }
+
+    /**
+     * A content hash of every field {@link Preset#toRE()} would encode, used as the cache key's
+     * stand-in for "did the preset actually change" (the Customize editor mutates one {@link Preset}
+     * instance in place, so identity alone can't tell). {@code toRE()}/the {@code PresetRE} codec are
+     * pure value encoding - no registry lookups - so this needs no {@link RegistryAccess}.
+     */
+    private static int presetHash(Preset preset) {
+        PresetRE re = preset.toRE();
+        JsonElement json = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+        return json.toString().hashCode();
     }
 
     /**
@@ -200,41 +218,43 @@ public class CityPreview implements AutoCloseable {
         key = null;
     }
 
-    private void recompute(UrbexProfile profile, long seed, Mode mode) {
+    private void recompute(Preset preset, String worldStyle, long seed, Mode mode) {
         // The datapack-derived predefined-city/street maps are static (shared with real worldgen)
-        // and keyed only by chunk coord, not by profile - drop them so a new profile/seed combo
-        // doesn't see another profile's predefined content. Mirrors the old editor's preview
+        // and keyed only by chunk coord, not by preset - drop them so a new preset/seed combo
+        // doesn't see another preset's predefined content. Mirrors the old editor's preview
         // refresh.
         City.cleanPredefinedCache();
 
+        Identifier worldStyleId = DataTools.fromName(worldStyle);
+
         // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
-        // the profile, so it does not pay to build one there - and this construction is the only site
-        // in this method that can throw: GridSettings.fromProfile validates the road settings, and a
-        // profile can be momentarily self-contradictory. The road settings come in min/max pairs held
+        // the preset, so it does not pay to build one there - and this construction is the only site
+        // in this method that can throw: GridSettings.fromPreset validates the road settings, and a
+        // preset can be momentarily self-contradictory. The road settings come in min/max pairs held
         // by two independent sliders, so dragging a minimum up necessarily passes through states where
         // it exceeds its maximum. GridSettings refuses those, correctly - a world must never be
         // generated from numbers nobody wrote - but the editor is where the player is still writing
         // them, and taking the screen down mid-drag is no way to say so. Keep showing the last good
-        // preview until the profile makes sense again; a profile still inconsistent at world creation
+        // preview until the preset makes sense again; a preset still inconsistent at world creation
         // fails there, with the field named. The catch is narrowed to just this construction so a bug
-        // in a renderer's own math is never silently swallowed as "the profile is invalid".
+        // in a renderer's own math is never silently swallowed as "the preset is invalid".
         NullDimensionInfo diminfo = null;
         if (mode != Mode.CITY) {
             try {
-                diminfo = new NullDimensionInfo(profile, seed, registryAccess);
+                diminfo = new NullDimensionInfo(preset, worldStyleId, seed, registryAccess);
             } catch (IllegalArgumentException e) {
                 // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
                 // good render. Leaving `mode` alone too keeps the legend describing the image actually
                 // on screen.
-                Urbex.LOGGER.debug("Preview not recomputed - profile is not currently valid: {}", e.getMessage());
+                Urbex.LOGGER.debug("Preview not recomputed - preset is not currently valid: {}", e.getMessage());
                 return;
             }
         }
         switch (mode) {
             case MAP -> renderMap(diminfo);
-            case TRANSPORT -> renderTransport(diminfo, profile);
-            case ROADS -> renderRoads(diminfo, profile);
-            case CITY -> renderCity(profile, seed);
+            case TRANSPORT -> renderTransport(diminfo, preset);
+            case ROADS -> renderRoads(diminfo, preset);
+            case CITY -> renderCity(preset, seed);
         }
         this.mode = mode;
         uploadTexture();
@@ -275,7 +295,7 @@ public class CityPreview implements AutoCloseable {
      * old {@code renderPreviewTransports} did with its {@code soft} base), with rail and highway
      * chunks blended over. Highway-over-rail is a distinct grey so an interchange is visible.
      */
-    private void renderTransport(NullDimensionInfo diminfo, UrbexProfile profile) {
+    private void renderTransport(NullDimensionInfo diminfo, Preset profile) {
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));
@@ -324,7 +344,7 @@ public class CityPreview implements AutoCloseable {
      * building footprints only, not a random fraction of the whole grid), not a defect masquerading
      * as a guarantee.
      */
-    private void renderRoads(NullDimensionInfo diminfo, UrbexProfile profile) {
+    private void renderRoads(NullDimensionInfo diminfo, Preset profile) {
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));
@@ -362,7 +382,7 @@ public class CityPreview implements AutoCloseable {
      * 150-pixel canvas into the {@link #WIDTH}x{@link #HEIGHT} texture buffer, so the proportions match
      * the original at a smaller size.
      */
-    private void renderCity(UrbexProfile profile, long seed) {
+    private void renderCity(Preset profile, long seed) {
         final int base = 44;      // ground line (of HEIGHT = 58): ~0.8 down, as the old base/150 was
         final int dimHor = 4;     // column pitch (old 10 of 150 -> 4 of 62)
         final int dimVer = 2;     // floor/cellar pitch (old 4 of 150 -> 2 of 58)

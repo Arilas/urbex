@@ -1,0 +1,15 @@
+{
+  "parent": "urbex:default",
+  "description": "Like default but no explosion damage",
+  "extraDescription": "Ruins and rubble are disabled and ravines are disabled in cities",
+  "icon": "textures/gui/icon_nodamage.png",
+  "destruction": {
+    "explosionChance": 0,
+    "miniExplosionChance": 0,
+    "ruinChance": 0,
+    "rubbleLayer": false
+  },
+  "decoration": {
+    "lightingDensity": 0.15
+  }
+}

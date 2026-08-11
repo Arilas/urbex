@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.DensitySelector;
 import net.minecraft.core.BlockPos;
 
@@ -10,11 +10,11 @@ final class SpecialMarkerPolicy {
     private SpecialMarkerPolicy() {
     }
 
-    static boolean populateLoot(long seed, BlockPos marker, UrbexProfile profile) {
+    static boolean populateLoot(long seed, BlockPos marker, Preset profile) {
         return DensitySelector.loot(seed, marker, profile.LOOT_DENSITY);
     }
 
-    static boolean generateSpawner(UrbexProfile profile) {
+    static boolean generateSpawner(Preset profile) {
         return profile.GENERATE_SPAWNERS;
     }
 }

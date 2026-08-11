@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
@@ -55,7 +55,7 @@ public interface IDimensionInfo {
 
     ResourceKey<Level> getType();
 
-    UrbexProfile getProfile();
+    Preset getProfile();
 
     WorldStyle getWorldStyle();
 

@@ -1,0 +1,39 @@
+{
+  "parent": "urbex:default",
+  "description": "This profile is meant for a cavern type world. There are lights in the building but the outside is very dark.",
+  "extraDescription": "This is very hard. It's recommended you enable a bonus chest!",
+  "warning": "Use this in combination with the Lost Worlds 'caves' world type",
+  "icon": "textures/gui/icon_cavern.png",
+  "terrain": {
+    "landscapeType": "cavern",
+    "groundLevel": 40,
+    "seaLevel": 32
+  },
+  "atmosphere": {
+    "horizon": 128,
+    "fogRed": 0,
+    "fogGreen": 0,
+    "fogBlue": 0,
+    "fogDensity": 0.02
+  },
+  "destruction": {
+    "explosionChance": 0,
+    "miniExplosionChance": 0
+  },
+  "railways": {
+    "railwaysEnabled": false
+  },
+  "cities": {
+    "cityLevel0Height": 44,
+    "cityLevel1Height": 52,
+    "cityLevel2Height": 60,
+    "cityLevel3Height": 68,
+    "cityLevel4Height": 76,
+    "cityLevel5Height": 82,
+    "cityLevel6Height": 90,
+    "cityLevel7Height": 98
+  },
+  "decoration": {
+    "lightingDensity": 0.65
+  }
+}

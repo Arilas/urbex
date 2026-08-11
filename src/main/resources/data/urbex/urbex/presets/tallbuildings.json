@@ -1,0 +1,26 @@
+{
+  "parent": "urbex:default",
+  "description": "Very tall buildings (performance heavy)",
+  "icon": "textures/gui/icon_tallbuildings.png",
+  "buildings": {
+    "buildingMinFloors": 4,
+    "buildingMinFloorsChance": 8,
+    "buildingMaxFloorsChance": 15,
+    "buildingMaxFloors": 19
+  },
+  "destruction": {
+    "debrisToNearbyChunkFactor": 175,
+    "explosionChance": 0.006,
+    "explosionMaxHeight": 256,
+    "explosionMaxRadius": 60,
+    "explosionMinHeight": 130,
+    "miniExplosionChance": 0.09,
+    "miniExplosionMaxHeight": 256,
+    "miniExplosionMaxRadius": 14,
+    "miniExplosionMinRadius": 3,
+    "ruinChance": 0.01
+  },
+  "decoration": {
+    "lightingDensity": 0.15
+  }
+}

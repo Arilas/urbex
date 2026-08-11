@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+- **Presets are now datapack-driven.** The old `UrbexProfile`/`Configuration` machinery, its
+  `config/urbex/profiles/*.json` files, and the legacy key migrations (`generateLighting`,
+  `generateLoot`, `buildingWithoutLootChance`, `chestWithoutLootChance`, `basedOn`) are gone with
+  no replacement parser. Presets are now a thirteenth dynamic registry (`urbex:presets`, registry
+  path `urbex/presets`) contributed at `data/<namespace>/urbex/presets/<name>.json`; the 12
+  built-ins ship in the mod's bundled datapack and resolve through an optional `parent` chain, so a
+  preset file only needs to state what differs from its parent. This is a clean, unsupported break:
+  no released Urbex worlds exist to protect, there is no migration for saved data that references
+  the old format, and old worlds/configs are not read — testers should recreate worlds rather than
+  reuse existing ones. This closes [#112](https://github.com/Arilas/urbex/issues/112): the stale
+  `config/urbex/profiles/` file the issue was tracking can no longer exist, because nothing under
+  `config/urbex/` is profile-shaped anymore. Confirmed by wiping `runs/digestcheck` and
+  `runs/digestcheckfeatures` and regenerating both digest goldens from clean run directories — the
+  only Urbex-owned files either run creates are `config/urbex/urbex.json` (empty `{}`) and
+  `world/serverconfig/urbex.json` (`{ "selectedPreset": "urbex:default" }`); no `profiles/`
+  directory or file appears anywhere under either run.
+- **`useAvgHeightmap` now defaults to `true`.** Previously the code default was `false`, so terrain
+  smoothing only applied where a profile explicitly opted in; every shipped preset now inherits the
+  smoothed default unless a datapack opts out, and `urbex savepreset` on an unmodified preset shows
+  `useAvgHeightmap: true`. The mod-config gate (`heightSampleSize > 2`, default 3) is unchanged.
+- **Lighting density no longer silently resolves to zero.** Every shipped preset now carries an
+  explicit, non-zero `decoration.lightingDensity` (values in the 0.05–1.0 range, zero only where a
+  preset deliberately wants darkness), closing a gap where a preset that never set the field could
+  end up dark with no lights placed via `CityGenerator.handleLightMarker` and no indication why.
+- **New `urbex savepreset` command** writes the fully resolved preset (after walking the `parent`
+  chain and applying any Customize-screen overrides) to disk as plain JSON, for inspecting or
+  sharing exactly what a world is running.
+- **Worldgen digests regenerated.** Both defaults changes above shift worldgen output, so
+  `digest.golden` and `digest-features.golden` are regenerated against the new defaults. As always,
+  the mod makes no promise that an existing world regenerates identically after an update.
 - **Removed city spheres and their supporting system.** The `space`, `spheres`, and `cavernspheres`
   landscape types and the `space`, `biosphere`, and `biosphere_caves` presets are removed, along
   with predefined spheres, sphere profile settings, sphere asset fields, and sphere spawn targeting.

@@ -1,0 +1,40 @@
+{
+  "parent": "urbex:default",
+  "description": "Cities on floating islands",
+  "extraDescription": "Note! No mineshafts or strongholds in this profile!",
+  "warning": "Preferably use this in combination with the Lost Worlds 'islands' world type",
+  "icon": "textures/gui/icon_floating.png",
+  "terrain": {
+    "landscapeType": "floating",
+    "groundLevel": 50
+  },
+  "cities": {
+    "cityChance": 0.03,
+    "cityLevel0Height": 50,
+    "cityLevel1Height": 56,
+    "cityLevel2Height": 62,
+    "cityLevel3Height": 68,
+    "cityLevel4Height": 76,
+    "cityLevel5Height": 84,
+    "cityLevel6Height": 92,
+    "cityLevel7Height": 100
+  },
+  "atmosphere": {
+    "horizon": 0
+  },
+  "highways": {
+    "highwaySupports": false,
+    "highwayDistanceMask": 15
+  },
+  "buildings": {
+    "buildingMaxCellars": 1
+  },
+  "railways": {
+    "railwaysCanEnd": true,
+    "railwaysEnabled": false,
+    "railwayStationsEnabled": false
+  },
+  "decoration": {
+    "lightingDensity": 0.15
+  }
+}

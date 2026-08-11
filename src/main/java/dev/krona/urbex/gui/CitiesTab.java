@@ -1,10 +1,12 @@
 package dev.krona.urbex.gui;
 
-import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.gui.preview.CityPreview;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -138,11 +140,13 @@ public class CitiesTab extends GridLayoutTab {
         this.preview = newPreview(previewRegistries(screen));
         this.previewSeedFallback = random.nextLong();
 
-        // The registered worldStyles come from the datapacks enabled for the world being created,
-        // read straight off the load context's registry - the state layer only needs the id list, so
-        // the tab injects it rather than have PresetSelection reach into a registry it can't see.
+        // The registered worldStyles and presets both come from the datapacks enabled for the world
+        // being created, read straight off the load context's registry - the state layer only needs
+        // the enumerated lists, so the tab injects them rather than have PresetSelection reach into a
+        // registry it can't see.
         List<String> worldStyles = registeredWorldStyles(screen);
         PresetSelection.CLIENT.setAvailableWorldStyles(worldStyles);
+        PresetSelection.CLIENT.setAvailablePresets(registeredPresets(screen));
 
         Font font = Minecraft.getInstance().font;
 
@@ -271,20 +275,13 @@ public class CitiesTab extends GridLayoutTab {
     private void openCustomizeEditor() {
         requestReopenOnCitiesTab();
         PresetSelection.Entry entry = PresetSelection.CLIENT.selected();
-        UrbexProfile profile = entry.profile().orElse(null);
-        if (profile == null) {
-            // The "disabled" entry has no profile to customize; its button is inactive anyway.
+        Preset preset = entry.preset();
+        if (preset == null) {
+            // The "disabled" entry has no preset to customize; its button is inactive anyway.
             forgetReopenOnCitiesTab();
             return;
         }
-        // A custom entry records where it started from in basedOn; a public preset is its own base.
-        String customizeBaseName = entry.custom() ? entry.basedOn() : entry.id();
-        // Hand the editor the effective worldStyle (the chosen override if any, else the preset's
-        // own), so its preview equals the outcome and Save-as bakes the switched style, not the
-        // preset's default (spec 1a - otherwise the override is silently lost).
-        String effectiveWorldStyle = PresetSelection.CLIENT.effectiveWorldStyle();
-        Minecraft.getInstance().gui.setScreen(
-                new CustomizeScreen(screen, profile, customizeBaseName, effectiveWorldStyle));
+        Minecraft.getInstance().gui.setScreen(new CustomizeScreen(screen, preset));
     }
 
     /** Repopulates the detail panel from whatever {@link PresetSelection#CLIENT} currently holds. */
@@ -329,9 +326,10 @@ public class CitiesTab extends GridLayoutTab {
 
     /**
      * Applies a worldStyle the player picked from the dropdown: records it and republishes so the
-     * server sees the switched style (as an editor-style customization when it differs from the
-     * preset's own). The preview reads {@code effectiveWorldStyle()} on its render pass, so it
-     * follows on its own; the selector's own size is unchanged, so no relayout is needed.
+     * server sees the switched style - its own {@code Config.worldStyleFromClient} value, orthogonal
+     * to whatever preset is selected (spec 1a). The preview reads {@code effectiveWorldStyle()} on its
+     * render pass, so it follows on its own; the selector's own size is unchanged, so no relayout is
+     * needed.
      */
     private void onWorldStyleChanged(String style) {
         PresetSelection.CLIENT.setWorldStyle(style);
@@ -370,16 +368,41 @@ public class CitiesTab extends GridLayoutTab {
     }
 
     /**
-     * The name a profile's {@code worldStyle} field stores for a registry key: the bare path for the
-     * mod's own namespace (so {@code urbex:standard} matches the profile default {@code "standard"}),
-     * {@code namespace:path} for any other datapack. Mirrors the old editor's client-side worldstyle
-     * naming, minus the file-path stripping that a registry key doesn't carry.
+     * The name a worldStyle registry key is shown/published as: the bare path for the mod's own
+     * namespace (so {@code urbex:standard} shows as {@code "standard"}), {@code namespace:path} for
+     * any other datapack. Same convention {@link DataTools#toName}/{@code DataTools#fromName} use for
+     * presets, kept separate only because the registry key type differs.
      */
     private static String worldStyleName(Identifier key) {
-        if (Urbex.MODID.equals(key.getNamespace())) {
-            return key.getPath();
+        return DataTools.toName(key);
+    }
+
+    /**
+     * The browsable presets registered for the world being created, resolved (parent chains flattened)
+     * against the same load-context {@code RegistryAccess} {@link #registeredWorldStyles} reads -
+     * {@code urbex:default} first, then alphabetical (per {@code Presets.listBrowsable}). Empty when
+     * the registry isn't reachable yet, exactly like {@link #registeredWorldStyles}.
+     * <p>
+     * Deliberately goes through the pure {@link Presets#resolve(Identifier, java.util.function.Function)}
+     * core with a lookup bound to this call's own {@code RegistryAccess}, not the caching
+     * {@code Presets.resolve(RegistryAccess, Identifier)} wrapper worldgen uses: that cache is keyed by
+     * id alone and only cleared by {@code AssetRegistries.reset()} from {@code CityFeature.cleanUp()},
+     * so after playing a world (or toggling datapacks in this very screen) it can hold a stale
+     * resolution for an id a different registry context now defines differently. The GUI has to see
+     * exactly what {@code access} says right now, not whatever the last world resolved.
+     */
+    private static List<PresetSelection.Entry> registeredPresets(CreateWorldScreen screen) {
+        RegistryAccess access = screen.getUiState().getSettings().worldgenLoadContext();
+        Optional<Registry<PresetRE>> registry = access.lookup(CustomRegistries.PRESET_REGISTRY_KEY);
+        if (registry.isEmpty()) {
+            return List.of();
         }
-        return key.getNamespace() + ":" + key.getPath();
+        List<PresetSelection.Entry> entries = new ArrayList<>();
+        for (Identifier id : Presets.listBrowsable(access)) {
+            Preset preset = Presets.resolve(id, registry.get()::getValue);
+            entries.add(new PresetSelection.Entry(id, Component.literal(DataTools.toName(id)), preset));
+        }
+        return entries;
     }
 
     private void refreshSeedControls() {
@@ -393,18 +416,18 @@ public class CitiesTab extends GridLayoutTab {
      * description, aqua "extra" line, red warning - minus the parts a profile leaves empty.
      */
     static Component describe(PresetSelection.Entry entry) {
-        UrbexProfile profile = entry.profile().orElse(null);
-        if (profile == null) {
+        Preset preset = entry.preset();
+        if (preset == null) {
             return Component.translatable("urbex.preset.disabled.info");
         }
-        MutableComponent result = Component.literal(profile.getDescription());
-        if (!profile.getExtraDescription().isEmpty()) {
+        MutableComponent result = Component.literal(preset.getDescription());
+        if (!preset.getExtraDescription().isEmpty()) {
             result.append(CommonComponents.NEW_LINE)
-                    .append(Component.literal(profile.getExtraDescription()).withStyle(ChatFormatting.AQUA));
+                    .append(Component.literal(preset.getExtraDescription()).withStyle(ChatFormatting.AQUA));
         }
-        if (!profile.getWarning().isEmpty()) {
+        if (!preset.getWarning().isEmpty()) {
             result.append(CommonComponents.NEW_LINE)
-                    .append(Component.literal(profile.getWarning()).withStyle(ChatFormatting.RED));
+                    .append(Component.literal(preset.getWarning()).withStyle(ChatFormatting.RED));
         }
         return result;
     }
@@ -472,16 +495,16 @@ public class CitiesTab extends GridLayoutTab {
 
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-            UrbexProfile profile = PresetSelection.CLIENT.selected().profile().orElse(null);
-            // The chosen worldStyle overrides the preset's own for the preview (spec 1a); with no
-            // override this is just the preset's own style. Empty for the disabled row (no profile).
+            Preset preset = PresetSelection.CLIENT.selected().preset();
+            // worldStyle is orthogonal to the preset (spec 1a): the chosen override if any, else the
+            // default. Empty for the disabled row is irrelevant - update() below no-ops on a null preset.
             String worldStyle = PresetSelection.CLIENT.effectiveWorldStyle();
             long seed = CityPreview.seedFromUi(screen.getUiState().getSeed(), previewSeedFallback);
-            // A no-op unless (profile, worldstyle, seed) actually changed, so driving it from the
+            // A no-op unless (preset, worldstyle, seed) actually changed, so driving it from the
             // render pass is what makes the preview follow selection changes, seed edits and tab
             // switches without any of them needing to know about the preview. The Cities tab always
             // shows the region map; the per-category city/transport views live in the editor.
-            preview.update(profile, worldStyle, seed, CityPreview.Mode.MAP);
+            preview.update(preset, worldStyle, seed, CityPreview.Mode.MAP);
 
             // resizeChildren() already aspect-fit this widget to (mapWidth, mapHeight + legend) via
             // CityPreview.fitPreview, so the map keeps its 62:58 ratio - pass the widget's own size

@@ -2,7 +2,8 @@ package dev.krona.urbex.gui.settings;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.io.InputStream;
@@ -24,15 +25,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The registry is the metadata backbone every later editor task builds on, so this test pins the two properties
- * that make it trustworthy: every user-editable {@link UrbexProfile} field is described exactly once, and every
- * descriptor points at a field (and lang keys) that actually exist. Reflection over the profile is what keeps the
+ * that make it trustworthy: every user-editable {@link Preset} field is described exactly once, and every
+ * descriptor points at a field (and lang keys) that actually exist. Reflection over the preset is what keeps the
  * registry honest when someone adds a field later — a new field with no descriptor fails here.
  */
 class SettingsCompletenessTest {
 
     /**
-     * Public {@code UrbexProfile} fields that are deliberately NOT surfaced as editable settings. Each needs a
+     * Public {@code Preset} fields that are deliberately NOT surfaced as editable settings. Each needs a
      * one-line justification; keep this list tiny — the point of the test is that almost everything is covered.
+     * {@code worldStyle} needs no entry here (unlike the old runtime-generated profile format): Task 4
+     * removed it from {@link Preset} entirely - worldStyle is a first-class value orthogonal to the
+     * preset, not one of its fields.
      */
     private static final Set<String> EXCLUDED = Set.of(
             // Internal world-edit flag toggled by the edit-mode tooling, not a world-generation knob.
@@ -41,7 +45,7 @@ class SettingsCompletenessTest {
 
     private static List<Field> editableFields() {
         List<Field> fields = new ArrayList<>();
-        for (Field f : UrbexProfile.class.getFields()) { // getFields() = public members only
+        for (Field f : Preset.class.getFields()) { // getFields() = public members only
             if (Modifier.isStatic(f.getModifiers())) {
                 continue; // category-id constants etc.
             }
@@ -88,8 +92,8 @@ class SettingsCompletenessTest {
                 duplicated.add(name);
             }
         }
-        assertTrue(missing.isEmpty(), "UrbexProfile fields with no descriptor: " + missing);
-        assertTrue(duplicated.isEmpty(), "UrbexProfile fields with more than one descriptor: " + duplicated);
+        assertTrue(missing.isEmpty(), "Preset fields with no descriptor: " + missing);
+        assertTrue(duplicated.isEmpty(), "Preset fields with more than one descriptor: " + duplicated);
     }
 
     @Test
@@ -99,7 +103,7 @@ class SettingsCompletenessTest {
             editable.add(f.getName());
         }
         Set<String> allFieldNames = new HashSet<>();
-        for (Field f : UrbexProfile.class.getFields()) {
+        for (Field f : Preset.class.getFields()) {
             if (!Modifier.isStatic(f.getModifiers())) {
                 allFieldNames.add(f.getName());
             }
@@ -114,7 +118,7 @@ class SettingsCompletenessTest {
                 pointsAtExcluded.add(d.key());
             }
         }
-        assertTrue(unknown.isEmpty(), "Descriptor keys that are not public UrbexProfile fields: " + unknown);
+        assertTrue(unknown.isEmpty(), "Descriptor keys that are not public Preset fields: " + unknown);
         assertTrue(pointsAtExcluded.isEmpty(), "Descriptor keys that point at an EXCLUDED field: " + pointsAtExcluded);
     }
 
@@ -157,11 +161,11 @@ class SettingsCompletenessTest {
      */
     @Test
     void logScaleSlidersRoundTripTheirDefaultValueThroughLogValueMapper() {
-        UrbexProfile profile = fresh();
+        Preset preset = fresh();
         for (SettingDescriptor d : Settings.ALL) {
             if (isSliderLike(d.kind()) && d.logScale()) {
                 LogValueMapper mapper = new LogValueMapper(d.min(), d.max());
-                double defaultValue = (Double) d.getter().apply(profile);
+                double defaultValue = (Double) d.getter().apply(preset);
                 double roundTripped = mapper.fromSlider(mapper.toSlider(defaultValue));
                 double relativeError = Math.abs((roundTripped - defaultValue) / defaultValue);
                 assertTrue(relativeError < 1e-9,
@@ -182,10 +186,10 @@ class SettingsCompletenessTest {
      */
     @Test
     void cycleDescriptorsHaveAtLeastTwoEnumConstants() {
-        UrbexProfile profile = fresh();
+        Preset preset = fresh();
         for (SettingDescriptor d : Settings.ALL) {
             if (d.kind() == ControlKind.CYCLE) {
-                Object value = d.getter().apply(profile);
+                Object value = d.getter().apply(preset);
                 assertTrue(value instanceof Enum<?>, "CYCLE descriptor " + d.key() + " getter did not return an enum value");
                 Class<?> enumType = ((Enum<?>) value).getDeclaringClass();
                 Object[] constants = enumType.getEnumConstants();
@@ -206,11 +210,11 @@ class SettingsCompletenessTest {
     @Test
     void cycleDescriptorEnumConstantsHaveLangLabels() {
         JsonObject lang = loadLang();
-        UrbexProfile profile = fresh();
+        Preset preset = fresh();
         Set<String> missing = new TreeSet<>();
         for (SettingDescriptor d : Settings.ALL) {
             if (d.kind() == ControlKind.CYCLE) {
-                Enum<?> value = (Enum<?>) d.getter().apply(profile);
+                Enum<?> value = (Enum<?>) d.getter().apply(preset);
                 Class<?> enumType = value.getDeclaringClass();
                 for (Object constant : enumType.getEnumConstants()) {
                     String key = SettingControls.enumLangKey((Enum<?>) constant);
@@ -302,7 +306,7 @@ class SettingsCompletenessTest {
     @Test
     void getterAndSetterObserveTheKeyedField() throws Exception {
         for (SettingDescriptor d : Settings.ALL) {
-            Field f = UrbexProfile.class.getField(d.key());
+            Field f = Preset.class.getField(d.key());
             f.setAccessible(true);
             Class<?> t = f.getType();
             String where = d.key();
@@ -318,8 +322,11 @@ class SettingsCompletenessTest {
                 checkObject(d, f, where, Boolean.TRUE, Boolean.FALSE);
             } else if (t == String.class) {
                 checkObject(d, f, where, "sentinel-a-" + d.key(), "sentinel-b-" + d.key());
-            } else if (t == String[].class) {
-                checkArray(d, f, where,
+            } else if (t == List.class) {
+                // FORCE_SPAWN_BUILDINGS / FORCE_SPAWN_PARTS: List<String> on Preset, but the TEXT
+                // control's boxing convention (SettingDescriptor's doc) is String[] for list-valued
+                // fields, same as it was for the old profile format's String[]-backed fields.
+                checkList(d, f, where,
                         new String[]{"sentinel-a-" + d.key()},
                         new String[]{"sentinel-b-" + d.key(), "c"});
             } else if (t.isEnum()) {
@@ -336,13 +343,13 @@ class SettingsCompletenessTest {
 
     /** Two-probe check for numeric fields, honoring the Double-boxed slider convention. */
     private static void checkNumeric(SettingDescriptor d, Field f, String where, double s1, double s2) throws Exception {
-        UrbexProfile getP = fresh();
+        Preset getP = fresh();
         f.set(getP, coerce(f.getType(), s1));
         assertEquals(s1, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4, "getter does not read field " + where);
         f.set(getP, coerce(f.getType(), s2));
         assertEquals(s2, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4, "getter does not read field " + where);
 
-        UrbexProfile setP = fresh();
+        Preset setP = fresh();
         d.setter().accept(setP, s1);
         assertEquals(s1, ((Number) f.get(setP)).doubleValue(), 1e-4, "setter does not write field " + where);
         d.setter().accept(setP, s2);
@@ -361,36 +368,36 @@ class SettingsCompletenessTest {
 
     /** Two-probe check for reference-valued fields compared with {@link Object#equals}. */
     private static void checkObject(SettingDescriptor d, Field f, String where, Object s1, Object s2) throws Exception {
-        UrbexProfile getP = fresh();
+        Preset getP = fresh();
         f.set(getP, s1);
         assertEquals(s1, d.getter().apply(getP), "getter does not read field " + where);
         f.set(getP, s2);
         assertEquals(s2, d.getter().apply(getP), "getter does not read field " + where);
 
-        UrbexProfile setP = fresh();
+        Preset setP = fresh();
         d.setter().accept(setP, s1);
         assertEquals(s1, f.get(setP), "setter does not write field " + where);
         d.setter().accept(setP, s2);
         assertEquals(s2, f.get(setP), "setter does not write field " + where);
     }
 
-    /** Two-probe check for {@code String[]} fields compared element-wise. */
-    private static void checkArray(SettingDescriptor d, Field f, String where, String[] s1, String[] s2) throws Exception {
-        UrbexProfile getP = fresh();
-        f.set(getP, s1);
+    /** Two-probe check for {@code List<String>} fields, boxed as {@code String[]} across the descriptor. */
+    private static void checkList(SettingDescriptor d, Field f, String where, String[] s1, String[] s2) throws Exception {
+        Preset getP = fresh();
+        f.set(getP, List.of(s1));
         assertArrayEquals(s1, (String[]) d.getter().apply(getP), "getter does not read field " + where);
-        f.set(getP, s2);
+        f.set(getP, List.of(s2));
         assertArrayEquals(s2, (String[]) d.getter().apply(getP), "getter does not read field " + where);
 
-        UrbexProfile setP = fresh();
+        Preset setP = fresh();
         d.setter().accept(setP, s1);
-        assertArrayEquals(s1, (String[]) f.get(setP), "setter does not write field " + where);
+        assertEquals(List.of(s1), f.get(setP), "setter does not write field " + where);
         d.setter().accept(setP, s2);
-        assertArrayEquals(s2, (String[]) f.get(setP), "setter does not write field " + where);
+        assertEquals(List.of(s2), f.get(setP), "setter does not write field " + where);
     }
 
-    private static UrbexProfile fresh() {
-        return new UrbexProfile("test", true);
+    private static Preset fresh() {
+        return new Preset(Identifier.fromNamespaceAndPath("urbex", "test"));
     }
 
     private static JsonObject loadLang() {

@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.MultiBuildingStreetConflict;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.EffectiveRoad;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.plan.grid.GridRoadField;
@@ -46,8 +46,8 @@ class ChunkContentResolverTest {
         Bootstrap.bootStrap();
     }
 
-    private static UrbexProfile profileWithBuildingChance(float chance) {
-        UrbexProfile profile = TestProfiles.dense();
+    private static Preset profileWithBuildingChance(float chance) {
+        Preset profile = TestProfiles.dense();
         profile.BUILDING_CHANCE = chance;
         return profile;
     }
@@ -91,7 +91,7 @@ class ChunkContentResolverTest {
             }
         }
 
-        private boolean resolve(UrbexProfile profile, MultiPos section, int cityLevel, Facts facts) {
+        private boolean resolve(Preset profile, MultiPos section, int cityLevel, Facts facts) {
             return ChunkContentResolver.couldHaveBuilding(profile, true, section, cityLevel,
                     new XoroshiroRandomSource(1234), facts.build());
         }
@@ -298,7 +298,7 @@ class ChunkContentResolverTest {
         /** As {@link #resolve} but with the road and the open-lot park chance under the test's control. */
         private ChunkContent resolveOn(RoadType road, float openLotParkChance, boolean isCity,
                                        boolean couldHaveBuilding) {
-            UrbexProfile profile = TestProfiles.dense();
+            Preset profile = TestProfiles.dense();
             profile.OPEN_LOT_PARK_CHANCE = openLotParkChance;
             return ChunkContentResolver.resolve(profile, SEED, new XoroshiroRandomSource(5), isCity,
                     couldHaveBuilding, road, MultiPos.SINGLE, COORD, SOCIABLE, "testbuilding");

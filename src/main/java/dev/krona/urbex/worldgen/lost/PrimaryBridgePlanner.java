@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.Hash;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.plan.grid.GridPurpose;
@@ -82,7 +82,7 @@ public final class PrimaryBridgePlanner {
     public static Optional<BridgeSpan> spanAt(ChunkCoord coord, IDimensionInfo provider) {
         // Dimension-wide, not per-chunk: a span's length limit and acceptance chance must be the
         // same number for every chunk in it.
-        UrbexProfile profile = provider.getProfile();
+        Preset profile = provider.getProfile();
         float chance = profile.PLANNED_PRIMARY_BRIDGE_CHANCE;
         int maxGapLength = profile.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
         if (chance <= 0.0f) {
@@ -297,7 +297,7 @@ public final class PrimaryBridgePlanner {
 
             @Override
             public boolean isEffectivePrimary(ChunkCoord coord) {
-                UrbexProfile profile = provider.getProfile();
+                Preset profile = provider.getProfile();
                 return BuildingInfo.effectiveRoadType(coord, provider, profile) == RoadType.PRIMARY;
             }
 

@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.*;
 import net.minecraft.world.level.CommonLevelAccessor;
@@ -45,6 +46,7 @@ public class AssetRegistries {
         PREDEFINED_CITIES.reset();
         STUFF.reset();
         STUFF_BY_TAG.clear();
+        Presets.reset();
         loaded = false;
         loadedPredefined = false;
     }
