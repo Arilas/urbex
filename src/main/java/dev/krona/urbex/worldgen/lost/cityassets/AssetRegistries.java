@@ -34,7 +34,7 @@ public class AssetRegistries {
      * The stuff-by-tag index, replaced wholesale rather than filled in place.
      * <p>
      * It used to be a {@code ConcurrentHashMap} filled with {@code putAll}, which is not one
-     * operation: a worldgen worker calling {@link #stuffForTag} while {@link #load} was midway
+     * operation: a worldgen worker calling {@link #stuffIndex} while {@link #load} was midway
      * through that {@code putAll} could see some tags present and others still missing, and a
      * missing tag is silent - {@code Stuff.generateStuff} simply places nothing for it. Now
      * {@code load} builds the whole index privately and publishes it with the single volatile write
@@ -54,12 +54,16 @@ public class AssetRegistries {
     private static volatile boolean loadedPredefined = false;
 
     /**
-     * Every stuff object filed under {@code tag}, or null when the tag has none (or when nothing is
-     * loaded yet). The returned list is immutable and safe to iterate from a worker thread.
+     * The whole tag index as one immutable snapshot.
+     * <p>
+     * Handing over the map rather than answering one tag at a time is what lets a caller that walks
+     * several tags be unaffected by a {@link #reset()} landing mid-walk: it reads the reference once
+     * and everything below it is immutable, so it either sees the old index throughout or the new
+     * one throughout. A per-tag accessor could not offer that - the reset would land between two
+     * lookups and half-decorate the chunk.
      */
-    @Nullable
-    public static List<StuffObject> stuffForTag(String tag) {
-        return stuffByTag.get(tag);
+    public static Map<String, List<StuffObject>> stuffIndex() {
+        return stuffByTag;
     }
 
     /**
@@ -70,8 +74,9 @@ public class AssetRegistries {
      * {@link RegistryAssetRegistry#get}, but the stuff-by-tag index has no lazy rebuild, so
      * generating while this is false writes an undecorated chunk and saves it. False here during
      * generation is never legitimate after Task 5c - it means something called {@link #reset}
-     * mid-generation - which is why the check is on this flag rather than on the index being empty
-     * (a pack that ships no stuff files legitimately has an empty index).
+     * mid-generation. It is read together with {@link #stuffIndex()} rather than alone, because on
+     * its own it cannot tell "reset just happened" from "this pack ships no stuff files", and the
+     * second is perfectly legitimate.
      */
     public static boolean isLoaded() {
         return loaded;

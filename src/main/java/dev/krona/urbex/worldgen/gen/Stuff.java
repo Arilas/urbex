@@ -20,6 +20,7 @@ import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,12 +39,22 @@ public class Stuff {
     private static final AtomicBoolean REPORTED_UNLOADED = new AtomicBoolean();
 
     public static void generateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
+        // The index is taken once, as a snapshot, and every tag below is read out of it. That is
+        // not a micro-optimisation: AssetRegistries.reset() replaces the whole index in one write
+        // (see the field), so holding the reference means a reset landing while this method is
+        // running cannot half-decorate the chunk - the walk either sees the old index throughout or
+        // the new one throughout. Asking per tag would leave exactly that sliver.
+        //
         // Generating with the registries unloaded is never legitimate here, and it is the one
-        // failure in this file that says nothing: stuffForTag returns null for every tag, the loop
-        // below places nothing, and the chunk is written and saved undecorated - exactly the
-        // shipped defect Task 5c removed, reappearing one chunk at a time. Every other registry
-        // heals itself on the next lookup (RegistryAssetRegistry.get re-resolves on a miss); the
-        // tag index has no lazy rebuild, so nothing would ever notice.
+        // failure in this file that says nothing: every tag misses, the loop below places nothing,
+        // and the chunk is written and saved undecorated - exactly the shipped defect Task 5c
+        // removed, reappearing one chunk at a time. Every other registry heals itself on the next
+        // lookup (RegistryAssetRegistry.get re-resolves on a miss); this index has no lazy rebuild,
+        // so nothing would ever notice.
+        //
+        // Both conditions are required. An empty index alone is legitimate - a pack may ship no
+        // stuff files at all - and !isLoaded() alone would fire on the harmless ordering where the
+        // reset lands after the snapshot was taken, which this chunk survives intact.
         //
         // Reachable, not hypothetical: AssetRegistries.reset() is called from CityFeature.cleanUp,
         // which reconcileDirtyCounter invokes when globalDimensionInfoDirtyCounter is bumped, and
@@ -51,13 +62,16 @@ public class Stuff {
         // client thread - which in single-player fires while the integrated server is still
         // draining in-flight generation.
         //
-        // Logged rather than thrown deliberately. Throwing would route through
-        // CityFeature.generateFromPipeline's handler, which calls ErrorLogger.report, and that
-        // dereferences ServerAccess.getServer() without a null check (ErrorLogger.java:28-29) -
-        // during the shutdown window this fires in, that turns a decoration bug into a dead
-        // worldgen worker. The chunk is lost to this either way; the point is that it stops being
-        // silent.
-        if (!AssetRegistries.isLoaded()) {
+        // Logged rather than thrown, for two reasons. generateStuff is the last statement of
+        // CityGenerator.doCityChunk, which generate() calls at CityGenerator.java:290, well before
+        // ctx.driver.actuallyGenerate(chunk) at :310 - so a throw here would unwind past the commit
+        // and lose the chunk's entire cached write set, costing the whole chunk rather than its
+        // decoration. And it would route through CityFeature.generateFromPipeline's handler into
+        // ErrorLogger.report, which dereferences ServerAccess.getServer() with no null check
+        // (ErrorLogger.java:28-29) - during the shutdown window this fires in, that turns a
+        // decoration bug into a dead worldgen worker.
+        Map<String, List<StuffObject>> stuffIndex = AssetRegistries.stuffIndex();
+        if (stuffIndex.isEmpty() && !AssetRegistries.isLoaded()) {
             if (REPORTED_UNLOADED.compareAndSet(false, true)) {
                 Urbex.getLogger().error(
                         "Generating chunk {},{} with the Urbex asset registries unloaded: no decoration will be " +
@@ -79,13 +93,13 @@ public class Stuff {
         // The ordinal is an RNG address, so what it counts has to be stable against anything that
         // is not a deliberate change to the pack. Both loops below are ordered for that reason and
         // not for tidiness: CityStyle.getStuffTags() is sorted (see the field) and each
-        // stuffForTag list is sorted by Identifier (see AssetRegistries.groupStuffByTag). Neither
+        // list in the index is sorted by Identifier (see AssetRegistries.groupStuffByTag). Neither
         // may go back to a hash-ordered collection.
         int stuffOrdinal = 0;
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
         for (String tag : info.getCityStyle().getStuffTags()) {
-            List<StuffObject> stuffs = AssetRegistries.stuffForTag(tag);
+            List<StuffObject> stuffs = stuffIndex.get(tag);
             if (stuffs != null) {
                 for (StuffObject stuff : stuffs) {
                     StuffSettingsRE settings = stuff.getSettings();

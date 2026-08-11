@@ -47,10 +47,6 @@ public class Tools {
         return stringbuilder.toString();
     }
 
-    public static BlockState stringToState(String s) {
-        return stringToState(s, null);
-    }
-
     /**
      * Resolves a datapack block string, naming {@code owner} if it cannot be resolved.
      * <p>
@@ -72,7 +68,12 @@ public class Tools {
      * That is why the one such string the bundled pack shipped was a hard crash at palette compile
      * rather than an automatic upgrade.
      *
-     * @param owner the asset the string came from, used only in the warning; may be null
+     * @param owner the asset the string came from, used only in the warning. This is the asset
+     *              <em>id</em>, not the file path, and for a palette written inline in a part or
+     *              building it is the synthetic {@code urbex:__local__<path>} name
+     *              {@link dev.krona.urbex.worldgen.lost.cityassets.Palette#inline} builds rather
+     *              than the owning part - close enough to find, but not a filename. May be null;
+     *              every production caller passes one.
      */
     public static BlockState stringToState(String s, @Nullable Object owner) {
         if (s.contains("[")) {

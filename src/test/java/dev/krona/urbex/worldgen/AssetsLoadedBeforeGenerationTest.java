@@ -78,7 +78,7 @@ class AssetsLoadedBeforeGenerationTest {
 
     @Test
     void generationPathLoadsTheStuffIndexBeforeItTouchesTheLevel() {
-        assertNull(AssetRegistries.stuffForTag("rubble"),
+        assertNull(AssetRegistries.stuffIndex().get("rubble"),
                 "precondition: nothing is filed under the tag before anything loads");
 
         WorldGenLevel level = levelThatOnlyAnswersRegistryAccess();
@@ -88,7 +88,7 @@ class AssetsLoadedBeforeGenerationTest {
         // how far it got first: the assets have to be loaded before that point, not after it.
         assertThrows(ReachedTheLevel.class, () -> feature.getDimensionInfo(level));
 
-        List<StuffObject> rubble = AssetRegistries.stuffForTag("rubble");
+        List<StuffObject> rubble = AssetRegistries.stuffIndex().get("rubble");
         assertNotNull(rubble, "the stuff tag index must be populated before generation reads the "
                 + "level - an empty index places no decoration and says nothing about it");
         assertEquals(List.of("urbex:cobweb"), rubble.stream().map(StuffObject::getName).toList());
@@ -110,6 +110,15 @@ class AssetsLoadedBeforeGenerationTest {
      * the registration line is gone, the invoker has no callbacks, nothing runs, and the latch stays
      * false. The registration is left on the static event afterwards; nothing else in the suite
      * invokes it.
+     * <p>
+     * <b>Why that latch is the signal, and what would break it.</b> {@code load} latching on a null
+     * level is exactly the no-op latch {@code loadPredefinedStuff} deliberately refuses (issue #67 -
+     * see the null guard in {@code AssetRegistries.loadPredefinedStuff}), because for predefined
+     * cities a real level arriving later still has to be able to load. {@code load} has no such
+     * guard, and none is needed in production: nothing ever calls it with a null level, since both
+     * call sites hand it a level they already hold. But if {@code load} ever gains that guard, this
+     * test starts failing while the registration it is pinning is perfectly intact. If that happens,
+     * the fix is to give this test a level rather than to delete it.
      */
     @Test
     void theEagerLoadIsWiredToTheLevelLoadEvent() {
@@ -130,8 +139,8 @@ class AssetsLoadedBeforeGenerationTest {
                 "the index is swapped in one write and read without a lock; without volatile a "
                         + "worker can miss the write entirely");
         assertFalse(Modifier.isPublic(field.getModifiers()),
-                "readers must go through stuffForTag - a handle on the map itself is a handle on "
-                        + "the previous index after a reset");
+                "readers must go through stuffIndex(), which re-reads the volatile field - a direct "
+                        + "handle on the field would hand out a stale index after a reset");
 
         AssetRegistries.load(levelThatOnlyAnswersRegistryAccess());
 
@@ -142,7 +151,7 @@ class AssetsLoadedBeforeGenerationTest {
                 "the published map must be finished before it is published - the putAll this "
                         + "replaced let a worker see some tags and not others");
         assertThrows(UnsupportedOperationException.class,
-                () -> AssetRegistries.stuffForTag("rubble").add(null),
+                () -> AssetRegistries.stuffIndex().get("rubble").add(null),
                 "each tag's list is immutable for the same reason");
     }
 

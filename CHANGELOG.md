@@ -39,10 +39,15 @@
     (485 cobweb, 268 chain, 8 at positions the driver had never written), 62 are connection flips on
     iron bars and glass panes that now attach to a chain - `ChunkDriver`'s corrections pass runs
     against the finished chunk, so it sees decoration - and 2 are blocks the explosion-damage pass
-    now breaks that it did not before, because `breakBlocksForDamageNew` feeds each layer's air count
-    back into the damage factor for the layers below it and decoration reduces that count. So
-    everything that moved is decoration or a consequence of decoration; "only decoration moved" would
-    have been the wrong claim.
+    now breaks that it did not before. That last coupling is the collection gate in
+    `breakBlocksForDamageNew`: it only accumulates damage for a cell that is not air, so a cobweb or
+    chain in a previously-air cell makes its column collect damage it used to skip, and the
+    accumulator carries *upward* through the ascending section loop. (Not the air count feeding the
+    damage factor, which is what an earlier draft of this entry said: decoration can only lower that
+    count, the factor only ratchets up, and less damage cannot break more blocks. Confirmed by
+    instrumenting both trees - the damage factor is identical at every sampled layer, while the
+    column accumulator diverges exactly where the gate flips.) So everything that moved is decoration
+    or a consequence of decoration; "only decoration moved" would have been the wrong claim.
   - *Two shipped datapack defects, both found by that validation running for the first time.*
     `palettes/bricks_desert_redsand.json` carried `minecraft:red_sandstone@2`, a 1.12 `name@meta`
     string predating flattening that is not a legal `Identifier`; `Identifier.parse` threw on it
@@ -65,11 +70,14 @@
     theoretical: `ClientPlayConnectionEvents.DISCONNECT` bumps the counter on the client thread, which
     in single-player fires while the integrated server is still draining generation. It is not closed
     here - closing it means not tearing the registries down from a path generation shares - but
-    `Stuff.generateStuff` now checks `AssetRegistries.isLoaded()` and logs an error naming the chunk
-    and the consequence, once per occurrence rather than once per chunk. It logs rather than throws
-    because `ErrorLogger.report` dereferences the server without a null check, and this fires exactly
-    when the server is going away. `CityFeature.cleanUp()` is private and synchronized, since the
-    design depends on it being reached only under the instance monitor.
+    `Stuff.generateStuff` now takes the index as a single snapshot - so a reset landing while it runs
+    can no longer half-decorate a chunk - and logs an error naming the chunk and the consequence when
+    that snapshot is empty and the registries are unloaded, once per occurrence rather than once per
+    chunk. It logs rather than throws because a throw would unwind past
+    `ctx.driver.actuallyGenerate(chunk)` and lose the chunk's whole cached write set, costing the
+    chunk rather than its decoration, and because `ErrorLogger.report` dereferences the server with no
+    null check exactly when the server is going away. `CityFeature.cleanUp()` is private and
+    synchronized, since the design depends on it being reached only under the instance monitor.
   - *An unknown block id still generates as air, but no longer in silence.* `Tools.stringToState`
     ends at `BuiltInRegistries.BLOCK.getValue`, which returns the registry's default - air - for an
     id it does not know, so its `value == null` guard has never fired. It now warns once per id,
