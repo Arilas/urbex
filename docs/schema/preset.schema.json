@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/Arilas/LostCities/main/docs/schema/preset.schema.json",
+  "$id": "https://raw.githubusercontent.com/Arilas/urbex/main/docs/schema/preset.schema.json",
   "title": "Urbex preset",
   "description": "A datapack-contributed entry for the urbex:presets dynamic registry (data/<namespace>/urbex/presets/<name>.json). Every field is optional: only fields actually present are applied on top of the resolved 'parent' chain, and unset fields fall through to the parent (or, at the root of the chain, to the code defaults in Preset.java). Keys starting with '_' are ignored (blessed pack metadata, e.g. '_comment').",
   "type": "object",
