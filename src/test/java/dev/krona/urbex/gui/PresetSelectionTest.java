@@ -260,6 +260,23 @@ class PresetSelectionTest {
         assertEquals("{\"cities\":{\"cityChance\":0.9}}", Config.overridesFromClient);
     }
 
+    /**
+     * Regression: an unparseable overridesJson must never reach {@code Config.overridesFromClient} -
+     * that field is read on a worldgen worker thread the instant a chunk generates
+     * ({@code CityFeature.getDimensionInfo}'s unguarded {@code PresetRE.CODEC.parse(...).getOrThrow()}),
+     * so a corrupted/hand-edited save's garbage JSON must be rejected before publish, not after.
+     */
+    @Test
+    void restoreWithMalformedOverridesJsonPublishesThePlainPresetInstead() {
+        PresetSelection selection = new PresetSelection();
+
+        selection.restore("urbex:default", "", "{not valid json at all");
+
+        assertEquals(id("default"), Config.presetFromClient, "the preset id itself is still restored");
+        assertEquals(Config.DEFAULT_WORLD_STYLE, Config.worldStyleFromClient);
+        assertNull(Config.overridesFromClient, "malformed overrides must never reach Config");
+    }
+
     @Test
     void restoreReconcilesTheVisualSelectionOnceEntriesAreInjected() {
         PresetSelection selection = new PresetSelection();

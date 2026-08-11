@@ -110,9 +110,20 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         }
         Preset preset = Presets.resolve(world.registryAccess(), choice.preset());
         if (choice.overridesJson().isPresent()) {
-            PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE,
-                    JsonParser.parseString(choice.overridesJson().get())).getOrThrow();
-            preset = Presets.applyOverrides(preset, re);
+            // Fail-soft, unlike the preset id resolution above: the overrides JSON is either a
+            // client-published payload PresetSelection.publish() encoded itself (trustworthy), or
+            // saved data read back from disk - a corrupted/hand-edited save file must not crash
+            // chunk generation. PresetSelection.restore() already validates before publishing, so
+            // this guard is a backstop against corrupted saved data reaching this far, not the
+            // primary defense.
+            try {
+                PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE,
+                        JsonParser.parseString(choice.overridesJson().get())).getOrThrow();
+                preset = Presets.applyOverrides(preset, re);
+            } catch (Exception e) {
+                Urbex.getLogger().error("Malformed Urbex preset overrides for dimension '{}'; " +
+                        "generating with the un-overridden preset '{}'.", type.identifier(), choice.preset(), e);
+            }
         }
         // Built outside the map. Two threads may both build one for the same dimension the
         // first time a chunk is generated - the loser's is simply dropped, caches and all.

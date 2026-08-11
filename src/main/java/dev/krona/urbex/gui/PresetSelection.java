@@ -222,7 +222,12 @@ public final class PresetSelection {
                     worldStyle, Config.DEFAULT_WORLD_STYLE);
             worldStyleId = Config.DEFAULT_WORLD_STYLE;
         }
-        String overrides = (overridesJson == null || overridesJson.isEmpty()) ? null : overridesJson;
+        // Validated BEFORE publishing, not after: Config.overridesFromClient is read on a worldgen
+        // worker thread the moment a chunk generates (CityFeature.getDimensionInfo), so an unparseable
+        // string must never reach it - publishing it and only catching the parse failure later (in
+        // reconcilePendingRestore's best-effort visual reconciliation) would leave the bad JSON sitting
+        // in Config while the visual selection quietly fell back to plain.
+        String overrides = validatedOverrides(overridesJson, presetId);
 
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
@@ -237,9 +242,36 @@ public final class PresetSelection {
     }
 
     /**
+     * Validates a saved-data overrides string against {@link PresetRE#CODEC} before it is allowed
+     * anywhere near {@link Config#overridesFromClient} - that field is read on a worldgen worker
+     * thread the instant a chunk generates ({@code CityFeature.getDimensionInfo}), so a string that
+     * fails to parse must never be published in the first place. Returns {@code null} - "plain
+     * preset, no overrides" - for a blank input or one that fails to parse (logged either way the
+     * failure differs).
+     */
+    @Nullable
+    private static String validatedOverrides(String overridesJson, Identifier presetId) {
+        if (overridesJson == null || overridesJson.isEmpty()) {
+            return null;
+        }
+        try {
+            PresetRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(overridesJson)).getOrThrow();
+            return overridesJson;
+        } catch (Exception e) {
+            Urbex.getLogger().warn("Re-created world '{}' had malformed Urbex preset overrides; " +
+                    "restoring it as the plain preset instead.", presetId, e);
+            return null;
+        }
+    }
+
+    /**
      * Tries to turn a pending {@link #restore} into a real visual selection against whatever
      * {@link #availablePresets} currently holds. Leaves the pending restore in place (retried on the
-     * next {@link #setAvailablePresets}) if the base preset isn't among them yet.
+     * next {@link #setAvailablePresets}) if the base preset isn't among them yet. The overrides JSON
+     * (if any) was already validated by {@link #restore} before it ever reached {@link Config}, so the
+     * parse here is a backstop, not the primary defense - kept anyway so a decode edge case this
+     * method's own {@code applyTo}/{@code applyOverrides} step might hit still degrades to "select it
+     * plain" instead of throwing out of a widget callback.
      */
     private void reconcilePendingRestore() {
         PendingRestore pending = pendingRestore;
