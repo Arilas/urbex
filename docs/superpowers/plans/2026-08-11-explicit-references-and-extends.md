@@ -1027,6 +1027,115 @@ default arm is now a failure, so a new registry cannot silently skip coverage."
 
 ---
 
+### Task 5b: Close the name-as-string determinism class
+
+> **Plan amendment (2026-08-11, after Task 5's third review round).** Three consecutive rounds each
+> found a second-order issue in the prior round's fix — the bare-name split, then tie-break
+> determinism, then a sort comparator. A systematic sweep was commissioned instead of a fourth
+> spot-check. It found four Important items in the same class, all pre-existing and none introduced
+> by Task 5. The owner ruled they land now, as one task, accepting a golden regeneration.
+
+**This task is the plan's one authorised exception to "a shifted digest is a bug, not a golden to
+regenerate".** Every other task must hold `414cb71424d5e53f` / `c8267f7b4abfd44e`. This one is
+expected to move both, and the discipline shifts accordingly: measure after each sub-change so every
+movement is attributable, then regenerate once at the end. A digest that moves for a reason you
+cannot state is still a bug.
+
+**Files:**
+- Modify: `src/main/java/dev/krona/urbex/worldgen/lost/cityassets/AssetRegistries.java`
+- Modify: `src/main/java/dev/krona/urbex/worldgen/gen/Stuff.java`
+- Modify: `src/main/java/dev/krona/urbex/worldgen/lost/cityassets/CityStyle.java`
+- Modify: `src/main/java/dev/krona/urbex/worldgen/lost/cityassets/ConditionContext.java`
+- Modify: `src/main/java/dev/krona/urbex/worldgen/lost/BuildingInfo.java`
+- Modify: `src/main/java/dev/krona/urbex/worldgen/CityGenerator.java`
+- Modify: `src/main/java/dev/krona/urbex/worldgen/gen/Scattered.java`
+- Modify: `digest.golden`, `digest-features.golden`
+- Modify: `CHANGELOG.md`
+- Tests: extend `RegistryChainResolutionTest` and `DatapackReferenceIntegrityTest`; add ordering tests
+
+- [ ] **Step 1: Make the stuff ordinal independent of name hashing**
+
+`AssetRegistries.java:86` builds `STUFF_BY_TAG` by iterating `STUFF.getIterable()`, which is
+`ConcurrentHashMap.values()` — `Identifier` hash-bucket order. `Stuff.java:41-53` then walks that
+list assigning `stuffOrdinal++`, and `Stuff.java:60-63` uses `stuffOrdinal` as the `Rng.atSlot`
+address. So the RNG address of every decoration depends on a hash.
+
+This is live in the bundled pack: `stuff/chains.json` and `stuff/cobweb.json` both declare tag
+`rubble`, so which is ordinal 0 is decided by `hash("urbex:chains")` versus `hash("urbex:cobweb")`.
+
+Sort each tag's list by `Identifier` before it is used. `CityStyle.stuffTags` is a `HashSet<String>`
+(`CityStyle.java:18`) feeding the same walk — give the tag iteration a deterministic order too.
+Expect the digests to move: this reassigns ordinals, and therefore relocates chains and cobwebs.
+
+- [ ] **Step 2: One convention for `inpart`, `inbuilding` and `belowpart`**
+
+These currently require opposite conventions in different files:
+
+| Field | Written in | Matches |
+|---|---|---|
+| `parts2[].inpart` | `buildings/*.json` | qualified |
+| `parts[].inpart` | `buildings/*.json` | never (`BuildingInfo.java:820` passes `"<none>"`) |
+| `parts[].belowpart` | `buildings/*.json` | qualified |
+| `inbuilding` | `buildings/*.json` | bare |
+| `values[].inpart` | `conditions/*.json` | bare, while `DatapackReferenceIntegrityTest.java:115` requires qualified |
+
+Make every one of them qualified, and **delete `ConditionContext.legacyMatchKey`** — that deletion is
+this step's definition of done, not "fix `inpart` matching". `chestloot.json`'s rail-dungeon
+conditions start firing as a result, which changes chest loot; that is the intended outcome, not a
+regression.
+
+Investigate `BuildingInfo.java:820`'s hardcoded `"<none>"` before changing it: for `parts[]`
+selection there may genuinely be no current part yet, in which case `<none>` is correct and the
+right fix is to document it rather than to invent a value. Say which you concluded and why.
+
+- [ ] **Step 3: One ordering for one asset kind**
+
+`BuildingInfo.java:373` tie-breaks the city-style vote on the raw qualified name string, which
+orders namespace-first. `MultiChunk.java:109` orders the same asset kind by `Identifier.compareTo`,
+which is path-first. Both are deterministic; they disagree once a second namespace exists. Put both
+on `Identifier.compareTo`. This should be inert for the bundled pack — confirm that it is.
+
+- [ ] **Step 4: Document what is safe only by construction**
+
+Three lower-severity items are correct today and should be recorded rather than changed, each with
+a comment naming what protects it:
+
+- `MultiChunk.java:88,111,218` key a `Counter` and an `Objects.equals` on `CityStyle` *identity*. No
+  `cityassets` class overrides `equals`/`hashCode`; this is safe only because
+  `RegistryAssetRegistry` canonicalises instances via `putIfAbsent`. If `AssetRegistries.reset()`
+  ran mid-generation, two instances of one id could coexist and the `getId()` sort would stop being
+  a total order.
+- `City.java:107,126,139,152` build predefined-content maps in name-hash order, so two predefined
+  cities claiming one chunk resolve last-writer-wins by hash. Conflict-only.
+- `BuildingInfo.java:840-843` and `:648-650` assign `belowPart = randomPart` *before* constructing
+  `conditionContext2`, so `parts2` selection sees `getPart()` equal to `getBelowPart()`. Determine
+  whether that is intended; fix it or document it.
+
+- [ ] **Step 5: Regenerate the goldens, once, with attribution**
+
+Run both digest checks after each of Steps 1–3 and record the hash each time, so every movement is
+attributable to a named change. Then regenerate `digest.golden` and `digest-features.golden` from
+clean run directories and record the final values.
+
+The CHANGELOG entry must state, per change, what moved and why — specifically that decoration
+placement shifts because ordinals were reassigned, and that chest loot changes because rail-dungeon
+conditions now fire. Do not write a bare "goldens regenerated".
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add -A
+git commit -m "fix!: worldgen decisions no longer ride on name hashing or bare-name matching
+
+The stuff ordinal was addressed by ConcurrentHashMap bucket order, so renaming
+a decoration file relocated every chain and cobweb. inpart/inbuilding/belowpart
+required opposite conventions in different files, so chestloot's rail-dungeon
+conditions never fired. Both goldens regenerated deliberately; the changelog
+attributes each movement."
+```
+
+---
+
 ### Task 6: Delete the thirty wiring defaults
 
 **Files:**
