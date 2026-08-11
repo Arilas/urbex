@@ -24,7 +24,6 @@ public enum SettingCategory {
     DAMAGE,
     TRANSPORT,
     ROADS,
-    SPHERES,
     TERRAIN,
     SPAWN,
     ADVANCED;

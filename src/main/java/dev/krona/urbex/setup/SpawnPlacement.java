@@ -8,7 +8,6 @@ import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity;
-import dev.krona.urbex.worldgen.lost.cityassets.PredefinedSphere;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.GlobalPos;
@@ -35,7 +34,7 @@ import java.util.function.Predicate;
 
 /**
  * Picks and applies the world spawn for profiles that constrain it (spawn biome, spawn city,
- * spawn sphere, in/outside buildings). Stateless apart from {@link #spawnPositions}, the pending
+ * in/outside buildings). Stateless apart from {@link #spawnPositions}, the pending
  * spawn corrections applied when the first player joins - cleared on server stop so nothing
  * leaks between worlds in one client session.
  */
@@ -100,42 +99,8 @@ public class SpawnPlacement {
                 } else {
                     float sqradius = getSqRadius(city.getRadius(), 0.8f);
                     isSuitable = blockPos -> city.getDimension() == serverLevel.dimension() &&
-                            CitySphere.squaredDistance(city.getChunkX()*16+8, city.getChunkZ()*16+8, blockPos.getX(), blockPos.getZ()) < sqradius;
+                            squaredHorizontalDistance(city.getChunkX()*16+8, city.getChunkZ()*16+8, blockPos.getX(), blockPos.getZ()) < sqradius;
                     needsCheck = true;
-                }
-            } else if (!profile.SPAWN_SPHERE.isEmpty()) {
-                if ("<in>".equals(profile.SPAWN_SPHERE)) {
-                    isSuitable = blockPos -> {
-                        ChunkCoord coord = new ChunkCoord(dimensionInfo.getType(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
-                        CitySphere sphere = CitySphere.getCitySphere(coord, dimensionInfo);
-                        if (!sphere.isEnabled()) {
-                            return false;
-                        }
-                        float sqradius = getSqRadius((int) sphere.getRadius(), 0.8f);
-                        return sphere.getCenterPos().distSqr(blockPos.atY(sphere.getCenterPos().getY())) < sqradius;
-                    };
-                    needsCheck = true;
-                } else if ("<out>".equals(profile.SPAWN_SPHERE)) {
-                    isSuitable = blockPos -> {
-                        ChunkCoord coord = new ChunkCoord(dimensionInfo.getType(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
-                        CitySphere sphere = CitySphere.getCitySphere(coord, dimensionInfo);
-                        if (!sphere.isEnabled()) {
-                            return true;
-                        }
-                        float sqradius = sphere.getRadius() * sphere.getRadius();
-                        return sphere.getCenterPos().distSqr(blockPos.atY(sphere.getCenterPos().getY())) > sqradius;
-                    };
-                    needsCheck = true;
-                } else {
-                    final PredefinedSphere sphere = AssetRegistries.PREDEFINED_SPHERES.get(world, profile.SPAWN_SPHERE);
-                    if (sphere == null) {
-                        Urbex.setup.getLogger().error("Cannot find sphere '" + profile.SPAWN_SPHERE + "' for the player to spawn in !");
-                    } else {
-                        float sqradius = getSqRadius(sphere.getRadius(), 0.8f);
-                        isSuitable = blockPos -> sphere.getDimension() == serverLevel.dimension() &&
-                                CitySphere.squaredDistance((sphere.getChunkX() << 4) + 8, (sphere.getChunkZ() << 4) + 8, blockPos.getX(), blockPos.getZ()) < sqradius;
-                        needsCheck = true;
-                    }
                 }
             }
 
@@ -180,18 +145,8 @@ public class SpawnPlacement {
             // In single player, this is potentially being ignored due to the case that level.dat does not exists yet
             // thus the world spawn is not set
             // then we'll store into the spawnPositions first and prepare to set it up again.
-            switch (profile.LANDSCAPE_TYPE) {
-                case DEFAULT, SPHERES -> {
-                    if (needsCheck) {
-                        BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, settings);
-                        LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
-                        serverLevel.setRespawnData(data);
-                        settings.setSpawn(data);
-                        spawnPositions.put(serverLevel.dimension(), pos);
-                        return true;
-                    }
-                }
-                case FLOATING, SPACE, CAVERN, CAVERNSPHERES -> {
+            if (profile.isDefault()) {
+                if (needsCheck) {
                     BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, settings);
                     LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
                     serverLevel.setRespawnData(data);
@@ -199,6 +154,13 @@ public class SpawnPlacement {
                     spawnPositions.put(serverLevel.dimension(), pos);
                     return true;
                 }
+            } else {
+                BlockPos pos = findSafeSpawnPoint(serverLevel, dimensionInfo, isSuitable, settings);
+                LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
+                serverLevel.setRespawnData(data);
+                settings.setSpawn(data);
+                spawnPositions.put(serverLevel.dimension(), pos);
+                return true;
             }
         }
         return false;
@@ -212,6 +174,12 @@ public class SpawnPlacement {
 
     private static int getSqRadius(int radius, float pct) {
         return (int) ((radius * pct) * (radius * pct));
+    }
+
+    private static double squaredHorizontalDistance(int x1, int z1, int x2, int z2) {
+        double dx = x1 - (double) x2;
+        double dz = z1 - (double) z2;
+        return dx * dx + dz * dz;
     }
 
     private static BlockPos findSafeSpawnPoint(Level world, IDimensionInfo provider, @Nonnull Predicate<BlockPos> isSuitable,
@@ -231,7 +199,7 @@ public class SpawnPlacement {
                 }
 
                 ChunkCoord coord = new ChunkCoord(provider.getType(), x >> 4, z >> 4);
-                UrbexProfile profile = BuildingInfo.getProfile(coord, provider);
+                UrbexProfile profile = provider.getProfile();
 
                 for (int y = profile.GROUNDLEVEL-5 ; y < 125 ; y++) {
                     BlockPos pos = new BlockPos(x, y, z);

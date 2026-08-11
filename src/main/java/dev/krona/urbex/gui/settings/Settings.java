@@ -314,8 +314,7 @@ public final class Settings {
                 p -> (double) p.DEBRIS_TO_NEARBYCHUNK_FACTOR, (p, v) -> p.DEBRIS_TO_NEARBYCHUNK_FACTOR = (int) Math.round((Double) v));
 
         // ==== TRANSPORT ======================================================
-        // The networks the Transport preview overlay actually draws: highways and railways (city
-        // spheres' monorail settings stay under SPHERES, next to the rest of that landscape's knobs).
+        // The networks the Transport preview overlay actually draws: highways and railways.
         // The hierarchical street grid below has its own ROADS tab and its own preview.
         //
         // A power-of-two-minus-1 bit mask (config ceiling Integer.MAX_VALUE, default 7); only a handful of masks
@@ -402,42 +401,6 @@ public final class Settings {
         r.cycle("MULTI_BUILDING_STREET_CONFLICT", SettingCategory.ROADS,
                 p -> p.MULTI_BUILDING_STREET_CONFLICT, (p, v) -> p.MULTI_BUILDING_STREET_CONFLICT = (MultiBuildingStreetConflict) v);
 
-        // ==== SPHERES ========================================================
-        // City spheres (the 'space' landscape).
-        r.section("placement");
-        r.toggle("CITYSPHERE_32GRID", SettingCategory.SPHERES,
-                p -> p.CITYSPHERE_32GRID, (p, v) -> p.CITYSPHERE_32GRID = (Boolean) v);
-        r.slider("CITYSPHERE_FACTOR", SettingCategory.SPHERES, 0.1, 10.0, 0.1,
-                p -> (double) p.CITYSPHERE_FACTOR, (p, v) -> p.CITYSPHERE_FACTOR = ((Double) v).floatValue());
-        r.slider("CITYSPHERE_CHANCE", SettingCategory.SPHERES, 0.0, 1.0, 0.01,
-                p -> (double) p.CITYSPHERE_CHANCE, (p, v) -> p.CITYSPHERE_CHANCE = ((Double) v).floatValue());
-        r.toggle("CITYSPHERE_ONLY_PREDEFINED", SettingCategory.SPHERES,
-                p -> p.CITYSPHERE_ONLY_PREDEFINED, (p, v) -> p.CITYSPHERE_ONLY_PREDEFINED = (Boolean) v);
-
-        r.section("surface");
-        r.slider("CITYSPHERE_SURFACE_VARIATION", SettingCategory.SPHERES, 0.0, 1.0, 0.01,
-                p -> (double) p.CITYSPHERE_SURFACE_VARIATION, (p, v) -> p.CITYSPHERE_SURFACE_VARIATION = ((Double) v).floatValue());
-        r.slider("CITYSPHERE_OUTSIDE_SURFACE_VARIATION", SettingCategory.SPHERES, 0.0, 1.0, 0.01,
-                p -> (double) p.CITYSPHERE_OUTSIDE_SURFACE_VARIATION, (p, v) -> p.CITYSPHERE_OUTSIDE_SURFACE_VARIATION = ((Double) v).floatValue());
-        r.slider("CITYSPHERE_OUTSIDE_GROUNDLEVEL", SettingCategory.SPHERES, -1, 256, 1,
-                p -> (double) p.CITYSPHERE_OUTSIDE_GROUNDLEVEL, (p, v) -> p.CITYSPHERE_OUTSIDE_GROUNDLEVEL = (int) Math.round((Double) v));
-
-        r.section("clearing");
-        r.slider("CITYSPHERE_CLEARABOVE", SettingCategory.SPHERES, 0, 1024, 1,
-                p -> (double) p.CITYSPHERE_CLEARABOVE, (p, v) -> p.CITYSPHERE_CLEARABOVE = (int) Math.round((Double) v));
-        r.slider("CITYSPHERE_CLEARBELOW", SettingCategory.SPHERES, 0, 1024, 1,
-                p -> (double) p.CITYSPHERE_CLEARBELOW, (p, v) -> p.CITYSPHERE_CLEARBELOW = (int) Math.round((Double) v));
-        r.toggle("CITYSPHERE_CLEARABOVE_UNTIL_AIR", SettingCategory.SPHERES,
-                p -> p.CITYSPHERE_CLEARABOVE_UNTIL_AIR, (p, v) -> p.CITYSPHERE_CLEARABOVE_UNTIL_AIR = (Boolean) v);
-        r.toggle("CITYSPHERE_CLEARBELOW_UNTIL_AIR", SettingCategory.SPHERES,
-                p -> p.CITYSPHERE_CLEARBELOW_UNTIL_AIR, (p, v) -> p.CITYSPHERE_CLEARBELOW_UNTIL_AIR = (Boolean) v);
-
-        r.section("monorail");
-        r.slider("CITYSPHERE_MONORAIL_CHANCE", SettingCategory.SPHERES, 0.0, 1.0, 0.01,
-                p -> (double) p.CITYSPHERE_MONORAIL_CHANCE, (p, v) -> p.CITYSPHERE_MONORAIL_CHANCE = ((Double) v).floatValue());
-        r.slider("CITYSPHERE_MONORAIL_HEIGHT_OFFSET", SettingCategory.SPHERES, -100, 100, 1,
-                p -> (double) p.CITYSPHERE_MONORAIL_HEIGHT_OFFSET, (p, v) -> p.CITYSPHERE_MONORAIL_HEIGHT_OFFSET = (int) Math.round((Double) v));
-
         // ==== TERRAIN ========================================================
         // Ground/sea level, terrain-adjustment offsets and bedrock. (Landscape type lives in GENERAL.)
         r.section("levels");
@@ -492,14 +455,10 @@ public final class Settings {
         r.section("identifiers");
         r.text("CITY_STYLE_ALTERNATIVE", SettingCategory.ADVANCED,
                 p -> p.CITY_STYLE_ALTERNATIVE, (p, v) -> p.CITY_STYLE_ALTERNATIVE = (String) v);
-        r.text("CITYSPHERE_OUTSIDE_PROFILE", SettingCategory.ADVANCED,
-                p -> p.CITYSPHERE_OUTSIDE_PROFILE, (p, v) -> p.CITYSPHERE_OUTSIDE_PROFILE = (String) v);
         r.text("SPAWN_BIOME", SettingCategory.ADVANCED,
                 p -> p.SPAWN_BIOME, (p, v) -> p.SPAWN_BIOME = (String) v);
         r.text("SPAWN_CITY", SettingCategory.ADVANCED,
                 p -> p.SPAWN_CITY, (p, v) -> p.SPAWN_CITY = (String) v);
-        r.text("SPAWN_SPHERE", SettingCategory.ADVANCED,
-                p -> p.SPAWN_SPHERE, (p, v) -> p.SPAWN_SPHERE = (String) v);
         r.text("FORCE_SPAWN_BUILDINGS", SettingCategory.ADVANCED,
                 p -> p.FORCE_SPAWN_BUILDINGS, (p, v) -> p.FORCE_SPAWN_BUILDINGS = (String[]) v);
         r.text("FORCE_SPAWN_PARTS", SettingCategory.ADVANCED,

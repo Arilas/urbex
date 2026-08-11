@@ -94,12 +94,6 @@ class DatapackReferenceIntegrityTest {
                 }
                 JsonObject parts = asObject(d.get("parts"));
                 if (parts != null) {
-                    JsonObject mono = asObject(parts.get("monorails"));
-                    if (mono != null) {
-                        for (Map.Entry<String, JsonElement> e : mono.entrySet()) {
-                            ref(src, e.getValue(), "parts");
-                        }
-                    }
                     for (String group : List.of("highways", "railways")) {
                         JsonObject g = asObject(parts.get(group));
                         if (g != null) {

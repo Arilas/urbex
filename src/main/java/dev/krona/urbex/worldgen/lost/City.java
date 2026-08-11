@@ -21,9 +21,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * A city is defined as a big sphere. Buildings are where the radius is less then 70%
- */
 public class City {
 
     record PreDefBuildingOffset(PredefinedBuilding building, int offsetX, int offsetZ) {}
@@ -175,21 +172,7 @@ public class City {
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         RandomSource cityCenterRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_CENTER);
-        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres())) {
-            // @todo config
-            CitySphere sphere = CitySphere.getCitySphere(coord, provider);
-            if (!sphere.isEnabled()) {
-                // No sphere
-                return cityCenterRandom.nextDouble() < provider.getOutsideProfile().CITY_CHANCE;
-            }
-            if (sphere.getCenter().chunkX() == chunkX && sphere.getCenter().chunkZ() == chunkZ) {
-                // This chunk is the center of a city
-                return cityCenterRandom.nextDouble() < provider.getProfile().CITY_CHANCE;
-            }
-            return false;
-        } else {
-            return cityCenterRandom.nextDouble() < provider.getProfile().CITY_CHANCE;
-        }
+        return cityCenterRandom.nextDouble() < provider.getProfile().CITY_CHANCE;
     }
 
     /**
@@ -208,15 +191,7 @@ public class City {
         if (cityRange < 1) {
             cityRange = 1;
         }
-        if (profile.isSpace() || profile.isSpheres()) {
-            if (CitySphere.intersectsWithCitySphere(coord, provider)) {
-                return profile.CITY_MINRADIUS + cityRadiusRandom.nextInt(cityRange);
-            } else {
-                return provider.getOutsideProfile().CITY_MINRADIUS + cityRadiusRandom.nextInt(provider.getOutsideProfile().CITY_MAXRADIUS - provider.getOutsideProfile().CITY_MINRADIUS);
-            }
-        } else {
-            return profile.CITY_MINRADIUS + cityRadiusRandom.nextInt(cityRange);
-        }
+        return profile.CITY_MINRADIUS + cityRadiusRandom.nextInt(cityRange);
     }
 
     // Call this on a city center to get the style of that city
@@ -337,16 +312,12 @@ public class City {
             for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
                 for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
                     ChunkCoord c = new ChunkCoord(type, cx, cz);
-                    UrbexProfile pro = BuildingInfo.getProfile(c, provider);
-                    // Only count cities that are in the same 'profile' as this one
-                    if (pro == profile) {
-                        if (isCityCenter(c, provider)) {
-                            float radius = getCityRadius(c, provider);
-                            float sqdist = (cx * 16 - (chunkX << 4)) * (cx * 16 - (chunkX << 4)) + (cz * 16 - (chunkZ << 4)) * (cz * 16 - (chunkZ << 4));
-                            if (sqdist < radius * radius) {
-                                float dist = (float) Math.sqrt(sqdist);
-                                factor += (radius - dist) / radius;
-                            }
+                    if (isCityCenter(c, provider)) {
+                        float radius = getCityRadius(c, provider);
+                        float sqdist = (cx * 16 - (chunkX << 4)) * (cx * 16 - (chunkX << 4)) + (cz * 16 - (chunkZ << 4)) * (cz * 16 - (chunkZ << 4));
+                        if (sqdist < radius * radius) {
+                            float dist = (float) Math.sqrt(sqdist);
+                            factor += (radius - dist) / radius;
                         }
                     }
                 }

@@ -22,7 +22,6 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
                     CorridorSettings.CODEC.optionalFieldOf("corridorblocks").forGetter(l -> Optional.ofNullable(l.corridorSettings)),
                     ParkSettings.CODEC.optionalFieldOf("parkblocks").forGetter(l -> Optional.ofNullable(l.parkSettings)),
                     RailSettings.CODEC.optionalFieldOf("railblocks").forGetter(l -> Optional.ofNullable(l.railSettings)),
-                    SphereSettings.CODEC.optionalFieldOf("sphereblocks").forGetter(l -> Optional.ofNullable(l.sphereSettings)),
                     StreetSettings.CODEC.optionalFieldOf("streetblocks").forGetter(l -> Optional.ofNullable(l.streetSettings)),
                     Selectors.CODEC.optionalFieldOf("selectors").forGetter(l -> Optional.ofNullable(l.selectors))
             ).apply(instance, CityStyleRE::new));
@@ -40,7 +39,6 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
     private final CorridorSettings corridorSettings;
     private final ParkSettings parkSettings;
     private final RailSettings railSettings;
-    private final SphereSettings sphereSettings;
     private final StreetSettings streetSettings;
 
     private final Selectors selectors;
@@ -55,7 +53,6 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
             Optional<CorridorSettings> corridorSettings,
             Optional<ParkSettings> parkSettings,
             Optional<RailSettings> railSettings,
-            Optional<SphereSettings> sphereSettings,
             Optional<StreetSettings> streetSettings,
             Optional<Selectors> selectors) {
         this.explosionChance = explosionChance.orElse(null);
@@ -67,7 +64,6 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
         this.corridorSettings = corridorSettings.orElse(null);
         this.parkSettings = parkSettings.orElse(null);
         this.railSettings = railSettings.orElse(null);
-        this.sphereSettings = sphereSettings.orElse(null);
         this.streetSettings = streetSettings.orElse(null);
         this.selectors = selectors.orElse(null);
     }
@@ -105,10 +101,6 @@ public class CityStyleRE implements IAsset<CityStyleRE> {
 
     public Optional<RailSettings> getRailSettings() {
         return Optional.ofNullable(railSettings);
-    }
-
-    public Optional<SphereSettings> getSphereSettings() {
-        return Optional.ofNullable(sphereSettings);
     }
 
     public Optional<StreetSettings> getStreetSettings() {

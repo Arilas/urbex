@@ -12,11 +12,6 @@
     "attempts": 50
   },
   "parts": {
-    "monorails": {
-      "both": "urbex:monorails_both",
-      "vertical": "urbex:monorails_vertical",
-      "station": "urbex:monorails_station"
-    },
     "highways": {
       "tunnel": ["urbex:highway_tunnel"],
       "open": ["urbex:highway_open"],

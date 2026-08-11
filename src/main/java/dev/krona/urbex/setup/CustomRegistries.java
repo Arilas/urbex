@@ -30,8 +30,6 @@ public class CustomRegistries {
 
     public static final ResourceKey<Registry<PredefinedCityRE>> PREDEFINEDCITIES_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "predefinedcities"));
 
-    public static final ResourceKey<Registry<PredefinedSphereRE>> PREDEFINEDSPHERES_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "predefinedspheres"));
-
     public static final ResourceKey<Registry<ScatteredRE>> SCATTERED_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "scattered"));
 
     public static final ResourceKey<Registry<StuffSettingsRE>> STUFF_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "stuff"));
@@ -50,7 +48,6 @@ public class CustomRegistries {
         DynamicRegistries.register(VARIANTS_REGISTRY_KEY, VariantRE.CODEC);
         DynamicRegistries.register(WORLDSTYLES_REGISTRY_KEY, WorldStyleRE.CODEC);
         DynamicRegistries.register(PREDEFINEDCITIES_REGISTRY_KEY, PredefinedCityRE.CODEC);
-        DynamicRegistries.register(PREDEFINEDSPHERES_REGISTRY_KEY, PredefinedSphereRE.CODEC);
         DynamicRegistries.register(SCATTERED_REGISTRY_KEY, ScatteredRE.CODEC);
         DynamicRegistries.register(STUFF_REGISTRY_KEY, StuffSettingsRE.CODEC);
     }

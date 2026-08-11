@@ -9,7 +9,6 @@ import dev.krona.urbex.varia.*;
 import dev.krona.urbex.worldgen.gen.*;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
-import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
 import net.minecraft.core.BlockPos;
@@ -266,7 +265,7 @@ public class CityGenerator {
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
         ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info);
 
-        boolean doCity = info.isCity || (info.outsideChunk && info.hasBuilding);
+        boolean doCity = info.isCity;
 
         // Check if there is no village or other structure here. We don't do this for multibuildings because otherwise part of the multibuilding might be cut off
         AvoidChunk avoidChunk = AvoidChunk.NO;
@@ -294,37 +293,12 @@ public class CityGenerator {
             doNormalChunk(ctx, info, heightmap, avoidChunk);
         }
 
-        if (profile.isSpace() || profile.isSpheres()) {
-            if (CitySphere.isCitySphereCenter(coord, provider)) {
-                CitySphereSettings settings = provider.getWorldStyle().getCitysphereSettings();
-                if (settings != null && settings.getCenterpart() != null) {
-                    BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), settings.getCenterpart());
-                    if (part != null) {
-                        int offset = settings.getCenterPartOffset();
-                        int partY = switch (settings.getCenterPartOrigin()) {
-                            case FIXED -> 0;
-                            case CENTER -> CitySphere.getCitySphere(coord, provider).getCenterPos().getY();
-                            case FIRSTFLOOR -> info.getCityGroundLevel();
-                            case GROUND -> info.groundLevel;
-                            case TOP -> getTopLevel(info);
-                        };
-                        partY += offset;
-                        generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, partY, 0, HardAirSetting.WATERLEVEL);
-                    }
-                }
-            }
-        }
-
         Railway.RailChunkInfo railInfo = info.getRailInfo();
         if (railInfo.getType() != RailChunkType.NONE) {
             Railways.generateRailways(ctx, this, info, railInfo, heightmap);
         }
         Railways.generateRailwayDungeons(ctx, this, info);
 
-//        if (profile.isSpace()) {
-//            generateMonorails(info);
-//        }
-//
         placeOptionalLights(ctx, info);
 
         if (info.getDamageArea().hasExplosions()) {
@@ -456,7 +430,7 @@ public class CityGenerator {
 
     private void doNormalChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
 //        debugClearChunk(chunkX, chunkZ, primer);
-        if ((avoidChunk != AvoidChunk.YES || !Config.AVOID_FLATTENING.get()) && (profile.isDefault() || profile.isVoidSpheres())) {
+        if ((avoidChunk != AvoidChunk.YES || !Config.AVOID_FLATTENING.get()) && profile.isDefault()) {
             correctTerrainShape(ctx, provider.getWorld(), info.coord, heightmap);
 //            flattenChunkToCityBorder(chunkX, chunkZ);
         }
@@ -939,7 +913,7 @@ public class CityGenerator {
         ChunkDriver driver = ctx.driver;
         boolean building = info.hasBuilding;
 
-        if (info.profile.isDefault() || info.profile.isVoidSpheres()) {
+        if (info.profile.isDefault()) {
             int minHeight = info.provider.getWorld().getMinY();
             BlockState bedrock = Blocks.BEDROCK.defaultBlockState();
             for (int x = 0; x < 16; ++x) {
@@ -960,7 +934,7 @@ public class CityGenerator {
 
         // City surface leveling - for prettier cities
         // Note: Better results may be achieved with terrain noise adjustment (like how newer structures do it)
-        if (profile.isDefault() || profile.isVoidSpheres()) {
+        if (profile.isDefault()) {
             int ground = info.getCityGroundLevel();
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
@@ -1330,13 +1304,12 @@ public class CityGenerator {
     private void generateBorders(ChunkGenContext ctx, BuildingInfo info, boolean canDoParks, ChunkHeightmap heightmap) {
         Character borderBlock = info.getCityStyle().getBorderBlock();
 
-        switch (info.profile.LANDSCAPE_TYPE) {
-            case DEFAULT -> fillToBedrockStreetBlock(ctx, info);
-            case FLOATING -> fillMainStreetBlock(ctx, info, borderBlock, 3);
-            case CAVERN -> fillMainStreetBlock(ctx, info, borderBlock, 2);
-            case CAVERNSPHERES -> fillMainStreetBlock(ctx, info, borderBlock, 2);
-            case SPACE -> fillToGroundStreetBlock(ctx, info, info.getCityGroundLevel());
-            case SPHERES -> fillToBedrockStreetBlock(ctx, info);
+        if (info.profile.isFloating()) {
+            fillMainStreetBlock(ctx, info, borderBlock, 3);
+        } else if (info.profile.isCavern()) {
+            fillMainStreetBlock(ctx, info, borderBlock, 2);
+        } else {
+            fillToBedrockStreetBlock(ctx, info);
         }
 
         if (doBorder(info, Direction.XMIN)) {
@@ -1386,23 +1359,6 @@ public class CityGenerator {
     }
 
     /**
-     * Fill from a certain lowest level with base blocks until non air is hit
-     */
-    private void fillToGroundStreetBlock(ChunkGenContext ctx, BuildingInfo info, int lowestLevel) {
-        ChunkDriver driver = ctx.driver;
-        for (int x = 0; x < 16; ++x) {
-            for (int z = 0; z < 16; ++z) {
-                int y = lowestLevel - 1;
-                driver.current(x, y, z);
-                while (y > 1 && driver.getBlock() == air) {
-                    driver.block(base).decY();
-                    y--;
-                }
-            }
-        }
-    }
-
-    /**
      * Fill a main street block with base blocks and border blocks at the bottom
      */
     private void fillMainStreetBlock(ChunkGenContext ctx, BuildingInfo info, Character borderBlock, int offset) {
@@ -1425,48 +1381,22 @@ public class CityGenerator {
         Character wallBlock = info.getCityStyle().getWallBlock();
         BlockState wall = ctx.paletteAt(info.getCompiledPalette(), wallBlock, x, info.getCityGroundLevel() + 1, z);
 
-        switch (info.profile.LANDSCAPE_TYPE) {
-            case DEFAULT, SPHERES -> {
-                int y = getMinHeightAt(info, x, z, heightmap);
-                if (y < info.getCityGroundLevel() + 1) {
-                    // We are above heightmap level. Generated a border from that level to our ground level
-                    setBlocksFromPalette(ctx, x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-                } else {
-                    // We are below heightmap level. Generate a thin border anyway
-                    setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-                }
-            }
-            case SPACE -> {
-                int adjacentY = info.getCityGroundLevel() - 8;
-                if (adjacent.isCity) {
-                    adjacentY = Math.min(adjacentY, adjacent.getCityGroundLevel());
-                } else {
-                    ChunkHeightmap adjacentHeightmap = getHeightmap(adjacent.coord, provider.getWorld());
-                    int minimumHeight = adjacentHeightmap.getHeight();
-                    adjacentY = Math.min(adjacentY, minimumHeight - 2);
-                }
-
-                if (adjacentY > 5) {
-                    setBlocksFromPalette(ctx, x, adjacentY, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-                }
-            }
-            case FLOATING -> {
+        if (info.profile.isFloating()) {
                 setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 if (isCorner(x, z)) {
                     generateBorderSupport(ctx, info, wall, x, z, 3, heightmap);
                 }
-            }
-            case CAVERN -> {
+        } else if (info.profile.isCavern()) {
                 setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 if (isCorner(x, z)) {
                     generateBorderSupport(ctx, info, wall, x, z, 2, heightmap);
                 }
-            }
-            case CAVERNSPHERES -> {
-                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-                if (isCorner(x, z)) {
-                    generateBorderSupport(ctx, info, wall, x, z, 2, heightmap);
-                }
+        } else {
+            int y = getMinHeightAt(info, x, z, heightmap);
+            if (y < info.getCityGroundLevel() + 1) {
+                setBlocksFromPalette(ctx, x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+            } else {
+                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
             }
         }
         if (canDoParks) {
@@ -2152,11 +2082,6 @@ public class CityGenerator {
         ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
                 todo.getPart(), belowFloor, todo.getBuilding(), info.coord) {
             @Override
-            public boolean isSphere() {
-                return CitySphere.isInSphere(info.coord, pos, diminfo);
-            }
-
-            @Override
             public Identifier getBiome() {
                 return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
             }
@@ -2190,11 +2115,6 @@ public class CityGenerator {
                 int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
                 ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
                         todo.getPart(), "<none>", todo.getBuilding(), info.coord) {
-                    @Override
-                    public boolean isSphere() {
-                        return CitySphere.isInSphere(info.coord, pos, diminfo);
-                    }
-
                     @Override
                     public Identifier getBiome() {
                         return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
@@ -2289,16 +2209,6 @@ public class CityGenerator {
             if (adjacent.cityLevel <= info.cityLevel) {
                 return true;
             }
-            if (info.profile.isSpace()) {
-                // Base it on ground level
-                ChunkHeightmap adjacentHeightmap = getHeightmap(adjacent.coord, provider.getWorld());
-                int adjacentHeight = adjacentHeightmap.getHeight();
-                if (adjacentHeight > 5) {
-                    if ((adjacentHeight - 4) < info.getCityGroundLevel()) {
-                        return true;
-                    }
-                }
-            }
         }
         return false;
     }
@@ -2345,7 +2255,7 @@ public class CityGenerator {
         for (int f = -cellars; f <= floors; f++) {
             // In default landscape type we clear the landscape on top of the building when we are at the top floor
             if (f == floors) {
-                if (profile.isDefault() || profile.isVoidSpheres()) {
+                if (profile.isDefault()) {
                     clearToMax(ctx, info, heightmap, height, max);
                 }
             }
@@ -2429,14 +2339,6 @@ public class CityGenerator {
                     clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
-        } else if (info.profile.isSpace()) {
-            fillToGround(ctx, info, lowestLevel, borderBlock);
-            // Also clear the inside of buildings to avoid geometry that doesn't really belong there
-            for (int x = 0; x < 16; ++x) {
-                for (int z = 0; z < 16; ++z) {
-                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, false);     // Never water in bubbles?
-                }
-            }
         } else if (info.profile.isCavern()) {
             // For normal cavern we have a thin layer of 'border' blocks because that looks nicer
             for (int x = 0; x < 16; ++x) {
@@ -2453,7 +2355,7 @@ public class CityGenerator {
                     clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
-        } else { // (also for spheres)
+        } else {
             // For normal worldgen we have a thin layer of 'border' blocks because that looks nicer
             // We try to avoid this layer in big caves though
             for (int x = 0; x < 16; ++x) {
@@ -2487,29 +2389,6 @@ public class CityGenerator {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
                     clearRange(ctx, info, x, z, height, maximumHeight, false);
-                }
-            }
-        }
-    }
-
-    // Used for space type worlds: fill underside the building/street until a block is encountered
-    public void fillToGround(ChunkGenContext ctx, BuildingInfo info, int lowestLevel, Character borderBlock) {
-        ChunkDriver driver = ctx.driver;
-        int deepestY = Math.max(1, lowestLevel - 10);
-        for (int x = 0; x < 16; ++x) {
-            for (int z = 0; z < 16; ++z) {
-                int y = lowestLevel - 1;
-                driver.current(x, y, z);
-                if (isSide(x, z)) {
-                    while (y > deepestY && driver.getBlock() == air) {
-                        driver.block(ctx.paletteHere(info.getCompiledPalette(), borderBlock)).decY();
-                        y--;
-                    }
-                } else {
-                    while (y > deepestY && driver.getBlock() == air) {
-                        driver.block(base).decY();
-                        y--;
-                    }
                 }
             }
         }

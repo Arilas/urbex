@@ -97,7 +97,7 @@ public class Railway {
         int chunkZ = key.chunkZ();
         RandomSource randomRailChunkType = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.RAILWAY);
 
-        UrbexProfile profile = BuildingInfo.getProfile(key, provider);
+        UrbexProfile profile = provider.getProfile();
         RailwayParts railwayParts = provider.getWorldStyle().getPartSelector().railwayParts();
 
         // @todo make all settings based on rand below configurable
@@ -321,9 +321,7 @@ public class Railway {
             return known;
         }
         RailChunkInfo info = getRailChunkTypeInternal(coord, provider);
-        if ((provider.getProfile().isSpace() || provider.getProfile().isSpheres()) && CitySphere.onCitySphereBorder(coord, provider)) {
-            info = RailChunkInfo.NOTHING;
-        } else if (info.getType().isStation()) {
+        if (info.getType().isStation()) {
             if (!profile.RAILWAY_STATIONS_ENABLED) {
                 info = RailChunkInfo.NOTHING;
             }

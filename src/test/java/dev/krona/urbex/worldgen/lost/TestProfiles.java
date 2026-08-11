@@ -31,6 +31,6 @@ final class TestProfiles {
         return new CityStyle(new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
+                Optional.empty(), Optional.empty(), Optional.empty()));
     }
 }

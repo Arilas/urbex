@@ -12,7 +12,6 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import dev.krona.urbex.worldgen.lost.CitySphere;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
 import dev.krona.urbex.worldgen.lost.Railway;
 import net.minecraft.commands.CommandSourceStack;
@@ -62,19 +61,11 @@ public class CommandDebug implements Command<CommandSourceStack> {
             System.out.println("getHighwayXLevel() = " + info.getHighwayXLevel());
             System.out.println("getHighwayZLevel() = " + info.getHighwayZLevel());
 
-            float reldist = CitySphere.getRelativeDistanceToCityCenter(info.coord, dimInfo);
-            System.out.println("reldist = " + reldist);
-
             Railway.RailChunkInfo railInfo = Railway.getRailChunkType(info.coord, info.provider, info.profile);
             System.out.println("railInfo.getType() = " + railInfo.getType());
             System.out.println("railInfo.getLevel() = " + railInfo.getLevel());
             System.out.println("railInfo.getDirection() = " + railInfo.getDirection());
             System.out.println("railInfo.getRails() = " + railInfo.getRails());
-
-            CitySphere sphere = CitySphere.getCitySphere(info.coord, dimInfo);
-            System.out.println("sphere.cityCenter = " + sphere.getCenter());
-            System.out.println("sphere.isEnabled() = " + sphere.isEnabled());
-            System.out.println("sphere.radius = " + sphere.getRadius());
 
             int explosions = info.getExplosions().size();
             System.out.println("explosions = " + explosions);

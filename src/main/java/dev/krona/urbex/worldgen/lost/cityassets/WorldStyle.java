@@ -23,7 +23,6 @@ public class WorldStyle {
     private final Identifier name;
     private final String outsideStyle;
 
-    private final CitySphereSettings citysphereSettings;
     private final ScatteredSettings scatteredSettings;
     @Nonnull private final PartSelector partSelector;
     private final List<Pair<Predicate<Holder<Biome>>, Pair<Float, String>>> cityStyleSelector = new ArrayList<>();
@@ -33,7 +32,6 @@ public class WorldStyle {
 
     public WorldStyle(WorldStyleRE object) {
         name = object.getRegistryName();
-        this.citysphereSettings = object.getCitysphereSettings();
         this.scatteredSettings = object.getScatteredSettings();
         this.partSelector = object.getPartSelector();
         this.multiSettings = object.getMultiSettings();
@@ -68,10 +66,6 @@ public class WorldStyle {
     @Nonnull
     public PartSelector getPartSelector() {
         return partSelector;
-    }
-
-    public CitySphereSettings getCitysphereSettings() {
-        return citysphereSettings;
     }
 
     @Nullable

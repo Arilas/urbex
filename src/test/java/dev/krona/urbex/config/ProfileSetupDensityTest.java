@@ -24,15 +24,10 @@ class ProfileSetupDensityTest {
             Map.entry("tallbuildings", new float[]{0.15f, 0.65f}),
             Map.entry("atlantis", new float[]{0.15f, 0.65f}),
             Map.entry("cavern", new float[]{0.65f, 0.65f}),
-            Map.entry("biosphere_caves", new float[]{0.65f, 0.65f}),
-            Map.entry("space", new float[]{0.50f, 0.65f}),
-            Map.entry("biosphere", new float[]{0.50f, 0.65f}),
             Map.entry("largecities", new float[]{0.35f, 0.65f}),
             Map.entry("ancient", new float[]{0.05f, 0.40f}),
             Map.entry("wasteland", new float[]{0.05f, 0.40f}),
-            Map.entry("bio_wasteland", new float[]{0.05f, 0.40f}),
-            Map.entry("safe", new float[]{1.00f, 0.00f}),
-            Map.entry("void_outside", new float[]{0.00f, 0.00f})
+            Map.entry("safe", new float[]{1.00f, 0.00f})
     );
 
     @Test

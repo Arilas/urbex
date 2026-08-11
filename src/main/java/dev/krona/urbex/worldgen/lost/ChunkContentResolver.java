@@ -6,7 +6,6 @@ import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.plan.grid.GridPurpose;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
-import dev.krona.urbex.worldgen.lost.regassets.data.CitySphereSettings;
 import net.minecraft.util.RandomSource;
 
 import javax.annotation.Nullable;
@@ -40,15 +39,11 @@ import java.util.function.Supplier;
  * </ol>
  *
  * <h2>The overrides</h2>
- * Three things are <em>not</em> steps in that chain. They are applied afterwards and overrule
+ * One thing is <em>not</em> a step in that chain. It is applied afterwards and overrules
  * whatever it decided:
  * <ul>
- *   <li>the <b>sphere-edge clamp</b> (pass one): a single chunk more than .7 of the way out from a
- *       city sphere's centre loses its building whatever the chain said;</li>
  *   <li>the <b>lonely-building veto</b> (pass two): a neighbour whose building type prefers to stand
- *       alone can take this chunk's building away;</li>
- *   <li>the <b>city-sphere-centre override</b> (pass two), which has the last word of all: STREET
- *       removes the building, BUILDING forces one back on.</li>
+ *       alone can take this chunk's building away.</li>
  * </ul>
  *
  * <h2>Why the order runs in two passes</h2>
@@ -93,12 +88,6 @@ public final class ChunkContentResolver {
         float at(ChunkCoord neighbour);
     }
 
-    /** A {@code float}-valued supplier; {@link java.util.function.DoubleSupplier} would widen. */
-    @FunctionalInterface
-    public interface FloatSupplier {
-        float get();
-    }
-
     /**
      * The world facts pass one consults, each behind its own supplier.
      *
@@ -121,7 +110,6 @@ public final class ChunkContentResolver {
      * @param maxHighwayLevel              the higher of this chunk's two highway levels
      * @param hasRailway                   a railway runs through this chunk
      * @param railInfo                     this chunk's railway type and level
-     * @param relativeDistanceToCityCenter how far out of its city sphere this chunk sits, 0 to 1
      */
     public record ChunkFacts(BooleanSupplier hasPredefinedBuilding,
                              BooleanSupplier hasPredefinedStreet,
@@ -130,8 +118,7 @@ public final class ChunkContentResolver {
                              BooleanSupplier hasHighway,
                              IntSupplier maxHighwayLevel,
                              BooleanSupplier hasRailway,
-                             Supplier<Railway.RailChunkInfo> railInfo,
-                             FloatSupplier relativeDistanceToCityCenter) {
+                             Supplier<Railway.RailChunkInfo> railInfo) {
     }
 
     /**
@@ -142,15 +129,7 @@ public final class ChunkContentResolver {
      */
     public static boolean couldHaveBuilding(UrbexProfile profile, boolean isCity, MultiPos section,
                                             int cityLevel, RandomSource rand, ChunkFacts facts) {
-        boolean couldHaveBuilding = isCity && checkBuildingPossibility(profile, section, cityLevel, rand, facts);
-        if ((profile.isSpace() || profile.isSpheres()) && section.isSingle()) {
-            // Minimize cities at the edge of the city in an orb
-            float dist = facts.relativeDistanceToCityCenter().get();
-            if (dist > .7f) {
-                couldHaveBuilding = false;
-            }
-        }
-        return couldHaveBuilding;
+        return isCity && checkBuildingPossibility(profile, section, cityLevel, rand, facts);
     }
 
     private static boolean checkBuildingPossibility(UrbexProfile profile, MultiPos section, int cityLevel, RandomSource rand, ChunkFacts facts) {
@@ -209,20 +188,18 @@ public final class ChunkContentResolver {
      * @param profile               the profile active for this chunk, for the open-lot park chance
      * @param seed                  the world seed, which addresses the open-lot park roll
      * @param rand                  the chunk's {@code BUILDING_LAYOUT} stream, positioned at its start
-     * @param isCity                whether this chunk is city at all, after any sphere-centre override
+     * @param isCity                whether this chunk is city at all
      * @param couldHaveBuilding     the pass-one verdict from {@link #couldHaveBuilding}
      * @param effectiveRoad         the planned road this chunk renders, already clipped to the city mask
      * @param section               this chunk's position in a multi-building, or {@link MultiPos#SINGLE}
      * @param coord                 this chunk, used to address the four neighbours of the lonely veto
      * @param prefersLonely         the neighbours' lonely preference, consulted lazily and in order
-     * @param sphereCenterType      the city sphere centre override, or null when this chunk is not one
      * @param candidateBuildingName the building asset picked in pass one, returned only if it stands
      */
     public static ChunkContent resolve(UrbexProfile profile, long seed, RandomSource rand,
                                        boolean isCity, boolean couldHaveBuilding, RoadType effectiveRoad,
                                        MultiPos section, ChunkCoord coord,
                                        PrefersLonely prefersLonely,
-                                       @Nullable CitySphereSettings.CitySphereCenterType sphereCenterType,
                                        @Nullable String candidateBuildingName) {
         boolean b = couldHaveBuilding;
         if (b && section.isSingle()) {
@@ -234,15 +211,6 @@ public final class ChunkContentResolver {
                 b = false;
             } else if (rand.nextFloat() < prefersLonely.at(coord.south())) {
                 b = false;
-            }
-        }
-
-        if (sphereCenterType != null) {
-            switch (sphereCenterType) {
-                case DEFAULT, NORMAL -> {
-                }
-                case STREET -> b = false;
-                case BUILDING -> b = true;
             }
         }
 

@@ -82,14 +82,17 @@ loom {
         // so it never moved when planned bridges and sloped minor roads were added and CI was
         // blind to both (see the hierarchical-streets Task 5 report). Widening the primary sample
         // to cover them was rejected - radius 15 there is ~20x the generation work of radius 3,
-        // and it is the pin for everything else on this branch. This is a separate, disposable
+        // and it is the pin for everything else here. This is a separate, disposable
         // window instead: seed 1337, offset 83, radius 9 (chunks 74..92 on both axes), sized to be
         // the smallest square covering both known features. Relocated here (from offset 101,
-        // radius 15) when the cross-chunk-access removal branch compacted Rng.Purpose by seven
+        // radius 15) when the cross-chunk-access removal compacted Rng.Purpose by seven
         // dead constants, shifting every addressed stream and moving every city layout; the old
         // window's slope at (93,116) was gone and a wide probe (radius 40 around the old offset,
         // 6561 chunks) was needed to relocate both features. The bridge deck now sampled sits at
         // (87,92), (88,92), (89,92); the nearest slope found anywhere in that probe is at (74,87).
+        // Both were re-probed and found at exactly those coordinates after the merge with the
+        // sphere removal dropped three more dead constants (enum 44 -> 41), so the window itself
+        // did not have to move again - only its golden.
         // At 361 chunks this costs 0.38x the 961-chunk window it replaces, and is still separate
         // from and disposable relative to the primary pin. requireBridge and requireSlope make
         // DigestRunner's own bridgeChunks/slopeChunks counts (printed on every run, in

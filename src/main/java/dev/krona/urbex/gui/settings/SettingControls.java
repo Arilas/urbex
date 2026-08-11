@@ -363,8 +363,8 @@ public final class SettingControls {
     }
 
     /**
-     * {@code urbex.enum.<enum simple name>.<constant name>}, all lowercase - e.g.
-     * {@code urbex.enum.landscapetype.cavernspheres}. General on purpose: any future {@code CYCLE} enum gets
+     * {@code urbex.enum.<enum simple name>.<constant name>}, all lowercase by design:
+     * any future {@code CYCLE} enum gets
      * a per-value label for free by following the same naming scheme in the lang file.
      *
      * <p>Package-private (not {@code private}) so {@code SettingsCompletenessTest} can assert every CYCLE

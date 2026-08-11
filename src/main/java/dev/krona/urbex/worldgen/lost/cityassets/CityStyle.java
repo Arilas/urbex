@@ -64,11 +64,6 @@ public class CityStyle {
     // Rail settings
     private Character railMainBlock;
 
-    // Sphere settings
-    private Character sphereBlock;          // Used for 'space' landscape type
-    private Character sphereSideBlock;      // Used for 'space' landscape type
-    private Character sphereGlassBlock;     // Used for 'space' landscape type
-
     // General settings
     private Character ironbarsBlock;
     private Character glowstoneBlock;
@@ -116,11 +111,6 @@ public class CityStyle {
             parkStreetThreshold = s.getParkStreetThreshold();
             grassBlock = s.getGrassBlock();
             parkElevationBlock = s.getParkElevationBlock();
-        });
-        object.getSphereSettings().ifPresent(s -> {
-            sphereBlock = s.getSphereBlock();
-            sphereGlassBlock = s.getSphereGlassBlock();
-            sphereSideBlock = s.getSphereSideBlock();
         });
         object.getStreetSettings().ifPresent(s -> {
             fountainChance = s.getFountainChance();
@@ -284,18 +274,6 @@ public class CityStyle {
         return wallBlock;
     }
 
-    public Character getSphereBlock() {
-        return sphereBlock;
-    }
-
-    public Character getSphereSideBlock() {
-        return sphereSideBlock;
-    }
-
-    public Character getSphereGlassBlock() {
-        return sphereGlassBlock;
-    }
-
     /**
      * Resolve 'inherit'. Called on every lookup of this style, from any worldgen worker thread, so
      * it has to be safe to race - and it mutates about thirty fields, so it cannot be done with a
@@ -425,15 +403,6 @@ public class CityStyle {
                 }
                 if (wallBlock == null) {
                     wallBlock = inheritFrom.wallBlock;
-                }
-                if (sphereBlock == null) {
-                    sphereBlock = inheritFrom.sphereBlock;
-                }
-                if (sphereSideBlock == null) {
-                    sphereSideBlock = inheritFrom.sphereSideBlock;
-                }
-                if (sphereGlassBlock == null) {
-                    sphereGlassBlock = inheritFrom.sphereGlassBlock;
                 }
             }
             initialized = true;

@@ -17,7 +17,6 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
                     Codec.STRING.fieldOf("outsidestyle").forGetter(l -> l.outsideStyle),
                     MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> l.multiSettings.get()),
                     WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> l.worldSettings.get()),
-                    CitySphereSettings.CODEC.optionalFieldOf("cityspheres").forGetter(l -> Optional.ofNullable(l.citysphereSettings)),
                     ScatteredSettings.CODEC.optionalFieldOf("scattered").forGetter(l -> Optional.ofNullable(l.scatteredSettings)),
                     PartSelector.CODEC.optionalFieldOf("parts").forGetter(l -> l.partSelector.get()),
                     Codec.list(CityStyleSelector.CODEC).fieldOf("citystyles").forGetter(l -> l.cityStyleSelectors),
@@ -29,7 +28,6 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
     private final MultiSettings multiSettings;
     private final WorldSettings worldSettings;
     private final ScatteredSettings scatteredSettings;
-    private final CitySphereSettings citysphereSettings;
     @Nonnull private final PartSelector partSelector;
     private final List<CityStyleSelector> cityStyleSelectors;
     private final List<CityBiomeMultiplier> cityBiomeMultipliers;
@@ -37,7 +35,6 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
     public WorldStyleRE(String outsideStyle,
                         Optional<MultiSettings> multiSettings,
                         Optional<WorldSettings> worldSettings,
-                        Optional<CitySphereSettings> citysphereSettings,
                         Optional<ScatteredSettings> scatteredSettings,
                         Optional<PartSelector> partSelector,
                         List<CityStyleSelector> cityStyleSelector,
@@ -45,7 +42,6 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
         this.outsideStyle = outsideStyle;
         this.multiSettings = multiSettings.orElse(MultiSettings.DEFAULT);
         this.worldSettings = worldSettings.orElse(WorldSettings.DEFAULT);
-        this.citysphereSettings = citysphereSettings.orElse(null);
         this.scatteredSettings = scatteredSettings.orElse(null);
         this.partSelector = partSelector.orElse(PartSelector.DEFAULT);
         this.cityStyleSelectors = cityStyleSelector;
@@ -59,10 +55,6 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
     @Nonnull
     public PartSelector getPartSelector() {
         return partSelector;
-    }
-
-    public CitySphereSettings getCitysphereSettings() {
-        return citysphereSettings;
     }
 
     @Nullable

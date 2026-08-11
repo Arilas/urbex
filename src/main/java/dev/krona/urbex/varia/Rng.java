@@ -39,7 +39,6 @@ public final class Rng {
         CITY_RADIUS,
         CITY_STYLE,
         RAILWAY,
-        SPHERE,
         SCATTERED,
         // Added after the first release of this enum. New consumers append here; they never
         // reorder what is above them, so an existing world keeps generating what it did.
@@ -52,11 +51,6 @@ public final class Rng {
         EXPLOSION_MINI,
         RUINS_BARS,
         DAMAGE_VARIANT,
-        // Each of these splits a second, logically independent decision off an address that
-        // already had one. Two decisions sharing an address and a purpose read the same draw, so
-        // one becomes a monotone function of the other - a sphere's block from its radius.
-        SPHERE_BLOCKS,
-        SPHERE_CITY_LEVEL,
         TERRAIN_FIX_LOWER,
         TERRAIN_FIX_UPPER,
         CITY_STYLE_LOCAL,

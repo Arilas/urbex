@@ -38,11 +38,6 @@
   "railblocks": {
     "railmain": "y"
   },
-  "sphereblocks": {
-    "glass": "Z",
-    "border": "9",
-    "inner": "b"
-  },
   "selectors": {
     "buildings": [
       {
