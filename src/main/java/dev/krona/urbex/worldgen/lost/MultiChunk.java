@@ -93,8 +93,19 @@ public class MultiChunk {
         // CityStyle. If AssetRegistries.reset() ever ran mid-generation, a chunk resolved before it
         // and one resolved after would hold two distinct instances of the same id: the counter
         // would split one style's votes in two, and the getId() sort would stop being a total order
-        // (two entries comparing equal, ordered by whatever the HashMap handed over). Safe today
-        // because reset() only runs from CityFeature.cleanUp on server start/stop.
+        // (two entries comparing equal, ordered by whatever the HashMap handed over).
+        //
+        // reset() is not confined to server start/stop, and that is worth being precise about:
+        // CityFeature.cleanUp() calls it, and cleanUp() is invoked lazily from
+        // CityFeature.getDimensionInfo() - on the chunk-generation path - whenever
+        // globalDimensionInfoDirtyCounter differs from this feature's own. It therefore does fire
+        // once per session during generation, since dimensionInfoDirtyCounter starts at -1. What
+        // actually protects this is narrower: globalDimensionInfoDirtyCounter is only ever bumped
+        // from client-side paths (ClientEventHandlers, PresetSelection), none of which run while a
+        // server is generating, so after that first reconcile the counters stay equal for the rest
+        // of the session and no reset lands between two chunks' style lookups. A server-side bump
+        // of that counter - a reload command, say - would break this, and would need the identity
+        // keys here replaced by ids rather than a comment.
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {

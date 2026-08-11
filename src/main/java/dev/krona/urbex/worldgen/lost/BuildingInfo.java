@@ -648,27 +648,8 @@ public class BuildingInfo {
             };
             String part = building.getRandomPart(rand, conditionContext);
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), part);
-
-            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, part, belowPart, building.getName(), coord) {
-                @Override
-                public boolean isBuilding() {
-                    return true;
-                }
-
-                @Override
-                public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly, where the old
-                    // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
-                    // offset - so the two can disagree right at a quart boundary. Forced: a cached
-                    // BuildingInfo is reached from its neighbours' generation and has no region to
-                    // ask, and the dimension's own level would go looking for unloaded chunks.
-                    Holder<Biome> biome = provider.getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
-                }
-            };
-            String part2 = building.getRandomPart2(rand, conditionContext2);
+            String part2 = building.getRandomPart2(rand, conditionContext, part);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
-            // Last, not before conditionContext2: see the constructor's copy of this loop.
             belowPart = part;
         }
     }
@@ -851,29 +832,10 @@ public class BuildingInfo {
 
             // parts2[] is the second part of *this* floor, so it does have a current part - the
             // parts[] pick just made - while "the part below" is still the previous floor's, which
-            // is why belowPart is only advanced at the end of the loop. It used to be advanced
-            // here, one line above this, which made getBelowPart() and getPart() the same string
-            // and so made a parts2[] "belowpart" an exact duplicate of "inpart" - the same defect
-            // issue #58 fixed on the reading side in ConditionContext.parseTest, still alive on the
-            // writing side.
-            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, part, belowPart, building.getName(), coord) {
-                @Override
-                public boolean isBuilding() {
-                    return true;
-                }
-
-                @Override
-                public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly, where the old
-                    // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
-                    // offset - so the two can disagree right at a quart boundary. Forced: a cached
-                    // BuildingInfo is reached from its neighbours' generation and has no region to
-                    // ask, and the dimension's own level would go looking for unloaded chunks.
-                    Holder<Biome> biome = provider.getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
-                }
-            };
-            String part2 = building.getRandomPart2(rand, conditionContext2);
+            // is why belowPart is only advanced at the end of the loop. getRandomPart2 derives its
+            // own context from this one (ConditionContext.withPart) precisely so that advancing
+            // belowPart early cannot poison it again the way it used to.
+            String part2 = building.getRandomPart2(rand, conditionContext, part);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
             belowPart = part;
             connectionAtX[i] = isCity(coord.west(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);

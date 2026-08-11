@@ -26,11 +26,20 @@
     called only from `ServerEventHandlers.onWorldTick`, while `DigestCheck` runs from
     `SERVER_STARTED` - before any tick - so `STUFF_BY_TAG` is empty for the whole of both digest
     runs and no decoration is placed in either window. The digests have never covered the `Stuff`
-    subsystem at all. That is a separate, larger bug (in a real server the maps are filled by the
-    first tick, so gameplay is unaffected once one has landed) and is tracked on its own rather than
-    fixed here, where it would have swamped the attribution. The ordering is pinned by unit tests
-    instead: `RegistryChainResolutionTest` feeds `groupStuffByTag` the exact order the hash map
-    produces and requires the sorted one back.
+    subsystem at all. **That is a separate and larger shipped defect, and it is player-visible.**
+    `prepareLevels()` - "Preparing spawn area" - runs inside `initServer()`, before `SERVER_STARTED`
+    and before any tick, and never calls `tickServer`, so `END_LEVEL_TICK` does not fire during it.
+    Every chunk generated there is generated with `STUFF_BY_TAG` empty, and generated chunks are
+    saved, so nothing heals them later: a newly created world has spawn cities with no decoration at
+    all and cities a few hundred blocks out with it, and a visible boundary between. Where that
+    boundary falls depends on how far spawn preparation and tick 1's chunk work happened to get -
+    and `ServerLevel.tick()` does its chunk work before Fabric fires `END_LEVEL_TICK` at the tail, so
+    those chunks land on the empty side too - which means two players on the same seed can get
+    different boundaries. It is tracked on its own and deliberately not fixed here, where filling the
+    maps earlier would have put decoration into both digest windows and swamped the per-change
+    attribution this entry is built on. The ordering fix above is therefore pinned by unit tests
+    rather than by a digest: `RegistryChainResolutionTest` feeds `groupStuffByTag` the exact order
+    the hash map produces and requires the sorted one back.
   - *`inpart`, `belowpart` and `inbuilding` have one convention: fully qualified, everywhere.* They
     used to need opposite conventions in different files. `parts2[].inpart` and `parts[].belowpart`
     in `buildings/*.json` matched a qualified id, because `getRandomPart` hands back the raw string a
@@ -61,13 +70,17 @@
     advanced `belowPart = randomPart` *before* building the context that selects `parts2[]`, so that
     selection saw `getBelowPart()` equal to `getPart()` - the same defect issue #58 fixed on the
     reading side in `ConditionContext.parseTest`, still alive on the writing side, in both copies of
-    the floor loop. `belowPart` is now advanced at the end of the loop, so `parts2[]` sees the
-    floor's own `parts[]` pick as the current part and the floor below's as the part below.
-    `Scattered` had the third variant of the same confusion - it reused the `parts[]` context for
-    `parts2[]`, so a scattered building's `parts2[].inpart` matched `"<none>"` and could never fire
-    while a city building's matched normally - and now builds its own. Inert for the bundled pack
-    (nothing in it writes `belowpart`, and no scattered building declares `parts2`), and measured to
-    confirm it.
+    the floor loop. `Scattered` had the third variant of the same confusion - it reused the `parts[]`
+    context for `parts2[]` outright, so a scattered building's `parts2[].inpart` was matched against
+    `"<none>"` and could never fire while a city building's matched normally. Rather than fix the
+    ordering three times, the `parts2` context is now *derived*: `ConditionContext.withPart` copies
+    the floor's context and replaces only the current part, and `Building.getRandomPart2` takes the
+    chosen part and applies it internally, so no caller can hand it a context whose `belowPart` has
+    already been advanced. The defect is unrepresentable rather than merely fixed, and all three
+    loops lost their duplicated second context. Inert for the bundled pack (nothing in it writes
+    `belowpart`, and no scattered-reachable building declares `parts2`), and measured to confirm it -
+    which is also why no golden could catch a revert, so `BelowPartConditionTest` now covers the
+    writing side alongside the reading side it already had, on the production `getRandomPart2` path.
   - *`parts[].inpart` never matching is correct, and is now documented as such rather than "fixed".*
     The context that selects `parts[i]` passes `NO_PART` as the current part because at that moment
     the floor genuinely has none - it is what is being chosen. What a `parts[]` entry can usefully
@@ -78,6 +91,13 @@
     `equals`/`hashCode`, so this works only because `RegistryAssetRegistry` canonicalises instances
     through `putIfAbsent`; if `AssetRegistries.reset()` ever ran mid-generation, one id could exist as
     two instances, splitting a style's votes and making the `getId()` sort stop being a total order.
+    `reset()` is *not* confined to server start/stop, which is the part worth writing down:
+    `CityFeature.cleanUp()` calls it and is invoked lazily from `CityFeature.getDimensionInfo()`, on
+    the chunk-generation path, firing once per session because `dimensionInfoDirtyCounter` starts at
+    `-1`. What actually protects the identity keys is narrower - `globalDimensionInfoDirtyCounter` is
+    bumped only from client-side paths (`ClientEventHandlers`, `PresetSelection`), none of which run
+    while a server generates, so after that first reconcile no reset can land between two chunks'
+    style lookups. A server-side bump would break it and would need ids here, not a comment.
     `City`'s five predefined-content maps are filled in name-hash order, so two predefined cities
     claiming one chunk resolve last-writer-wins by hash - left alone deliberately, since that is a
     pack authoring conflict rather than a silent reordering of a working configuration, and any rule

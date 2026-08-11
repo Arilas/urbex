@@ -281,22 +281,11 @@ public class Scattered {
             BlockState liquid = feature.liquid;
             String partName = building.getRandomPart(rand, conditionContext);
             BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), partName);
-            // Its own context, not conditionContext reused: parts2[] is the second part of a floor
-            // that now has one, so "inpart" here means the parts[] pick just made. Reusing the
-            // parts[] context passed NO_PART instead, which no parts2[] "inpart" could ever match -
-            // the same field behaving differently for a scattered building than for a city one.
-            ConditionContext conditionContext2 = new ConditionContext(lowestLevel, f, 0, floors, partName, belowFloor, building.getName(), info.coord) {
-                @Override
-                public boolean isBuilding() {
-                    return true;
-                }
-
-                @Override
-                public Identifier getBiome() {
-                    return conditionContext.getBiome();
-                }
-            };
-            String part2Name = building.getRandomPart2(rand, conditionContext2);
+            // getRandomPart2 derives its own context (ConditionContext.withPart) with partName as
+            // the current part. This used to pass conditionContext itself, whose part is NO_PART,
+            // so a scattered building's parts2[] "inpart" could never match while a city
+            // building's matched normally - one field, two meanings.
+            String part2Name = building.getRandomPart2(rand, conditionContext, partName);
             BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), part2Name);    // Null is legal
             belowFloor = partName;
 

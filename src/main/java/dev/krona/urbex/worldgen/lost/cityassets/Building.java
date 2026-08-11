@@ -208,7 +208,17 @@ public class Building {
         return partNames.get(random.nextInt(partNames.size()));
     }
 
-    public String getRandomPart2(RandomSource random, ConditionContext info) {
+    /**
+     * The {@code parts2[]} entry for a floor whose {@code parts[]} entry is {@code currentPart}.
+     * <p>
+     * Takes the part rather than a ready-made context, and derives one with
+     * {@link ConditionContext#withPart}, so that no caller can hand this a context whose
+     * {@code belowPart} has already been advanced to {@code currentPart} - which is exactly what all
+     * three floor loops used to do, making a {@code parts2[]} {@code belowpart} a duplicate of its
+     * {@code inpart}. {@code floorContext} is the same context {@link #getRandomPart} was given.
+     */
+    public String getRandomPart2(RandomSource random, ConditionContext floorContext, String currentPart) {
+        ConditionContext info = floorContext.withPart(currentPart);
         List<String> partNames = new ArrayList<>();
         for (Pair<Predicate<ConditionContext>, String> pair : parts2) {
             if (pair.getLeft().test(info)) {

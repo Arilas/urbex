@@ -56,6 +56,37 @@ public abstract class ConditionContext {
         this.coord = coord;
     }
 
+    /**
+     * This same floor, once its {@code parts[]} entry has been chosen: everything is carried over
+     * and only the current part is replaced. It is what {@code parts2[]} selection is evaluated
+     * against - the second part of a floor that now has a first one, sitting on the same floor below.
+     * <p>
+     * A derivation rather than a second constructor call at each site, and the only way to build a
+     * {@code parts2} context ({@link Building#getRandomPart2} applies it internally), because
+     * building one by hand is how the defect this replaces happened: all three floor loops advanced
+     * their {@code belowPart} variable to the part just chosen <em>before</em> constructing the
+     * second context, so it saw {@code getBelowPart()} equal to {@code getPart()} and a
+     * {@code parts2[]} {@code belowpart} was an exact duplicate of its {@code inpart} - the same
+     * defect issue #58 fixed on the reading side in {@link #parseTest}. Deriving makes that
+     * unrepresentable: {@code belowPart} here can only be whatever the {@code parts[]} context
+     * already had, whatever the caller does to its own local afterwards.
+     */
+    public final ConditionContext withPart(String part) {
+        ConditionContext floorContext = this;
+        return new ConditionContext(level, floor, floorsBelowGround, floorsAboveGround,
+                part, belowPart, building, coord) {
+            @Override
+            public boolean isBuilding() {
+                return floorContext.isBuilding();
+            }
+
+            @Override
+            public Identifier getBiome() {
+                return floorContext.getBiome();
+            }
+        };
+    }
+
     private static Predicate<ConditionContext> combine(Predicate<ConditionContext> orig, Predicate<ConditionContext> newTest) {
         if (orig == null) {
             return newTest;
