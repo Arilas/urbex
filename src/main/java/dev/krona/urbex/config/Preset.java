@@ -259,8 +259,14 @@ public class Preset {
         p.warning = warning;
         p.iconFile = iconFile;
         p.icon = icon;
-        p.liquidBlock = liquidBlock;
-        p.baseBlock = baseBlock;
+        // liquidBlock/baseBlock (the resolved BlockState cache) deliberately do NOT carry over:
+        // TerrainSettings.apply() writes LIQUID_BLOCK/BASE_BLOCK (the string fields) directly, with
+        // no setter to invalidate a cache. Presets.applyOverrides() is copy() followed by an
+        // apply() of the override's sections; if the base's cache was already warmed (getLiquidBlock()
+        // called before the override) and the override changes the block string, a copied cache
+        // would make getLiquidBlock()/getBaseBlock() keep returning the pre-override block. Leaving
+        // them null here forces a fresh lazy resolve against whatever LIQUID_BLOCK/BASE_BLOCK ends
+        // up being on the copy.
 
         p.LANDSCAPE_TYPE = LANDSCAPE_TYPE;
         p.GROUNDLEVEL = GROUNDLEVEL;
