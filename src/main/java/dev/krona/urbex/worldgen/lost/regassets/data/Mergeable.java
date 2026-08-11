@@ -4,7 +4,10 @@ import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * A list field that can either replace what an ancestor in the {@code extends} chain put there, or
@@ -33,5 +36,33 @@ public record Mergeable<E>(boolean replace, List<E> values) {
             target.clear();
         }
         target.addAll(incoming.values());
+    }
+
+    /**
+     * The immutable form of {@link #apply}, for a field held as a value rather than accumulated in a
+     * mutable list.
+     * <p>
+     * The three distinguishable inputs stay distinguishable: an absent {@code incoming} is a file
+     * that did not mention the field, and hands back {@code base} - including a null {@code base},
+     * which is "nothing in the chain has declared it yet" and is what
+     * {@link dev.krona.urbex.worldgen.lost.cityassets.Resolved#require} later turns into a load
+     * error. A declared bare array replaces, an empty one included. The {@code {"replace": false}}
+     * form appends to what the chain inherited, or is simply the whole value when nothing preceded
+     * it.
+     *
+     * @param base     what the chain has accumulated so far, or null if no entry declared this field
+     * @param incoming what this one chain entry declared, or empty if it did not mention the field
+     */
+    public static <E> List<E> fold(@Nullable List<E> base, Optional<Mergeable<E>> incoming) {
+        if (incoming.isEmpty()) {
+            return base;
+        }
+        Mergeable<E> declared = incoming.get();
+        if (base == null || declared.replace()) {
+            return List.copyOf(declared.values());
+        }
+        List<E> combined = new ArrayList<>(base);
+        combined.addAll(declared.values());
+        return List.copyOf(combined);
     }
 }

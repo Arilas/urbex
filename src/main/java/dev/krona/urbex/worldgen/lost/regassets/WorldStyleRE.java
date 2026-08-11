@@ -25,7 +25,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
                     MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> Optional.ofNullable(l.multiSettings)),
                     WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> Optional.ofNullable(l.worldSettings)),
                     ScatteredSettings.CODEC.optionalFieldOf("scattered").forGetter(l -> Optional.ofNullable(l.scatteredSettings)),
-                    PartSelector.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.partSelector)),
+                    PartSelector.Decl.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.partSelector)),
                     Mergeable.codec(CityStyleSelector.CODEC).optionalFieldOf("citystyles").forGetter(l -> Optional.ofNullable(l.cityStyleSelectors)),
                     Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
             ).apply(instance, WorldStyleRE::new));
@@ -37,7 +37,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
     private final MultiSettings multiSettings;
     private final WorldSettings worldSettings;
     private final ScatteredSettings scatteredSettings;
-    private final PartSelector partSelector;
+    private final PartSelector.Decl partSelector;
     private final Mergeable<CityStyleSelector> cityStyleSelectors;
     private final Mergeable<CityBiomeMultiplier> cityBiomeMultipliers;
 
@@ -46,7 +46,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
                         Optional<MultiSettings> multiSettings,
                         Optional<WorldSettings> worldSettings,
                         Optional<ScatteredSettings> scatteredSettings,
-                        Optional<PartSelector> partSelector,
+                        Optional<PartSelector.Decl> partSelector,
                         Optional<Mergeable<CityStyleSelector>> cityStyleSelector,
                         Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers) {
         this.extendsId = extendsId;
@@ -65,7 +65,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
     }
 
     @Nullable
-    public PartSelector getPartSelector() {
+    public PartSelector.Decl getPartSelector() {
         return partSelector;
     }
 

@@ -35,15 +35,19 @@ public class WorldStyle {
      * settings block takes the value of the last entry that declares one, and the two selector
      * lists go through {@link Mergeable} so a declared list replaces unless it opts into appending.
      * <p>
-     * {@code outsidestyle} and {@code citystyles} are required of the chain rather than of each
-     * file: a child that only swaps its scattered settings inherits both, and a chain where nothing
-     * declares one is a load error naming the asset and the field.
+     * {@code outsidestyle}, {@code citystyles} and the {@code parts} wiring are required of the
+     * chain rather than of each file: a child that only swaps its scattered settings inherits them,
+     * and a chain where nothing declares one is a load error naming the asset and the field.
+     * <p>
+     * The wiring used to default to Urbex's own highway and railway parts when a world style said
+     * nothing, which is how a third-party pack could generate parts it never mentioned. It is
+     * folded field by field, so a child can append one tunnel variant without restating the group.
      */
     public WorldStyle(List<WorldStyleRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         String outside = null;
         ScatteredSettings scattered = null;
-        PartSelector parts = PartSelector.DEFAULT;
+        PartSelector parts = null;
         MultiSettings multi = MultiSettings.DEFAULT;
         WorldSettings world = WorldSettings.DEFAULT;
         List<CityStyleSelector> selectors = new ArrayList<>();
@@ -57,7 +61,7 @@ public class WorldStyle {
                 scattered = object.getScatteredSettings();
             }
             if (object.getPartSelector() != null) {
-                parts = object.getPartSelector();
+                parts = PartSelector.merge(parts, object.getPartSelector());
             }
             if (object.getMultiSettings() != null) {
                 multi = object.getMultiSettings();
@@ -76,7 +80,7 @@ public class WorldStyle {
         this.outsideStyle = Resolved.require(outside, name, "outsidestyle");
         Resolved.require(anySelectors ? selectors : null, name, "citystyles");
         this.scatteredSettings = scattered;
-        this.partSelector = parts;
+        this.partSelector = Resolved.require(parts, name, "parts").requireComplete(name);
         this.multiSettings = multi;
         this.worldSettings = world;
         for (CityStyleSelector selector : selectors) {

@@ -1,6 +1,7 @@
 package dev.krona.urbex.varia;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.datafixers.util.Either;
@@ -158,10 +159,32 @@ public class Tools {
         return level.getSeaLevel();
     }
 
-    public static <T> RecordCodecBuilder<T, List<String>> listOrStringList(String fieldName, String defaultVal, Function<T, List<String>> getter) {
-        return Codec.either(Codec.STRING, Codec.STRING.listOf())
-                .optionalFieldOf(fieldName, Either.left(defaultVal))
-                .xmap(either -> either.map(List::of, Function.identity()), list -> list.size() == 1 ? Either.left(list.get(0)) : Either.right(list))
+    /**
+     * A part-wiring field: one part id, an array of them, or the {@code {"replace": false,
+     * "values": [...]}} form that appends to what the {@code extends} chain already put there.
+     * <p>
+     * <b>There is no default.</b> A field this codec does not find is {@link Optional#empty()},
+     * which reads as "this file did not mention it" and lets the chain supply it; a field nothing in
+     * the chain declares is a load error raised by
+     * {@link dev.krona.urbex.worldgen.lost.cityassets.Resolved#require} after the chain is applied,
+     * naming the asset and the field. It used to fall back to a bare asset name written here in
+     * Java, so a world style that never mentioned primary roads still generated Urbex's own
+     * wide-road parts - a reference no datapack file wrote, and nothing to grep for when it
+     * misbehaved.
+     * <p>
+     * Absence has to stay decodable per file rather than being a required field, because a child
+     * that overrides one part family must not have to restate the other seven: that is what
+     * {@link Mergeable#fold} folds together, and what the {@code {"replace": false}} arm appends to.
+     */
+    public static <T> RecordCodecBuilder<T, Optional<Mergeable<String>>> listOrStringList(
+            String fieldName, Function<T, Optional<Mergeable<String>>> getter) {
+        return Codec.either(Codec.STRING, Mergeable.codec(Codec.STRING))
+                .optionalFieldOf(fieldName)
+                .xmap(opt -> opt.map(either ->
+                                either.map(s -> new Mergeable<>(true, List.of(s)), Function.identity())),
+                        opt -> opt.map(m -> m.replace() && m.values().size() == 1
+                                ? Either.left(m.values().get(0))
+                                : Either.right(m)))
                 .forGetter(getter);
     }
 

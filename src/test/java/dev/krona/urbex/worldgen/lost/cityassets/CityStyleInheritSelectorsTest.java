@@ -4,6 +4,7 @@ import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Selectors;
+import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -70,10 +71,13 @@ class CityStyleInheritSelectorsTest {
                 Optional.empty(),
                 Optional.empty(),
                 multiBuildings);
+        // The street wiring is boilerplate here, not part of what these tests assert: since the
+        // code-side defaults were deleted, a city style whose chain declares no 'parts' family is a
+        // load error, so every entry these tests build has to carry one.
         return new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(selectors));
+                Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.of(selectors));
     }
 
     private static List<String> values(CityStyle style, CityStyle.Sel kind) {

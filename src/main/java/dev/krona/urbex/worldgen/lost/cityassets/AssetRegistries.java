@@ -117,7 +117,8 @@ public class AssetRegistries {
     }
 
     /**
-     * Resolves every registered asset in every registry that has required fields.
+     * Resolves every registered asset in the ten registries listed below - every registry that has
+     * required fields, except {@code CITYSTYLES}; see the note further down.
      * <p>
      * Requiredness is checked when a chain is resolved rather than when a file is decoded (see
      * {@link Resolved}), so an asset that is never resolved is never validated. Everything below
@@ -128,6 +129,18 @@ public class AssetRegistries {
      * <p>
      * This does mean a broken third-party asset fails the world even when the player never selects
      * it. That is the intended trade, not a side effect.
+     * <p>
+     * <b>{@code CITYSTYLES} is the one registry with required fields that is deliberately left
+     * out</b>, and it has been since street part wiring became required of a city style's resolved
+     * chain. Resolving every registered city style would forbid a city style that exists only to be
+     * extended, because requiredness is a property of the end of a chain: the bundled
+     * {@code citystyles/citystyle_config.json} declares a street width and nothing else, and is
+     * complete only through {@code citystyle_common}, which extends it. Sweeping it here would
+     * refuse the world over a file that is not wrong. The cost is that a third-party city style
+     * missing its wiring raises at {@code CITYSTYLES.get} - the first time a city of that style is
+     * generated - rather than at world load; the bundled pack's own completeness is pinned at build
+     * time instead, by {@code WorldStyleCompletenessTest}. {@code PREDEFINED_CITIES} is also absent
+     * but for an unrelated reason: {@link #loadPredefinedStuff} loads it, under the same lock.
      * <p>
      * Order is deliberate only in one place: {@code VARIANTS} before {@code PALETTES}, because
      * compiling a palette entry that names a variant reaches into that registry. The lookup is

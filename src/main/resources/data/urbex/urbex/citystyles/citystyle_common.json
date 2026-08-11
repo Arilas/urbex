@@ -15,7 +15,9 @@
       "bend": ["urbex:street_bend"],
       "t": ["urbex:street_t"],
       "none": ["urbex:street_none"],
-      "all": ["urbex:street_all"]
+      "all": ["urbex:street_all"],
+      "connector": ["urbex:street_large_connector"],
+      "stair": ["urbex:street_stair"]
     },
     "largeparts": {
       "straight": "urbex:street_large_straight",

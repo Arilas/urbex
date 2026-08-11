@@ -20,6 +20,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -216,7 +217,7 @@ class RegistryChainResolutionTest {
         return new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(tags)),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty())
+                Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "citystyle_" + tags[0]));
     }
 
@@ -335,7 +336,8 @@ class RegistryChainResolutionTest {
     void worldStyleChildInheritsTheSelectorsAndSettingsItDoesNotDeclare() {
         ScatteredSettings scattered = new ScatteredSettings(24, 0.25f, 4, List.of());
         WorldStyleRE parent = new WorldStyleRE(Optional.empty(), Optional.of("urbex:standard"),
-                Optional.empty(), Optional.empty(), Optional.of(scattered), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(scattered),
+                Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
                 Optional.empty())

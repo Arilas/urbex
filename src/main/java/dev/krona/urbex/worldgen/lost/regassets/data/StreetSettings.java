@@ -17,9 +17,11 @@ public class StreetSettings {
     private final Character streetVariantBlock;
     private final Character borderBlock;
     private final Character wallBlock;
-    private final StreetParts parts;
-    private final StreetParts largeParts;
-    private final StreetParts tertiaryParts;
+    // Null on any of these three means "this file did not mention that family", so the extends
+    // chain supplies it; see StreetParts.merge.
+    private final StreetParts.Decl parts;
+    private final StreetParts.Decl largeParts;
+    private final StreetParts.Decl tertiaryParts;
 
     public static final Codec<StreetSettings> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -31,9 +33,9 @@ public class StreetSettings {
                     Codec.STRING.optionalFieldOf("streetvariant").forGetter(l -> DataTools.toNullable(l.streetVariantBlock)),
                     Codec.STRING.optionalFieldOf("border").forGetter(l -> DataTools.toNullable(l.borderBlock)),
                     Codec.STRING.optionalFieldOf("wall").forGetter(l -> DataTools.toNullable(l.wallBlock)),
-                    StreetParts.CODEC.optionalFieldOf("parts").forGetter(l -> l.parts.get()),
-                    StreetParts.CODEC.optionalFieldOf("largeparts").forGetter(l -> l.largeParts.get()),
-                    StreetParts.CODEC.optionalFieldOf("tertiaryparts").forGetter(l -> l.tertiaryParts.get())
+                    StreetParts.Decl.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.parts)),
+                    StreetParts.Decl.CODEC.optionalFieldOf("largeparts").forGetter(l -> Optional.ofNullable(l.largeParts)),
+                    StreetParts.Decl.CODEC.optionalFieldOf("tertiaryparts").forGetter(l -> Optional.ofNullable(l.tertiaryParts))
             ).apply(instance, StreetSettings::new));
 
     public Float getFountainChance() {
@@ -68,16 +70,16 @@ public class StreetSettings {
         return wallBlock;
     }
 
-    public StreetParts getParts() {
-        return parts;
+    public Optional<StreetParts.Decl> getParts() {
+        return Optional.ofNullable(parts);
     }
 
-    public StreetParts getLargeParts() {
-        return largeParts;
+    public Optional<StreetParts.Decl> getLargeParts() {
+        return Optional.ofNullable(largeParts);
     }
 
-    public StreetParts getTertiaryParts() {
-        return tertiaryParts;
+    public Optional<StreetParts.Decl> getTertiaryParts() {
+        return Optional.ofNullable(tertiaryParts);
     }
 
     public StreetSettings(Optional<Float> fountainChance,
@@ -88,9 +90,9 @@ public class StreetSettings {
                           Optional<String> streetVariantBlock,
                           Optional<String> borderBlock,
                           Optional<String> wallBlock,
-                          Optional<StreetParts> parts,
-                          Optional<StreetParts> largeParts,
-                          Optional<StreetParts> tertiaryParts) {
+                          Optional<StreetParts.Decl> parts,
+                          Optional<StreetParts.Decl> largeParts,
+                          Optional<StreetParts.Decl> tertiaryParts) {
         this.fountainChance = fountainChance.orElse(null);
         this.frontChance = frontChance.orElse(null);
         this.streetWidth = streetWidth.orElse(null);
@@ -99,8 +101,8 @@ public class StreetSettings {
         this.streetVariantBlock = DataTools.getNullableChar(streetVariantBlock);
         this.borderBlock = DataTools.getNullableChar(borderBlock);
         this.wallBlock = DataTools.getNullableChar(wallBlock);
-        this.parts = parts.orElse(StreetParts.DEFAULT);
-        this.largeParts = largeParts.orElse(StreetParts.DEFAULT);
-        this.tertiaryParts = tertiaryParts.orElse(StreetParts.DEFAULT);
+        this.parts = parts.orElse(null);
+        this.largeParts = largeParts.orElse(null);
+        this.tertiaryParts = tertiaryParts.orElse(null);
     }
 }

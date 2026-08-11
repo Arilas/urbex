@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+- **Street, highway and railway part wiring must be declared by the datapack; there is no code-side
+  default left.** Thirty `Tools.listOrStringList` call sites carried a bare asset name as a fallback,
+  so a world style that never mentioned primary roads still generated Urbex's own
+  `urbex:street_large_*` parts, and a city style that never mentioned railways still got
+  `urbex:rails_*`. That is the leak this whole change set exists to close: a reference no datapack
+  file wrote is a reference nobody can grep for when it misbehaves, and a third-party pack inherited
+  a road class it never asked for. The `defaultVal` parameter is gone, and `StreetParts.DEFAULT`,
+  `HighwayParts.DEFAULT`, `RailwayParts.DEFAULT` and `PartSelector.DEFAULT` with it. A world style
+  whose chain declares no `parts` now refuses the world load naming the field
+  (`'urbex:x' declares no 'parts.railways.railsbend', and neither does anything it extends`), in the
+  same sentence every other required field uses. `MultiSettings.DEFAULT` and `WorldSettings.DEFAULT`
+  stay: they hold numbers and enums, not asset references.
+  - *Requiredness is still a property of the chain, not of the file.* A child that overrides one
+    street family must not have to restate the other seven, so each field decodes as absent and the
+    check runs after the `extends` chain is applied, exactly as in the rest of this work. The
+    families are folded **component by component** now, where a whole `StreetParts` used to be
+    swapped in or out - which is what delivers the append opt-in spec section 4 promised for ordered
+    part lists: `"straight": {"replace": false, "values": ["urbex:street_straight_alt"]}` adds one
+    variant after the ones the parent declared, while a bare array replaces them. That per-field fold
+    also removes a sentinel bug of the kind this work has been eliminating: the old test was
+    `s.getParts() != StreetParts.DEFAULT`, so a child could never override an inherited family back
+    to the default one. `largeparts` and `tertiaryparts` remain optional *as blocks* and fall back to
+    `parts` when nothing in the chain declares them - a fallback to parts the pack itself wrote, not
+    to a name written in Java - but a family that is declared at all must be complete, or half of it
+    reaches generation as a null list.
+  - *Where a city style's failure lands.* World styles are validated at world load, because
+    `AssetRegistries.load` resolves that registry eagerly. `CITYSTYLES` is deliberately not in that
+    sweep and is now the one registry with required fields that is left out: resolving every
+    registered city style would forbid a city style that exists only to be extended, and the bundled
+    `citystyle_config` is exactly that - it declares a street width and is complete only through
+    `citystyle_common`, which extends it. So a third-party city style missing its wiring raises when
+    that style is first resolved during generation, not at world load. The bundled pack's own
+    completeness is pinned at build time instead, by `WorldStyleCompletenessTest`.
+  - *Two ids moved out of Java and into the pack, and nothing moved in the world.*
+    `citystyle_common`'s `parts` block never declared `connector` or `stair`, so both came from the
+    Java defaults - `urbex:street_large_connector` and `urbex:street_stair` - and `stair` was in
+    active use, since secondary streets are what ramp. Both are now written in the file, with the
+    same values. Both goldens are unchanged (`88af6b69e7762fbc`, `7c297c1e4ec1ce38`, `unsafeReads=0`),
+    which is the check that no default silently in use was replaced by a different value.
+  - *Tests.* `NoAssetReferenceDefaultsTest` fails if any wiring field regains a literal default.
+    `WorldStyleCompletenessTest` walks every world style, the city styles it names and both their
+    `extends` chains, resolves each through the constructors the game uses, and requires every wiring
+    field to hold at least one part id - asserting on the union over a chain, so `citystyle_border`
+    declaring no `parts` and taking `citystyle_common`'s is correct rather than a failure, and
+    failing in `Resolved.require`'s own wording so an author meets one convention rather than two.
+    `WiringRequiredTest` covers the three codec arms in both directions, the append opt-in on a
+    string part list, and the load errors for a missing and for a half-declared family.
+
 - **Decoration now generates in the spawn area, where it previously did not.** `AssetRegistries.load()`
   was called only from `ServerTickEvents.END_LEVEL_TICK`, but `prepareLevels()` - "Preparing spawn
   area" - generates its chunks inside `initServer()`, before any tick fires. Every chunk it wrote had

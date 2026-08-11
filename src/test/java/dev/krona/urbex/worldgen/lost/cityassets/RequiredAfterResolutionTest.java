@@ -6,6 +6,7 @@ import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
@@ -189,11 +190,18 @@ class RequiredAfterResolutionTest {
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_multi"));
     }
 
+    /**
+     * Declares the {@code parts} wiring on every entry, so these tests keep failing on the field
+     * each of them names rather than on the wiring - which is required of a world style's chain
+     * since the code-side defaults were deleted, and has its own coverage in
+     * {@link WiringRequiredTest}.
+     */
     private static WorldStyleRE worldStyle(Optional<String> outsideStyle,
                                            Optional<Mergeable<CityStyleSelector>> cityStyles,
                                            Optional<ScatteredSettings> scattered) {
         return new WorldStyleRE(Optional.empty(), outsideStyle,
-                Optional.empty(), Optional.empty(), scattered, Optional.empty(),
+                Optional.empty(), Optional.empty(), scattered,
+                Optional.of(TestWiring.partSelector()),
                 cityStyles, Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_world"));
     }

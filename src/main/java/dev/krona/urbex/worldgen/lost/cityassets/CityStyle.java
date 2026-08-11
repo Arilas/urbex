@@ -39,9 +39,14 @@ public class CityStyle {
         BUILDING, BRIDGE, LARGE_BRIDGE, PARK, FOUNTAIN, STAIR, FRONT, RAIL_DUNGEON, MULTI_BUILDING
     }
 
-    private StreetParts streetParts = StreetParts.DEFAULT;
-    private StreetParts largeStreetParts = StreetParts.DEFAULT;
-    private StreetParts tertiaryStreetParts = StreetParts.DEFAULT;
+    /**
+     * Null until some entry in the chain declares the family. {@code parts} is required of the
+     * chain; the other two fall back to it when no entry declares them at all (see
+     * {@link #getLargeStreetParts()}).
+     */
+    private StreetParts streetParts;
+    private StreetParts largeStreetParts;
+    private StreetParts tertiaryStreetParts;
 
     // Building settings
     private Integer minFloorCount;
@@ -98,6 +103,19 @@ public class CityStyle {
         stuffTags.add("all");
         for (CityStyleRE re : chainRootFirst) {
             applyFrom(re);
+        }
+        Resolved.require(streetParts, name, "streetblocks.parts")
+                .requireComplete(name, "streetblocks.parts");
+        // The other two families are optional as a block - a style that declares neither draws its
+        // primary and tertiary roads from the secondary family, which is the rule
+        // getLargeStreetParts() and getTertiaryStreetParts() apply. Once a style starts declaring
+        // one, though, every part of it has to come from somewhere in the chain: half a family
+        // would otherwise be a null list reaching generation.
+        if (largeStreetParts != null) {
+            largeStreetParts.requireComplete(name, "streetblocks.largeparts");
+        }
+        if (tertiaryStreetParts != null) {
+            tertiaryStreetParts.requireComplete(name, "streetblocks.tertiaryparts");
         }
     }
 
@@ -194,15 +212,9 @@ public class CityStyle {
             if (s.getStreetWidth() != null) {
                 streetWidth = s.getStreetWidth();
             }
-            if (s.getParts() != StreetParts.DEFAULT) {
-                streetParts = s.getParts();
-            }
-            if (s.getLargeParts() != StreetParts.DEFAULT) {
-                largeStreetParts = s.getLargeParts();
-            }
-            if (s.getTertiaryParts() != StreetParts.DEFAULT) {
-                tertiaryStreetParts = s.getTertiaryParts();
-            }
+            s.getParts().ifPresent(d -> streetParts = StreetParts.merge(streetParts, d));
+            s.getLargeParts().ifPresent(d -> largeStreetParts = StreetParts.merge(largeStreetParts, d));
+            s.getTertiaryParts().ifPresent(d -> tertiaryStreetParts = StreetParts.merge(tertiaryStreetParts, d));
         });
         object.getGeneralSettings().ifPresent(s -> {
             if (s.getGlowstoneBlock() != null) {
@@ -279,14 +291,17 @@ public class CityStyle {
         return streetParts;
     }
 
-    /** Primary roads fall back to the secondary-road family when a style does not define their own. */
+    /**
+     * Primary roads fall back to the secondary-road family when nothing in the chain declares their
+     * own. That is a fallback to parts the pack itself wrote, not to a part name written in Java.
+     */
     public StreetParts getLargeStreetParts() {
-        return largeStreetParts == StreetParts.DEFAULT ? streetParts : largeStreetParts;
+        return largeStreetParts == null ? streetParts : largeStreetParts;
     }
 
-    /** Tertiary roads fall back to the secondary-road family when a style does not define their own. */
+    /** Tertiary roads fall back to the secondary-road family, exactly as primaries do. */
     public StreetParts getTertiaryStreetParts() {
-        return tertiaryStreetParts == StreetParts.DEFAULT ? streetParts : tertiaryStreetParts;
+        return tertiaryStreetParts == null ? streetParts : tertiaryStreetParts;
     }
 
     public Integer getMinFloorCount() {
