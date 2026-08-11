@@ -38,6 +38,28 @@ Urbex has not shipped; no released worlds exist to protect.
 
 - `inherit` and `parent` are deleted, not aliased. A file using either fails to
   load with an error naming the file and the replacement key.
+
+> **Implemented late (final branch review, 2026-08-11), and worth recording as
+> such.** Nothing enforced this until the end of the branch, and the gap was the
+> most expensive kind: DFU ignores unknown map keys, so a file using either key
+> decoded cleanly and loaded as a **chain root with no inheritance and no
+> diagnostic** — silently generating without what it meant to inherit, or
+> failing later with a message about a missing field that names neither key.
+> `presets` alone would have logged a `WARN` via `UnknownKeys`.
+> `RetiredKeys.reject` now wraps all thirteen registry codecs and fails the
+> decode. Two notes on the wording above, both checked rather than assumed:
+> the *replacement key* is named by Urbex's own message; the *file* is named by
+> Minecraft's `RegistryDataLoader`, which collects per-element errors and prints
+> `>> Errors in element <id>:` before throwing, so the promise is met by the two
+> together rather than by one message. `RetiredKeysRejectedTest` proves the
+> coverage by enumeration — it reflects the `CODEC` off every `*RE` class and
+> cross-checks the count against `CustomRegistries`' registry keys — so a
+> fourteenth registry cannot arrive uncovered.
+>
+> `parent` is not a hypothetical: it was Urbex's own preset inheritance key
+> until commit `5644fbbd` on this branch, so the rejection protects presets
+> written against this repository a few weeks ago as well as ported Lost Cities
+> Modern Tweaks packs, where `inherit` is the key.
 - Third-party packs written against today's rules fail at datapack load rather
   than generating differently. Loud failure is the point: the quiet version of
   this is the bug in §7.1.
@@ -150,6 +172,22 @@ contradicts inherited slices is a load error, not a silent truncation.
 no separate resolution pass, no lazy initialisation, and no mutation after
 construction.
 
+> **Corrected after implementation (final branch review, 2026-08-11).** "No lazy
+> initialisation, and no mutation after construction" and "the `cityassets/*`
+> classes become uniformly immutable" are both stronger than what shipped, and
+> deliberately so in one place. `BuildingPart` (`:47`) and `Building` (`:34`)
+> keep a `private volatile Palette localPalette`, resolved on first read and
+> written back, because resolving a `refpalette` needs a level to reach the
+> registry and the constructor has none. It is documented and justified where it
+> lives — the resolution is idempotent, so a race costs a duplicate lookup and
+> nothing else — but it *is* lazy initialisation and it *is* a write after
+> construction. §5.1's narrower claim, that `CityStyle`'s `init()`, `volatile
+> initialized` flag, `synchronized` block and half-built-on-cycle
+> `ThreadLocal` guard are all gone, is fully true and is the claim that carries
+> the determinism argument. The blanket version here is not. No code was changed
+> to make the original wording true: eagerly resolving `refpalette` would mean
+> threading a level into every constructor, which is a different design.
+
 - `*RE` classes stay raw decoded datapack entries, carrying `extends`
   unresolved.
 - The `cityassets/*` classes become uniformly what `WorldStyle` already is:
@@ -187,6 +225,21 @@ Generation code holds a wrapper constructed with an explicit worldstyle, never
 a dimension-global lookup. This costs nothing today — `City` already routes
 every read through `provider.getWorldStyle()`, and `getCityStyle(provider,
 coord)` is already coordinate-aware.
+
+> **Corrected after implementation (final branch review, 2026-08-11).** This did
+> not ship, and the section as written asserts something the code does not do.
+> No such wrapper exists. Every worldstyle read in generation goes through
+> `IDimensionInfo.getWorldStyle()` — `CityGenerator`, `MultiChunk`,
+> `BuildingInfo`, `City`, `Railway`, `Railways` and `Highways`, nineteen call
+> sites — and that *is* the dimension-global lookup this section says generation
+> never uses: an `IDimensionInfo` holds one worldstyle for the whole dimension.
+> The plan reduced the guarantee to "no dimension-global lookup is **added**",
+> which is a defensible scope cut and is what was implemented and verified; the
+> spec was never brought down to match. Read this section as stating the
+> intended end state, not the current one. The reasoning still holds — it is
+> cheap now and expensive to retrofit — so it stays as a design note rather than
+> being deleted, and per-city worldstyle selection remains explicitly out of
+> scope. No code was changed to make the original wording true.
 
 It is done now because it is cheap now and expensive to retrofit. **Per-city
 worldstyle selection is explicitly not part of this spec**: what picks the
@@ -230,6 +283,33 @@ the load already failed.
 
 `MultiSettings.DEFAULT` (`10, 1, 5, 0.8f, 50`) and `WorldSettings.DEFAULT`
 (`IGNORE, 1`) hold numbers and enums, not asset references. They stay.
+
+`Config.DEFAULT_WORLD_STYLE` (`urbex:standard`) stays too, and it is the one
+exception on this list that **is** an asset reference — so it is named here
+rather than left to be discovered. It is a *selection* fallback, not asset
+wiring: it answers "which worldstyle did the player choose?" when nothing —
+no client publication, no saved world data, no config entry, no `@worldstyle`
+suffix on a `dimensionsWithPresets` line — has answered it, at `Config.java`
+`:236`, `:292`, `:306`, `:311`, `:323`, `:341`, `:370` and `PresetSelection.java`
+`:37`, `:219`, `:222`, `:223`. §6 rule 3's target is a *datapack file* that
+silently acquires a reference it never wrote, which is unfindable when it
+misbehaves; a selection default is visible in the profile UI, overridable
+everywhere it applies, and has to be *something* for a world to generate at all.
+
+The consequence is still worth stating plainly, because it is real: a
+third-party pack that registers only its own worldstyle and no preset selection
+still gets `urbex:standard` when nothing else is selected — a reference no file
+in that pack wrote. Removing it means either a hard failure when no worldstyle
+is selected or a rule for picking one from what is registered, which is a
+selection-policy decision and not this spec's.
+
+> **Corrected after implementation (final branch review, 2026-08-11).** This
+> paragraph is an addition, not a restatement: §6.3 originally listed only
+> `MultiSettings.DEFAULT` and `WorldSettings.DEFAULT` and justified both as
+> "numbers and enums, not asset references", which left `Config.DEFAULT_WORLD_STYLE`
+> silently exempt from §6's rule 3 ("no asset reference has a code-side
+> default") while plainly being an asset reference. No code was changed; the
+> exception is stated with its rationale instead.
 
 The rule is *no asset reference exists that no file wrote*. It is deliberately
 not "every field must be written": settings may still default, and the

@@ -1204,6 +1204,15 @@ The bug was invisible for the life of the project because nothing asserted that 
 
 Record the before and after values. The CHANGELOG must say plainly that decoration now generates in the spawn area where it previously did not, that both digests moved because decoration entered the sampled window for the first time, and that the previous goldens did not cover the `Stuff` subsystem at all. Do not describe this as a routine regeneration — it changes what the goldens are evidence *for*.
 
+The values this task lands on, which Global Constraints then requires Tasks 6 and 7 to hold:
+
+| Golden | Before | After |
+| --- | --- | --- |
+| `digest.golden` | `414cb71424d5e53f` | `88af6b69e7762fbc` |
+| `digest-features.golden` | `8a3215441fb9f46d` | `7c297c1e4ec1ce38` |
+
+Attribution is per change, not for the pair together. In particular, isolate the `minecraft:chain` → `minecraft:iron_chain` palette fix from the load fix: with the load fix alone the primary digest is `a993b976a935e2eb` (21 cobwebs, no chains), and the block-id fix alone takes it to `88af6b69e7762fbc`. Record that intermediate value in the CHANGELOG — a regeneration justified as "measured" has to leave the measurement somewhere the repository keeps.
+
 - [ ] **Step 5: Commit**
 
 ```bash
@@ -1431,7 +1440,14 @@ In `docs/presets.md`, add a line near the top noting that presets follow the sam
 
 Every JSON snippet in `docs/datapacks.md` must be one a real datapack could ship. Check each against the codecs it claims to satisfy — field names, whether a field is required, and whether the id is qualified. A doc example that would fail to load is worse than no example.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Run the suite and the digests**
+
+Run: `./gradlew test`, then both digest tasks.
+Expected: PASS; `88af6b69e7762fbc` and `7c297c1e4ec1ce38`, `unsafeReads=0`, both goldens clean in `git status`. This task should be documentation-only, so a moving digest means something other than documentation changed — find it rather than regenerating. Both authorised regenerations were spent by Tasks 5b and 5c; there is no budget for a third.
+
+Note that `docs/datapacks.md` and `docs/schema/` are declared inputs to `:test`. Without that, a documentation-only edit leaves the task `UP-TO-DATE` and the tests that read those files do not run on the change they exist for.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add docs/datapacks.md docs/presets.md README.md

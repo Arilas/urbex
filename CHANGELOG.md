@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+- **`inherit` and `parent` are refused by name, in all thirteen registries.** The spec said from the
+  start that they were "deleted, not aliased" and that a file using either would fail to load naming
+  the replacement key - and nothing implemented it, so the promise was the one thing standing between
+  a pack author and the worst version of this failure. DFU codecs ignore unknown map keys, so a city
+  style declaring `"inherit": "urbex:citystyle_common"` decoded perfectly cleanly and loaded as a
+  **chain root with no inheritance and no diagnostic**; `presets` alone would have logged a `WARN`,
+  via `UnknownKeys`, which is a line in a log rather than a refusal. What the author saw next
+  depended on what else the file said, and neither outcome named the key: a file that also spelled
+  out complete wiring loaded and generated silently without anything it meant to inherit, and one
+  that leaned on its parent failed with `declares no 'streetblocks.parts'`, which mentions neither
+  `inherit` nor `extends`. That is a bad failure for anyone, and it is the *expected* failure for
+  this branch's stated first consumer: a port of Lost Cities Modern Tweaks, a format in which
+  `inherit` **is** the key, so a mechanically converted pack hits it on every file. `RetiredKeys`
+  now pre-checks the top-level keys of every registry entry and fails the decode with a message
+  naming the offending key, its replacement, and what leaving it in place would have done. It is a
+  pre-pass rather than a field on each record, so it fires on the key's presence whatever its value's
+  type. Encode is delegated untouched - `PaletteRE`, `BuildingPartRE` and `PresetRE` encode on live
+  command and GUI paths that read the `DataResult` themselves, and no encoder can produce these keys
+  anyway.
+  - *The coverage claim is made by enumeration, not by a list to keep up to date.*
+    `RetiredKeysRejectedTest` reflects the `CODEC` field off every `*RE` class in the registry
+    package, requires all thirteen to reject both keys with a message naming the key and `extends`,
+    and separately requires that count to equal the number of `_REGISTRY_KEY` fields on
+    `CustomRegistries` - so a fourteenth registry cannot arrive uncovered. A file carrying both keys
+    reports the same one every run (declaration order, not map order), and a non-map input is left to
+    the wrapped codec rather than being described as a retired key.
+  - *Inert, and checked rather than assumed.* No file in `src/main/resources/data` uses either key -
+    asserted by the same test, not grepped once by hand - so nothing that loads today changes shape
+    and neither golden can move. Both are unchanged (`88af6b69e7762fbc`, `7c297c1e4ec1ce38`,
+    `unsafeReads=0`). `docs/datapacks.md` gains the row in its common-errors table, and the carve-out
+    it needs in "a misspelled key is ignored": these two keys are the exception to that rule in every
+    registry, which is precisely why they had to stop being ignorable.
+
 - **Datapack authoring has a guide: `docs/datapacks.md`.** Everything below changes what a
   third-party pack must write down, and until now the only way to learn the rules was to read the
   codecs. The guide covers the thirteen registries and where their files go, `extends` and its
@@ -13,7 +46,9 @@
   it, so an *incomplete* chain root is legal only in `citystyles` - while `predefinedcities` is
   resolved on the generation path instead, and only its `citystyle` reference is seen at load; that
   an empty part list is a real opt-out for the three street families but a generation crash for
-  highways and railways; that a city style's `style` is needed but not checked at load; that a
+  highways and railways; that **three** city-style fields are needed but not checked at load -
+  `style`, and the `streetblocks` characters `street` and `border`, each of which throws at a
+  different moment in generation; that a
   misspelled **key** is silently ignored in every registry but `presets`; and that an unknown block id
   resolves to air with a warning naming the palette it was written in, not the asset that looks
   broken. `README.md` and `docs/presets.md` link to it.
@@ -31,7 +66,7 @@
     decodes every JSON block in the guide through the codec of the registry it is marked as belonging
     to, and re-encodes the result - walking objects and arrays alike - to catch keys the codec
     silently ignored, so a doc example that would fail to load, or load and quietly do nothing, fails
-    the build. It also fails if a registry has no example, and a second test provokes eight of the
+    the build. It also fails if a registry has no example, and a second test provokes nine of the
     guide's quoted error messages from the code that raises them and requires the guide to contain
     each verbatim. Both needed `docs/datapacks.md` declared as an input to `:test`, along with
     `docs/schema/` for `PresetSchemaTest`: without them a documentation-only edit left the task
@@ -178,7 +213,13 @@
     not start at all until it was fixed. It is `minecraft:cut_red_sandstone` - taken from vanilla's
     own flattening table for legacy id 179 meta 2, not guessed. `palettes/common.json` mapped `{` to
     `minecraft:chain`, renamed `minecraft:iron_chain` in 26.x, so the entire `urbex:chains`
-    decoration had been placing air: `Tools.stringToState` ends at
+    decoration had been placing air. **The two were separated on the digest rather than reasoned
+    about together:** with the load fix in place but before the chain fix, the primary digest was
+    `a993b976a935e2eb`, with 21 cobwebs and zero chains in the window; the chain fix alone took it
+    to the shipped `88af6b69e7762fbc` by turning 16 of those placements from air into chains. That
+    intermediate value is recorded here because it is the measurement the "measured, not inferred"
+    claim above rests on, and it exists in no other file.
+    The mechanism: `Tools.stringToState` ends at
     `BuiltInRegistries.BLOCK.getValue(id)`, which hands back the registry's *default* value -
     `minecraft:air` - for an unknown id, so its `value == null` guard never fires and a renamed block
     becomes air with no exception and no log line. `ShippedBlockIdsResolveTest` now checks every
@@ -223,9 +264,12 @@
   a hash bucket, and not on a bare-versus-qualified comparison.** A systematic sweep found four
   places, all pre-existing, none introduced by the qualification pass below; they land together
   because they are one class of bug. `digest-features.golden` moves from `c8267f7b4abfd44e` to
-  `8a3215441fb9f46d` as a result, and this is the one deliberate golden regeneration in this work.
-  `digest.golden` stays `414cb71424d5e53f`. Each change was measured on its own so every movement is
-  attributable; where a digest did **not** move, the reason is stated rather than assumed.
+  `8a3215441fb9f46d` as a result. This is the **first of the two** deliberate golden regenerations in
+  this work, not the only one: the decoration entry above moves both goldens again, on to
+  `88af6b69e7762fbc` and `7c297c1e4ec1ce38`, which are the values that ship.
+  `digest.golden` is unchanged *by this entry*, at `414cb71424d5e53f`. Each change was measured on
+  its own so every movement is attributable; where a digest did **not** move, the reason is stated
+  rather than assumed.
   - *The stuff ordinal no longer comes from a hash.* `Stuff.generateStuff` walks each tag's list
     assigning a running `stuffOrdinal`, and that ordinal is the RNG slot address every placement
     attempt of that decoration draws from. The list came from `STUFF.getIterable()`, a
@@ -239,11 +283,13 @@
     immutable (a `List.copyOf`, which is also safely published to the worker threads by the map write
     alone - the former `CopyOnWriteArrayList` was buying thread safety for an `add` that no longer
     happens after publication), and `CityStyle.stuffTags` is a `TreeSet`. **Both digests are
-    unchanged by this, and not because the ordering was already right.** `AssetRegistries.load()` is
+    unchanged by this, and not because the ordering was already right.** At the time of this change
+    `AssetRegistries.load()` was
     called only from `ServerEventHandlers.onWorldTick`, while `DigestCheck` runs from
-    `SERVER_STARTED` - before any tick - so `STUFF_BY_TAG` is empty for the whole of both digest
-    runs and no decoration is placed in either window. The digests have never covered the `Stuff`
-    subsystem at all. **That is a separate and larger shipped defect, and it is player-visible.**
+    `SERVER_STARTED` - before any tick - so `STUFF_BY_TAG` was empty for the whole of both digest
+    runs and no decoration was placed in either window. The digests had, up to here, never covered
+    the `Stuff`
+    subsystem at all. **That was a separate and larger shipped defect, and it was player-visible.**
     `prepareLevels()` - "Preparing spawn area" - runs inside `initServer()`, before `SERVER_STARTED`
     and before any tick, and never calls `tickServer`, so `END_LEVEL_TICK` does not fire during it.
     Every chunk generated there is generated with `STUFF_BY_TAG` empty, and generated chunks are
@@ -252,9 +298,11 @@
     boundary falls depends on how far spawn preparation and tick 1's chunk work happened to get -
     and `ServerLevel.tick()` does its chunk work before Fabric fires `END_LEVEL_TICK` at the tail, so
     those chunks land on the empty side too - which means two players on the same seed can get
-    different boundaries. It is tracked on its own and deliberately not fixed here, where filling the
+    different boundaries. It was tracked on its own and deliberately not fixed here, where filling the
     maps earlier would have put decoration into both digest windows and swamped the per-change
-    attribution this entry is built on. The ordering fix above is therefore pinned by unit tests
+    attribution this entry is built on - **it is closed by the decoration entry above**, which moves
+    the load off the tick and regenerates both goldens so that the sampled windows cover `Stuff` for
+    the first time. The ordering fix above is therefore pinned by unit tests
     rather than by a digest: `RegistryChainResolutionTest` feeds `groupStuffByTag` the exact order
     the hash map produces and requires the sorted one back.
   - *`inpart`, `belowpart` and `inbuilding` have one convention: fully qualified, everywhere.* They
@@ -386,16 +434,21 @@
   (bare) name against a fully-qualified command argument and could never find anything; both sides are
   qualified now, so it works.
 - **`Counter.getMostOccuring()`'s tie-break is now a stated rule instead of `HashMap` iteration
-  order, and its tie-break key is a required parameter instead of an implicit `String.valueOf`.**
+  order, and the tie-break is a required parameter instead of an implicit `String.valueOf`.**
   `BuildingInfo`'s majority-cityStyle vote among a chunk's neighbors produces an even split at every
   style boundary (ten votes: 3x3 neighbors plus the center counted twice), and the old tie-break fell
   through to whichever key `HashMap` happened to visit first, which depends on each key's hash bucket:
   an unrelated rename of a city style could silently move which side of a boundary a tied chunk falls
-  on. Ties now break on the lexicographically lowest `tieBreakKey.apply(key)`, and every caller must
-  supply that key explicitly rather than the method defaulting to `String.valueOf` - a key type with
+  on. Ties now break on the smallest key under an order the caller supplies, and supplying it is
+  mandatory rather than the method defaulting to `String.valueOf` - a key type with
   no meaningful `toString()` (e.g. `CityStyle`, whose default embeds an identity hash) would otherwise
   make the tie-break *look* deterministic while it still varied run to run, the same bug moved one
-  layer down rather than fixed. That was not hypothetical: `MultiChunk`'s own city-style sort
+  layer down rather than fixed. (This entry originally described that parameter as a
+  `Function<T, String>` tie-break *key* and the rule as "the lexicographically lowest
+  `tieBreakKey.apply(key)`". A later task in this same work replaced it with a
+  `Comparator<? super T>` - see the "One asset kind, one order" bullet above for why no single string
+  key reproduces `Identifier`'s path-then-namespace order - and this entry is corrected to match the
+  code that ships. There is no `tieBreakKey` API.) That was not hypothetical: `MultiChunk`'s own city-style sort
   (`styleList.sort(Comparator.comparing(...))`, which feeds the weighted pick that decides which
   multibuilding gets placed) used `CityStyle::getName` and is a second-order dependency on the very
   accessor the entry above just requalified. The bundled pack is entirely `urbex`-namespaced, so the
@@ -408,7 +461,7 @@
   candidate reachable in generation at all (`urbex:standard`) - so a real tie, or a second datapack's
   city style, could lay out differently elsewhere than either used to. `CounterTest` pins the tie-break
   rule directly: a unique winner is unaffected, a tie's winner does not depend on insertion order, and
-  the key is read from wherever the caller says, not from the key object's own `toString()`.
+  the order comes from wherever the caller says, not from the key object's own `toString()`.
 - **A separate, pre-existing bug the entry above could have fixed by accident, and deliberately did
   not:** `conditions/chestloot.json`'s `inpart` entries (`"urbex:rail_dungeon1"`/`"urbex:rail_dungeon2"`)
   are required to be fully qualified by `DatapackReferenceIntegrityTest`, but the runtime side of that
@@ -416,13 +469,19 @@
   entries up just qualified - so qualifying it everywhere would have made a chest-loot condition that
   has never once fired since the qualified-`inpart` convention was introduced start firing, silently,
   as a side effect of an unrelated change. Confirmed by hand: reverting just that one path reverted
-  `runDigestCheckFeatures` to the shipped golden, proving it was the entire cause of the only digest
-  shift this work produced anywhere. The new `ConditionContext.legacyMatchKey(Identifier)` preserves
+  `runDigestCheckFeatures` to the golden current at the time (`c8267f7b4abfd44e`), proving it was the
+  entire cause of the digest shift this entry was written against. (It was *not* the only digest shift
+  this work produced: two later regenerations follow it, and both goldens end at `88af6b69e7762fbc`
+  and `7c297c1e4ec1ce38` - see the two entries above that move them.) The new
+  `ConditionContext.legacyMatchKey(Identifier)` preserves
   the exact old (bare-for-`urbex`) comparison every `inpart`/`inbuilding` match used, pinned by
   `ConditionContextLegacyMatchKeyTest`, so this pass changes nothing about which chest-loot conditions
   fire - that mismatch stays a separate, tracked follow-up (worded so that *deleting* `legacyMatchKey`
   is the definition of done, not "fix `inpart` matching" - the bug now has a comfortable name, and a
-  comfortable name is how it survives). **Confirmed inert for everything the digest window reaches:**
+  comfortable name is how it survives). **That follow-up landed inside this same work:** the
+  "one convention: fully qualified, everywhere" bullet above deletes `legacyMatchKey` and its test,
+  and the chest-loot condition fires from then on - so the deferral described here is history, not
+  the shipped state. **Confirmed inert for everything the digest window reaches:**
   both digests regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
   That is direct evidence for this `legacyMatchKey` decision, where every path it touches lies inside
   the window - it is *not* evidence for the two tie-break determinism fixes in the entry just above,
