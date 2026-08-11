@@ -1,0 +1,23 @@
+{
+  "parent": "urbex:default",
+  "description": "Wasteland, no water, bare land",
+  "extraDescription": "This profile works best with Biomes O Plenty and the Wastify mod",
+  "icon": "textures/gui/icon_wasteland.png",
+  "terrain": {
+    "avoidWater": true
+  },
+  "decoration": {
+    "randomLeafBlockChance": 0.01,
+    "avoidFoliage": true,
+    "lightingDensity": 0.05,
+    "lootDensity": 0.4
+  },
+  "destruction": {
+    "rubbleLayer": true,
+    "rubbleDirtScale": 2.0,
+    "rubbleLeaveScale": 0.0,
+    "ruinChance": 0.5,
+    "ruinMinlevelPercent": 0.5,
+    "ruinMaxlevelPercent": 0.9
+  }
+}

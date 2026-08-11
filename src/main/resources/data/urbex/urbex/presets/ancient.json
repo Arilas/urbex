@@ -1,0 +1,21 @@
+{
+  "parent": "urbex:default",
+  "description": "Ancient jungle city, leafs, ruined buildings",
+  "icon": "textures/gui/icon_ancient.png",
+  "decoration": {
+    "randomLeafBlockThickness": 6,
+    "randomLeafBlockChance": 0.05,
+    "lightingDensity": 0.05,
+    "lootDensity": 0.4
+  },
+  "destruction": {
+    "explosionChance": 0,
+    "miniExplosionChance": 0,
+    "rubbleLayer": true,
+    "rubbleDirtScale": 2.0,
+    "rubbleLeaveScale": 2.0,
+    "ruinChance": 0.9,
+    "ruinMinlevelPercent": 0.0,
+    "ruinMaxlevelPercent": 0.9
+  }
+}

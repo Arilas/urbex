@@ -1,0 +1,12 @@
+{
+  "parent": "urbex:default",
+  "description": "Safe mode: no spawners, lighting but no loot",
+  "icon": "textures/gui/icon_safe.png",
+  "buildings": {
+    "generateSpawners": false
+  },
+  "decoration": {
+    "lightingDensity": 1.0,
+    "lootDensity": 0.0
+  }
+}

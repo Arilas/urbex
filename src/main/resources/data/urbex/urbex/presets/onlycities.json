@@ -1,0 +1,12 @@
+{
+  "parent": "urbex:default",
+  "description": "The entire world is a city",
+  "icon": "textures/gui/icon_onlycities.png",
+  "cities": {
+    "cityChance": 0.2,
+    "cityMaxRadius": 256
+  },
+  "decoration": {
+    "lightingDensity": 0.15
+  }
+}
