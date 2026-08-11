@@ -237,7 +237,7 @@
     },
     {
       "char": "{",
-      "block": "minecraft:chain"
+      "block": "minecraft:iron_chain"
     },
     {
       "char": "*",

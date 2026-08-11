@@ -102,18 +102,17 @@ public class MultiChunk {
         // starts at -1 - not necessarily from a generation call, since getDimensionInfo also has
         // callers in DigestRunner, SpawnPlacement, StructureSuppressor and the commands.
         //
-        // What bounds this is narrow, and does not amount to a guarantee. After that first
-        // reconcile the counters stay equal, because globalDimensionInfoDirtyCounter is only ever
-        // bumped from client-side paths (ClientEventHandlers, PresetSelection), none of which run
-        // while a server is generating - so in a settled session no reset lands between two chunks'
-        // style lookups. The first reconcile itself is not guaranteed to be a single call:
-        // getDimensionInfo's check-then-act on two volatile ints is not atomic and cleanUp() is
-        // unsynchronized, while generation runs on the parallel worker pool (see CityFeature's "No
-        // lock" note), so one thread can be inside the loop below while another, having read the
-        // counter before the first thread's write, calls cleanUp() again and resets the registries
-        // underneath it. That window is exactly the split-vote case above. It is pre-existing and
-        // is not closed here; closing it properly means keying on ids rather than instances, or
-        // making the reconcile atomic - not a comment.
+        // What bounds this is narrow, and still does not amount to a guarantee. The first reconcile
+        // is now a single call: CityFeature.reconcileDirtyCounter holds the feature's monitor across
+        // the counter comparison and cleanUp(), so the second thread through waits and then finds
+        // the counters equal instead of resetting the registries underneath the first (Task 5c; the
+        // check-then-act this paragraph used to describe is gone). After that the counters stay
+        // equal, because globalDimensionInfoDirtyCounter is only ever bumped from client-side paths
+        // (ClientEventHandlers, PresetSelection), none of which run while a server is generating -
+        // so in a settled session no reset lands between two chunks' style lookups. That last part
+        // is an argument about who writes the counter, not something the code enforces, and it is
+        // all that stands between this loop and the split-vote case above. Closing it outright means
+        // keying on ids rather than instances - not a comment.
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {

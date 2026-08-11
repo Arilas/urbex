@@ -2,6 +2,56 @@
 
 ## Unreleased
 
+- **Decoration now generates in the spawn area, where it previously did not.** `AssetRegistries.load()`
+  was called only from `ServerTickEvents.END_LEVEL_TICK`, but `prepareLevels()` - "Preparing spawn
+  area" - generates its chunks inside `initServer()`, before any tick fires. Every chunk it wrote had
+  no cobwebs and no chains, and chunks are saved, so nothing ever healed them: a new world had a
+  bare-spawn city and a decorated one a few hundred blocks out, with a visible boundary between.
+  Where that boundary fell depended on how far spawn preparation and tick 1's chunk work happened to
+  get, so two players on one seed got different worlds - which is the opposite of what this mod
+  claims. Loading now happens in two places and neither is a tick. `ServerLevelEvents.LOAD` runs the
+  eager validation while the world is still loading: Fabric raises it from a `@WrapOperation` on the
+  `levels.put` inside `MinecraftServer.createLevels`, and `loadLevel` calls `createLevels()` before
+  `prepareLevels()`, so a broken pack refuses the world instead of failing under a player. That alone
+  would only swap one ordering assumption for another, so the guarantee itself lives on the
+  generation path: `CityFeature.getDimensionInfo` - which `CarverHookMixin` reaches before any city
+  is generated - loads the registries before it touches the level, which also covers the case a
+  lifecycle event cannot, namely `CityFeature.cleanUp()` resetting the registries mid-session from
+  that same path. `AssetRegistries.load` is now called from worker threads, so it takes a lock and
+  publishes the stuff-by-tag index with a single volatile write of a finished map; the old `putAll`
+  into a shared `ConcurrentHashMap` let a worker see some tags present and others still missing, and
+  a missing tag places nothing and says nothing. `CityFeature`'s dirty-counter reconcile is atomic
+  now rather than a check-then-act on two volatile ints, so the first reconcile of a session cannot
+  reset the registries underneath a thread that is already generating.
+  - **Both goldens move, and this is not a routine regeneration - it changes what they are evidence
+    for.** `digest.golden` goes from `414cb71424d5e53f` to `88af6b69e7762fbc` and
+    `digest-features.golden` from `8a3215441fb9f46d` to `7c297c1e4ec1ce38`, because decoration exists
+    in the sampled windows for the first time. **The previous goldens did not cover the `Stuff`
+    subsystem at all** - not `generateStuff`, not the `stuffOrdinal` RNG addressing, not a single
+    `StuffSettingsRE` filter, not `columnResolves`, and `Rng.Purpose.STUFF` had never appeared in a
+    draw sequence - because `DigestCheck` runs on `SERVER_STARTED` and halts the server before a tick
+    ever fires. The same gap meant the eager load-time validation added for all ten registries had
+    never run in a digest either. The movement in the primary window is 38 driver positions out of
+    850,049: 21 that were air are cobweb, 16 are iron chains, and one blue stained-glass pane changed
+    its `west` connection because a chain is now a real block next to it.
+  - *Two shipped datapack defects, both found by that validation running for the first time.*
+    `palettes/bricks_desert_redsand.json` carried `minecraft:red_sandstone@2`, a 1.12 `name@meta`
+    string predating flattening that is not a legal `Identifier`; `Identifier.parse` threw on it
+    inside `Palette`'s constructor, which now takes the whole world load with it, so the world did
+    not start at all until it was fixed. It is `minecraft:cut_red_sandstone` - taken from vanilla's
+    own flattening table for legacy id 179 meta 2, not guessed. `palettes/common.json` mapped `{` to
+    `minecraft:chain`, renamed `minecraft:iron_chain` in 26.x, so the entire `urbex:chains`
+    decoration had been placing air: `Tools.stringToState` ends at
+    `BuiltInRegistries.BLOCK.getValue(id)`, which hands back the registry's *default* value -
+    `minecraft:air` - for an unknown id, so its `value == null` guard never fires and a renamed block
+    becomes air with no exception and no log line. `ShippedBlockIdsResolveTest` now checks every
+    `block` and `damaged` id in the bundled pack against the block registry; the air fallback in
+    `Tools.stringToState` is a wider contract change and is left for its own task.
+  - *Tests.* `AssetsLoadedBeforeGenerationTest` drives `CityFeature.getDimensionInfo` through a level
+    that throws the moment anything past `registryAccess()` is asked of it, and requires the stuff
+    index to be populated by then - so the load moving back off the generation path fails a test
+    rather than silently costing a player their spawn-area decoration. It also pins the index's
+    single-write publication.
 - **No worldgen decision rides on an asset's name as a string any more - not on where its id lands in
   a hash bucket, and not on a bare-versus-qualified comparison.** A systematic sweep found four
   places, all pre-existing, none introduced by the qualification pass below; they land together

@@ -39,13 +39,13 @@ public class Stuff {
         // The ordinal is an RNG address, so what it counts has to be stable against anything that
         // is not a deliberate change to the pack. Both loops below are ordered for that reason and
         // not for tidiness: CityStyle.getStuffTags() is sorted (see the field) and each
-        // STUFF_BY_TAG list is sorted by Identifier (see AssetRegistries.groupStuffByTag). Neither
+        // stuffForTag list is sorted by Identifier (see AssetRegistries.groupStuffByTag). Neither
         // may go back to a hash-ordered collection.
         int stuffOrdinal = 0;
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
         for (String tag : info.getCityStyle().getStuffTags()) {
-            List<StuffObject> stuffs = AssetRegistries.STUFF_BY_TAG.get(tag);
+            List<StuffObject> stuffs = AssetRegistries.stuffForTag(tag);
             if (stuffs != null) {
                 for (StuffObject stuff : stuffs) {
                     StuffSettingsRE settings = stuff.getSettings();

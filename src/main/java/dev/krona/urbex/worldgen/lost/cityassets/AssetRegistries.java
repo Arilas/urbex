@@ -6,12 +6,14 @@ import dev.krona.urbex.worldgen.lost.regassets.*;
 import net.minecraft.world.level.CommonLevelAccessor;
 
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class AssetRegistries {
 
@@ -28,30 +30,57 @@ public class AssetRegistries {
     public static final RegistryAssetRegistry<PredefinedCity, PredefinedCityRE> PREDEFINED_CITIES = new RegistryAssetRegistry<>(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, PredefinedCity::new);
     public static final RegistryAssetRegistry<StuffObject, StuffSettingsRE> STUFF = new RegistryAssetRegistry<>(CustomRegistries.STUFF_REGISTRY_KEY, StuffObject::new);
 
-    public static final Map<String, List<StuffObject>> STUFF_BY_TAG = new ConcurrentHashMap<>();
+    /**
+     * The stuff-by-tag index, replaced wholesale rather than filled in place.
+     * <p>
+     * It used to be a {@code ConcurrentHashMap} filled with {@code putAll}, which is not one
+     * operation: a worldgen worker calling {@link #stuffForTag} while {@link #load} was midway
+     * through that {@code putAll} could see some tags present and others still missing, and a
+     * missing tag is silent - {@code Stuff.generateStuff} simply places nothing for it. Now
+     * {@code load} builds the whole index privately and publishes it with the single volatile write
+     * below, so a reader sees either the previous index or the complete new one and never a state
+     * in between. The map handed over is unmodifiable and is never touched again after the write.
+     */
+    private static volatile Map<String, List<StuffObject>> stuffByTag = Map.of();
 
-    // Volatile, and written after the maps they guard are filled: load() is called from the server
-    // thread on every tick, while worker threads are reading the registries during generation.
+    // Guards load() and reset() against each other and against concurrent loads. load() is no
+    // longer confined to the server thread: CityFeature.getDimensionInfo calls it, and generation
+    // runs on the parallel worldgen worker pool (see the "No lock" note in CityFeature).
+    private static final Object LOAD_LOCK = new Object();
+
+    // Volatile, and written after the maps they guard are filled, so the fast path out of load()
+    // and loadPredefinedStuff() can skip the lock entirely once the work is done.
     private static volatile boolean loaded = false;
     private static volatile boolean loadedPredefined = false;
 
+    /**
+     * Every stuff object filed under {@code tag}, or null when the tag has none (or when nothing is
+     * loaded yet). The returned list is immutable and safe to iterate from a worker thread.
+     */
+    @Nullable
+    public static List<StuffObject> stuffForTag(String tag) {
+        return stuffByTag.get(tag);
+    }
+
     public static void reset() {
-        VARIANTS.reset();
-        CONDITIONS.reset();
-        WORLDSTYLES.reset();
-        PARTS.reset();
-        BUILDINGS.reset();
-        CITYSTYLES.reset();
-        MULTI_BUILDINGS.reset();
-        STYLES.reset();
-        PALETTES.reset();
-        SCATTERED.reset();
-        PREDEFINED_CITIES.reset();
-        STUFF.reset();
-        STUFF_BY_TAG.clear();
-        Presets.reset();
-        loaded = false;
-        loadedPredefined = false;
+        synchronized (LOAD_LOCK) {
+            VARIANTS.reset();
+            CONDITIONS.reset();
+            WORLDSTYLES.reset();
+            PARTS.reset();
+            BUILDINGS.reset();
+            CITYSTYLES.reset();
+            MULTI_BUILDINGS.reset();
+            STYLES.reset();
+            PALETTES.reset();
+            SCATTERED.reset();
+            PREDEFINED_CITIES.reset();
+            STUFF.reset();
+            stuffByTag = Map.of();
+            Presets.reset();
+            loaded = false;
+            loadedPredefined = false;
+        }
     }
 
     /**
@@ -70,23 +99,38 @@ public class AssetRegistries {
      * Order is deliberate only in one place: {@code VARIANTS} before {@code PALETTES}, because
      * compiling a palette entry that names a variant reaches into that registry. The lookup is
      * lazy, so this is tidiness rather than a requirement.
+     * <p>
+     * Called from two places, for two different reasons. {@code ServerEventHandlers} calls it from
+     * {@code ServerLevelEvents.LOAD} so the validation above happens while the world is loading and
+     * a broken pack refuses the world instead of failing later; {@code CityFeature.getDimensionInfo}
+     * calls it on the generation path so that no chunk can ever generate against an unloaded
+     * registry, whenever generation starts and whatever has reset the registries since. The second
+     * caller means this runs on worldgen worker threads, hence the lock: exactly one thread does the
+     * work and the rest wait for it, rather than several racing through {@code loadAll} and building
+     * the tag index from a half-filled {@code STUFF}.
      */
     public static void load(CommonLevelAccessor level) {
         if (loaded) {
             return;
         }
-        VARIANTS.loadAll(level);
-        PALETTES.loadAll(level);
-        CONDITIONS.loadAll(level);
-        STYLES.loadAll(level);
-        PARTS.loadAll(level);
-        BUILDINGS.loadAll(level);
-        MULTI_BUILDINGS.loadAll(level);
-        SCATTERED.loadAll(level);
-        WORLDSTYLES.loadAll(level);
-        STUFF.loadAll(level);
-        STUFF_BY_TAG.putAll(groupStuffByTag(STUFF.getIterable()));
-        loaded = true;
+        synchronized (LOAD_LOCK) {
+            if (loaded) {
+                return;
+            }
+            VARIANTS.loadAll(level);
+            PALETTES.loadAll(level);
+            CONDITIONS.loadAll(level);
+            STYLES.loadAll(level);
+            PARTS.loadAll(level);
+            BUILDINGS.loadAll(level);
+            MULTI_BUILDINGS.loadAll(level);
+            SCATTERED.loadAll(level);
+            WORLDSTYLES.loadAll(level);
+            STUFF.loadAll(level);
+            // One write, publishing a map that is complete before the reference escapes.
+            stuffByTag = groupStuffByTag(STUFF.getIterable());
+            loaded = true;
+        }
     }
 
     /**
@@ -103,20 +147,20 @@ public class AssetRegistries {
      * then namespace) is the same total order {@code MultiChunk}'s city-style sort uses, so one
      * asset kind is not ordered two ways in two places.
      * <p>
-     * Returns immutable lists: worldgen workers read {@code STUFF_BY_TAG} while the server thread
-     * is in {@code load}, and an immutable list's contents are safely published by the map write
-     * alone. (The former {@code CopyOnWriteArrayList} bought thread safety for an
+     * Returns immutable lists inside an unmodifiable map: the whole structure is finished before
+     * {@link #load} publishes it, and nothing writes to it afterwards, so worldgen workers can read
+     * it without locking. (The former {@code CopyOnWriteArrayList} bought thread safety for an
      * {@code add} that no longer happens after publication.)
      */
-    static Map<String, List<StuffObject>> groupStuffByTag(Iterable<StuffObject> stuff) {
-        Map<String, List<StuffObject>> byTag = new TreeMap<>();
+    static SortedMap<String, List<StuffObject>> groupStuffByTag(Iterable<StuffObject> stuff) {
+        SortedMap<String, List<StuffObject>> byTag = new TreeMap<>();
         stuff.forEach(object -> object.getSettings().getTags().forEach(
                 tag -> byTag.computeIfAbsent(tag, t -> new ArrayList<>()).add(object)));
         byTag.replaceAll((tag, list) -> {
             list.sort(Comparator.comparing(StuffObject::getId));
             return List.copyOf(list);
         });
-        return byTag;
+        return Collections.unmodifiableSortedMap(byTag);
     }
 
     public static void loadPredefinedStuff(CommonLevelAccessor level) {
@@ -129,7 +173,14 @@ public class AssetRegistries {
             // no-op: a real level arriving later must still get its predefined cities (#67).
             return;
         }
-        PREDEFINED_CITIES.loadAll(level);
-        loadedPredefined = true;
+        // Same lock as load(): City's predefined maps are built from worker threads too, and the
+        // latch below must not be set by one thread while another is still inside loadAll.
+        synchronized (LOAD_LOCK) {
+            if (loadedPredefined) {
+                return;
+            }
+            PREDEFINED_CITIES.loadAll(level);
+            loadedPredefined = true;
+        }
     }
 }

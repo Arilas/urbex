@@ -95,10 +95,15 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
 
     @Nullable
     public IDimensionInfo getDimensionInfo(WorldGenLevel world) {
-        if (globalDimensionInfoDirtyCounter != dimensionInfoDirtyCounter) {
-            // Force clear of cache
-            cleanUp();
-        }
+        reconcileDirtyCounter();
+        // Every path that generates Urbex content comes through here first - CarverHookMixin ->
+        // generateFromPipeline -> getDimensionInfo, before CityGenerator.generate is reached - so
+        // this is where "no chunk generates against unloaded assets" is actually enforced. A
+        // lifecycle event cannot enforce it on its own: reconcileDirtyCounter() above calls
+        // cleanUp(), which calls AssetRegistries.reset(), from this very path (see cleanUp below),
+        // and no further level-load event fires for a level that is already loaded. AssetRegistries
+        // .load() latches, so from the second chunk on this costs one volatile read.
+        AssetRegistries.load(world);
         ResourceKey<Level> type = world.getLevel().dimension();
         IDimensionInfo known = dimensionInfo.get(type);
         if (known != null) {
@@ -130,6 +135,36 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         IDimensionInfo diminfo = new DefaultDimensionInfo(world, preset, choice.worldStyle());
         IDimensionInfo raced = dimensionInfo.putIfAbsent(type, diminfo);
         return raced != null ? raced : diminfo;
+    }
+
+    /**
+     * Drops the caches once per bump of {@link #globalDimensionInfoDirtyCounter}, and makes every
+     * other caller wait while that happens.
+     * <p>
+     * This used to be a bare {@code if (global != mine) cleanUp();} on two volatile ints - a
+     * check-then-act, run from the parallel worldgen worker pool, so two threads reading the counter
+     * before either had written it back both called {@link #cleanUp()}. The first call of a session
+     * always reconciles ({@code dimensionInfoDirtyCounter} starts at -1), so that was reachable on
+     * any world's first chunks: the second reset landed while the first thread was already
+     * generating against the registries it cleared. MultiChunk's city-style counter names the same
+     * window, because a style resolved either side of a reset is two instances of one id.
+     * <p>
+     * The lock only bites when the counters differ; once they agree, the volatile read on the first
+     * line returns and nothing synchronizes. What this does not cover is a bump that arrives while
+     * generation is in flight - {@code globalDimensionInfoDirtyCounter} is written only from
+     * {@code ClientEventHandlers} and {@code PresetSelection} (both client-side, neither running
+     * against a generating server), which bounds it but is an argument about callers, not a
+     * guarantee this method can make.
+     */
+    private void reconcileDirtyCounter() {
+        if (globalDimensionInfoDirtyCounter == dimensionInfoDirtyCounter) {
+            return;
+        }
+        synchronized (this) {
+            if (globalDimensionInfoDirtyCounter != dimensionInfoDirtyCounter) {
+                cleanUp();
+            }
+        }
     }
 
     public void cleanUp() {
