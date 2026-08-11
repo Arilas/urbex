@@ -48,13 +48,15 @@ public class CommandSavePreset implements Command<CommandSourceStack> {
         Path out = FabricLoader.getInstance().getGameDir().resolve("urbex-export");
         Path target = out.resolve(preset.getId().getPath() + ".json");
         try {
-            Files.createDirectories(out);
+            // The preset id's path can itself contain '/' (a datapack preset registered under a
+            // subdirectory), so the target's own parent - not just the export root - must exist.
+            Files.createDirectories(target.getParent());
             Files.writeString(target, new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(json));
         } catch (IOException e) {
             context.getSource().sendFailure(Component.literal("Error saving preset '" + preset.getId() + "'!").withStyle(ChatFormatting.RED));
             return 0;
         }
-        context.getSource().sendSuccess(() -> Component.literal(ChatFormatting.GREEN + "Saved preset to '" + target + "'!"), true);
-        return 0;
+        context.getSource().sendSuccess(() -> Component.literal("Saved preset to '" + target + "'!").withStyle(ChatFormatting.GREEN), true);
+        return Command.SINGLE_SUCCESS;
     }
 }
