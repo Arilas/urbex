@@ -88,8 +88,20 @@ are exactly three shapes, which is what makes a uniform mechanism learnable.
 | Shape | Rule | Examples |
 |---|---|---|
 | Scalar | child wins when present | `style`, `outsidestyle`, `buildingChance`, `xsize`, `refpalette` |
-| Ordered list | child **replaces**; append is opt-in | `selectors.buildings`, `scattered.list`, `streetblocks.parts.straight`, `slices` |
+| Ordered list | child **replaces**; append is opt-in | `selectors.buildings`, `citystyles`, `streetblocks.parts.straight`, `randompalettes` |
 | Keyed collection | merge by key; child's key wins | `palette` (keyed by `char`) |
+
+> **Corrected during implementation (Task 7).** This table originally cited `scattered.list` and
+> `slices` as ordered lists. Neither is: `slices` is a plain `Codec.list` on `BuildingPartRE` and
+> `scattered.list` a plain, *required* `Codec.list` inside `ScatteredSettings`, so the
+> `{"replace": false, "values": [...]}` form fails to decode on both. Two further fields the rule
+> would mispredict came to light with them: `multibuildings.buildings` is a plain list, and
+> `citystyles.stuff_tags` is a fourth behaviour — `CityStyle.applyFrom` unions it into a set, so a
+> child can neither replace nor remove an inherited tag. The `scattered` block is additionally a
+> *scalar*: `WorldStyle` swaps it wholesale, alongside `multisettings` and `settings`. Three shapes
+> remains the right design and the implementation follows it; what was wrong was the claim that it
+> covers every field. `docs/datapacks.md` enumerates the exceptions, and no code was changed to
+> make the original wording true.
 
 ### 4.1 Ordered lists: replace by default
 

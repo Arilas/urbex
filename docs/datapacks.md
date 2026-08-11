@@ -48,7 +48,7 @@ string every other file uses to name it. Directory names are the registry names 
 | `predefinedcities` | A city pinned to fixed chunk coordinates | `dimension`, `chunkx`, `chunkz`, `radius`, `citystyle` |
 | `presets` | Per-dimension worldgen tuning — see [`docs/presets.md`](presets.md) | *(nothing)* |
 
-Every one of them accepts `extends`, and every one of them applies the same three merge rules. That
+Every one of them accepts `extends`, and every one of them merges by the same rules. That
 uniformity is deliberate: you should never have to look up whether *this* asset type supports
 extension.
 
@@ -108,12 +108,15 @@ Resolution starts at the root — the end of the chain with no `extends` — and
 `citystyle_config`'s values land first, then `citystyle_common`'s declared fields on top, then
 `citystyle_border`'s. The file you asked for is applied last, so it always wins.
 
-A cycle, or an `extends` naming an id nothing provides, is a load error that prints the chain:
+A cycle, or an `extends` naming an id nothing provides, is an error that prints the chain:
 
 ```
 'extends' cycle: urbexmt:a -> urbexmt:b -> urbexmt:a
 Unknown asset 'urbexmt:missing' (referenced from 'urbexmt:downtown')
 ```
+
+It is raised when the chain is *resolved*, which for most registries is world load — see
+[When each asset is resolved](#when-each-asset-is-resolved) below for the three where it is not.
 
 ### Absence means inherit
 
@@ -135,26 +138,38 @@ One consequence worth knowing: a value that is present but malformed is still a 
 an absence. `"maxfloors": "three"` fails the file; it does not read as "unset" and silently inherit
 an ancestor's number.
 
-### Every asset is resolved at world load — not just the ones in use
+### When each asset is resolved
 
-The check above runs on **every registered asset**, whether or not anything selects it. Loading a
-world resolves all of `variants`, `palettes`, `conditions`, `styles`, `parts`, `buildings`,
-`multibuildings`, `scattered`, `worldstyles`, `stuff` and `predefinedcities` up front, so a broken
-file in your pack fails the world even for a player who never picks your world style. That is the
-intended trade: a load error naming the file beats an exception from a worldgen worker thread three
-hours into someone's save.
+In **ten** registries the check above runs on every registered asset, whether or not anything
+selects it. Loading a world resolves all of `variants`, `palettes`, `conditions`, `styles`, `parts`,
+`buildings`, `multibuildings`, `scattered`, `worldstyles` and `stuff` up front, so a broken file in
+your pack fails the world even for a player who never picks your world style. That is the intended
+trade: a load error naming the file beats an exception from a worldgen worker thread three hours
+into someone's save.
 
-It has one consequence for how you write bases. In those eleven registries an **incomplete** chain
-root is not allowed — a "base part" that carries only a `refpalette`, meaning to be completed by
-children, fails the load on its own. Bases in those registries have to be complete assets that
-children specialise.
+It has one consequence for how you write bases. In those ten registries an **incomplete** chain root
+is not allowed — a "base part" that carries only a `refpalette`, meaning to be completed by
+children, fails the load on its own. Bases there have to be complete assets that children
+specialise.
 
-`citystyles` is the exception, and deliberately so: only city styles something can actually
-*select* are resolved. That is a world style's `citystyles` selectors, a preset's
-`cities.cityStyleAlternative`, and a predefined city's `citystyle`. A city style nothing names is
-never resolved and never validated — which is what lets the bundled `urbex:citystyle_config` exist
-as a street width and nothing else, complete only through `urbex:citystyle_common`, which extends
-it. `presets` are the other exception, for the simpler reason that nothing in a preset is required.
+The other three registries are each resolved differently, and it is worth knowing which you are in:
+
+- **`citystyles` is resolved by reachability.** Only city styles something can actually *select* are
+  resolved: the ones a world style's `citystyles` selectors name, a preset's
+  `cities.cityStyleAlternative`, and a predefined city's `citystyle`. A city style nothing names is
+  never resolved and never validated — which is what lets the bundled `urbex:citystyle_config` exist
+  as a street width and nothing else, complete only through `urbex:citystyle_common`, which extends
+  it. It is the one registry where an incomplete chain root is legal.
+- **`predefinedcities` is resolved on the generation path**, not at world load — the first time
+  `City` looks for a predefined city. So a predefined city missing `radius` throws from a worldgen
+  worker rather than refusing the world. Its `citystyle` *reference* is checked at load, because the
+  reachability sweep above reads that field out of the raw entry; do not read that as the entry
+  itself having been validated.
+- **`presets`** have no required fields at all, so there is nothing for this check to do. A preset
+  resolves when it is selected.
+
+Everything a resolution can raise — a required field nothing declared, a cycle, a dangling
+`extends` — surfaces at whichever of those moments applies to the registry.
 
 ## The three merge shapes
 
@@ -164,11 +179,45 @@ field**, not by which registry it belongs to. There are exactly three shapes:
 | Shape | Rule | Examples |
 |---|---|---|
 | Scalar | The child wins when it declares the field; otherwise the ancestor's value stands | `style`, `outsidestyle`, `buildingchance`, `xsize`, `refpalette`, `filler` |
-| Ordered list | The child **replaces** by default; appending is opt-in | `selectors.buildings`, `citystyles`, `scattered.list`, `streetblocks.parts.straight`, `slices` |
+| Mergeable list | The child **replaces** by default; appending is opt-in | `selectors.buildings`, `citystyles`, `streetblocks.parts.straight`, `parts.highways.tunnel`, `randompalettes`, `parts` on a building, `values` on a condition |
 | Keyed collection | Merged by key; the child's entry wins for the keys it declares | `palette` (keyed by `char`) |
 
-Three shapes rather than one per asset type is what makes this learnable. If you can see the shape
-of a field in the JSON, you know how it merges.
+Three shapes rather than one per asset type is what makes this learnable — but the shape is a
+property of the *field*, not of the JSON you can see, and four fields do not follow it. Read the
+next section before assuming.
+
+### The exceptions, in full
+
+**Four list fields are plain lists, not mergeable ones.** They replace what the chain inherited and
+have no append form at all — `{"replace": false, "values": [...]}` there is a decode failure, not an
+append:
+
+| Field | Registry | Behaviour |
+|---|---|---|
+| `slices` | `parts` | Replaces. A grid is not a list you append rows to |
+| `buildings` | `multibuildings` | Replaces. Appending rows would contradict `dimx`/`dimz` |
+| `scattered.list` | `worldstyles` | Replaces — and see below, it is rarely reached on its own |
+| `stuff_tags` | `citystyles` | **Unions.** See below |
+
+`stuff_tags` is a fourth behaviour rather than a third: a city style's tags are accumulated into a
+set, so a child's list is always added to what it inherits. It cannot replace, and it cannot remove
+a tag an ancestor declared. (`all` is added to every city style regardless.)
+
+**Three blocks are scalars even though they look like objects to merge into.** Most nested blocks —
+`streetblocks`, `buildingsettings`, `parkblocks`, `corridorblocks`, `railblocks`, `generalblocks` on
+a city style, and `parts` on a world style — are merged field by field, so overriding one number in
+one of them leaves the rest alone. These three are not:
+
+| Block | Registry | Behaviour |
+|---|---|---|
+| `scattered` | `worldstyles` | Replaced wholesale. A child that touches it must restate `areasize`, `chance`, `weightnone` and the whole `list` — all four are required by the block's own codec |
+| `multisettings` | `worldstyles` | Replaced wholesale; `areasize`, `minimum` and `maximum` are required by the block |
+| `settings` | `worldstyles` | Replaced wholesale; `railwayavoidance` is required by the block |
+
+Those three are the one place in the format where "state only what you change" does not hold, and
+they are the only three settings blocks whose own codec has required fields — every other block is
+optional all the way down. That is the tell: a block that refuses to decode when you leave a field
+out is a block you have to restate in full.
 
 ### Scalars: child wins when present
 
@@ -177,7 +226,7 @@ entry set — it does not blank it out. And "present" is read from the key being
 sentinel value, so a child *can* set `preferslonely` back to `0.0` or `maxfloors` back to `-1`
 against an ancestor that set something else.
 
-### Ordered lists: replace by default, append on request
+### Mergeable lists: replace by default, append on request
 
 A declared list means exactly that list. An explicitly empty list means empty. Neither used to be
 expressible, and the bundled `citystyle_border` was the proof: its `"multibuildings": []` used to
@@ -205,8 +254,9 @@ That city style has the eight parks `urbex:citystyle_common` declares plus one m
 entries follow the parent's**, so adding children never reorders what the parent wrote. A bare
 array is equivalent to `"replace": true`.
 
-Every ordered-list field takes both forms, including the part-wiring fields, which additionally
-accept a single string as shorthand for a one-element list. These three are the same value:
+Every *mergeable* list field takes both forms — the four plain lists in the table above take
+neither. The part-wiring fields additionally accept a single string as shorthand for a one-element
+list, so these three are the same value:
 
 <!-- example: none -->
 ```json
@@ -240,7 +290,7 @@ its ancestor's rubble block.
 
 ## Palettes, `refpalette`, and inline palettes
 
-There are three ways a part or building gets a palette, and they are not layers of the same thing:
+There are two ways a part or building gets a palette, and they are alternatives rather than layers:
 
 - **`refpalette`** names a registered palette. It is a scalar: the nearest ancestor that declares
   one wins.
@@ -248,9 +298,10 @@ There are three ways a part or building gets a palette, and they are not layers 
   blocks merge by character along the owner's `extends` chain, exactly as a registered palette
   does — so a part that extends another and inlines two characters keeps the rest of its
   ancestor's.
-- Naming a `refpalette` and inlining a `palette` are a *choice*, not a stack. Whichever the later
-  chain entry declares drops the other; within a single file that declares both, the inline block
-  wins and the `refpalette` is ignored.
+
+They do not stack. Whichever the later chain entry declares drops the other, so an inline block
+anywhere below a `refpalette` discards it and vice versa; and within a single file that declares
+both, the inline block wins and the `refpalette` is ignored.
 
 `extends` inside an inline `palette` block is rejected at load. The key decodes — an inline block
 uses the same format a registered palette does — but an inline block is not a registry entry, so
@@ -407,9 +458,9 @@ city style whose chain declares neither draws primary and tertiary roads from `p
 secondary family. That is a fallback to parts *the pack itself wrote*, not to a name written in
 Java, which is why it survived the deletion of the other thirty.
 
-The fallback is per block, and **requiredness is per component**. So the moment anything in your
-chain declares one component of `largeparts`, the whole family is on, and all eight components must
-come from somewhere in the chain:
+The fallback is per block, and **requiredness is per component**. What arms it is the *block* being
+present anywhere in the chain — one component is enough, and so is an empty `"largeparts": {}`.
+Once it is armed all eight components must come from somewhere in the chain:
 
 ```
 'urbexmt:downtown' declares no 'streetblocks.largeparts.connector', and neither does anything it
@@ -436,28 +487,55 @@ legal.
 check — the field is declared, so it is not null — and then crashes the moment generation reaches a
 highway tunnel. If you do not want a component, you still have to give it a part.
 
-## Blocks that do not exist become air
+## Two typos that do not fail the load
+
+Nearly everything wrong in a datapack refuses to load and names itself. These two do not, and
+between them they account for most of the time you will spend wondering why a change did nothing.
+
+### A misspelled key is ignored
+
+The codecs read the keys they know and **silently ignore every other key in the object**. So
+`"styl"` for `"style"`, `"maxfloor"` for `"maxfloors"`, `"varient"` for `"variant"` all load
+cleanly and do nothing at all. Nothing is logged, nothing fails, and the asset simply behaves as
+though you had not written the line.
+
+This is why the field names in this guide are worth copying exactly, and why a change that appears
+to have no effect is worth spell-checking before it is worth debugging. It also cuts the other way,
+usefully: a `"_comment"` key — or any other `_`-prefixed note — is ignored everywhere, so you can
+annotate files freely.
+
+`presets` are the one exception. Their codec checks its keys and logs one `WARN` naming the bad
+key and the section it was in, which is the behaviour [`docs/presets.md`](presets.md) documents.
+The other twelve registries have no such check.
+
+The examples in this guide are machine-checked against the codecs for exactly this: each is decoded
+and then re-encoded, and a key that does not survive the round trip fails the build. A field name
+you read here is one the mod actually reads.
+
+### An unknown block id becomes air
 
 A block id in a palette that this Minecraft version does not know **resolves to air**, with one
 warning per id:
 
 ```
-Block 'minecraft:chain' (in urbex:chains) does not exist in this Minecraft version; it will
+Block 'minecraft:chain' (in urbex:common) does not exist in this Minecraft version; it will
 generate as air. It was most likely renamed - check the current id and update the asset.
 ```
 
-This is worth saying plainly because it is the one place a typo does *not* fail the load. A
-misspelled block id shows up as missing blocks in the world, and only the log says why. That is how
-`minecraft:chain` — renamed `minecraft:iron_chain` in 26.x — made a whole decoration invisible
-without anyone noticing.
+A misspelled block id shows up as missing blocks in the world, and only the log says why. That is
+how `minecraft:chain` — renamed `minecraft:iron_chain` in 26.x — made the whole `urbex:chains`
+decoration invisible without anyone noticing.
 
-Two details about that warning:
+Three details about that warning:
 
-- It names the **owning asset id**, not the file it came from. For a palette written inline in a
-  part or building, the id it names is the synthetic `urbex:__local__<path>` the inline block is
-  registered under — for a part `urbexmt:tower` that reads `urbex:__local__tower`. Close enough to
-  find; not a filename, and note that the synthetic id is always in the `urbex` namespace whatever
-  the owner's is.
+- It names the **owning asset id**, not the file it came from, and that owner is always the
+  `palettes` or `variants` entry the string was written in — never the asset you noticed was
+  broken. In the example above the missing chains belong to a `stuff` entry called `urbex:chains`,
+  but the id in the warning is `urbex:common`, the palette that maps the character it places.
+- For a palette written inline in a part or building, the id is the synthetic
+  `urbex:__local__<path>` the inline block is registered under — for a part `urbexmt:tower` that
+  reads `urbex:__local__tower`. Close enough to find; not a filename, and note that the synthetic
+  id is always in the `urbex` namespace whatever the owner's is.
 - It only covers the plain form. A blockstate string — anything containing `[` — is parsed
   strictly, so `minecraft:nosuchblock[facing=north]` is a hard failure rather than air.
 
@@ -477,8 +555,9 @@ Two details about that warning:
 | `Illegal palette urbex:x!` | A palette entry names no `block`, `variant`, `blocks`, `frompalette` or `light` | Give the character something to resolve to |
 | `Can't find 'urbexmt:p' in urbex:parts!` | A highway or railway part id resolves to nothing | Check the id; this one throws rather than degrading |
 | `Cannot find 'urbexmt:p' in urbex:parts!` (WARN) | A street part id resolves to nothing | Same, but generation continues without the part |
-| `Block 'minecraft:chain' (in ...) does not exist ...; it will generate as air` | A renamed or misspelled block id | Update the id; nothing else will tell you |
+| `Block 'minecraft:chain' (in urbex:common) ... it will generate as air` | A renamed or misspelled block id | Update the id; nothing else will tell you. The id in brackets is the palette or variant, not the asset that looks broken |
 | `Error getting resource urbexmt:x!` | The wrapper around any of the above, naming the asset being resolved | Read the cause below it |
+| *(no message at all)* | A misspelled **key** — the codecs ignore keys they do not know, in every registry but `presets` | Check the field name against this guide |
 
 ## A working example of each registry
 

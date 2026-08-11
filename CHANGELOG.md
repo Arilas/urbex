@@ -8,18 +8,34 @@
   root-first order, the three merge shapes and the `{"replace": false}` append opt-in, palettes
   merging per character, `extends` composing with `refpalette` on a part, and the wiring every world
   style and city style has to declare - with a working example of every registry and a table pairing
-  each load error with its fix. It also writes down what only the source said: that eleven of the
-  thirteen registries resolve **every** registered asset at world load whether or not anything
-  selects it, so an *incomplete* chain root is legal only in `citystyles`; that an empty part list is
-  a real opt-out for the three street families but a generation crash for highways and railways; that
-  a city style's `style` is needed but not checked at load; and that an unknown block id still
-  resolves to air with a warning rather than failing. `README.md` and `docs/presets.md` link to it.
-  - *The examples are checked, not proofread.* `DatapackGuideExamplesTest` decodes every JSON block
-    in the guide through the codec of the registry it is marked as belonging to, and re-encodes the
-    result to catch keys the codec silently ignored - a doc example that would fail to load, or load
-    and quietly do nothing, fails the build instead. It also fails if a registry has no example. This
-    needed `docs/` declared as an input to `:test`: without it a documentation-only edit left the
-    task `UP-TO-DATE`, so neither this test nor `PresetSchemaTest` ran on the change they exist for.
+  each load error with its fix. It also writes down what only the source said: that **ten** of the
+  thirteen registries resolve every registered asset at world load whether or not anything selects
+  it, so an *incomplete* chain root is legal only in `citystyles` - while `predefinedcities` is
+  resolved on the generation path instead, and only its `citystyle` reference is seen at load; that
+  an empty part list is a real opt-out for the three street families but a generation crash for
+  highways and railways; that a city style's `style` is needed but not checked at load; that a
+  misspelled **key** is silently ignored in every registry but `presets`; and that an unknown block id
+  resolves to air with a warning naming the palette it was written in, not the asset that looks
+  broken. `README.md` and `docs/presets.md` link to it.
+  - *Spec section 4's merge-shape table was wrong, and is corrected in place.* It cited
+    `scattered.list` and `slices` as ordered lists that take the append form. Neither is mergeable at
+    all, and two more fields the rule mispredicts turned up with them: `multibuildings.buildings` is
+    also a plain list, and `citystyles.stuff_tags` is a fourth behaviour - `CityStyle.applyFrom`
+    unions it into a set, so a child can neither replace nor remove an inherited tag. The `scattered`
+    block is additionally a scalar, replaced wholesale alongside `multisettings` and `settings`, and
+    those three are the only settings blocks with fields required by their own codec - so restating
+    one means restating all of it. Three shapes is still the design; what was wrong was the claim
+    that it covered every field, and the guide now enumerates the exceptions rather than promising
+    the shape can be read off the JSON. No code changed.
+  - *The examples and the quoted errors are checked, not proofread.* `DatapackGuideExamplesTest`
+    decodes every JSON block in the guide through the codec of the registry it is marked as belonging
+    to, and re-encodes the result - walking objects and arrays alike - to catch keys the codec
+    silently ignored, so a doc example that would fail to load, or load and quietly do nothing, fails
+    the build. It also fails if a registry has no example, and a second test provokes eight of the
+    guide's quoted error messages from the code that raises them and requires the guide to contain
+    each verbatim. Both needed the two docs the tests read declared as inputs to `:test`: without
+    them a documentation-only edit left the task `UP-TO-DATE`, so neither these nor `PresetSchemaTest`
+    ran on the change they exist for.
 
 - **Street, highway and railway part wiring must be declared by the datapack; there is no code-side
   default left.** Thirty `Tools.listOrStringList` call sites carried a bare asset name as a fallback,

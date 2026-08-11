@@ -179,11 +179,14 @@ dependencies {
 test {
     useJUnitPlatform()
     // Two tests read files under docs/ - DatapackGuideExamplesTest decodes every JSON example in
-    // docs/datapacks.md, PresetSchemaTest drift-guards docs/schema/preset.schema.json - and docs/ is
-    // on no classpath, so without declaring it Gradle leaves :test UP-TO-DATE after a
-    // documentation-only edit. That is exactly the edit those two exist to catch.
-    inputs.files(fileTree('docs') { include '**/*.md'; include '**/*.json' })
-            .withPropertyName('docs')
+    // docs/datapacks.md and checks the error messages it quotes, PresetSchemaTest drift-guards
+    // docs/schema/preset.schema.json - and docs/ is on no classpath, so without declaring these
+    // Gradle leaves :test UP-TO-DATE after a documentation-only edit. That is exactly the edit those
+    // two exist to catch. Only the files a test actually reads are listed: the specs and plans under
+    // docs/superpowers/ change constantly and nothing asserts on them, so including them would cost
+    // a full suite run per plan edit.
+    inputs.files(files('docs/datapacks.md', 'docs/presets.md'), fileTree('docs/schema'))
+            .withPropertyName('docsReadByTests')
             .withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {
         events "passed", "skipped", "failed"

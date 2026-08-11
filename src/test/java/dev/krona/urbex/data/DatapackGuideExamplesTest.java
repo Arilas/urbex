@@ -1,10 +1,15 @@
 package dev.krona.urbex.data;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
+import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
+import dev.krona.urbex.worldgen.lost.cityassets.ExtendsChain;
+import dev.krona.urbex.worldgen.lost.cityassets.Palette;
+import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
@@ -18,7 +23,10 @@ import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
 import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.SharedConstants;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -30,6 +38,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,6 +56,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * --&gt;</code> marker naming the registry directory it is a file for, or {@code none} for a block
  * that is not a registry file at all ({@code pack.mcmeta}, a fragment shown out of context). An
  * unmarked block fails, so a future example cannot skip the check by omission.
+ * <p>
+ * The second test does the same for the error messages the guide quotes: it provokes each one from
+ * the code that produces it and requires the guide to contain the result verbatim. A quoted message
+ * that has drifted misleads exactly the reader who is already stuck, and a review of the first
+ * version of this guide found one that named an asset the code cannot put there.
  */
 class DatapackGuideExamplesTest {
 
@@ -123,6 +137,97 @@ class DatapackGuideExamplesTest {
         assertTrue(problems.isEmpty(), () -> problems.size() + " problems:\n" + String.join("\n", problems));
     }
 
+    /**
+     * Every error message the guide quotes verbatim is produced by the code that raises it, and the
+     * guide must contain the result.
+     * <p>
+     * Whitespace is collapsed on both sides, because the guide wraps long messages across lines.
+     * <p>
+     * Six of the table's rows are not reachable from here and stay hand-checked: the two
+     * {@code Can't find} / {@code Cannot find} lookups, {@code Error getting resource}, the
+     * "selected by" wrapper and the renamed-block warning all need a level, a registry or a log
+     * appender. What they have in common is that they name an id rather than describing a rule, so
+     * drift in them costs a reader less than drift in the eight below.
+     */
+    @Test
+    void quotedErrorMessagesAreTheOnesTheCodeProduces() throws IOException {
+        String guide = collapse(Files.readString(GUIDE));
+        List<String> missing = new ArrayList<>();
+
+        Identifier tower = Identifier.fromNamespaceAndPath("urbexmt", "tower");
+        Identifier downtown = Identifier.fromNamespaceAndPath("urbexmt", "downtown");
+        Identifier a = Identifier.fromNamespaceAndPath("urbexmt", "a");
+        Identifier b = Identifier.fromNamespaceAndPath("urbexmt", "b");
+        Identifier missingId = Identifier.fromNamespaceAndPath("urbexmt", "missing");
+
+        // Unqualified reference, from the strict resolver every cross-reference goes through.
+        expect(guide, missing, () -> DataTools.fromName("street_straight"));
+
+        // Cycle and dangling extends, from the chain walker. The lookup stands in for a registry and
+        // each entry is its own id, so 'extends' can be read back off it: a -> b -> a for the cycle,
+        // downtown -> missing (which the lookup does not know) for the dangling link.
+        Map<Identifier, Identifier> cyclic = Map.of(a, b, b, a);
+        expect(guide, missing, () -> ExtendsChain.resolve(a,
+                id -> cyclic.containsKey(id) ? id : null,
+                entry -> Optional.ofNullable(cyclic.get(entry))));
+        expect(guide, missing, () -> ExtendsChain.resolve(downtown,
+                id -> downtown.equals(id) ? id : null,
+                entry -> Optional.of(missingId)));
+
+        // A required field nothing in the chain declared.
+        expect(guide, missing, () -> Resolved.require(null, downtown, "streetblocks.parts.stair"));
+
+        // A part with no geometry, and a part whose redeclared size contradicts inherited slices.
+        expect(guide, missing, () -> new BuildingPart(List.of(namedPart(tower, null, null, null))));
+        expect(guide, missing, () -> new BuildingPart(List.of(
+                namedPart(Identifier.fromNamespaceAndPath("urbexmt", "tower_base"), 16, 16,
+                        List.of(List.of("x".repeat(256)))),
+                namedPart(tower, 8, null, null))));
+
+        // 'extends' inside an inline palette block.
+        expect(guide, missing, () -> Palette.inline(tower, List.of(new PaletteRE(
+                Optional.of(Identifier.fromNamespaceAndPath("urbex", "common")), Optional.empty()))));
+
+        // A palette entry that resolves to nothing at all.
+        PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        expect(guide, missing, () -> new Palette(List.of(
+                new PaletteRE(Optional.empty(), Optional.of(List.of(empty)))
+                        .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "x")))));
+
+        assertTrue(missing.isEmpty(),
+                () -> missing.size() + " quoted message(s) the guide does not contain verbatim:\n"
+                        + String.join("\n", missing));
+    }
+
+    /** Runs {@code shouldThrow}, and records its message unless {@code guide} already contains it. */
+    private static void expect(String guide, List<String> missing, Runnable shouldThrow) {
+        String message;
+        try {
+            shouldThrow.run();
+            missing.add("expected an error, but nothing was thrown");
+            return;
+        } catch (RuntimeException e) {
+            message = e.getMessage();
+        }
+        if (!guide.contains(collapse(message))) {
+            missing.add(GUIDE + " does not contain: " + message);
+        }
+    }
+
+    private static BuildingPartRE namedPart(Identifier id, Integer xSize, Integer zSize,
+                                            List<List<String>> slices) {
+        return new BuildingPartRE(Optional.empty(), Optional.ofNullable(xSize),
+                Optional.ofNullable(zSize), Optional.ofNullable(slices), Optional.empty(),
+                Optional.empty(), Optional.empty()).setRegistryName(id);
+    }
+
+    /** Collapses runs of whitespace to one space, so a message wrapped in Markdown still matches. */
+    private static String collapse(String text) {
+        return text.replaceAll("\\s+", " ");
+    }
+
     private record Example(String registry, String json, int line) {
     }
 
@@ -135,11 +240,15 @@ class DatapackGuideExamplesTest {
      * it and blames themselves. Re-encoding the decoded value and looking for keys that did not
      * survive is what catches that.
      * <p>
-     * Only object keys are compared, and only where both sides are objects: a list field re-encodes
-     * in whichever of its three accepted shapes the value now has, so aligning those would be
-     * comparing formatting rather than meaning. The one false positive this leaves is an explicit
-     * {@code "replace": true}, which is the default and re-encodes as a bare array; write the bare
-     * array instead.
+     * Arrays are walked element-wise when both sides have the same length, because most of the
+     * content in this guide's examples lives inside one - palette entries, a variant's
+     * {@code blocks}, a selector's {@code values}, a building's {@code parts} - and a misspelled
+     * optional field on an element ({@code "tp"} for {@code "top"}) is the same silent no-op as a
+     * misspelled top-level key. Lengths differ only where a codec re-encodes a list into a
+     * different shape from the one it was written in, which is a formatting difference rather than
+     * a meaning one, so those are skipped rather than reported: a one-element part-wiring array
+     * comes back as a bare string, and the explicit {@code "replace": true} form comes back as a
+     * bare array. Write the shorter form in both cases and the check applies.
      */
     private static <A> List<String> unreadKeys(Codec<A> codec, JsonElement json) {
         A decoded = codec.parse(JsonOps.INSTANCE, json).getOrThrow();
@@ -150,16 +259,27 @@ class DatapackGuideExamplesTest {
     }
 
     private static void collectUnreadKeys(String path, JsonElement source, JsonElement encoded, List<String> unread) {
+        if (source.isJsonArray() && encoded.isJsonArray()) {
+            JsonArray fromList = source.getAsJsonArray();
+            JsonArray toList = encoded.getAsJsonArray();
+            if (fromList.size() == toList.size()) {
+                for (int i = 0; i < fromList.size(); i++) {
+                    collectUnreadKeys(path + "[" + i + "]", fromList.get(i), toList.get(i), unread);
+                }
+            }
+            return;
+        }
         if (!source.isJsonObject() || !encoded.isJsonObject()) {
             return;
         }
         JsonObject from = source.getAsJsonObject();
         JsonObject to = encoded.getAsJsonObject();
         for (String key : from.keySet()) {
+            String keyPath = path.isEmpty() ? key : path + "." + key;
             if (!to.has(key)) {
-                unread.add(path + key);
+                unread.add(keyPath);
             } else {
-                collectUnreadKeys(path + key + ".", from.get(key), to.get(key), unread);
+                collectUnreadKeys(keyPath, from.get(key), to.get(key), unread);
             }
         }
     }
