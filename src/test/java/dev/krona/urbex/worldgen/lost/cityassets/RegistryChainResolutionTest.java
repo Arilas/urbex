@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  * bodies would never execute anywhere.
  * <p>
  * {@code stuff} is the dangerous one: {@code AssetRegistries.load} files each {@link StuffObject}
- * into {@code STUFF_BY_TAG} by its tags and {@code Stuff} reads back by tag, so a fold that dropped
+ * into the {@code stuffIndex()} tag index and {@code Stuff} reads back by tag, so a fold that dropped
  * inherited tags would produce decoration that simply never spawns - no exception, no log line, and
  * nothing a digest would catch.
  * <p>
@@ -71,7 +71,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void stuffThatDeclaresNoTagsKeepsItsAncestors() {
-        // The silent-damage case: dropping these would unfile the object from STUFF_BY_TAG and it
+        // The silent-damage case: dropping these would unfile the object from the tag index and it
         // would never be selected for placement again.
         StuffObject resolved = new StuffObject(List.of(
                 stuff("torches").tags(true, "all", "indoor").build(),

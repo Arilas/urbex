@@ -20,7 +20,6 @@ import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -53,8 +52,11 @@ public class Stuff {
         // so nothing would ever notice.
         //
         // Both conditions are required. An empty index alone is legitimate - a pack may ship no
-        // stuff files at all - and !isLoaded() alone would fire on the harmless ordering where the
-        // reset lands after the snapshot was taken, which this chunk survives intact.
+        // stuff files at all - and the flag alone would fire on the harmless ordering where the
+        // reset lands after the snapshot was taken, which this chunk survives intact. They come off
+        // one record and one volatile read on purpose: as two separate volatile fields they could be
+        // observed out of step (emptied index, stale loaded == true), and the guard would wave
+        // through exactly the silent chunk it exists to catch. See AssetRegistries.StuffIndex.
         //
         // Reachable, not hypothetical: AssetRegistries.reset() is called from CityFeature.cleanUp,
         // which reconcileDirtyCounter invokes when globalDimensionInfoDirtyCounter is bumped, and
@@ -70,8 +72,8 @@ public class Stuff {
         // ErrorLogger.report, which dereferences ServerAccess.getServer() with no null check
         // (ErrorLogger.java:28-29) - during the shutdown window this fires in, that turns a
         // decoration bug into a dead worldgen worker.
-        Map<String, List<StuffObject>> stuffIndex = AssetRegistries.stuffIndex();
-        if (stuffIndex.isEmpty() && !AssetRegistries.isLoaded()) {
+        AssetRegistries.StuffIndex stuffIndex = AssetRegistries.stuffIndex();
+        if (stuffIndex.byTag().isEmpty() && !stuffIndex.loaded()) {
             if (REPORTED_UNLOADED.compareAndSet(false, true)) {
                 Urbex.getLogger().error(
                         "Generating chunk {},{} with the Urbex asset registries unloaded: no decoration will be " +
@@ -99,7 +101,7 @@ public class Stuff {
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
         for (String tag : info.getCityStyle().getStuffTags()) {
-            List<StuffObject> stuffs = stuffIndex.get(tag);
+            List<StuffObject> stuffs = stuffIndex.byTag().get(tag);
             if (stuffs != null) {
                 for (StuffObject stuff : stuffs) {
                     StuffSettingsRE settings = stuff.getSettings();

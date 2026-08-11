@@ -46,8 +46,13 @@
     damage factor, which is what an earlier draft of this entry said: decoration can only lower that
     count, the factor only ratchets up, and less damage cannot break more blocks. Confirmed by
     instrumenting both trees - the damage factor is identical at every sampled layer, while the
-    column accumulator diverges exactly where the gate flips.) So everything that moved is decoration
-    or a consequence of decoration; "only decoration moved" would have been the wrong claim.
+    column accumulator diverges exactly where the gate flips.) One step of that account is inference
+    rather than measurement, and is worth stating in an entry whose justification is "measured": for
+    one of the two blocks, the cell that opened the gate records air in *both* runs, so the decoration
+    that opened it was evidently broken by the same pass in the same layer - consistent with the
+    arithmetic and with decoration being the pass's only changed input, but not watched directly. So
+    everything that moved is decoration or a consequence of decoration; "only decoration moved" would
+    have been the wrong claim.
   - *Two shipped datapack defects, both found by that validation running for the first time.*
     `palettes/bricks_desert_redsand.json` carried `minecraft:red_sandstone@2`, a 1.12 `name@meta`
     string predating flattening that is not a legal `Identifier`; `Identifier.parse` threw on it
@@ -73,7 +78,10 @@
     `Stuff.generateStuff` now takes the index as a single snapshot - so a reset landing while it runs
     can no longer half-decorate a chunk - and logs an error naming the chunk and the consequence when
     that snapshot is empty and the registries are unloaded, once per occurrence rather than once per
-    chunk. It logs rather than throws because a throw would unwind past
+    chunk. The index and its loaded flag are one record behind one volatile field, because two
+    volatile fields cannot be read together: a reader could legally see the emptied index and the
+    stale "loaded" and wave through the very chunk the check exists to catch. Reversing the write
+    order only narrows that window; one field removes it. It logs rather than throws because a throw would unwind past
     `ctx.driver.actuallyGenerate(chunk)` and lose the chunk's whole cached write set, costing the
     chunk rather than its decoration, and because `ErrorLogger.report` dereferences the server with no
     null check exactly when the server is going away. `CityFeature.cleanUp()` is private and

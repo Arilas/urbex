@@ -31,55 +31,68 @@ public class AssetRegistries {
     public static final RegistryAssetRegistry<StuffObject, StuffSettingsRE> STUFF = new RegistryAssetRegistry<>(CustomRegistries.STUFF_REGISTRY_KEY, StuffObject::new);
 
     /**
-     * The stuff-by-tag index, replaced wholesale rather than filled in place.
+     * The stuff-by-tag index and whether it was actually loaded, as one value.
      * <p>
-     * It used to be a {@code ConcurrentHashMap} filled with {@code putAll}, which is not one
-     * operation: a worldgen worker calling {@link #stuffIndex} while {@link #load} was midway
-     * through that {@code putAll} could see some tags present and others still missing, and a
-     * missing tag is silent - {@code Stuff.generateStuff} simply places nothing for it. Now
-     * {@code load} builds the whole index privately and publishes it with the single volatile write
-     * below, so a reader sees either the previous index or the complete new one and never a state
-     * in between. The map handed over is unmodifiable and is never touched again after the write.
+     * They are one record rather than two fields because {@code Stuff.generateStuff} has to consult
+     * both - an empty index alone is legitimate (a pack may ship no stuff files) and so is a
+     * momentarily unloaded registry - and two volatile fields cannot be read together. Reading them
+     * separately is a genuine tear, not a theoretical one: volatile accesses are totally ordered
+     * consistently with program order, so with a writer doing {@code map} then {@code loaded} and a
+     * reader doing {@code map} then {@code loaded}, the order {@code W_map, R_map, R_loaded,
+     * W_loaded} is legal - the reader sees the emptied index and the stale {@code loaded == true},
+     * concludes nothing is wrong, and generates a silently undecorated chunk. Reversing the writes
+     * only narrows that: a reader that saw the emptied index would then be guaranteed to see
+     * {@code loaded == false} <em>from that reset</em>, but a subsequent {@link #load} completing
+     * between the two reads restores {@code true} and the same silent outcome. One field and one
+     * read removes the interleaving instead of making it unlikely.
+     *
+     * @param byTag  each tag's stuff, sorted; unmodifiable, and never touched after publication
+     * @param loaded whether {@link #load} completed and {@link #reset} has not run since
      */
-    private static volatile Map<String, List<StuffObject>> stuffByTag = Map.of();
+    public record StuffIndex(Map<String, List<StuffObject>> byTag, boolean loaded) {
+    }
+
+    /**
+     * Replaced wholesale, never filled in place.
+     * <p>
+     * The index used to be a {@code ConcurrentHashMap} filled with {@code putAll}, which is not one
+     * operation: a worldgen worker reading it while {@link #load} was midway through that
+     * {@code putAll} could see some tags present and others still missing, and a missing tag is
+     * silent - {@code Stuff.generateStuff} simply places nothing for it. Now {@code load} builds the
+     * whole thing privately and publishes it with the single volatile write below.
+     */
+    private static volatile StuffIndex stuffIndex = new StuffIndex(Map.of(), false);
 
     // Guards load() and reset() against each other and against concurrent loads. load() is no
     // longer confined to the server thread: CityFeature.getDimensionInfo calls it, and generation
     // runs on the parallel worldgen worker pool (see the "No lock" note in CityFeature).
     private static final Object LOAD_LOCK = new Object();
 
-    // Volatile, and written after the maps they guard are filled, so the fast path out of load()
-    // and loadPredefinedStuff() can skip the lock entirely once the work is done.
-    private static volatile boolean loaded = false;
+    // Volatile, and written after the map it guards is filled, so the fast path out of
+    // loadPredefinedStuff() can skip the lock entirely once the work is done.
     private static volatile boolean loadedPredefined = false;
 
     /**
-     * The whole tag index as one immutable snapshot.
+     * The index and its loaded flag, taken together in one volatile read.
      * <p>
-     * Handing over the map rather than answering one tag at a time is what lets a caller that walks
-     * several tags be unaffected by a {@link #reset()} landing mid-walk: it reads the reference once
-     * and everything below it is immutable, so it either sees the old index throughout or the new
-     * one throughout. A per-tag accessor could not offer that - the reset would land between two
-     * lookups and half-decorate the chunk.
+     * Callers that need both must call this <em>once</em> and use what it returns - asking again, or
+     * combining it with {@link #isLoaded()}, is the tear the record exists to prevent. Holding the
+     * value also makes a caller that walks several tags immune to a {@link #reset()} landing mid-walk:
+     * everything under the reference is immutable, so the walk sees one index throughout.
      */
-    public static Map<String, List<StuffObject>> stuffIndex() {
-        return stuffByTag;
+    public static StuffIndex stuffIndex() {
+        return stuffIndex;
     }
 
     /**
      * Whether {@link #load} has completed and not been undone by {@link #reset} since.
      * <p>
-     * Read on the generation path by {@code Stuff.generateStuff}, which is the one consumer whose
-     * failure mode is silent: every other registry re-resolves lazily through
-     * {@link RegistryAssetRegistry#get}, but the stuff-by-tag index has no lazy rebuild, so
-     * generating while this is false writes an undecorated chunk and saves it. False here during
-     * generation is never legitimate after Task 5c - it means something called {@link #reset}
-     * mid-generation. It is read together with {@link #stuffIndex()} rather than alone, because on
-     * its own it cannot tell "reset just happened" from "this pack ships no stuff files", and the
-     * second is perfectly legitimate.
+     * For callers that need <em>only</em> this. Anything that also needs the index must take
+     * {@link #stuffIndex()} once and read {@link StuffIndex#loaded()} off it, or it is back to
+     * reading a pair that can tear.
      */
     public static boolean isLoaded() {
-        return loaded;
+        return stuffIndex.loaded();
     }
 
     public static void reset() {
@@ -96,9 +109,9 @@ public class AssetRegistries {
             SCATTERED.reset();
             PREDEFINED_CITIES.reset();
             STUFF.reset();
-            stuffByTag = Map.of();
             Presets.reset();
-            loaded = false;
+            // One write, so no reader can catch the index emptied but still flagged loaded.
+            stuffIndex = new StuffIndex(Map.of(), false);
             loadedPredefined = false;
         }
     }
@@ -130,11 +143,11 @@ public class AssetRegistries {
      * the tag index from a half-filled {@code STUFF}.
      */
     public static void load(CommonLevelAccessor level) {
-        if (loaded) {
+        if (stuffIndex.loaded()) {
             return;
         }
         synchronized (LOAD_LOCK) {
-            if (loaded) {
+            if (stuffIndex.loaded()) {
                 return;
             }
             VARIANTS.loadAll(level);
@@ -147,9 +160,9 @@ public class AssetRegistries {
             SCATTERED.loadAll(level);
             WORLDSTYLES.loadAll(level);
             STUFF.loadAll(level);
-            // One write, publishing a map that is complete before the reference escapes.
-            stuffByTag = groupStuffByTag(STUFF.getIterable());
-            loaded = true;
+            // One write, publishing a map that is complete before the reference escapes - and
+            // publishing the flag with it, so the two can never be observed out of step.
+            stuffIndex = new StuffIndex(groupStuffByTag(STUFF.getIterable()), true);
         }
     }
 

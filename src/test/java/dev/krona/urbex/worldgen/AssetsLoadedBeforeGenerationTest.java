@@ -78,7 +78,7 @@ class AssetsLoadedBeforeGenerationTest {
 
     @Test
     void generationPathLoadsTheStuffIndexBeforeItTouchesTheLevel() {
-        assertNull(AssetRegistries.stuffIndex().get("rubble"),
+        assertNull(AssetRegistries.stuffIndex().byTag().get("rubble"),
                 "precondition: nothing is filed under the tag before anything loads");
 
         WorldGenLevel level = levelThatOnlyAnswersRegistryAccess();
@@ -88,7 +88,7 @@ class AssetsLoadedBeforeGenerationTest {
         // how far it got first: the assets have to be loaded before that point, not after it.
         assertThrows(ReachedTheLevel.class, () -> feature.getDimensionInfo(level));
 
-        List<StuffObject> rubble = AssetRegistries.stuffIndex().get("rubble");
+        List<StuffObject> rubble = AssetRegistries.stuffIndex().byTag().get("rubble");
         assertNotNull(rubble, "the stuff tag index must be populated before generation reads the "
                 + "level - an empty index places no decoration and says nothing about it");
         assertEquals(List.of("urbex:cobweb"), rubble.stream().map(StuffObject::getName).toList());
@@ -134,7 +134,7 @@ class AssetsLoadedBeforeGenerationTest {
 
     @Test
     void theTagIndexIsPublishedWholeAndCannotBeMutatedAfterwards() throws Exception {
-        Field field = AssetRegistries.class.getDeclaredField("stuffByTag");
+        Field field = AssetRegistries.class.getDeclaredField("stuffIndex");
         assertTrue(Modifier.isVolatile(field.getModifiers()),
                 "the index is swapped in one write and read without a lock; without volatile a "
                         + "worker can miss the write entirely");
@@ -145,13 +145,12 @@ class AssetsLoadedBeforeGenerationTest {
         AssetRegistries.load(levelThatOnlyAnswersRegistryAccess());
 
         field.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        Map<String, List<StuffObject>> published = (Map<String, List<StuffObject>>) field.get(null);
+        Map<String, List<StuffObject>> published = ((AssetRegistries.StuffIndex) field.get(null)).byTag();
         assertThrows(UnsupportedOperationException.class, () -> published.put("late", List.of()),
                 "the published map must be finished before it is published - the putAll this "
                         + "replaced let a worker see some tags and not others");
         assertThrows(UnsupportedOperationException.class,
-                () -> AssetRegistries.stuffIndex().get("rubble").add(null),
+                () -> AssetRegistries.stuffIndex().byTag().get("rubble").add(null),
                 "each tag's list is immutable for the same reason");
     }
 
