@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.ConditionRE;
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -136,6 +138,86 @@ class RegistryChainResolutionTest {
         StuffSettingsRE only = stuff("torches").tags(true, "all").build();
 
         assertSame(only, new StuffObject(List.of(only)).getSettings());
+    }
+
+    // ------------------------------------------- stuff ordering (RNG addresses)
+
+    /**
+     * {@code Stuff.generateStuff} walks each tag's list assigning the {@code stuffOrdinal} that
+     * addresses the RNG slot every placement attempt of that decoration draws from, so the position
+     * of every chain and cobweb in the world depends on this list's order. The source is
+     * {@code STUFF.getIterable()}, a {@code ConcurrentHashMap}'s values - {@code Identifier}
+     * hash-bucket order - which is exactly what must not reach an RNG address.
+     */
+    @Test
+    void stuffFiledUnderATagIsOrderedByIdRatherThanByArrivalOrder() {
+        StuffObject cobweb = new StuffObject(List.of(stuff("cobweb").tags(true, "rubble").build()));
+        StuffObject chains = new StuffObject(List.of(stuff("chains").tags(true, "rubble").build()));
+
+        // Deliberately the order AssetRegistries' ConcurrentHashMap actually hands these two over
+        // in - hash("urbex:cobweb") lands in a lower bucket than hash("urbex:chains") - so this
+        // fails if the sort is ever dropped, rather than passing by luck of the input order.
+        assertEquals(List.of("urbex:chains", "urbex:cobweb"),
+                namesOf(AssetRegistries.groupStuffByTag(List.of(cobweb, chains)).get("rubble")));
+    }
+
+    @Test
+    void stuffOrderIsPathFirstThenNamespace() {
+        // Identifier's own order, the same one MultiChunk sorts city styles by and BuildingInfo
+        // breaks its cityStyle vote on. Ordering on toString() instead would put both urbex entries
+        // ahead of the third-party one and silently relocate its decoration the day it is installed.
+        StuffObject ownRope = new StuffObject(List.of(stuff("urbex", "rope").tags(true, "rubble").build()));
+        StuffObject ownVines = new StuffObject(List.of(stuff("urbex", "vines").tags(true, "rubble").build()));
+        StuffObject thirdPartySoot = new StuffObject(List.of(stuff("urbexmt", "soot").tags(true, "rubble").build()));
+
+        assertEquals(List.of("urbex:rope", "urbexmt:soot", "urbex:vines"),
+                namesOf(AssetRegistries.groupStuffByTag(List.of(ownVines, thirdPartySoot, ownRope)).get("rubble")));
+    }
+
+    @Test
+    void stuffWithSeveralTagsIsFiledUnderEachOfThem() {
+        StuffObject both = new StuffObject(List.of(stuff("torches").tags(true, "all", "indoor").build()));
+        StuffObject indoorOnly = new StuffObject(List.of(stuff("banners").tags(true, "indoor").build()));
+
+        Map<String, List<StuffObject>> byTag = AssetRegistries.groupStuffByTag(List.of(both, indoorOnly));
+
+        assertEquals(List.of("all", "indoor"), List.copyOf(byTag.keySet()),
+                "the tag map is sorted too - Stuff walks the tags in one pass, so their order is "
+                        + "part of the same running ordinal");
+        assertEquals(List.of("urbex:torches"), namesOf(byTag.get("all")));
+        assertEquals(List.of("urbex:banners", "urbex:torches"), namesOf(byTag.get("indoor")));
+    }
+
+    private static List<String> namesOf(List<StuffObject> stuff) {
+        return stuff.stream().map(StuffObject::getName).toList();
+    }
+
+    // ------------------------------------------ city style tag order (RNG addresses)
+
+    /**
+     * The other half of the stuff ordinal: {@code Stuff.generateStuff} iterates
+     * {@code CityStyle.getStuffTags()} and keeps counting across tags, so the tag order is as much
+     * an RNG address as the per-tag list order. Under the former {@code HashSet} it was String
+     * hash-bucket order, which meant adding one tag to a city style relocated the decoration filed
+     * under all the others.
+     */
+    @Test
+    void cityStyleStuffTagsIterateInASortedOrderRegardlessOfHowTheyWereDeclared() {
+        CityStyle style = new CityStyle(List.of(
+                cityStyleWithTags("indoor", "rubble"),
+                cityStyleWithTags("banners", "cobbles")));
+
+        assertEquals(List.of("all", "banners", "cobbles", "indoor", "rubble"),
+                List.copyOf(style.getStuffTags()),
+                "'all' is added by the constructor and sorts in with the rest");
+    }
+
+    private static CityStyleRE cityStyleWithTags(String... tags) {
+        return new CityStyleRE(
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(tags)),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty())
+                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "citystyle_" + tags[0]));
     }
 
     // ----------------------------------------------------------- conditions
@@ -471,10 +553,15 @@ class RegistryChainResolutionTest {
     }
 
     private static StuffBuilder stuff(String path) {
-        return new StuffBuilder(path);
+        return new StuffBuilder("urbex", path);
+    }
+
+    private static StuffBuilder stuff(String namespace, String path) {
+        return new StuffBuilder(namespace, path);
     }
 
     private static final class StuffBuilder {
+        private final String namespace;
         private final String path;
         private Optional<Mergeable<String>> tags = Optional.empty();
         private Optional<String> column = Optional.of("AA");
@@ -487,7 +574,8 @@ class RegistryChainResolutionTest {
         private Optional<Boolean> seesky = Optional.empty();
         private Optional<IdentifierMatcher> buildings = Optional.empty();
 
-        StuffBuilder(String path) {
+        StuffBuilder(String namespace, String path) {
+            this.namespace = namespace;
             this.path = path;
         }
 
@@ -537,7 +625,7 @@ class RegistryChainResolutionTest {
             return new StuffSettingsRE(Optional.empty(), tags, column, minheight, maxheight,
                     mincount, maxcount, attempts, inbuilding, seesky,
                     Optional.empty(), Optional.empty(), Optional.empty(), buildings)
-                    .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
+                    .setRegistryName(Identifier.fromNamespaceAndPath(namespace, path));
         }
     }
 }

@@ -2,7 +2,6 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionTest;
 import net.minecraft.resources.Identifier;
@@ -12,6 +11,15 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 public abstract class ConditionContext {
+
+    /**
+     * The value of {@code part}, {@code belowPart} or {@code building} when there is no such thing
+     * here: below the lowest floor, before a floor's part has been chosen, or outside a building.
+     * Every other value in those three slots is a fully-qualified asset id, and this one cannot
+     * collide with any of them - an id must contain a {@code ':'} and this does not.
+     */
+    public static final String NO_PART = "<none>";
+
     private final int level;        // Global level in world with 0 being to lowest possible level where a building section can be
     private final int floor;        // Level of the building with 0 being the ground floor. floor == floorsAboveGround means the top of the building section
     private final int floorsBelowGround;    // 0 means nothing below ground
@@ -22,22 +30,21 @@ public abstract class ConditionContext {
     private final ChunkCoord coord;
 
     /**
-     * The key an asset is matched against by an {@code inpart}/{@code inbuilding} condition: the
-     * bare path for an {@code urbex}-namespace id, the full qualified id otherwise. This mirrors
-     * what every {@code getName()} in {@code cityassets} used to return before this pass qualified
-     * them all - deliberately preserved here rather than switched to the now-qualified {@code
-     * getName()}, because a bundled condition file's {@code inpart}/{@code inbuilding} value is
-     * required to be fully qualified (by {@code DatapackReferenceIntegrityTest}), so comparing it
-     * against a bare {@code urbex}-namespace key can never match. That mismatch is a real,
-     * pre-existing bug (see {@code chestloot.json}'s rail-dungeon {@code inpart} entries, which
-     * never fire) - fixing it changes chest loot within the digest-check window (confirmed by
-     * hand), so it is intentionally left alone here as a separate, tracked follow-up rather than
-     * fixed as an incidental side effect of qualifying {@code getName()} everywhere else.
+     * Every asset name reaching a condition test is the fully-qualified id, on both sides of the
+     * comparison and in all five places one is written: {@code parts[].belowpart},
+     * {@code parts[].inpart}, {@code parts2[].inpart}, {@code conditions}' {@code values[].inpart}
+     * and {@code values[].inbuilding}. There used to be a {@code legacyMatchKey} here that stripped
+     * the {@code urbex:} namespace, mirroring what {@code cityassets}' {@code getName()} returned
+     * before those were qualified - so a condition file, which {@code DatapackReferenceIntegrityTest}
+     * requires to write a qualified id, was comparing {@code "urbex:rail_dungeon1"} against
+     * {@code "rail_dungeon1"} and could never match. Anything constructing a {@code ConditionContext}
+     * must pass {@code getName()}/{@code getId().toString()}, never a bare path.
+     * <p>
+     * {@code "<none>"} is the one non-id value the {@code part}, {@code belowPart} and
+     * {@code building} slots take, for "there is no such thing here": below the first floor, or
+     * outside a building. It is not an id, cannot collide with one (no {@code ':'}), and is what
+     * {@link #isBuilding()} tests.
      */
-    public static String legacyMatchKey(Identifier id) {
-        return id.getNamespace().equals(Urbex.MODID) ? id.getPath() : id.toString();
-    }
-
     public ConditionContext(int level, int floor, int floorsBelowGround, int floorsAboveGround, String part, String belowPart, String building, ChunkCoord coord) {
         this.level = level;
         this.floor = floor;
@@ -234,7 +241,7 @@ public abstract class ConditionContext {
     }
 
     public boolean isBuilding() {
-        return !"<none>".equals(building);
+        return !NO_PART.equals(building);
     }
 
     public abstract Identifier getBiome();

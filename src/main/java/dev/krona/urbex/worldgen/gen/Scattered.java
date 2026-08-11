@@ -257,9 +257,9 @@ public class Scattered {
             floors = minfloors + rand.nextInt(maxfloors - minfloors + 1);
         }
         // TODO top condition is wrong due to floor calculation being different
-        String belowFloor = "<none>";
+        String belowFloor = ConditionContext.NO_PART;
         for (int f = 0; f < floors; f++) {
-            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, "<none>", belowFloor, ConditionContext.legacyMatchKey(building.getId()), info.coord) {
+            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, ConditionContext.NO_PART, belowFloor, building.getName(), info.coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -279,11 +279,26 @@ public class Scattered {
             ChunkDriver driver = ctx.driver;
             BlockState air = Blocks.AIR.defaultBlockState();
             BlockState liquid = feature.liquid;
-            String randomPart = building.getRandomPart(rand, conditionContext);
-            BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
-            belowFloor = randomPart;
-            randomPart = building.getRandomPart2(rand, conditionContext);
-            BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // Null is legal
+            String partName = building.getRandomPart(rand, conditionContext);
+            BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), partName);
+            // Its own context, not conditionContext reused: parts2[] is the second part of a floor
+            // that now has one, so "inpart" here means the parts[] pick just made. Reusing the
+            // parts[] context passed NO_PART instead, which no parts2[] "inpart" could ever match -
+            // the same field behaving differently for a scattered building than for a city one.
+            ConditionContext conditionContext2 = new ConditionContext(lowestLevel, f, 0, floors, partName, belowFloor, building.getName(), info.coord) {
+                @Override
+                public boolean isBuilding() {
+                    return true;
+                }
+
+                @Override
+                public Identifier getBiome() {
+                    return conditionContext.getBiome();
+                }
+            };
+            String part2Name = building.getRandomPart2(rand, conditionContext2);
+            BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), part2Name);    // Null is legal
+            belowFloor = partName;
 
             if (f == 0) {
                 switch (terrainFix) {

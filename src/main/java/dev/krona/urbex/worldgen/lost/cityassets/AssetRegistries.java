@@ -6,9 +6,11 @@ import dev.krona.urbex.worldgen.lost.regassets.*;
 import net.minecraft.world.level.CommonLevelAccessor;
 
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class AssetRegistries {
@@ -83,16 +85,38 @@ public class AssetRegistries {
         SCATTERED.loadAll(level);
         WORLDSTYLES.loadAll(level);
         STUFF.loadAll(level);
-        STUFF.getIterable().forEach(stuff -> stuff.getSettings().getTags().forEach(tag -> {
-            List<StuffObject> list = STUFF_BY_TAG.get(tag);
-            if (list == null) {
-                List<StuffObject> fresh = new CopyOnWriteArrayList<>();
-                List<StuffObject> raced = STUFF_BY_TAG.putIfAbsent(tag, fresh);
-                list = raced != null ? raced : fresh;
-            }
-            list.add(stuff);
-        }));
+        STUFF_BY_TAG.putAll(groupStuffByTag(STUFF.getIterable()));
         loaded = true;
+    }
+
+    /**
+     * Files every stuff object under each tag it declares, each tag's list sorted by
+     * {@link StuffObject#getId()}.
+     * <p>
+     * The sort is not cosmetic. {@code Stuff.generateStuff} walks these lists assigning a
+     * {@code stuffOrdinal}, and that ordinal is the RNG slot address every placement attempt of
+     * that decoration draws from. The source order is {@code STUFF.getIterable()}, which is a
+     * {@code ConcurrentHashMap}'s values - i.e. {@code Identifier} hash-bucket order - so without
+     * this, which of two decorations sharing a tag is ordinal 0 was decided by
+     * {@code hash("urbex:chains")} versus {@code hash("urbex:cobweb")}, and renaming either file
+     * would have relocated both throughout the world. {@code Identifier}'s natural order (path,
+     * then namespace) is the same total order {@code MultiChunk}'s city-style sort uses, so one
+     * asset kind is not ordered two ways in two places.
+     * <p>
+     * Returns immutable lists: worldgen workers read {@code STUFF_BY_TAG} while the server thread
+     * is in {@code load}, and an immutable list's contents are safely published by the map write
+     * alone. (The former {@code CopyOnWriteArrayList} bought thread safety for an
+     * {@code add} that no longer happens after publication.)
+     */
+    static Map<String, List<StuffObject>> groupStuffByTag(Iterable<StuffObject> stuff) {
+        Map<String, List<StuffObject>> byTag = new TreeMap<>();
+        stuff.forEach(object -> object.getSettings().getTags().forEach(
+                tag -> byTag.computeIfAbsent(tag, t -> new ArrayList<>()).add(object)));
+        byTag.replaceAll((tag, list) -> {
+            list.sort(Comparator.comparing(StuffObject::getId));
+            return List.copyOf(list);
+        });
+        return byTag;
     }
 
     public static void loadPredefinedStuff(CommonLevelAccessor level) {

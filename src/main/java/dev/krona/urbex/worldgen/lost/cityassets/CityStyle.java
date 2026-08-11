@@ -15,7 +15,14 @@ public class CityStyle {
 
     private final Identifier name;
 
-    private final Set<String> stuffTags = new HashSet<>();
+    /**
+     * Sorted, not a {@code HashSet}: {@code Stuff.generateStuff} iterates these tags and assigns a
+     * running {@code stuffOrdinal} across all of them, and that ordinal is the RNG slot address
+     * every placement attempt draws from. Under {@code HashSet} the tags came out in String
+     * hash-bucket order, so adding or renaming one tag on a city style relocated the decoration
+     * filed under every other tag as well.
+     */
+    private final Set<String> stuffTags = new TreeSet<>();
 
     private final List<ObjectSelector> buildingSelector = new ArrayList<>();
     private final List<ObjectSelector> bridgeSelector = new ArrayList<>();

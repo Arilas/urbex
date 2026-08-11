@@ -2,6 +2,92 @@
 
 ## Unreleased
 
+- **No worldgen decision rides on an asset's name as a string any more - not on where its id lands in
+  a hash bucket, and not on a bare-versus-qualified comparison.** A systematic sweep found four
+  places, all pre-existing, none introduced by the qualification pass below; they land together
+  because they are one class of bug. `digest-features.golden` moves from `c8267f7b4abfd44e` to
+  `8a3215441fb9f46d` as a result, and this is the one deliberate golden regeneration in this work.
+  `digest.golden` stays `414cb71424d5e53f`. Each change was measured on its own so every movement is
+  attributable; where a digest did **not** move, the reason is stated rather than assumed.
+  - *The stuff ordinal no longer comes from a hash.* `Stuff.generateStuff` walks each tag's list
+    assigning a running `stuffOrdinal`, and that ordinal is the RNG slot address every placement
+    attempt of that decoration draws from. The list came from `STUFF.getIterable()`, a
+    `ConcurrentHashMap`'s values - `Identifier` hash-bucket order - and the tag loop came from a
+    `HashSet<String>` on `CityStyle`. So which of `stuff/chains.json` and `stuff/cobweb.json` (both
+    tagged `rubble`) was ordinal 0 was decided by `hash("urbex:chains")` versus
+    `hash("urbex:cobweb")`, and renaming either file would have relocated every chain and cobweb in
+    the world. Measured, not assumed: that map hands the three bundled entries over as `example,
+    cobweb, chains`, so cobweb held ordinal 0 and chains ordinal 1; sorted by `Identifier` they swap.
+    `AssetRegistries.groupStuffByTag` now sorts each tag's list by `Identifier` and publishes it
+    immutable (a `List.copyOf`, which is also safely published to the worker threads by the map write
+    alone - the former `CopyOnWriteArrayList` was buying thread safety for an `add` that no longer
+    happens after publication), and `CityStyle.stuffTags` is a `TreeSet`. **Both digests are
+    unchanged by this, and not because the ordering was already right.** `AssetRegistries.load()` is
+    called only from `ServerEventHandlers.onWorldTick`, while `DigestCheck` runs from
+    `SERVER_STARTED` - before any tick - so `STUFF_BY_TAG` is empty for the whole of both digest
+    runs and no decoration is placed in either window. The digests have never covered the `Stuff`
+    subsystem at all. That is a separate, larger bug (in a real server the maps are filled by the
+    first tick, so gameplay is unaffected once one has landed) and is tracked on its own rather than
+    fixed here, where it would have swamped the attribution. The ordering is pinned by unit tests
+    instead: `RegistryChainResolutionTest` feeds `groupStuffByTag` the exact order the hash map
+    produces and requires the sorted one back.
+  - *`inpart`, `belowpart` and `inbuilding` have one convention: fully qualified, everywhere.* They
+    used to need opposite conventions in different files. `parts2[].inpart` and `parts[].belowpart`
+    in `buildings/*.json` matched a qualified id, because `getRandomPart` hands back the raw string a
+    part entry wrote; `inbuilding`, and `values[].inpart` in `conditions/*.json`, matched a *bare*
+    name, because `ConditionContext.legacyMatchKey` stripped the `urbex:` namespace on the way in -
+    while `DatapackReferenceIntegrityTest` requires those same files to write a qualified one. The
+    consequence was concrete and shipped: `chestloot.json`'s two rail-dungeon entries compared
+    `"urbex:rail_dungeon1"` against `"rail_dungeon1"` and had never once fired. `legacyMatchKey` is
+    deleted and every producer now passes `getName()`, so **chest loot changes**: a chest in a rail
+    dungeon now rolls `urbex:chests/raildungeonchest` at factor 20 alongside the general table
+    instead of only the general table, which is what the pack has always said it should do. That is
+    the entire cause of the `digest-features` movement - measured on its own, before any other change
+    in this entry, and it produced exactly `8a3215441fb9f46d`. The bare-name comparison had one
+    remaining producer and now has none. `"<none>"` (the one non-id value those slots take, for
+    "there is no such thing here") is a named constant, `ConditionContext.NO_PART`, rather than nine
+    scattered literals.
+  - *One asset kind, one order.* `BuildingInfo`'s majority-cityStyle vote broke ties on the raw id
+    string, which orders namespace-first, while `MultiChunk`'s city-style sort uses
+    `Identifier.compareTo`, which orders path-first. Both were deterministic; they disagree the
+    moment a second namespace ships a city style. The vote now counts `Identifier`s and breaks ties
+    on `Identifier`'s own order, so the two agree by construction. `Counter.getMostOccuring` takes a
+    `Comparator<? super T>` instead of a `Function<T, String>` for this - no single string key
+    reproduces path-then-namespace, so the string form was what forced the two orders apart in the
+    first place; the tie-break stays a mandatory parameter for the reason it was made one.
+    **Confirmed inert**, as expected: every bundled city style is `urbex`-namespaced, so both digests
+    were byte-identical across this change alone.
+  - *A `parts2[]` entry's `belowpart` was an exact duplicate of its `inpart`.* `BuildingInfo`
+    advanced `belowPart = randomPart` *before* building the context that selects `parts2[]`, so that
+    selection saw `getBelowPart()` equal to `getPart()` - the same defect issue #58 fixed on the
+    reading side in `ConditionContext.parseTest`, still alive on the writing side, in both copies of
+    the floor loop. `belowPart` is now advanced at the end of the loop, so `parts2[]` sees the
+    floor's own `parts[]` pick as the current part and the floor below's as the part below.
+    `Scattered` had the third variant of the same confusion - it reused the `parts[]` context for
+    `parts2[]`, so a scattered building's `parts2[].inpart` matched `"<none>"` and could never fire
+    while a city building's matched normally - and now builds its own. Inert for the bundled pack
+    (nothing in it writes `belowpart`, and no scattered building declares `parts2`), and measured to
+    confirm it.
+  - *`parts[].inpart` never matching is correct, and is now documented as such rather than "fixed".*
+    The context that selects `parts[i]` passes `NO_PART` as the current part because at that moment
+    the floor genuinely has none - it is what is being chosen. What a `parts[]` entry can usefully
+    condition on is the part *below*, which is `belowpart`, and that is passed correctly. Inventing a
+    value here would have made `inpart` and `belowpart` synonyms on `parts[]`, which is the bug above.
+  - *Three things that are correct only by construction now say so.* `MultiChunk` keys a `Counter`
+    and an `Objects.equals` on `CityStyle` identity - no `cityassets` class overrides
+    `equals`/`hashCode`, so this works only because `RegistryAssetRegistry` canonicalises instances
+    through `putIfAbsent`; if `AssetRegistries.reset()` ever ran mid-generation, one id could exist as
+    two instances, splitting a style's votes and making the `getId()` sort stop being a total order.
+    `City`'s five predefined-content maps are filled in name-hash order, so two predefined cities
+    claiming one chunk resolve last-writer-wins by hash - left alone deliberately, since that is a
+    pack authoring conflict rather than a silent reordering of a working configuration, and any rule
+    for it (first-wins, or a load error naming both) is a validation decision.
+  - *Tests.* `DatapackReferenceIntegrityTest` now checks `inpart`, `belowpart` and `inbuilding` on
+    both `buildings` part entries and `conditions` values, in either their single-string or their
+    array form - previously only `conditions`' `inpart` was checked, so the two fields whose
+    convention this entry fixes were the two nothing was watching. `CounterTest` gains the
+    path-first-versus-namespace-first case directly. `ConditionContextLegacyMatchKeyTest` is deleted
+    with the function it pinned.
 - **An unqualified datapack reference is now a load error instead of an implicit `urbex:` default.**
   `DataTools.fromName` is the single choke point every reference resolves through -
   `RegistryAssetRegistry`'s four lookup methods, `IdentifierMatcher`, and `Config`'s preset/worldstyle

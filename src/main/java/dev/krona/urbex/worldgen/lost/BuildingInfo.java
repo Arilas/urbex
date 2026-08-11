@@ -11,7 +11,6 @@ import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 import net.minecraft.core.BlockPos;
@@ -129,12 +128,12 @@ public class BuildingInfo {
         private final String building;
 
         public ConditionTodo(String condition, String part, BuildingInfo info) {
-            this.part = part == null ? "<none>" : part;
+            this.part = part == null ? ConditionContext.NO_PART : part;
             this.condition = condition;
             if (info.hasBuilding) {
                 this.building = info.getBuildingType();
             } else {
-                this.building = "<none>";
+                this.building = ConditionContext.NO_PART;
             }
         }
 
@@ -354,23 +353,25 @@ public class BuildingInfo {
         // that represents the majority. This is to prevent streets from switching style randomly if two
         // different styled cities mix
         if (characteristics.isCity && !characteristics.couldHaveBuilding) {
-            // Counted by the fully-qualified id (CityStyle.getName()). A tie is the ordinary case
-            // at a style boundary (ten votes: 3x3 neighbours plus the centre twice), and
-            // Counter.getMostOccuring() now breaks ties on a stated rule (lexicographically lowest
-            // key) rather than HashMap bucket order, so counting the qualified id no longer risks
-            // silently moving worldgen the way it would have under the old hash-order tie-break.
-            Counter<String> counter = new Counter<>();
+            // Counted by Identifier, not by the id's String form. A tie is the ordinary case at a
+            // style boundary (ten votes: 3x3 neighbours plus the centre twice), and
+            // Counter.getMostOccuring() breaks ties on a stated rule rather than HashMap bucket
+            // order. That rule is Identifier's own order - path, then namespace - which is what
+            // MultiChunk's city-style sort already uses; tie-breaking on toString() instead would
+            // order the same asset kind namespace-first here and path-first there, and the two
+            // disagree as soon as a second namespace ships a city style.
+            Counter<Identifier> counter = new Counter<>();
             for (int cx = -1; cx <= 1; cx++) {
                 for (int cz = -1; cz <= 1; cz++) {
                     ChunkCoord key = coord.offset(cx, cz);
                     cityStyle = City.getCityStyle(key, provider, profile);
-                    counter.add(cityStyle.getName());
+                    counter.add(cityStyle.getId());
                     if (cx == 0 && cz == 0) {
-                        counter.add(cityStyle.getName());   // Add this chunk again for a bias
+                        counter.add(cityStyle.getId());   // Add this chunk again for a bias
                     }
                 }
             }
-            cityStyle = AssetRegistries.CITYSTYLES.get(world, DataTools.fromName(counter.getMostOccuring(s -> s)));
+            cityStyle = AssetRegistries.CITYSTYLES.get(world, counter.getMostOccuring(Comparator.naturalOrder()));
         } else {
             cityStyle = City.getCityStyle(coord, provider, profile);
         }
@@ -624,9 +625,11 @@ public class BuildingInfo {
 
         RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_FLOORS);
 
-        String belowPart = "<none>";
+        String belowPart = ConditionContext.NO_PART;
         for (int i = 0; i <= floors + cellars; i++) {
-            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
+            // NO_PART, not the previous floor's part: this context is what selects parts[i], so
+            // there is no current part yet - see the constructor's copy of this loop.
+            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, ConditionContext.NO_PART, belowPart, building.getName(), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -643,11 +646,10 @@ public class BuildingInfo {
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
-            String randomPart = building.getRandomPart(rand, conditionContext);
-            floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
-            belowPart = randomPart;
+            String part = building.getRandomPart(rand, conditionContext);
+            floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), part);
 
-            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
+            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, part, belowPart, building.getName(), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -664,8 +666,10 @@ public class BuildingInfo {
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
-            randomPart = building.getRandomPart2(rand, conditionContext2);
-            floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // null is legal
+            String part2 = building.getRandomPart2(rand, conditionContext2);
+            floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
+            // Last, not before conditionContext2: see the constructor's copy of this loop.
+            belowPart = part;
         }
     }
 
@@ -814,10 +818,15 @@ public class BuildingInfo {
 
         connectionAtX = new boolean[floors + cellars + 1];
         connectionAtZ = new boolean[floors + cellars + 1];
-        String belowPart = "<none>";
+        String belowPart = ConditionContext.NO_PART;
         Building building = (Building) getBuilding();
         for (int i = 0; i <= floors + cellars; i++) {
-            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
+            // The current part is NO_PART, deliberately, and not "the part we are about to pick":
+            // this context is the input to choosing parts[i], so at this moment the floor has no
+            // part. A parts[] entry's own "inpart" therefore never matches, which is correct rather
+            // than broken - "the part below" is what a parts[] entry can usefully condition on, and
+            // that is "belowpart", passed here and carrying the previous floor's parts[] pick.
+            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, ConditionContext.NO_PART, belowPart, building.getName(), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -834,14 +843,20 @@ public class BuildingInfo {
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
-            String randomPart = building.getRandomPart(rand, conditionContext);
-            if (randomPart == null) {
+            String part = building.getRandomPart(rand, conditionContext);
+            if (part == null) {
                 throw new RuntimeException("Misconfiguration! Floor were generated for a building where no part condition matches!");
             }
-            belowPart = randomPart;
-            floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
+            floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), part);
 
-            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
+            // parts2[] is the second part of *this* floor, so it does have a current part - the
+            // parts[] pick just made - while "the part below" is still the previous floor's, which
+            // is why belowPart is only advanced at the end of the loop. It used to be advanced
+            // here, one line above this, which made getBelowPart() and getPart() the same string
+            // and so made a parts2[] "belowpart" an exact duplicate of "inpart" - the same defect
+            // issue #58 fixed on the reading side in ConditionContext.parseTest, still alive on the
+            // writing side.
+            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, part, belowPart, building.getName(), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -858,8 +873,9 @@ public class BuildingInfo {
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
-            randomPart = building.getRandomPart2(rand, conditionContext2);
-            floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // null is legal
+            String part2 = building.getRandomPart2(rand, conditionContext2);
+            floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
+            belowPart = part;
             connectionAtX[i] = isCity(coord.west(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
             connectionAtZ[i] = isCity(coord.north(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
         }
@@ -1924,9 +1940,12 @@ public class BuildingInfo {
         return this.isCity;
     }
 
-    /** Feeds only {@link ConditionTodo}'s "building" field - see {@link ConditionContext#legacyMatchKey}. */
+    /**
+     * Feeds only {@link ConditionTodo}'s "building" field, which an {@code inbuilding} condition is
+     * matched against - so this is the fully-qualified id, the same string a condition file writes.
+     */
     public String getBuildingType() {
-        return hasBuilding ? ConditionContext.legacyMatchKey(buildingType.getId()) : null;
+        return hasBuilding ? buildingType.getName() : null;
     }
 
     public int getCityLevel() {

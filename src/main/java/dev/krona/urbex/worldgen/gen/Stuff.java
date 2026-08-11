@@ -35,6 +35,12 @@ public class Stuff {
         // own, derived from the loop indices. An attempt therefore draws the same values however
         // many attempts before it were abandoned - and whether an attempt is abandoned depends on
         // what is already in the world, which is not ours to depend on.
+        //
+        // The ordinal is an RNG address, so what it counts has to be stable against anything that
+        // is not a deliberate change to the pack. Both loops below are ordered for that reason and
+        // not for tidiness: CityStyle.getStuffTags() is sorted (see the field) and each
+        // STUFF_BY_TAG list is sorted by Identifier (see AssetRegistries.groupStuffByTag). Neither
+        // may go back to a hash-ordered collection.
         int stuffOrdinal = 0;
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();

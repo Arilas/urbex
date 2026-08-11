@@ -84,7 +84,17 @@ public class MultiChunk {
         ChunkCoord topleft = new ChunkCoord(mc.dimension(), mc.chunkX() * areasize, mc.chunkZ() * areasize);
         int cityLevel = BuildingInfo.getCityLevel(topleft, provider);
 
-        // Find all city styles in this multichunk and count them
+        // Find all city styles in this multichunk and count them.
+        //
+        // Keyed on CityStyle *identity*: no cityassets class overrides equals/hashCode, so this
+        // counter, the getMap().keySet() sort below and the Objects.equals in isMultiBuildingOk all
+        // rely on one id resolving to exactly one instance. That holds only because
+        // RegistryAssetRegistry canonicalises through putIfAbsent - it is not a property of
+        // CityStyle. If AssetRegistries.reset() ever ran mid-generation, a chunk resolved before it
+        // and one resolved after would hold two distinct instances of the same id: the counter
+        // would split one style's votes in two, and the getId() sort would stop being a total order
+        // (two entries comparing equal, ordered by whatever the HashMap handed over). Safe today
+        // because reset() only runs from CityFeature.cleanUp on server start/stop.
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {
@@ -106,6 +116,8 @@ public class MultiChunk {
         // keySet, and Tools.getRandomFromList below walks the list subtracting weights, so the
         // order decides which style (and therefore which multibuilding) gets picked. getId()
         // never changes meaning under a future accessor rename the way getName() just did.
+        // Identifier's own order - path, then namespace - is also what BuildingInfo's city-style
+        // vote breaks ties on, so this asset kind has one order, not two.
         styleList.sort(Comparator.comparing(CityStyle::getId));
         for (int i = 0 ; i < cnt ; i++) {
             CityStyle cityStyle = Tools.getRandomFromList(rand, styleList, style -> (float) cityStyleCounter.get(style));

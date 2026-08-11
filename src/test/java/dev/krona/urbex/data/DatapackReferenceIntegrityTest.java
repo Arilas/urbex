@@ -56,7 +56,16 @@ class DatapackReferenceIntegrityTest {
         switch (category) {
             case "buildings" -> {
                 for (String key : List.of("parts", "parts2")) {
-                    forEachObject(d.get(key), e -> ref(src, e.get("part"), "parts"));
+                    forEachObject(d.get(key), e -> {
+                        ref(src, e.get("part"), "parts");
+                        // The condition fields on a part entry name assets too, and are matched at
+                        // runtime against a fully-qualified id - the same string this requires -
+                        // so a bare value here is a condition that silently never fires. Each takes
+                        // either one string or an array of them (ConditionTest's either-codec).
+                        refListOrString(src, e.get("inpart"), "parts");
+                        refListOrString(src, e.get("belowpart"), "parts");
+                        refListOrString(src, e.get("inbuilding"), "buildings");
+                    });
                 }
             }
             case "multibuildings" -> forEachElement(d.get("buildings"),
@@ -112,7 +121,13 @@ class DatapackReferenceIntegrityTest {
                 forEachElement(d.get("buildings"), v -> ref(src, v, "buildings"));
                 ref(src, d.get("multibuilding"), "multibuildings");
             }
-            case "conditions" -> forEachObject(d.get("values"), e -> ref(src, e.get("inpart"), "parts"));
+            // inpart was already covered; belowpart and inbuilding are the same convention on the
+            // same object, and were the two that could be written bare without anything noticing.
+            case "conditions" -> forEachObject(d.get("values"), e -> {
+                refListOrString(src, e.get("inpart"), "parts");
+                refListOrString(src, e.get("belowpart"), "parts");
+                refListOrString(src, e.get("inbuilding"), "buildings");
+            });
             case "stuff" -> {
                 JsonObject buildings = asObject(d.get("buildings"));
                 if (buildings != null) {
