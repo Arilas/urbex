@@ -779,6 +779,147 @@ building and swapping its palette is a two-line file."
 
 ---
 
+### Task 4a: Absent fields inherit from the chain
+
+> **Plan amendment (2026-08-11, after the Task 4 review).** Task 4 made `xsize`, `zsize` and
+> `slices` optional on `BuildingPartRE` so a part could inherit its ancestor's geometry. The Task 4
+> review found that this was the *only* registry to get that treatment: twenty-two fields across ten
+> other registries are still `fieldOf`, so a child must restate them to decode at all. On
+> `multibuildings` every field is required, which makes `extends` there entirely decorative.
+>
+> Spec §4's shape table says scalars are "child wins **when present**" and §6.4 says a file need not
+> restate what it inherits. Both are general claims; only `parts` delivered them. The human ruled
+> this a bug, and ruled the fix general rather than scalar-only: **if a field is absent, read the
+> parent.** This task executes immediately after Task 4 and before Task 5.
+
+**Files:**
+- Modify: `BuildingRE.java`, `ConditionRE.java`, `MultiBuildingRE.java`, `PaletteRE.java`, `PredefinedCityRE.java`, `ScatteredRE.java`, `StuffSettingsRE.java`, `StyleRE.java`, `VariantRE.java`, `WorldStyleRE.java` (all under `src/main/java/dev/krona/urbex/worldgen/lost/regassets/`)
+- Modify: the matching runtime classes under `src/main/java/dev/krona/urbex/worldgen/lost/cityassets/`
+- Create: `src/main/java/dev/krona/urbex/worldgen/lost/cityassets/Resolved.java`
+- Create: `src/test/java/dev/krona/urbex/worldgen/lost/cityassets/RequiredAfterResolutionTest.java`
+- Modify: `src/test/java/dev/krona/urbex/worldgen/lost/cityassets/RegistryChainResolutionTest.java`
+- Modify: `CHANGELOG.md`
+
+**Interfaces:**
+- Consumes: `ExtendsChain.resolve`, `Extendable`, `Mergeable` from Tasks 1, 3 and 4.
+- Produces: `Resolved.require(T value, Identifier owner, String field)` returning `value`, or throwing `IllegalStateException` naming the asset and the field when `value` is null.
+
+The twenty-two fields, so the implementer does not have to rediscover them:
+
+| Registry | Currently required |
+|---|---|
+| `predefinedcities` | `dimension`, `chunkx`, `chunkz`, `radius`, `citystyle` |
+| `stuff` | `column`, `mincount`, `maxcount`, `attempts` |
+| `multibuildings` | `dimx`, `dimz`, `buildings` |
+| `buildings` | `filler`, `parts` |
+| `scattered` | `terrainheight`, `terrainfix` |
+| `worldstyles` | `outsidestyle`, `citystyles` |
+| `conditions` | `values` |
+| `palettes` | `palette` |
+| `styles` | `randompalettes` |
+| `variants` | `blocks` |
+
+`citystyles` and `presets` already have none. `parts` was done in Task 4.
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `RequiredAfterResolutionTest.java` covering both directions, for at least `stuff` (four required scalars, the registry `extends` is most obviously for), `multibuildings` (where `extends` is currently decorative), and `worldstyles` (`outsidestyle`, the scalar spec §4 names by example):
+
+```java
+    @Test
+    void aChildInheritsRequiredScalarsItDoesNotDeclare() {
+        StuffSettingsRE parent = stuff(/* column */ "y", /* mincount */ 2, /* maxcount */ 5,
+                /* attempts */ 10, /* tags */ List.of("rubble"));
+        StuffSettingsRE child = stuffDeclaringOnlyTags(List.of("debris"));
+
+        StuffObject resolved = new StuffObject(List.of(parent, child));
+
+        assertEquals(2, resolved.getSettings().getMinCount(),
+                "a field the child omits comes from the chain, not from a codec default");
+        assertEquals(List.of("debris"), resolved.getSettings().getTags());
+    }
+
+    @Test
+    void aFieldNoEntryInTheChainDeclaresIsALoadErrorNamingBoth() {
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new StuffObject(List.of(stuffDeclaringOnlyTags(List.of("debris")))));
+        assertTrue(e.getMessage().contains("mincount"), e.getMessage());
+        assertTrue(e.getMessage().contains("urbex:test_stuff"), e.getMessage());
+    }
+```
+
+Write the equivalent pair for `multibuildings` (a child declaring only `buildings` inherits `dimx`/`dimz`) and for `worldstyles` (a child declaring only `scattered` inherits `outsidestyle` and `citystyles`). Build the `*RE` objects with their real constructors — read each file first, do not guess argument order.
+
+- [ ] **Step 2: Run to verify failure**
+
+Run: `./gradlew test --tests '*RequiredAfterResolutionTest*'`
+Expected: FAIL to compile or FAIL at decode — the `*RE` constructors still take non-optional values for these fields.
+
+- [ ] **Step 3: Add the `Resolved` helper**
+
+```java
+package dev.krona.urbex.worldgen.lost.cityassets;
+
+import net.minecraft.resources.Identifier;
+
+/**
+ * Requiredness for datapack assets is enforced <em>after</em> the {@code extends} chain is applied,
+ * not by the codec. A child that omits a field inherits it; a field nothing in the whole chain
+ * declares is the error this raises.
+ */
+public class Resolved {
+
+    private Resolved() {
+    }
+
+    public static <T> T require(T value, Identifier owner, String field) {
+        if (value == null) {
+            throw new IllegalStateException("'" + owner + "' declares no '" + field
+                    + "', and neither does anything it extends");
+        }
+        return value;
+    }
+}
+```
+
+- [ ] **Step 4: Make the twenty-two fields optional**
+
+In each of the ten REs, change the listed `fieldOf` entries to `optionalFieldOf`, store the field as nullable, and widen the constructor parameter to `Optional<…>`. Follow the shape `BuildingPartRE` already uses after Task 4 — read it first.
+
+Two shape notes:
+- `multibuildings.buildings` stays a plain `Codec.list(Codec.list(Codec.STRING))`, not `Mergeable`: it is a 2D grid whose rows are positional, so appending is meaningless. Absent means inherit; present means replace.
+- Fields that are already `Mergeable` keep that codec. Absence now means "inherit unchanged", which is what `{"replace": false, "values": []}` was being used for; that incantation still works but stops being the only way.
+
+- [ ] **Step 5: Fold and then require, in each runtime asset**
+
+Each runtime constructor already walks its chain root-first. Take each field from the last entry that declares one, then pass every previously-required field through `Resolved.require(...)` before assigning it, so the error names the asset and the field rather than surfacing as an NPE during generation.
+
+- [ ] **Step 6: Cover the six registries that still have no chain test**
+
+Task 4 left `Style`, `ScatteredBuilding`, `PredefinedCity`, `WorldStyle`, `MultiBuilding` and `Building` without a two-entry-chain test. This task touches all six, so add one apiece to `RegistryChainResolutionTest`: a child declaring one field inherits the rest, asserted on a value that could only have come from the parent.
+
+- [ ] **Step 7: Run the suite and the digests**
+
+Run: `./gradlew test`, then `./gradlew runDigestCheck` and `./gradlew runDigestCheckFeatures`.
+Expected: PASS; `414cb71424d5e53f` and `c8267f7b4abfd44e`, `unsafeReads=0`, goldens clean. Every bundled asset declares its own required fields today, so making them optional cannot change what the pack resolves to — if a digest moves, a field is being read from the wrong chain entry.
+
+- [ ] **Step 8: Add the changelog entry and commit**
+
+Record that a datapack file now only needs to state what it changes, on every registry rather than only on parts; that a field nothing in the chain declares is a load error naming the asset and the field; and that this is not a breaking change for existing packs, since a file that declares everything still decodes exactly as before.
+
+```bash
+git add -A
+git commit -m "fix!: an absent field inherits from the extends chain on every registry
+
+Task 4 made part geometry optional so a part could inherit it. Twenty-two
+fields across ten other registries stayed required, so a child had to restate
+them to decode at all -- on multibuildings, every field was required, which
+made extends there entirely decorative. Requiredness now applies after the
+chain is applied, which is what the design said all along."
+```
+
+---
+
 ### Task 5: Unqualified references become load errors
 
 **Files:**
@@ -1051,6 +1192,8 @@ Keep `MultiSettings.DEFAULT` and `WorldSettings.DEFAULT` — they hold numbers a
 
 Create `WorldStyleCompletenessTest.java`, which walks `src/main/resources/data/urbex/urbex/worldstyles/*.json`, follows each `citystyles[].citystyle` reference and each `extends` chain, and asserts that every street/highway/railway wiring field resolves to at least one part id somewhere in the chain. Assert on the *union* over the chain, not on any single file: `citystyle_border` declares no `parts` and correctly takes `citystyle_common`'s.
 
+Build this on `Resolved.require` from Task 4a rather than duplicating its error shape: wiring completeness is the same rule ("required after the chain is applied") applied to one more set of fields, and the two should fail with the same message wording so an author sees one convention rather than two. This test is the static, whole-pack sweep; `Resolved.require` is the per-asset runtime guard. Keep both — the test catches a bundled-pack regression at build time, the runtime guard catches a third-party pack at load time.
+
 - [ ] **Step 7: Run the suite and the digests**
 
 Run: `./gradlew test`, then both digest tasks.
@@ -1121,7 +1264,8 @@ git commit -m "docs: datapack authoring guide for extends and explicit reference
 | §6.1 unqualified references are load errors | 5 |
 | §6.2 thirty wiring defaults deleted | 6 |
 | §6.3 numeric settings keep defaults | 6, step 4 |
-| §6.4 requiredness applies after resolution | 6, step 6 |
+| §6.4 requiredness applies after resolution | 4a (all registries, runtime), 6 step 6 (wiring, static sweep) |
+| §4 "child wins **when present**" for every field, not only parts | 4a |
 | §7.1 `citystyle_border` bug | already fixed in `1993627c`; Task 3 generalises the mechanism |
 | §7.2 rename in bundled pack, qualify `largecities` | 1 (citystyles), 2 (presets), 5 (`largecities`) |
 | §7.3 digests must not move | Global Constraints, and a verification step in every task |
