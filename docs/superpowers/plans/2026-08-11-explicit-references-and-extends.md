@@ -897,8 +897,9 @@ default arm is now a failure, so a new registry cannot silently skip coverage."
 - Modify: `CHANGELOG.md`
 
 **Interfaces:**
-- Consumes: nothing new.
-- Produces: `Tools.listOrStringList(String fieldName, Function<T, List<String>> getter)` — the `defaultVal` parameter is gone, and the field is required.
+- Consumes: `Mergeable` and `Mergeable.apply` from Task 3.
+- Produces: `Tools.listOrStringList(String fieldName, Function<T, Mergeable<String>> getter)` — the `defaultVal` parameter is gone, the field is required, and the codec accepts a bare string, a bare array, or `{"replace": false, "values": [...]}`.
+- Produces: `StreetParts.merge(StreetParts base, StreetParts incoming)` and the equivalent on `HighwayParts` and `RailwayParts`, folding an incoming instance onto an accumulated one per field.
 
 - [ ] **Step 1: Write the guard test**
 
@@ -958,23 +959,87 @@ class NoAssetReferenceDefaultsTest {
 Run: `./gradlew test --tests '*NoAssetReferenceDefaultsTest*'`
 Expected: FAIL, listing 30 matches across `StreetParts.java`, `HighwayParts.java` and `RailwayParts.java`.
 
-- [ ] **Step 3: Drop the default parameter from the helper**
+- [ ] **Step 3: Make the helper three-arm, and drop the default parameter**
 
-In `Tools.java`, change `listOrStringList` to:
+> **Plan amendment (2026-08-11, after the Task 3 review).** Spec §4 line 91 lists
+> `streetblocks.parts.straight` as an ordered list whose append is opt-in, and §4.1 line 114 says
+> `listOrStringList` "grows a third arm". As originally written, neither Task 3 nor this task
+> delivered that — Task 3 wired `Mergeable` into `Selectors` only. Building it here was chosen over
+> a Task 3 fix round because this task rewrites all thirty call sites anyway. The ripple is real
+> and is Step 3a below: `StreetParts` is currently swapped across a chain as a whole-object scalar,
+> so per-field append needs it merged field by field.
+
+In `Tools.java`, replace `listOrStringList` with a `Mergeable`-returning three-arm version — a bare
+string, a bare array, or the `{"replace": false, "values": [...]}` object — and no default:
 
 ```java
-    public static <T> RecordCodecBuilder<T, List<String>> listOrStringList(String fieldName, Function<T, List<String>> getter) {
-        return Codec.either(Codec.STRING, Codec.STRING.listOf())
+    public static <T> RecordCodecBuilder<T, Mergeable<String>> listOrStringList(
+            String fieldName, Function<T, Mergeable<String>> getter) {
+        return Codec.either(Codec.STRING, Mergeable.codec(Codec.STRING))
                 .fieldOf(fieldName)
-                .xmap(either -> either.map(List::of, Function.identity()),
-                        list -> list.size() == 1 ? Either.left(list.get(0)) : Either.right(list))
+                .xmap(either -> either.map(s -> new Mergeable<>(true, List.of(s)), Function.identity()),
+                        m -> m.replace() && m.values().size() == 1
+                                ? Either.left(m.values().get(0))
+                                : Either.right(m))
                 .forGetter(getter);
     }
 ```
 
+`Mergeable.codec` already handles the array-versus-object arms, so this only adds the bare-string
+shorthand on top of it. Import `dev.krona.urbex.worldgen.lost.regassets.data.Mergeable`.
+
+- [ ] **Step 3a: Merge part-wiring records field by field**
+
+`StreetParts`, `HighwayParts` and `RailwayParts` become records of `Mergeable<String>` rather than
+`List<String>`. Today `CityStyle` swaps a whole `StreetParts` in or out (`streetParts ==
+StreetParts.DEFAULT`), which cannot express "append two street variants to the ones I inherit". Give
+each of the three records a method that folds an incoming instance onto an accumulated one, applying
+`Mergeable.apply` per component:
+
+```java
+    /** Applies {@code incoming}'s declared components onto {@code base}, per field. */
+    public static StreetParts merge(StreetParts base, StreetParts incoming) {
+        return new StreetParts(
+                mergeOne(base.straight(), incoming.straight()),
+                mergeOne(base.end(), incoming.end()),
+                mergeOne(base.bend(), incoming.bend()),
+                mergeOne(base.t(), incoming.t()),
+                mergeOne(base.none(), incoming.none()),
+                mergeOne(base.all(), incoming.all()),
+                mergeOne(base.connector(), incoming.connector()),
+                mergeOne(base.stair(), incoming.stair()));
+    }
+
+    private static Mergeable<String> mergeOne(Mergeable<String> base, Mergeable<String> incoming) {
+        if (incoming == null) {
+            return base;
+        }
+        if (base == null || incoming.replace()) {
+            return incoming;
+        }
+        List<String> combined = new ArrayList<>(base.values());
+        combined.addAll(incoming.values());
+        return new Mergeable<>(true, combined);
+    }
+```
+
+In `CityStyle.applyFrom`, replace the whole-object swap with `streetParts = StreetParts.merge(streetParts, s.getParts())` and the same for `largeStreetParts` and `tertiaryStreetParts`. Do the equivalent in `WorldStyle` for `PartSelector`'s highway and railway groups.
+
+Consumers that read these components (`CityStyle.getStreetParts()` and callers in `CityGenerator`, `Highways`, `Railways`) want a plain `List<String>`; expose `.values()` at the accessor boundary rather than pushing `Mergeable` into generation code.
+
+- [ ] **Step 3b: Test the append opt-in on a string part list**
+
+Add to `CityStyleInheritSelectorsTest` (or a sibling test class, whichever reads better) a case proving a child city style that declares
+
+```json
+"streetblocks": { "parts": { "straight": { "replace": false, "values": ["urbex:street_straight_alt"] } } }
+```
+
+resolves to its parent's `straight` entries followed by `urbex:street_straight_alt`, and that a bare array in the same position replaces them instead. Assert with order-sensitive `List.of(...)` equality, not set membership or size.
+
 - [ ] **Step 4: Update all thirty call sites and delete the DEFAULT constants**
 
-Remove the middle argument from every `listOrStringList` call in `StreetParts.java` (8), `HighwayParts.java` (6) and `RailwayParts.java` (16). Delete `StreetParts.DEFAULT`, `HighwayParts.DEFAULT`, `RailwayParts.DEFAULT` and `PartSelector.DEFAULT`, and the `get()` methods that compare against them. In `WorldStyleRE`'s constructor, `partSelector.orElse(PartSelector.DEFAULT)` becomes a required field; in `CityStyle`, the `streetParts == StreetParts.DEFAULT` comparisons become null checks.
+Remove the middle argument from every `listOrStringList` call in `StreetParts.java` (8), `HighwayParts.java` (6) and `RailwayParts.java` (16). Delete `StreetParts.DEFAULT`, `HighwayParts.DEFAULT`, `RailwayParts.DEFAULT` and `PartSelector.DEFAULT`, and the `get()` methods that compare against them. In `WorldStyleRE`'s constructor, `partSelector.orElse(PartSelector.DEFAULT)` becomes a required field; in `CityStyle`, the `streetParts == StreetParts.DEFAULT` comparisons are already gone via Step 3a.
 
 Keep `MultiSettings.DEFAULT` and `WorldSettings.DEFAULT` — they hold numbers and enums, not asset references.
 
