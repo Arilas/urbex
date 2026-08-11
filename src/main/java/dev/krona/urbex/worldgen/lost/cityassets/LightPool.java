@@ -116,7 +116,7 @@ public final class LightPool {
             }
             BlockState state;
             try {
-                state = Tools.stringToState(entry.block());
+                state = Tools.stringToState(entry.block(), paletteId);
             } catch (RuntimeException e) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "cannot parse block state", e);

@@ -31,6 +31,13 @@ public class ServerEventHandlers {
         // hooks). It is not what guarantees loaded assets during generation, though: a level that is
         // already loaded never fires it again, so the guarantee lives on the generation path in
         // CityFeature.getDimensionInfo. This is the eager half - fail at load, naming the file.
+        //
+        // The two are not simply complementary, and it is worth being exact: on a fresh world load
+        // this populates the registries, and then the very first getDimensionInfo of the session
+        // reconciles its dirty counter (it starts at -1), calls cleanUp(), and throws all of it away
+        // - reloading it on the same call. So every session resolves the ten registries twice. The
+        // validation still happens first, which is the point of having this at all, but the second
+        // resolve is not free and is not a fresh requirement being met.
         ServerLevelEvents.LOAD.register((server, level) -> AssetRegistries.load(level));
         ServerTickEvents.END_LEVEL_TICK.register(ServerEventHandlers::onWorldTick);
         ServerLifecycleEvents.SERVER_STARTING.register(server -> cleanUp());

@@ -106,13 +106,19 @@ public class MultiChunk {
         // is now a single call: CityFeature.reconcileDirtyCounter holds the feature's monitor across
         // the counter comparison and cleanUp(), so the second thread through waits and then finds
         // the counters equal instead of resetting the registries underneath the first (Task 5c; the
-        // check-then-act this paragraph used to describe is gone). After that the counters stay
-        // equal, because globalDimensionInfoDirtyCounter is only ever bumped from client-side paths
-        // (ClientEventHandlers, PresetSelection), none of which run while a server is generating -
-        // so in a settled session no reset lands between two chunks' style lookups. That last part
-        // is an argument about who writes the counter, not something the code enforces, and it is
-        // all that stands between this loop and the split-vote case above. Closing it outright means
-        // keying on ids rather than instances - not a comment.
+        // check-then-act this paragraph used to describe is gone). What remains is a bump arriving
+        // while generation is in flight: globalDimensionInfoDirtyCounter is written only from
+        // client-side paths, but ClientEventHandlers.java:42-46 writes it from
+        // ClientPlayConnectionEvents.DISCONNECT, which in single-player fires while the integrated
+        // server is still draining generation - so "none of them run while a server generates" is an
+        // argument about callers that does not actually hold at shutdown.
+        //
+        // And the split vote below is the mild consequence, not the worst one. The same reset empties
+        // AssetRegistries' stuff-by-tag index, which - alone among the registries - has no lazy
+        // rebuild, so the affected chunks are written and saved with no decoration at all. See
+        // CityFeature.reconcileDirtyCounter and the guard in Stuff.generateStuff, which at least
+        // makes it say so. Closing this loop's own exposure means keying on ids rather than
+        // instances - not a comment.
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {

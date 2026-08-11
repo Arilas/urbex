@@ -150,11 +150,21 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
      * window, because a style resolved either side of a reset is two instances of one id.
      * <p>
      * The lock only bites when the counters differ; once they agree, the volatile read on the first
-     * line returns and nothing synchronizes. What this does not cover is a bump that arrives while
-     * generation is in flight - {@code globalDimensionInfoDirtyCounter} is written only from
-     * {@code ClientEventHandlers} and {@code PresetSelection} (both client-side, neither running
-     * against a generating server), which bounds it but is an argument about callers, not a
-     * guarantee this method can make.
+     * line returns and nothing synchronizes.
+     * <p>
+     * <b>What this does not cover, and what it costs.</b> A bump that arrives while generation is
+     * already in flight still resets the registries underneath it, and the consequence is not
+     * merely MultiChunk's split city-style vote - that is the mild version. {@link
+     * AssetRegistries#reset()} sets the stuff-by-tag index to empty, and unlike every other registry
+     * that index has no lazy rebuild: {@code Stuff.generateStuff} reads null for every tag, places
+     * nothing, and the chunk is written and <em>saved</em> undecorated. That is the shipped defect
+     * this whole task removed, reappearing one chunk at a time. It is reachable rather than
+     * theoretical - {@code ClientEventHandlers.java:42-46} bumps the counter from
+     * {@code ClientPlayConnectionEvents.DISCONNECT} on the client thread, which in single-player
+     * fires while the integrated server is still draining in-flight generation. Nothing here
+     * prevents it; {@code Stuff.generateStuff} logs loudly when it happens so it can no longer pass
+     * quietly, and closing it properly means not tearing the registries down from a path that
+     * generation shares.
      */
     private void reconcileDirtyCounter() {
         if (globalDimensionInfoDirtyCounter == dimensionInfoDirtyCounter) {
@@ -167,7 +177,14 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         }
     }
 
-    public void cleanUp() {
+    /**
+     * Private and synchronized on purpose. {@link #reconcileDirtyCounter()} is the only caller and
+     * already holds this monitor, and the design above depends on that staying true: a caller that
+     * reached this without the monitor would be back to two threads resetting the registries at
+     * once. Java monitors are reentrant, so the redundant acquisition costs nothing on the existing
+     * path and is what keeps a future second caller from silently reopening the window.
+     */
+    private synchronized void cleanUp() {
         ServerEventHandlers.cleanUp();
         AssetRegistries.reset();
         dimensionInfo.clear();

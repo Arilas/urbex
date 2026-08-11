@@ -36,7 +36,7 @@ public class Variant {
         }
         Resolved.require(anyBlocks ? entries : null, name, "blocks");
         for (BlockEntry entry : entries) {
-            BlockState state = Tools.stringToState(entry.block());
+            BlockState state = Tools.stringToState(entry.block(), name);
             blocks.add(Pair.of(entry.random(), state));
         }
     }

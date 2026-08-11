@@ -1,5 +1,6 @@
 package dev.krona.urbex.varia;
 
+import dev.krona.urbex.Urbex;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.datafixers.util.Either;
@@ -24,12 +25,14 @@ import net.minecraft.world.level.block.state.properties.Property;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class Tools {
 
-    private static final Set<String> DONE = new HashSet<>();
+    /** Block ids already reported by {@link #stringToState}, so each is named once, not per use. */
+    private static final Set<String> WARNED_MISSING_BLOCKS = ConcurrentHashMap.newKeySet();
 
     public static String stateToString(BlockState state) {
         StringBuilder stringbuilder = new StringBuilder();
@@ -45,6 +48,33 @@ public class Tools {
     }
 
     public static BlockState stringToState(String s) {
+        return stringToState(s, null);
+    }
+
+    /**
+     * Resolves a datapack block string, naming {@code owner} if it cannot be resolved.
+     * <p>
+     * <b>An unknown id still returns air, exactly as before.</b> {@code BuiltInRegistries.BLOCK} is
+     * a {@link DefaultedRegistry}, so {@code getValue} hands back the registry's default value -
+     * {@code minecraft:air} - for an id it does not know, never null. The {@code value == null}
+     * guard below has therefore never fired, and an id that a Minecraft version renames becomes air
+     * everywhere it is used with no exception and no log line. That is how {@code minecraft:chain}
+     * (renamed {@code minecraft:iron_chain} in 26.x) made the whole {@code urbex:chains} decoration
+     * invisible without anyone noticing. Turning it into a load error is a contract change for every
+     * third-party pack and is tracked separately; the warning below is the part that costs nothing
+     * and can move no golden, because the state returned is unchanged.
+     * <p>
+     * The legacy branch under it is dead in both directions, and is kept only because deleting it is
+     * a separate decision. {@code Identifier.parse} on the line above throws for a pre-flattening
+     * {@code name@meta} string - {@code @} is not a legal path character - so such a string can
+     * never reach {@code upgradeBlock}; and {@code BlockStateData.upgradeBlock(String)} does not
+     * handle that form anyway (measured: it returns {@code minecraft:red_sandstone@2} unchanged).
+     * That is why the one such string the bundled pack shipped was a hard crash at palette compile
+     * rather than an automatic upgrade.
+     *
+     * @param owner the asset the string came from, used only in the warning; may be null
+     */
+    public static BlockState stringToState(String s, @Nullable Object owner) {
         if (s.contains("[")) {
             try {
                 HolderLookup<Block> blocks = ServerAccess.getServer() == null
@@ -63,7 +93,14 @@ public class Tools {
         }
 
         String converted = BlockStateData.upgradeBlock(s);
-        Block value = BuiltInRegistries.BLOCK.getValue(Identifier.parse(converted));
+        Identifier convertedId = Identifier.parse(converted);
+        if (!BuiltInRegistries.BLOCK.containsKey(convertedId) && WARNED_MISSING_BLOCKS.add(s)) {
+            Urbex.LOGGER.warn(
+                    "Block '{}'{} does not exist in this Minecraft version; it will generate as air. " +
+                            "It was most likely renamed - check the current id and update the asset.",
+                    s, owner == null ? "" : " (in " + owner + ")");
+        }
+        Block value = BuiltInRegistries.BLOCK.getValue(convertedId);
         if (value == null) {
             throw new RuntimeException("Cannot find block: '" + s + "'!");
         }

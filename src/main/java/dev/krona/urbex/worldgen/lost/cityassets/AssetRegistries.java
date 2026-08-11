@@ -62,6 +62,21 @@ public class AssetRegistries {
         return stuffByTag.get(tag);
     }
 
+    /**
+     * Whether {@link #load} has completed and not been undone by {@link #reset} since.
+     * <p>
+     * Read on the generation path by {@code Stuff.generateStuff}, which is the one consumer whose
+     * failure mode is silent: every other registry re-resolves lazily through
+     * {@link RegistryAssetRegistry#get}, but the stuff-by-tag index has no lazy rebuild, so
+     * generating while this is false writes an undecorated chunk and saves it. False here during
+     * generation is never legitimate after Task 5c - it means something called {@link #reset}
+     * mid-generation - which is why the check is on this flag rather than on the index being empty
+     * (a pack that ships no stuff files legitimately has an empty index).
+     */
+    public static boolean isLoaded() {
+        return loaded;
+    }
+
     public static void reset() {
         synchronized (LOAD_LOCK) {
             VARIANTS.reset();

@@ -2,10 +2,12 @@ package dev.krona.urbex.worldgen;
 
 import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.setup.ServerEventHandlers;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistrationInfo;
@@ -90,6 +92,35 @@ class AssetsLoadedBeforeGenerationTest {
         assertNotNull(rubble, "the stuff tag index must be populated before generation reads the "
                 + "level - an empty index places no decoration and says nothing about it");
         assertEquals(List.of("urbex:cobweb"), rubble.stream().map(StuffObject::getName).toList());
+    }
+
+    /**
+     * The other half of the argument, and the half a deletion would take away silently.
+     * <p>
+     * The test above pins the generation-path load, which is what guarantees a chunk never generates
+     * against unloaded assets. It says nothing about the <em>eager</em> load, and without that one
+     * Task 4a's rule reverts from "a bad asset fails the world load, naming the file" to "a bad
+     * asset throws from a worldgen worker mid-generation" - with every test still green, because
+     * generation would go on loading the registries itself. So the registration is pinned here
+     * directly: register the server events, fire {@code ServerLevelEvents.LOAD}, and require that
+     * something on it loaded the registries.
+     * <p>
+     * A null level is enough to tell the two apart. {@code RegistryAssetRegistry.loadAll} returns
+     * immediately for one, so nothing is actually resolved, but {@code load} still latches - and if
+     * the registration line is gone, the invoker has no callbacks, nothing runs, and the latch stays
+     * false. The registration is left on the static event afterwards; nothing else in the suite
+     * invokes it.
+     */
+    @Test
+    void theEagerLoadIsWiredToTheLevelLoadEvent() {
+        assertFalse(AssetRegistries.isLoaded(), "precondition: @BeforeEach reset the registries");
+
+        ServerEventHandlers.register();
+        ServerLevelEvents.LOAD.invoker().onLevelLoad(null, null);
+
+        assertTrue(AssetRegistries.isLoaded(),
+                "ServerLevelEvents.LOAD must load the asset registries - it is what keeps the "
+                        + "eager validation a load-time check instead of a mid-generation one");
     }
 
     @Test

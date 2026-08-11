@@ -134,7 +134,7 @@ public class Palette {
             Character c = entry.getChr().charAt(0);
             BlockState dmg = null;
             if (entry.getDamaged() != null) {
-                dmg = Tools.stringToState(entry.getDamaged());
+                dmg = Tools.stringToState(entry.getDamaged(), name);
             }
             LightPool light = entry.getLight() == null ? null : LightPool.compile(name, c, entry.getLight());
             Info info = new Info(entry.getMob(), entry.getLoot(),
@@ -142,7 +142,7 @@ public class Palette {
 
             if (entry.getBlock() != null) {
                 String block = entry.getBlock();
-                BlockState state = Tools.stringToState(block);
+                BlockState state = Tools.stringToState(block, name);
                 palette.put(c, new PE(state, info));
                 if (dmg != null) {
                     damaged.put(state, dmg);
@@ -168,7 +168,7 @@ public class Palette {
                 for (BlockEntry ob : entryBlocks) {
                     Integer f = ob.random();
                     String block = ob.block();
-                    BlockState state = Tools.stringToState(block);
+                    BlockState state = Tools.stringToState(block, name);
                     blocks.add(Pair.of(f, state));
                     if (dmg != null) {
                         damaged.put(state, dmg);

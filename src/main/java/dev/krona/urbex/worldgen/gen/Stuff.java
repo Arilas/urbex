@@ -22,6 +22,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Stuff {
 
@@ -30,7 +31,46 @@ public class Stuff {
     // palettes. Report each such combination once instead of on every city chunk.
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Latches while the registries are unloaded so the report below fires once per episode rather
+     * than once per chunk, and re-arms as soon as they are loaded again.
+     */
+    private static final AtomicBoolean REPORTED_UNLOADED = new AtomicBoolean();
+
     public static void generateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
+        // Generating with the registries unloaded is never legitimate here, and it is the one
+        // failure in this file that says nothing: stuffForTag returns null for every tag, the loop
+        // below places nothing, and the chunk is written and saved undecorated - exactly the
+        // shipped defect Task 5c removed, reappearing one chunk at a time. Every other registry
+        // heals itself on the next lookup (RegistryAssetRegistry.get re-resolves on a miss); the
+        // tag index has no lazy rebuild, so nothing would ever notice.
+        //
+        // Reachable, not hypothetical: AssetRegistries.reset() is called from CityFeature.cleanUp,
+        // which reconcileDirtyCounter invokes when globalDimensionInfoDirtyCounter is bumped, and
+        // ClientEventHandlers.java:42-46 bumps it from ClientPlayConnectionEvents.DISCONNECT on the
+        // client thread - which in single-player fires while the integrated server is still
+        // draining in-flight generation.
+        //
+        // Logged rather than thrown deliberately. Throwing would route through
+        // CityFeature.generateFromPipeline's handler, which calls ErrorLogger.report, and that
+        // dereferences ServerAccess.getServer() without a null check (ErrorLogger.java:28-29) -
+        // during the shutdown window this fires in, that turns a decoration bug into a dead
+        // worldgen worker. The chunk is lost to this either way; the point is that it stops being
+        // silent.
+        if (!AssetRegistries.isLoaded()) {
+            if (REPORTED_UNLOADED.compareAndSet(false, true)) {
+                Urbex.getLogger().error(
+                        "Generating chunk {},{} with the Urbex asset registries unloaded: no decoration will be " +
+                                "placed in this chunk or any other until they are loaded again, and the chunks are " +
+                                "saved that way. Something called AssetRegistries.reset() while generation was in " +
+                                "flight. Reported once per occurrence, not once per chunk.",
+                        ctx.coord.chunkX(), ctx.coord.chunkZ());
+            }
+            return;
+        }
+        if (REPORTED_UNLOADED.get()) {
+            REPORTED_UNLOADED.set(false);
+        }
         // Each stuff object gets its own address, and within it each placement attempt gets its
         // own, derived from the loop indices. An attempt therefore draws the same values however
         // many attempts before it were abandoned - and whether an attempt is abandoned depends on

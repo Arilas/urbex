@@ -31,9 +31,18 @@
     `StuffSettingsRE` filter, not `columnResolves`, and `Rng.Purpose.STUFF` had never appeared in a
     draw sequence - because `DigestCheck` runs on `SERVER_STARTED` and halts the server before a tick
     ever fires. The same gap meant the eager load-time validation added for all ten registries had
-    never run in a digest either. The movement in the primary window is 38 driver positions out of
-    850,049: 21 that were air are cobweb, 16 are iron chains, and one blue stained-glass pane changed
-    its `west` connection because a chain is now a real block next to it.
+    never run in a digest either. Both windows were dumped position-by-position on the pre-change and
+    post-change trees, so the movement is measured rather than argued. The primary window moves 38
+    driver positions out of 850,049: 21 that were air are cobweb, 16 are iron chains, and one blue
+    stained-glass pane changed its `west` connection because a chain is now a real block beside it.
+    The features window moves 825 out of 4,605,750, and nothing is lost: 761 are decoration itself
+    (485 cobweb, 268 chain, 8 at positions the driver had never written), 62 are connection flips on
+    iron bars and glass panes that now attach to a chain - `ChunkDriver`'s corrections pass runs
+    against the finished chunk, so it sees decoration - and 2 are blocks the explosion-damage pass
+    now breaks that it did not before, because `breakBlocksForDamageNew` feeds each layer's air count
+    back into the damage factor for the layers below it and decoration reduces that count. So
+    everything that moved is decoration or a consequence of decoration; "only decoration moved" would
+    have been the wrong claim.
   - *Two shipped datapack defects, both found by that validation running for the first time.*
     `palettes/bricks_desert_redsand.json` carried `minecraft:red_sandstone@2`, a 1.12 `name@meta`
     string predating flattening that is not a legal `Identifier`; `Identifier.parse` threw on it
@@ -47,11 +56,35 @@
     becomes air with no exception and no log line. `ShippedBlockIdsResolveTest` now checks every
     `block` and `damaged` id in the bundled pack against the block registry; the air fallback in
     `Tools.stringToState` is a wider contract change and is left for its own task.
+  - *The one reset that is still reachable now says so instead of costing you a chunk.* A bump of
+    `globalDimensionInfoDirtyCounter` arriving while generation is in flight still resets the
+    registries underneath it, and the consequence is not the mild one: `AssetRegistries.reset()`
+    empties the stuff-by-tag index, and that index - alone among the registries, which all re-resolve
+    lazily on the next lookup - has no rebuild, so the chunks in flight are written and **saved** with
+    no decoration. That is this entry's own bug, one chunk at a time. It is reachable rather than
+    theoretical: `ClientPlayConnectionEvents.DISCONNECT` bumps the counter on the client thread, which
+    in single-player fires while the integrated server is still draining generation. It is not closed
+    here - closing it means not tearing the registries down from a path generation shares - but
+    `Stuff.generateStuff` now checks `AssetRegistries.isLoaded()` and logs an error naming the chunk
+    and the consequence, once per occurrence rather than once per chunk. It logs rather than throws
+    because `ErrorLogger.report` dereferences the server without a null check, and this fires exactly
+    when the server is going away. `CityFeature.cleanUp()` is private and synchronized, since the
+    design depends on it being reached only under the instance monitor.
+  - *An unknown block id still generates as air, but no longer in silence.* `Tools.stringToState`
+    ends at `BuiltInRegistries.BLOCK.getValue`, which returns the registry's default - air - for an
+    id it does not know, so its `value == null` guard has never fired. It now warns once per id,
+    naming the id and the asset it came from. **The state returned is unchanged, so no world output
+    moves**; making it a load error is a contract change for every third-party pack and is tracked
+    separately. The legacy `name@meta` fallback below it is documented as dead in both directions:
+    `Identifier.parse` rejects such a string on the line above, and `BlockStateData.upgradeBlock`
+    does not handle that form anyway (measured).
   - *Tests.* `AssetsLoadedBeforeGenerationTest` drives `CityFeature.getDimensionInfo` through a level
     that throws the moment anything past `registryAccess()` is asked of it, and requires the stuff
     index to be populated by then - so the load moving back off the generation path fails a test
     rather than silently costing a player their spawn-area decoration. It also pins the index's
-    single-write publication.
+    single-write publication, and pins the `ServerLevelEvents.LOAD` registration itself: deleting
+    that line would otherwise revert the eager validation to a mid-generation failure with the whole
+    suite still green, because generation would go on loading the registries by itself.
 - **No worldgen decision rides on an asset's name as a string any more - not on where its id lands in
   a hash bucket, and not on a bare-versus-qualified comparison.** A systematic sweep found four
   places, all pre-existing, none introduced by the qualification pass below; they land together
