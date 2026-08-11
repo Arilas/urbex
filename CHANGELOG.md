@@ -75,9 +75,15 @@
     `"<none>"` and could never fire while a city building's matched normally. Rather than fix the
     ordering three times, the `parts2` context is now *derived*: `ConditionContext.withPart` copies
     the floor's context and replaces only the current part, and `Building.getRandomPart2` takes the
-    chosen part and applies it internally, so no caller can hand it a context whose `belowPart` has
-    already been advanced. The defect is unrepresentable rather than merely fixed, and all three
-    loops lost their duplicated second context. Inert for the bundled pack (nothing in it writes
+    chosen part and applies it internally. That buys one invariant, stated no wider than it is: the
+    `parts2` context's `belowPart` is always the `parts[]` context's, so a caller mutating its own
+    local after building the floor context cannot reach it - which is precisely the defect that was
+    shipping, and it is gone at all three sites, each of which also lost its duplicated second
+    context. It is *not* a proof that `getPart()` can never equal `getBelowPart()`: the
+    `ConditionContext` constructor is public, the `parts[]` contexts are still hand-written, and
+    `getRandomPart2(rand, ctx, ctx.getBelowPart())` still compiles. Nothing rejects it on purpose -
+    a building that repeats a part on consecutive floors legitimately has the two equal, and
+    `library00` (one non-top part entry) does. Inert for the bundled pack (nothing in it writes
     `belowpart`, and no scattered-reachable building declares `parts2`), and measured to confirm it -
     which is also why no golden could catch a revert, so `BelowPartConditionTest` now covers the
     writing side alongside the reading side it already had, on the production `getRandomPart2` path.
@@ -86,18 +92,24 @@
     the floor genuinely has none - it is what is being chosen. What a `parts[]` entry can usefully
     condition on is the part *below*, which is `belowpart`, and that is passed correctly. Inventing a
     value here would have made `inpart` and `belowpart` synonyms on `parts[]`, which is the bug above.
-  - *Three things that are correct only by construction now say so.* `MultiChunk` keys a `Counter`
-    and an `Objects.equals` on `CityStyle` identity - no `cityassets` class overrides
-    `equals`/`hashCode`, so this works only because `RegistryAssetRegistry` canonicalises instances
-    through `putIfAbsent`; if `AssetRegistries.reset()` ever ran mid-generation, one id could exist as
-    two instances, splitting a style's votes and making the `getId()` sort stop being a total order.
-    `reset()` is *not* confined to server start/stop, which is the part worth writing down:
-    `CityFeature.cleanUp()` calls it and is invoked lazily from `CityFeature.getDimensionInfo()`, on
-    the chunk-generation path, firing once per session because `dimensionInfoDirtyCounter` starts at
-    `-1`. What actually protects the identity keys is narrower - `globalDimensionInfoDirtyCounter` is
+  - *Things that are correct only by construction now say so - including one that is not fully
+    correct.* `MultiChunk` keys a `Counter` and an `Objects.equals` on `CityStyle` identity - no
+    `cityassets` class overrides `equals`/`hashCode`, so this works only because
+    `RegistryAssetRegistry` canonicalises instances through `putIfAbsent`; if
+    `AssetRegistries.reset()` ran mid-generation, one id could exist as two instances, splitting a
+    style's votes and making the `getId()` sort stop being a total order. `reset()` is *not* confined
+    to server start/stop, which is the part worth writing down: `CityFeature.cleanUp()` calls it and
+    is invoked lazily from `CityFeature.getDimensionInfo()`, firing once per session because
+    `dimensionInfoDirtyCounter` starts at `-1` - and not necessarily from generation, since that
+    method also has callers in `DigestRunner`, `SpawnPlacement`, `StructureSuppressor` and the
+    commands. What bounds it is narrow and is not a guarantee: `globalDimensionInfoDirtyCounter` is
     bumped only from client-side paths (`ClientEventHandlers`, `PresetSelection`), none of which run
-    while a server generates, so after that first reconcile no reset can land between two chunks'
-    style lookups. A server-side bump would break it and would need ids here, not a comment.
+    while a server generates, so in a *settled* session no reset lands between two chunks' style
+    lookups. The first reconcile is not guaranteed to be a single call - `getDimensionInfo`'s
+    check-then-act on two volatile ints is not atomic, `cleanUp()` is unsynchronized, and generation
+    runs on the parallel worker pool - so one thread can be inside the style loop while another
+    resets the registries underneath it. That window is pre-existing, is documented rather than
+    closed here, and closing it means keying on ids or making the reconcile atomic.
     `City`'s five predefined-content maps are filled in name-hash order, so two predefined cities
     claiming one chunk resolve last-writer-wins by hash - left alone deliberately, since that is a
     pack authoring conflict rather than a silent reordering of a working configuration, and any rule

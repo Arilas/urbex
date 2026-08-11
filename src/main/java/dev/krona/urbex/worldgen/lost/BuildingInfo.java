@@ -648,8 +648,12 @@ public class BuildingInfo {
             };
             String part = building.getRandomPart(rand, conditionContext);
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), part);
+            // getRandomPart2 derives the parts2 context from this one, so it sees this floor's
+            // parts[] pick as the current part and the floor below as the part below - see the
+            // constructor's copy of this loop.
             String part2 = building.getRandomPart2(rand, conditionContext, part);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
+            // Last in the body: the next iteration's parts[] context is what reads this.
             belowPart = part;
         }
     }
@@ -831,12 +835,14 @@ public class BuildingInfo {
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), part);
 
             // parts2[] is the second part of *this* floor, so it does have a current part - the
-            // parts[] pick just made - while "the part below" is still the previous floor's, which
-            // is why belowPart is only advanced at the end of the loop. getRandomPart2 derives its
-            // own context from this one (ConditionContext.withPart) precisely so that advancing
-            // belowPart early cannot poison it again the way it used to.
+            // parts[] pick just made - while "the part below" is still the previous floor's.
+            // getRandomPart2 derives its own context from this one (ConditionContext.withPart)
+            // rather than being handed one, which is what stops belowPart being poisoned the way it
+            // used to be when this loop advanced it before building a second context by hand.
             String part2 = building.getRandomPart2(rand, conditionContext, part);
             floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
+            // Last in the body: what still reads this local is the *next* iteration's parts[]
+            // context, at the top of the loop, which must see the floor below rather than this one.
             belowPart = part;
             connectionAtX[i] = isCity(coord.west(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
             connectionAtZ[i] = isCity(coord.north(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);

@@ -67,14 +67,23 @@ public abstract class ConditionContext {
      * their {@code belowPart} variable to the part just chosen <em>before</em> constructing the
      * second context, so it saw {@code getBelowPart()} equal to {@code getPart()} and a
      * {@code parts2[]} {@code belowpart} was an exact duplicate of its {@code inpart} - the same
-     * defect issue #58 fixed on the reading side in {@link #parseTest}. Deriving makes that
-     * unrepresentable: {@code belowPart} here can only be whatever the {@code parts[]} context
-     * already had, whatever the caller does to its own local afterwards.
+     * defect issue #58 fixed on the reading side in {@link #parseTest}.
+     * <p>
+     * What deriving buys is exactly one invariant, and it is worth stating no wider than it is: the
+     * {@code parts2} context's {@code belowPart} is always the {@code parts[]} context's
+     * {@code belowPart}, so whatever a caller does to its own local afterwards cannot reach it. That
+     * is the defect that was shipping, and it is gone at all three sites. It is not a proof that a
+     * {@code parts2} context can never have {@code getPart()} equal to {@code getBelowPart()}: the
+     * constructor is public, the {@code parts[]} contexts are still hand-written with a hand-chosen
+     * {@code belowPart}, and nothing rejects {@code getRandomPart2(rand, ctx, ctx.getBelowPart())}.
+     * Nor should anything: a building that repeats one part on consecutive floors makes
+     * {@code part} legitimately equal {@code belowPart}, and {@code buildings/library00.json} - one
+     * non-top entry, so every non-top floor draws {@code urbex:library00_1} - does exactly that.
      */
-    public final ConditionContext withPart(String part) {
+    final ConditionContext withPart(String newPart) {
         ConditionContext floorContext = this;
         return new ConditionContext(level, floor, floorsBelowGround, floorsAboveGround,
-                part, belowPart, building, coord) {
+                newPart, belowPart, building, coord) {
             @Override
             public boolean isBuilding() {
                 return floorContext.isBuilding();

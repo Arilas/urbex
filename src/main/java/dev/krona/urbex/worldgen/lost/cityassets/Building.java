@@ -212,10 +212,17 @@ public class Building {
      * The {@code parts2[]} entry for a floor whose {@code parts[]} entry is {@code currentPart}.
      * <p>
      * Takes the part rather than a ready-made context, and derives one with
-     * {@link ConditionContext#withPart}, so that no caller can hand this a context whose
-     * {@code belowPart} has already been advanced to {@code currentPart} - which is exactly what all
+     * {@link ConditionContext#withPart}, so that the {@code parts2} context's {@code belowPart} is
+     * always {@code floorContext}'s - a caller advancing its own {@code belowPart} local to
+     * {@code currentPart} before calling this can no longer reach it, which is exactly what all
      * three floor loops used to do, making a {@code parts2[]} {@code belowpart} a duplicate of its
-     * {@code inpart}. {@code floorContext} is the same context {@link #getRandomPart} was given.
+     * {@code inpart}. That is the invariant; it is not a check. {@code currentPart} is an untyped
+     * positional {@code String}, so passing {@code floorContext.getBelowPart()} still compiles and
+     * still produces the wrong condition - and deliberately is not rejected, because a building that
+     * repeats a part on consecutive floors legitimately has them equal ({@code library00} has one
+     * non-top part entry, so every non-top floor of one draws the same part).
+     * <p>
+     * {@code floorContext} is the same context {@link #getRandomPart} was given.
      */
     public String getRandomPart2(RandomSource random, ConditionContext floorContext, String currentPart) {
         ConditionContext info = floorContext.withPart(currentPart);

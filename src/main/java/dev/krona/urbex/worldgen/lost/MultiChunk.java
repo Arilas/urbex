@@ -97,15 +97,23 @@ public class MultiChunk {
         //
         // reset() is not confined to server start/stop, and that is worth being precise about:
         // CityFeature.cleanUp() calls it, and cleanUp() is invoked lazily from
-        // CityFeature.getDimensionInfo() - on the chunk-generation path - whenever
-        // globalDimensionInfoDirtyCounter differs from this feature's own. It therefore does fire
-        // once per session during generation, since dimensionInfoDirtyCounter starts at -1. What
-        // actually protects this is narrower: globalDimensionInfoDirtyCounter is only ever bumped
-        // from client-side paths (ClientEventHandlers, PresetSelection), none of which run while a
-        // server is generating, so after that first reconcile the counters stay equal for the rest
-        // of the session and no reset lands between two chunks' style lookups. A server-side bump
-        // of that counter - a reload command, say - would break this, and would need the identity
-        // keys here replaced by ids rather than a comment.
+        // CityFeature.getDimensionInfo() whenever globalDimensionInfoDirtyCounter differs from that
+        // feature's own. It therefore does fire once per session, since dimensionInfoDirtyCounter
+        // starts at -1 - not necessarily from a generation call, since getDimensionInfo also has
+        // callers in DigestRunner, SpawnPlacement, StructureSuppressor and the commands.
+        //
+        // What bounds this is narrow, and does not amount to a guarantee. After that first
+        // reconcile the counters stay equal, because globalDimensionInfoDirtyCounter is only ever
+        // bumped from client-side paths (ClientEventHandlers, PresetSelection), none of which run
+        // while a server is generating - so in a settled session no reset lands between two chunks'
+        // style lookups. The first reconcile itself is not guaranteed to be a single call:
+        // getDimensionInfo's check-then-act on two volatile ints is not atomic and cleanUp() is
+        // unsynchronized, while generation runs on the parallel worker pool (see CityFeature's "No
+        // lock" note), so one thread can be inside the loop below while another, having read the
+        // counter before the first thread's write, calls cleanUp() again and resets the registries
+        // underneath it. That window is exactly the split-vote case above. It is pre-existing and
+        // is not closed here; closing it properly means keying on ids rather than instances, or
+        // making the reconcile atomic - not a comment.
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {

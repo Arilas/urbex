@@ -287,6 +287,7 @@ public class Scattered {
             // building's matched normally - one field, two meanings.
             String part2Name = building.getRandomPart2(rand, conditionContext, partName);
             BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), part2Name);    // Null is legal
+            // Read by the next iteration's parts[] context, at the top of the loop.
             belowFloor = partName;
 
             if (f == 0) {
