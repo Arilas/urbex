@@ -1,6 +1,7 @@
 package dev.krona.urbex.config;
 
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.cityassets.ExtendsChain;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -11,17 +12,14 @@ import net.minecraft.tags.TagKey;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
- * Resolves {@link PresetRE} parent chains into runtime {@link Preset}s, and lists the presets a
- * UI should offer to browse.
+ * Resolves {@link PresetRE} {@code extends} chains into runtime {@link Preset}s, and lists the
+ * presets a UI should offer to browse.
  */
 public class Presets {
 
@@ -39,32 +37,18 @@ public class Presets {
     }
 
     /**
-     * Pure resolution core: walks the {@code parent} chain of {@code id} through {@code lookup},
+     * Pure resolution core: walks the {@code extends} chain of {@code id} through {@code lookup},
      * then applies the chain root-first onto a fresh {@link Preset}. Testable without any registry
      * or level.
      *
-     * @throws IllegalStateException if the parent chain cycles, or a referenced parent id is
-     *                                unknown to {@code lookup}.
+     * @throws IllegalStateException if the extends chain cycles, or a referenced id is unknown to
+     *                                {@code lookup}.
      */
     public static Preset resolve(Identifier id, Function<Identifier, PresetRE> lookup) {
-        List<PresetRE> chain = new ArrayList<>();   // leaf..root
-        Set<Identifier> seen = new LinkedHashSet<>();
-        Identifier cur = id;
-        while (cur != null) {
-            if (!seen.add(cur)) {
-                String path = seen.stream().map(Identifier::toString).collect(Collectors.joining(" -> "));
-                throw new IllegalStateException("Preset parent cycle: " + path + " -> " + cur);
-            }
-            PresetRE re = lookup.apply(cur);
-            if (re == null) {
-                throw new IllegalStateException("Unknown preset '" + cur + "' (referenced from '" + id + "')");
-            }
-            chain.add(re);
-            cur = re.parent().orElse(null);
-        }
+        List<PresetRE> chain = ExtendsChain.resolve(id, lookup, PresetRE::getExtends);
         Preset p = new Preset(id);
-        for (int i = chain.size() - 1; i >= 0; i--) {
-            chain.get(i).applyTo(p);
+        for (PresetRE re : chain) {
+            re.applyTo(p);
         }
         return p;
     }
@@ -89,9 +73,13 @@ public class Presets {
     }
 
     /**
-     * Members of tag {@code #urbex:presets} in registry order; if the tag is missing or empty,
-     * every registry entry instead. {@code urbex:default} sorts first, then the rest
-     * lexicographically.
+     * Members of tag {@code #urbex:presets}; if the tag is missing or empty, every registry entry
+     * instead. Either way the result is sorted - the sort below is unconditional, so neither the
+     * tag's declared order nor the registry's survives it. {@code urbex:default} sorts first, then
+     * the rest by {@link Identifier#compareTo}, which is <em>path, then namespace</em> and not
+     * lexicographic on the whole id: {@code b:apple} sorts before {@code a:zebra}. That is the same
+     * order {@code MultiChunk}'s city-style sort and {@code BuildingInfo}'s city-style vote already
+     * use.
      */
     public static List<Identifier> listBrowsable(RegistryAccess access) {
         Registry<PresetRE> registry = access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);

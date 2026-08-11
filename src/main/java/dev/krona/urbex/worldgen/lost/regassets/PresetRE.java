@@ -14,6 +14,8 @@ import dev.krona.urbex.worldgen.lost.regassets.data.preset.RailwaySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.RoadSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.SpawnSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -22,18 +24,18 @@ import java.util.Set;
 
 /**
  * The datapack-facing preset format: every field is optional, and only the fields actually
- * present in the JSON are applied on top of a parent chain (see {@code Presets.resolve}). Mirrors
- * the {@code WorldStyleRE} registry-entry idiom.
+ * present in the JSON are applied on top of an {@code extends} chain (see {@code Presets.resolve}).
+ * Mirrors the {@code WorldStyleRE} registry-entry idiom.
  */
-public class PresetRE implements IAsset<PresetRE> {
+public class PresetRE implements IAsset<PresetRE>, Extendable {
 
-    public static final Set<String> KEYS = Set.of("parent", "description", "extraDescription", "warning", "icon",
+    public static final Set<String> KEYS = Set.of("extends", "description", "extraDescription", "warning", "icon",
             "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
             "spawn", "atmosphere", "misc");
 
     private static final Codec<PresetRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("parent").forGetter(PresetRE::parent),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(PresetRE::getExtends),
                     Codec.STRING.optionalFieldOf("description").forGetter(PresetRE::description),
                     Codec.STRING.optionalFieldOf("extraDescription").forGetter(PresetRE::extraDescription),
                     Codec.STRING.optionalFieldOf("warning").forGetter(PresetRE::warning),
@@ -51,12 +53,19 @@ public class PresetRE implements IAsset<PresetRE> {
                     MiscSettings.CODEC.optionalFieldOf("misc").forGetter(PresetRE::misc)
             ).apply(instance, PresetRE::new));
 
-    public static final Codec<PresetRE> CODEC =
-            dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys.warning(RAW, KEYS, "preset");
+    /**
+     * Retired-key rejection outside the unknown-key warning, so {@code inherit}/{@code parent} fail
+     * the decode instead of being reported as one more ignorable typo. Presets are the only registry
+     * where an unknown key is even mentioned - the other twelve drop it silently - which is exactly
+     * why the retired keys cannot be left to that path. See {@link RetiredKeys}.
+     */
+    public static final Codec<PresetRE> CODEC = RetiredKeys.reject(
+            dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys.warning(RAW, KEYS, "preset"),
+            "preset");
 
     private Identifier name;
 
-    private final Optional<Identifier> parent;
+    private final Optional<Identifier> extendsId;
     private final Optional<String> description;
     private final Optional<String> extraDescription;
     private final Optional<String> warning;
@@ -73,7 +82,7 @@ public class PresetRE implements IAsset<PresetRE> {
     private final Optional<AtmosphereSettings> atmosphere;
     private final Optional<MiscSettings> misc;
 
-    public PresetRE(Optional<Identifier> parent,
+    public PresetRE(Optional<Identifier> extendsId,
                      Optional<String> description,
                      Optional<String> extraDescription,
                      Optional<String> warning,
@@ -89,7 +98,7 @@ public class PresetRE implements IAsset<PresetRE> {
                      Optional<SpawnSettings> spawn,
                      Optional<AtmosphereSettings> atmosphere,
                      Optional<MiscSettings> misc) {
-        this.parent = parent;
+        this.extendsId = extendsId;
         this.description = description;
         this.extraDescription = extraDescription;
         this.warning = warning;
@@ -107,8 +116,9 @@ public class PresetRE implements IAsset<PresetRE> {
         this.misc = misc;
     }
 
-    public Optional<Identifier> parent() {
-        return parent;
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     public Optional<String> description() {

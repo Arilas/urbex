@@ -2,6 +2,620 @@
 
 ## Unreleased
 
+- **`inherit` and `parent` are refused by name, in all thirteen registries.** The spec said from the
+  start that they were "deleted, not aliased" and that a file using either would fail to load naming
+  the replacement key - and nothing implemented it, so the promise was the one thing standing between
+  a pack author and the worst version of this failure. DFU codecs ignore unknown map keys, so a city
+  style declaring `"inherit": "urbex:citystyle_common"` decoded perfectly cleanly and loaded as a
+  **chain root with no inheritance and no diagnostic**; `presets` alone would have logged a `WARN`,
+  via `UnknownKeys`, which is a line in a log rather than a refusal. What the author saw next
+  depended on what else the file said, and neither outcome named the key: a file that also spelled
+  out complete wiring loaded and generated silently without anything it meant to inherit, and one
+  that leaned on its parent failed with `declares no 'streetblocks.parts'`, which mentions neither
+  `inherit` nor `extends`. That is a bad failure for anyone, and it is the *expected* failure for
+  this branch's stated first consumer: a port of Lost Cities Modern Tweaks, a format in which
+  `inherit` **is** the key, so a mechanically converted pack hits it on every file. `RetiredKeys`
+  now pre-checks the top-level keys of every registry entry and fails the decode with a message
+  naming the offending key, its replacement, and what leaving it in place would have done. It is a
+  pre-pass rather than a field on each record, so it fires on the key's presence whatever its value's
+  type. Encode is delegated untouched - `PaletteRE`, `BuildingPartRE` and `PresetRE` encode on live
+  command and GUI paths that read the `DataResult` themselves, and no encoder can produce these keys
+  anyway.
+  - *The coverage claim is made by enumeration, not by a list to keep up to date.*
+    `RetiredKeysRejectedTest` reflects the `CODEC` field off every `*RE` class in the registry
+    package, requires all thirteen to reject both keys with a message naming the key and `extends`,
+    and separately requires that count to equal the number of `_REGISTRY_KEY` fields on
+    `CustomRegistries` - so a fourteenth registry cannot arrive uncovered. A file carrying both keys
+    reports the same one every run (declaration order, not map order), and a non-map input is left to
+    the wrapped codec rather than being described as a retired key.
+  - *Inert, and checked rather than assumed.* No file in `src/main/resources/data` uses either key -
+    asserted by the same test, not grepped once by hand - so nothing that loads today changes shape
+    and neither golden can move. Both are unchanged (`88af6b69e7762fbc`, `7c297c1e4ec1ce38`,
+    `unsafeReads=0`). `docs/datapacks.md` gains the row in its common-errors table, and the carve-out
+    it needs in "a misspelled key is ignored": these two keys are the exception to that rule in every
+    registry, which is precisely why they had to stop being ignorable.
+
+- **Datapack authoring has a guide: `docs/datapacks.md`.** Everything below changes what a
+  third-party pack must write down, and until now the only way to learn the rules was to read the
+  codecs. The guide covers the thirteen registries and where their files go, `extends` and its
+  root-first order, the three merge shapes and the `{"replace": false}` append opt-in, palettes
+  merging per character, `extends` composing with `refpalette` on a part, and the wiring every world
+  style and city style has to declare - with a working example of every registry and a table pairing
+  each load error with its fix. It also writes down what only the source said: that **ten** of the
+  thirteen registries resolve every registered asset at world load whether or not anything selects
+  it, so an *incomplete* chain root is legal only in `citystyles` - while `predefinedcities` is
+  resolved on the generation path instead, and only its `citystyle` reference is seen at load; that
+  an empty part list is a real opt-out for the three street families but a generation crash for
+  highways and railways; that **three** city-style fields are needed but not checked at load -
+  `style`, and the `streetblocks` characters `street` and `border`, each of which throws at a
+  different moment in generation; that a
+  misspelled **key** is silently ignored in every registry but `presets`; and that an unknown block id
+  resolves to air with a warning naming the palette it was written in, not the asset that looks
+  broken. `README.md` and `docs/presets.md` link to it.
+  - *Spec section 4's merge-shape table was wrong, and is corrected in place.* It cited
+    `scattered.list` and `slices` as ordered lists that take the append form. Neither is mergeable at
+    all, and two more fields the rule mispredicts turned up with them: `multibuildings.buildings` is
+    also a plain list, and `citystyles.stuff_tags` is a fourth behaviour - `CityStyle.applyFrom`
+    unions it into a set, so a child can neither replace nor remove an inherited tag. The `scattered`
+    block is additionally a scalar, replaced wholesale alongside `multisettings` and `settings`, and
+    those three are the only settings blocks with fields required by their own codec - so restating
+    one means restating all of it. Three shapes is still the design; what was wrong was the claim
+    that it covered every field, and the guide now enumerates the exceptions rather than promising
+    the shape can be read off the JSON. No code changed.
+  - *The examples and the quoted errors are checked, not proofread.* `DatapackGuideExamplesTest`
+    decodes every JSON block in the guide through the codec of the registry it is marked as belonging
+    to, and re-encodes the result - walking objects and arrays alike - to catch keys the codec
+    silently ignored, so a doc example that would fail to load, or load and quietly do nothing, fails
+    the build. It also fails if a registry has no example, and a second test provokes nine of the
+    guide's quoted error messages from the code that raises them and requires the guide to contain
+    each verbatim. Both needed `docs/datapacks.md` declared as an input to `:test`, along with
+    `docs/schema/` for `PresetSchemaTest`: without them a documentation-only edit left the task
+    `UP-TO-DATE`, so neither ran on the change it exists for. Nothing reads `docs/presets.md` - its
+    prose is unasserted, only the schema beside it is checked - so it is not an input.
+
+- **Street, highway and railway part wiring must be declared by the datapack; there is no code-side
+  default left.** Thirty `Tools.listOrStringList` call sites carried a bare asset name as a fallback,
+  so a world style that never mentioned primary roads still generated Urbex's own
+  `urbex:street_large_*` parts, and a city style that never mentioned railways still got
+  `urbex:rails_*`. That is the leak this whole change set exists to close: a reference no datapack
+  file wrote is a reference nobody can grep for when it misbehaves, and a third-party pack inherited
+  a road class it never asked for. The `defaultVal` parameter is gone, and `StreetParts.DEFAULT`,
+  `HighwayParts.DEFAULT`, `RailwayParts.DEFAULT` and `PartSelector.DEFAULT` with it. A world style
+  whose chain declares no `parts` now refuses the world load naming the field
+  (`'urbex:x' declares no 'parts.railways.railsbend', and neither does anything it extends`), in the
+  same sentence every other required field uses. `MultiSettings.DEFAULT` and `WorldSettings.DEFAULT`
+  stay: they hold numbers and enums, not asset references.
+  - *Requiredness is still a property of the chain, not of the file.* A child that overrides one
+    street family must not have to restate the other seven, so each field decodes as absent and the
+    check runs after the `extends` chain is applied, exactly as in the rest of this work. The
+    families are folded **component by component** now, where a whole `StreetParts` used to be
+    swapped in or out - which is what delivers the append opt-in spec section 4 promised for ordered
+    part lists: `"straight": {"replace": false, "values": ["urbex:street_straight_alt"]}` adds one
+    variant after the ones the parent declared, while a bare array replaces them.
+    `largeparts` and `tertiaryparts` remain optional *as blocks* and fall back to
+    `parts` when nothing in the chain declares them - a fallback to parts the pack itself wrote, not
+    to a name written in Java - but a family that is declared at all must be complete, or half of it
+    reaches generation as a null list. The `s.getParts() != StreetParts.DEFAULT` sentinel goes with
+    the constant, though **it was not itself producing a wrong result**, and this entry should not
+    imply it was: `StreetParts` is a record, so `!=` compared references, and the `DEFAULT` *instance*
+    could only ever arise from `StreetSettings`' `orElse` on an absent key - a declared block always
+    decoded to a fresh object, whatever its contents. It was an opaque way of asking "did this file
+    contain the key", not a broken one. What replaces it asks that directly, and per component.
+  - *City styles are now validated at world load too, by reachability.* Making the wiring required
+    created a failure that could only be raised too late: `CITYSTYLES` was not in
+    `AssetRegistries.load`'s eager sweep, so a third-party city style with no `parts` would have
+    thrown from a worldgen worker mid-generation, wrapped in a `RuntimeException`, rather than
+    refusing the world. Sweeping *every* registered city style is not the fix - it would forbid a
+    style that exists only to be extended, and the bundled `citystyle_config` is exactly that, a
+    street width and nothing else, complete only through `citystyle_common`. `load` now resolves
+    every city style anything can *select*: the ones a world style's `citystyles` selectors name,
+    every preset's `cities.cityStyleAlternative`, and every predefined city's `citystyle`. Roots
+    nothing names drop out for free. That third route matters for the bundled pack itself -
+    `citystyle_border` is named by no world style at all, only by `presets/largecities.json`, and it
+    generates real cities. A fourth route cannot be swept from a registry at all: the same
+    `cityStyleAlternative` field also arrives as per-world *override* JSON, since it is a free-text
+    box in the customization GUI that rides into the world through `UrbexData`. A player typing an
+    incomplete style there - a third-party extend-only base, or bundled `urbex:citystyle_config`
+    itself - would still have crashed from a worker. `CityFeature.getDimensionInfo` now checks that
+    one where it builds the preset, once per dimension and before any chunk work.
+    `WorldStyleCompletenessTest` follows routes 1-3; route 4 exists in no file in the repository, so
+    it has no build-time equivalent, and `CityStyleLookupSitesTest` fails the build if a new
+    city-style lookup site appears without registering with either sweep.
+  - *Two consequences of validating earlier, both intended and neither only about wiring.* A name
+    that does not resolve is now a load failure **in an asset nobody selects**: a world style
+    selector naming a style from an optional datapack the player did not install, or an unselected
+    preset naming a missing style, refuses a world that loaded before. A preset can even name an
+    alternative it could never reach, since `CITY_STYLE_THRESHOLD` defaults to `-1f` and the test at
+    `City.java:241` is `factor < threshold`. That is the same trade `AssetRegistries.load` already
+    documents for the other ten registries - a broken third-party asset fails the world even when
+    nobody selects it - now extended to city styles. And because `getDimensionInfo` is called at
+    `CityFeature.java:67`, outside the per-chunk try/catch below it, a city-style failure on the
+    generation path takes the pipeline down rather than being logged per chunk. That has been true
+    of the other ten registries since the load-timing change above; city styles join them here.
+  - *Two ids moved out of Java and into the pack, and nothing moved in the world.*
+    `citystyle_common`'s `parts` block never declared `connector` or `stair`, so both came from the
+    Java defaults - `urbex:street_large_connector` and `urbex:street_stair` - and `stair` was in
+    active use, since secondary streets are what ramp. Both are now written in the file, with the
+    same values. Both goldens are unchanged (`88af6b69e7762fbc`, `7c297c1e4ec1ce38`, `unsafeReads=0`),
+    which is the check that no default silently in use was replaced by a different value.
+  - *Tests.* `NoAssetReferenceDefaultsTest` fails if any wiring field regains a literal default.
+    `WorldStyleCompletenessTest` walks every world style, every city style anything can select and
+    all their `extends` chains, resolves each through the constructors the game uses, and requires
+    every wiring field to hold at least one part id - asserting on the union over a chain, so
+    `citystyle_border` declaring no `parts` and taking `citystyle_common`'s is correct rather than a
+    failure, and failing in `Resolved.require`'s own wording so an author meets one convention rather
+    than two. Note what "at least one" buys: for the three street families an empty list is a genuine
+    runtime opt-out that `CityGenerator` guards, so the test is stricter than the rule there on
+    purpose; for highways and railways `Highways` and `Railways` hand the list straight to
+    `getRandomPart`, so `"tunnel": []` crashes generation and this test is the only thing checking it.
+    What the load-time guard promises is non-null, not usable. `DatapackReferenceIntegrityTest` also
+    reads the `{"replace": false, "values": [...]}` form now, in both its list helpers: it used to
+    fall through on an object, so a bare or dangling name inside a `values` list was invisible to the
+    whole reference sweep on all thirty wiring fields and on every mergeable selector list.
+    `WiringRequiredTest` covers the three codec arms in both directions, the append opt-in on a
+    string part list, and the load errors for a missing and for a half-declared family.
+
+- **Decoration now generates in the spawn area, where it previously did not.** `AssetRegistries.load()`
+  was called only from `ServerTickEvents.END_LEVEL_TICK`, but `prepareLevels()` - "Preparing spawn
+  area" - generates its chunks inside `initServer()`, before any tick fires. Every chunk it wrote had
+  no cobwebs and no chains, and chunks are saved, so nothing ever healed them: a new world had a
+  bare-spawn city and a decorated one a few hundred blocks out, with a visible boundary between.
+  Where that boundary fell depended on how far spawn preparation and tick 1's chunk work happened to
+  get, so two players on one seed got different worlds - which is the opposite of what this mod
+  claims. Loading now happens in two places and neither is a tick. `ServerLevelEvents.LOAD` runs the
+  eager validation while the world is still loading: Fabric raises it from a `@WrapOperation` on the
+  `levels.put` inside `MinecraftServer.createLevels`, and `loadLevel` calls `createLevels()` before
+  `prepareLevels()`, so a broken pack refuses the world instead of failing under a player. That alone
+  would only swap one ordering assumption for another, so the guarantee itself lives on the
+  generation path: `CityFeature.getDimensionInfo` - which `CarverHookMixin` reaches before any city
+  is generated - loads the registries before it touches the level, which also covers the case a
+  lifecycle event cannot, namely `CityFeature.cleanUp()` resetting the registries mid-session from
+  that same path. `AssetRegistries.load` is now called from worker threads, so it takes a lock and
+  publishes the stuff-by-tag index with a single volatile write of a finished map; the old `putAll`
+  into a shared `ConcurrentHashMap` let a worker see some tags present and others still missing, and
+  a missing tag places nothing and says nothing. `CityFeature`'s dirty-counter reconcile is atomic
+  now rather than a check-then-act on two volatile ints, so the first reconcile of a session cannot
+  reset the registries underneath a thread that is already generating.
+  - **Both goldens move, and this is not a routine regeneration - it changes what they are evidence
+    for.** `digest.golden` goes from `414cb71424d5e53f` to `88af6b69e7762fbc` and
+    `digest-features.golden` from `8a3215441fb9f46d` to `7c297c1e4ec1ce38`, because decoration exists
+    in the sampled windows for the first time. **The previous goldens did not cover the `Stuff`
+    subsystem at all** - not `generateStuff`, not the `stuffOrdinal` RNG addressing, not a single
+    `StuffSettingsRE` filter, not `columnResolves`, and `Rng.Purpose.STUFF` had never appeared in a
+    draw sequence - because `DigestCheck` runs on `SERVER_STARTED` and halts the server before a tick
+    ever fires. The same gap meant the eager load-time validation added for all ten registries had
+    never run in a digest either. Both windows were dumped position-by-position on the pre-change and
+    post-change trees, so the movement is measured rather than argued. The primary window moves 38
+    driver positions out of 850,049: 21 that were air are cobweb, 16 are iron chains, and one blue
+    stained-glass pane changed its `west` connection because a chain is now a real block beside it.
+    The features window moves 825 out of 4,605,750, and nothing is lost: 761 are decoration itself
+    (485 cobweb, 268 chain, 8 at positions the driver had never written), 62 are connection flips on
+    iron bars and glass panes that now attach to a chain - `ChunkDriver`'s corrections pass runs
+    against the finished chunk, so it sees decoration - and 2 are blocks the explosion-damage pass
+    now breaks that it did not before. That last coupling is the collection gate in
+    `breakBlocksForDamageNew`: it only accumulates damage for a cell that is not air, so a cobweb or
+    chain in a previously-air cell makes its column collect damage it used to skip, and the
+    accumulator carries *upward* through the ascending section loop. (Not the air count feeding the
+    damage factor, which is what an earlier draft of this entry said: decoration can only lower that
+    count, the factor only ratchets up, and less damage cannot break more blocks. Confirmed by
+    instrumenting both trees - the damage factor is identical at every sampled layer, while the
+    column accumulator diverges exactly where the gate flips.) One step of that account is inference
+    rather than measurement, and is worth stating in an entry whose justification is "measured": for
+    one of the two blocks, the cell that opened the gate records air in *both* runs, so the decoration
+    that opened it was evidently broken by the same pass in the same layer - consistent with the
+    arithmetic and with decoration being the pass's only changed input, but not watched directly. So
+    everything that moved is decoration or a consequence of decoration; "only decoration moved" would
+    have been the wrong claim.
+  - *Two shipped datapack defects, both found by that validation running for the first time.*
+    `palettes/bricks_desert_redsand.json` carried `minecraft:red_sandstone@2`, a 1.12 `name@meta`
+    string predating flattening that is not a legal `Identifier`; `Identifier.parse` threw on it
+    inside `Palette`'s constructor, which now takes the whole world load with it, so the world did
+    not start at all until it was fixed. It is `minecraft:cut_red_sandstone` - taken from vanilla's
+    own flattening table for legacy id 179 meta 2, not guessed. `palettes/common.json` mapped `{` to
+    `minecraft:chain`, renamed `minecraft:iron_chain` in 26.x, so the entire `urbex:chains`
+    decoration had been placing air. **The two were separated on the digest rather than reasoned
+    about together:** with the load fix in place but before the chain fix, the primary digest was
+    `a993b976a935e2eb`, with 21 cobwebs and zero chains in the window; the chain fix alone took it
+    to the shipped `88af6b69e7762fbc` by turning 16 of those placements from air into chains. That
+    intermediate value is recorded here because it is the measurement the "measured, not inferred"
+    claim above rests on, and until now it existed only in a scratch workspace.
+    The mechanism: `Tools.stringToState` ends at
+    `BuiltInRegistries.BLOCK.getValue(id)`, which hands back the registry's *default* value -
+    `minecraft:air` - for an unknown id, so its `value == null` guard never fires and a renamed block
+    becomes air with no exception and no log line. `ShippedBlockIdsResolveTest` now checks every
+    `block` and `damaged` id in the bundled pack against the block registry; the air fallback in
+    `Tools.stringToState` is a wider contract change and is left for its own task.
+  - *The one reset that is still reachable now says so instead of costing you a chunk.* A bump of
+    `globalDimensionInfoDirtyCounter` arriving while generation is in flight still resets the
+    registries underneath it, and the consequence is not the mild one: `AssetRegistries.reset()`
+    empties the stuff-by-tag index, and that index - alone among the registries, which all re-resolve
+    lazily on the next lookup - has no rebuild, so the chunks in flight are written and **saved** with
+    no decoration. That is this entry's own bug, one chunk at a time. It is reachable rather than
+    theoretical: `ClientPlayConnectionEvents.DISCONNECT` bumps the counter on the client thread, which
+    in single-player fires while the integrated server is still draining generation. It is not closed
+    here - closing it means not tearing the registries down from a path generation shares - but
+    `Stuff.generateStuff` now takes the index as a single snapshot - so a reset landing while it runs
+    can no longer half-decorate a chunk - and logs an error naming the chunk and the consequence when
+    that snapshot is empty and the registries are unloaded, once per occurrence rather than once per
+    chunk. The index and its loaded flag are one record behind one volatile field, because two
+    volatile fields cannot be read together: a reader could legally see the emptied index and the
+    stale "loaded" and wave through the very chunk the check exists to catch. Reversing the write
+    order only narrows that window; one field removes it. It logs rather than throws because a throw would unwind past
+    `ctx.driver.actuallyGenerate(chunk)` and lose the chunk's whole cached write set, costing the
+    chunk rather than its decoration, and because `ErrorLogger.report` dereferences the server with no
+    null check exactly when the server is going away. `CityFeature.cleanUp()` is private and
+    synchronized, since the design depends on it being reached only under the instance monitor.
+  - *An unknown block id still generates as air, but no longer in silence.* `Tools.stringToState`
+    ends at `BuiltInRegistries.BLOCK.getValue`, which returns the registry's default - air - for an
+    id it does not know, so its `value == null` guard has never fired. It now warns once per id,
+    naming the id and the asset it came from. **The state returned is unchanged, so no world output
+    moves**; making it a load error is a contract change for every third-party pack and is tracked
+    separately. The legacy `name@meta` fallback below it is documented as dead in both directions:
+    `Identifier.parse` rejects such a string on the line above, and `BlockStateData.upgradeBlock`
+    does not handle that form anyway (measured).
+  - *Tests.* `AssetsLoadedBeforeGenerationTest` drives `CityFeature.getDimensionInfo` through a level
+    that throws the moment anything past `registryAccess()` is asked of it, and requires the stuff
+    index to be populated by then - so the load moving back off the generation path fails a test
+    rather than silently costing a player their spawn-area decoration. It also pins the index's
+    single-write publication, and pins the `ServerLevelEvents.LOAD` registration itself: deleting
+    that line would otherwise revert the eager validation to a mid-generation failure with the whole
+    suite still green, because generation would go on loading the registries by itself.
+- **No worldgen decision rides on an asset's name as a string any more - not on where its id lands in
+  a hash bucket, and not on a bare-versus-qualified comparison.** A systematic sweep found four
+  places, all pre-existing, none introduced by the qualification pass below; they land together
+  because they are one class of bug. `digest-features.golden` moves from `c8267f7b4abfd44e` to
+  `8a3215441fb9f46d` as a result. This is the **first of the two** deliberate golden regenerations in
+  this work, not the only one: the decoration entry above moves both goldens again, on to
+  `88af6b69e7762fbc` and `7c297c1e4ec1ce38`, which are the values that ship.
+  `digest.golden` is unchanged *by this entry*, at `414cb71424d5e53f`. Each change was measured on
+  its own so every movement is attributable; where a digest did **not** move, the reason is stated
+  rather than assumed.
+  - *The stuff ordinal no longer comes from a hash.* `Stuff.generateStuff` walks each tag's list
+    assigning a running `stuffOrdinal`, and that ordinal is the RNG slot address every placement
+    attempt of that decoration draws from. The list came from `STUFF.getIterable()`, a
+    `ConcurrentHashMap`'s values - `Identifier` hash-bucket order - and the tag loop came from a
+    `HashSet<String>` on `CityStyle`. So which of `stuff/chains.json` and `stuff/cobweb.json` (both
+    tagged `rubble`) was ordinal 0 was decided by `hash("urbex:chains")` versus
+    `hash("urbex:cobweb")`, and renaming either file would have relocated every chain and cobweb in
+    the world. Measured, not assumed: that map hands the three bundled entries over as `example,
+    cobweb, chains`, so cobweb held ordinal 0 and chains ordinal 1; sorted by `Identifier` they swap.
+    `AssetRegistries.groupStuffByTag` now sorts each tag's list by `Identifier` and publishes it
+    immutable (a `List.copyOf`, which is also safely published to the worker threads by the map write
+    alone - the former `CopyOnWriteArrayList` was buying thread safety for an `add` that no longer
+    happens after publication), and `CityStyle.stuffTags` is a `TreeSet`. **Both digests are
+    unchanged by this, and not because the ordering was already right.** At the time of this change
+    `AssetRegistries.load()` was
+    called only from `ServerEventHandlers.onWorldTick`, while `DigestCheck` runs from
+    `SERVER_STARTED` - before any tick - so `STUFF_BY_TAG` was empty for the whole of both digest
+    runs and no decoration was placed in either window. The digests had, up to here, never covered
+    the `Stuff`
+    subsystem at all. **That was a separate and larger shipped defect, and it was player-visible.**
+    `prepareLevels()` - "Preparing spawn area" - runs inside `initServer()`, before `SERVER_STARTED`
+    and before any tick, and never calls `tickServer`, so `END_LEVEL_TICK` does not fire during it.
+    Every chunk generated there is generated with `STUFF_BY_TAG` empty, and generated chunks are
+    saved, so nothing heals them later: a newly created world has spawn cities with no decoration at
+    all and cities a few hundred blocks out with it, and a visible boundary between. Where that
+    boundary falls depends on how far spawn preparation and tick 1's chunk work happened to get -
+    and `ServerLevel.tick()` does its chunk work before Fabric fires `END_LEVEL_TICK` at the tail, so
+    those chunks land on the empty side too - which means two players on the same seed can get
+    different boundaries. It was tracked on its own and deliberately not fixed here, where filling the
+    maps earlier would have put decoration into both digest windows and swamped the per-change
+    attribution this entry is built on - **it is closed by the decoration entry above**, which moves
+    the load off the tick and regenerates both goldens so that the sampled windows cover `Stuff` for
+    the first time. The ordering fix above is therefore pinned by unit tests
+    rather than by a digest: `RegistryChainResolutionTest` feeds `groupStuffByTag` the exact order
+    the hash map produces and requires the sorted one back.
+  - *`inpart`, `belowpart` and `inbuilding` have one convention: fully qualified, everywhere.* They
+    used to need opposite conventions in different files. `parts2[].inpart` and `parts[].belowpart`
+    in `buildings/*.json` matched a qualified id, because `getRandomPart` hands back the raw string a
+    part entry wrote; `inbuilding`, and `values[].inpart` in `conditions/*.json`, matched a *bare*
+    name, because `ConditionContext.legacyMatchKey` stripped the `urbex:` namespace on the way in -
+    while `DatapackReferenceIntegrityTest` requires those same files to write a qualified one. The
+    consequence was concrete and shipped: `chestloot.json`'s two rail-dungeon entries compared
+    `"urbex:rail_dungeon1"` against `"rail_dungeon1"` and had never once fired. `legacyMatchKey` is
+    deleted and every producer now passes `getName()`, so **chest loot changes**: a chest in a rail
+    dungeon now rolls `urbex:chests/raildungeonchest` at factor 20 alongside the general table
+    instead of only the general table, which is what the pack has always said it should do. That is
+    the entire cause of the `digest-features` movement - measured on its own, before any other change
+    in this entry, and it produced exactly `8a3215441fb9f46d`. The bare-name comparison had one
+    remaining producer and now has none. `"<none>"` (the one non-id value those slots take, for
+    "there is no such thing here") is a named constant, `ConditionContext.NO_PART`, rather than nine
+    scattered literals.
+  - *One asset kind, one order.* `BuildingInfo`'s majority-cityStyle vote broke ties on the raw id
+    string, which orders namespace-first, while `MultiChunk`'s city-style sort uses
+    `Identifier.compareTo`, which orders path-first. Both were deterministic; they disagree the
+    moment a second namespace ships a city style. The vote now counts `Identifier`s and breaks ties
+    on `Identifier`'s own order, so the two agree by construction. `Counter.getMostOccuring` takes a
+    `Comparator<? super T>` instead of a `Function<T, String>` for this - no single string key
+    reproduces path-then-namespace, so the string form was what forced the two orders apart in the
+    first place; the tie-break stays a mandatory parameter for the reason it was made one.
+    **Confirmed inert**, as expected: every bundled city style is `urbex`-namespaced, so both digests
+    were byte-identical across this change alone.
+  - *A `parts2[]` entry's `belowpart` was an exact duplicate of its `inpart`.* `BuildingInfo`
+    advanced `belowPart = randomPart` *before* building the context that selects `parts2[]`, so that
+    selection saw `getBelowPart()` equal to `getPart()` - the same defect issue #58 fixed on the
+    reading side in `ConditionContext.parseTest`, still alive on the writing side, in both copies of
+    the floor loop. `Scattered` had the third variant of the same confusion - it reused the `parts[]`
+    context for `parts2[]` outright, so a scattered building's `parts2[].inpart` was matched against
+    `"<none>"` and could never fire while a city building's matched normally. Rather than fix the
+    ordering three times, the `parts2` context is now *derived*: `ConditionContext.withPart` copies
+    the floor's context and replaces only the current part, and `Building.getRandomPart2` takes the
+    chosen part and applies it internally. That buys one invariant, stated no wider than it is: the
+    `parts2` context's `belowPart` is always the `parts[]` context's, so a caller mutating its own
+    local after building the floor context cannot reach it - which is precisely the defect that was
+    shipping, and it is gone at all three sites, each of which also lost its duplicated second
+    context. It is *not* a proof that `getPart()` can never equal `getBelowPart()`: the
+    `ConditionContext` constructor is public, the `parts[]` contexts are still hand-written, and
+    `getRandomPart2(rand, ctx, ctx.getBelowPart())` still compiles. Nothing rejects it on purpose -
+    a building that repeats a part on consecutive floors legitimately has the two equal, and
+    `library00` (one non-top part entry) does. Inert for the bundled pack (nothing in it writes
+    `belowpart`, and no scattered-reachable building declares `parts2`), and measured to confirm it -
+    which is also why no golden could catch a revert, so `BelowPartConditionTest` now covers the
+    writing side alongside the reading side it already had, on the production `getRandomPart2` path.
+  - *`parts[].inpart` never matching is correct, and is now documented as such rather than "fixed".*
+    The context that selects `parts[i]` passes `NO_PART` as the current part because at that moment
+    the floor genuinely has none - it is what is being chosen. What a `parts[]` entry can usefully
+    condition on is the part *below*, which is `belowpart`, and that is passed correctly. Inventing a
+    value here would have made `inpart` and `belowpart` synonyms on `parts[]`, which is the bug above.
+  - *Things that are correct only by construction now say so - including one that is not fully
+    correct.* `MultiChunk` keys a `Counter` and an `Objects.equals` on `CityStyle` identity - no
+    `cityassets` class overrides `equals`/`hashCode`, so this works only because
+    `RegistryAssetRegistry` canonicalises instances through `putIfAbsent`; if
+    `AssetRegistries.reset()` ran mid-generation, one id could exist as two instances, splitting a
+    style's votes and making the `getId()` sort stop being a total order. `reset()` is *not* confined
+    to server start/stop, which is the part worth writing down: `CityFeature.cleanUp()` calls it and
+    is invoked lazily from `CityFeature.getDimensionInfo()`, firing once per session because
+    `dimensionInfoDirtyCounter` starts at `-1` - and not necessarily from generation, since that
+    method also has callers in `DigestRunner`, `SpawnPlacement`, `StructureSuppressor` and the
+    commands. What bounds it is narrow and is not a guarantee: `globalDimensionInfoDirtyCounter` is
+    bumped only from client-side paths (`ClientEventHandlers`, `PresetSelection`), none of which run
+    while a server generates, so in a *settled* session no reset lands between two chunks' style
+    lookups. The first reconcile is not guaranteed to be a single call - `getDimensionInfo`'s
+    check-then-act on two volatile ints is not atomic, `cleanUp()` is unsynchronized, and generation
+    runs on the parallel worker pool - so one thread can be inside the style loop while another
+    resets the registries underneath it. That window is pre-existing, is documented rather than
+    closed here, and closing it means keying on ids or making the reconcile atomic.
+    `City`'s five predefined-content maps are filled in name-hash order, so two predefined cities
+    claiming one chunk resolve last-writer-wins by hash - left alone deliberately, since that is a
+    pack authoring conflict rather than a silent reordering of a working configuration, and any rule
+    for it (first-wins, or a load error naming both) is a validation decision.
+  - *Tests.* `DatapackReferenceIntegrityTest` now checks `inpart`, `belowpart` and `inbuilding` on
+    both `buildings` part entries and `conditions` values, in either their single-string or their
+    array form - previously only `conditions`' `inpart` was checked, so the two fields whose
+    convention this entry fixes were the two nothing was watching. `CounterTest` gains the
+    path-first-versus-namespace-first case directly. `ConditionContextLegacyMatchKeyTest` is deleted
+    with the function it pinned.
+- **An unqualified datapack reference is now a load error instead of an implicit `urbex:` default.**
+  `DataTools.fromName` is the single choke point every reference resolves through -
+  `RegistryAssetRegistry`'s four lookup methods, `IdentifierMatcher`, and `Config`'s preset/worldstyle
+  parsing all call it - so making it throw `IllegalArgumentException` for a string without a `:`
+  closes off the implicit resolution this plan's `extends` work otherwise left standing: a bare name
+  like `"radiotower"` used to silently resolve to `urbex:radiotower`, which could point at whatever
+  happened to be registered there rather than at anything a file actually wrote, so a wrong reference
+  was unfindable the moment it misbehaved. The message names both the offending string and the fix,
+  e.g. `Unqualified datapack reference 'radiotower': references must name their namespace, e.g.
+  'urbex:radiotower'`. Every registry's `extends` field used to decode through plain `Identifier.CODEC`,
+  under which a bare name resolves against the `minecraft` namespace instead of erroring - a third,
+  silent defaulting rule, inconsistent both with the strict rule above and with itself from one registry
+  to the next. All thirteen registries now share one `DataTools.STRICT_IDENTIFIER_CODEC`, which wraps
+  `fromName` and catches `RuntimeException` rather than just `IllegalArgumentException` -
+  `Identifier.parse` throws `net.minecraft.IdentifierException` (a `RuntimeException`) for a
+  qualified-but-malformed id, e.g. an uppercase letter, and that must fail as a clean per-file
+  `DataResult.error` too, not escape the codec as a thrown exception. `DatapackReferenceIntegrityTest`'s
+  `presets` case, previously checking only `cities.cityStyleAlternative`, now also checks
+  `spawn.spawnCity` (an unqualified value is a hard throw at spawn placement, through the same strict
+  `fromName`), `spawn.forceSpawnBuildings`/`spawn.forceSpawnParts` (compared against a resolved asset's
+  own qualified id, so an unqualified authored value would otherwise never match anything, silently),
+  and `icon` (its own check rather than the shared reference helper - it is a texture path under
+  `assets/urbex`, not a `data/` registry reference, so this only confirms the file exists). The same
+  widened test caught that `palettes` had no case at all (30 files, only `extends` and `palette`
+  entries, both already checked elsewhere - closed with the same no-op case `variants` already had) and
+  that `largecities.json`'s `cityStyleAlternative: "citystyle_border"` was the bundled pack's last
+  unqualified reference, now `"urbex:citystyle_border"`. The test's former silent fall-through category
+  is now itself a failure naming the uncovered category, so a fourteenth registry cannot go uncovered
+  the way `presets` and `palettes` did.
+- **`DataTools.toName`/`fromDisplayName` and the "two names per asset" they existed to bridge are gone;
+  every asset is one qualified id everywhere, including on screen.** Twelve `cityassets` classes
+  (`Building`, `BuildingPart`, `CityStyle`, `Condition`, `MultiBuilding`, `Palette`, `PredefinedCity`,
+  `ScatteredBuilding`, `Style`, `StuffObject`, `Variant`, `WorldStyle`) plus the `IBuildingPart`
+  interface `BuildingPart` implements had a `getName()` that stripped the `urbex:` namespace for
+  display, alongside a `getId()` that never did - a split that made sense while bare names were legal
+  in a datapack (a Lost Cities convention this mod inherited), but not once the entry above makes them
+  illegal: a stripped name no longer matches anything a datapack or config file is allowed to write.
+  `getName()` on all twelve (thirteen counting the interface) now returns the same fully-qualified id
+  as `getId().toString()`. The Cities tab, the Customize editor and the world-creation preview - which
+  held worldStyle ids as `toName()`-shortened strings because `Preset` carries no worldStyle field of
+  its own - now show and round-trip the qualified id throughout; labels are longer as a direct result,
+  which is the intended outcome: once a second datapack is installed, a bare `"standard"` next to a
+  bare `"moderntweaks"` no longer says who owns which. `EditModeData`'s persisted part name (read back
+  by the `editpart`/`resumeedit`/`exportpart` edit-mode commands) changes format the same way - this
+  fork's clean-break policy applies here too, and there are no released worlds to protect. One latent
+  bug is fixed as a direct consequence, not a deliberate change: `/urbex locatepart` compared a stored
+  (bare) name against a fully-qualified command argument and could never find anything; both sides are
+  qualified now, so it works.
+- **`Counter.getMostOccuring()`'s tie-break is now a stated rule instead of `HashMap` iteration
+  order, and the tie-break is a required parameter instead of an implicit `String.valueOf`.**
+  `BuildingInfo`'s majority-cityStyle vote among a chunk's neighbors produces an even split at every
+  style boundary (ten votes: 3x3 neighbors plus the center counted twice), and the old tie-break fell
+  through to whichever key `HashMap` happened to visit first, which depends on each key's hash bucket:
+  an unrelated rename of a city style could silently move which side of a boundary a tied chunk falls
+  on. Ties now break on the smallest key under an order the caller supplies, and supplying it is
+  mandatory rather than the method defaulting to `String.valueOf` - a key type with
+  no meaningful `toString()` (e.g. `CityStyle`, whose default embeds an identity hash) would otherwise
+  make the tie-break *look* deterministic while it still varied run to run, the same bug moved one
+  layer down rather than fixed. (This entry originally described that parameter as a
+  `Function<T, String>` tie-break *key* and the rule as "the lexicographically lowest
+  `tieBreakKey.apply(key)`". A later task in this same work replaced it with a
+  `Comparator<? super T>` - see the "One asset kind, one order" bullet above for why no single string
+  key reproduces `Identifier`'s path-then-namespace order - and this entry is corrected to match the
+  code that ships. There is no `tieBreakKey` API.) That was not hypothetical: `MultiChunk`'s own city-style sort
+  (`styleList.sort(Comparator.comparing(...))`, which feeds the weighted pick that decides which
+  multibuilding gets placed) used `CityStyle::getName` and is a second-order dependency on the very
+  accessor the entry above just requalified. The bundled pack is entirely `urbex`-namespaced, so the
+  sort order is unchanged and both digests stay clean - but with a third-party city style in play, a
+  bare `citystyle_x` used to sort before `lostcities:citystyle_a` (`c` < `l`) and `urbex:citystyle_x`
+  now sorts after it (`u` > `l`): a silent reorder, exactly the class of accident this pass exists to
+  close off. Switched to `CityStyle::getId`, which cannot change meaning under a future `getName()`
+  edit. **Neither determinism fix is verified worldgen-inert by the shipped digests** - the sampled
+  windows contain no tied city-style boundary and no second namespace to reorder against, only one
+  candidate reachable in generation at all (`urbex:standard`) - so a real tie, or a second datapack's
+  city style, could lay out differently elsewhere than either used to. `CounterTest` pins the tie-break
+  rule directly: a unique winner is unaffected, a tie's winner does not depend on insertion order, and
+  the order comes from wherever the caller says, not from the key object's own `toString()`.
+- **A separate, pre-existing bug the entry above could have fixed by accident, and deliberately did
+  not:** `conditions/chestloot.json`'s `inpart` entries (`"urbex:rail_dungeon1"`/`"urbex:rail_dungeon2"`)
+  are required to be fully qualified by `DatapackReferenceIntegrityTest`, but the runtime side of that
+  comparison (`ConditionContext.getPart()`/`getBuilding()`) used to be fed by the very `getName()` two
+  entries up just qualified - so qualifying it everywhere would have made a chest-loot condition that
+  has never once fired since the qualified-`inpart` convention was introduced start firing, silently,
+  as a side effect of an unrelated change. Confirmed by hand: reverting just that one path reverted
+  `runDigestCheckFeatures` to the golden current at the time (`c8267f7b4abfd44e`), proving it was the
+  entire cause of the digest shift this entry was written against. (It was *not* the only digest shift
+  this work produced: two later regenerations follow it, and both goldens end at `88af6b69e7762fbc`
+  and `7c297c1e4ec1ce38` - see the two entries above that move them.) The new
+  `ConditionContext.legacyMatchKey(Identifier)` preserves
+  the exact old (bare-for-`urbex`) comparison every `inpart`/`inbuilding` match used, pinned by
+  `ConditionContextLegacyMatchKeyTest`, so this pass changes nothing about which chest-loot conditions
+  fire - that mismatch stays a separate, tracked follow-up (worded so that *deleting* `legacyMatchKey`
+  is the definition of done, not "fix `inpart` matching" - the bug now has a comfortable name, and a
+  comfortable name is how it survives). **That follow-up landed inside this same work:** the
+  "one convention: fully qualified, everywhere" bullet above deletes `legacyMatchKey` and its test,
+  and the chest-loot condition fires from then on - so the deferral described here is history, not
+  the shipped state. **Confirmed inert for everything the digest window reaches:**
+  both digests regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
+  That is direct evidence for this `legacyMatchKey` decision, where every path it touches lies inside
+  the window - it is *not* evidence for the two tie-break determinism fixes in the entry just above,
+  whose own gap in digest coverage is stated there and stands on its own.
+- **A datapack file now only has to state what it changes, on every registry rather than only on
+  parts.** Twenty-two fields that the codec still demanded of every file are optional now:
+  `predefinedcities.dimension`/`chunkx`/`chunkz`/`radius`/`citystyle`, `stuff.column`/`mincount`/
+  `maxcount`/`attempts`, `multibuildings.dimx`/`dimz`/`buildings`, `buildings.filler`/`parts`,
+  `scattered.terrainheight`/`terrainfix`, `worldstyles.outsidestyle`/`citystyles`,
+  `conditions.values`, `palettes.palette`, `styles.randompalettes` and `variants.blocks`. Absent
+  means "read the parent": each takes the value of the last file in the chain that declares one, so
+  `{"extends": "urbex:oilrig", "buildings": ["urbex:oilrig_burnt"]}` is now a complete `scattered`
+  file, and a second predefined city can be the first one moved by declaring nothing but its own
+  `chunkx` and `chunkz`. This is the rule `parts` already got for `xsize`/`zsize`/`slices`, applied
+  everywhere - on `multibuildings` every single field was required, which made `extends` there
+  purely decorative. Requiredness has not gone away, it has moved: a field that *nothing* in the
+  whole chain declares is a load error naming the asset and the field ("`'urbex:oilrig_burnt'`
+  declares no `'terrainfix'`, and neither does anything it extends"), raised while the pack loads
+  rather than surfacing as a null somewhere in generation. Keeping that promise meant resolving
+  every registered asset up front: `worldstyles`, `multibuildings`, `styles`, `palettes`,
+  `variants`, `conditions` and `scattered` used to be built lazily on first lookup from a worldgen
+  worker, so a broken file in one of them would have failed mid-generation, and one nothing
+  referenced would never have been checked at all. They are resolved at load now alongside `parts`,
+  `buildings` and `stuff`, which does mean a broken third-party asset fails the world even when the
+  player never selects it - the intended trade, and the same rule the rest of the format follows.
+  (`scattered` was also missing from the registry reset, so a datapack reload kept serving stale
+  objects; it is reset with the others now.) Along the way, `buildings` stopped
+  encoding "undeclared" as a sentinel: `minfloors`/`maxfloors`/`mincellars`/`maxcellars` no longer
+  use `-1` and `preferslonely` no longer uses `0.0` to mean "absent", so a child can now set an
+  inherited `preferslonely` of `0.8` back down to `0.0`, or an inherited floor limit back to `-1`
+  ("take the level's limit"), which under the old sentinels was impossible to say. Nothing in an
+  existing datapack needs to change: a file that declares everything decodes exactly as it did
+  before, and this only widens what is accepted. A third-party pack that relied on a file failing
+  to load when it omitted one of these keys now gets that error from the resolved chain instead of
+  from the codec, with the asset and the field named. Confirmed worldgen-inert: both digests
+  regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
+- **All thirteen datapack registries now support `extends`, so an author never has to look up which
+  asset types can build on another.** `buildings`, `parts`, `palettes`, `styles`, `multibuildings`,
+  `scattered`, `conditions`, `variants`, `stuff`, `predefinedcities` and `worldstyles` join
+  `citystyles` and `presets`: each takes one fully-qualified id of an asset in its own registry,
+  chains are applied root-first, and a cycle or a dangling id is a load error naming the chain. Two
+  of the eleven are more than a rename. **Palettes merge per character**, not per position: a child
+  that repaints two markers out of thirty overwrites exactly those two and keeps the other
+  twenty-eight, and an overridden entry takes its `damaged` mapping with it rather than leaving it
+  keyed on a block the palette no longer places. That applies to the inline `palette` block a part
+  or building can carry as well as to a registered `palettes` entry - a part that extends another
+  and repaints two markers inline keeps the rest, rather than silently starting from nothing. An
+  `extends` written *inside* an inline `palette` block is now a load error naming the owning asset:
+  the codec accepts the key wherever a palette is embedded, but an inline block is not a registry
+  entry, so nothing can resolve it and silently dropping it would let a file mean something other
+  than what it says. Use `refpalette`, or put `extends` on the part or building itself.
+  **Parts inherit their ancestor's geometry**:
+  `xsize`, `zsize` and `slices` each come from the last file in the chain that declares one, so
+  `{"extends": "urbex:radiotower", "refpalette": "urbexmt:radiotower_rusted"}` is a complete part
+  file. Those three keys are therefore no longer required on a part; a part whose whole chain
+  declares no `slices` (or no `xsize`/`zsize`) is a load error naming the part, and a part
+  declaring a size that contradicts the slices actually in force is a load error naming the part,
+  the declared size and the real width - not the silent truncation it would have been. Ordered list
+  fields across these registries (`buildings.parts`/`parts2`, `parts.meta`,
+  `styles.randompalettes`, `scattered.buildings`, `conditions.values`, `variants.blocks`,
+  `stuff.tags`, `predefinedcities.buildings`/`streets`, `worldstyles.citystyles`/
+  `citybiomemultipliers`) now decode through `Mergeable`, so a bare array still replaces what the
+  chain inherited and `{"replace": false, "values": [...]}` appends to it instead. Two shapes stay
+  wholesale replacements on purpose: `multibuildings.buildings` and `parts.slices` are grids, and a
+  half-inherited grid would contradict its own declared dimensions. Nothing in a datapack has to
+  change: `extends` is optional everywhere, every previously required key is still accepted, and
+  the only keys *this* change made optional are the three on `parts` - the entry above then applies
+  the same rule to twenty-two more, across ten registries. Third-party packs that relied on a
+  part failing to load when it omitted `xsize`, `zsize` or `slices` now get that error from the
+  resolved chain instead of from the codec, with the part named. `DatapackReferenceIntegrityTest`
+  checks `extends` in every category rather than only in `citystyles`, so a fourteenth registry
+  cannot skip the check. Confirmed worldgen-inert: both digests regenerate unchanged
+  (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`), so this is a load-path and
+  format change only.
+- **A city style's selector lists can now opt into appending to what they inherit, instead of
+  always replacing it.** `CityStyle`'s nine selector fields (`buildings`, `bridges`,
+  `largebridges`, `parks`, `fountains`, `stairs`, `fronts`, `raildungeons`, `multibuildings`) now
+  decode through the new `Mergeable<E>` codec: a bare JSON array still replaces the inherited list,
+  which remains the default and needs nothing extra from a datapack author, but the object form
+  `{"replace": false, "values": [...]}` - the same shape vanilla tag files use - appends the file's
+  own entries after the inherited ones instead, so a style can widen a selection without retyping
+  its parent's. `Selectors`' nine fields changed type from `Optional<List<ObjectSelector>>` to
+  `Optional<Mergeable<ObjectSelector>>` to carry the choice; the bundled datapack still ships only
+  bare arrays, so no shipped file needs a change. A third-party city style that wants the old
+  always-append behavior back for a given list should switch that list to the object form with
+  `"replace": false`. Confirmed worldgen-inert: both digests regenerate unchanged
+  (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
+- **Presets now declare `extends` instead of `parent`, resolved through the same chain walker city
+  styles use.** `PresetRE`'s `parent` field is gone; it implements the `Extendable` interface and
+  reads an `extends` field instead, like every other cross-reference. `Presets.resolve` no longer
+  walks its own leaf-to-root loop and reverses it by hand - it delegates straight to
+  `ExtendsChain.resolve`, which already returns the chain root-first, so the application loop is a
+  plain forward loop now instead of a reversed one. A cycle or a dangling `extends` is an
+  `IllegalStateException` naming the full chain (or both the missing id and the referrer), exactly
+  like a bad city style `extends` - presets and city styles now fail identically instead of each
+  keeping their own ad hoc parent-walking code. This is datapack-visible: any preset file, bundled
+  or third-party, using `"parent"` must rename that key to `"extends"` - the value is unchanged,
+  still a fully-qualified id such as `"urbex:default"`. `docs/presets.md` and
+  `docs/schema/preset.schema.json` are updated to match, and `PresetSchemaTest` keeps them pinned to
+  `PresetRE.KEYS`. Confirmed worldgen-inert: both digests regenerate unchanged
+  (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`), so this is a load-path and
+  format change only.
+- **City styles now declare `extends` instead of `inherit`, and their whole ancestor chain resolves
+  once at load time instead of lazily on first use.** `CityStyleRE`'s `inherit` field (a bare
+  string) is gone; it implements the new `Extendable` interface and reads an `extends` field
+  instead, typed as a fully-qualified `Identifier` like every other cross-reference. `CityStyle` is
+  now built once from the whole chain, root-first, via the new pure `ExtendsChain.resolve` (testable
+  without a level - see `ExtendsChainTest`), and never mutates afterward: `CityStyle.init()`, its
+  `volatile initialized` flag, its per-style monitor, and its per-thread `RESOLVING` cycle guard are
+  all gone. A dangling `extends` or a cycle is now a load-time `IllegalStateException` naming every
+  id in the chain, instead of the old guard's silent no-op that left a style half-resolved with no
+  diagnostic. `RegistryAssetRegistry` now builds each asset from `Function<List<R>, T>` (the
+  resolved chain) rather than `Function<R, T>` (the bare leaf), so all twelve dynamic registries
+  route through the same chain resolution; eleven of the twelve still collapse it to just the leaf
+  entry until a later task gives them `extends` support of their own. This is datapack-visible: any
+  city style file, bundled or third-party, using `"inherit"` must rename that key to `"extends"` -
+  the value is unchanged, still a fully-qualified id such as `"urbex:citystyle_common"`. Confirmed
+  worldgen-inert: both digests regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both
+  `unsafeReads=0`), so this is a load-path and format change only.
+- **A city style's own selector lists now replace the ones it inherits, instead of being appended
+  to them.** `CityStyle.init()` unconditionally `addAll`'d the parent's nine selector lists on top
+  of the child's, with no deduplication, so a style could only ever widen a selection - never
+  narrow one, and never empty one. The bundled `urbex:citystyle_border` is the case that surfaced
+  it: it lists 5 buildings and no multibuildings, but generated with 13 building entries
+  (`building1`-`building5` at double weight plus all three of `citystyle_common`'s that it
+  deliberately omits) and all 12 of the parent's multibuildings. An explicitly empty list was
+  indistinguishable from an absent one, so "none here" was inexpressible. A list the child does not
+  mention still inherits whole, so no style needs to restate what it wants unchanged. This is
+  datapack-visible: a third-party city style that declared a selector list expecting it to add to
+  its parent's now replaces it, and should list what it actually wants. Reachable in the bundled
+  pack only through the `urbex:largecities` preset, which is the one place `cityStyleAlternative`
+  names the border style - so both worldgen digests are unchanged (`414cb71424d5e53f` and
+  `c8267f7b4abfd44e`, `unsafeReads=0`), and the fix is covered by `CityStyleInheritSelectorsTest`
+  instead.
 - **Presets are now datapack-driven.** The old `UrbexProfile`/`Configuration` machinery, its
   `config/urbex/profiles/*.json` files, and the legacy key migrations (`generateLighting`,
   `generateLoot`, `buildingWithoutLootChance`, `chestWithoutLootChance`, `basedOn`) are gone with
@@ -52,9 +666,10 @@
 - **The bundled datapack is now fully namespaced.** Every internal asset reference is written
   `urbex:name` instead of relying on bare-name defaulting, and street/highway/railway part wiring
   is declared explicitly in `worldstyles/standard` and `citystyles/citystyle_common`
-  (previously implicit Java defaults). Bare names in third-party datapacks still work and still
-  default to the `urbex` namespace. A new test enforces that every shipped reference is
-  namespaced and resolves.
+  (previously implicit Java defaults). Bare names in third-party datapacks still worked and still
+  defaulted to the `urbex` namespace at the time this change landed - a later entry above ("An
+  unqualified datapack reference is now a load error") removes that default entirely. A new test
+  enforces that every shipped reference is namespaced and resolves.
 - **Hierarchical streets replace the per-chunk street/park coin flip.** Every dimension now builds
   one deterministic road field of primary, secondary and tertiary roads, computed once from (seed,
   dimension id, road settings) rather than decided chunk by chunk. Primaries render through a new

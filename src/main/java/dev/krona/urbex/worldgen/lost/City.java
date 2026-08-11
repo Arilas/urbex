@@ -25,7 +25,7 @@ public class City {
 
     record PreDefBuildingOffset(PredefinedBuilding building, int offsetX, int offsetZ) {}
 
-    // These four are datapack-derived: identical for every dimension, and their contents already
+    // These five are datapack-derived: identical for every dimension, and their contents already
     // carry the dimension they belong to. So they stay static - but they are built lazily from
     // several worker threads at once, so each one is a concurrent map published through its own
     // volatile guard. The guard is written last, so a thread that sees it set sees a full map.
@@ -35,6 +35,14 @@ public class City {
     private static final Map<ChunkCoord, PreDefBuildingOffset> OCCUPIED_CHUNKS_BUILDING = new ConcurrentHashMap<>();
     private static final Map<ChunkCoord, PredefinedStreet> OCCUPIED_CHUNKS_STREET = new ConcurrentHashMap<>();
 
+    // All five are filled by walking AssetRegistries.PREDEFINED_CITIES.getIterable(), which is a
+    // ConcurrentHashMap's values - Identifier hash-bucket order. Two predefined cities that claim
+    // the same chunk therefore resolve last-writer-wins by hash, and renaming either file could
+    // flip which one that is. Left as is deliberately: unlike the stuff ordinal, this is not a
+    // silent reordering of a working configuration but a conflict - two files claiming one chunk is
+    // already a pack authoring error, and the loser is unreachable whichever way it is broken. Any
+    // future rule here (first-wins, or a load error naming both) is a datapack-validation decision,
+    // not a determinism fix.
     private static volatile boolean predefinedCityMapReady = false;
     private static volatile boolean predefinedBuildingMapReady = false;
     private static volatile boolean predefinedStreetMapReady = false;

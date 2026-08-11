@@ -84,7 +84,41 @@ public class MultiChunk {
         ChunkCoord topleft = new ChunkCoord(mc.dimension(), mc.chunkX() * areasize, mc.chunkZ() * areasize);
         int cityLevel = BuildingInfo.getCityLevel(topleft, provider);
 
-        // Find all city styles in this multichunk and count them
+        // Find all city styles in this multichunk and count them.
+        //
+        // Keyed on CityStyle *identity*: no cityassets class overrides equals/hashCode, so this
+        // counter, the getMap().keySet() sort below and the Objects.equals in isMultiBuildingOk all
+        // rely on one id resolving to exactly one instance. That holds only because
+        // RegistryAssetRegistry canonicalises through putIfAbsent - it is not a property of
+        // CityStyle. If AssetRegistries.reset() ever ran mid-generation, a chunk resolved before it
+        // and one resolved after would hold two distinct instances of the same id: the counter
+        // would split one style's votes in two, and the getId() sort would stop being a total order
+        // (two entries comparing equal, ordered by whatever the HashMap handed over).
+        //
+        // reset() is not confined to server start/stop, and that is worth being precise about:
+        // CityFeature.cleanUp() calls it, and cleanUp() is invoked lazily from
+        // CityFeature.getDimensionInfo() whenever globalDimensionInfoDirtyCounter differs from that
+        // feature's own. It therefore does fire once per session, since dimensionInfoDirtyCounter
+        // starts at -1 - not necessarily from a generation call, since getDimensionInfo also has
+        // callers in DigestRunner, SpawnPlacement, StructureSuppressor and the commands.
+        //
+        // What bounds this is narrow, and still does not amount to a guarantee. The first reconcile
+        // is now a single call: CityFeature.reconcileDirtyCounter holds the feature's monitor across
+        // the counter comparison and cleanUp(), so the second thread through waits and then finds
+        // the counters equal instead of resetting the registries underneath the first (Task 5c; the
+        // check-then-act this paragraph used to describe is gone). What remains is a bump arriving
+        // while generation is in flight: globalDimensionInfoDirtyCounter is written only from
+        // client-side paths, but ClientEventHandlers.java:42-46 writes it from
+        // ClientPlayConnectionEvents.DISCONNECT, which in single-player fires while the integrated
+        // server is still draining generation - so "none of them run while a server generates" is an
+        // argument about callers that does not actually hold at shutdown.
+        //
+        // And the split vote below is the mild consequence, not the worst one. The same reset empties
+        // AssetRegistries' stuff-by-tag index, which - alone among the registries - has no lazy
+        // rebuild, so the affected chunks are written and saved with no decoration at all. See
+        // CityFeature.reconcileDirtyCounter and the guard in Stuff.generateStuff, which at least
+        // makes it say so. Closing this loop's own exposure means keying on ids rather than
+        // instances - not a comment.
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {
@@ -102,7 +136,13 @@ public class MultiChunk {
         record Chosen(MultiBuilding building, CityStyle style) {}
         List<Chosen> chosen = new ArrayList<>();
         List<CityStyle> styleList = new ArrayList<>(cityStyleCounter.getMap().keySet());
-        styleList.sort(Comparator.comparing(CityStyle::getName));
+        // Sorted on getId(), not getName(): this imposes deterministic order on a HashMap
+        // keySet, and Tools.getRandomFromList below walks the list subtracting weights, so the
+        // order decides which style (and therefore which multibuilding) gets picked. getId()
+        // never changes meaning under a future accessor rename the way getName() just did.
+        // Identifier's own order - path, then namespace - is also what BuildingInfo's city-style
+        // vote breaks ties on, so this asset kind has one order, not two.
+        styleList.sort(Comparator.comparing(CityStyle::getId));
         for (int i = 0 ; i < cnt ; i++) {
             CityStyle cityStyle = Tools.getRandomFromList(rand, styleList, style -> (float) cityStyleCounter.get(style));
             String multiBuilding = cityStyle.getRandomMultiBuilding(rand, topleft);
@@ -225,6 +265,8 @@ public class MultiChunk {
     }
 
     private void placeBuilding(MultiBuilding building, int x, int z) {
+        // getName() is the fully-qualified id: MB.name is fed straight back into
+        // AssetRegistries.MULTI_BUILDINGS.getOrThrow(String) in BuildingInfo.initMultiBuildingSection.
         for (int xx = 0 ; xx < building.getDimX() ; xx++) {
             for (int zz = 0 ; zz < building.getDimZ() ; zz++) {
                 buildingGrid[x+xx][z+zz] = new MB(building.getName(), xx, zz);

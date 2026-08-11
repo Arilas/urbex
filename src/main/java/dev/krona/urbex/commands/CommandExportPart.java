@@ -21,6 +21,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
@@ -58,7 +59,8 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             return 0;
         }
 
-        BuildingPart part = AssetRegistries.PARTS.get(context.getSource().getLevel(), editorInfo.getPartName());
+        // editorInfo.getPartName() is Editor.startEditing's recorded part id - always qualified.
+        BuildingPart part = AssetRegistries.PARTS.get(context.getSource().getLevel(), DataTools.fromName(editorInfo.getPartName()));
         if (part == null) {
             context.getSource().sendFailure(Component.literal("Error finding part '" + editorInfo.getPartName() + "'!").withStyle(ChatFormatting.RED));
             return 0;
@@ -140,7 +142,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
                         Optional.empty(),
                         Optional.empty()));
             }
-            PaletteRE paletteRE = new PaletteRE(entries);
+            PaletteRE paletteRE = new PaletteRE(Optional.empty(), Optional.of(entries));
             DataResult<JsonElement> result = PaletteRE.CODEC.encodeStart(JsonOps.INSTANCE, paletteRE);
             root.add("__comment__", new JsonPrimitive("'missingpalette' represents all blockstates that it couldn't find in the palette. These have to be put in a palette. " +
                     "'exportedpart' is the actual exported part"));
@@ -149,7 +151,8 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             root.add("__comment__", new JsonPrimitive("'exportedpart' is the actual exported part"));
         }
 
-        BuildingPartRE buildingPartRE = new BuildingPartRE(part.getXSize(), part.getZSize(), slices,
+        BuildingPartRE buildingPartRE = new BuildingPartRE(Optional.empty(),
+                Optional.of(part.getXSize()), Optional.of(part.getZSize()), Optional.of(slices),
                 Optional.ofNullable(part.getRefPaletteName()), Optional.empty(), Optional.empty());
         DataResult<JsonElement> result = BuildingPartRE.CODEC.encodeStart(JsonOps.INSTANCE, buildingPartRE);
         root.add("exportedpart", result.result().get());

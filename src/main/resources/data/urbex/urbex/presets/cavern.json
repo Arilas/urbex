@@ -1,5 +1,5 @@
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "description": "This profile is meant for a cavern type world. There are lights in the building but the outside is very dark.",
   "extraDescription": "This is very hard. It's recommended you enable a bonus chest!",
   "warning": "Use this in combination with the Lost Worlds 'caves' world type",

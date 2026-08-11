@@ -16,12 +16,12 @@ import dev.krona.urbex.worldgen.lost.regassets.data.BlockMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Stuff {
 
@@ -30,16 +30,77 @@ public class Stuff {
     // palettes. Report each such combination once instead of on every city chunk.
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
+    /**
+     * Latches while the registries are unloaded so the report below fires once per episode rather
+     * than once per chunk, and re-arms as soon as they are loaded again.
+     */
+    private static final AtomicBoolean REPORTED_UNLOADED = new AtomicBoolean();
+
     public static void generateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
+        // The index is taken once, as a snapshot, and every tag below is read out of it. That is
+        // not a micro-optimisation: AssetRegistries.reset() replaces the whole index in one write
+        // (see the field), so holding the reference means a reset landing while this method is
+        // running cannot half-decorate the chunk - the walk either sees the old index throughout or
+        // the new one throughout. Asking per tag would leave exactly that sliver.
+        //
+        // Generating with the registries unloaded is never legitimate here, and it is the one
+        // failure in this file that says nothing: every tag misses, the loop below places nothing,
+        // and the chunk is written and saved undecorated - exactly the shipped defect Task 5c
+        // removed, reappearing one chunk at a time. Every other registry heals itself on the next
+        // lookup (RegistryAssetRegistry.get re-resolves on a miss); this index has no lazy rebuild,
+        // so nothing would ever notice.
+        //
+        // Both conditions are required. An empty index alone is legitimate - a pack may ship no
+        // stuff files at all - and the flag alone would fire on the harmless ordering where the
+        // reset lands after the snapshot was taken, which this chunk survives intact. They come off
+        // one record and one volatile read on purpose: as two separate volatile fields they could be
+        // observed out of step (emptied index, stale loaded == true), and the guard would wave
+        // through exactly the silent chunk it exists to catch. See AssetRegistries.StuffIndex.
+        //
+        // Reachable, not hypothetical: AssetRegistries.reset() is called from CityFeature.cleanUp,
+        // which reconcileDirtyCounter invokes when globalDimensionInfoDirtyCounter is bumped, and
+        // ClientEventHandlers.java:42-46 bumps it from ClientPlayConnectionEvents.DISCONNECT on the
+        // client thread - which in single-player fires while the integrated server is still
+        // draining in-flight generation.
+        //
+        // Logged rather than thrown, for two reasons. generateStuff is the last statement of
+        // CityGenerator.doCityChunk, which generate() calls at CityGenerator.java:290, well before
+        // ctx.driver.actuallyGenerate(chunk) at :310 - so a throw here would unwind past the commit
+        // and lose the chunk's entire cached write set, costing the whole chunk rather than its
+        // decoration. And it would route through CityFeature.generateFromPipeline's handler into
+        // ErrorLogger.report, which dereferences ServerAccess.getServer() with no null check
+        // (ErrorLogger.java:28-29) - during the shutdown window this fires in, that turns a
+        // decoration bug into a dead worldgen worker.
+        AssetRegistries.StuffIndex stuffIndex = AssetRegistries.stuffIndex();
+        if (stuffIndex.byTag().isEmpty() && !stuffIndex.loaded()) {
+            if (REPORTED_UNLOADED.compareAndSet(false, true)) {
+                Urbex.getLogger().error(
+                        "Generating chunk {},{} with the Urbex asset registries unloaded: no decoration will be " +
+                                "placed in this chunk or any other until they are loaded again, and the chunks are " +
+                                "saved that way. Something called AssetRegistries.reset() while generation was in " +
+                                "flight. Reported once per occurrence, not once per chunk.",
+                        ctx.coord.chunkX(), ctx.coord.chunkZ());
+            }
+            return;
+        }
+        if (REPORTED_UNLOADED.get()) {
+            REPORTED_UNLOADED.set(false);
+        }
         // Each stuff object gets its own address, and within it each placement attempt gets its
         // own, derived from the loop indices. An attempt therefore draws the same values however
         // many attempts before it were abandoned - and whether an attempt is abandoned depends on
         // what is already in the world, which is not ours to depend on.
+        //
+        // The ordinal is an RNG address, so what it counts has to be stable against anything that
+        // is not a deliberate change to the pack. Both loops below are ordered for that reason and
+        // not for tidiness: CityStyle.getStuffTags() is sorted (see the field) and each
+        // list in the index is sorted by Identifier (see AssetRegistries.groupStuffByTag). Neither
+        // may go back to a hash-ordered collection.
         int stuffOrdinal = 0;
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
         for (String tag : info.getCityStyle().getStuffTags()) {
-            List<StuffObject> stuffs = AssetRegistries.STUFF_BY_TAG.get(tag);
+            List<StuffObject> stuffs = stuffIndex.byTag().get(tag);
             if (stuffs != null) {
                 for (StuffObject stuff : stuffs) {
                     StuffSettingsRE settings = stuff.getSettings();
@@ -122,8 +183,9 @@ public class Stuff {
             return;
         }
         ChunkDriver driver = ctx.driver;
-        // The generating region, not the dimension's level: canSeeSky() below reads blocks.
-        WorldGenLevel level = ctx.region;
+        // No level is taken here: the sky test below is seesSky(), which reads through the driver
+        // rather than the region. The old level.canSeeSky() this method used to call is gone with
+        // it (#46), and so is the local that held the level for it.
         int attempts = settings.getAttempts();
         Integer minheight = settings.getMinheight();
         Integer maxheight = settings.getMaxheight();

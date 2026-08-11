@@ -132,6 +132,49 @@ class PresetSchemaTest {
         assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
     }
 
+    /**
+     * The schema must not green-light JSON the game refuses to load.
+     * <p>
+     * It did: the {@code extends} pattern made the namespace group optional, so {@code "default"}
+     * validated here while {@code DataTools.STRICT_IDENTIFIER_CODEC} rejected it, and the other four
+     * reference fields carried no pattern at all. {@link #schemaCoversExactlyTheCodecKeys} compares
+     * key <em>names</em>, so nothing failed. These are the five fields
+     * {@code DatapackReferenceIntegrityTest} requires to be qualified in the shipped pack.
+     */
+    @Test
+    void schemaRequiresANamespaceOnEveryAssetReference() throws IOException {
+        JsonSchema schema = loadSchema();
+        ObjectMapper mapper = new ObjectMapper();
+
+        Map<String, String> bare = new LinkedHashMap<>();
+        bare.put("extends", "{\"extends\":\"default\"}");
+        bare.put("cities.cityStyleAlternative", "{\"cities\":{\"cityStyleAlternative\":\"citystyle_border\"}}");
+        bare.put("spawn.spawnCity", "{\"spawn\":{\"spawnCity\":\"city1\"}}");
+        bare.put("spawn.forceSpawnBuildings", "{\"spawn\":{\"forceSpawnBuildings\":[\"building1\"]}}");
+        bare.put("spawn.forceSpawnParts", "{\"spawn\":{\"forceSpawnParts\":[\"part1\"]}}");
+
+        Map<String, String> qualified = new LinkedHashMap<>();
+        qualified.put("extends", "{\"extends\":\"urbex:default\"}");
+        qualified.put("cities.cityStyleAlternative", "{\"cities\":{\"cityStyleAlternative\":\"urbex:citystyle_border\"}}");
+        qualified.put("spawn.spawnCity", "{\"spawn\":{\"spawnCity\":\"urbex:city1\"}}");
+        qualified.put("spawn.forceSpawnBuildings", "{\"spawn\":{\"forceSpawnBuildings\":[\"urbex:building1\"]}}");
+        qualified.put("spawn.forceSpawnParts", "{\"spawn\":{\"forceSpawnParts\":[\"urbex:part1\"]}}");
+
+        List<String> failures = new ArrayList<>();
+        for (Map.Entry<String, String> e : bare.entrySet()) {
+            if (schema.validate(mapper.readTree(e.getValue())).isEmpty()) {
+                failures.add(e.getKey() + ": schema accepted an unqualified reference: " + e.getValue());
+            }
+        }
+        for (Map.Entry<String, String> e : qualified.entrySet()) {
+            Set<ValidationMessage> messages = schema.validate(mapper.readTree(e.getValue()));
+            if (!messages.isEmpty()) {
+                failures.add(e.getKey() + ": schema rejected a qualified reference: " + e.getValue() + " -> " + messages);
+            }
+        }
+        assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
+    }
+
     @Test
     void schemaRejectsUnknownKey() throws IOException {
         JsonSchema schema = loadSchema();

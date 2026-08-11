@@ -204,8 +204,9 @@ public class CityGenerator {
     }
 
     /**
-     * One rubble state for the block the driver is about to write - regenerates the weight table
-     * if empty. Addressed by that position, for the same reason as {@link #getRandomLeaf}.
+     * One rubble state for the block the driver is about to write. Addressed by that position, for
+     * the same reason as {@link #getRandomLeaf}. Nothing is regenerated here: {@code randomDirt} is
+     * a final array built once in the constructor and never empty.
      */
     private BlockState getRandomDirt(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
@@ -2078,7 +2079,7 @@ public class CityGenerator {
         Condition cnd = AssetRegistries.CONDITIONS.getOrThrow(world, condition);
         int level = (pos.getY() - diminfo.getProfile().GROUNDLEVEL) / FLOORHEIGHT;
         int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
-        String belowFloor = "<none>";
+        String belowFloor = ConditionContext.NO_PART;
         ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
                 todo.getPart(), belowFloor, todo.getBuilding(), info.coord) {
             @Override
@@ -2114,7 +2115,7 @@ public class CityGenerator {
                 int level = (pos.getY() - diminfo.getProfile().GROUNDLEVEL) / FLOORHEIGHT;
                 int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
                 ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
-                        todo.getPart(), "<none>", todo.getBuilding(), info.coord) {
+                        todo.getPart(), ConditionContext.NO_PART, todo.getBuilding(), info.coord) {
                     @Override
                     public Identifier getBiome() {
                         return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));

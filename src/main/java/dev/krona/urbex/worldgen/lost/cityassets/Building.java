@@ -1,7 +1,8 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
@@ -24,8 +25,8 @@ public class Building {
     private Boolean allowDoors = true;  // true means generation for the door is allowed, adjacent to street and building
     private Boolean allowFillers = true;  // true means generation for the filler is allowed, for cellars
     private Boolean overrideFloors = false;	// This overrides the citystyle/profile all min/max floors, meaning it will ONLY use this building definition's all min/max Floors.
-    private final char fillerBlock;           // Block used to fill/close areas. Usually the block of the building itself
-    private final Character rubbleBlock;      // Block used for destroyed building rubble
+    private char fillerBlock;           // Block used to fill/close areas. Usually the block of the building itself
+    private Character rubbleBlock;      // Block used for destroyed building rubble
     private float prefersLonely = 0.0f; // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
     // See BuildingPart.localPalette: a reference to another palette needs the level to resolve, so
@@ -36,31 +37,94 @@ public class Building {
     private final List<Pair<Predicate<ConditionContext>, String>> parts = new ArrayList<>();
     private final List<Pair<Predicate<ConditionContext>, String>> parts2 = new ArrayList<>();
 
-    public Building(BuildingRE object) {
-        name = object.getRegistryName();
-        minFloors = object.getMinFloors();
-        minCellars = object.getMinCellars();
-        maxFloors = object.getMaxFloors();
-        maxCellars = object.getMaxCellars();
-        allowDoors = object.getAllowDoors();
-        allowFillers = object.getAllowFillers();
-        overrideFloors = object.getOverrideFloors();
-        prefersLonely = object.getPrefersLonely();
-        fillerBlock = object.getFillerBlock();
-        rubbleBlock = object.getRubbleBlock();
-        if (object.getLocalPalette() != null) {
-            localPalette = new Palette("__local__" + object.getRegistryName().getPath());
-            localPalette.parsePaletteArray(object.getLocalPalette()); // @todo get the full palette instead
-        } else if (object.getRefPaletteName() != null) {
-            refPaletteName = object.getRefPaletteName();
+    /**
+     * Builds a fully resolved building from its {@code extends} chain, root first: every scalar
+     * takes the value of the last entry that declares one, so an entry that omits a field does not
+     * blank out what an earlier one set, and the two part lists go through {@link Mergeable} so a
+     * declared list replaces the inherited one unless it opts into appending.
+     * <p>
+     * {@code filler} and {@code parts} are required of the chain rather than of each file, so a
+     * building that only repaints what it extends need declare neither; a chain where nothing
+     * declares one is a load error naming the asset and the field.
+     * <p>
+     * "Declared" is read from a null rather than from a sentinel, so a child can set
+     * {@code preferslonely} back to {@code 0.0} or {@code maxfloors} back to {@code -1} against an
+     * ancestor that set something else. The defaults the fields start at are this class's own
+     * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
+     */
+    public Building(List<BuildingRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<PartRef> partRefs = new ArrayList<>();
+        boolean anyParts = false;
+        List<PartRef> partRefs2 = new ArrayList<>();
+        List<PaletteRE> inlinePalettes = new ArrayList<>();
+        String refPalette = null;
+        Character filler = null;
+        for (BuildingRE object : chainRootFirst) {
+            if (object.getMinFloors() != null) {
+                minFloors = object.getMinFloors();
+            }
+            if (object.getMinCellars() != null) {
+                minCellars = object.getMinCellars();
+            }
+            if (object.getMaxFloors() != null) {
+                maxFloors = object.getMaxFloors();
+            }
+            if (object.getMaxCellars() != null) {
+                maxCellars = object.getMaxCellars();
+            }
+            if (object.getAllowDoors() != null) {
+                allowDoors = object.getAllowDoors();
+            }
+            if (object.getAllowFillers() != null) {
+                allowFillers = object.getAllowFillers();
+            }
+            if (object.getOverrideFloors() != null) {
+                overrideFloors = object.getOverrideFloors();
+            }
+            if (object.getPrefersLonely() != null) {
+                prefersLonely = object.getPrefersLonely();
+            }
+            if (object.getFillerBlock() != null) {
+                filler = object.getFillerBlock();
+            }
+            if (object.getRubbleBlock() != null) {
+                rubbleBlock = object.getRubbleBlock();
+            }
+            // Inline palettes stack: they are a keyed collection like a registered palette, so a
+            // later block repaints the characters it declares and keeps the rest. Naming a palette
+            // with refpalette instead is a different choice, not another layer, so it drops them.
+            if (object.getLocalPalette() != null) {
+                inlinePalettes.add(object.getLocalPalette());
+                refPalette = null;
+            } else if (object.getRefPaletteName() != null) {
+                refPalette = object.getRefPaletteName();
+                inlinePalettes.clear();
+            }
+            if (object.getParts() != null) {
+                Mergeable.apply(partRefs, object.getParts());
+                anyParts = true;
+            }
+            if (object.getParts2() != null) {
+                Mergeable.apply(partRefs2, object.getParts2());
+            }
+        }
+        fillerBlock = Resolved.require(filler, name, "filler");
+        Resolved.require(anyParts ? partRefs : null, name, "parts");
+
+        if (!inlinePalettes.isEmpty()) {
+            localPalette = Palette.inline(name, inlinePalettes); // @todo get the full palette instead
+        } else if (refPalette != null) {
+            refPaletteName = refPalette;
         }
 
-        readParts(this.parts, object.getParts());
-        readParts(this.parts2, object.getParts2());
+        readParts(this.parts, partRefs);
+        readParts(this.parts2, partRefs2);
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:radiotower"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {
@@ -144,7 +208,24 @@ public class Building {
         return partNames.get(random.nextInt(partNames.size()));
     }
 
-    public String getRandomPart2(RandomSource random, ConditionContext info) {
+    /**
+     * The {@code parts2[]} entry for a floor whose {@code parts[]} entry is {@code currentPart}.
+     * <p>
+     * Takes the part rather than a ready-made context, and derives one with
+     * {@link ConditionContext#withPart}, so that the {@code parts2} context's {@code belowPart} is
+     * always {@code floorContext}'s - a caller advancing its own {@code belowPart} local to
+     * {@code currentPart} before calling this can no longer reach it, which is exactly what all
+     * three floor loops used to do, making a {@code parts2[]} {@code belowpart} a duplicate of its
+     * {@code inpart}. That is the invariant; it is not a check. {@code currentPart} is an untyped
+     * positional {@code String}, so passing {@code floorContext.getBelowPart()} still compiles and
+     * still produces the wrong condition - and deliberately is not rejected, because a building that
+     * repeats a part on consecutive floors legitimately has them equal ({@code library00} has one
+     * non-top part entry, so every non-top floor of one draws the same part).
+     * <p>
+     * {@code floorContext} is the same context {@link #getRandomPart} was given.
+     */
+    public String getRandomPart2(RandomSource random, ConditionContext floorContext, String currentPart) {
+        ConditionContext info = floorContext.withPart(currentPart);
         List<String> partNames = new ArrayList<>();
         for (Pair<Predicate<ConditionContext>, String> pair : parts2) {
             if (pair.getLeft().test(info)) {

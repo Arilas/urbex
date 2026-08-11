@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.ConditionRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import org.apache.commons.lang3.tuple.Pair;
@@ -18,9 +18,24 @@ public class Condition {
 
     private final List<Pair<Predicate<ConditionContext>, Pair<Float, String>>> valueSelector = new ArrayList<>();
 
-    public Condition(ConditionRE object) {
-        name = object.getRegistryName();
-        for (ConditionPart cp : object.getValues()) {
+    /**
+     * Builds a fully resolved condition from its {@code extends} chain, root first: a declared
+     * {@code values} replaces the inherited list unless it opts into appending, and an absent one
+     * inherits it unchanged. A chain where nothing declares {@code values} is a load error, since
+     * the condition would silently hand back null for every draw.
+     */
+    public Condition(List<ConditionRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<ConditionPart> values = new ArrayList<>();
+        boolean anyValues = false;
+        for (ConditionRE object : chainRootFirst) {
+            if (object.getValues() != null) {
+                Mergeable.apply(values, object.getValues());
+                anyValues = true;
+            }
+        }
+        Resolved.require(anyValues ? values : null, name, "values");
+        for (ConditionPart cp : values) {
             float factor = cp.getFactor();
             String value = cp.getValue();
             Predicate<ConditionContext> test = ConditionContext.parseTest(cp);
@@ -28,8 +43,9 @@ public class Condition {
         }
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:chestloot"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

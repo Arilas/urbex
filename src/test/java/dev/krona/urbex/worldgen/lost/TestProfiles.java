@@ -3,8 +3,10 @@ package dev.krona.urbex.worldgen.lost;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import net.minecraft.resources.Identifier;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -27,11 +29,17 @@ final class TestProfiles {
         return profile;
     }
 
-    /** A style that overrides nothing, so every chance falls back to the profile. */
+    /**
+     * A style that overrides nothing, so every chance falls back to the profile.
+     * <p>
+     * Except the street part wiring, which is required of every city style since the code-side
+     * defaults were deleted: {@link TestWiring#streetSettings()} declares a complete family of
+     * {@code urbex:test_street_*} ids that no test here places.
+     */
     static CityStyle cityStyle() {
-        return new CityStyle(new CityStyleRE(
+        return new CityStyle(List.of(new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty()));
+                Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.empty())));
     }
 }

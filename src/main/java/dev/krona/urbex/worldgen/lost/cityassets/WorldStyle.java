@@ -30,29 +30,74 @@ public class WorldStyle {
     @Nonnull private final MultiSettings multiSettings;
     @Nonnull private final WorldSettings worldSettings;
 
-    public WorldStyle(WorldStyleRE object) {
-        name = object.getRegistryName();
-        this.scatteredSettings = object.getScatteredSettings();
-        this.partSelector = object.getPartSelector();
-        this.multiSettings = object.getMultiSettings();
-        this.worldSettings = object.getWorldSettings();
-        outsideStyle = object.getOutsideStyle();
-        for (CityStyleSelector selector : object.getCityStyleSelectors()) {
+    /**
+     * Builds a fully resolved world style from its {@code extends} chain, root first: every
+     * settings block takes the value of the last entry that declares one, and the two selector
+     * lists go through {@link Mergeable} so a declared list replaces unless it opts into appending.
+     * <p>
+     * {@code outsidestyle}, {@code citystyles} and the {@code parts} wiring are required of the
+     * chain rather than of each file: a child that only swaps its scattered settings inherits them,
+     * and a chain where nothing declares one is a load error naming the asset and the field.
+     * <p>
+     * The wiring used to default to Urbex's own highway and railway parts when a world style said
+     * nothing, which is how a third-party pack could generate parts it never mentioned. It is
+     * folded field by field, so a child can append one tunnel variant without restating the group.
+     */
+    public WorldStyle(List<WorldStyleRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        String outside = null;
+        ScatteredSettings scattered = null;
+        PartSelector parts = null;
+        MultiSettings multi = MultiSettings.DEFAULT;
+        WorldSettings world = WorldSettings.DEFAULT;
+        List<CityStyleSelector> selectors = new ArrayList<>();
+        boolean anySelectors = false;
+        List<CityBiomeMultiplier> multipliers = new ArrayList<>();
+        for (WorldStyleRE object : chainRootFirst) {
+            if (object.getOutsideStyle() != null) {
+                outside = object.getOutsideStyle();
+            }
+            if (object.getScatteredSettings() != null) {
+                scattered = object.getScatteredSettings();
+            }
+            if (object.getPartSelector() != null) {
+                parts = PartSelector.merge(parts, object.getPartSelector());
+            }
+            if (object.getMultiSettings() != null) {
+                multi = object.getMultiSettings();
+            }
+            if (object.getWorldSettings() != null) {
+                world = object.getWorldSettings();
+            }
+            if (object.getCityStyleSelectors() != null) {
+                Mergeable.apply(selectors, object.getCityStyleSelectors());
+                anySelectors = true;
+            }
+            if (object.getCityBiomeMultipliers() != null) {
+                Mergeable.apply(multipliers, object.getCityBiomeMultipliers());
+            }
+        }
+        this.outsideStyle = Resolved.require(outside, name, "outsidestyle");
+        Resolved.require(anySelectors ? selectors : null, name, "citystyles");
+        this.scatteredSettings = scattered;
+        this.partSelector = Resolved.require(parts, name, "parts").requireComplete(name);
+        this.multiSettings = multi;
+        this.worldSettings = world;
+        for (CityStyleSelector selector : selectors) {
             Predicate<Holder<Biome>> predicate = biomeHolder -> true;
             if (selector.biomeMatcher() != null) {
                 predicate = selector.biomeMatcher();
             }
             cityStyleSelector.add(Pair.of(predicate, Pair.of(selector.factor(), selector.citystyle())));
         }
-        if (object.getCityBiomeMultipliers() != null) {
-            for (CityBiomeMultiplier multiplier : object.getCityBiomeMultipliers()) {
-                cityBiomeMultiplier.add(Pair.of(multiplier.biomeMatcher(), multiplier.multiplier()));
-            }
+        for (CityBiomeMultiplier multiplier : multipliers) {
+            cityBiomeMultiplier.add(Pair.of(multiplier.biomeMatcher(), multiplier.multiplier()));
         }
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:standard"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {
@@ -61,6 +106,14 @@ public class WorldStyle {
 
     public String getOutsideStyle() {
         return outsideStyle;
+    }
+
+    /**
+     * The resolved {@code citystyles}, for tests. The public surface offers only a weighted draw
+     * that needs a level and a biome, so without this the chain fold is unobservable.
+     */
+    List<Pair<Predicate<Holder<Biome>>, Pair<Float, String>>> cityStyleSelectors() {
+        return cityStyleSelector;
     }
 
     @Nonnull

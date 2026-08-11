@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.core.Registry;
@@ -24,18 +24,50 @@ public class PredefinedCity {
     private final List<PredefinedBuilding> predefinedBuildings = new ArrayList<>();
     private final List<PredefinedStreet> predefinedStreets = new ArrayList<>();
 
-    public PredefinedCity(PredefinedCityRE object) {
-        name = object.getRegistryName();
-        dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(object.getDimension()));
-        chunkX = object.getChunkX();
-        chunkZ = object.getChunkZ();
-        radius = object.getRadius();
-        cityStyle = object.getCityStyle();
-        if (object.getPredefinedBuildings() != null) {
-            predefinedBuildings.addAll(object.getPredefinedBuildings());
+    /**
+     * Builds a fully resolved predefined city from its {@code extends} chain, root first: each
+     * scalar takes the value of the last entry that declares one, so a second city can be the
+     * first one moved by declaring nothing but its own {@code chunkx}/{@code chunkz}. The building
+     * and street lists go through {@link Mergeable} so a declared list replaces unless it opts into
+     * appending.
+     */
+    public PredefinedCity(List<PredefinedCityRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        String declaredDimension = null;
+        Integer declaredChunkX = null;
+        Integer declaredChunkZ = null;
+        Integer declaredRadius = null;
+        String declaredCityStyle = null;
+        for (PredefinedCityRE object : chainRootFirst) {
+            if (object.getDimension() != null) {
+                declaredDimension = object.getDimension();
+            }
+            if (object.getChunkX() != null) {
+                declaredChunkX = object.getChunkX();
+            }
+            if (object.getChunkZ() != null) {
+                declaredChunkZ = object.getChunkZ();
+            }
+            if (object.getRadius() != null) {
+                declaredRadius = object.getRadius();
+            }
+            if (object.getCityStyle() != null) {
+                declaredCityStyle = object.getCityStyle();
+            }
         }
-        if (object.getPredefinedStreets() != null) {
-            predefinedStreets.addAll(object.getPredefinedStreets());
+        dimension = ResourceKey.create(Registries.DIMENSION,
+                Identifier.parse(Resolved.require(declaredDimension, name, "dimension")));
+        chunkX = Resolved.require(declaredChunkX, name, "chunkx");
+        chunkZ = Resolved.require(declaredChunkZ, name, "chunkz");
+        radius = Resolved.require(declaredRadius, name, "radius");
+        cityStyle = Resolved.require(declaredCityStyle, name, "citystyle");
+        for (PredefinedCityRE object : chainRootFirst) {
+            if (object.getPredefinedBuildings() != null) {
+                Mergeable.apply(predefinedBuildings, object.getPredefinedBuildings());
+            }
+            if (object.getPredefinedStreets() != null) {
+                Mergeable.apply(predefinedStreets, object.getPredefinedStreets());
+            }
         }
     }
 
@@ -67,8 +99,9 @@ public class PredefinedCity {
         return predefinedStreets;
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:spawncity"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

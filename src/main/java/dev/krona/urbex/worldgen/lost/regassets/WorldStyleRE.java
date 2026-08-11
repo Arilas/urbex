@@ -6,54 +6,69 @@ import dev.krona.urbex.worldgen.lost.regassets.data.*;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import java.util.List;
 import java.util.Optional;
 
-public class WorldStyleRE implements IAsset<WorldStyleRE> {
+/**
+ * A world style.
+ * <p>
+ * {@code outsidestyle} and {@code citystyles} are optional here rather than required, because a
+ * world style that only swaps its scattered settings should not have to restate them. Requiredness
+ * is checked after the chain is resolved, in
+ * {@link dev.krona.urbex.worldgen.lost.cityassets.WorldStyle}.
+ */
+public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
 
-    public static final Codec<WorldStyleRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<WorldStyleRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.STRING.fieldOf("outsidestyle").forGetter(l -> l.outsideStyle),
-                    MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> l.multiSettings.get()),
-                    WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> l.worldSettings.get()),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    Codec.STRING.optionalFieldOf("outsidestyle").forGetter(l -> Optional.ofNullable(l.outsideStyle)),
+                    MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> Optional.ofNullable(l.multiSettings)),
+                    WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> Optional.ofNullable(l.worldSettings)),
                     ScatteredSettings.CODEC.optionalFieldOf("scattered").forGetter(l -> Optional.ofNullable(l.scatteredSettings)),
-                    PartSelector.CODEC.optionalFieldOf("parts").forGetter(l -> l.partSelector.get()),
-                    Codec.list(CityStyleSelector.CODEC).fieldOf("citystyles").forGetter(l -> l.cityStyleSelectors),
-                    Codec.list(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
+                    PartSelector.Decl.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.partSelector)),
+                    Mergeable.codec(CityStyleSelector.CODEC).optionalFieldOf("citystyles").forGetter(l -> Optional.ofNullable(l.cityStyleSelectors)),
+                    Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
             ).apply(instance, WorldStyleRE::new));
 
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<WorldStyleRE> CODEC = RetiredKeys.reject(RAW, "worldstyle");
+
     private Identifier name;
+    private final Optional<Identifier> extendsId;
+    // Null on either of these means "not declared here", so the chain reads it from an ancestor.
     private final String outsideStyle;
     private final MultiSettings multiSettings;
     private final WorldSettings worldSettings;
     private final ScatteredSettings scatteredSettings;
-    @Nonnull private final PartSelector partSelector;
-    private final List<CityStyleSelector> cityStyleSelectors;
-    private final List<CityBiomeMultiplier> cityBiomeMultipliers;
+    private final PartSelector.Decl partSelector;
+    private final Mergeable<CityStyleSelector> cityStyleSelectors;
+    private final Mergeable<CityBiomeMultiplier> cityBiomeMultipliers;
 
-    public WorldStyleRE(String outsideStyle,
+    public WorldStyleRE(Optional<Identifier> extendsId,
+                        Optional<String> outsideStyle,
                         Optional<MultiSettings> multiSettings,
                         Optional<WorldSettings> worldSettings,
                         Optional<ScatteredSettings> scatteredSettings,
-                        Optional<PartSelector> partSelector,
-                        List<CityStyleSelector> cityStyleSelector,
-                        Optional<List<CityBiomeMultiplier>> cityBiomeMultipliers) {
-        this.outsideStyle = outsideStyle;
-        this.multiSettings = multiSettings.orElse(MultiSettings.DEFAULT);
-        this.worldSettings = worldSettings.orElse(WorldSettings.DEFAULT);
+                        Optional<PartSelector.Decl> partSelector,
+                        Optional<Mergeable<CityStyleSelector>> cityStyleSelector,
+                        Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers) {
+        this.extendsId = extendsId;
+        this.outsideStyle = outsideStyle.orElse(null);
+        this.multiSettings = multiSettings.orElse(null);
+        this.worldSettings = worldSettings.orElse(null);
         this.scatteredSettings = scatteredSettings.orElse(null);
-        this.partSelector = partSelector.orElse(PartSelector.DEFAULT);
-        this.cityStyleSelectors = cityStyleSelector;
+        this.partSelector = partSelector.orElse(null);
+        this.cityStyleSelectors = cityStyleSelector.orElse(null);
         this.cityBiomeMultipliers = cityBiomeMultipliers.orElse(null);
     }
 
+    @Nullable
     public String getOutsideStyle() {
         return outsideStyle;
     }
 
-    @Nonnull
-    public PartSelector getPartSelector() {
+    @Nullable
+    public PartSelector.Decl getPartSelector() {
         return partSelector;
     }
 
@@ -62,22 +77,29 @@ public class WorldStyleRE implements IAsset<WorldStyleRE> {
         return scatteredSettings;
     }
 
-    public List<CityStyleSelector> getCityStyleSelectors() {
+    @Nullable
+    public Mergeable<CityStyleSelector> getCityStyleSelectors() {
         return cityStyleSelectors;
     }
 
-    public List<CityBiomeMultiplier> getCityBiomeMultipliers() {
+    @Nullable
+    public Mergeable<CityBiomeMultiplier> getCityBiomeMultipliers() {
         return cityBiomeMultipliers;
     }
 
-    @Nonnull
+    @Nullable
     public MultiSettings getMultiSettings() {
         return multiSettings;
     }
 
-    @Nonnull
+    @Nullable
     public WorldSettings getWorldSettings() {
         return worldSettings;
+    }
+
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     @Override

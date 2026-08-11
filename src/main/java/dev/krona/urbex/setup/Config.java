@@ -203,11 +203,19 @@ public class Config {
     }
 
     /**
-     * Parses one {@code dimensionsWithPresets} entry: {@code dimension=preset[@worldstyle]}. Bare
-     * (unnamespaced) preset/worldstyle names default to the {@code urbex} namespace. Malformed
-     * entries - wrong arity on either side of {@code =}, or an id that fails to parse - are
-     * logged and rejected rather than thrown, so one bad line in the config doesn't take the
-     * whole list down.
+     * Parses one {@code dimensionsWithPresets} entry: {@code dimension=preset[@worldstyle]}. The
+     * preset and worldstyle names must name their namespace: {@link DataTools#fromName} rejects a
+     * bare one rather than defaulting it, so {@code minecraft:overworld=default} is refused and
+     * {@code minecraft:overworld=urbex:default} is not. (The dimension id on the left is parsed by
+     * {@link Identifier#parse} and does still default, to {@code minecraft} - it is a vanilla id,
+     * not a datapack cross-reference.) Malformed entries - wrong arity on either side of {@code =},
+     * or an id that fails to parse - are logged and rejected rather than thrown, so one bad line in
+     * the config doesn't take the whole list down.
+     * <p>
+     * The rejection messages below carry {@code e.getMessage()} through, because for the two
+     * {@code fromName} calls that is the only place the "add a namespace, e.g. urbex:default" hint
+     * exists - and a config written before namespaces were mandatory is exactly the case that hits
+     * it, so it is the one message that user will see.
      */
     public static Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> parseDimensionPresetEntry(String entry) {
         String[] split = entry.split("=");
@@ -233,7 +241,7 @@ public class Config {
             try {
                 worldStyle = DataTools.fromName(stylePart);
             } catch (Exception e) {
-                Urbex.getLogger().error("Bad worldstyle id in config value: '{}'!", entry);
+                Urbex.getLogger().error("Bad worldstyle id in config value: '{}'! {}", entry, e.getMessage());
                 return Optional.empty();
             }
         }
@@ -242,7 +250,7 @@ public class Config {
         try {
             presetId = DataTools.fromName(presetName);
         } catch (Exception e) {
-            Urbex.getLogger().error("Bad preset id in config value: '{}'!", entry);
+            Urbex.getLogger().error("Bad preset id in config value: '{}'! {}", entry, e.getMessage());
             return Optional.empty();
         }
 

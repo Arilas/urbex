@@ -1,5 +1,5 @@
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "icon": "textures/gui/icon_default.png",
   "cities": {
     "cityChance": -1,
@@ -8,7 +8,7 @@
     "cityPerlinInnerScale": 0.1,
     "cityThreshold": 0.1,
     "cityStyleThreshold": 0.4,
-    "cityStyleAlternative": "citystyle_border"
+    "cityStyleAlternative": "urbex:citystyle_border"
   },
   "buildings": {
     "buildingMaxFloors": 9,

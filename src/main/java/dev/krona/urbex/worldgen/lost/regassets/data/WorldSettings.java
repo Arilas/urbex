@@ -4,8 +4,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.util.StringRepresentable;
 
-import java.util.Optional;
-
 public record WorldSettings(
         RailwayAvoidance railwayAvoidance,
         int railPartHeight6) {
@@ -33,13 +31,5 @@ public record WorldSettings(
             ).apply(instance, WorldSettings::new));
 
     public static final WorldSettings DEFAULT = new WorldSettings(RailwayAvoidance.IGNORE, 1);
-
-    public Optional<WorldSettings> get() {
-        if (this == DEFAULT) {
-            return Optional.empty();
-        } else {
-            return Optional.of(this);
-        }
-    }
 
 }

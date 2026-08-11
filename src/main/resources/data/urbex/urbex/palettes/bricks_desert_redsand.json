@@ -2,7 +2,7 @@
   "palette": [
     {
       "char": "X",
-      "block": "minecraft:red_sandstone@2",
+      "block": "minecraft:cut_red_sandstone",
       "damaged": "minecraft:iron_bars"
     },
     {
@@ -19,7 +19,7 @@
         },
         {
           "random": 2000,
-          "block": "minecraft:red_sandstone@2"
+          "block": "minecraft:cut_red_sandstone"
         }
       ],
       "damaged": "minecraft:iron_bars"

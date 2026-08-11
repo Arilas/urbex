@@ -1,5 +1,5 @@
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "description": "Wasteland, no water, bare land",
   "extraDescription": "This profile works best with Biomes O Plenty and the Wastify mod",
   "icon": "textures/gui/icon_wasteland.png",

@@ -26,7 +26,7 @@ import java.util.Optional;
 
 /**
  * A fully-resolved preset: the runtime settings used by worldgen, produced by walking a
- * {@link PresetRE}'s parent chain onto these code defaults (see {@code Presets.resolve}).
+ * {@link PresetRE}'s extends chain onto these code defaults (see {@code Presets.resolve}).
  * <p>
  * Public field names match the runtime-generated profile format this class replaced (same names,
  * same types) so that the worldgen consumers migrated by a pure type rename. Exceptions: there is

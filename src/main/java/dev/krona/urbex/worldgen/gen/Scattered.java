@@ -257,9 +257,9 @@ public class Scattered {
             floors = minfloors + rand.nextInt(maxfloors - minfloors + 1);
         }
         // TODO top condition is wrong due to floor calculation being different
-        String belowFloor = "<none>";
+        String belowFloor = ConditionContext.NO_PART;
         for (int f = 0; f < floors; f++) {
-            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, "<none>", belowFloor, building.getName(), info.coord) {
+            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, ConditionContext.NO_PART, belowFloor, building.getName(), info.coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -279,11 +279,16 @@ public class Scattered {
             ChunkDriver driver = ctx.driver;
             BlockState air = Blocks.AIR.defaultBlockState();
             BlockState liquid = feature.liquid;
-            String randomPart = building.getRandomPart(rand, conditionContext);
-            BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
-            belowFloor = randomPart;
-            randomPart = building.getRandomPart2(rand, conditionContext);
-            BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), randomPart);    // Null is legal
+            String partName = building.getRandomPart(rand, conditionContext);
+            BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), partName);
+            // getRandomPart2 derives its own context (ConditionContext.withPart) with partName as
+            // the current part. This used to pass conditionContext itself, whose part is NO_PART,
+            // so a scattered building's parts2[] "inpart" could never match while a city
+            // building's matched normally - one field, two meanings.
+            String part2Name = building.getRandomPart2(rand, conditionContext, partName);
+            BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), part2Name);    // Null is legal
+            // Read by the next iteration's parts[] context, at the top of the loop.
+            belowFloor = partName;
 
             if (f == 0) {
                 switch (terrainFix) {

@@ -12,6 +12,7 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -48,7 +49,8 @@ public class CommandResumeEdit implements Command<CommandSourceStack> {
 
         ChunkPos cp = ChunkPos.containing(start);
         for (EditModeData.PartData data : EditModeData.getData().getPartData(new ChunkCoord(level.dimension(), cp.x(), cp.z()))) {
-            BuildingPart part = AssetRegistries.PARTS.get(level, data.partName());
+            // data.partName() is CityGenerator.generatePart's recorded part id - always qualified.
+            BuildingPart part = AssetRegistries.PARTS.get(level, DataTools.fromName(data.partName()));
             if (part == null) {
                 context.getSource().sendFailure(Component.literal("Unknown part '" + data.partName() + "' in this chunk!"));
                 return 0;

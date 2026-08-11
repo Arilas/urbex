@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
 
 public interface IBuildingPart {
@@ -14,6 +15,8 @@ public interface IBuildingPart {
     String getMetaString(String key);
 
     String getName();
+
+    Identifier getId();
 
     char[][] getVslices();
 

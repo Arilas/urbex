@@ -3,12 +3,11 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.CommonLevelAccessor;
 
 import java.util.*;
 
@@ -16,7 +15,14 @@ public class CityStyle {
 
     private final Identifier name;
 
-    private final Set<String> stuffTags = new HashSet<>();
+    /**
+     * Sorted, not a {@code HashSet}: {@code Stuff.generateStuff} iterates these tags and assigns a
+     * running {@code stuffOrdinal} across all of them, and that ordinal is the RNG slot address
+     * every placement attempt draws from. Under {@code HashSet} the tags came out in String
+     * hash-bucket order, so adding or renaming one tag on a city style relocated the decoration
+     * filed under every other tag as well.
+     */
+    private final Set<String> stuffTags = new TreeSet<>();
 
     private final List<ObjectSelector> buildingSelector = new ArrayList<>();
     private final List<ObjectSelector> bridgeSelector = new ArrayList<>();
@@ -27,9 +33,20 @@ public class CityStyle {
     private final List<ObjectSelector> frontSelector = new ArrayList<>();
     private final List<ObjectSelector> railDungeonSelector = new ArrayList<>();
     private final List<ObjectSelector> multiBuildingSelector = new ArrayList<>();
-    private StreetParts streetParts = StreetParts.DEFAULT;
-    private StreetParts largeStreetParts = StreetParts.DEFAULT;
-    private StreetParts tertiaryStreetParts = StreetParts.DEFAULT;
+
+    /** The nine selector lists a city style can declare, so inheritance can be driven by a loop. */
+    enum Sel {
+        BUILDING, BRIDGE, LARGE_BRIDGE, PARK, FOUNTAIN, STAIR, FRONT, RAIL_DUNGEON, MULTI_BUILDING
+    }
+
+    /**
+     * Null until some entry in the chain declares the family. {@code parts} is required of the
+     * chain; the other two fall back to it when no entry declares them at all (see
+     * {@link #getLargeStreetParts()}).
+     */
+    private StreetParts streetParts;
+    private StreetParts largeStreetParts;
+    private StreetParts tertiaryStreetParts;
 
     // Building settings
     private Integer minFloorCount;
@@ -72,80 +89,186 @@ public class CityStyle {
 
     private Float explosionChance;
     private String style;
-    private final String inherit;
-    // 'initialized' is written last, inside the monitor, so a reader that sees it set is guaranteed
-    // to see every field init() copied down from the parent style.
-    private volatile boolean initialized = false;
 
-    // Per-thread cycle guard for the inherit chain - see init().
-    private static final ThreadLocal<Set<CityStyle>> RESOLVING = ThreadLocal.withInitial(HashSet::new);
-
-    public CityStyle(CityStyleRE object) {
-        name = object.getRegistryName();
-        inherit = object.getInherit();
-        style = object.getStyle();
+    /**
+     * Builds a fully resolved style from its {@code extends} chain, root first: each entry
+     * overwrites what its ancestors set, and a declared selector list replaces the inherited one by
+     * default, or appends to it when the entry opts in with {@code {"replace": false, ...}} (see
+     * {@link #declare}). Nothing mutates after this returns, so worldgen worker threads share one
+     * immutable instance with no locking.
+     */
+    public CityStyle(List<CityStyleRE> chainRootFirst) {
+        CityStyleRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
+        name = leaf.getRegistryName();
         stuffTags.add("all");
+        for (CityStyleRE re : chainRootFirst) {
+            applyFrom(re);
+        }
+        Resolved.require(streetParts, name, "streetblocks.parts")
+                .requireComplete(name, "streetblocks.parts");
+        // The other two families are optional as a block - a style that declares neither draws its
+        // primary and tertiary roads from the secondary family, which is the rule
+        // getLargeStreetParts() and getTertiaryStreetParts() apply. Once a style starts declaring
+        // one, though, every part of it has to come from somewhere in the chain: half a family
+        // would otherwise be a null list reaching generation.
+        if (largeStreetParts != null) {
+            largeStreetParts.requireComplete(name, "streetblocks.largeparts");
+        }
+        if (tertiaryStreetParts != null) {
+            tertiaryStreetParts.requireComplete(name, "streetblocks.tertiaryparts");
+        }
+    }
+
+    /**
+     * Applies one link of the {@code extends} chain on top of whatever earlier links already set.
+     * Every scalar assignment is conditional on the incoming value being present, so a chain entry
+     * that omits a field does not blank out what an earlier entry set.
+     */
+    private void applyFrom(CityStyleRE object) {
+        if (object.getStyle() != null) {
+            style = object.getStyle();
+        }
         if (object.getStuffTags() != null) {
             stuffTags.addAll(object.getStuffTags());
         }
-        explosionChance = object.getExplosionChance();
+        if (object.getExplosionChance() != null) {
+            explosionChance = object.getExplosionChance();
+        }
         object.getBuildingSettings().ifPresent(s -> {
-            buildingChance = s.getBuildingChance();
-            maxCellarCount = s.getMaxCellarCount();
-            maxFloorCount = s.getMaxFloorCount();
-            minCellarCount = s.getMinCellarCount();
-            minFloorCount = s.getMinFloorCount();
+            if (s.getBuildingChance() != null) {
+                buildingChance = s.getBuildingChance();
+            }
+            if (s.getMaxCellarCount() != null) {
+                maxCellarCount = s.getMaxCellarCount();
+            }
+            if (s.getMaxFloorCount() != null) {
+                maxFloorCount = s.getMaxFloorCount();
+            }
+            if (s.getMinCellarCount() != null) {
+                minCellarCount = s.getMinCellarCount();
+            }
+            if (s.getMinFloorCount() != null) {
+                minFloorCount = s.getMinFloorCount();
+            }
         });
         object.getCorridorSettings().ifPresent(s -> {
-            corridorChance = s.getCorridorChance();
-            corridorGlassBlock = s.getCorridorGlassBlock();
-            corridorRoofBlock = s.getCorridorRoofBlock();
+            if (s.getCorridorChance() != null) {
+                corridorChance = s.getCorridorChance();
+            }
+            if (s.getCorridorGlassBlock() != null) {
+                corridorGlassBlock = s.getCorridorGlassBlock();
+            }
+            if (s.getCorridorRoofBlock() != null) {
+                corridorRoofBlock = s.getCorridorRoofBlock();
+            }
         });
         object.getRailSettings().ifPresent(s -> {
-            railMainBlock = s.getRailMainBlock();
+            if (s.getRailMainBlock() != null) {
+                railMainBlock = s.getRailMainBlock();
+            }
         });
         object.getParkSettings().ifPresent(s -> {
-            avoidFoliage = s.getAvoidFoliage();
-            parkBorder = s.getParkBorder();
-            parkElevation = s.getParkElevation();
-            parkStreetThreshold = s.getParkStreetThreshold();
-            grassBlock = s.getGrassBlock();
-            parkElevationBlock = s.getParkElevationBlock();
+            if (s.getAvoidFoliage() != null) {
+                avoidFoliage = s.getAvoidFoliage();
+            }
+            if (s.getParkBorder() != null) {
+                parkBorder = s.getParkBorder();
+            }
+            if (s.getParkElevation() != null) {
+                parkElevation = s.getParkElevation();
+            }
+            if (s.getParkStreetThreshold() != null) {
+                parkStreetThreshold = s.getParkStreetThreshold();
+            }
+            if (s.getGrassBlock() != null) {
+                grassBlock = s.getGrassBlock();
+            }
+            if (s.getParkElevationBlock() != null) {
+                parkElevationBlock = s.getParkElevationBlock();
+            }
         });
         object.getStreetSettings().ifPresent(s -> {
-            fountainChance = s.getFountainChance();
-            frontChance = s.getFrontChance();
-            borderBlock = s.getBorderBlock();
-            streetBaseBlock = s.getStreetBaseBlock();
-            streetBlock = s.getStreetBlock();
-            streetVariantBlock = s.getStreetVariantBlock();
-            wallBlock = s.getWallBlock();
-            streetWidth = s.getStreetWidth();
-            streetParts = s.getParts();
-            largeStreetParts = s.getLargeParts();
-            tertiaryStreetParts = s.getTertiaryParts();
+            if (s.getFountainChance() != null) {
+                fountainChance = s.getFountainChance();
+            }
+            if (s.getFrontChance() != null) {
+                frontChance = s.getFrontChance();
+            }
+            if (s.getBorderBlock() != null) {
+                borderBlock = s.getBorderBlock();
+            }
+            if (s.getStreetBaseBlock() != null) {
+                streetBaseBlock = s.getStreetBaseBlock();
+            }
+            if (s.getStreetBlock() != null) {
+                streetBlock = s.getStreetBlock();
+            }
+            if (s.getStreetVariantBlock() != null) {
+                streetVariantBlock = s.getStreetVariantBlock();
+            }
+            if (s.getWallBlock() != null) {
+                wallBlock = s.getWallBlock();
+            }
+            if (s.getStreetWidth() != null) {
+                streetWidth = s.getStreetWidth();
+            }
+            s.getParts().ifPresent(d -> streetParts = StreetParts.merge(streetParts, d));
+            s.getLargeParts().ifPresent(d -> largeStreetParts = StreetParts.merge(largeStreetParts, d));
+            s.getTertiaryParts().ifPresent(d -> tertiaryStreetParts = StreetParts.merge(tertiaryStreetParts, d));
         });
         object.getGeneralSettings().ifPresent(s -> {
-            glowstoneBlock = s.getGlowstoneBlock();
-            ironbarsBlock = s.getIronbarsBlock();
-            leavesBlock = s.getLeavesBlock();
-            rubbleDirtBlock = s.getRubbleDirtBlock();
+            if (s.getGlowstoneBlock() != null) {
+                glowstoneBlock = s.getGlowstoneBlock();
+            }
+            if (s.getIronbarsBlock() != null) {
+                ironbarsBlock = s.getIronbarsBlock();
+            }
+            if (s.getLeavesBlock() != null) {
+                leavesBlock = s.getLeavesBlock();
+            }
+            if (s.getRubbleDirtBlock() != null) {
+                rubbleDirtBlock = s.getRubbleDirtBlock();
+            }
         });
         object.getSelectors().ifPresent(s -> {
-            s.getBridgeSelector().ifPresent(bridgeSelector::addAll);
-            s.getLargeBridgeSelector().ifPresent(largeBridgeSelector::addAll);
-            s.getBuildingSelector().ifPresent(buildingSelector::addAll);
-            s.getFountainSelector().ifPresent(fountainSelector::addAll);
-            s.getFrontSelector().ifPresent(frontSelector::addAll);
-            s.getParkSelector().ifPresent(parkSelector::addAll);
-            s.getMultiBuildingSelector().ifPresent(multiBuildingSelector::addAll);
-            s.getRailDungeonSelector().ifPresent(railDungeonSelector::addAll);
-            s.getStairSelector().ifPresent(stairSelector::addAll);
+            declare(Sel.BRIDGE, s.getBridgeSelector());
+            declare(Sel.LARGE_BRIDGE, s.getLargeBridgeSelector());
+            declare(Sel.BUILDING, s.getBuildingSelector());
+            declare(Sel.FOUNTAIN, s.getFountainSelector());
+            declare(Sel.FRONT, s.getFrontSelector());
+            declare(Sel.PARK, s.getParkSelector());
+            declare(Sel.MULTI_BUILDING, s.getMultiBuildingSelector());
+            declare(Sel.RAIL_DUNGEON, s.getRailDungeonSelector());
+            declare(Sel.STAIR, s.getStairSelector());
         });
     }
 
+    /**
+     * A bare-array declaration replaces whatever an ancestor put there; the {@code {"replace":
+     * false, ...}} object form appends to it instead. A kind the file does not mention at all
+     * leaves the inherited list alone.
+     */
+    private void declare(Sel kind, Optional<Mergeable<ObjectSelector>> values) {
+        values.ifPresent(v -> Mergeable.apply(selectorList(kind), v));
+    }
+
+    List<ObjectSelector> selectorList(Sel kind) {
+        return switch (kind) {
+            case BUILDING -> buildingSelector;
+            case BRIDGE -> bridgeSelector;
+            case LARGE_BRIDGE -> largeBridgeSelector;
+            case PARK -> parkSelector;
+            case FOUNTAIN -> fountainSelector;
+            case STAIR -> stairSelector;
+            case FRONT -> frontSelector;
+            case RAIL_DUNGEON -> railDungeonSelector;
+            case MULTI_BUILDING -> multiBuildingSelector;
+        };
+    }
+
+    /** The fully-qualified id, e.g. {@code "urbex:citystyle_common"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {
@@ -168,14 +291,17 @@ public class CityStyle {
         return streetParts;
     }
 
-    /** Primary roads fall back to the secondary-road family when a style does not define their own. */
+    /**
+     * Primary roads fall back to the secondary-road family when nothing in the chain declares their
+     * own. That is a fallback to parts the pack itself wrote, not to a part name written in Java.
+     */
     public StreetParts getLargeStreetParts() {
-        return largeStreetParts == StreetParts.DEFAULT ? streetParts : largeStreetParts;
+        return largeStreetParts == null ? streetParts : largeStreetParts;
     }
 
-    /** Tertiary roads fall back to the secondary-road family when a style does not define their own. */
+    /** Tertiary roads fall back to the secondary-road family, exactly as primaries do. */
     public StreetParts getTertiaryStreetParts() {
-        return tertiaryStreetParts == StreetParts.DEFAULT ? streetParts : tertiaryStreetParts;
+        return tertiaryStreetParts == null ? streetParts : tertiaryStreetParts;
     }
 
     public Integer getMinFloorCount() {
@@ -272,141 +398,6 @@ public class CityStyle {
 
     public Character getWallBlock() {
         return wallBlock;
-    }
-
-    /**
-     * Resolve 'inherit'. Called on every lookup of this style, from any worldgen worker thread, so
-     * it has to be safe to race - and it mutates about thirty fields, so it cannot be done with a
-     * volatile write per field. A monitor on this style is the cheap answer: after the first call
-     * the volatile read below short-circuits and no lock is taken at all.
-     * <p>
-     * The parent is resolved <em>before</em> the monitor is taken, deliberately. Resolving it
-     * recursively init()s the parent, so doing it inside would mean holding this style's monitor
-     * while acquiring the parent's - and a cyclic inherit chain touched by two threads would then
-     * be a lock-ordering deadlock, which in worldgen means a hung server and no diagnostic at all.
-     * By the time the monitor is entered, every lock this method needs has already been released.
-     * <p>
-     * That moves the cycle guard out of the monitor, so it is a ThreadLocal rather than a field: a
-     * field would make one thread's half-resolved style visible to another. A style already being
-     * resolved further up <em>this thread's</em> stack returns uninitialised, which is exactly what
-     * the old single-threaded 'resolveInherit' flag did - a cycle terminates rather than recursing.
-     */
-    public void init(CommonLevelAccessor level) {
-        if (initialized) {
-            return;
-        }
-        CityStyle inheritFrom = null;
-        if (inherit != null) {
-            Set<CityStyle> inProgress = RESOLVING.get();
-            if (!inProgress.add(this)) {
-                return;     // cycle in the inherit chain; leave this style as it is, as before
-            }
-            try {
-                inheritFrom = AssetRegistries.CITYSTYLES.getOrThrow(level, inherit);
-            } finally {
-                inProgress.remove(this);
-            }
-        }
-        synchronized (this) {
-            // Re-check: the addAll()s below are not idempotent, so exactly one thread may run them.
-            if (initialized) {
-                return;
-            }
-            if (inheritFrom != null) {
-                if (style == null) {
-                    style = inheritFrom.getStyle();
-                }
-                stuffTags.addAll(inheritFrom.stuffTags);
-                buildingSelector.addAll(inheritFrom.buildingSelector);
-                bridgeSelector.addAll(inheritFrom.bridgeSelector);
-                largeBridgeSelector.addAll(inheritFrom.largeBridgeSelector);
-                parkSelector.addAll(inheritFrom.parkSelector);
-                fountainSelector.addAll(inheritFrom.fountainSelector);
-                stairSelector.addAll(inheritFrom.stairSelector);
-                frontSelector.addAll(inheritFrom.frontSelector);
-                railDungeonSelector.addAll(inheritFrom.railDungeonSelector);
-                multiBuildingSelector.addAll(inheritFrom.multiBuildingSelector);
-                if (explosionChance == null) {
-                    explosionChance = inheritFrom.explosionChance;
-                }
-                if (streetWidth == null) {
-                    streetWidth = inheritFrom.streetWidth;
-                }
-                if (streetParts == StreetParts.DEFAULT) {
-                    streetParts = inheritFrom.streetParts;
-                }
-                if (largeStreetParts == StreetParts.DEFAULT) {
-                    largeStreetParts = inheritFrom.largeStreetParts;
-                }
-                if (tertiaryStreetParts == StreetParts.DEFAULT) {
-                    tertiaryStreetParts = inheritFrom.tertiaryStreetParts;
-                }
-                if (minFloorCount == null) {
-                    minFloorCount = inheritFrom.minFloorCount;
-                }
-                if (minCellarCount == null) {
-                    minCellarCount = inheritFrom.minCellarCount;
-                }
-                if (maxFloorCount == null) {
-                    maxFloorCount = inheritFrom.maxFloorCount;
-                }
-                if (maxCellarCount == null) {
-                    maxCellarCount = inheritFrom.maxCellarCount;
-                }
-                if (buildingChance == null) {
-                    buildingChance = inheritFrom.buildingChance;
-                }
-                if (fountainChance == null) {
-                    fountainChance = inheritFrom.fountainChance;
-                }
-                if (frontChance == null) {
-                    frontChance = inheritFrom.frontChance;
-                }
-                if (corridorChance == null) {
-                    corridorChance = inheritFrom.corridorChance;
-                }
-                if (parkElevation == null) {
-                    parkElevation = inheritFrom.parkElevation;
-                }
-                if (avoidFoliage == null) {
-                    avoidFoliage = inheritFrom.avoidFoliage;
-                }
-                if (parkBorder == null) {
-                    parkBorder = inheritFrom.parkBorder;
-                }
-                if (parkStreetThreshold == null) {
-                    parkStreetThreshold = inheritFrom.parkStreetThreshold;
-                }
-                if (streetBlock == null) {
-                    streetBlock = inheritFrom.streetBlock;
-                }
-                if (streetBaseBlock == null) {
-                    streetBaseBlock = inheritFrom.streetBaseBlock;
-                }
-                if (streetVariantBlock == null) {
-                    streetVariantBlock = inheritFrom.streetVariantBlock;
-                }
-                if (parkElevationBlock == null) {
-                    parkElevationBlock = inheritFrom.parkElevationBlock;
-                }
-                if (corridorRoofBlock == null) {
-                    corridorRoofBlock = inheritFrom.corridorRoofBlock;
-                }
-                if (corridorGlassBlock == null) {
-                    corridorGlassBlock = inheritFrom.corridorGlassBlock;
-                }
-                if (railMainBlock == null) {
-                    railMainBlock = inheritFrom.railMainBlock;
-                }
-                if (borderBlock == null) {
-                    borderBlock = inheritFrom.borderBlock;
-                }
-                if (wallBlock == null) {
-                    wallBlock = inheritFrom.wallBlock;
-                }
-            }
-            initialized = true;
-        }
     }
 
     private static String getRandomFromList(RandomSource random, List<ObjectSelector> list, ChunkCoord pos) {

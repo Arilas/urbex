@@ -95,10 +95,15 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
 
     @Nullable
     public IDimensionInfo getDimensionInfo(WorldGenLevel world) {
-        if (globalDimensionInfoDirtyCounter != dimensionInfoDirtyCounter) {
-            // Force clear of cache
-            cleanUp();
-        }
+        reconcileDirtyCounter();
+        // Every path that generates Urbex content comes through here first - CarverHookMixin ->
+        // generateFromPipeline -> getDimensionInfo, before CityGenerator.generate is reached - so
+        // this is where "no chunk generates against unloaded assets" is actually enforced. A
+        // lifecycle event cannot enforce it on its own: reconcileDirtyCounter() above calls
+        // cleanUp(), which calls AssetRegistries.reset(), from this very path (see cleanUp below),
+        // and no further level-load event fires for a level that is already loaded. AssetRegistries
+        // .load() latches, so from the second chunk on this costs one volatile read.
+        AssetRegistries.load(world);
         ResourceKey<Level> type = world.getLevel().dimension();
         IDimensionInfo known = dimensionInfo.get(type);
         if (known != null) {
@@ -125,6 +130,16 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
                         "generating with the un-overridden preset '{}'.", type.identifier(), choice.preset(), e);
             }
         }
+        // Route 4 of the four that name a city style (see AssetRegistries.loadReachableCityStyles):
+        // the alternative style can arrive as per-world override JSON rather than from a registry
+        // entry, so the load-time sweep cannot see it - a player types an id into the ADVANCED
+        // settings box and it rides into the world through UrbexData. Checked here instead, once per
+        // dimension and before any chunk work, so an incomplete or missing style refuses the
+        // pipeline naming the dimension rather than throwing from a worker on every chunk. This is
+        // deliberately not fail-soft like the overrides parse above: a malformed payload can be
+        // ignored and the un-overridden preset used, but a style that cannot resolve has no such
+        // fallback - City.getCityStyle would simply hand null on to generation.
+        AssetRegistries.requireCityStyle(world, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
         // Built outside the map. Two threads may both build one for the same dimension the
         // first time a chunk is generated - the loser's is simply dropped, caches and all.
         IDimensionInfo diminfo = new DefaultDimensionInfo(world, preset, choice.worldStyle());
@@ -132,7 +147,54 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         return raced != null ? raced : diminfo;
     }
 
-    public void cleanUp() {
+    /**
+     * Drops the caches once per bump of {@link #globalDimensionInfoDirtyCounter}, and makes every
+     * other caller wait while that happens.
+     * <p>
+     * This used to be a bare {@code if (global != mine) cleanUp();} on two volatile ints - a
+     * check-then-act, run from the parallel worldgen worker pool, so two threads reading the counter
+     * before either had written it back both called {@link #cleanUp()}. The first call of a session
+     * always reconciles ({@code dimensionInfoDirtyCounter} starts at -1), so that was reachable on
+     * any world's first chunks: the second reset landed while the first thread was already
+     * generating against the registries it cleared. MultiChunk's city-style counter names the same
+     * window, because a style resolved either side of a reset is two instances of one id.
+     * <p>
+     * The lock only bites when the counters differ; once they agree, the volatile read on the first
+     * line returns and nothing synchronizes.
+     * <p>
+     * <b>What this does not cover, and what it costs.</b> A bump that arrives while generation is
+     * already in flight still resets the registries underneath it, and the consequence is not
+     * merely MultiChunk's split city-style vote - that is the mild version. {@link
+     * AssetRegistries#reset()} sets the stuff-by-tag index to empty, and unlike every other registry
+     * that index has no lazy rebuild: {@code Stuff.generateStuff} reads null for every tag, places
+     * nothing, and the chunk is written and <em>saved</em> undecorated. That is the shipped defect
+     * this whole task removed, reappearing one chunk at a time. It is reachable rather than
+     * theoretical - {@code ClientEventHandlers.java:42-46} bumps the counter from
+     * {@code ClientPlayConnectionEvents.DISCONNECT} on the client thread, which in single-player
+     * fires while the integrated server is still draining in-flight generation. Nothing here
+     * prevents it; {@code Stuff.generateStuff} logs loudly when it happens so it can no longer pass
+     * quietly, and closing it properly means not tearing the registries down from a path that
+     * generation shares.
+     */
+    private void reconcileDirtyCounter() {
+        if (globalDimensionInfoDirtyCounter == dimensionInfoDirtyCounter) {
+            return;
+        }
+        synchronized (this) {
+            if (globalDimensionInfoDirtyCounter != dimensionInfoDirtyCounter) {
+                cleanUp();
+            }
+        }
+    }
+
+    /**
+     * Private and synchronized on purpose. {@link #reconcileDirtyCounter()} is the only caller and
+     * already holds this monitor, and the design above depends on that staying true: a caller that
+     * reached this without the monitor would be back to two threads resetting the registries at
+     * once. Java monitors are reentrant, so the redundant acquisition costs nothing on the existing
+     * path and is what keeps a future second caller from silently reopening the window.
+     */
+    private synchronized void cleanUp() {
         ServerEventHandlers.cleanUp();
         AssetRegistries.reset();
         dimensionInfo.clear();

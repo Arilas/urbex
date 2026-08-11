@@ -34,7 +34,7 @@ public final class PresetSelection {
     public static final Identifier CUSTOMIZED_ID = Identifier.fromNamespaceAndPath("urbex", "customized");
 
     private static final Gson GSON = new Gson();
-    private static final String DEFAULT_STYLE_NAME = DataTools.toName(Config.DEFAULT_WORLD_STYLE);
+    private static final String DEFAULT_STYLE_NAME = Config.DEFAULT_WORLD_STYLE.toString();
 
     /**
      * One selectable row. {@code preset} is {@code null} only for the Disabled row; every other
@@ -96,7 +96,8 @@ public final class PresetSelection {
 
     /**
      * The full, current list of choices: {@code disabled} first, then the injected browsable presets
-     * (already {@code urbex:default}-first-then-alphabetical, per {@code Presets.listBrowsable}), then
+     * (already {@code urbex:default} first and the rest in {@code Identifier}'s own path-then-namespace
+     * order, not alphabetical on the whole id, per {@code Presets.listBrowsable}), then
      * the transient customized entry (if any) last.
      */
     public List<Entry> entries() {
@@ -159,7 +160,7 @@ public final class PresetSelection {
         return selectedWorldStyle;
     }
 
-    /** The bare-name worldStyle that will actually generate: the chosen override, or the default. */
+    /** The fully-qualified worldStyle that will actually generate: the chosen override, or the default. */
     public String effectiveWorldStyle() {
         return selectedWorldStyle != null ? selectedWorldStyle : DEFAULT_STYLE_NAME;
     }
@@ -236,7 +237,7 @@ public final class PresetSelection {
         Config.overridesFromClient = overrides;
         Urbex.getLogger().info("Restored Urbex preset '{}' for world re-creation", presetId);
 
-        this.selectedWorldStyle = DataTools.toName(worldStyleId);
+        this.selectedWorldStyle = worldStyleId.toString();
         this.pendingRestore = new PendingRestore(presetId, overrides);
         reconcilePendingRestore();
     }
@@ -321,6 +322,8 @@ public final class PresetSelection {
             return;
         }
 
+        // effectiveWorldStyle() is always fully qualified (see DEFAULT_STYLE_NAME and setWorldStyle),
+        // so this can go through the same strict resolution as any other reference.
         Config.worldStyleFromClient = DataTools.fromName(effectiveWorldStyle());
 
         if (CUSTOMIZED_ID.equals(entry.id())) {

@@ -1,11 +1,12 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringRepresentable;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -20,13 +21,54 @@ public class ScatteredBuilding {
     private final ScatteredBuilding.TerrainFix terrainfix;
     private final int heightoffset;
 
-    public ScatteredBuilding(ScatteredRE object) {
-        name = object.getRegistryName();
-        this.buildings = object.getBuildings();
-        this.multibuilding = object.getMultibuilding();
-        this.terrainheight = object.getTerrainheight();
-        this.terrainfix = object.getTerrainfix();
-        this.heightoffset = object.getHeightoffset();
+    /**
+     * Builds a fully resolved scattered building from its {@code extends} chain, root first: each
+     * scalar takes the value of the last entry that declares one, and the building list goes
+     * through {@link Mergeable} so a declared list replaces unless it opts into appending.
+     * <p>
+     * {@code terrainheight} and {@code terrainfix} are required of the chain rather than of each
+     * file, so a variant that only swaps its building list inherits both.
+     * <p>
+     * {@code buildings} and {@code multibuilding} are required as a <em>pair</em>: the resolved
+     * chain must leave at least one, and neither is required on its own, which is the one shape
+     * {@link Resolved#require} cannot state. Left unchecked, a chain declaring neither loaded and
+     * then threw from {@code Scattered.generate} the first time the entry was placed.
+     */
+    public ScatteredBuilding(List<ScatteredRE> chainRootFirst) {
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        List<String> declaredBuildings = new ArrayList<>();
+        boolean anyBuildings = false;
+        String multibuilding = null;
+        int heightoffset = 0;
+        TerrainHeight terrainheight = null;
+        TerrainFix terrainfix = null;
+        for (ScatteredRE object : chainRootFirst) {
+            if (object.getBuildings() != null) {
+                Mergeable.apply(declaredBuildings, object.getBuildings());
+                anyBuildings = true;
+            }
+            if (object.getMultibuilding() != null) {
+                multibuilding = object.getMultibuilding();
+            }
+            if (object.getHeightoffset() != null) {
+                heightoffset = object.getHeightoffset();
+            }
+            if (object.getTerrainheight() != null) {
+                terrainheight = object.getTerrainheight();
+            }
+            if (object.getTerrainfix() != null) {
+                terrainfix = object.getTerrainfix();
+            }
+        }
+        this.buildings = anyBuildings ? List.copyOf(declaredBuildings) : null;
+        this.multibuilding = multibuilding;
+        if (this.buildings == null && this.multibuilding == null) {
+            throw new IllegalStateException("'" + name + "' declares neither 'buildings' nor "
+                    + "'multibuilding', and neither does anything it extends");
+        }
+        this.terrainheight = Resolved.require(terrainheight, name, "terrainheight");
+        this.terrainfix = Resolved.require(terrainfix, name, "terrainfix");
+        this.heightoffset = heightoffset;
     }
 
     @Nullable
@@ -51,8 +93,9 @@ public class ScatteredBuilding {
         return heightoffset;
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:oilrig"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

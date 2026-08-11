@@ -1,5 +1,5 @@
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "description": "Safe mode: no spawners, lighting but no loot",
   "icon": "textures/gui/icon_safe.png",
   "buildings": {

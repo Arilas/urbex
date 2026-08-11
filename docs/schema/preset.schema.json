@@ -2,13 +2,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Arilas/urbex/main/docs/schema/preset.schema.json",
   "title": "Urbex preset",
-  "description": "A datapack-contributed entry for the urbex:presets dynamic registry (data/<namespace>/urbex/presets/<name>.json). Every field is optional: only fields actually present are applied on top of the resolved 'parent' chain, and unset fields fall through to the parent (or, at the root of the chain, to the code defaults in Preset.java). Keys starting with '_' are ignored (blessed pack metadata, e.g. '_comment').",
+  "description": "A datapack-contributed entry for the urbex:presets dynamic registry (data/<namespace>/urbex/presets/<name>.json). Every field is optional: only fields actually present are applied on top of the resolved 'extends' chain, and unset fields fall through to the asset this preset extends (or, at the root of the chain, to the code defaults in Preset.java). Keys starting with '_' are ignored (blessed pack metadata, e.g. '_comment').",
   "type": "object",
-  "properties": {
-    "parent": {
+  "$defs": {
+    "qualifiedIdentifier": {
       "type": "string",
-      "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$",
-      "description": "Identifier of another preset in the urbex:presets registry to inherit from. This preset's sections are applied on top of the fully-resolved parent, field by field, so only the fields that differ need to be listed here. Like all Minecraft identifiers, an id with no namespace (no ':') defaults to the 'minecraft' namespace -- presets should always give an explicit namespace (e.g. 'urbex:default'). A parent cycle, or a parent id that does not resolve, is a load-time error."
+      "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$",
+      "description": "A datapack asset reference. The namespace is mandatory: DataTools.fromName rejects a bare name rather than defaulting it, so 'default' is a load error and 'urbex:default' is not."
+    }
+  },
+  "properties": {
+    "extends": {
+      "$ref": "#/$defs/qualifiedIdentifier",
+      "description": "Asset this preset builds on. Fully qualified, e.g. `urbex:default`."
     },
     "description": {
       "type": "string",
@@ -180,8 +186,8 @@
           "description": "A city factor below this threshold will use the city style specified in cityStyleAlternative."
         },
         "cityStyleAlternative": {
-          "type": "string",
-          "description": "Alternative city style. Used with cityStyleThreshold."
+          "$ref": "#/$defs/qualifiedIdentifier",
+          "description": "Alternative city style, fully qualified. Used with cityStyleThreshold."
         },
         "cityAvoidVoid": {
           "type": "boolean",
@@ -684,7 +690,7 @@
           "type": "number",
           "minimum": 0.0,
           "maximum": 1.0,
-          "description": "Chance that an optional decorative-light marker places a light. Every shipped preset sets this explicitly; leaving it unset falls through to the parent chain rather than defaulting to zero."
+          "description": "Chance that an optional decorative-light marker places a light. Every shipped preset sets this explicitly; leaving it unset falls through to the extends chain rather than defaulting to zero."
         },
         "lootDensity": {
           "type": "number",
@@ -705,8 +711,8 @@
           "description": "When set, the player will always spawn in the given biome."
         },
         "spawnCity": {
-          "type": "string",
-          "description": "When set, the player will always spawn in the given predefined city."
+          "$ref": "#/$defs/qualifiedIdentifier",
+          "description": "When set, the player will always spawn in the given predefined city, named fully qualified."
         },
         "spawnNotInBuilding": {
           "type": "boolean",
@@ -718,13 +724,13 @@
         },
         "forceSpawnBuildings": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Buildings the player may spawn in when forceSpawnInBuilding is true. Empty means any building. Can be combined with forceSpawnParts."
+          "items": { "$ref": "#/$defs/qualifiedIdentifier" },
+          "description": "Buildings the player may spawn in when forceSpawnInBuilding is true, each fully qualified. Empty means any building. Can be combined with forceSpawnParts."
         },
         "forceSpawnParts": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Parts the player may spawn in when forceSpawnInBuilding is true. Empty means any part. Can be combined with forceSpawnBuildings."
+          "items": { "$ref": "#/$defs/qualifiedIdentifier" },
+          "description": "Parts the player may spawn in when forceSpawnInBuilding is true, each fully qualified. Empty means any part. Can be combined with forceSpawnBuildings."
         },
         "spawnCheckRadius": {
           "type": "integer",

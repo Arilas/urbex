@@ -11,6 +11,15 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 public abstract class ConditionContext {
+
+    /**
+     * The value of {@code part}, {@code belowPart} or {@code building} when there is no such thing
+     * here: below the lowest floor, before a floor's part has been chosen, or outside a building.
+     * Every other value in those three slots is a fully-qualified asset id, and this one cannot
+     * collide with any of them - an id must contain a {@code ':'} and this does not.
+     */
+    public static final String NO_PART = "<none>";
+
     private final int level;        // Global level in world with 0 being to lowest possible level where a building section can be
     private final int floor;        // Level of the building with 0 being the ground floor. floor == floorsAboveGround means the top of the building section
     private final int floorsBelowGround;    // 0 means nothing below ground
@@ -20,6 +29,27 @@ public abstract class ConditionContext {
     private final String building;
     private final ChunkCoord coord;
 
+    /**
+     * Every asset name reaching a condition test is the fully-qualified id, on both sides of the
+     * comparison and in all nine places one is written. Three fields take one -
+     * {@code belowpart}, {@code inpart} and {@code inbuilding} - and three blocks declare all
+     * three: a building's {@code parts[]} and {@code parts2[]} (both are {@code PartRef}, bound
+     * twice by {@code BuildingRE}) and a condition's own {@code values[]}
+     * ({@code ConditionPart}). {@code inbiome} is the fourth field of both records and is
+     * deliberately not in this list: it is a biome id, not an asset name.
+     * {@code DatapackReferenceIntegrityTest} walks the same nine.
+     * There used to be a {@code legacyMatchKey} here that stripped
+     * the {@code urbex:} namespace, mirroring what {@code cityassets}' {@code getName()} returned
+     * before those were qualified - so a condition file, which {@code DatapackReferenceIntegrityTest}
+     * requires to write a qualified id, was comparing {@code "urbex:rail_dungeon1"} against
+     * {@code "rail_dungeon1"} and could never match. Anything constructing a {@code ConditionContext}
+     * must pass {@code getName()}/{@code getId().toString()}, never a bare path.
+     * <p>
+     * {@code "<none>"} is the one non-id value the {@code part}, {@code belowPart} and
+     * {@code building} slots take, for "there is no such thing here": below the first floor, or
+     * outside a building. It is not an id, cannot collide with one (no {@code ':'}), and is what
+     * {@link #isBuilding()} tests.
+     */
     public ConditionContext(int level, int floor, int floorsBelowGround, int floorsAboveGround, String part, String belowPart, String building, ChunkCoord coord) {
         this.level = level;
         this.floor = floor;
@@ -29,6 +59,46 @@ public abstract class ConditionContext {
         this.belowPart = belowPart;
         this.building = building;
         this.coord = coord;
+    }
+
+    /**
+     * This same floor, once its {@code parts[]} entry has been chosen: everything is carried over
+     * and only the current part is replaced. It is what {@code parts2[]} selection is evaluated
+     * against - the second part of a floor that now has a first one, sitting on the same floor below.
+     * <p>
+     * A derivation rather than a second constructor call at each site, and the only way to build a
+     * {@code parts2} context ({@link Building#getRandomPart2} applies it internally), because
+     * building one by hand is how the defect this replaces happened: all three floor loops advanced
+     * their {@code belowPart} variable to the part just chosen <em>before</em> constructing the
+     * second context, so it saw {@code getBelowPart()} equal to {@code getPart()} and a
+     * {@code parts2[]} {@code belowpart} was an exact duplicate of its {@code inpart} - the same
+     * defect issue #58 fixed on the reading side in {@link #parseTest}.
+     * <p>
+     * What deriving buys is exactly one invariant, and it is worth stating no wider than it is: the
+     * {@code parts2} context's {@code belowPart} is always the {@code parts[]} context's
+     * {@code belowPart}, so whatever a caller does to its own local afterwards cannot reach it. That
+     * is the defect that was shipping, and it is gone at all three sites. It is not a proof that a
+     * {@code parts2} context can never have {@code getPart()} equal to {@code getBelowPart()}: the
+     * constructor is public, the {@code parts[]} contexts are still hand-written with a hand-chosen
+     * {@code belowPart}, and nothing rejects {@code getRandomPart2(rand, ctx, ctx.getBelowPart())}.
+     * Nor should anything: a building that repeats one part on consecutive floors makes
+     * {@code part} legitimately equal {@code belowPart}, and {@code buildings/library00.json} - one
+     * non-top entry, so every non-top floor draws {@code urbex:library00_1} - does exactly that.
+     */
+    final ConditionContext withPart(String newPart) {
+        ConditionContext floorContext = this;
+        return new ConditionContext(level, floor, floorsBelowGround, floorsAboveGround,
+                newPart, belowPart, building, coord) {
+            @Override
+            public boolean isBuilding() {
+                return floorContext.isBuilding();
+            }
+
+            @Override
+            public Identifier getBiome() {
+                return floorContext.getBiome();
+            }
+        };
     }
 
     private static Predicate<ConditionContext> combine(Predicate<ConditionContext> orig, Predicate<ConditionContext> newTest) {
@@ -216,7 +286,7 @@ public abstract class ConditionContext {
     }
 
     public boolean isBuilding() {
-        return !"<none>".equals(building);
+        return !NO_PART.equals(building);
     }
 
     public abstract Identifier getBiome();

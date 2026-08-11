@@ -5,6 +5,12 @@ building shapes, road layout, explosion damage, spawn rules, and so on. Presets 
 datapack JSON — no code, no rebuild, no mod jar changes. Drop a file in the right place, add it to
 a tag, and it shows up in the preset picker.
 
+Presets are one of Urbex's thirteen datapack registries and follow the same rules as the other
+twelve: one `extends` key naming a fully-qualified id in the same registry, chains applied
+root-first, and no bare references anywhere. [`docs/datapacks.md`](datapacks.md) is the guide to
+those shared rules and to the registries this document does not cover; what follows here is what is
+specific to the preset format.
+
 ## What a preset is
 
 A preset is one JSON file registered in the `urbex:presets` dynamic registry, at:
@@ -21,8 +27,8 @@ preset at either id is unsupported — the UI's built-in rows shadow it and it w
 or selectable.
 
 Every field in the file is **optional**. A preset only needs to state what it changes; anything
-left out falls through to its `parent` (see [Resolution rules](#resolution-rules) below). The
-top-level object has five plain metadata fields (`parent`, `description`, `extraDescription`,
+left out falls through to what it `extends` (see [Resolution rules](#resolution-rules) below). The
+top-level object has five plain metadata fields (`extends`, `description`, `extraDescription`,
 `warning`, `icon`) plus eleven **sections**, each grouping related settings: `terrain`, `cities`,
 `buildings`, `roads`, `highways`, `railways`, `destruction`, `decoration`, `spawn`, `atmosphere`,
 `misc`. A section is only applied if it's present in the file, and within a present section only
@@ -78,7 +84,7 @@ the fields that change from `urbex:default` need to be listed:
 
 ```json
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "description": "Heavily ruined cities, no spawners",
   "destruction": {
     "ruinChance": 0.6,
@@ -93,7 +99,8 @@ the fields that change from `urbex:default` need to be listed:
 
 **`data/urbex/tags/urbex/presets/presets.json`** — the `#urbex:presets` tag drives the
 preset-selection UI (`Presets.listBrowsable`); a preset that exists but isn't tagged still
-resolves and works (e.g. as someone else's `parent`), it just won't show up to pick directly. To
+resolves and works (e.g. as something another preset `extends`), it just won't show up to pick
+directly. To
 add your preset alongside the built-ins, `"replace": false` merges your tag with the mod's own
 rather than overwriting it:
 
@@ -112,39 +119,39 @@ uses), and `mypack:ruins` appears in the **Cities** tab's preset list next to th
 
 A preset resolves in two layers:
 
-1. **Parent chain.** Starting from the requested preset, Urbex follows `parent` links until it
-   reaches a preset with no `parent` (or errors if the chain cycles, or a `parent` id doesn't
+1. **Extends chain.** Starting from the requested preset, Urbex follows `extends` links until it
+   reaches a preset with no `extends` (or errors if the chain cycles, or an `extends` id doesn't
    resolve to a registered preset). It then applies each preset in the chain **root-first**: the
-   root's fields land first, then each child's present fields overwrite them, ending with the
+   root's fields land first, then each descendant's present fields overwrite them, ending with the
    requested preset itself. A field a preset doesn't mention is simply not touched at that step —
    it keeps whatever the chain has set so far.
 2. **Code defaults.** The chain is applied onto a fresh `Preset` object, which starts out with the
    hardcoded defaults in `Preset.java` (the same values the old built-in profiles used). A field no
    preset in the whole chain ever sets keeps its code default. In practice every shipped preset
-   parents `urbex:default` (except `urbex:default` itself, which has no parent), so `urbex:default`
-   is effectively every other built-in preset's baseline, and the code defaults are `urbex:default`'s
-   own baseline.
+   extends `urbex:default` (except `urbex:default` itself, which has no `extends`), so
+   `urbex:default` is effectively every other built-in preset's baseline, and the code defaults are
+   `urbex:default`'s own baseline.
 
 There is no other source of truth: no config file, no legacy migration, no partial application
-based on world type. A preset with a bad `parent` (cycle, or an id nothing provides) fails to
+based on world type. A preset with a bad `extends` (cycle, or an id nothing provides) fails to
 resolve rather than falling back to something implicit.
 
 ## `urbex savepreset`: show me everything
 
-Because most fields in a preset file are typically absent (inherited from the parent chain), a
+Because most fields in a preset file are typically absent (inherited from the extends chain), a
 preset file alone doesn't show you the *effective* settings for a running world. The
 `/urbex savepreset` command (admin-only; `/ubx savepreset` also works, `ubx` is the short command
-alias) writes the **fully resolved** preset for your current dimension — parent chain walked,
+alias) writes the **fully resolved** preset for your current dimension — extends chain walked,
 every field populated, nothing omitted — to `<game dir>/urbex-export/<preset-id-path>.json`. Use it
 to:
 
 - See every field and its current effective value, as a starting point for a new preset (copy the
-  parts you want to change into a new file, add `parent`, delete the rest).
-- Confirm what a `parent` chain actually resolves to before shipping a datapack.
+  parts you want to change into a new file, add `extends`, delete the rest).
+- Confirm what an `extends` chain actually resolves to before shipping a datapack.
 - Diff two presets' effective settings by exporting both and comparing the files.
 
 The exported file round-trips: it validates against the same schema as any other preset file, and
-can itself be used as a `parent` value for another preset.
+can itself be used as an `extends` value for another preset.
 
 ## IDE wiring
 
