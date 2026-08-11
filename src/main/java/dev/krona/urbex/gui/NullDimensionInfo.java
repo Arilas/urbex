@@ -13,7 +13,10 @@ import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
+import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -38,6 +41,12 @@ public class NullDimensionInfo implements IDimensionInfo {
 
     public static final int PREVIEW_WIDTH = 62;
     public static final int PREVIEW_HEIGHT = 58;
+
+    /** What the placeholder world style calls itself, so a load error can name it. */
+    private static final Identifier PLACEHOLDER_ID =
+            Identifier.fromNamespaceAndPath(Urbex.MODID, "preview_placeholder");
+    /** A style the bundled pack actually ships, and qualified; see {@link #placeholderStyle()}. */
+    private static final String PLACEHOLDER_OUTSIDE_STYLE = Urbex.MODID + ":standard";
 
     private final String[] biomeMap = new String[] {
             "ddddddddddddddddddddddppppppppppppppp==ppppppppppppppppppppppp",
@@ -125,18 +134,7 @@ public class NullDimensionInfo implements IDimensionInfo {
                 Urbex.LOGGER.debug("Preview could not resolve worldstyle '{}'; using the placeholder.", worldStyle, e);
             }
         }
-        style = resolved != null ? resolved : new WorldStyle(List.of(new WorldStyleRE(
-                Optional.empty(),
-                Optional.of("standard"),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                // Declared and empty rather than absent: the placeholder has no chain to inherit
-                // from, and an absent 'citystyles' is now a load error.
-                Optional.of(new Mergeable<>(true, Collections.emptyList())),
-                Optional.empty()
-        )));
+        style = resolved != null ? resolved : new WorldStyle(List.of(placeholderStyle()));
         this.seed = seed;
         random = new Random(seed);
         feature = new CityGenerator(this, profile);
@@ -145,6 +143,50 @@ public class NullDimensionInfo implements IDimensionInfo {
         // The preview's own seed and dimension, so the roads it draws are the roads the world will
         // have. Same construction as DefaultDimensionInfo; there is no server to ask.
         roadField = new GridRoadField(seed, getType().identifier().toString(), GridSettings.fromPreset(profile));
+    }
+
+    /**
+     * The world style the preview falls back to when it cannot resolve the chosen one.
+     * <p>
+     * It is a one-entry {@code extends} chain, so it has nothing to inherit from and must declare
+     * every field {@link WorldStyle} requires <em>after</em> resolution by itself - today
+     * {@code outsidestyle}, {@code citystyles} and the whole of {@code parts}, down to each of the
+     * twenty-two wiring components {@code PartSelector.requireComplete} checks. Anything left absent
+     * is an {@link IllegalStateException} out of the constructor rather than a decode failure, and
+     * this is the one place in {@code src/main} that builds a {@code WorldStyleRE} by hand instead
+     * of decoding one, so no datapack test covers it; {@code NullDimensionInfoPlaceholderTest} does.
+     * <p>
+     * The lists are declared and empty rather than absent because the preview draws no parts: it
+     * samples biomes, city placement, road classes and rail/highway chunk <em>types</em>, none of
+     * which reads a part name. Naming real parts here would be a claim about a datapack that, on
+     * this path, either isn't loaded or doesn't have the style the player asked for.
+     */
+    private static WorldStyleRE placeholderStyle() {
+        return new WorldStyleRE(
+                Optional.empty(),
+                // Fully qualified, like every other asset reference: a bare name throws out of
+                // DataTools.fromName the moment anything resolves it.
+                Optional.of(PLACEHOLDER_OUTSIDE_STYLE),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(new PartSelector.Decl(
+                        Optional.of(new HighwayParts.Decl(
+                                noParts(), noParts(), noParts(), noParts(), noParts(), noParts())),
+                        Optional.of(new RailwayParts.Decl(
+                                noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
+                                noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
+                                noParts(), noParts(), noParts(), noParts())))),
+                Optional.of(new Mergeable<>(true, Collections.emptyList())),
+                Optional.empty()
+                // Named, so the load error names this placeholder rather than 'null' if a field is
+                // ever added to the required set and not added here.
+        ).setRegistryName(PLACEHOLDER_ID);
+    }
+
+    /** One wiring component, declared as empty: the preview places no parts. */
+    private static Optional<Mergeable<String>> noParts() {
+        return Optional.of(new Mergeable<>(true, Collections.emptyList()));
     }
 
     @Override

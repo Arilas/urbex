@@ -22,7 +22,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.levelgen.WorldOptions;
 
 import javax.annotation.Nullable;
@@ -225,29 +224,41 @@ public class CityPreview implements AutoCloseable {
         // refresh.
         City.cleanPredefinedCache();
 
-        // worldStyle (from PresetSelection.effectiveWorldStyle()) is always fully qualified.
-        Identifier worldStyleId = DataTools.fromName(worldStyle);
-
         // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
-        // the preset, so it does not pay to build one there - and this construction is the only site
-        // in this method that can throw: GridSettings.fromPreset validates the road settings, and a
-        // preset can be momentarily self-contradictory. The road settings come in min/max pairs held
-        // by two independent sliders, so dragging a minimum up necessarily passes through states where
-        // it exceeds its maximum. GridSettings refuses those, correctly - a world must never be
-        // generated from numbers nobody wrote - but the editor is where the player is still writing
-        // them, and taking the screen down mid-drag is no way to say so. Keep showing the last good
-        // preview until the preset makes sense again; a preset still inconsistent at world creation
-        // fails there, with the field named. The catch is narrowed to just this construction so a bug
-        // in a renderer's own math is never silently swallowed as "the preset is invalid".
+        // the preset, so it does not pay to build one there - nor to parse the world style name,
+        // which is why DataTools.fromName sits inside this branch and inside the guard rather than
+        // above it.
+        //
+        // Two things under the guard can throw, and both must leave the screen standing:
+        //   - GridSettings.fromPreset validates the road settings, and a preset can be momentarily
+        //     self-contradictory. The road settings come in min/max pairs held by two independent
+        //     sliders, so dragging a minimum up necessarily passes through states where it exceeds
+        //     its maximum. GridSettings refuses those, correctly - a world must never be generated
+        //     from numbers nobody wrote - but the editor is where the player is still writing them,
+        //     and taking the screen down mid-drag is no way to say so. Keep showing the last good
+        //     preview until the preset makes sense again; a preset still inconsistent at world
+        //     creation fails there, with the field named. (IllegalArgumentException.)
+        //   - NullDimensionInfo's world style: DataTools.fromName refuses an unqualified name
+        //     (IllegalArgumentException), and building the fallback placeholder raises the
+        //     post-resolution requiredness error if a field required of a resolved chain is ever
+        //     added and not added to the placeholder (IllegalStateException, out of Resolved.require
+        //     - which is the whole reason the placeholder is covered by a test of its own). The
+        //     placeholder is reached whenever the chosen style cannot be resolved, including with no
+        //     registry access at all, so it is on the ordinary path and not a corner.
+        // The guard stays wrapped around just this construction so a bug in a renderer's own math is
+        // never silently swallowed as "the preset is invalid".
         NullDimensionInfo diminfo = null;
         if (mode != Mode.CITY) {
             try {
-                diminfo = new NullDimensionInfo(preset, worldStyleId, seed, registryAccess);
-            } catch (IllegalArgumentException e) {
+                // worldStyle (from PresetSelection.effectiveWorldStyle()) is always fully qualified;
+                // fromName is what enforces that rather than assumes it.
+                diminfo = new NullDimensionInfo(preset, DataTools.fromName(worldStyle), seed, registryAccess);
+            } catch (IllegalArgumentException | IllegalStateException e) {
                 // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
                 // good render. Leaving `mode` alone too keeps the legend describing the image actually
                 // on screen.
-                Urbex.LOGGER.debug("Preview not recomputed - preset is not currently valid: {}", e.getMessage());
+                Urbex.LOGGER.debug("Preview not recomputed - preset or world style is not currently valid: {}",
+                        e.getMessage());
                 return;
             }
         }
