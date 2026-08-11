@@ -53,10 +53,15 @@ uniformity is deliberate: you should never have to look up whether *this* asset 
 extension.
 
 The last column is what the load-time check enforces, and it is not quite the same as "what a
-working asset needs". The gap you are most likely to hit is a city style's `style`, which names the
-`styles` entry its buildings are painted from: it is not checked at load, so a selected city style
-with no `style` anywhere in its chain throws the first time a chunk asks for a palette. Treat it as
-required.
+working asset needs". Three city-style fields are needed but unchecked: `style`, which names the
+`styles` entry its buildings are painted from, and the `streetblocks` characters `street` and
+`border`. A selected city style whose chain declares none of them loads without complaint and then
+throws the first time a chunk needs one — `style` when a building asks for its palette, `street`
+when the chunk is set up, `border` when room is cleared for a building.
+
+Treat all three as required. Extending `urbex:citystyle_common` covers `street` and `border`; it
+leaves `style` to its children, which is why `urbex:citystyle_standard` is little more than an
+`extends` and a `style`.
 
 A pack needs the usual `pack.mcmeta` alongside `data/`. `pack_format` must match your target
 Minecraft version's data pack format — this repository currently targets `107`, for Minecraft

@@ -143,11 +143,15 @@ class DatapackGuideExamplesTest {
      * <p>
      * Whitespace is collapsed on both sides, because the guide wraps long messages across lines.
      * <p>
-     * Six of the table's rows are not reachable from here and stay hand-checked: the two
-     * {@code Can't find} / {@code Cannot find} lookups, {@code Error getting resource}, the
-     * "selected by" wrapper and the renamed-block warning all need a level, a registry or a log
-     * appender. What they have in common is that they name an id rather than describing a rule, so
-     * drift in them costs a reader less than drift in the eight below.
+     * Six rows of the guide's common-errors table stay hand-checked, for two different reasons.
+     * Four are unreachable from a headless test: the {@code Can't find} and {@code Cannot find}
+     * part lookups and {@code Error getting resource} need a level and a registry, and the
+     * renamed-block warning is a log line rather than a thrown message, so it needs an appender. The
+     * other two - {@code declares no 'parts.railways.railsbend'} and
+     * {@code declares no 'streetblocks.largeparts.connector'} - are trivially reachable, but the
+     * table abbreviates both with an ellipsis, so there is no verbatim string to match. They are the
+     * same {@link Resolved#require} sentence as the {@code streetblocks.parts.stair} case asserted
+     * below, differing only in the field name they carry.
      */
     @Test
     void quotedErrorMessagesAreTheOnesTheCodeProduces() throws IOException {
@@ -240,15 +244,17 @@ class DatapackGuideExamplesTest {
      * it and blames themselves. Re-encoding the decoded value and looking for keys that did not
      * survive is what catches that.
      * <p>
-     * Arrays are walked element-wise when both sides have the same length, because most of the
-     * content in this guide's examples lives inside one - palette entries, a variant's
-     * {@code blocks}, a selector's {@code values}, a building's {@code parts} - and a misspelled
-     * optional field on an element ({@code "tp"} for {@code "top"}) is the same silent no-op as a
-     * misspelled top-level key. Lengths differ only where a codec re-encodes a list into a
-     * different shape from the one it was written in, which is a formatting difference rather than
-     * a meaning one, so those are skipped rather than reported: a one-element part-wiring array
-     * comes back as a bare string, and the explicit {@code "replace": true} form comes back as a
-     * bare array. Write the shorter form in both cases and the check applies.
+     * Arrays are walked element-wise, because most of the content in this guide's examples lives
+     * inside one - palette entries, a variant's {@code blocks}, a selector's {@code values}, a
+     * building's {@code parts} - and a misspelled optional field on an element ({@code "tp"} for
+     * {@code "top"}) is the same silent no-op as a misspelled top-level key.
+     * <p>
+     * Two mismatches are skipped rather than reported, and both fall out of the requirement that the
+     * two sides be the same kind of node: a one-element part-wiring array re-encodes as a bare
+     * string, and an explicit {@code "replace": true} object re-encodes as a bare array. Those are
+     * formatting differences, not meaning ones - write the shorter form in either case and the walk
+     * resumes. The equal-length condition on arrays is a separate guard, for a codec that changes a
+     * list's element count; nothing in the guide currently trips it.
      */
     private static <A> List<String> unreadKeys(Codec<A> codec, JsonElement json) {
         A decoded = codec.parse(JsonOps.INSTANCE, json).getOrThrow();

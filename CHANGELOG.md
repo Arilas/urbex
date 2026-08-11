@@ -33,9 +33,10 @@
     silently ignored, so a doc example that would fail to load, or load and quietly do nothing, fails
     the build. It also fails if a registry has no example, and a second test provokes eight of the
     guide's quoted error messages from the code that raises them and requires the guide to contain
-    each verbatim. Both needed the two docs the tests read declared as inputs to `:test`: without
-    them a documentation-only edit left the task `UP-TO-DATE`, so neither these nor `PresetSchemaTest`
-    ran on the change they exist for.
+    each verbatim. Both needed `docs/datapacks.md` declared as an input to `:test`, along with
+    `docs/schema/` for `PresetSchemaTest`: without them a documentation-only edit left the task
+    `UP-TO-DATE`, so neither ran on the change it exists for. Nothing reads `docs/presets.md` - its
+    prose is unasserted, only the schema beside it is checked - so it is not an input.
 
 - **Street, highway and railway part wiring must be declared by the datapack; there is no code-side
   default left.** Thirty `Tools.listOrStringList` call sites carried a bare asset name as a fallback,
