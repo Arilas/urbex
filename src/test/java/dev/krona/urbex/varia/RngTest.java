@@ -91,20 +91,23 @@ class RngTest {
 
     @Test
     void streamIsStableAcrossRunsForTheLastPurpose() {
-        // A second golden vector, over the tail of the enum. GOLDEN pins RUINS, ordinal 4, so it
-        // survives an insertion or reorder anywhere below it - which is all but the first five
+        // A second golden vector, over the tail of the enum. GOLDEN pins RUINS, ordinal 3, so it
+        // survives an insertion or reorder anywhere below it - which is all but the first four
         // constants, including everything recent commits appended. This one moves whenever the
         // tail moves. Regenerate the same way as GOLDEN, over LAST_PURPOSE.
         assertArrayEquals(GOLDEN_LAST, take(Rng.at(42L, 100, -100, LAST_PURPOSE), 4));
     }
 
     @Test
-    void theEnumIsAppendOnly() {
+    void theEnumLayoutIsPinned() {
         // purpose.ordinal() feeds the hash, so inserting, removing or reordering a constant
-        // reseeds every consumer from that ordinal on, in every world that already exists.
-        // Appending is the only safe edit. A failure here is either a genuine append - update
+        // reseeds every consumer from that ordinal on, changing every generated world. That is
+        // sometimes an intentional edit rather than a forbidden one - while this mod is
+        // unreleased it is an accepted cost, and this test exists so it is never an accidental
+        // one. A failure here is either a genuine, deliberate layout change - update
         // PURPOSE_COUNT, LAST_PURPOSE, GOLDEN_LAST and PURPOSE_ORDER, and say so in the commit -
-        // or a reorder that must be undone.
+        // or an unintended reorder that must be undone. Once worlds exist in the wild, a layout
+        // change stops being an available option and becomes a breaking change.
         assertEquals(PURPOSE_COUNT, Rng.Purpose.values().length, "Purpose constant count changed");
         assertEquals(PURPOSE_COUNT - 1, LAST_PURPOSE.ordinal(), LAST_PURPOSE + " is no longer last");
 

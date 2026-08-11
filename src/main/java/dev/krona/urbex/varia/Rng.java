@@ -21,7 +21,13 @@ public final class Rng {
     private Rng() {
     }
 
-    /** One independent stream per consumer. Never reorder or remove constants: doing so changes every world. */
+    /**
+     * One independent stream per consumer. Reordering or removing a constant reseeds every
+     * consumer from that ordinal on, changing every generated world - do it only deliberately,
+     * with both {@code RngTest} golden vectors re-pinned in the same commit. While this mod is
+     * unreleased that is an accepted cost; once worlds exist in the wild it becomes a breaking
+     * change.
+     */
     public enum Purpose {
         BUILDING,
         MULTI,

@@ -5,8 +5,10 @@
 - **Removed city spheres and their supporting system.** The `space`, `spheres`, and `cavernspheres`
   landscape types and the `space`, `biosphere`, and `biosphere_caves` presets are removed, along
   with predefined spheres, sphere profile settings, sphere asset fields, and sphere spawn targeting.
-  The old monorail implementation is removed because it only connected spheres. Old test worlds and
-  config directories may need to be recreated; no migration is provided.
+  The old monorail implementation is removed because it only connected spheres. A world config
+  that still references one of the removed landscape types (for example a stale
+  `config/urbex/profiles/space.json`) will crash on startup with `Bad landscape type: space!`;
+  there is no fallback. Delete or edit any such profile file before upgrading.
 - **Removed the `urbex:city` dimension.** It existed for historical reasons only (it was a plain
   overworld clone). Cities are enabled by picking a profile on the world-creation Cities tab or
   via the `dimensionsWithProfiles` config. The sleep-on-a-special-bed teleport and its
