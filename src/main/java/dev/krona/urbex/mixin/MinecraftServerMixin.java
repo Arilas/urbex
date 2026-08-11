@@ -12,7 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Fabric replacement for NeoForge's LevelEvent.CreateSpawnPosition event: gives Lost Cities
- * a chance to pick the initial world spawn position (e.g. inside/outside a city or sphere).
+ * a chance to pick the initial world spawn position (e.g. inside or outside a city).
  */
 @Mixin(MinecraftServer.class)
 public class MinecraftServerMixin {

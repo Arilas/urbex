@@ -154,12 +154,11 @@ public class ProfileSetup {
         STANDARD_PROFILES.put(profile.getName(), profile);
 
         profile = new UrbexProfile("ancient", true);
-        profile.setDescription("Ancient jungle city, vines and leafs, ruined buildings");
+        profile.setDescription("Ancient jungle city, leafs, ruined buildings");
 //        profile.setExtraDescription("Note! This disables many biomes like deserts, plains, extreme hills, ...");
         profile.setIconFile("textures/gui/icon_ancient.png");
         profile.THICKNESS_OF_RANDOM_LEAFBLOCKS = 6;
         profile.CHANCE_OF_RANDOM_LEAFBLOCKS = 0.05f;
-        profile.VINE_CHANCE = 0.1f;
         profile.EXPLOSION_CHANCE = 0;
         profile.MINI_EXPLOSION_CHANCE = 0;
 //        profile.MINI_EXPLOSION_MAXRADIUS = 10;
@@ -178,7 +177,6 @@ public class ProfileSetup {
         profile.setExtraDescription("This profile works best with Biomes O Plenty and the Wastify mod");
         profile.setIconFile("textures/gui/icon_wasteland.png");
 //        profile.WATERLEVEL_OFFSET = 70;
-        profile.VINE_CHANCE = 0.003f;
         profile.CHANCE_OF_RANDOM_LEAFBLOCKS = 0.01f;
         profile.RUBBLELAYER = true;
         profile.RUBBLE_DIRT_SCALE = 2.0f;

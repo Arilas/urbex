@@ -55,6 +55,12 @@ loom {
             ideConfigGenerated(false)
             runDir('runs/digestcheck')
             vmArg '-Durbex.digestCheck=3,rowmajor,100'
+            // Two Urbex cross-chunk terrain reads at the carver stage - where a chunk may touch
+            // only itself - survived for months because nothing watched for them (see
+            // UnsafeReadGateMixin, UnsafeReadCounter). This gate is not window-specific like
+            // requireBridge/requireSlope below: any window should be free of Urbex cross-chunk
+            // reads, so both digest runs set it.
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
             // This runs on the parallel path, deliberately. Generation used to be pinned to one
             // core here with -XX:ActiveProcessorCount=1, because a chunk's decoration step could
             // run before or after its neighbours' passes and output was not run-to-run
@@ -76,30 +82,38 @@ loom {
         // so it never moved when planned bridges and sloped minor roads were added and CI was
         // blind to both (see the hierarchical-streets Task 5 report). Widening the primary sample
         // to cover them was rejected - radius 15 there is ~20x the generation work of radius 3,
-        // and it is the pin for everything else on this branch. This is a separate, disposable
-        // window instead: seed 1337, offset 101, radius 15 (chunks 86..116 on both axes), sized to
-        // be the smallest square covering both known features - the bridge deck at (87,108),
-        // (88,108), (89,108) and the one slope found anywhere in a wide scan of this area, at
-        // (93,116). At 961 chunks it costs 1.54x the 625-chunk window this replaces, and still far
-        // less than the rejected radius-15-at-the-primary-offset alternative, because this window
-        // stays separate from and disposable relative to the primary pin. requireBridge and
-        // requireSlope make DigestRunner's own bridgeChunks/slopeChunks counts (printed on every
-        // run, in DRIVERDIGEST's line) hard gates here: zero of either in the sample fails the
-        // check instead of silently passing. Before accepting a *new* digest-features.golden
-        // (moving code changed this window's output), confirm the window still contains both
-        // features - `/urbex debug` around chunk (88, 108) for the bridge and (93, 116) for the
-        // slope, or a `spanAt`/`getStreetSlopeDirection` probe - and if it does not, relocate the
-        // window (a new offset/radius) rather than just regenerating the hash: a passing check on a
-        // window missing either feature is exactly the silent coverage loss this whole file exists
-        // to prevent.
+        // and it is the pin for everything else here. This is a separate, disposable
+        // window instead: seed 1337, offset 83, radius 9 (chunks 74..92 on both axes), sized to be
+        // the smallest square covering both known features. Relocated here (from offset 101,
+        // radius 15) when the cross-chunk-access removal compacted Rng.Purpose by seven
+        // dead constants, shifting every addressed stream and moving every city layout; the old
+        // window's slope at (93,116) was gone and a wide probe (radius 40 around the old offset,
+        // 6561 chunks) was needed to relocate both features. The bridge deck now sampled sits at
+        // (87,92), (88,92), (89,92); the nearest slope found anywhere in that probe is at (74,87).
+        // Both were re-probed and found at exactly those coordinates after the merge with the
+        // sphere removal dropped three more dead constants (enum 44 -> 41), so the window itself
+        // did not have to move again - only its golden.
+        // At 361 chunks this costs 0.38x the 961-chunk window it replaces, and is still separate
+        // from and disposable relative to the primary pin. requireBridge and requireSlope make
+        // DigestRunner's own bridgeChunks/slopeChunks counts (printed on every run, in
+        // DRIVERDIGEST's line) hard gates here: zero of either in the sample fails the check
+        // instead of silently passing. Before accepting a *new* digest-features.golden (moving code
+        // changed this window's output), confirm the window still contains both features -
+        // `/urbex debug` around chunk (88, 92) for the bridge and (74, 87) for the slope, or a
+        // `spanAt`/`getStreetSlopeDirection` probe - and if it does not, relocate the window (a new
+        // offset/radius) rather than just regenerating the hash: a passing check on a window
+        // missing either feature is exactly the silent coverage loss this whole file exists to
+        // prevent.
         digestCheckFeatures {
             server()
             setConfigName('Urbex Digest Check (features)')
             ideConfigGenerated(false)
             runDir('runs/digestcheckfeatures')
-            vmArg '-Durbex.digestCheck=15,rowmajor,101'
+            vmArg '-Durbex.digestCheck=9,rowmajor,83'
             vmArg '-Durbex.digestCheck.requireBridge'
             vmArg '-Durbex.digestCheck.requireSlope'
+            // See the digestCheck block above: not window-specific, so both runs set it.
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
             def golden = file('digest-features.golden')
             if (golden.exists()) {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"

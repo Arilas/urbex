@@ -21,12 +21,15 @@ public final class Rng {
     private Rng() {
     }
 
-    /** One independent stream per consumer. Never reorder or remove constants: doing so changes every world. */
+    /**
+     * One independent stream per consumer. Reordering or removing a constant reseeds every
+     * consumer from that ordinal on, changing every generated world - do it only deliberately,
+     * with both {@code RngTest} golden vectors re-pinned in the same commit. While this mod is
+     * unreleased that is an accepted cost; once worlds exist in the wild it becomes a breaking
+     * change.
+     */
     public enum Purpose {
         BUILDING,
-        /** No longer drawn from: the street-type re-roll it fed died with the road field. Kept because
-         *  removing it would renumber everything below and change every world. */
-        STREET,
         MULTI,
         PARTS,
         RUINS,
@@ -38,19 +41,10 @@ public final class Rng {
         LOOT,
         VEGETATION,
         DAMAGE,
-        VINES,
         CITY_CENTER,
         CITY_RADIUS,
         CITY_STYLE,
-        // RESERVED - do not delete, even though nothing calls Rng with it today. The ordinal is
-        // part of the hash (see at()/atPos()/atSlot(): purpose.ordinal() feeds the mix), so
-        // removing this constant would shift RAILWAY and everything after it by one and silently
-        // change every world ever generated. If highway placement ever needs an addressed stream
-        // again, reuse this constant rather than appending a new one.
-        HIGHWAY,
         RAILWAY,
-        // Unused slots preserve stable addresses for unrelated consumers below them.
-        RESERVED_19,
         SCATTERED,
         // Added after the first release of this enum. New consumers append here; they never
         // reorder what is above them, so an existing world keeps generating what it did.
@@ -63,10 +57,6 @@ public final class Rng {
         EXPLOSION_MINI,
         RUINS_BARS,
         DAMAGE_VARIANT,
-        // Unused slots preserve stable addresses for unrelated consumers below them.
-        RESERVED_30,
-        RESERVED_31,
-        VINES_CONTINUE,
         TERRAIN_FIX_LOWER,
         TERRAIN_FIX_UPPER,
         CITY_STYLE_LOCAL,
@@ -88,13 +78,6 @@ public final class Rng {
         // and one purpose would make accepting the one imply accepting the other.
         EXPLOSION_ACCEPT,
         EXPLOSION_MINI_ACCEPT,
-        // generateVines runs four wall passes. The west pass keeps VINES; the other three take
-        // their own constant because the west and north passes address the same block at a chunk's
-        // NW corner column - one purpose there would make the two facings the identical roll, so
-        // the corner could never have one facing without the other.
-        VINES_EAST,
-        VINES_NORTH,
-        VINES_SOUTH,
         LIGHTING_DENSITY,
         LIGHTING_VARIANT,
         LOOT_DENSITY,
@@ -113,7 +96,7 @@ public final class Rng {
 
     /**
      * As {@link #at} but keyed on a block position, for consumers that vary within a chunk
-     * (per-block vine placement, per-spawner mob choice).
+     * (deferred light placement, per-spawner mob choice).
      */
     public static RandomSource atPos(long worldSeed, int x, int y, int z, Purpose purpose) {
         return new XoroshiroRandomSource(hashPos(worldSeed, x, y, z, purpose));

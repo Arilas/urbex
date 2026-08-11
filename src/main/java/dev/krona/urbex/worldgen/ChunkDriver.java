@@ -45,11 +45,15 @@ public class ChunkDriver {
     // off entirely.
     //
     // What this does NOT cover: writes this mod makes straight to the world, bypassing the
-    // driver. Those are invisible here and so invisible to the digest. Today that is the vine
-    // generation in ChunkFixer (world.setBlock in createVineStrip) and the post-todo callbacks
-    // run out of BuildingInfo.getPostTodo, which write through the WorldGenLevel. Any
-    // order-dependence on those paths is structurally unobservable to /urbex digest - see issue
-    // #20 for the vine case, which is known to be order-dependent and cannot be caught here.
+    // driver. Those are invisible here and so invisible to the digest. Today that is two things:
+    // the post-todo callbacks run out of BuildingInfo.getPostTodo, which write through the
+    // WorldGenLevel; and the border-block shape updates this class defers to vanilla
+    // postprocessing (see updateAdjacent) - a matching DRIVERDIGEST no longer proves fence, wall
+    // and stair connections at chunk borders are unchanged, because postprocessing writes them
+    // outside the driver. UnsafeReadGateMixin covers the residual risk from a different angle: it
+    // hooks both WorldGenRegion.getChunk and WorldGenRegion.ensureCanWrite, so any read or write
+    // that ever crossed a chunk boundary - post-todo or otherwise - is counted there, whether or
+    // not it is one this comment enumerates.
     //
     // Each touched position is recorded together with the state the driver last wrote there.
     // A position written three times contributes its last state once, so the internal path by
@@ -383,6 +387,16 @@ public class ChunkDriver {
     }
 
     /**
+     * True when this position sits on the edge of its own chunk, so at least one of its four
+     * horizontal neighbours lives in the next chunk along.
+     */
+    private static boolean isOnChunkBoundary(BlockPos pos) {
+        int lx = pos.getX() & 0xf;
+        int lz = pos.getZ() & 0xf;
+        return lx == 0 || lx == 15 || lz == 0 || lz == 15;
+    }
+
+    /**
      * Shape-updates the in-chunk neighbour at {@code pos} against the newly placed {@code state}
      * and returns the neighbour's (possibly updated) state for the placed block's own
      * connection decisions.
@@ -391,8 +405,9 @@ public class ChunkDriver {
      * touches nothing. It used to read the neighbouring chunk (whose content depends on whether
      * that chunk's features ran yet) and even write into it when it happened to be FULL; both
      * made generated output depend on worker-thread timing - the run-to-run digest divergence
-     * behind issue #24. Border blocks are marked for vanilla postprocessing in
-     * {@link #correct} instead, which recomputes their connections from final neighbour data.
+     * behind issue #24. Border blocks are marked for vanilla postprocessing right here, below,
+     * instead of being shape-updated - which recomputes their connections from final neighbour
+     * data once every chunk involved has finished generating.
      */
     private BlockState updateAdjacent(BlockState state, Direction direction, BlockPos pos, ChunkAccess thisChunk) {
         if (!isThisChunk(pos)) {
@@ -400,6 +415,27 @@ public class ChunkDriver {
         }
         BlockState adjacent = getBlock(pos);
         if (adjacent.getBlock() instanceof LadderBlock) {
+            return adjacent;
+        }
+        if (isOnChunkBoundary(pos)) {
+            // updateShape consults this block's own outward neighbour, which lives in the next
+            // chunk. At the carver stage the write radius is 0, so that read is forbidden - and
+            // the neighbour is not finished anyway. Defer instead: vanilla recomputes the
+            // connections from final neighbour data when the chunk is postprocessed, the same
+            // mechanism vanilla structures use across chunk borders. Marking here rather than
+            // relying on correct()'s mark is deliberate: that one only fires for positions the
+            // driver itself writes, and this position may be untouched terrain.
+            //
+            // Skip air and LiquidBlock: LevelChunk.postProcessGeneration only calls
+            // updateFromNeighbourShapes for the else branch of "is this a liquid" - a LiquidBlock
+            // position is ticked instead, never shape-updated, so marking one buys nothing and
+            // costs a tick this position would not otherwise have had during generation (e.g.
+            // untouched water at a chunk edge starting to flow into an adjacent excavated street).
+            // Air always resolves back to air, so marking it is pure waste. Neither case loses a
+            // shape update, since neither would have received one anyway.
+            if (!adjacent.isAir() && !(adjacent.getBlock() instanceof LiquidBlock)) {
+                thisChunk.markPosForPostProcessing(pos.immutable());
+            }
             return adjacent;
         }
         BlockState newAdjacent = null;
