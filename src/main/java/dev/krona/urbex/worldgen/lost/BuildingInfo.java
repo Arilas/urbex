@@ -370,7 +370,7 @@ public class BuildingInfo {
                     }
                 }
             }
-            cityStyle = AssetRegistries.CITYSTYLES.get(world, DataTools.fromName(counter.getMostOccuring()));
+            cityStyle = AssetRegistries.CITYSTYLES.get(world, DataTools.fromName(counter.getMostOccuring(s -> s)));
         } else {
             cityStyle = City.getCityStyle(coord, provider, profile);
         }

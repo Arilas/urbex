@@ -102,7 +102,11 @@ public class MultiChunk {
         record Chosen(MultiBuilding building, CityStyle style) {}
         List<Chosen> chosen = new ArrayList<>();
         List<CityStyle> styleList = new ArrayList<>(cityStyleCounter.getMap().keySet());
-        styleList.sort(Comparator.comparing(CityStyle::getName));
+        // Sorted on getId(), not getName(): this imposes deterministic order on a HashMap
+        // keySet, and Tools.getRandomFromList below walks the list subtracting weights, so the
+        // order decides which style (and therefore which multibuilding) gets picked. getId()
+        // never changes meaning under a future accessor rename the way getName() just did.
+        styleList.sort(Comparator.comparing(CityStyle::getId));
         for (int i = 0 ; i < cnt ; i++) {
             CityStyle cityStyle = Tools.getRandomFromList(rand, styleList, style -> (float) cityStyleCounter.get(style));
             String multiBuilding = cityStyle.getRandomMultiBuilding(rand, topleft);

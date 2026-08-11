@@ -50,31 +50,48 @@
   bug is fixed as a direct consequence, not a deliberate change: `/urbex locatepart` compared a stored
   (bare) name against a fully-qualified command argument and could never find anything; both sides are
   qualified now, so it works.
-- **`Counter.getMostOccuring()`'s tie-break is now a stated rule instead of `HashMap` iteration order.**
-  `BuildingInfo`'s majority-cityStyle vote among a chunk's neighbors - the only caller - produces an
-  even split at every style boundary (ten votes: 3x3 neighbors plus the center counted twice), and the
-  old tie-break fell through to whichever key `HashMap` happened to visit first, which depends on each
-  key's hash bucket: an unrelated rename of a city style could silently move which side of a boundary a
-  tied chunk falls on. Ties now break on the lexicographically lowest key, so counting the qualified id
-  (needed for the entry above) can no longer move a tie by accident the way it could have under the old
-  rule. **This determinism fix is not verified worldgen-inert by the shipped digests** - neither
-  sampled window contains a tied city-style boundary, only one candidate reachable in generation at
-  all (`urbex:standard`) - so a real tie elsewhere in a world could now lay out differently than it
-  used to, even though both digests regenerate unchanged. `CounterTest` pins the new rule directly: a
-  unique winner is unaffected, and a tie's winner no longer depends on insertion order.
-- **A separate, pre-existing bug this pass could have fixed by accident, and deliberately did not:**
-  `conditions/chestloot.json`'s `inpart` entries (`"urbex:rail_dungeon1"`/`"urbex:rail_dungeon2"`) are
-  required to be fully qualified by `DatapackReferenceIntegrityTest`, but the runtime side of that
-  comparison (`ConditionContext.getPart()`/`getBuilding()`) used to be fed by the very `getName()` the
-  entry above just qualified - so qualifying it everywhere would have made a chest-loot condition that
+- **`Counter.getMostOccuring()`'s tie-break is now a stated rule instead of `HashMap` iteration
+  order, and its tie-break key is a required parameter instead of an implicit `String.valueOf`.**
+  `BuildingInfo`'s majority-cityStyle vote among a chunk's neighbors produces an even split at every
+  style boundary (ten votes: 3x3 neighbors plus the center counted twice), and the old tie-break fell
+  through to whichever key `HashMap` happened to visit first, which depends on each key's hash bucket:
+  an unrelated rename of a city style could silently move which side of a boundary a tied chunk falls
+  on. Ties now break on the lexicographically lowest `tieBreakKey.apply(key)`, and every caller must
+  supply that key explicitly rather than the method defaulting to `String.valueOf` - a key type with
+  no meaningful `toString()` (e.g. `CityStyle`, whose default embeds an identity hash) would otherwise
+  make the tie-break *look* deterministic while it still varied run to run, the same bug moved one
+  layer down rather than fixed. That was not hypothetical: `MultiChunk`'s own city-style sort
+  (`styleList.sort(Comparator.comparing(...))`, which feeds the weighted pick that decides which
+  multibuilding gets placed) used `CityStyle::getName` and is a second-order dependency on the very
+  accessor the entry above just requalified. The bundled pack is entirely `urbex`-namespaced, so the
+  sort order is unchanged and both digests stay clean - but with a third-party city style in play, a
+  bare `citystyle_x` used to sort before `lostcities:citystyle_a` (`c` < `l`) and `urbex:citystyle_x`
+  now sorts after it (`u` > `l`): a silent reorder, exactly the class of accident this pass exists to
+  close off. Switched to `CityStyle::getId`, which cannot change meaning under a future `getName()`
+  edit. **Neither determinism fix is verified worldgen-inert by the shipped digests** - the sampled
+  windows contain no tied city-style boundary and no second namespace to reorder against, only one
+  candidate reachable in generation at all (`urbex:standard`) - so a real tie, or a second datapack's
+  city style, could lay out differently elsewhere than either used to. `CounterTest` pins the tie-break
+  rule directly: a unique winner is unaffected, a tie's winner does not depend on insertion order, and
+  the key is read from wherever the caller says, not from the key object's own `toString()`.
+- **A separate, pre-existing bug the entry above could have fixed by accident, and deliberately did
+  not:** `conditions/chestloot.json`'s `inpart` entries (`"urbex:rail_dungeon1"`/`"urbex:rail_dungeon2"`)
+  are required to be fully qualified by `DatapackReferenceIntegrityTest`, but the runtime side of that
+  comparison (`ConditionContext.getPart()`/`getBuilding()`) used to be fed by the very `getName()` two
+  entries up just qualified - so qualifying it everywhere would have made a chest-loot condition that
   has never once fired since the qualified-`inpart` convention was introduced start firing, silently,
   as a side effect of an unrelated change. Confirmed by hand: reverting just that one path reverted
   `runDigestCheckFeatures` to the shipped golden, proving it was the entire cause of the only digest
-  shift this work produced. The new `ConditionContext.legacyMatchKey(Identifier)` preserves the exact
-  old (bare-for-`urbex`) comparison every `inpart`/`inbuilding` match used, pinned by
+  shift this work produced anywhere. The new `ConditionContext.legacyMatchKey(Identifier)` preserves
+  the exact old (bare-for-`urbex`) comparison every `inpart`/`inbuilding` match used, pinned by
   `ConditionContextLegacyMatchKeyTest`, so this pass changes nothing about which chest-loot conditions
-  fire - that mismatch stays a separate, tracked follow-up. Confirmed worldgen-inert: both digests
-  regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
+  fire - that mismatch stays a separate, tracked follow-up (worded so that *deleting* `legacyMatchKey`
+  is the definition of done, not "fix `inpart` matching" - the bug now has a comfortable name, and a
+  comfortable name is how it survives). **Confirmed inert for everything the digest window reaches:**
+  both digests regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
+  That is direct evidence for this `legacyMatchKey` decision, where every path it touches lies inside
+  the window - it is *not* evidence for the two tie-break determinism fixes in the entry just above,
+  whose own gap in digest coverage is stated there and stands on its own.
 - **A datapack file now only has to state what it changes, on every registry rather than only on
   parts.** Twenty-two fields that the codec still demanded of every file are optional now:
   `predefinedcities.dimension`/`chunkx`/`chunkz`/`radius`/`citystyle`, `stuff.column`/`mincount`/
