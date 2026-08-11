@@ -96,7 +96,8 @@ public final class PresetSelection {
 
     /**
      * The full, current list of choices: {@code disabled} first, then the injected browsable presets
-     * (already {@code urbex:default}-first-then-alphabetical, per {@code Presets.listBrowsable}), then
+     * (already {@code urbex:default} first and the rest in {@code Identifier}'s own path-then-namespace
+     * order, not alphabetical on the whole id, per {@code Presets.listBrowsable}), then
      * the transient customized entry (if any) last.
      */
     public List<Entry> entries() {

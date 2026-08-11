@@ -204,8 +204,9 @@ public class CityGenerator {
     }
 
     /**
-     * One rubble state for the block the driver is about to write - regenerates the weight table
-     * if empty. Addressed by that position, for the same reason as {@link #getRandomLeaf}.
+     * One rubble state for the block the driver is about to write. Addressed by that position, for
+     * the same reason as {@link #getRandomLeaf}. Nothing is regenerated here: {@code randomDirt} is
+     * a final array built once in the constructor and never empty.
      */
     private BlockState getRandomDirt(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();

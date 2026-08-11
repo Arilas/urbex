@@ -25,7 +25,7 @@ public class City {
 
     record PreDefBuildingOffset(PredefinedBuilding building, int offsetX, int offsetZ) {}
 
-    // These four are datapack-derived: identical for every dimension, and their contents already
+    // These five are datapack-derived: identical for every dimension, and their contents already
     // carry the dimension they belong to. So they stay static - but they are built lazily from
     // several worker threads at once, so each one is a concurrent map published through its own
     // volatile guard. The guard is written last, so a thread that sees it set sees a full map.

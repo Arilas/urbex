@@ -73,9 +73,13 @@ public class Presets {
     }
 
     /**
-     * Members of tag {@code #urbex:presets} in registry order; if the tag is missing or empty,
-     * every registry entry instead. {@code urbex:default} sorts first, then the rest
-     * lexicographically.
+     * Members of tag {@code #urbex:presets}; if the tag is missing or empty, every registry entry
+     * instead. Either way the result is sorted - the sort below is unconditional, so neither the
+     * tag's declared order nor the registry's survives it. {@code urbex:default} sorts first, then
+     * the rest by {@link Identifier#compareTo}, which is <em>path, then namespace</em> and not
+     * lexicographic on the whole id: {@code b:apple} sorts before {@code a:zebra}. That is the same
+     * order {@code MultiChunk}'s city-style sort and {@code BuildingInfo}'s city-style vote already
+     * use.
      */
     public static List<Identifier> listBrowsable(RegistryAccess access) {
         Registry<PresetRE> registry = access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);

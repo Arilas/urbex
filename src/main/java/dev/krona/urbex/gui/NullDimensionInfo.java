@@ -298,12 +298,15 @@ public class NullDimensionInfo implements IDimensionInfo {
     @Override
     public Holder<Biome> getBiome(BlockPos pos) {
         if (biomeRegistry == null) {
-            // #67: no registry access (the deprecated no-registry constructor) means there's no
-            // registry to resolve even a plains fallback from - dereferencing it unconditionally is
-            // what used to NPE here. Every caller currently reachable without registry access
-            // (BuildingInfo.getChunkCharacteristicsGui and friends) never dereferences this result:
-            // the registryAccess()-gated rules in City that do read biomes only run when we're not
-            // in this branch.
+            // #67: no registry access means there's no registry to resolve even a plains fallback
+            // from - dereferencing it unconditionally is what used to NPE here. This is not a
+            // legacy shim: there is one constructor, and the GUI passes null to it deliberately
+            // whenever the world-creation context has no biome registry yet, or (in the Customize
+            // screen) no parent screen at all - see CitiesTab.previewRegistries and
+            // CustomizeScreen.previewRegistries. Every caller currently reachable without registry
+            // access (BuildingInfo.getChunkCharacteristicsGui and friends) never dereferences this
+            // result: the registryAccess()-gated rules in City that do read biomes only run when
+            // we're not in this branch.
             Urbex.LOGGER.warn("NullDimensionInfo.getBiome() called without registry access; returning null.");
             return null;
         }

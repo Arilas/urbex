@@ -378,7 +378,8 @@ public class CitiesTab extends GridLayoutTab {
     /**
      * The browsable presets registered for the world being created, resolved (extends chains flattened)
      * against the same load-context {@code RegistryAccess} {@link #registeredWorldStyles} reads -
-     * {@code urbex:default} first, then alphabetical (per {@code Presets.listBrowsable}). Empty when
+     * {@code urbex:default} first, then in path-then-namespace order (per {@code Presets.listBrowsable};
+     * that is {@code Identifier}'s own order, not alphabetical on the whole id). Empty when
      * the registry isn't reachable yet, exactly like {@link #registeredWorldStyles}.
      * <p>
      * Deliberately goes through the pure {@link Presets#resolve(Identifier, java.util.function.Function)}

@@ -31,9 +31,14 @@ public abstract class ConditionContext {
 
     /**
      * Every asset name reaching a condition test is the fully-qualified id, on both sides of the
-     * comparison and in all five places one is written: {@code parts[].belowpart},
-     * {@code parts[].inpart}, {@code parts2[].inpart}, {@code conditions}' {@code values[].inpart}
-     * and {@code values[].inbuilding}. There used to be a {@code legacyMatchKey} here that stripped
+     * comparison and in all nine places one is written. Three fields take one -
+     * {@code belowpart}, {@code inpart} and {@code inbuilding} - and three blocks declare all
+     * three: a building's {@code parts[]} and {@code parts2[]} (both are {@code PartRef}, bound
+     * twice by {@code BuildingRE}) and a condition's own {@code values[]}
+     * ({@code ConditionPart}). {@code inbiome} is the fourth field of both records and is
+     * deliberately not in this list: it is a biome id, not an asset name.
+     * {@code DatapackReferenceIntegrityTest} walks the same nine.
+     * There used to be a {@code legacyMatchKey} here that stripped
      * the {@code urbex:} namespace, mirroring what {@code cityassets}' {@code getName()} returned
      * before those were qualified - so a condition file, which {@code DatapackReferenceIntegrityTest}
      * requires to write a qualified id, was comparing {@code "urbex:rail_dungeon1"} against

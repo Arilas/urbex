@@ -16,7 +16,6 @@ import dev.krona.urbex.worldgen.lost.regassets.data.BlockMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
@@ -184,8 +183,9 @@ public class Stuff {
             return;
         }
         ChunkDriver driver = ctx.driver;
-        // The generating region, not the dimension's level: canSeeSky() below reads blocks.
-        WorldGenLevel level = ctx.region;
+        // No level is taken here: the sky test below is seesSky(), which reads through the driver
+        // rather than the region. The old level.canSeeSky() this method used to call is gone with
+        // it (#46), and so is the local that held the level for it.
         int attempts = settings.getAttempts();
         Integer minheight = settings.getMinheight();
         Integer maxheight = settings.getMaxheight();

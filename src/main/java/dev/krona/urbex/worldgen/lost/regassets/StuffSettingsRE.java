@@ -191,9 +191,11 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
     /**
      * Required, so never null on a resolved object: {@link #requireResolved} fails the load if the
      * chain left it undeclared. Same for {@link #getMincount}, {@link #getMaxcount} and
-     * {@link #getAttempts}, whose {@code int} return types unbox it. Those four are the whole
-     * required set - the getters between them here are <em>not</em> required; see
-     * {@link #getMinheight}.
+     * {@link #getAttempts} - those three unbox to {@code int}; this one is a {@code String} and
+     * unboxes nothing. Those four are the whole required set, and they are <em>not</em> the four
+     * getters that follow: read this note positionally and the next two, {@link #getMinheight} and
+     * {@link #getMaxheight}, look required, which is the one reading of it that breaks generation.
+     * They are nullable on purpose - see the note on {@link #getMinheight}.
      * <p>
      * Generation only ever sees a settings object that came out of {@link #resolve}, so it may read
      * all four without a null check.
@@ -204,13 +206,13 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
 
     /**
      * <b>Deliberately not required, and null here is a value, not a fault.</b> Null means the chain
-     * declared no {@code minheight}, and {@code Stuff.generateStuff} derives one from the building
+     * declared no {@code minheight}, and {@code Stuff.actuallyGenerateStuff} derives one from the building
      * context instead ({@code worldgen/gen/Stuff.java}, right after it reads these two) - the path
      * most stuff assets rely on, since few declare either bound. {@link #getMaxheight} is the same.
      * <p>
      * So these return {@code Integer}, not {@code int}, and adding them to {@link #requireResolved}
      * would fail the load on assets that are correct; deleting the null handling in
-     * {@code Stuff.generateStuff} on the strength of the note above would NPE.
+     * {@code Stuff.actuallyGenerateStuff} on the strength of the note above would NPE.
      */
     public Integer getMinheight() {
         return minheight;
