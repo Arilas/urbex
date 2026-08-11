@@ -26,18 +26,42 @@ public class PredefinedCity {
     private final List<PredefinedStreet> predefinedStreets = new ArrayList<>();
 
     /**
-     * Builds a fully resolved predefined city from its {@code extends} chain, root first. Its
-     * scalars are all required, so the leaf's win; the building and street lists go through
-     * {@link Mergeable} so a declared list replaces unless it opts into appending.
+     * Builds a fully resolved predefined city from its {@code extends} chain, root first: each
+     * scalar takes the value of the last entry that declares one, so a second city can be the
+     * first one moved by declaring nothing but its own {@code chunkx}/{@code chunkz}. The building
+     * and street lists go through {@link Mergeable} so a declared list replaces unless it opts into
+     * appending.
      */
     public PredefinedCity(List<PredefinedCityRE> chainRootFirst) {
-        PredefinedCityRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
-        name = leaf.getRegistryName();
-        dimension = ResourceKey.create(Registries.DIMENSION, Identifier.parse(leaf.getDimension()));
-        chunkX = leaf.getChunkX();
-        chunkZ = leaf.getChunkZ();
-        radius = leaf.getRadius();
-        cityStyle = leaf.getCityStyle();
+        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        String declaredDimension = null;
+        Integer declaredChunkX = null;
+        Integer declaredChunkZ = null;
+        Integer declaredRadius = null;
+        String declaredCityStyle = null;
+        for (PredefinedCityRE object : chainRootFirst) {
+            if (object.getDimension() != null) {
+                declaredDimension = object.getDimension();
+            }
+            if (object.getChunkX() != null) {
+                declaredChunkX = object.getChunkX();
+            }
+            if (object.getChunkZ() != null) {
+                declaredChunkZ = object.getChunkZ();
+            }
+            if (object.getRadius() != null) {
+                declaredRadius = object.getRadius();
+            }
+            if (object.getCityStyle() != null) {
+                declaredCityStyle = object.getCityStyle();
+            }
+        }
+        dimension = ResourceKey.create(Registries.DIMENSION,
+                Identifier.parse(Resolved.require(declaredDimension, name, "dimension")));
+        chunkX = Resolved.require(declaredChunkX, name, "chunkx");
+        chunkZ = Resolved.require(declaredChunkZ, name, "chunkz");
+        radius = Resolved.require(declaredRadius, name, "radius");
+        cityStyle = Resolved.require(declaredCityStyle, name, "citystyle");
         for (PredefinedCityRE object : chainRootFirst) {
             if (object.getPredefinedBuildings() != null) {
                 Mergeable.apply(predefinedBuildings, object.getPredefinedBuildings());

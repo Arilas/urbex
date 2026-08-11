@@ -260,7 +260,7 @@ class BuildingPartExtendsTest {
         }
 
         Builder inlinePalette(Optional<Identifier> paletteExtends, PaletteEntry... entries) {
-            this.inlinePalette = Optional.of(new PaletteRE(paletteExtends, List.of(entries)));
+            this.inlinePalette = Optional.of(new PaletteRE(paletteExtends, Optional.of(List.of(entries))));
             return this;
         }
 

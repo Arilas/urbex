@@ -140,7 +140,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
                         Optional.empty(),
                         Optional.empty()));
             }
-            PaletteRE paletteRE = new PaletteRE(Optional.empty(), entries);
+            PaletteRE paletteRE = new PaletteRE(Optional.empty(), Optional.of(entries));
             DataResult<JsonElement> result = PaletteRE.CODEC.encodeStart(JsonOps.INSTANCE, paletteRE);
             root.add("__comment__", new JsonPrimitive("'missingpalette' represents all blockstates that it couldn't find in the palette. These have to be put in a palette. " +
                     "'exportedpart' is the actual exported part"));

@@ -8,22 +8,31 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
+/**
+ * A world style.
+ * <p>
+ * {@code outsidestyle} and {@code citystyles} are optional here rather than required, because a
+ * world style that only swaps its scattered settings should not have to restate them. Requiredness
+ * is checked after the chain is resolved, in
+ * {@link dev.krona.urbex.worldgen.lost.cityassets.WorldStyle}.
+ */
 public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
 
     public static final Codec<WorldStyleRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
                     Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
-                    Codec.STRING.fieldOf("outsidestyle").forGetter(l -> l.outsideStyle),
+                    Codec.STRING.optionalFieldOf("outsidestyle").forGetter(l -> Optional.ofNullable(l.outsideStyle)),
                     MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> Optional.ofNullable(l.multiSettings)),
                     WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> Optional.ofNullable(l.worldSettings)),
                     ScatteredSettings.CODEC.optionalFieldOf("scattered").forGetter(l -> Optional.ofNullable(l.scatteredSettings)),
                     PartSelector.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.partSelector)),
-                    Mergeable.codec(CityStyleSelector.CODEC).fieldOf("citystyles").forGetter(l -> l.cityStyleSelectors),
+                    Mergeable.codec(CityStyleSelector.CODEC).optionalFieldOf("citystyles").forGetter(l -> Optional.ofNullable(l.cityStyleSelectors)),
                     Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
             ).apply(instance, WorldStyleRE::new));
 
     private Identifier name;
     private final Optional<Identifier> extendsId;
+    // Null on either of these means "not declared here", so the chain reads it from an ancestor.
     private final String outsideStyle;
     private final MultiSettings multiSettings;
     private final WorldSettings worldSettings;
@@ -33,23 +42,24 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
     private final Mergeable<CityBiomeMultiplier> cityBiomeMultipliers;
 
     public WorldStyleRE(Optional<Identifier> extendsId,
-                        String outsideStyle,
+                        Optional<String> outsideStyle,
                         Optional<MultiSettings> multiSettings,
                         Optional<WorldSettings> worldSettings,
                         Optional<ScatteredSettings> scatteredSettings,
                         Optional<PartSelector> partSelector,
-                        Mergeable<CityStyleSelector> cityStyleSelector,
+                        Optional<Mergeable<CityStyleSelector>> cityStyleSelector,
                         Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers) {
         this.extendsId = extendsId;
-        this.outsideStyle = outsideStyle;
+        this.outsideStyle = outsideStyle.orElse(null);
         this.multiSettings = multiSettings.orElse(null);
         this.worldSettings = worldSettings.orElse(null);
         this.scatteredSettings = scatteredSettings.orElse(null);
         this.partSelector = partSelector.orElse(null);
-        this.cityStyleSelectors = cityStyleSelector;
+        this.cityStyleSelectors = cityStyleSelector.orElse(null);
         this.cityBiomeMultipliers = cityBiomeMultipliers.orElse(null);
     }
 
+    @Nullable
     public String getOutsideStyle() {
         return outsideStyle;
     }
@@ -64,6 +74,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
         return scatteredSettings;
     }
 
+    @Nullable
     public Mergeable<CityStyleSelector> getCityStyleSelectors() {
         return cityStyleSelectors;
     }

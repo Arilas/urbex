@@ -127,12 +127,14 @@ public class NullDimensionInfo implements IDimensionInfo {
         }
         style = resolved != null ? resolved : new WorldStyle(List.of(new WorldStyleRE(
                 Optional.empty(),
-                "standard",
+                Optional.of("standard"),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                new Mergeable<>(true, Collections.emptyList()),
+                // Declared and empty rather than absent: the placeholder has no chain to inherit
+                // from, and an absent 'citystyles' is now a load error.
+                Optional.of(new Mergeable<>(true, Collections.emptyList())),
                 Optional.empty()
         )));
         this.seed = seed;

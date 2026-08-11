@@ -10,24 +10,32 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * A style: the groups of palettes a building can be painted from.
+ * <p>
+ * {@code randompalettes} is optional here rather than required, because requiredness is checked
+ * after the {@code extends} chain is resolved, in
+ * {@link dev.krona.urbex.worldgen.lost.cityassets.Style}.
+ */
 public class StyleRE implements IAsset<StyleRE>, Extendable {
 
     public static final Codec<StyleRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
                     Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
-                    Mergeable.codec(Codec.list(PaletteSelector.CODEC)).fieldOf("randompalettes").forGetter(l -> l.randomPaletteChoices)
+                    Mergeable.codec(Codec.list(PaletteSelector.CODEC)).optionalFieldOf("randompalettes").forGetter(l -> Optional.ofNullable(l.randomPaletteChoices))
             ).apply(instance, StyleRE::new));
 
     private Identifier name;
 
     private final Optional<Identifier> extendsId;
-    private final Mergeable<List<PaletteSelector>> randomPaletteChoices;
+    private final Mergeable<List<PaletteSelector>> randomPaletteChoices;   // null when undeclared
 
-    public StyleRE(Optional<Identifier> extendsId, Mergeable<List<PaletteSelector>> randomPaletteChoices) {
+    public StyleRE(Optional<Identifier> extendsId, Optional<Mergeable<List<PaletteSelector>>> randomPaletteChoices) {
         this.extendsId = extendsId;
-        this.randomPaletteChoices = randomPaletteChoices;
+        this.randomPaletteChoices = randomPaletteChoices.orElse(null);
     }
 
+    @Nullable
     public Mergeable<List<PaletteSelector>> getRandomPaletteChoices() {
         return randomPaletteChoices;
     }

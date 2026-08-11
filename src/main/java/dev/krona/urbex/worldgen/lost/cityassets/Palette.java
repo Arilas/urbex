@@ -43,7 +43,7 @@ public class Palette {
      */
     public Palette(List<PaletteRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
-        compile(mergeByCharacter(chainRootFirst));
+        compile(mergeByCharacter(chainRootFirst, name));
     }
 
     public Palette(String name) {
@@ -77,7 +77,7 @@ public class Palette {
             }
         }
         Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(mergeByCharacter(chainRootFirst));
+        palette.compile(mergeByCharacter(chainRootFirst, owner));
         return palette;
     }
 
@@ -86,14 +86,25 @@ public class Palette {
      * surviving entries are handed on to {@link #compile}, so an overridden entry takes its
      * {@code damaged} mapping with it rather than leaving it keyed on a block that is no longer
      * placed.
+     * <p>
+     * {@code palette} is required of the chain rather than of each file, so an entry that only
+     * declares {@code extends} inherits its ancestor's markers; a chain where nothing declares one
+     * is a load error rather than a palette that silently maps no characters at all.
      */
-    private static Collection<PaletteEntry> mergeByCharacter(List<PaletteRE> chainRootFirst) {
+    private static Collection<PaletteEntry> mergeByCharacter(List<PaletteRE> chainRootFirst,
+                                                             Identifier owner) {
         Map<Character, PaletteEntry> merged = new LinkedHashMap<>();
+        boolean anyEntries = false;
         for (PaletteRE re : chainRootFirst) {
+            if (re.getPaletteEntries() == null) {
+                continue;
+            }
+            anyEntries = true;
             for (PaletteEntry entry : re.getPaletteEntries()) {
                 merged.put(entry.getChr().charAt(0), entry);
             }
         }
+        Resolved.require(anyEntries ? merged : null, owner, "palette");
         return merged.values();
     }
 

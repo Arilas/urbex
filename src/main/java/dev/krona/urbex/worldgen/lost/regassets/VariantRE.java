@@ -9,23 +9,30 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
+/**
+ * A weighted set of blockstates a palette marker can resolve to.
+ * <p>
+ * {@code blocks} is optional here rather than required, because requiredness is checked after the
+ * {@code extends} chain is resolved, in {@link dev.krona.urbex.worldgen.lost.cityassets.Variant}.
+ */
 public class VariantRE implements IAsset<VariantRE>, Extendable {
 
     public static final Codec<VariantRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
                     Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
-                    Mergeable.codec(BlockEntry.CODEC).fieldOf("blocks").forGetter(l -> l.blocks)
+                    Mergeable.codec(BlockEntry.CODEC).optionalFieldOf("blocks").forGetter(l -> Optional.ofNullable(l.blocks))
             ).apply(instance, VariantRE::new));
 
     private Identifier name;
     private final Optional<Identifier> extendsId;
-    private final Mergeable<BlockEntry> blocks;
+    private final Mergeable<BlockEntry> blocks;   // null when this entry declares none
 
-    public VariantRE(Optional<Identifier> extendsId, Mergeable<BlockEntry> entries) {
+    public VariantRE(Optional<Identifier> extendsId, Optional<Mergeable<BlockEntry>> entries) {
         this.extendsId = extendsId;
-        this.blocks = entries;
+        this.blocks = entries.orElse(null);
     }
 
+    @Nullable
     public Mergeable<BlockEntry> getBlocks() {
         return blocks;
     }

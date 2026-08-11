@@ -43,24 +43,35 @@ public class Building {
      * takes the value of the last entry that declares one, so an entry that omits a field does not
      * blank out what an earlier one set, and the two part lists go through {@link Mergeable} so a
      * declared list replaces the inherited one unless it opts into appending.
+     * <p>
+     * {@code filler} and {@code parts} are required of the chain rather than of each file, so a
+     * building that only repaints what it extends need declare neither; a chain where nothing
+     * declares one is a load error naming the asset and the field.
+     * <p>
+     * "Declared" is read from a null rather than from a sentinel, so a child can set
+     * {@code preferslonely} back to {@code 0.0} or {@code maxfloors} back to {@code -1} against an
+     * ancestor that set something else. The defaults the fields start at are this class's own
+     * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
      */
     public Building(List<BuildingRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<PartRef> partRefs = new ArrayList<>();
+        boolean anyParts = false;
         List<PartRef> partRefs2 = new ArrayList<>();
         List<PaletteRE> inlinePalettes = new ArrayList<>();
         String refPalette = null;
+        Character filler = null;
         for (BuildingRE object : chainRootFirst) {
-            if (object.getMinFloors() != -1) {
+            if (object.getMinFloors() != null) {
                 minFloors = object.getMinFloors();
             }
-            if (object.getMinCellars() != -1) {
+            if (object.getMinCellars() != null) {
                 minCellars = object.getMinCellars();
             }
-            if (object.getMaxFloors() != -1) {
+            if (object.getMaxFloors() != null) {
                 maxFloors = object.getMaxFloors();
             }
-            if (object.getMaxCellars() != -1) {
+            if (object.getMaxCellars() != null) {
                 maxCellars = object.getMaxCellars();
             }
             if (object.getAllowDoors() != null) {
@@ -72,10 +83,12 @@ public class Building {
             if (object.getOverrideFloors() != null) {
                 overrideFloors = object.getOverrideFloors();
             }
-            if (object.getPrefersLonely() != 0.0f) {
+            if (object.getPrefersLonely() != null) {
                 prefersLonely = object.getPrefersLonely();
             }
-            fillerBlock = object.getFillerBlock();
+            if (object.getFillerBlock() != null) {
+                filler = object.getFillerBlock();
+            }
             if (object.getRubbleBlock() != null) {
                 rubbleBlock = object.getRubbleBlock();
             }
@@ -89,11 +102,16 @@ public class Building {
                 refPalette = object.getRefPaletteName();
                 inlinePalettes.clear();
             }
-            Mergeable.apply(partRefs, object.getParts());
+            if (object.getParts() != null) {
+                Mergeable.apply(partRefs, object.getParts());
+                anyParts = true;
+            }
             if (object.getParts2() != null) {
                 Mergeable.apply(partRefs2, object.getParts2());
             }
         }
+        fillerBlock = Resolved.require(filler, name, "filler");
+        Resolved.require(anyParts ? partRefs : null, name, "parts");
 
         if (!inlinePalettes.isEmpty()) {
             localPalette = Palette.inline(name, inlinePalettes); // @todo get the full palette instead

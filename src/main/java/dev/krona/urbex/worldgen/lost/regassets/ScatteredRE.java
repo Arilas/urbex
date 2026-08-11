@@ -10,6 +10,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 
+/**
+ * A building scattered outside the cities.
+ * <p>
+ * {@code terrainheight} and {@code terrainfix} are optional here rather than required, because a
+ * variant that only swaps its building list should not have to restate how it sits on the terrain.
+ * Requiredness is checked after the chain is resolved, in {@link ScatteredBuilding}.
+ */
 public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
 
     public static final Codec<ScatteredRE> CODEC = RecordCodecBuilder.create(instance ->
@@ -18,8 +25,8 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
                     Mergeable.codec(Codec.STRING).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildings)),
                     Codec.STRING.optionalFieldOf("multibuilding").forGetter(l -> Optional.ofNullable(l.multibuilding)),
                     Codec.BOOL.optionalFieldOf("rotatable").forGetter(l -> Optional.ofNullable(l.rotatable)),
-                    StringRepresentable.fromEnum(ScatteredBuilding.TerrainHeight::values).fieldOf("terrainheight").forGetter(l -> l.terrainheight),
-                    StringRepresentable.fromEnum(ScatteredBuilding.TerrainFix::values).fieldOf("terrainfix").forGetter(l -> l.terrainfix),
+                    StringRepresentable.fromEnum(ScatteredBuilding.TerrainHeight::values).optionalFieldOf("terrainheight").forGetter(l -> Optional.ofNullable(l.terrainheight)),
+                    StringRepresentable.fromEnum(ScatteredBuilding.TerrainFix::values).optionalFieldOf("terrainfix").forGetter(l -> Optional.ofNullable(l.terrainfix)),
                     Codec.INT.optionalFieldOf("heightoffset").forGetter(l -> Optional.ofNullable(l.heightoffset))
             ).apply(instance, ScatteredRE::new));
 
@@ -35,14 +42,15 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
     public ScatteredRE(Optional<Identifier> extendsId,
                        Optional<Mergeable<String>> buildings, Optional<String> multibuilding,
                        Optional<Boolean> rotatable,
-                       ScatteredBuilding.TerrainHeight terrainheight, ScatteredBuilding.TerrainFix terrainfix,
+                       Optional<ScatteredBuilding.TerrainHeight> terrainheight,
+                       Optional<ScatteredBuilding.TerrainFix> terrainfix,
                        Optional<Integer> heightoffset) {
         this.extendsId = extendsId;
         this.buildings = buildings.orElse(null);
         this.multibuilding = multibuilding.map(String::intern).orElse(null);
         this.rotatable = rotatable.orElse(null);
-        this.terrainheight = terrainheight;
-        this.terrainfix = terrainfix;
+        this.terrainheight = terrainheight.orElse(null);
+        this.terrainfix = terrainfix.orElse(null);
         this.heightoffset = heightoffset.orElse(null);
     }
 
@@ -61,10 +69,12 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
         return multibuilding;
     }
 
+    @Nullable
     public ScatteredBuilding.TerrainHeight getTerrainheight() {
         return terrainheight;
     }
 
+    @Nullable
     public ScatteredBuilding.TerrainFix getTerrainfix() {
         return terrainfix;
     }

@@ -34,6 +34,10 @@ public class WorldStyle {
      * Builds a fully resolved world style from its {@code extends} chain, root first: every
      * settings block takes the value of the last entry that declares one, and the two selector
      * lists go through {@link Mergeable} so a declared list replaces unless it opts into appending.
+     * <p>
+     * {@code outsidestyle} and {@code citystyles} are required of the chain rather than of each
+     * file: a child that only swaps its scattered settings inherits both, and a chain where nothing
+     * declares one is a load error naming the asset and the field.
      */
     public WorldStyle(List<WorldStyleRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
@@ -43,9 +47,12 @@ public class WorldStyle {
         MultiSettings multi = MultiSettings.DEFAULT;
         WorldSettings world = WorldSettings.DEFAULT;
         List<CityStyleSelector> selectors = new ArrayList<>();
+        boolean anySelectors = false;
         List<CityBiomeMultiplier> multipliers = new ArrayList<>();
         for (WorldStyleRE object : chainRootFirst) {
-            outside = object.getOutsideStyle();
+            if (object.getOutsideStyle() != null) {
+                outside = object.getOutsideStyle();
+            }
             if (object.getScatteredSettings() != null) {
                 scattered = object.getScatteredSettings();
             }
@@ -58,12 +65,16 @@ public class WorldStyle {
             if (object.getWorldSettings() != null) {
                 world = object.getWorldSettings();
             }
-            Mergeable.apply(selectors, object.getCityStyleSelectors());
+            if (object.getCityStyleSelectors() != null) {
+                Mergeable.apply(selectors, object.getCityStyleSelectors());
+                anySelectors = true;
+            }
             if (object.getCityBiomeMultipliers() != null) {
                 Mergeable.apply(multipliers, object.getCityBiomeMultipliers());
             }
         }
-        this.outsideStyle = outside;
+        this.outsideStyle = Resolved.require(outside, name, "outsidestyle");
+        Resolved.require(anySelectors ? selectors : null, name, "citystyles");
         this.scatteredSettings = scattered;
         this.partSelector = parts;
         this.multiSettings = multi;
@@ -90,6 +101,14 @@ public class WorldStyle {
 
     public String getOutsideStyle() {
         return outsideStyle;
+    }
+
+    /**
+     * The resolved {@code citystyles}, for tests. The public surface offers only a weighted draw
+     * that needs a level and a biome, so without this the chain fold is unobservable.
+     */
+    List<Pair<Predicate<Holder<Biome>>, Pair<Float, String>>> cityStyleSelectors() {
+        return cityStyleSelector;
     }
 
     @Nonnull

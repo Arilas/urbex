@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- **A datapack file now only has to state what it changes, on every registry rather than only on
+  parts.** Twenty-two fields that the codec still demanded of every file are optional now:
+  `predefinedcities.dimension`/`chunkx`/`chunkz`/`radius`/`citystyle`, `stuff.column`/`mincount`/
+  `maxcount`/`attempts`, `multibuildings.dimx`/`dimz`/`buildings`, `buildings.filler`/`parts`,
+  `scattered.terrainheight`/`terrainfix`, `worldstyles.outsidestyle`/`citystyles`,
+  `conditions.values`, `palettes.palette`, `styles.randompalettes` and `variants.blocks`. Absent
+  means "read the parent": each takes the value of the last file in the chain that declares one, so
+  `{"extends": "urbex:oilrig", "buildings": ["urbex:oilrig_burnt"]}` is now a complete `scattered`
+  file, and a second predefined city can be the first one moved by declaring nothing but its own
+  `chunkx` and `chunkz`. This is the rule `parts` already got for `xsize`/`zsize`/`slices`, applied
+  everywhere - on `multibuildings` every single field was required, which made `extends` there
+  purely decorative. Requiredness has not gone away, it has moved: a field that *nothing* in the
+  whole chain declares is a load error naming the asset and the field ("`'urbex:oilrig_burnt'`
+  declares no `'terrainfix'`, and neither does anything it extends"), raised while the pack loads
+  rather than surfacing as a null somewhere in generation. Along the way, `buildings` stopped
+  encoding "undeclared" as a sentinel: `minfloors`/`maxfloors`/`mincellars`/`maxcellars` no longer
+  use `-1` and `preferslonely` no longer uses `0.0` to mean "absent", so a child can now set an
+  inherited `preferslonely` of `0.8` back down to `0.0`, or an inherited floor limit back to `-1`
+  ("take the level's limit"), which under the old sentinels was impossible to say. Nothing in an
+  existing datapack needs to change: a file that declares everything decodes exactly as it did
+  before, and this only widens what is accepted. A third-party pack that relied on a file failing
+  to load when it omitted one of these keys now gets that error from the resolved chain instead of
+  from the codec, with the asset and the field named. Confirmed worldgen-inert: both digests
+  regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
 - **All thirteen datapack registries now support `extends`, so an author never has to look up which
   asset types can build on another.** `buildings`, `parts`, `palettes`, `styles`, `multibuildings`,
   `scattered`, `conditions`, `variants`, `stuff`, `predefinedcities` and `worldstyles` join

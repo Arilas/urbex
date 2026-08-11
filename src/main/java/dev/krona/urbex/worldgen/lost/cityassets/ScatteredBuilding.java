@@ -26,6 +26,9 @@ public class ScatteredBuilding {
      * Builds a fully resolved scattered building from its {@code extends} chain, root first: each
      * scalar takes the value of the last entry that declares one, and the building list goes
      * through {@link Mergeable} so a declared list replaces unless it opts into appending.
+     * <p>
+     * {@code terrainheight} and {@code terrainfix} are required of the chain rather than of each
+     * file, so a variant that only swaps its building list inherits both.
      */
     public ScatteredBuilding(List<ScatteredRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
@@ -46,13 +49,17 @@ public class ScatteredBuilding {
             if (object.getHeightoffset() != null) {
                 heightoffset = object.getHeightoffset();
             }
-            terrainheight = object.getTerrainheight();
-            terrainfix = object.getTerrainfix();
+            if (object.getTerrainheight() != null) {
+                terrainheight = object.getTerrainheight();
+            }
+            if (object.getTerrainfix() != null) {
+                terrainfix = object.getTerrainfix();
+            }
         }
         this.buildings = anyBuildings ? List.copyOf(declaredBuildings) : null;
         this.multibuilding = multibuilding;
-        this.terrainheight = terrainheight;
-        this.terrainfix = terrainfix;
+        this.terrainheight = Resolved.require(terrainheight, name, "terrainheight");
+        this.terrainfix = Resolved.require(terrainfix, name, "terrainfix");
         this.heightoffset = heightoffset;
     }
 

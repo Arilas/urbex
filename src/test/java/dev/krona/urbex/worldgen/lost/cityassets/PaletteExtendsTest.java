@@ -98,7 +98,7 @@ class PaletteExtendsTest {
     }
 
     private static PaletteRE palette(String path, PaletteEntry... entries) {
-        return new PaletteRE(Optional.empty(), List.of(entries))
+        return new PaletteRE(Optional.empty(), Optional.of(List.of(entries)))
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
     }
 

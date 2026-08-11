@@ -21,14 +21,21 @@ public class Condition {
 
     /**
      * Builds a fully resolved condition from its {@code extends} chain, root first: a declared
-     * {@code values} replaces the inherited list unless it opts into appending.
+     * {@code values} replaces the inherited list unless it opts into appending, and an absent one
+     * inherits it unchanged. A chain where nothing declares {@code values} is a load error, since
+     * the condition would silently hand back null for every draw.
      */
     public Condition(List<ConditionRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<ConditionPart> values = new ArrayList<>();
+        boolean anyValues = false;
         for (ConditionRE object : chainRootFirst) {
-            Mergeable.apply(values, object.getValues());
+            if (object.getValues() != null) {
+                Mergeable.apply(values, object.getValues());
+                anyValues = true;
+            }
         }
+        Resolved.require(anyValues ? values : null, name, "values");
         for (ConditionPart cp : values) {
             float factor = cp.getFactor();
             String value = cp.getValue();
