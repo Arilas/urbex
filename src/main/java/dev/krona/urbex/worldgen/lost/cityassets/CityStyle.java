@@ -3,7 +3,6 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
@@ -248,8 +247,9 @@ public class CityStyle {
         };
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:citystyle_common"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

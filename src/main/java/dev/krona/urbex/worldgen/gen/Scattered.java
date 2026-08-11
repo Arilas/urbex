@@ -259,7 +259,7 @@ public class Scattered {
         // TODO top condition is wrong due to floor calculation being different
         String belowFloor = "<none>";
         for (int f = 0; f < floors; f++) {
-            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, "<none>", belowFloor, building.getName(), info.coord) {
+            ConditionContext conditionContext = new ConditionContext(lowestLevel, f, 0, floors, "<none>", belowFloor, ConditionContext.legacyMatchKey(building.getId()), info.coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;

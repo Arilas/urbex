@@ -3,7 +3,6 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
 import net.minecraft.resources.Identifier;
@@ -176,11 +175,13 @@ public class BuildingPart implements IBuildingPart {
         return refPaletteName;
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:street_straight"}. */
     @Override
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
+    @Override
     public Identifier getId() {
         return name;
     }

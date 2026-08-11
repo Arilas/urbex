@@ -15,7 +15,7 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
             instance.group(
                     Codec.FLOAT.optionalFieldOf("explosionchance").forGetter(l -> Optional.ofNullable(l.explosionChance)),
                     Codec.STRING.optionalFieldOf("style").forGetter(l -> Optional.ofNullable(l.style)),
-                    Identifier.CODEC.optionalFieldOf("extends").forGetter(CityStyleRE::getExtends),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(CityStyleRE::getExtends),
                     Codec.STRING.listOf().optionalFieldOf("stuff_tags").forGetter(l -> Optional.ofNullable(l.stuffTags)),
                     GeneralSettings.CODEC.optionalFieldOf("generalblocks").forGetter(l -> Optional.ofNullable(l.generalSettings)),
                     BuildingSettings.CODEC.optionalFieldOf("buildingsettings").forGetter(l -> Optional.ofNullable(l.buildingSettings)),

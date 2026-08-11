@@ -3,7 +3,6 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.state.BlockState;
@@ -42,8 +41,9 @@ public class Variant {
         }
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:leaves_green"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

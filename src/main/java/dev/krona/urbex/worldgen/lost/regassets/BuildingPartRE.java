@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
 import net.minecraft.resources.Identifier;
@@ -23,7 +24,7 @@ public class BuildingPartRE implements IAsset<BuildingPartRE>, Extendable {
 
     public static final Codec<BuildingPartRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.INT.optionalFieldOf("xsize").forGetter(l -> Optional.ofNullable(l.xSize)),
                     Codec.INT.optionalFieldOf("zsize").forGetter(l -> Optional.ofNullable(l.zSize)),
                     Codec.list(Codec.list(Codec.STRING)).optionalFieldOf("slices").forGetter(BuildingPartRE::createSlices),

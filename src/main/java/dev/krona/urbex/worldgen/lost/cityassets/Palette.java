@@ -4,7 +4,6 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
@@ -113,8 +112,9 @@ public class Palette {
         damaged.putAll(other.damaged);
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:common"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DatapackReferenceIntegrityTest {
 
     private static final Path ROOT = Path.of("src/main/resources/data/urbex/urbex");
+    private static final Path ASSETS_ROOT = Path.of("src/main/resources/assets/urbex");
 
     /** target category (directory under ROOT) -> collected [sourceFile, reference] pairs */
     private final List<String> problems = new ArrayList<>();
@@ -126,6 +127,15 @@ class DatapackReferenceIntegrityTest {
                 if (cities != null) {
                     ref(src, cities.get("cityStyleAlternative"), "citystyles");
                 }
+                JsonObject spawn = asObject(d.get("spawn"));
+                if (spawn != null) {
+                    ref(src, spawn.get("spawnCity"), "predefinedcities");
+                    forEachElement(spawn.get("forceSpawnBuildings"), v -> ref(src, v, "buildings"));
+                    forEachElement(spawn.get("forceSpawnParts"), v -> ref(src, v, "parts"));
+                }
+                // "icon" is a texture path under assets/urbex, not a data/ asset reference, so it
+                // gets its own check rather than ref().
+                iconRef(src, d.get("icon"));
             }
             case "palettes", "variants" -> { /* only palette-entry refs, handled below */ }
             default -> problems.add(file + ": category '" + category
@@ -175,6 +185,19 @@ class DatapackReferenceIntegrityTest {
         Path target = ROOT.resolve(targetCategory).resolve(name.substring(colon + 1) + ".json");
         if (!Files.isRegularFile(target)) {
             problems.add(src + ": \"" + name + "\" does not resolve to " + target);
+        }
+    }
+
+    /** A preset's "icon" is a path relative to assets/urbex, always in the urbex namespace - not
+     *  a data/ registry cross-reference, so this checks the file exists rather than calling ref(). */
+    private void iconRef(String src, JsonElement el) {
+        if (el == null || !el.isJsonPrimitive()) {
+            return;
+        }
+        String path = el.getAsString();
+        Path target = ASSETS_ROOT.resolve(path);
+        if (!Files.isRegularFile(target)) {
+            problems.add(src + ": icon \"" + path + "\" does not resolve to " + target);
         }
     }
 

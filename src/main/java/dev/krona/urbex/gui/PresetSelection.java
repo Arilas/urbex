@@ -34,7 +34,7 @@ public final class PresetSelection {
     public static final Identifier CUSTOMIZED_ID = Identifier.fromNamespaceAndPath("urbex", "customized");
 
     private static final Gson GSON = new Gson();
-    private static final String DEFAULT_STYLE_NAME = DataTools.toName(Config.DEFAULT_WORLD_STYLE);
+    private static final String DEFAULT_STYLE_NAME = Config.DEFAULT_WORLD_STYLE.toString();
 
     /**
      * One selectable row. {@code preset} is {@code null} only for the Disabled row; every other
@@ -159,7 +159,7 @@ public final class PresetSelection {
         return selectedWorldStyle;
     }
 
-    /** The bare-name worldStyle that will actually generate: the chosen override, or the default. */
+    /** The fully-qualified worldStyle that will actually generate: the chosen override, or the default. */
     public String effectiveWorldStyle() {
         return selectedWorldStyle != null ? selectedWorldStyle : DEFAULT_STYLE_NAME;
     }
@@ -236,7 +236,7 @@ public final class PresetSelection {
         Config.overridesFromClient = overrides;
         Urbex.getLogger().info("Restored Urbex preset '{}' for world re-creation", presetId);
 
-        this.selectedWorldStyle = DataTools.toName(worldStyleId);
+        this.selectedWorldStyle = worldStyleId.toString();
         this.pendingRestore = new PendingRestore(presetId, overrides);
         reconcilePendingRestore();
     }
@@ -321,9 +321,9 @@ public final class PresetSelection {
             return;
         }
 
-        // effectiveWorldStyle() is a toName()-shortened display string this class's own state
-        // produced, not an authored reference - see DataTools.fromDisplayName.
-        Config.worldStyleFromClient = DataTools.fromDisplayName(effectiveWorldStyle());
+        // effectiveWorldStyle() is always fully qualified (see DEFAULT_STYLE_NAME and setWorldStyle),
+        // so this can go through the same strict resolution as any other reference.
+        Config.worldStyleFromClient = DataTools.fromName(effectiveWorldStyle());
 
         if (CUSTOMIZED_ID.equals(entry.id())) {
             Preset preset = entry.preset();

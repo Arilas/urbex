@@ -11,31 +11,70 @@
   happened to be registered there rather than at anything a file actually wrote, so a wrong reference
   was unfindable the moment it misbehaved. The message names both the offending string and the fix,
   e.g. `Unqualified datapack reference 'radiotower': references must name their namespace, e.g.
-  'urbex:radiotower'`. `PresetRE`'s `extends` field decoded through `Identifier.CODEC` rather than
-  `fromName`, so it had a third, different defaulting rule of its own - a bare name became
-  `minecraft:name` instead of either erroring or defaulting to `urbex:` - now routed through the same
-  strict resolution via a codec that wraps `DataTools.fromName`. `DatapackReferenceIntegrityTest`
-  gained a `presets` case (checking `cities.cityStyleAlternative`; `extends` was already checked for
-  every category by the shared check above the switch) and its former silent fall-through category is
-  now itself a failure naming the uncovered category - which is how it caught both that `presets` had
-  never been checked at all and that `largecities.json`'s `cityStyleAlternative: "citystyle_border"`
-  was the bundled pack's last unqualified reference, now `"urbex:citystyle_border"`. The same widened
-  test also caught that `palettes` had no case either; its 30 files carry only `extends` and `palette`
-  entries, both already checked elsewhere, so it now has the same no-op case `variants` does. A
-  third-party datapack author must qualify every reference from here on, in any registry's `extends`
-  or any cross-reference field - bare names no longer default to the `urbex` namespace anywhere.
-  Auditing every call site this change reaches also turned up a handful of places where the mod's own
-  Java code, not a datapack, produced the bare string: `PresetSelection`/`CityPreview` round-trip a
-  `toName()`-shortened worldStyle id through the Cities tab and the world-creation preview,
-  `BuildingInfo`'s majority-cityStyle vote among a chunk's neighbors and `MultiChunk`'s scattered
-  multi-building placement counted/stored that same shortened name, and the `editpart`/`resumeedit`/
-  `exportpart` edit-mode commands read one back from `EditModeData`/`EditorInfo`. None of those are
-  authored references, so routing them through the now-strict `fromName` would have broken the
-  default worldStyle selection and crashed every edit-mode command; they now go through the new
-  `DataTools.fromDisplayName` (or the already-qualified `Identifier` directly), which is documented as
-  the inverse of `toName()` and is never to be used on a datapack- or config-authored string. Confirmed
-  worldgen-inert: both digests regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both
-  `unsafeReads=0`).
+  'urbex:radiotower'`. Every registry's `extends` field used to decode through plain `Identifier.CODEC`,
+  under which a bare name resolves against the `minecraft` namespace instead of erroring - a third,
+  silent defaulting rule, inconsistent both with the strict rule above and with itself from one registry
+  to the next. All thirteen registries now share one `DataTools.STRICT_IDENTIFIER_CODEC`, which wraps
+  `fromName` and catches `RuntimeException` rather than just `IllegalArgumentException` -
+  `Identifier.parse` throws `net.minecraft.IdentifierException` (a `RuntimeException`) for a
+  qualified-but-malformed id, e.g. an uppercase letter, and that must fail as a clean per-file
+  `DataResult.error` too, not escape the codec as a thrown exception. `DatapackReferenceIntegrityTest`'s
+  `presets` case, previously checking only `cities.cityStyleAlternative`, now also checks
+  `spawn.spawnCity` (an unqualified value is a hard throw at spawn placement, through the same strict
+  `fromName`), `spawn.forceSpawnBuildings`/`spawn.forceSpawnParts` (compared against a resolved asset's
+  own qualified id, so an unqualified authored value would otherwise never match anything, silently),
+  and `icon` (its own check rather than the shared reference helper - it is a texture path under
+  `assets/urbex`, not a `data/` registry reference, so this only confirms the file exists). The same
+  widened test caught that `palettes` had no case at all (30 files, only `extends` and `palette`
+  entries, both already checked elsewhere - closed with the same no-op case `variants` already had) and
+  that `largecities.json`'s `cityStyleAlternative: "citystyle_border"` was the bundled pack's last
+  unqualified reference, now `"urbex:citystyle_border"`. The test's former silent fall-through category
+  is now itself a failure naming the uncovered category, so a fourteenth registry cannot go uncovered
+  the way `presets` and `palettes` did.
+- **`DataTools.toName`/`fromDisplayName` and the "two names per asset" they existed to bridge are gone;
+  every asset is one qualified id everywhere, including on screen.** Twelve `cityassets` classes
+  (`Building`, `BuildingPart`, `CityStyle`, `Condition`, `MultiBuilding`, `Palette`, `PredefinedCity`,
+  `ScatteredBuilding`, `Style`, `StuffObject`, `Variant`, `WorldStyle`) plus the `IBuildingPart`
+  interface `BuildingPart` implements had a `getName()` that stripped the `urbex:` namespace for
+  display, alongside a `getId()` that never did - a split that made sense while bare names were legal
+  in a datapack (a Lost Cities convention this mod inherited), but not once the entry above makes them
+  illegal: a stripped name no longer matches anything a datapack or config file is allowed to write.
+  `getName()` on all twelve (thirteen counting the interface) now returns the same fully-qualified id
+  as `getId().toString()`. The Cities tab, the Customize editor and the world-creation preview - which
+  held worldStyle ids as `toName()`-shortened strings because `Preset` carries no worldStyle field of
+  its own - now show and round-trip the qualified id throughout; labels are longer as a direct result,
+  which is the intended outcome: once a second datapack is installed, a bare `"standard"` next to a
+  bare `"moderntweaks"` no longer says who owns which. `EditModeData`'s persisted part name (read back
+  by the `editpart`/`resumeedit`/`exportpart` edit-mode commands) changes format the same way - this
+  fork's clean-break policy applies here too, and there are no released worlds to protect. One latent
+  bug is fixed as a direct consequence, not a deliberate change: `/urbex locatepart` compared a stored
+  (bare) name against a fully-qualified command argument and could never find anything; both sides are
+  qualified now, so it works.
+- **`Counter.getMostOccuring()`'s tie-break is now a stated rule instead of `HashMap` iteration order.**
+  `BuildingInfo`'s majority-cityStyle vote among a chunk's neighbors - the only caller - produces an
+  even split at every style boundary (ten votes: 3x3 neighbors plus the center counted twice), and the
+  old tie-break fell through to whichever key `HashMap` happened to visit first, which depends on each
+  key's hash bucket: an unrelated rename of a city style could silently move which side of a boundary a
+  tied chunk falls on. Ties now break on the lexicographically lowest key, so counting the qualified id
+  (needed for the entry above) can no longer move a tie by accident the way it could have under the old
+  rule. **This determinism fix is not verified worldgen-inert by the shipped digests** - neither
+  sampled window contains a tied city-style boundary, only one candidate reachable in generation at
+  all (`urbex:standard`) - so a real tie elsewhere in a world could now lay out differently than it
+  used to, even though both digests regenerate unchanged. `CounterTest` pins the new rule directly: a
+  unique winner is unaffected, and a tie's winner no longer depends on insertion order.
+- **A separate, pre-existing bug this pass could have fixed by accident, and deliberately did not:**
+  `conditions/chestloot.json`'s `inpart` entries (`"urbex:rail_dungeon1"`/`"urbex:rail_dungeon2"`) are
+  required to be fully qualified by `DatapackReferenceIntegrityTest`, but the runtime side of that
+  comparison (`ConditionContext.getPart()`/`getBuilding()`) used to be fed by the very `getName()` the
+  entry above just qualified - so qualifying it everywhere would have made a chest-loot condition that
+  has never once fired since the qualified-`inpart` convention was introduced start firing, silently,
+  as a side effect of an unrelated change. Confirmed by hand: reverting just that one path reverted
+  `runDigestCheckFeatures` to the shipped golden, proving it was the entire cause of the only digest
+  shift this work produced. The new `ConditionContext.legacyMatchKey(Identifier)` preserves the exact
+  old (bare-for-`urbex`) comparison every `inpart`/`inbuilding` match used, pinned by
+  `ConditionContextLegacyMatchKeyTest`, so this pass changes nothing about which chest-loot conditions
+  fire - that mismatch stays a separate, tracked follow-up. Confirmed worldgen-inert: both digests
+  regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`).
 - **A datapack file now only has to state what it changes, on every registry rather than only on
   parts.** Twenty-two fields that the codec still demanded of every file are optional now:
   `predefinedcities.dimension`/`chunkx`/`chunkz`/`radius`/`citystyle`, `stuff.column`/`mincount`/

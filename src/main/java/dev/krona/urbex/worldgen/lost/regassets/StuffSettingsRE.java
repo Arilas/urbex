@@ -5,6 +5,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
 import dev.krona.urbex.worldgen.lost.regassets.data.BiomeMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockMatcher;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
@@ -26,7 +27,7 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
 
     public static final Codec<StuffSettingsRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(Codec.STRING).optionalFieldOf("tags").forGetter(l -> Optional.ofNullable(l.tags)),
                     Codec.STRING.optionalFieldOf("column").forGetter(l -> Optional.ofNullable(l.column)),
                     Codec.INT.optionalFieldOf("minheight").forGetter(l -> Optional.ofNullable(l.minheight)),

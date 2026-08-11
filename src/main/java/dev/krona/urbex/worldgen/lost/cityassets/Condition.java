@@ -3,7 +3,6 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.ConditionRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
@@ -44,8 +43,9 @@ public class Condition {
         }
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:chestloot"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

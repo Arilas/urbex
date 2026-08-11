@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.lost.regassets;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
@@ -21,7 +22,7 @@ public class ConditionRE implements IAsset<ConditionRE>, Extendable {
 
     public static final Codec<ConditionRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(ConditionPart.CODEC).optionalFieldOf("values").forGetter(l -> Optional.ofNullable(l.values))
             ).apply(instance, ConditionRE::new));
 

@@ -11,6 +11,7 @@ import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 import net.minecraft.core.BlockPos;
@@ -353,21 +354,23 @@ public class BuildingInfo {
         // that represents the majority. This is to prevent streets from switching style randomly if two
         // different styled cities mix
         if (characteristics.isCity && !characteristics.couldHaveBuilding) {
-            // Counted by the full id, not CityStyle.getName()'s toName()-shortened display string:
-            // that string is bare for every urbex-namespace style, and AssetRegistries.get(String)
-            // now rejects an unqualified name rather than defaulting it.
+            // Counted by the fully-qualified id (CityStyle.getName()). A tie is the ordinary case
+            // at a style boundary (ten votes: 3x3 neighbours plus the centre twice), and
+            // Counter.getMostOccuring() now breaks ties on a stated rule (lexicographically lowest
+            // key) rather than HashMap bucket order, so counting the qualified id no longer risks
+            // silently moving worldgen the way it would have under the old hash-order tie-break.
             Counter<String> counter = new Counter<>();
             for (int cx = -1; cx <= 1; cx++) {
                 for (int cz = -1; cz <= 1; cz++) {
                     ChunkCoord key = coord.offset(cx, cz);
                     cityStyle = City.getCityStyle(key, provider, profile);
-                    counter.add(cityStyle.getId().toString());
+                    counter.add(cityStyle.getName());
                     if (cx == 0 && cz == 0) {
-                        counter.add(cityStyle.getId().toString());   // Add this chunk again for a bias
+                        counter.add(cityStyle.getName());   // Add this chunk again for a bias
                     }
                 }
             }
-            cityStyle = AssetRegistries.CITYSTYLES.get(world, Identifier.parse(counter.getMostOccuring()));
+            cityStyle = AssetRegistries.CITYSTYLES.get(world, DataTools.fromName(counter.getMostOccuring()));
         } else {
             cityStyle = City.getCityStyle(coord, provider, profile);
         }
@@ -623,7 +626,7 @@ public class BuildingInfo {
 
         String belowPart = "<none>";
         for (int i = 0; i <= floors + cellars; i++) {
-            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, building.getName(), coord) {
+            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -644,7 +647,7 @@ public class BuildingInfo {
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
             belowPart = randomPart;
 
-            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, building.getName(), coord) {
+            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -814,7 +817,7 @@ public class BuildingInfo {
         String belowPart = "<none>";
         Building building = (Building) getBuilding();
         for (int i = 0; i <= floors + cellars; i++) {
-            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, building.getName(), coord) {
+            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, "<none>", belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -838,7 +841,7 @@ public class BuildingInfo {
             belowPart = randomPart;
             floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), randomPart);
 
-            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, building.getName(), coord) {
+            ConditionContext conditionContext2 = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, randomPart, belowPart, ConditionContext.legacyMatchKey(building.getId()), coord) {
                 @Override
                 public boolean isBuilding() {
                     return true;
@@ -1921,8 +1924,9 @@ public class BuildingInfo {
         return this.isCity;
     }
 
+    /** Feeds only {@link ConditionTodo}'s "building" field - see {@link ConditionContext#legacyMatchKey}. */
     public String getBuildingType() {
-        return hasBuilding ? buildingType.getName() : null;
+        return hasBuilding ? ConditionContext.legacyMatchKey(buildingType.getId()) : null;
     }
 
     public int getCityLevel() {

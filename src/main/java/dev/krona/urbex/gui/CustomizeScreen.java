@@ -6,7 +6,6 @@ import dev.krona.urbex.gui.settings.SettingCategory;
 import dev.krona.urbex.gui.settings.SettingControls;
 import dev.krona.urbex.gui.settings.SettingDescriptor;
 import dev.krona.urbex.gui.settings.Settings;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -76,7 +75,7 @@ public class CustomizeScreen extends Screen {
     private final Screen parent;
     @Nullable
     private final CreateWorldScreen createWorldScreen;
-    /** Display name only ({@code DataTools.toName(base.getId())}) - not the editor's own state. */
+    /** Display name only ({@code base.getId().toString()}) - not the editor's own state. */
     private final String baseName;
     private final Preset base;
     private Preset copy;
@@ -105,11 +104,11 @@ public class CustomizeScreen extends Screen {
     private boolean suppressSearchResponder;
 
     public CustomizeScreen(Screen parent, Preset base) {
-        super(Component.translatable("urbex.screen.customize.title", DataTools.toName(base.getId())));
+        super(Component.translatable("urbex.screen.customize.title", base.getId().toString()));
         this.parent = parent;
         this.createWorldScreen = parent instanceof CreateWorldScreen cws ? cws : null;
         this.base = base;
-        this.baseName = DataTools.toName(base.getId());
+        this.baseName = base.getId().toString();
         this.copy = base.copy();
         this.preview = new CityPreview(previewRegistries(createWorldScreen));
         this.previewSeedFallback = random.nextLong();

@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -20,7 +21,7 @@ public class MultiBuildingRE implements IAsset<MultiBuildingRE>, Extendable {
 
     public static final Codec<MultiBuildingRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.INT.optionalFieldOf("dimx").forGetter(l -> Optional.ofNullable(l.dimX)),
                     Codec.INT.optionalFieldOf("dimz").forGetter(l -> Optional.ofNullable(l.dimZ)),
                     // A grid, not an ordered list: appending rows would contradict dimx/dimz, so a

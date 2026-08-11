@@ -49,9 +49,8 @@ public class CommandResumeEdit implements Command<CommandSourceStack> {
 
         ChunkPos cp = ChunkPos.containing(start);
         for (EditModeData.PartData data : EditModeData.getData().getPartData(new ChunkCoord(level.dimension(), cp.x(), cp.z()))) {
-            // data.partName() is a toName()-shortened display string CityGenerator.generatePart
-            // recorded, not an authored reference - see DataTools.fromDisplayName.
-            BuildingPart part = AssetRegistries.PARTS.get(level, DataTools.fromDisplayName(data.partName()));
+            // data.partName() is CityGenerator.generatePart's recorded part id - always qualified.
+            BuildingPart part = AssetRegistries.PARTS.get(level, DataTools.fromName(data.partName()));
             if (part == null) {
                 context.getSource().sendFailure(Component.literal("Unknown part '" + data.partName() + "' in this chunk!"));
                 return 0;

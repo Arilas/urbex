@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
@@ -100,8 +99,9 @@ public class PredefinedCity {
         return predefinedStreets;
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:spawncity"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

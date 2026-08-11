@@ -122,8 +122,8 @@ public class CityPreview implements AutoCloseable {
     /**
      * Recomputes the preview iff (preset content, worldStyle, seed, mode) differs from the last call.
      * {@code preset == null} clears whatever is showing (nothing selected yet). {@code worldStyle} is
-     * a bare or {@code namespace:path} style id (the Cities tab / Customize editor's own convention),
-     * resolved against the registry the preview was built with.
+     * a fully-qualified {@code namespace:path} style id, resolved against the registry the preview
+     * was built with.
      */
     public void update(@Nullable Preset preset, String worldStyle, long seed, Mode mode) {
         if (preset == null) {
@@ -225,9 +225,8 @@ public class CityPreview implements AutoCloseable {
         // refresh.
         City.cleanPredefinedCache();
 
-        // worldStyle is a toName()-shortened display string PresetSelection.effectiveWorldStyle()
-        // produced, not an authored reference - see DataTools.fromDisplayName.
-        Identifier worldStyleId = DataTools.fromDisplayName(worldStyle);
+        // worldStyle (from PresetSelection.effectiveWorldStyle()) is always fully qualified.
+        Identifier worldStyleId = DataTools.fromName(worldStyle);
 
         // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
         // the preset, so it does not pay to build one there - and this construction is the only site

@@ -6,7 +6,6 @@ import dev.krona.urbex.gui.preview.CityPreview;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -75,7 +74,7 @@ public class CitiesTab extends GridLayoutTab {
     private static final int MAX_PREVIEW_WIDTH = 130;
 
     /** The built-in worldStyle every install ships; sorts first in the selector. */
-    private static final String STANDARD_STYLE = "standard";
+    private static final String STANDARD_STYLE = "urbex:standard";
 
     /**
      * The preview owns a GPU texture, and nothing tells a {@link net.minecraft.client.gui.components.tabs.Tab}
@@ -368,13 +367,12 @@ public class CitiesTab extends GridLayoutTab {
     }
 
     /**
-     * The name a worldStyle registry key is shown/published as: the bare path for the mod's own
-     * namespace (so {@code urbex:standard} shows as {@code "standard"}), {@code namespace:path} for
-     * any other datapack. Same convention {@link DataTools#toName}/{@code DataTools#fromName} use for
-     * presets, kept separate only because the registry key type differs.
+     * The name a worldStyle registry key is shown/published as: its full {@code namespace:path},
+     * unabbreviated - once a second datapack is installed, a bare "standard" next to a bare
+     * "moderntweaks" would not say which pack owns which, so every entry is qualified.
      */
     private static String worldStyleName(Identifier key) {
-        return DataTools.toName(key);
+        return key.toString();
     }
 
     /**
@@ -400,7 +398,7 @@ public class CitiesTab extends GridLayoutTab {
         List<PresetSelection.Entry> entries = new ArrayList<>();
         for (Identifier id : Presets.listBrowsable(access)) {
             Preset preset = Presets.resolve(id, registry.get()::getValue);
-            entries.add(new PresetSelection.Entry(id, Component.literal(DataTools.toName(id)), preset));
+            entries.add(new PresetSelection.Entry(id, Component.literal(id.toString()), preset));
         }
         return entries;
     }

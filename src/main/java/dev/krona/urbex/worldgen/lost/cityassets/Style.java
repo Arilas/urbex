@@ -2,7 +2,6 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import net.minecraft.resources.Identifier;
@@ -45,8 +44,9 @@ public class Style {
         }
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:common"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

@@ -59,9 +59,8 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             return 0;
         }
 
-        // editorInfo.getPartName() is a toName()-shortened display string Editor.startEditing
-        // recorded, not an authored reference - see DataTools.fromDisplayName.
-        BuildingPart part = AssetRegistries.PARTS.get(context.getSource().getLevel(), DataTools.fromDisplayName(editorInfo.getPartName()));
+        // editorInfo.getPartName() is Editor.startEditing's recorded part id - always qualified.
+        BuildingPart part = AssetRegistries.PARTS.get(context.getSource().getLevel(), DataTools.fromName(editorInfo.getPartName()));
         if (part == null) {
             context.getSource().sendFailure(Component.literal("Error finding part '" + editorInfo.getPartName() + "'!").withStyle(ChatFormatting.RED));
             return 0;

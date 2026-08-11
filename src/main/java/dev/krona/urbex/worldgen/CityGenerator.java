@@ -1986,7 +1986,7 @@ public class CityGenerator {
             // how many spawners this chunk happened to place before it.
             RandomSource spawnerRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SPAWNERS);
             Identifier randomValue = getRandomSpawnerMob(world.getLevel(), spawnerRandom, provider, info,
-                    new BuildingInfo.ConditionTodo(mobid, part.getName(), info), pos);
+                    new BuildingInfo.ConditionTodo(mobid, ConditionContext.legacyMatchKey(part.getId()), info), pos);
             CompoundTag sd = new CompoundTag();
             sd.putString("id", randomValue.toString());
             SpawnData data = new SpawnData(sd, Optional.empty(), Optional.empty());
@@ -2009,7 +2009,7 @@ public class CityGenerator {
             if (!inWorld.getBlockState(pos).isAir()) {
                 inWorld.setBlock(pos, block, Block.UPDATE_CLIENTS);
                 generateLoot(info, inWorld, pos,
-                        new BuildingInfo.ConditionTodo(marker.loot(), part.getName(), info));
+                        new BuildingInfo.ConditionTodo(marker.loot(), ConditionContext.legacyMatchKey(part.getId()), info));
             }
         });
     }

@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringRepresentable;
@@ -85,8 +84,9 @@ public class ScatteredBuilding {
         return heightoffset;
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:oilrig"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

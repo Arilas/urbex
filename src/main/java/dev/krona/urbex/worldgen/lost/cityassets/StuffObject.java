@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.resources.Identifier;
 
 import java.util.List;
@@ -21,8 +20,9 @@ public class StuffObject {
         this.name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:signs"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

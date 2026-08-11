@@ -1,5 +1,7 @@
 package dev.krona.urbex.worldgen.lost.regassets.data;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import dev.krona.urbex.Urbex;
 import net.minecraft.resources.Identifier;
 
@@ -19,14 +21,6 @@ public class DataTools {
         return opt.isPresent() ? opt.get().charAt(0) : null;
     }
 
-    public static String toName(Identifier rl) {
-        if (rl.getNamespace().equals(Urbex.MODID)) {
-            return rl.getPath();
-        } else {
-            return rl.toString();
-        }
-    }
-
     public static Identifier fromName(String name) {
         if (!name.contains(":")) {
             throw new IllegalArgumentException("Unqualified datapack reference '" + name
@@ -36,15 +30,23 @@ public class DataTools {
     }
 
     /**
-     * Inverse of {@link #toName}, for the client-only display round trip the Cities tab, the
-     * customize editor and the preview use (worldStyle ids are held as {@code toName}-shortened
-     * strings there because {@link dev.krona.urbex.config.Preset} carries no worldStyle field of
-     * its own). A bare string reaching this method was produced by {@code toName} from a real,
-     * already-resolved {@code urbex}-namespace {@link Identifier} - it is not an authored
-     * reference, so it must not go through {@link #fromName}'s strict check. Never call this on a
-     * string a datapack or config file wrote; only on a value this mod's own code already emitted.
+     * Strict identifier codec for every registry's {@code extends} field: decodes through
+     * {@link #fromName}, so a bare (unqualified) value fails the same way, with the same message,
+     * as any other datapack cross-reference - rather than {@code Identifier.CODEC}'s own defaulting,
+     * which resolves a bare string against the {@code minecraft} namespace instead of erroring.
+     * Catches {@code RuntimeException}, not just {@link IllegalArgumentException}: {@link
+     * Identifier#parse} throws {@code net.minecraft.IdentifierException} (a {@code RuntimeException},
+     * not an {@code IllegalArgumentException}) for a qualified but malformed id (illegal characters,
+     * uppercase, etc.), and that must fail cleanly as a per-file {@link DataResult#error} too,
+     * instead of escaping the codec as a thrown exception.
      */
-    public static Identifier fromDisplayName(String name) {
-        return name.contains(":") ? Identifier.parse(name) : Identifier.fromNamespaceAndPath(Urbex.MODID, name);
-    }
+    public static final Codec<Identifier> STRICT_IDENTIFIER_CODEC = Codec.STRING.comapFlatMap(
+            s -> {
+                try {
+                    return DataResult.success(fromName(s));
+                } catch (RuntimeException e) {
+                    return DataResult.error(e::getMessage);
+                }
+            },
+            Identifier::toString);
 }

@@ -161,8 +161,8 @@ class PresetSelectionTest {
         PresetSelection selection = new PresetSelection();
         selection.setAvailablePresets(List.of(entry("cavern")));
         selection.select(id("cavern"));
-        selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
-        selection.setWorldStyle("lcmt");
+        selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
+        selection.setWorldStyle("urbex:lcmt");
 
         selection.publish();
 
@@ -199,8 +199,8 @@ class PresetSelectionTest {
         PresetSelection selection = new PresetSelection();
         selection.setAvailablePresets(List.of(entry("default")));
         selection.select(id("default"));
-        selection.setAvailableWorldStyles(List.of("standard", "lcmt"));
-        selection.setWorldStyle("lcmt");
+        selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
+        selection.setWorldStyle("urbex:lcmt");
         selection.applyCustomized(preset("default"));
 
         selection.publish();

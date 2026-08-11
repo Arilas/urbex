@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.resources.Identifier;
 
 import java.util.HashSet;
@@ -63,8 +62,9 @@ public class MultiBuilding {
         return dimZ;
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:oilrig"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

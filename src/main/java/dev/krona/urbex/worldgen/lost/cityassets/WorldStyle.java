@@ -91,8 +91,9 @@ public class WorldStyle {
         }
     }
 
+    /** The fully-qualified id, e.g. {@code "urbex:standard"}. */
     public String getName() {
-        return DataTools.toName(name);
+        return name.toString();
     }
 
     public Identifier getId() {

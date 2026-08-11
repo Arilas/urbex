@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
@@ -22,7 +23,7 @@ public class PredefinedCityRE implements IAsset<PredefinedCityRE>, Extendable {
 
     public static final Codec<PredefinedCityRE> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("dimension").forGetter(l -> Optional.ofNullable(l.dimension)),
                     Codec.INT.optionalFieldOf("chunkx").forGetter(l -> Optional.ofNullable(l.chunkX)),
                     Codec.INT.optionalFieldOf("chunkz").forGetter(l -> Optional.ofNullable(l.chunkZ)),

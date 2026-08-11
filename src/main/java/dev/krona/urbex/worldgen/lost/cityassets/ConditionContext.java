@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionTest;
 import net.minecraft.resources.Identifier;
@@ -19,6 +20,23 @@ public abstract class ConditionContext {
     private final String belowPart;
     private final String building;
     private final ChunkCoord coord;
+
+    /**
+     * The key an asset is matched against by an {@code inpart}/{@code inbuilding} condition: the
+     * bare path for an {@code urbex}-namespace id, the full qualified id otherwise. This mirrors
+     * what every {@code getName()} in {@code cityassets} used to return before this pass qualified
+     * them all - deliberately preserved here rather than switched to the now-qualified {@code
+     * getName()}, because a bundled condition file's {@code inpart}/{@code inbuilding} value is
+     * required to be fully qualified (by {@code DatapackReferenceIntegrityTest}), so comparing it
+     * against a bare {@code urbex}-namespace key can never match. That mismatch is a real,
+     * pre-existing bug (see {@code chestloot.json}'s rail-dungeon {@code inpart} entries, which
+     * never fire) - fixing it changes chest loot within the digest-check window (confirmed by
+     * hand), so it is intentionally left alone here as a separate, tracked follow-up rather than
+     * fixed as an incidental side effect of qualifying {@code getName()} everywhere else.
+     */
+    public static String legacyMatchKey(Identifier id) {
+        return id.getNamespace().equals(Urbex.MODID) ? id.getPath() : id.toString();
+    }
 
     public ConditionContext(int level, int floor, int floorsBelowGround, int floorsAboveGround, String part, String belowPart, String building, ChunkCoord coord) {
         this.level = level;
