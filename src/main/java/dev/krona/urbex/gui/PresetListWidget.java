@@ -1,13 +1,12 @@
 package dev.krona.urbex.gui;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 
 import javax.annotation.Nullable;
@@ -62,7 +61,7 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
         restoringSelection = true;
         try {
             clearEntries();
-            String selectedId = PresetSelection.CLIENT.selected().id();
+            Identifier selectedId = PresetSelection.CLIENT.selected().id();
             Row toSelect = null;
             for (PresetSelection.Entry entry : PresetSelection.CLIENT.entries()) {
                 Row row = new Row(entry);
@@ -154,27 +153,24 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
         }
     }
 
+    /**
+     * A row's label is exactly its entry's name - since Task 4 there is no more "based on" provenance
+     * to decorate it with (a preset's own id is carried, unshown, in {@code Preset.getId()}, purely
+     * for {@link PresetSelection#publish()}'s benefit).
+     */
     static Component buildLabel(PresetSelection.Entry entry) {
-        if (!entry.custom()) {
-            return entry.name();
-        }
-        MutableComponent label = Component.translatable("urbex.preset.custom_prefix").append(entry.name());
-        if (entry.basedOn() != null && !entry.basedOn().isEmpty() && !PresetSelection.CUSTOM_ID.equals(entry.basedOn())) {
-            // basedOn == CUSTOM_ID is the "lineage unknown" marker (a customization restored from
-            // saved world data); dumping that marker at the player would say nothing.
-            label = label.append(Component.translatable("urbex.preset.custom_suffix", entry.basedOn()));
-        }
-        return label;
+        return entry.name();
     }
 
     /**
-     * The profile's icon, or {@code null} when it has none or the texture is not actually shipped -
+     * The preset's icon, or {@code null} when it has none or the texture is not actually shipped -
      * blitting a missing {@link Identifier} would draw the magenta/black "missing texture"
      * checkerboard, which reads as a bug rather than as "this preset has no art".
      */
     @Nullable
     private static Identifier resolveIcon(PresetSelection.Entry entry) {
-        Identifier icon = entry.profile().map(UrbexProfile::getIcon).orElse(null);
+        Preset preset = entry.preset();
+        Identifier icon = preset == null ? null : preset.getIcon();
         if (icon == null) {
             return null;
         }

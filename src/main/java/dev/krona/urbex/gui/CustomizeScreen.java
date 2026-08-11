@@ -1,16 +1,12 @@
 package dev.krona.urbex.gui;
 
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.ProfileSetup;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.gui.preview.CityPreview;
 import dev.krona.urbex.gui.settings.SettingCategory;
 import dev.krona.urbex.gui.settings.SettingControls;
 import dev.krona.urbex.gui.settings.SettingDescriptor;
 import dev.krona.urbex.gui.settings.Settings;
-import net.fabricmc.loader.api.FabricLoader;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -34,21 +30,19 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 import javax.annotation.Nullable;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * The Phase 2 "Customize this preset…" editor: the metadata-driven successor to the old
- * world-creation config screen. It works entirely on a private {@link UrbexProfile} copy of the preset it
- * was opened on, so nothing global is touched until the player presses Done - which is exactly what
- * makes Cancel/ESC a clean discard (issue #65). Layout is a category list on the left, a scrollable
- * column of setting controls in the middle (with a search box on top that filters across categories),
- * and a live {@link CityPreview} on the right; the bottom bar carries Save-as / Reset / Done / Cancel.
+ * world-creation config screen. Since Task 4 it works entirely on a private {@link Preset} copy of
+ * the preset it was opened on ({@code Preset.copy()}), so nothing global is touched until the player
+ * presses Done - which is exactly what makes Cancel/ESC a clean discard (issue #65). Layout is a
+ * category list on the left, a scrollable column of setting controls in the middle (with a search box
+ * on top that filters across categories), and a live {@link CityPreview} on the right; the bottom bar
+ * carries Reset / Done / Cancel - the Save-as flow (writing to {@code config/urbex/profiles/}) is gone
+ * (spec §9): Done publishes the edited preset as a world-saved-data overrides overlay instead of a
+ * file (see {@link PresetSelection#applyCustomized}).
  * <p>
  * Nothing is placed at fixed screen pixels: {@link #layoutWidgets()} derives every rectangle from the
  * screen size, dropping the preview column when it would squeeze the controls too thin, so the editor
@@ -82,16 +76,10 @@ public class CustomizeScreen extends Screen {
     private final Screen parent;
     @Nullable
     private final CreateWorldScreen createWorldScreen;
+    /** Display name only ({@code DataTools.toName(base.getId())}) - not the editor's own state. */
     private final String baseName;
-    private final UrbexProfile base;
-    private final UrbexProfile copy;
-    /**
-     * The effective worldStyle handed over from the Cities tab (spec 1a). Held so "Reset to preset"
-     * restores the base's <em>settings</em> without dropping the orthogonal worldStyle choice -
-     * worldStyle is not an editor setting. Blank means "keep the base's own style".
-     */
-    @Nullable
-    private final String worldStyleOverride;
+    private final Preset base;
+    private Preset copy;
     private CityPreview preview;
     /** True once {@link #removed()} has closed the preview, so the next {@link #init()} rebuilds it. */
     private boolean previewClosed;
@@ -111,47 +99,29 @@ public class CustomizeScreen extends Screen {
     private SettingsList settingsList;
     private PreviewWidget previewWidget;
     private Button rerollButton;
-    /** The four bottom-bar buttons in display order, repopulated each {@link #init()}. */
+    /** The bottom-bar buttons in display order, repopulated each {@link #init()}. */
     private final List<AbstractWidget> bottomBar = new ArrayList<>();
     /** Suppresses the search box responder while the code (not the player) clears it on a category switch. */
     private boolean suppressSearchResponder;
 
-    public CustomizeScreen(Screen parent, UrbexProfile base, String baseName, @Nullable String worldStyleOverride) {
-        super(Component.translatable("urbex.screen.customize.title", baseName));
+    public CustomizeScreen(Screen parent, Preset base) {
+        super(Component.translatable("urbex.screen.customize.title", DataTools.toName(base.getId())));
         this.parent = parent;
         this.createWorldScreen = parent instanceof CreateWorldScreen cws ? cws : null;
         this.base = base;
-        this.baseName = baseName == null ? "" : baseName;
-        this.worldStyleOverride = worldStyleOverride;
-        this.copy = editorCopy(base, this.baseName, worldStyleOverride);
+        this.baseName = DataTools.toName(base.getId());
+        this.copy = base.copy();
         this.preview = new CityPreview(previewRegistries(createWorldScreen));
         this.previewSeedFallback = random.nextLong();
-    }
-
-    /**
-     * The private working copy the editor edits: a fresh non-public profile seeded from {@code base},
-     * with the effective worldStyle the Cities tab handed over applied on top (spec 1a) so the
-     * editor's live preview, Done, and Save-as all reflect the switched style rather than the preset's
-     * own - otherwise an active override is silently lost when the player customizes or saves. A blank
-     * override keeps the base's own style. Package-visible so a headless test pins the override
-     * plumbing without constructing the (GL) screen.
-     */
-    static UrbexProfile editorCopy(UrbexProfile base, String baseName, @Nullable String worldStyleOverride) {
-        UrbexProfile copy = new UrbexProfile((baseName == null ? "" : baseName) + "-copy", false);
-        copy.copyFrom(base);
-        if (worldStyleOverride != null && !worldStyleOverride.isEmpty()) {
-            copy.setWorldStyle(worldStyleOverride);
-        }
-        return copy;
     }
 
     @Override
     protected void init() {
         Font font = this.font;
 
-        // removed() closes the preview when this screen is replaced (including by the Save-as dialog);
-        // re-showing the same instance afterwards has to rebuild it, since a closed CityPreview keeps
-        // its cache key and would otherwise never recompute the now-null texture.
+        // removed() closes the preview when this screen is replaced; re-showing the same instance
+        // afterwards has to rebuild it, since a closed CityPreview keeps its cache key and would
+        // otherwise never recompute the now-null texture.
         if (previewClosed) {
             preview = new CityPreview(previewRegistries(createWorldScreen));
             previewClosed = false;
@@ -188,7 +158,6 @@ public class CustomizeScreen extends Screen {
         addRenderableWidget(rerollButton);
 
         bottomBar.clear();
-        bottomBar.add(addRenderableWidget(Button.builder(Component.translatable("urbex.screen.customize.save_as"), b -> openSaveAs()).build()));
         bottomBar.add(addRenderableWidget(Button.builder(Component.translatable("urbex.screen.customize.reset"), b -> reset()).build()));
         bottomBar.add(addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> done()).build()));
         bottomBar.add(addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> cancel()).build()));
@@ -308,7 +277,9 @@ public class CustomizeScreen extends Screen {
 
     private void updatePreview() {
         previewDirty = false;
-        preview.update(copy, copy.getWorldStyle(), currentSeed(), modeForCategory(selectedCategory));
+        // worldStyle is orthogonal to the preset (spec 1a) - a Preset carries no field for it any
+        // more, so the live value always comes from PresetSelection, not from the copy being edited.
+        preview.update(copy, PresetSelection.CLIENT.effectiveWorldStyle(), currentSeed(), modeForCategory(selectedCategory));
     }
 
     /**
@@ -343,8 +314,14 @@ public class CustomizeScreen extends Screen {
 
     // ---- flows --------------------------------------------------------------
 
+    /**
+     * Publishes the edited copy as a world-saved-data overrides overlay (spec §9) - not a file:
+     * {@link PresetSelection#applyCustomized} keeps it purely in memory, and {@link PresetSelection#publish()}
+     * encodes it as a {@code PresetRE} overlay over its base preset id ({@code copy.getId()}, unchanged
+     * by {@link Preset#copy()}).
+     */
     private void done() {
-        PresetSelection.CLIENT.applyCustomized(copy, baseName);
+        PresetSelection.CLIENT.applyCustomized(copy);
         PresetSelection.CLIENT.publish();
         returnToTab();
     }
@@ -355,12 +332,7 @@ public class CustomizeScreen extends Screen {
     }
 
     private void reset() {
-        // Reset the base's settings, but re-apply the orthogonal worldStyle so a chosen style isn't
-        // silently lost by a settings reset (spec 1a: worldStyle is not an editor setting).
-        copy.copyFrom(base);
-        if (worldStyleOverride != null && !worldStyleOverride.isEmpty()) {
-            copy.setWorldStyle(worldStyleOverride);
-        }
+        copy = base.copy();
         dirty = false;
         rebuildControls();
         schedulePreview();
@@ -373,69 +345,10 @@ public class CustomizeScreen extends Screen {
 
     private void returnToTab() {
         CitiesTab.requestReopenOnCitiesTab();
-        // Release the preview's texture (and the frozen RegistryAccess it pins) on the way out for
-        // good. Note the Save-as dialog trip goes through removed() instead, which rebuilds on return.
+        // Release the preview's texture (and the frozen RegistryAccess it pins) on the way out for good.
         preview.close();
         previewClosed = true;
         this.minecraft.gui.setScreen(parent);
-    }
-
-    /**
-     * The names a Save-as must reject: every registered profile plus the two reserved selection ids
-     * ({@code disabled}, {@code customized}) that aren't in {@code STANDARD_PROFILES} but must not be
-     * savable - {@code disabled} would double-list against the built-in Disabled row, and
-     * {@code customized} is the transient marker {@code PresetSelection.entries()} never lists as a
-     * saved file (so it would save invisibly). Package-visible so a headless test pins the union in
-     * place: dropping either reserved id here regresses the guard.
-     */
-    static Set<String> takenSaveNames() {
-        Set<String> taken = new HashSet<>(ProfileSetup.STANDARD_PROFILES.keySet());
-        taken.add(PresetSelection.DISABLED_ID);
-        taken.add(PresetSelection.CUSTOM_ID);
-        return taken;
-    }
-
-    private void openSaveAs() {
-        Set<String> taken = takenSaveNames();
-        SaveAsDialog[] holder = new SaveAsDialog[1];
-        holder[0] = new SaveAsDialog(this, taken, name -> {
-            if (!performSave(name)) {
-                holder[0].showIoError();
-            }
-        });
-        this.minecraft.gui.setScreen(holder[0]);
-    }
-
-    /**
-     * Writes the copy to {@code config/urbex/profiles/<name>.json} (with a {@code basedOn} member),
-     * registers it as a non-public standard profile, selects it and returns to the tab. Returns
-     * {@code false} - leaving the dialog open to show the IO error - if the file could not be written.
-     */
-    private boolean performSave(String name) {
-        UrbexProfile saved = new UrbexProfile(name, false);
-        saved.copyFrom(copy);
-        JsonObject json = saved.toJson(false);
-        json.addProperty("basedOn", baseName);
-
-        Path dir = FabricLoader.getInstance().getConfigDir().resolve("urbex").resolve("profiles");
-        try {
-            Files.createDirectories(dir);
-            String pretty = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(json);
-            Files.writeString(dir.resolve(name + ".json"), pretty);
-        } catch (IOException e) {
-            Urbex.getLogger().error("Couldn't save custom profile '{}'", name, e);
-            return false;
-        }
-
-        // Register as a first-class user profile so it shows same-session (and, via the file above,
-        // after a restart) as its own selectable row with "based on" provenance.
-        ProfileSetup.STANDARD_PROFILES.put(name, saved);
-        ProfileSetup.USER_PROFILES.add(name);
-        ProfileSetup.PROFILE_BASED_ON.put(name, baseName);
-        PresetSelection.CLIENT.select(name);
-        PresetSelection.CLIENT.publish();
-        returnToTab();
-        return true;
     }
 
     // ---- rendering ----------------------------------------------------------

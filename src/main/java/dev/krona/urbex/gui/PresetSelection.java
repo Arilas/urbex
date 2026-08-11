@@ -1,146 +1,143 @@
 package dev.krona.urbex.gui;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.ProfileSetup;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.worldgen.CityFeature;
+import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
- * Client-side state for "which Urbex preset generates this world", replacing the old editor
- * screen's client-side profile state for the redesigned Cities tab (Task 3 onwards; that old state
- * holder was removed in Phase 2). Pure state - nothing here touches widgets, so it's unit-testable
- * headless.
- * <p>
- * Custom (hand-edited) profiles are never written into {@link ProfileSetup#STANDARD_PROFILES}
- * by this class outside of {@link #publish()} - they live only in the selection itself, supplied
- * by the customize editor via {@link #applyCustomized}.
+ * Client-side state for "which Urbex preset generates this world", registry-driven since Task 4:
+ * every selectable entry (bar the built-in Disabled row) is injected by {@link CitiesTab} from the
+ * world-creation {@code RegistryAccess} via {@code Presets.listBrowsable} + {@code Presets.resolve} -
+ * this class holds no static preset table of its own and knows nothing about any registry. Pure
+ * state - nothing here touches widgets, so it's unit-testable headless.
  */
 public final class PresetSelection {
 
-    public static final String DISABLED_ID = "disabled";
-    public static final String CUSTOM_ID = "customized";
+    /** The built-in "no cities" row. Not a real registered preset. */
+    public static final Identifier DISABLED_ID = Identifier.fromNamespaceAndPath("urbex", "disabled");
+    /** Sentinel id for the transient, hand-edited entry the Customize editor produces. Never a real
+     *  registered preset, and never published as-is (see {@link #publish()}). */
+    public static final Identifier CUSTOMIZED_ID = Identifier.fromNamespaceAndPath("urbex", "customized");
+
+    private static final Gson GSON = new Gson();
+    private static final String DEFAULT_STYLE_NAME = DataTools.toName(Config.DEFAULT_WORLD_STYLE);
 
     /**
-     * One selectable preset. {@code basedOn} is only meaningful when {@code custom} is true: it's
-     * the id of the public preset the customization started from, or {@link #CUSTOM_ID} itself
-     * when that origin isn't known (e.g. a customization restored from saved world data, which
-     * only carries the resulting JSON, not its lineage).
+     * One selectable row. {@code preset} is {@code null} only for the Disabled row; every other
+     * entry (built-in or the transient customized one) always carries the resolved {@link Preset} it
+     * would generate with. {@code Preset.getId()} on the customized entry's preset is the base
+     * preset it was customized from (an unchanged, immutable field that survives {@link Preset#copy()}),
+     * which is what {@link #publish()} reports as the preset id underneath the overrides.
      */
-    public record Entry(String id, Component name, boolean custom, String basedOn, Optional<UrbexProfile> profile) {
+    public record Entry(Identifier id, Component name, @Nullable Preset preset) {
     }
 
     private static final Entry DISABLED_ENTRY =
-            new Entry(DISABLED_ID, Component.translatable("urbex.preset.disabled"), false, "", Optional.empty());
+            new Entry(DISABLED_ID, Component.translatable("urbex.preset.disabled"), null);
 
     // Declared AFTER everything its constructor / instance-field initializers depend on (chiefly
-    // DISABLED_ENTRY, which `selected` initializes to). Static fields initialize in declaration order,
-    // so hoisting CLIENT above DISABLED_ENTRY would run the singleton's constructor while DISABLED_ENTRY
-    // is still null, leaving the singleton's `selected` null forever (headless tests miss it because
-    // they build fresh instances only after the class has finished loading). Keep CLIENT last.
+    // DISABLED_ENTRY, which `selected` initializes to) - see the old class's note on this; the same
+    // static-init-order hazard applies here.
     /** The shared client-side selection driving the Cities tab and the customize editor. */
     public static final PresetSelection CLIENT = new PresetSelection();
 
+    /** The remembered choice a Re-Create restore couldn't yet show (no matching injected entry at
+     *  the time it ran) - reconciled against {@link #availablePresets} the next time it changes. */
+    private record PendingRestore(Identifier presetId, @Nullable String overridesJson) {
+    }
+
+    /** Registry-backed browsable presets, injected by {@link CitiesTab}; empty until then. */
+    private List<Entry> availablePresets = List.of();
+
     private Entry selected = DISABLED_ENTRY;
-    private UrbexProfile customProfile = null;
-    private String customBasedOn = "";
+    @Nullable
+    private Preset customized = null;
 
-    /**
-     * The worldStyle ids the Cities tab currently offers, injected from the live datapack registry
-     * ({@code AssetRegistries.WORLDSTYLES} via the preview's {@code RegistryAccess}) - the enumeration
-     * can't be built headless, so it's supplied rather than read here. Empty until the tab injects it.
-     */
     private List<String> availableWorldStyles = List.of();
-
-    /**
-     * The player's chosen worldStyle, orthogonal to the preset (spec 1a). {@code null} means "no
-     * override - use the selected preset's own worldStyle"; a non-null value that differs from the
-     * preset's own is published as an editor-style customization at {@link #publish()} time.
-     */
+    @Nullable
     private String selectedWorldStyle = null;
+
+    @Nullable
+    private PendingRestore pendingRestore = null;
 
     public PresetSelection() {
     }
 
     /**
-     * The full, current list of choices: {@code disabled} first, then public built-in presets
-     * ({@code default} first, then alphabetical - same ordering as the old editor's profile
-     * cycling), then the custom entry (if any) last.
+     * Injects the registry-backed presets the Cities tab currently offers: {@code CitiesTab} builds
+     * this from {@code Presets.listBrowsable} + {@code Presets.resolve} against the world-creation
+     * {@code RegistryAccess} - the enumeration can't be built headless, so it's supplied rather than
+     * read here. Re-selects the current choice against the fresh list (a no-op if it's no longer
+     * present, matching {@link #select}'s existing "unknown id" rule), and reconciles a Re-Create
+     * restore that arrived before any entries existed yet.
+     */
+    public void setAvailablePresets(List<Entry> entries) {
+        this.availablePresets = entries == null ? List.of() : List.copyOf(entries);
+        if (pendingRestore != null) {
+            reconcilePendingRestore();
+        } else {
+            select(selected.id());
+        }
+    }
+
+    /**
+     * The full, current list of choices: {@code disabled} first, then the injected browsable presets
+     * (already {@code urbex:default}-first-then-alphabetical, per {@code Presets.listBrowsable}), then
+     * the transient customized entry (if any) last.
      */
     public List<Entry> entries() {
-        List<Entry> result = new ArrayList<>();
+        List<Entry> result = new ArrayList<>(availablePresets.size() + 2);
         result.add(DISABLED_ENTRY);
-
-        List<String> publicIds = new ArrayList<>();
-        for (Map.Entry<String, UrbexProfile> e : ProfileSetup.STANDARD_PROFILES.entrySet()) {
-            if (e.getValue().isPublic()) {
-                publicIds.add(e.getKey());
-            }
-        }
-        publicIds.sort((a, b) -> {
-            if ("default".equals(a)) {
-                return -1;
-            }
-            if ("default".equals(b)) {
-                return 1;
-            }
-            return a.compareTo(b);
-        });
-        for (String id : publicIds) {
-            result.add(new Entry(id, Component.literal(id), false, "", Optional.of(ProfileSetup.STANDARD_PROFILES.get(id))));
-        }
-
-        // Hand-saved custom presets (from the Customize editor's "Save as"), sorted by name, each a
-        // first-class row carrying its "based on" provenance. Filtered to ones still registered, and
-        // never a reserved selection id: CUSTOM_ID is the transient row below (not a saved file), and
-        // DISABLED_ID would double-list against the built-in Disabled row - guard both even against a
-        // stray on-disk file that shouldn't exist.
-        List<String> userIds = new ArrayList<>();
-        for (String id : ProfileSetup.USER_PROFILES) {
-            if (!CUSTOM_ID.equals(id) && !DISABLED_ID.equals(id) && ProfileSetup.STANDARD_PROFILES.containsKey(id)) {
-                userIds.add(id);
-            }
-        }
-        userIds.sort(String::compareTo);
-        for (String id : userIds) {
-            String basedOn = ProfileSetup.PROFILE_BASED_ON.getOrDefault(id, "");
-            result.add(new Entry(id, Component.literal(id), true, basedOn, Optional.of(ProfileSetup.STANDARD_PROFILES.get(id))));
-        }
-
-        if (customProfile != null) {
-            result.add(new Entry(CUSTOM_ID, Component.translatable("urbex.preset.custom"), true, customBasedOn, Optional.of(customProfile)));
+        result.addAll(availablePresets);
+        if (customized != null) {
+            result.add(new Entry(CUSTOMIZED_ID, Component.translatable("urbex.preset.custom"), customized));
         }
         return result;
     }
 
     /** Selects the entry with the given id. Unknown ids (e.g. a stale id from a rebuilt list) are a no-op. */
-    public void select(String id) {
+    public void select(Identifier id) {
+        Entry found = findEntry(id);
+        if (found != null) {
+            selected = found;
+        }
+    }
+
+    @Nullable
+    private Entry findEntry(Identifier id) {
         for (Entry entry : entries()) {
             if (entry.id().equals(id)) {
-                selected = entry;
-                dropInvalidWorldStyle();
-                return;
+                return entry;
             }
         }
+        return null;
     }
 
     /**
      * The worldStyle ids the Cities tab renders in its selector, injected from the live registry.
      * The tab hides the control when this has {@code <= 1} entries (the common "standard-only" case).
      * Injecting a list that no longer contains the chosen style clears the override back to "use the
-     * preset's own", so a stale choice never survives a registry that dropped it.
+     * default", so a stale choice never survives a registry that dropped it.
      */
     public void setAvailableWorldStyles(List<String> ids) {
         this.availableWorldStyles = ids == null ? List.of() : List.copyOf(ids);
-        dropInvalidWorldStyle();
+        if (selectedWorldStyle != null && !availableWorldStyles.contains(selectedWorldStyle)) {
+            selectedWorldStyle = null;
+        }
     }
 
     /** What the Cities tab renders in its worldStyle selector; empty until injected. */
@@ -149,49 +146,22 @@ public final class PresetSelection {
     }
 
     /**
-     * Records the player's chosen worldStyle. {@code null} (or the selected preset's own style)
-     * means "no override". Doesn't publish - the caller republishes so the change reaches the server.
+     * Records the player's chosen worldStyle - orthogonal to the preset (spec 1a): a {@link Preset}
+     * carries no worldStyle field of its own any more. {@code null} means "no override - use the
+     * default". Doesn't publish - the caller republishes so the change reaches the server.
      */
     public void setWorldStyle(String id) {
         this.selectedWorldStyle = id;
     }
 
-    /** The chosen worldStyle override, or {@code null} for "use the selected preset's own". */
+    /** The chosen worldStyle override, or {@code null} for "use the default". */
     public String selectedWorldStyle() {
         return selectedWorldStyle;
     }
 
-    /**
-     * The worldStyle the current selection actually generates with - the chosen override if any, else
-     * the selected preset's own. Empty for the disabled row (no profile). Drives the preview and the
-     * selector's displayed value, so both follow a preset change even when no override is set.
-     */
+    /** The bare-name worldStyle that will actually generate: the chosen override, or the default. */
     public String effectiveWorldStyle() {
-        UrbexProfile profile = selected.profile().orElse(null);
-        if (profile == null) {
-            return "";
-        }
-        return selectedWorldStyle != null ? selectedWorldStyle : profile.getWorldStyle();
-    }
-
-    /** Resets a chosen style the current registry no longer offers, so it can't be published stale. */
-    private void dropInvalidWorldStyle() {
-        if (selectedWorldStyle != null && !availableWorldStyles.contains(selectedWorldStyle)) {
-            selectedWorldStyle = null;
-        }
-    }
-
-    /**
-     * The effective worldStyle override for an entry, or {@code null} when the selection publishes
-     * as-is: no chosen style, no profile (the disabled row), or a chosen style that already matches
-     * the preset's own. A non-null result is a style that genuinely differs from the preset default.
-     */
-    @Nullable
-    private String worldStyleOverride(Entry entry) {
-        if (selectedWorldStyle == null || entry.profile().isEmpty()) {
-            return null;
-        }
-        return selectedWorldStyle.equals(entry.profile().get().getWorldStyle()) ? null : selectedWorldStyle;
+        return selectedWorldStyle != null ? selectedWorldStyle : DEFAULT_STYLE_NAME;
     }
 
     public Entry selected() {
@@ -203,101 +173,132 @@ public final class PresetSelection {
         return selected;
     }
 
-    /** Supplies a hand-edited profile from the (future) customize editor and selects it. */
-    public void applyCustomized(UrbexProfile copy, String basedOn) {
-        this.customProfile = copy;
-        this.customBasedOn = basedOn == null ? "" : basedOn;
-        select(CUSTOM_ID);
+    /** Supplies a hand-edited preset copy from the Customize editor and selects it. */
+    public void applyCustomized(Preset copy) {
+        this.customized = copy;
+        select(CUSTOMIZED_ID);
     }
 
     public void reset() {
+        availablePresets = List.of();
         selected = DISABLED_ENTRY;
-        customProfile = null;
-        customBasedOn = "";
+        customized = null;
         selectedWorldStyle = null;
         availableWorldStyles = List.of();
+        pendingRestore = null;
     }
 
     /**
-     * Restores a profile selection read from an existing world's saved data, for the vanilla
-     * Re-Create flow (issue #85), and immediately {@link #publish()}es it. Publishing here (rather
-     * than waiting for the Cities tab to be opened) is what makes the restored choice actually
-     * reach the server if the player never opens that tab before creating the world - matching the
-     * old editor's restore-from-saved-data path, which selected the profile inline for exactly this
-     * reason. An unknown profile name is logged and leaves the current selection (and anything
-     * already published) untouched.
-     */
-    public void restore(String profileName, String json) {
-        if (profileName == null || profileName.isEmpty()) {
-            return;
-        }
-        if (json != null && !json.isEmpty()) {
-            UrbexProfile copy = new UrbexProfile(CUSTOM_ID, false);
-            copy.copyFrom(new UrbexProfile(CUSTOM_ID, json));
-            applyCustomized(copy, CUSTOM_ID);
-            publish();
-            return;
-        }
-        UrbexProfile profile = ProfileSetup.STANDARD_PROFILES.get(profileName);
-        if (profile != null) {
-            selected = new Entry(profileName, Component.literal(profileName), false, "", Optional.of(profile));
-            publish();
-        } else {
-            Urbex.getLogger().warn("Re-created world used unknown Urbex profile '{}'; ignoring", profileName);
-        }
-    }
-
-    /**
-     * Publishes the current selection so it reaches world generation.
+     * Restores a preset selection read from an existing world's saved data, for the vanilla
+     * Re-Create flow (issue #85), and immediately publishes the raw ids/JSON to {@link Config} -
+     * unconditionally, so the choice reaches the server even if the player never opens the Cities tab
+     * before creating the world (matching the old editor's restore-from-saved-data path). This needs
+     * no registry access, so it never fails on a genuinely unknown preset the way {@code select} would -
+     * that check happens server-side, same as any other client-published id (see
+     * {@code Config.buildPresetCache}).
      * <p>
-     * <b>Rough mapping, not a redesign:</b> this GUI (and {@code ProfileSetup.STANDARD_PROFILES})
-     * still speaks the pre-Task-3 {@link UrbexProfile} shape; {@link Config}'s selection surface
-     * now speaks {@code Preset} ids ({@code presetFromClient}/{@code worldStyleFromClient}) plus an
-     * optional {@code PresetRE} JSON overlay ({@code overridesFromClient}). A hand-edited/custom
-     * {@code UrbexProfile} cannot be losslessly re-expressed as a {@code PresetRE} overlay here (the
-     * two are different shapes) - that conversion is Task 4's job, once this screen is rebuilt
-     * against {@code Preset} natively. Until then: a plain built-in selection publishes its id
-     * cleanly; a customized one publishes the closest named preset id (its {@code basedOn}, so the
-     * server at least generates *something* valid) with the old profile JSON riding in
-     * {@code overridesFromClient} verbatim - not a real {@code PresetRE}, so a customization made
-     * through this screen will not actually reach worldgen as edited. This mirrors the task brief's
-     * accepted "old GUI world-creation flow may be temporarily degraded" note.
+     * The <em>visual</em> selection is a separate, best-effort concern: {@code RecreateProfileRestore}
+     * runs before {@code CitiesTab} has injected any entries ({@code ScreenEvents.BEFORE_INIT} fires
+     * before the tab is built), so there is nothing yet to select against. The attempt is retried by
+     * {@link #setAvailablePresets} once real entries exist.
+     *
+     * @param preset       the saved preset id ({@code namespace:path}); empty means nothing to restore.
+     * @param worldStyle   the saved worldStyle id, or empty for {@link Config#DEFAULT_WORLD_STYLE}.
+     * @param overridesJson the saved {@code PresetRE} overrides JSON, or empty for a plain preset.
+     */
+    public void restore(String preset, String worldStyle, String overridesJson) {
+        if (preset == null || preset.isEmpty()) {
+            return;
+        }
+        Identifier presetId = Identifier.tryParse(preset);
+        if (presetId == null) {
+            Urbex.getLogger().warn("Re-created world used a malformed Urbex preset id '{}'; ignoring", preset);
+            return;
+        }
+        Identifier worldStyleId = (worldStyle == null || worldStyle.isEmpty())
+                ? Config.DEFAULT_WORLD_STYLE : Identifier.tryParse(worldStyle);
+        if (worldStyleId == null) {
+            Urbex.getLogger().warn("Re-created world used a malformed Urbex worldstyle id '{}'; using {}.",
+                    worldStyle, Config.DEFAULT_WORLD_STYLE);
+            worldStyleId = Config.DEFAULT_WORLD_STYLE;
+        }
+        String overrides = (overridesJson == null || overridesJson.isEmpty()) ? null : overridesJson;
+
+        CityFeature.globalDimensionInfoDirtyCounter++;
+        Config.resetProfileCache();
+        Config.presetFromClient = presetId;
+        Config.worldStyleFromClient = worldStyleId;
+        Config.overridesFromClient = overrides;
+        Urbex.getLogger().info("Restored Urbex preset '{}' for world re-creation", presetId);
+
+        this.selectedWorldStyle = DataTools.toName(worldStyleId);
+        this.pendingRestore = new PendingRestore(presetId, overrides);
+        reconcilePendingRestore();
+    }
+
+    /**
+     * Tries to turn a pending {@link #restore} into a real visual selection against whatever
+     * {@link #availablePresets} currently holds. Leaves the pending restore in place (retried on the
+     * next {@link #setAvailablePresets}) if the base preset isn't among them yet.
+     */
+    private void reconcilePendingRestore() {
+        PendingRestore pending = pendingRestore;
+        Entry base = findEntry(pending.presetId());
+        if (base == null) {
+            // Not found yet (or genuinely unknown - the server-side check will report that once a
+            // chunk generates). Keep waiting; the raw Config fields are already correct either way.
+            return;
+        }
+        pendingRestore = null;
+        if (pending.overridesJson() == null || base.preset() == null) {
+            select(pending.presetId());
+            return;
+        }
+        try {
+            PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(pending.overridesJson())).getOrThrow();
+            applyCustomized(Presets.applyOverrides(base.preset(), re));
+        } catch (Exception e) {
+            Urbex.getLogger().warn("Could not rebuild the restored customized preset '{}'; showing it plain.",
+                    pending.presetId(), e);
+            select(pending.presetId());
+        }
+    }
+
+    /**
+     * Publishes the current selection so it reaches world generation: the three {@link Config}
+     * fields the server reads in {@code Config.buildPresetCache}.
+     * <ul>
+     *   <li>Disabled: all three {@code null}.</li>
+     *   <li>A plain built-in entry: its own id, the effective worldStyle, no overrides.</li>
+     *   <li>The transient customized entry: the <em>base</em> preset id it was customized from
+     *       (carried, unchanged, in {@code Preset.getId()} through every {@link Preset#copy()}), the
+     *       effective worldStyle, and the full edited preset encoded as a {@link PresetRE} overlay -
+     *       so the server rebuilds exactly what the editor showed, not an approximation.</li>
+     * </ul>
      */
     public void publish() {
         Entry entry = selected;
-        // A chosen worldStyle that differs from the preset's own is an editor-style customization:
-        // it publishes exactly like a hand-edited profile (CUSTOM_ID + full JSON below), so the server
-        // sees the switched style with no special worldStyle plumbing of its own.
-        String worldStyle = worldStyleOverride(entry);
-        boolean publishAsCustom = entry.custom() || worldStyle != null;
 
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetProfileCache();
 
-        if (publishAsCustom && entry.profile().isPresent()) {
-            UrbexProfile source = entry.profile().get();
-            UrbexProfile published = ProfileSetup.STANDARD_PROFILES
-                    .computeIfAbsent(CUSTOM_ID, k -> new UrbexProfile(CUSTOM_ID, false));
-            published.copyFrom(source);
-            if (worldStyle != null) {
-                published.setWorldStyle(worldStyle);
-            }
-            // CUSTOM_ID itself is not a real registered preset (it's the transient row's own
-            // marker, or restore()'s "we don't know the real basedOn" placeholder) - falling back
-            // to it here would publish an unresolvable id and crash worldgen the moment a chunk is
-            // generated. Treat it exactly like "no basedOn known" and fall back to "default".
-            String basedOn = entry.basedOn();
-            if (basedOn == null || basedOn.isEmpty() || CUSTOM_ID.equals(basedOn)) {
-                basedOn = "default";
-            }
-            Config.presetFromClient = DataTools.fromName(basedOn);
-            Config.worldStyleFromClient = DataTools.fromName(published.getWorldStyle());
-            Config.overridesFromClient = published.toJson(false).toString();
-        } else {
-            Config.presetFromClient = DISABLED_ID.equals(entry.id()) ? null : DataTools.fromName(entry.id());
+        if (DISABLED_ID.equals(entry.id()) || entry.preset() == null) {
+            Config.presetFromClient = null;
             Config.worldStyleFromClient = null;
-            // Clear any overlay a prior custom/worldStyle publish left behind, or the server would
-            // try to apply that stale (and wrongly-shaped) JSON on top of the now-plain preset.
+            Config.overridesFromClient = null;
+            return;
+        }
+
+        Config.worldStyleFromClient = DataTools.fromName(effectiveWorldStyle());
+
+        if (CUSTOMIZED_ID.equals(entry.id())) {
+            Preset preset = entry.preset();
+            Config.presetFromClient = preset.getId();
+            PresetRE re = preset.toRE();
+            JsonElement json = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+            Config.overridesFromClient = GSON.toJson(json);
+        } else {
+            Config.presetFromClient = entry.id();
             Config.overridesFromClient = null;
         }
     }

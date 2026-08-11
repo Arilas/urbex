@@ -4,11 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.config.UrbexConfig;
 import dev.krona.urbex.data.UrbexData;
+import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -342,6 +344,19 @@ public class Config {
         PresetChoice overworldChoice = cache.get(Level.OVERWORLD);
         if (overworldChoice != null) {
             Preset overworldPreset = Presets.resolve(level.registryAccess(), overworldChoice.preset());
+            // The GENERATE_NETHER probe must see the same preset CityFeature.getDimensionInfo will
+            // actually generate with - including any client-published/saved overrides overlay - or an
+            // override that flips GENERATE_NETHER (on or off) would silently not count here.
+            if (overworldChoice.overridesJson().isPresent()) {
+                try {
+                    PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE,
+                            JsonParser.parseString(overworldChoice.overridesJson().get())).getOrThrow();
+                    overworldPreset = Presets.applyOverrides(overworldPreset, re);
+                } catch (Exception e) {
+                    Urbex.getLogger().error("Malformed Urbex preset overrides for the overworld; " +
+                            "the GENERATE_NETHER probe will see the un-overridden preset.", e);
+                }
+            }
             if (overworldPreset.GENERATE_NETHER) {
                 cache.put(Level.NETHER, new PresetChoice(
                         Identifier.fromNamespaceAndPath("urbex", "cavern"), DEFAULT_WORLD_STYLE, Optional.empty()));

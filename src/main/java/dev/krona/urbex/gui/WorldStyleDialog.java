@@ -26,7 +26,7 @@ import java.util.function.Consumer;
  * {@link #preselectIndex} is the one pure, headless-testable piece ({@code WorldStyleDialogTest});
  * everything else is GL widget code exercised only manually. Nothing here lays widgets at fixed
  * screen coordinates: the block is sized from the style count and centred in whatever screen area it
- * opens over, matching {@link SaveAsDialog}.
+ * opens over.
  */
 public class WorldStyleDialog extends Screen {
 

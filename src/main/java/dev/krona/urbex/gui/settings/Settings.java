@@ -2,7 +2,7 @@ package dev.krona.urbex.gui.settings;
 
 import dev.krona.urbex.config.LandscapeType;
 import dev.krona.urbex.config.MultiBuildingStreetConflict;
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.ArrayList;
@@ -12,13 +12,13 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
- * The complete registry of editable {@link UrbexProfile} settings for the Phase 2 editor.
+ * The complete registry of editable {@link Preset} settings for the Phase 2 editor.
  *
  * <p>{@link #ALL} holds exactly one descriptor per editable profile field — no duplicates. Each field
  * therefore lives in exactly one {@link SettingCategory}; a curated handful of the most impactful knobs carry
  * {@link SettingCategory#GENERAL} as their real home (and are absent from their former categories) so the same
  * control never renders twice. The {@code SettingsCompletenessTest} guarantees the descriptors cover every
- * public {@code UrbexProfile} field exactly once (minus a small, justified excluded set).</p>
+ * public {@code Preset} field exactly once (minus a small, justified excluded set).</p>
  *
  * <p>Within a category the descriptors are grouped into ordered <em>sub-sections</em> (see
  * {@link SettingDescriptor#section()}): every descriptor is stamped with the {@link Reg#section current section}
@@ -52,7 +52,7 @@ public final class Settings {
 
         private void add(String key, SettingCategory cat, ControlKind kind, double min, double max, double step,
                          boolean logScale, boolean integerOnly,
-                         Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                         Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             if (section == null) {
                 throw new IllegalStateException("descriptor " + key + " added before any section() was opened");
             }
@@ -60,13 +60,13 @@ public final class Settings {
         }
 
         private void slider(String key, SettingCategory cat, double min, double max, double step,
-                            Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                            Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             add(key, cat, ControlKind.SLIDER, min, max, step, false, false, getter, setter);
         }
 
         /** A logarithmic slider (min &gt; 0) for the chance knobs where 0.0001 and 0.001 must be distinguishable. */
         private void logSlider(String key, SettingCategory cat, double min, double max, double step,
-                               Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                               Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             add(key, cat, ControlKind.SLIDER, min, max, step, true, false, getter, setter);
         }
 
@@ -82,7 +82,7 @@ public final class Settings {
          * {@code int} field, an overflowing) value.</p>
          */
         private void number(String key, SettingCategory cat, double min, double max, boolean integerOnly,
-                            Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                            Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             add(key, cat, ControlKind.NUMBER, min, max, 0, false, integerOnly, getter, setter);
         }
 
@@ -92,22 +92,22 @@ public final class Settings {
          * field access; the widget coordinates the sentinel against the single field.
          */
         private void chancePerlin(String key, SettingCategory cat, double min, double max, double step,
-                                  Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                                  Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             add(key, cat, ControlKind.CHANCE_PERLIN, min, max, step, true, false, getter, setter);
         }
 
         private void toggle(String key, SettingCategory cat,
-                            Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                            Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             add(key, cat, ControlKind.TOGGLE, 0, 0, 0, false, false, getter, setter);
         }
 
         private void cycle(String key, SettingCategory cat,
-                           Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                           Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             add(key, cat, ControlKind.CYCLE, 0, 0, 0, false, false, getter, setter);
         }
 
         private void text(String key, SettingCategory cat,
-                          Function<UrbexProfile, Object> getter, BiConsumer<UrbexProfile, Object> setter) {
+                          Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
             add(key, cat, ControlKind.TEXT, 0, 0, 0, false, false, getter, setter);
         }
     }
@@ -417,6 +417,15 @@ public final class Settings {
         r.toggle("AVOID_WATER", SettingCategory.TERRAIN,
                 p -> p.AVOID_WATER, (p, v) -> p.AVOID_WATER = (Boolean) v);
 
+        // Public on Preset since Task 3 (unlike the old UrbexProfile, where both were private and so
+        // never reachable from any editor) - datapack presets can already override them via the
+        // PresetRE terrain section, so the in-game editor gets parity rather than a silent gap.
+        r.section("blocks");
+        r.text("LIQUID_BLOCK", SettingCategory.TERRAIN,
+                p -> p.LIQUID_BLOCK, (p, v) -> p.LIQUID_BLOCK = (String) v);
+        r.text("BASE_BLOCK", SettingCategory.TERRAIN,
+                p -> p.BASE_BLOCK, (p, v) -> p.BASE_BLOCK = (String) v);
+
         // The min/max offsets that smooth city plots into surrounding terrain, split by lower and upper edge.
         r.section("adaptation");
         r.slider("TERRAIN_FIX_LOWER_MIN_OFFSET", SettingCategory.TERRAIN, -40, 40, 1,
@@ -459,10 +468,13 @@ public final class Settings {
                 p -> p.SPAWN_BIOME, (p, v) -> p.SPAWN_BIOME = (String) v);
         r.text("SPAWN_CITY", SettingCategory.ADVANCED,
                 p -> p.SPAWN_CITY, (p, v) -> p.SPAWN_CITY = (String) v);
+        // Preset stores these as List<String> (unlike UrbexProfile's String[]); the TEXT control's
+        // boxing convention (SettingDescriptor's doc) stays String[] across the getter/setter boundary,
+        // so the two are bridged right here rather than changing SettingControls' array handling.
         r.text("FORCE_SPAWN_BUILDINGS", SettingCategory.ADVANCED,
-                p -> p.FORCE_SPAWN_BUILDINGS, (p, v) -> p.FORCE_SPAWN_BUILDINGS = (String[]) v);
+                p -> p.FORCE_SPAWN_BUILDINGS.toArray(new String[0]), (p, v) -> p.FORCE_SPAWN_BUILDINGS = List.of((String[]) v));
         r.text("FORCE_SPAWN_PARTS", SettingCategory.ADVANCED,
-                p -> p.FORCE_SPAWN_PARTS, (p, v) -> p.FORCE_SPAWN_PARTS = (String[]) v);
+                p -> p.FORCE_SPAWN_PARTS.toArray(new String[0]), (p, v) -> p.FORCE_SPAWN_PARTS = List.of((String[]) v));
 
         r.section("misc");
         r.toggle("MULTI_USE_CORNER", SettingCategory.ADVANCED,

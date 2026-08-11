@@ -10,10 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class RecreateProfileRestoreTest {
 
-    private static CompoundTag payload(String profile, String json) {
+    private static CompoundTag payload(String preset, String worldStyle, String overrides) {
         CompoundTag data = new CompoundTag();
-        data.putString("profile", profile);
-        data.putString("json", json);
+        data.putString("preset", preset);
+        data.putString("worldStyle", worldStyle);
+        data.putString("overrides", overrides);
         return data;
     }
 
@@ -21,25 +22,26 @@ public class RecreateProfileRestoreTest {
     public void parsesModernSavedDataWrapper() {
         // SavedData files wrap the codec payload in a "data" compound
         CompoundTag root = new CompoundTag();
-        root.put("data", payload("rare", ""));
+        root.put("data", payload("urbex:rare", "urbex:standard", ""));
         Optional<RecreateProfileRestore.Pending> pending = RecreateProfileRestore.parse(root);
-        assertEquals("rare", pending.orElseThrow().profile());
-        assertEquals("", pending.orElseThrow().json());
+        assertEquals("urbex:rare", pending.orElseThrow().preset());
+        assertEquals("urbex:standard", pending.orElseThrow().worldStyle());
+        assertEquals("", pending.orElseThrow().overridesJson());
     }
 
     @Test
-    public void parsesCustomizedProfileWithJson() {
+    public void parsesCustomizedPresetWithOverridesJson() {
         CompoundTag root = new CompoundTag();
-        root.put("data", payload("customized", "{\"citychance\":0.9}"));
+        root.put("data", payload("urbex:default", "urbex:standard", "{\"cities\":{\"cityChance\":0.9}}"));
         Optional<RecreateProfileRestore.Pending> pending = RecreateProfileRestore.parse(root);
-        assertEquals("customized", pending.orElseThrow().profile());
-        assertEquals("{\"citychance\":0.9}", pending.orElseThrow().json());
+        assertEquals("urbex:default", pending.orElseThrow().preset());
+        assertEquals("{\"cities\":{\"cityChance\":0.9}}", pending.orElseThrow().overridesJson());
     }
 
     @Test
-    public void emptyProfileMeansNothingToRestore() {
+    public void emptyPresetMeansNothingToRestore() {
         CompoundTag root = new CompoundTag();
-        root.put("data", payload("", ""));
+        root.put("data", payload("", "", ""));
         assertTrue(RecreateProfileRestore.parse(root).isEmpty());
     }
 

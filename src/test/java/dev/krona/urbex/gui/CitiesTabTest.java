@@ -1,15 +1,15 @@
 package dev.krona.urbex.gui;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
 import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The detail panel is widget code, but the blurb it shows is a pure function of the selected entry:
  * the old editor's three-part colouring (plain description, aqua extra, red warning) has to survive
- * the move, and profiles that leave a part empty must not get a blank line for it.
+ * the move to {@link Preset}, and a preset that leaves a part empty must not get a blank line for it.
  */
 class CitiesTabTest {
 
@@ -29,22 +29,23 @@ class CitiesTabTest {
         CitiesTab.forgetReopenOnCitiesTab();
     }
 
-    private static PresetSelection.Entry entryFor(UrbexProfile profile) {
-        return new PresetSelection.Entry("test", Component.literal("test"), false, "", Optional.of(profile));
+    private static PresetSelection.Entry entryFor(Preset preset) {
+        return new PresetSelection.Entry(Identifier.fromNamespaceAndPath("urbex", "test"),
+                Component.literal("test"), preset);
     }
 
-    private static UrbexProfile profile(String description, String extra, String warning) {
-        UrbexProfile profile = new UrbexProfile("test", true);
-        profile.setDescription(description);
-        profile.setExtraDescription(extra);
-        profile.setWarning(warning);
-        return profile;
+    private static Preset preset(String description, String extra, String warning) {
+        Preset preset = new Preset(Identifier.fromNamespaceAndPath("urbex", "test"));
+        preset.setDescription(description);
+        preset.setExtraDescription(extra);
+        preset.setWarning(warning);
+        return preset;
     }
 
     @Test
     void theDisabledEntryExplainsItselfInsteadOfShowingAProfileBlurb() {
         PresetSelection.Entry disabled = new PresetSelection.Entry(PresetSelection.DISABLED_ID,
-                Component.translatable("urbex.preset.disabled"), false, "", Optional.empty());
+                Component.translatable("urbex.preset.disabled"), null);
         TranslatableContents contents = assertInstanceOf(TranslatableContents.class,
                 CitiesTab.describe(disabled).getContents());
         assertEquals("urbex.preset.disabled.info", contents.getKey());
@@ -52,14 +53,14 @@ class CitiesTabTest {
 
     @Test
     void aDescriptionOnlyProfileGetsNoExtraLines() {
-        Component described = CitiesTab.describe(entryFor(profile("Common cities", "", "")));
+        Component described = CitiesTab.describe(entryFor(preset("Common cities", "", "")));
         assertEquals("Common cities", described.getString());
         assertTrue(described.getSiblings().isEmpty(), "empty extra/warning must not add blank lines");
     }
 
     @Test
     void extraAndWarningKeepTheOldEditorsColours() {
-        Component described = CitiesTab.describe(entryFor(profile("Base", "Harder than it looks", "Needs a caves world")));
+        Component described = CitiesTab.describe(entryFor(preset("Base", "Harder than it looks", "Needs a caves world")));
         List<Component> siblings = described.getSiblings();
         // description, then (newline, extra), then (newline, warning)
         assertEquals(4, siblings.size());
@@ -71,7 +72,7 @@ class CitiesTabTest {
 
     @Test
     void aWarningWithoutAnExtraDescriptionStillRenders() {
-        Component described = CitiesTab.describe(entryFor(profile("Base", "", "Careful")));
+        Component described = CitiesTab.describe(entryFor(preset("Base", "", "Careful")));
         List<Component> siblings = described.getSiblings();
         assertEquals(2, siblings.size(), "expected exactly one newline plus the warning");
         assertEquals("Careful", siblings.get(1).getString());

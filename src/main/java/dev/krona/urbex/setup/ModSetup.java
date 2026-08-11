@@ -1,6 +1,5 @@
 package dev.krona.urbex.setup;
 
-import dev.krona.urbex.config.ProfileSetup;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import org.apache.logging.log4j.LogManager;
@@ -16,7 +15,6 @@ public class ModSetup {
 
     public void preInit() {
         logger = LogManager.getLogger();
-        ProfileSetup.setupProfiles();
     }
 
     public void init() {

@@ -1,6 +1,6 @@
 package dev.krona.urbex.gui.settings;
 
-import dev.krona.urbex.config.UrbexProfile;
+import dev.krona.urbex.config.Preset;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -39,7 +39,7 @@ public final class SettingControls {
     private SettingControls() {
     }
 
-    public static AbstractWidget create(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+    public static AbstractWidget create(SettingDescriptor d, Preset target, Runnable onChanged, int width) {
         return switch (d.kind()) {
             case SLIDER -> createSlider(d, target, onChanged, width);
             case CHANCE_PERLIN -> createChancePerlin(d, target, onChanged, width);
@@ -52,7 +52,7 @@ public final class SettingControls {
 
     // ---- SLIDER ---------------------------------------------------------
 
-    private static AbstractWidget createSlider(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+    private static AbstractWidget createSlider(SettingDescriptor d, Preset target, Runnable onChanged, int width) {
         double initialValue = (Double) d.getter().apply(target);
         LogValueMapper logMapper = d.logScale() ? new LogValueMapper(d.min(), d.max()) : null;
         double initialPosition = logMapper != null ? logMapper.toSlider(initialValue) : linearToSlider(d, initialValue);
@@ -103,11 +103,11 @@ public final class SettingControls {
      */
     private static final class SliderWidget extends AbstractSliderButton {
         private final SettingDescriptor descriptor;
-        private final UrbexProfile target;
+        private final Preset target;
         private final Runnable onChanged;
         private final LogValueMapper logMapper;
 
-        private SliderWidget(SettingDescriptor descriptor, UrbexProfile target, Runnable onChanged,
+        private SliderWidget(SettingDescriptor descriptor, Preset target, Runnable onChanged,
                               LogValueMapper logMapper, int width, double initialPosition, Component initialLabel) {
             super(0, 0, width, HEIGHT, initialLabel, initialPosition);
             this.descriptor = descriptor;
@@ -147,7 +147,7 @@ public final class SettingControls {
      * coordinated against the single field via {@link PerlinCityChance}. Toggle on ⇒ field is {@code -1} and
      * the slider is inert (disabled); toggle off ⇒ field is the slider's current positive value.
      */
-    private static AbstractWidget createChancePerlin(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+    private static AbstractWidget createChancePerlin(SettingDescriptor d, Preset target, Runnable onChanged, int width) {
         double field = (Double) d.getter().apply(target);
         boolean perlinOn = PerlinCityChance.isPerlin(field);
         double sliderValue = PerlinCityChance.sliderValue(field, d.min());
@@ -178,7 +178,7 @@ public final class SettingControls {
         private final CycleButton<Boolean> toggle;
         private AbstractWidget focusedChild;
 
-        private PerlinChanceControl(SettingDescriptor d, UrbexProfile target, Runnable onChanged,
+        private PerlinChanceControl(SettingDescriptor d, Preset target, Runnable onChanged,
                                     SliderWidget slider, boolean perlinOn, int width) {
             super(0, 0, width, HEIGHT, Component.translatable(d.nameKey()));
             this.slider = slider;
@@ -319,7 +319,7 @@ public final class SettingControls {
 
     // ---- TOGGLE -----------------------------------------------------------
 
-    private static AbstractWidget createToggle(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+    private static AbstractWidget createToggle(SettingDescriptor d, Preset target, Runnable onChanged, int width) {
         boolean initialValue = (Boolean) d.getter().apply(target);
         CycleButton<Boolean> button = CycleButton
                 .booleanBuilder(CommonComponents.OPTION_ON, CommonComponents.OPTION_OFF, initialValue)
@@ -340,7 +340,7 @@ public final class SettingControls {
      * the constants off the current value (per the brief) sidesteps that: every profile always has a real
      * value here, so there is always a concrete instance to ask.
      */
-    private static AbstractWidget createCycle(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+    private static AbstractWidget createCycle(SettingDescriptor d, Preset target, Runnable onChanged, int width) {
         Object initialValue = d.getter().apply(target);
         // getDeclaringClass(), not getClass(): a constant with a class body (a constant-specific anonymous
         // subclass) would make getClass() return that subclass, whose getEnumConstants() is null;
@@ -393,7 +393,7 @@ public final class SettingControls {
      * fields box as {@code String[]}). Arrays round-trip through a comma-separated display: joined for
      * display, split-and-stripped on every edit.
      */
-    private static AbstractWidget createText(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+    private static AbstractWidget createText(SettingDescriptor d, Preset target, Runnable onChanged, int width) {
         Font font = Minecraft.getInstance().font;
         Object initialValue = d.getter().apply(target);
         boolean isArray = initialValue instanceof String[];
@@ -429,7 +429,7 @@ public final class SettingControls {
      * is rejected: the setter is simply not called, so the field keeps its last valid value.
      * {@link SettingDescriptor#integerOnly()} makes an {@code int}-backed field reject decimals as well.
      */
-    private static AbstractWidget createNumber(SettingDescriptor d, UrbexProfile target, Runnable onChanged, int width) {
+    private static AbstractWidget createNumber(SettingDescriptor d, Preset target, Runnable onChanged, int width) {
         Font font = Minecraft.getInstance().font;
         boolean integerOnly = d.integerOnly();
         double initialValue = (Double) d.getter().apply(target);
