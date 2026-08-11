@@ -4,6 +4,7 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.gui.preview.CityPreview;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.ChatFormatting;
@@ -381,15 +382,24 @@ public class CitiesTab extends GridLayoutTab {
      * against the same load-context {@code RegistryAccess} {@link #registeredWorldStyles} reads -
      * {@code urbex:default} first, then alphabetical (per {@code Presets.listBrowsable}). Empty when
      * the registry isn't reachable yet, exactly like {@link #registeredWorldStyles}.
+     * <p>
+     * Deliberately goes through the pure {@link Presets#resolve(Identifier, java.util.function.Function)}
+     * core with a lookup bound to this call's own {@code RegistryAccess}, not the caching
+     * {@code Presets.resolve(RegistryAccess, Identifier)} wrapper worldgen uses: that cache is keyed by
+     * id alone and only cleared by {@code AssetRegistries.reset()} from {@code CityFeature.cleanUp()},
+     * so after playing a world (or toggling datapacks in this very screen) it can hold a stale
+     * resolution for an id a different registry context now defines differently. The GUI has to see
+     * exactly what {@code access} says right now, not whatever the last world resolved.
      */
     private static List<PresetSelection.Entry> registeredPresets(CreateWorldScreen screen) {
         RegistryAccess access = screen.getUiState().getSettings().worldgenLoadContext();
-        if (access.lookup(CustomRegistries.PRESET_REGISTRY_KEY).isEmpty()) {
+        Optional<Registry<PresetRE>> registry = access.lookup(CustomRegistries.PRESET_REGISTRY_KEY);
+        if (registry.isEmpty()) {
             return List.of();
         }
         List<PresetSelection.Entry> entries = new ArrayList<>();
         for (Identifier id : Presets.listBrowsable(access)) {
-            Preset preset = Presets.resolve(access, id);
+            Preset preset = Presets.resolve(id, registry.get()::getValue);
             entries.add(new PresetSelection.Entry(id, Component.literal(DataTools.toName(id)), preset));
         }
         return entries;

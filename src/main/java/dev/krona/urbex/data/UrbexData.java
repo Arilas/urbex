@@ -20,7 +20,7 @@ public class UrbexData extends SavedData {
     // optionalFieldOf, not fieldOf: old worlds stored {profile, json} under different keys. Those
     // are simply absent here and ignored - a clean break, the world regenerates its selection as
     // unset rather than crashing on load.
-    private static Codec<UrbexData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+    public static final Codec<UrbexData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.optionalFieldOf("preset", "").forGetter(d -> d.selectedPreset),
             Codec.STRING.optionalFieldOf("worldStyle", "").forGetter(d -> d.selectedWorldStyle),
             Codec.STRING.optionalFieldOf("overrides", "").forGetter(d -> d.selectedOverrides)

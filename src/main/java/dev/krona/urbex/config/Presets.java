@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Resolves {@link PresetRE} parent chains into runtime {@link Preset}s, and lists the presets a
@@ -51,7 +52,8 @@ public class Presets {
         Identifier cur = id;
         while (cur != null) {
             if (!seen.add(cur)) {
-                throw new IllegalStateException("Preset parent cycle: " + seen + " -> " + cur);
+                String path = seen.stream().map(Identifier::toString).collect(Collectors.joining(" -> "));
+                throw new IllegalStateException("Preset parent cycle: " + path + " -> " + cur);
             }
             PresetRE re = lookup.apply(cur);
             if (re == null) {

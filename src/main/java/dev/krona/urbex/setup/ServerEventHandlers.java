@@ -34,7 +34,7 @@ public class ServerEventHandlers {
     }
 
     public static void cleanUp() {
-        Config.resetProfileCache();
+        Config.resetPresetCache();
         // Everything that used to be cleared here now lives on DimensionCaches, and goes away with
         // the IDimensionInfo that owns it (CityFeature.cleanUp clears that map right after
         // calling us). Only the datapack-derived predefined maps are still global.

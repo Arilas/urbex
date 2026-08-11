@@ -97,4 +97,34 @@ class PresetResolutionTest {
                 () -> Presets.resolve(leafId, lookup::get));
         assertTrue(ex.getMessage().contains("urbex:ghost"));
     }
+
+    /**
+     * The pure core ({@code Presets.resolve(Identifier, Function)}) caches nothing itself - unlike
+     * the registry-backed {@code Presets.resolve(RegistryAccess, Identifier)} wrapper, whose static
+     * {@code CACHE} is keyed by id alone and only cleared by {@code AssetRegistries.reset()}. This
+     * is exactly what lets {@code CitiesTab.registeredPresets} call the pure core directly with a
+     * lookup bound to its own {@code RegistryAccess} and see a fresh resolution every time, instead
+     * of a resolution some earlier registry context (e.g. a previously played world) left behind.
+     * <p>
+     * A live {@code RegistryAccess}/{@code Registry} can't be constructed headless without a full
+     * game bootstrap, so this test stands in for the GUI call site: it proves the property the fix
+     * actually depends on (the pure resolver is stateless across calls) using the same {@code
+     * Map::get}-shaped lookup {@code CitiesTab} passes in.
+     */
+    @Test
+    void pureResolveReflectsALookupChangeBetweenCalls() {
+        Identifier presetId = id("mutable");
+        Map<Identifier, PresetRE> lookup = new HashMap<>();
+        lookup.put(presetId, decode("{\"cities\":{\"cityChance\":0.1}}"));
+
+        Preset first = Presets.resolve(presetId, lookup::get);
+        assertEquals(0.1, first.CITY_CHANCE);
+
+        // Simulates a datapack toggle / new registry context redefining the same id - nothing about
+        // the pure core remembers the first call.
+        lookup.put(presetId, decode("{\"cities\":{\"cityChance\":0.9}}"));
+        Preset second = Presets.resolve(presetId, lookup::get);
+
+        assertEquals(0.9, second.CITY_CHANCE);
+    }
 }

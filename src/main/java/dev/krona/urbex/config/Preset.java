@@ -3,6 +3,17 @@ package dev.krona.urbex.config;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.ModSetup;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.DestructionSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.HighwaySettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.MiscSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.RailwaySettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.RoadSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.SpawnSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -400,8 +411,8 @@ public class Preset {
      * sections). Used for round-trip tests, saved-data overrides, and the export command.
      */
     public PresetRE toRE() {
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings terrain =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings(
+        TerrainSettings terrain =
+                new TerrainSettings(
                 Optional.of(LANDSCAPE_TYPE),
                 Optional.of(GROUNDLEVEL),
                 Optional.of(SEALEVEL),
@@ -415,8 +426,8 @@ public class Preset {
                 Optional.of(OCEAN_CORRECTION_BORDER),
                 Optional.of(AVOID_WATER),
                 Optional.of(USE_AVG_HEIGHTMAP));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings cities =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings(
+        CitySettings cities =
+                new CitySettings(
                 Optional.of(CITY_CHANCE),
                 Optional.of(CITY_MINRADIUS),
                 Optional.of(CITY_MAXRADIUS),
@@ -442,8 +453,8 @@ public class Preset {
                 Optional.of(CITY_MINHEIGHT),
                 Optional.of(CITY_MAXHEIGHT),
                 Optional.of(SCATTERED_CHANCE_MULTIPLIER));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings buildings =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings(
+        BuildingSettings buildings =
+                new BuildingSettings(
                 Optional.of(BUILDING_CHANCE),
                 Optional.of(BUILDING_MINFLOORS),
                 Optional.of(BUILDING_MAXFLOORS),
@@ -456,8 +467,8 @@ public class Preset {
                 Optional.of(MULTI_USE_CORNER),
                 Optional.of(MULTI_BUILDING_STREET_CONFLICT),
                 Optional.of(GENERATE_SPAWNERS));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.RoadSettings roads =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.RoadSettings(
+        RoadSettings roads =
+                new RoadSettings(
                 Optional.of(PRIMARY_ROAD_SPACING_X),
                 Optional.of(PRIMARY_ROAD_SPACING_Z),
                 Optional.of(PRIMARY_ROAD_OPTIONAL_CHANCE),
@@ -481,8 +492,8 @@ public class Preset {
                 Optional.of(CORRIDOR_CHANCE),
                 Optional.of(BRIDGE_CHANCE),
                 Optional.of(BRIDGE_SUPPORTS));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.HighwaySettings highways =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.HighwaySettings(
+        HighwaySettings highways =
+                new HighwaySettings(
                 Optional.of(HIGHWAY_REQUIRES_TWO_CITIES),
                 Optional.of(HIGHWAY_LEVEL_FROM_CITIES_MODE),
                 Optional.of(HIGHWAY_DISTANCE_MASK),
@@ -490,15 +501,15 @@ public class Preset {
                 Optional.of(HIGHWAY_SECONDARYPERLIN_SCALE),
                 Optional.of(HIGHWAY_PERLIN_FACTOR),
                 Optional.of(HIGHWAY_SUPPORTS));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.RailwaySettings railways =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.RailwaySettings(
+        RailwaySettings railways =
+                new RailwaySettings(
                 Optional.of(RAILWAYS_ENABLED),
                 Optional.of(RAILWAY_STATIONS_ENABLED),
                 Optional.of(RAILWAY_SURFACE_STATIONS_ENABLED),
                 Optional.of(RAILWAYS_CAN_END),
                 Optional.of(RAILWAY_DUNGEON_CHANCE));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.DestructionSettings destruction =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.DestructionSettings(
+        DestructionSettings destruction =
+                new DestructionSettings(
                 Optional.of(RUIN_CHANCE),
                 Optional.of(RUIN_MINLEVEL_PERCENT),
                 Optional.of(RUIN_MAXLEVEL_PERCENT),
@@ -517,15 +528,15 @@ public class Preset {
                 Optional.of(MINI_EXPLOSION_MAXHEIGHT),
                 Optional.of(EXPLOSIONS_IN_CITIES_ONLY),
                 Optional.of(DEBRIS_TO_NEARBYCHUNK_FACTOR));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings decoration =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings(
+        DecorationSettings decoration =
+                new DecorationSettings(
                 Optional.of(CHANCE_OF_RANDOM_LEAFBLOCKS),
                 Optional.of(THICKNESS_OF_RANDOM_LEAFBLOCKS),
                 Optional.of(AVOID_FOLIAGE),
                 Optional.of(LIGHTING_DENSITY),
                 Optional.of(LOOT_DENSITY));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.SpawnSettings spawn =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.SpawnSettings(
+        SpawnSettings spawn =
+                new SpawnSettings(
                 Optional.of(SPAWN_BIOME),
                 Optional.of(SPAWN_CITY),
                 Optional.of(SPAWN_NOT_IN_BUILDING),
@@ -535,15 +546,15 @@ public class Preset {
                 Optional.of(SPAWN_CHECK_RADIUS),
                 Optional.of(SPAWN_RADIUS_INCREASE),
                 Optional.of(SPAWN_CHECK_ATTEMPTS));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings atmosphere =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings(
+        AtmosphereSettings atmosphere =
+                new AtmosphereSettings(
                 Optional.of(HORIZON),
                 Optional.of(FOG_RED),
                 Optional.of(FOG_GREEN),
                 Optional.of(FOG_BLUE),
                 Optional.of(FOG_DENSITY));
-        dev.krona.urbex.worldgen.lost.regassets.data.preset.MiscSettings misc =
-                new dev.krona.urbex.worldgen.lost.regassets.data.preset.MiscSettings(
+        MiscSettings misc =
+                new MiscSettings(
                 Optional.of(EDITMODE),
                 Optional.of(GENERATE_NETHER));
 

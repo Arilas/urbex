@@ -230,7 +230,7 @@ public final class PresetSelection {
         String overrides = validatedOverrides(overridesJson, presetId);
 
         CityFeature.globalDimensionInfoDirtyCounter++;
-        Config.resetProfileCache();
+        Config.resetPresetCache();
         Config.presetFromClient = presetId;
         Config.worldStyleFromClient = worldStyleId;
         Config.overridesFromClient = overrides;
@@ -312,7 +312,7 @@ public final class PresetSelection {
         Entry entry = selected;
 
         CityFeature.globalDimensionInfoDirtyCounter++;
-        Config.resetProfileCache();
+        Config.resetPresetCache();
 
         if (DISABLED_ID.equals(entry.id()) || entry.preset() == null) {
             Config.presetFromClient = null;

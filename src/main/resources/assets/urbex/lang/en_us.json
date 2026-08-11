@@ -94,7 +94,7 @@
   "urbex.section.spawn.search": "Search Area",
   "urbex.section.spawn.search.desc": "How wide and how hard Urbex searches for a valid spawn.",
   "urbex.section.advanced.identifiers": "Identifiers & Overrides",
-  "urbex.section.advanced.identifiers.desc": "Named styles, profiles and forced-spawn part lists.",
+  "urbex.section.advanced.identifiers.desc": "Named styles, presets and forced-spawn part lists.",
   "urbex.section.advanced.misc": "Generation Internals",
   "urbex.section.advanced.misc.desc": "Low-level switches that change how geometry is assembled.",
   "urbex.section.advanced.visuals": "Client Visuals",

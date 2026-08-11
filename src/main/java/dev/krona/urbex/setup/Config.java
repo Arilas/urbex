@@ -138,7 +138,7 @@ public class Config {
         }
         active = result;
         AVOID_STRUCTURES_SET = null;
-        resetProfileCache();
+        resetPresetCache();
     }
 
     private static JsonObject readJson(Path file) {
@@ -188,7 +188,7 @@ public class Config {
         active = global;
     }
 
-    public static void resetProfileCache() {
+    public static void resetPresetCache() {
         dimensionPresetCache = null;
     }
 

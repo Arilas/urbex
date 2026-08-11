@@ -3,7 +3,7 @@
 A **preset** selects and tunes the worldgen behaviour Urbex uses for a dimension: city rarity,
 building shapes, road layout, explosion damage, spawn rules, and so on. Presets are plain
 datapack JSON — no code, no rebuild, no mod jar changes. Drop a file in the right place, add it to
-a tag, and it shows up in the profile picker.
+a tag, and it shows up in the preset picker.
 
 ## What a preset is
 
@@ -14,6 +14,11 @@ data/<namespace>/urbex/presets/<name>.json
 ```
 
 Its registry id is `<namespace>:<name>` (for example `urbex:default`, or `mypack:ruins`).
+
+`urbex:disabled` and `urbex:customized` are reserved: they name the Cities tab's own built-in
+"no cities" row and its transient hand-edited entry, not registry-backed presets. Registering a
+preset at either id is unsupported — the UI's built-in rows shadow it and it will never be shown
+or selectable.
 
 Every field in the file is **optional**. A preset only needs to state what it changes; anything
 left out falls through to its `parent` (see [Resolution rules](#resolution-rules) below). The
@@ -37,7 +42,7 @@ type instead of waiting for you to check the log.
 ## A complete minimal example datapack
 
 This is a full, working datapack that adds one preset — a "ruins" variant that just dials up ruin
-chance and turns off spawners — and makes it selectable in the profile picker.
+chance and turns off spawners — and makes it selectable in the preset picker.
 
 ```
 myruinspack/
@@ -87,7 +92,7 @@ the fields that change from `urbex:default` need to be listed:
 ```
 
 **`data/urbex/tags/urbex/presets/presets.json`** — the `#urbex:presets` tag drives the
-profile-selection UI (`Presets.listBrowsable`); a preset that exists but isn't tagged still
+preset-selection UI (`Presets.listBrowsable`); a preset that exists but isn't tagged still
 resolves and works (e.g. as someone else's `parent`), it just won't show up to pick directly. To
 add your preset alongside the built-ins, `"replace": false` merges your tag with the mod's own
 rather than overwriting it:
@@ -101,7 +106,7 @@ rather than overwriting it:
 
 Zip the `myruinspack` folder's contents (not the folder itself) into `myruinspack.zip`, drop it in
 your world's `datapacks/` folder (or the global `resourcepacks`-style datapack folder your server
-uses), and `mypack:ruins` appears in the **Cities** tab's profile list next to the built-ins.
+uses), and `mypack:ruins` appears in the **Cities** tab's preset list next to the built-ins.
 
 ## Resolution rules
 
