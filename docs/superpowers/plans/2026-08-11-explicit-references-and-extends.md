@@ -1136,6 +1136,84 @@ attributes each movement."
 
 ---
 
+### Task 5c: Asset loading must not wait for a server tick
+
+> **Plan amendment (2026-08-11, after Task 5b's review).** Task 5b's Step 1 sorted the stuff ordinal
+> and moved no digest. The reason turned out to be larger than the fix: `AssetRegistries.load()` is
+> called only from `END_LEVEL_TICK`, while `DigestCheck` runs on `SERVER_STARTED`, so **both digest
+> runs generate every chunk with `STUFF_BY_TAG` empty**. Confirmed independently down to bytecode
+> offsets. The owner ruled both halves land now.
+
+**Two things are broken, and they are the same bug seen from two sides.**
+
+*The shipped defect.* `prepareLevels()` — "Preparing spawn area" — runs inside `initServer()`,
+before `SERVER_STARTED` and before any tick, and never calls `tickServer`/`tickChildren`. Every
+chunk it generates is written with no decoration, and chunks persist, so it never heals. A player
+sees a new world whose spawn cities have no cobwebs or chains, with a visible boundary further out.
+Where that boundary falls depends on how far spawn preparation and tick 1's chunk work happened to
+get — so two players on the same seed get different worlds, which contradicts the mod's central
+claim. Chunks completed during tick 1 land on the wrong side too, because `ServerLevel.tick()` does
+its chunk work before Fabric fires `END_LEVEL_TICK` at the tail.
+
+*The coverage hole.* Because `AssetRegistries.load()` is also the only caller of every registry's
+`loadAll`, neither digest has ever exercised the `Stuff` subsystem — `generateStuff`, the
+`stuffOrdinal` RNG addressing, every `StuffSettingsRE` filter, `columnResolves` — nor the eager
+"fail at load, naming the file" validation that Task 4a added for all ten registries.
+`Rng.Purpose.STUFF` has never appeared in a golden.
+
+**This is the plan's second and final authorised golden regeneration.** Both are expected to move,
+because decoration will exist in the sampled window for the first time. Unlike Task 5b's, this
+regeneration makes the goldens cover *more* than they did.
+
+**Files:**
+- Modify: `src/main/java/dev/krona/urbex/setup/ServerEventHandlers.java`
+- Modify: `src/main/java/dev/krona/urbex/worldgen/lost/cityassets/AssetRegistries.java`
+- Modify: whatever hook you determine is correct (see Step 1)
+- Modify: `digest.golden`, `digest-features.golden`
+- Modify: `CHANGELOG.md`
+- Tests: a regression test that fails if generation can observe unloaded assets
+
+- [ ] **Step 1: Remove the tick dependency**
+
+The requirement, not the implementation: **no chunk may ever generate against unloaded assets, regardless of when generation starts.** Moving the call to a different lifecycle event only swaps one ordering assumption for another — `prepareLevels()` runs inside `initServer()`, so any event that fires after `initServer()` returns is already too late.
+
+Read the code and choose. Candidates worth evaluating, with the objection to each:
+- **Populate lazily on first use**, like every other registry does through `RegistryAssetRegistry.get`. Removes the ordering question entirely, but must be safe under the parallel worldgen worker pool, and would lose the eager validation unless kept alongside.
+- **A per-level hook that fires before chunk generation** (`ServerWorldEvents.LOAD` or similar). Verify by reading Fabric's injection point that it genuinely precedes `prepareLevels()`; do not assume from the name.
+- **From `CityFeature.getDimensionInfo()`**, which is already on the generation path and already runs before any city generation. The `loaded` flag makes repeat calls cheap.
+
+Whichever you pick, the eager validation must survive: Task 4a's promise that a bad asset fails at load naming the file depends on `loadAll` running for all ten registries. Say in your report which option you chose, what you rejected, and why.
+
+Handle the `STUFF_BY_TAG` publication race while you are here: `putAll` currently lets a worker observe a partially populated map. Task 5b improved this — each tag's list is now complete-or-absent — but the map itself is still filled incrementally.
+
+- [ ] **Step 2: Make the harness prove it**
+
+`DigestCheck` must now generate with decoration present. Confirm it does, and record the evidence — `Rng.Purpose.STUFF` appearing in the draw sequence, or a non-zero decoration count, whichever the harness can report.
+
+- [ ] **Step 3: A test that fails if this regresses**
+
+The bug was invisible for the life of the project because nothing asserted that assets were loaded before generation. Add something that fails if they are not. A test that asserts `STUFF_BY_TAG` is populated before the first chunk generates is worth more here than one that asserts a particular decoration lands somewhere.
+
+- [ ] **Step 4: Regenerate the goldens, with attribution**
+
+Record the before and after values. The CHANGELOG must say plainly that decoration now generates in the spawn area where it previously did not, that both digests moved because decoration entered the sampled window for the first time, and that the previous goldens did not cover the `Stuff` subsystem at all. Do not describe this as a routine regeneration — it changes what the goldens are evidence *for*.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add -A
+git commit -m "fix!: load assets before generation, not on the first server tick
+
+AssetRegistries.load ran only from END_LEVEL_TICK, but prepareLevels
+generates the spawn area inside initServer, before any tick. Spawn-area
+chunks were written with no decoration and persisted that way, and where the
+boundary fell varied between two players on one seed. The same gap meant
+neither digest had ever exercised the Stuff subsystem or the eager
+load-time validation. Both goldens regenerated; they now cover more."
+```
+
+---
+
 ### Task 6: Delete the thirty wiring defaults
 
 **Files:**
