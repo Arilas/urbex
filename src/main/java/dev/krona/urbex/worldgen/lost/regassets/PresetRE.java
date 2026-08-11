@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
@@ -14,6 +15,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.preset.RailwaySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.RoadSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.SpawnSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -31,9 +33,27 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
             "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
             "spawn", "atmosphere", "misc");
 
+    /**
+     * {@code Identifier.CODEC} would decode a bare (unqualified) string against the
+     * {@code minecraft} namespace, a third, silent defaulting rule distinct from both
+     * {@code DataTools.fromName}'s {@code urbex} default and the strict resolution the rest of
+     * the datapack format now uses. Routing through {@code DataTools.fromName} instead means a
+     * preset's {@code extends} fails the same way, and with the same message, as every other
+     * cross-reference: an unqualified id is a load error naming the string and the fix.
+     */
+    private static final Codec<Identifier> EXTENDS_CODEC = Codec.STRING.comapFlatMap(
+            s -> {
+                try {
+                    return DataResult.success(DataTools.fromName(s));
+                } catch (IllegalArgumentException e) {
+                    return DataResult.error(e::getMessage);
+                }
+            },
+            Identifier::toString);
+
     private static final Codec<PresetRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("extends").forGetter(PresetRE::getExtends),
+                    EXTENDS_CODEC.optionalFieldOf("extends").forGetter(PresetRE::getExtends),
                     Codec.STRING.optionalFieldOf("description").forGetter(PresetRE::description),
                     Codec.STRING.optionalFieldOf("extraDescription").forGetter(PresetRE::extraDescription),
                     Codec.STRING.optionalFieldOf("warning").forGetter(PresetRE::warning),

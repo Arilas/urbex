@@ -120,7 +120,16 @@ class DatapackReferenceIntegrityTest {
                     }
                 }
             }
-            default -> { /* variants and future categories: only palette-entry refs below */ }
+            case "presets" -> {
+                // "extends" is already checked unconditionally above, for every category.
+                JsonObject cities = asObject(d.get("cities"));
+                if (cities != null) {
+                    ref(src, cities.get("cityStyleAlternative"), "citystyles");
+                }
+            }
+            case "palettes", "variants" -> { /* only palette-entry refs, handled below */ }
+            default -> problems.add(file + ": category '" + category
+                    + "' has no reference checks; add a case to this switch");
         }
         walkPaletteEntries(src, d);
     }

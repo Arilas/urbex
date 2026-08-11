@@ -21,6 +21,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
@@ -58,7 +59,9 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             return 0;
         }
 
-        BuildingPart part = AssetRegistries.PARTS.get(context.getSource().getLevel(), editorInfo.getPartName());
+        // editorInfo.getPartName() is a toName()-shortened display string Editor.startEditing
+        // recorded, not an authored reference - see DataTools.fromDisplayName.
+        BuildingPart part = AssetRegistries.PARTS.get(context.getSource().getLevel(), DataTools.fromDisplayName(editorInfo.getPartName()));
         if (part == null) {
             context.getSource().sendFailure(Component.literal("Error finding part '" + editorInfo.getPartName() + "'!").withStyle(ChatFormatting.RED));
             return 0;

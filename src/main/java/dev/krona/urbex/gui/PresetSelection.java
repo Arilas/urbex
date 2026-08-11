@@ -321,7 +321,9 @@ public final class PresetSelection {
             return;
         }
 
-        Config.worldStyleFromClient = DataTools.fromName(effectiveWorldStyle());
+        // effectiveWorldStyle() is a toName()-shortened display string this class's own state
+        // produced, not an authored reference - see DataTools.fromDisplayName.
+        Config.worldStyleFromClient = DataTools.fromDisplayName(effectiveWorldStyle());
 
         if (CUSTOMIZED_ID.equals(entry.id())) {
             Preset preset = entry.preset();

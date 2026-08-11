@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+- **An unqualified datapack reference is now a load error instead of an implicit `urbex:` default.**
+  `DataTools.fromName` is the single choke point every reference resolves through -
+  `RegistryAssetRegistry`'s four lookup methods, `IdentifierMatcher`, and `Config`'s preset/worldstyle
+  parsing all call it - so making it throw `IllegalArgumentException` for a string without a `:`
+  closes off the implicit resolution this plan's `extends` work otherwise left standing: a bare name
+  like `"radiotower"` used to silently resolve to `urbex:radiotower`, which could point at whatever
+  happened to be registered there rather than at anything a file actually wrote, so a wrong reference
+  was unfindable the moment it misbehaved. The message names both the offending string and the fix,
+  e.g. `Unqualified datapack reference 'radiotower': references must name their namespace, e.g.
+  'urbex:radiotower'`. `PresetRE`'s `extends` field decoded through `Identifier.CODEC` rather than
+  `fromName`, so it had a third, different defaulting rule of its own - a bare name became
+  `minecraft:name` instead of either erroring or defaulting to `urbex:` - now routed through the same
+  strict resolution via a codec that wraps `DataTools.fromName`. `DatapackReferenceIntegrityTest`
+  gained a `presets` case (checking `cities.cityStyleAlternative`; `extends` was already checked for
+  every category by the shared check above the switch) and its former silent fall-through category is
+  now itself a failure naming the uncovered category - which is how it caught both that `presets` had
+  never been checked at all and that `largecities.json`'s `cityStyleAlternative: "citystyle_border"`
+  was the bundled pack's last unqualified reference, now `"urbex:citystyle_border"`. The same widened
+  test also caught that `palettes` had no case either; its 30 files carry only `extends` and `palette`
+  entries, both already checked elsewhere, so it now has the same no-op case `variants` does. A
+  third-party datapack author must qualify every reference from here on, in any registry's `extends`
+  or any cross-reference field - bare names no longer default to the `urbex` namespace anywhere.
+  Auditing every call site this change reaches also turned up a handful of places where the mod's own
+  Java code, not a datapack, produced the bare string: `PresetSelection`/`CityPreview` round-trip a
+  `toName()`-shortened worldStyle id through the Cities tab and the world-creation preview,
+  `BuildingInfo`'s majority-cityStyle vote among a chunk's neighbors and `MultiChunk`'s scattered
+  multi-building placement counted/stored that same shortened name, and the `editpart`/`resumeedit`/
+  `exportpart` edit-mode commands read one back from `EditModeData`/`EditorInfo`. None of those are
+  authored references, so routing them through the now-strict `fromName` would have broken the
+  default worldStyle selection and crashed every edit-mode command; they now go through the new
+  `DataTools.fromDisplayName` (or the already-qualified `Identifier` directly), which is documented as
+  the inverse of `toName()` and is never to be used on a datapack- or config-authored string. Confirmed
+  worldgen-inert: both digests regenerate unchanged (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both
+  `unsafeReads=0`).
 - **A datapack file now only has to state what it changes, on every registry rather than only on
   parts.** Twenty-two fields that the codec still demanded of every file are optional now:
   `predefinedcities.dimension`/`chunkx`/`chunkz`/`radius`/`citystyle`, `stuff.column`/`mincount`/
@@ -182,9 +216,10 @@
 - **The bundled datapack is now fully namespaced.** Every internal asset reference is written
   `urbex:name` instead of relying on bare-name defaulting, and street/highway/railway part wiring
   is declared explicitly in `worldstyles/standard` and `citystyles/citystyle_common`
-  (previously implicit Java defaults). Bare names in third-party datapacks still work and still
-  default to the `urbex` namespace. A new test enforces that every shipped reference is
-  namespaced and resolves.
+  (previously implicit Java defaults). Bare names in third-party datapacks still worked and still
+  defaulted to the `urbex` namespace at the time this change landed - a later entry above ("An
+  unqualified datapack reference is now a load error") removes that default entirely. A new test
+  enforces that every shipped reference is namespaced and resolves.
 - **Hierarchical streets replace the per-chunk street/park coin flip.** Every dimension now builds
   one deterministic road field of primary, secondary and tertiary roads, computed once from (seed,
   dimension id, road settings) rather than decided chunk by chunk. Primaries render through a new

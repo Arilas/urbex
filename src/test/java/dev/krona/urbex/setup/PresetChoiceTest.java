@@ -39,12 +39,11 @@ class PresetChoiceTest {
         assertEquals(Identifier.fromNamespaceAndPath("urbex", "cavern"), explicitStyle.get().getValue().preset());
         assertEquals(Identifier.fromNamespaceAndPath("urbex", "standard"), explicitStyle.get().getValue().worldStyle());
 
-        // Bare names default to the urbex namespace.
+        // A bare (unqualified) name is rejected, not defaulted to the urbex namespace: the entry
+        // is logged and dropped, same as any other malformed entry.
         Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> bareName =
                 Config.parseDimensionPresetEntry("minecraft:overworld=default");
-        assertTrue(bareName.isPresent());
-        assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), bareName.get().getValue().preset());
-        assertEquals(Config.DEFAULT_WORLD_STYLE, bareName.get().getValue().worldStyle());
+        assertTrue(bareName.isEmpty());
     }
 
     @Test

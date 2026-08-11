@@ -225,7 +225,9 @@ public class CityPreview implements AutoCloseable {
         // refresh.
         City.cleanPredefinedCache();
 
-        Identifier worldStyleId = DataTools.fromName(worldStyle);
+        // worldStyle is a toName()-shortened display string PresetSelection.effectiveWorldStyle()
+        // produced, not an authored reference - see DataTools.fromDisplayName.
+        Identifier worldStyleId = DataTools.fromDisplayName(worldStyle);
 
         // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
         // the preset, so it does not pay to build one there - and this construction is the only site

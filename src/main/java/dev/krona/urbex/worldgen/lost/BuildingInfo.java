@@ -353,18 +353,21 @@ public class BuildingInfo {
         // that represents the majority. This is to prevent streets from switching style randomly if two
         // different styled cities mix
         if (characteristics.isCity && !characteristics.couldHaveBuilding) {
+            // Counted by the full id, not CityStyle.getName()'s toName()-shortened display string:
+            // that string is bare for every urbex-namespace style, and AssetRegistries.get(String)
+            // now rejects an unqualified name rather than defaulting it.
             Counter<String> counter = new Counter<>();
             for (int cx = -1; cx <= 1; cx++) {
                 for (int cz = -1; cz <= 1; cz++) {
                     ChunkCoord key = coord.offset(cx, cz);
                     cityStyle = City.getCityStyle(key, provider, profile);
-                    counter.add(cityStyle.getName());
+                    counter.add(cityStyle.getId().toString());
                     if (cx == 0 && cz == 0) {
-                        counter.add(cityStyle.getName());   // Add this chunk again for a bias
+                        counter.add(cityStyle.getId().toString());   // Add this chunk again for a bias
                     }
                 }
             }
-            cityStyle = AssetRegistries.CITYSTYLES.get(world, counter.getMostOccuring());
+            cityStyle = AssetRegistries.CITYSTYLES.get(world, Identifier.parse(counter.getMostOccuring()));
         } else {
             cityStyle = City.getCityStyle(coord, provider, profile);
         }

@@ -225,9 +225,13 @@ public class MultiChunk {
     }
 
     private void placeBuilding(MultiBuilding building, int x, int z) {
+        // The fully-qualified id, not getName()'s toName()-shortened display string: MB.name is
+        // fed straight back into AssetRegistries.MULTI_BUILDINGS.getOrThrow(String) in
+        // BuildingInfo.initMultiBuildingSection, which now rejects an unqualified name rather
+        // than defaulting it.
         for (int xx = 0 ; xx < building.getDimX() ; xx++) {
             for (int zz = 0 ; zz < building.getDimZ() ; zz++) {
-                buildingGrid[x+xx][z+zz] = new MB(building.getName(), xx, zz);
+                buildingGrid[x+xx][z+zz] = new MB(building.getId().toString(), xx, zz);
             }
         }
     }
