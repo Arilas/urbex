@@ -13,7 +13,13 @@
 ## Global Constraints
 
 - **Branch base:** this work sits on top of `fix/citystyle-selector-inherit` (commit `1993627c`), which already made a city style's declared selector lists replace rather than append. Rebase `feature/explicit-references-and-extends` onto it before Task 1. Task 3 generalises the `CityStyle.Sel` / `declared` mechanism that commit introduced; do not re-derive it.
-- **Worldgen output must not move.** `./gradlew runDigestCheck` must print `DRIVERDIGEST=414cb71424d5e53f` and `./gradlew runDigestCheckFeatures` must print `DRIVERDIGEST=c8267f7b4abfd44e`, both with `unsafeReads=0`, and `digest.golden` / `digest-features.golden` must stay untracked-clean in `git status`. **A shifted digest is a bug in the task, not a golden to regenerate.** If one moves, stop and diagnose.
+- **Worldgen output must not move.** `./gradlew runDigestCheck` and `./gradlew runDigestCheckFeatures` must print the current golden values with `unsafeReads=0`, and `digest.golden` / `digest-features.golden` must stay untracked-clean in `git status`. **A shifted digest is a bug in the task, not a golden to regenerate.** If one moves, stop and diagnose.
+
+  **Current values — Tasks 6 and 7 must hold these:** `digest.golden` = `88af6b69e7762fbc`, `digest-features.golden` = `7c297c1e4ec1ce38`.
+
+  The plan started at `414cb71424d5e53f` / `c8267f7b4abfd44e`, which is what the earlier tasks' steps still name; those references are left as the historical record of what each task held at the time. Two regenerations were authorised, each in its own task and each expected:
+  - **Task 5b** moved features to `8a3215441fb9f46d` — rail-dungeon `inpart` conditions began firing once bare-name matching was removed, changing chest loot.
+  - **Task 5c** moved both to the current values — decoration entered the sampled window for the first time, because asset loading no longer waited for a server tick.
 - **Clean break, no compatibility shims.** Urbex has not shipped. `inherit` and `parent` are deleted, not aliased. No migration code, no deprecation window.
 - **Every new user-visible behaviour change gets a `CHANGELOG.md` entry** under `## Unreleased`, in the established style: bold lead sentence, then what changed, why, and what a datapack author must do.
 - **No `lostcit*` identifiers** in `src/main`. This fork removed the last one deliberately.
@@ -1384,7 +1390,7 @@ Build this on `Resolved.require` from Task 4a rather than duplicating its error 
 - [ ] **Step 7: Run the suite and the digests**
 
 Run: `./gradlew test`, then both digest tasks.
-Expected: PASS; `414cb71424d5e53f` and `c8267f7b4abfd44e`. This is the task most likely to move worldgen — if a digest shifts, a default that was silently in use has been replaced by a different value, so find it rather than regenerating.
+Expected: PASS; `88af6b69e7762fbc` and `7c297c1e4ec1ce38`. This is the task most likely to move worldgen — if a digest shifts, a default that was silently in use has been replaced by a different value, so find it rather than regenerating. Both authorised regenerations are already spent; there is no budget for a third.
 
 - [ ] **Step 8: Add the changelog entry and commit**
 
