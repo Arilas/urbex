@@ -174,9 +174,13 @@ class PresetSelectionTest {
         selection.restore("customized", "{\"citychance\":0.9}");
 
         // Rough mapping (Task 4 replaces this editor with one that speaks Preset natively): the
-        // closest preset id publishes so the server has something valid to resolve, with the old
-        // profile JSON riding along in overridesFromClient (not yet a real PresetRE overlay).
-        assertEquals(Identifier.fromNamespaceAndPath("urbex", "customized"), Config.presetFromClient);
+        // closest *resolvable* preset id publishes so the server has something valid to resolve,
+        // with the old profile JSON riding along in overridesFromClient (not yet a real PresetRE
+        // overlay). restore()'s basedOn for a JSON restore is CUSTOM_ID itself ("customized"),
+        // which is not a real registered preset - publish() must not forward that verbatim (it
+        // would make Presets.resolve throw the moment a chunk generates), so it falls back to
+        // "default" here.
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), Config.presetFromClient);
         assertTrue(Config.overridesFromClient != null && !Config.overridesFromClient.isEmpty());
     }
 

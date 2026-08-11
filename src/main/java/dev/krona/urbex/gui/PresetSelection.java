@@ -282,7 +282,14 @@ public final class PresetSelection {
             if (worldStyle != null) {
                 published.setWorldStyle(worldStyle);
             }
-            String basedOn = entry.basedOn() == null || entry.basedOn().isEmpty() ? "default" : entry.basedOn();
+            // CUSTOM_ID itself is not a real registered preset (it's the transient row's own
+            // marker, or restore()'s "we don't know the real basedOn" placeholder) - falling back
+            // to it here would publish an unresolvable id and crash worldgen the moment a chunk is
+            // generated. Treat it exactly like "no basedOn known" and fall back to "default".
+            String basedOn = entry.basedOn();
+            if (basedOn == null || basedOn.isEmpty() || CUSTOM_ID.equals(basedOn)) {
+                basedOn = "default";
+            }
             Config.presetFromClient = DataTools.fromName(basedOn);
             Config.worldStyleFromClient = DataTools.fromName(published.getWorldStyle());
             Config.overridesFromClient = published.toJson(false).toString();

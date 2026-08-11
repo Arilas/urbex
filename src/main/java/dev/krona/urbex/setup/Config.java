@@ -11,6 +11,7 @@ import dev.krona.urbex.config.UrbexConfig;
 import dev.krona.urbex.data.UrbexData;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
@@ -254,6 +255,16 @@ public class Config {
      * config entry put at {@link Level#OVERWORLD}, exactly as the old flow did. Finally, if the
      * resolved overworld preset has {@code GENERATE_NETHER} set, the nether is pointed at
      * {@code urbex:cavern}, overriding any explicit nether entry - also unchanged from before.
+     * <p>
+     * {@code dimensionsWithPresets} entries and the global config's own selection are already
+     * checked once at server start by {@link #validateSelectedPresets}, but the client-published
+     * and saved-data ids are not - a player's client or an old/hand-edited save can hand this
+     * method an id nothing validated. So whatever ends up selected for the overworld here is
+     * resolved against the live registries right before publication, same as
+     * {@link #validateSelectedPresets}'s checks, just logging instead of throwing: this runs on a
+     * worldgen worker thread while a chunk is generating, not at a point a player can act on, so an
+     * unknown id is reported and the selection dropped (worldstyle falls back to
+     * {@link #DEFAULT_WORLD_STYLE}) rather than taking generation down.
      */
     private static Map<ResourceKey<Level>, PresetChoice> buildPresetCache(ServerLevel level) {
         Map<ResourceKey<Level>, PresetChoice> cache = new ConcurrentHashMap<>();
@@ -276,11 +287,23 @@ public class Config {
         } else {
             String savedPreset = data.getSelectedPreset();
             if (!savedPreset.isEmpty()) {
-                selectedPreset = Identifier.parse(savedPreset);
-                String savedStyle = data.getSelectedWorldStyle();
-                selectedWorldStyle = savedStyle.isEmpty() ? DEFAULT_WORLD_STYLE : Identifier.parse(savedStyle);
-                String savedOverrides = data.getSelectedOverrides();
-                selectedOverrides = savedOverrides.isEmpty() ? null : savedOverrides;
+                selectedPreset = Identifier.tryParse(savedPreset);
+                if (selectedPreset == null) {
+                    Urbex.getLogger().error("Malformed saved preset id '{}' in world data; treating the overworld's selection as unset.", savedPreset);
+                } else {
+                    String savedStyle = data.getSelectedWorldStyle();
+                    if (savedStyle.isEmpty()) {
+                        selectedWorldStyle = DEFAULT_WORLD_STYLE;
+                    } else {
+                        selectedWorldStyle = Identifier.tryParse(savedStyle);
+                        if (selectedWorldStyle == null) {
+                            Urbex.getLogger().error("Malformed saved worldstyle id '{}' in world data; using {}.", savedStyle, DEFAULT_WORLD_STYLE);
+                            selectedWorldStyle = DEFAULT_WORLD_STYLE;
+                        }
+                    }
+                    String savedOverrides = data.getSelectedOverrides();
+                    selectedOverrides = savedOverrides.isEmpty() ? null : savedOverrides;
+                }
             } else if (level.dimension() == Level.OVERWORLD) {
                 String globalPreset = Config.SELECTED_PRESET.get();
                 if (globalPreset != null && !globalPreset.isEmpty()) {
@@ -289,6 +312,23 @@ public class Config {
                     selectedWorldStyle = globalStyle == null || globalStyle.isEmpty()
                             ? DEFAULT_WORLD_STYLE : DataTools.fromName(globalStyle);
                 }
+            }
+        }
+
+        if (selectedPreset != null) {
+            RegistryAccess access = level.registryAccess();
+            Registry<dev.krona.urbex.worldgen.lost.regassets.PresetRE> presets =
+                    access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
+            Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE> worldStyles =
+                    access.lookupOrThrow(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
+            if (presets.get(selectedPreset).isEmpty()) {
+                Urbex.getLogger().error("Unknown Urbex preset '{}' selected for the overworld; ignoring. Valid presets: {}",
+                        selectedPreset, String.join(", ", sortedIds(presets)));
+                selectedPreset = null;
+            } else if (worldStyles.get(selectedWorldStyle).isEmpty()) {
+                Urbex.getLogger().error("Unknown Urbex worldstyle '{}' selected for the overworld; using {}. Valid worldstyles: {}",
+                        selectedWorldStyle, DEFAULT_WORLD_STYLE, String.join(", ", sortedIds(worldStyles)));
+                selectedWorldStyle = DEFAULT_WORLD_STYLE;
             }
         }
 
@@ -345,22 +385,24 @@ public class Config {
 
     private static void requirePreset(Registry<dev.krona.urbex.worldgen.lost.regassets.PresetRE> presets, Identifier id, String context) {
         if (presets.get(id).isEmpty()) {
-            List<String> valid = new ArrayList<>();
-            presets.keySet().forEach(i -> valid.add(i.toString()));
-            Collections.sort(valid);
             throw new IllegalStateException("Unknown Urbex preset '" + id + "' (" + context + "). Valid presets: "
-                    + String.join(", ", valid));
+                    + String.join(", ", sortedIds(presets)));
         }
     }
 
     private static void requireWorldStyle(Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE> worldStyles, Identifier id, String context) {
         if (worldStyles.get(id).isEmpty()) {
-            List<String> valid = new ArrayList<>();
-            worldStyles.keySet().forEach(i -> valid.add(i.toString()));
-            Collections.sort(valid);
             throw new IllegalStateException("Unknown Urbex worldstyle '" + id + "' (" + context + "). Valid worldstyles: "
-                    + String.join(", ", valid));
+                    + String.join(", ", sortedIds(worldStyles)));
         }
+    }
+
+    /** Every id a registry holds, sorted, for "valid ids are ..." diagnostics. */
+    private static List<String> sortedIds(Registry<?> registry) {
+        List<String> ids = new ArrayList<>();
+        registry.keySet().forEach(i -> ids.add(i.toString()));
+        Collections.sort(ids);
+        return ids;
     }
 
     public static boolean isAvoidedStructure(Identifier id) {
