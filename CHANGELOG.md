@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **Presets now declare `extends` instead of `parent`, resolved through the same chain walker city
+  styles use.** `PresetRE`'s `parent` field is gone; it implements the `Extendable` interface and
+  reads an `extends` field instead, like every other cross-reference. `Presets.resolve` no longer
+  walks its own leaf-to-root loop and reverses it by hand - it delegates straight to
+  `ExtendsChain.resolve`, which already returns the chain root-first, so the application loop is a
+  plain forward loop now instead of a reversed one. A cycle or a dangling `extends` is an
+  `IllegalStateException` naming the full chain (or both the missing id and the referrer), exactly
+  like a bad city style `extends` - presets and city styles now fail identically instead of each
+  keeping their own ad hoc parent-walking code. This is datapack-visible: any preset file, bundled
+  or third-party, using `"parent"` must rename that key to `"extends"` - the value is unchanged,
+  still a fully-qualified id such as `"urbex:default"`. `docs/presets.md` and
+  `docs/schema/preset.schema.json` are updated to match, and `PresetSchemaTest` keeps them pinned to
+  `PresetRE.KEYS`. Confirmed worldgen-inert: both digests regenerate unchanged
+  (`414cb71424d5e53f` and `c8267f7b4abfd44e`, both `unsafeReads=0`), so this is a load-path and
+  format change only.
 - **City styles now declare `extends` instead of `inherit`, and their whole ancestor chain resolves
   once at load time instead of lazily on first use.** `CityStyleRE`'s `inherit` field (a bare
   string) is gone; it implements the new `Extendable` interface and reads an `extends` field

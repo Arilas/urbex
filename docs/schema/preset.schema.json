@@ -2,13 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Arilas/urbex/main/docs/schema/preset.schema.json",
   "title": "Urbex preset",
-  "description": "A datapack-contributed entry for the urbex:presets dynamic registry (data/<namespace>/urbex/presets/<name>.json). Every field is optional: only fields actually present are applied on top of the resolved 'parent' chain, and unset fields fall through to the parent (or, at the root of the chain, to the code defaults in Preset.java). Keys starting with '_' are ignored (blessed pack metadata, e.g. '_comment').",
+  "description": "A datapack-contributed entry for the urbex:presets dynamic registry (data/<namespace>/urbex/presets/<name>.json). Every field is optional: only fields actually present are applied on top of the resolved 'extends' chain, and unset fields fall through to the asset this preset extends (or, at the root of the chain, to the code defaults in Preset.java). Keys starting with '_' are ignored (blessed pack metadata, e.g. '_comment').",
   "type": "object",
   "properties": {
-    "parent": {
+    "extends": {
       "type": "string",
       "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$",
-      "description": "Identifier of another preset in the urbex:presets registry to inherit from. This preset's sections are applied on top of the fully-resolved parent, field by field, so only the fields that differ need to be listed here. Like all Minecraft identifiers, an id with no namespace (no ':') defaults to the 'minecraft' namespace -- presets should always give an explicit namespace (e.g. 'urbex:default'). A parent cycle, or a parent id that does not resolve, is a load-time error."
+      "description": "Asset this preset builds on. Fully qualified, e.g. `urbex:default`."
     },
     "description": {
       "type": "string",
@@ -684,7 +684,7 @@
           "type": "number",
           "minimum": 0.0,
           "maximum": 1.0,
-          "description": "Chance that an optional decorative-light marker places a light. Every shipped preset sets this explicitly; leaving it unset falls through to the parent chain rather than defaulting to zero."
+          "description": "Chance that an optional decorative-light marker places a light. Every shipped preset sets this explicitly; leaving it unset falls through to the extends chain rather than defaulting to zero."
         },
         "lootDensity": {
           "type": "number",

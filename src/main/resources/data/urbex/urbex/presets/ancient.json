@@ -1,5 +1,5 @@
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "description": "Ancient jungle city, leafs, ruined buildings",
   "icon": "textures/gui/icon_ancient.png",
   "decoration": {

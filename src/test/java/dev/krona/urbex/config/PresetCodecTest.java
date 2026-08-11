@@ -37,7 +37,7 @@ class PresetCodecTest {
         assertTrue(re.cities().isPresent());
         assertEquals(0.001, re.cities().get().cityChance().orElseThrow());
 
-        assertTrue(re.parent().isEmpty());
+        assertTrue(re.getExtends().isEmpty());
         assertTrue(re.extraDescription().isEmpty());
         assertTrue(re.warning().isEmpty());
         assertTrue(re.icon().isEmpty());

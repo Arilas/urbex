@@ -378,7 +378,7 @@ public class CitiesTab extends GridLayoutTab {
     }
 
     /**
-     * The browsable presets registered for the world being created, resolved (parent chains flattened)
+     * The browsable presets registered for the world being created, resolved (extends chains flattened)
      * against the same load-context {@code RegistryAccess} {@link #registeredWorldStyles} reads -
      * {@code urbex:default} first, then alphabetical (per {@code Presets.listBrowsable}). Empty when
      * the registry isn't reachable yet, exactly like {@link #registeredWorldStyles}.

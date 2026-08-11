@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,8 +26,16 @@ class PresetResolutionTest {
         return Identifier.fromNamespaceAndPath("urbex", path);
     }
 
+    /** Builds a {@code PresetRE} with only the {@code extends} field set. */
+    private static PresetRE presetWithExtends(Identifier extendsId) {
+        return new PresetRE(Optional.of(extendsId), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty());
+    }
+
     @Test
-    void parentlessPresetGetsCodeDefaults() {
+    void extendslessPresetGetsCodeDefaults() {
         Identifier presetId = id("leaf");
         Map<Identifier, PresetRE> lookup = Map.of(presetId, decode("{}"));
 
@@ -44,7 +53,7 @@ class PresetResolutionTest {
 
         Map<Identifier, PresetRE> lookup = new HashMap<>();
         lookup.put(parentId, decode("{\"cities\":{\"cityChance\":0.5}}"));
-        lookup.put(childId, decode("{\"parent\":\"urbex:parent\",\"destruction\":{\"ruinChance\":0.9}}"));
+        lookup.put(childId, decode("{\"extends\":\"urbex:parent\",\"destruction\":{\"ruinChance\":0.9}}"));
 
         Preset p = Presets.resolve(childId, lookup::get);
 
@@ -63,9 +72,9 @@ class PresetResolutionTest {
 
         Map<Identifier, PresetRE> lookup = new HashMap<>();
         lookup.put(rootId, decode("{\"cities\":{\"cityChance\":0.1}}"));
-        lookup.put(middleId, decode("{\"parent\":\"urbex:root\","
+        lookup.put(middleId, decode("{\"extends\":\"urbex:root\","
                 + "\"cities\":{\"cityChance\":0.2},\"buildings\":{\"buildingChance\":0.3}}"));
-        lookup.put(leafId, decode("{\"parent\":\"urbex:middle\",\"buildings\":{\"buildingChance\":0.4}}"));
+        lookup.put(leafId, decode("{\"extends\":\"urbex:middle\",\"buildings\":{\"buildingChance\":0.4}}"));
 
         Preset p = Presets.resolve(leafId, lookup::get);
 
@@ -79,8 +88,8 @@ class PresetResolutionTest {
         Identifier bId = id("b");
 
         Map<Identifier, PresetRE> lookup = new HashMap<>();
-        lookup.put(aId, decode("{\"parent\":\"urbex:b\"}"));
-        lookup.put(bId, decode("{\"parent\":\"urbex:a\"}"));
+        lookup.put(aId, decode("{\"extends\":\"urbex:b\"}"));
+        lookup.put(bId, decode("{\"extends\":\"urbex:a\"}"));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> Presets.resolve(aId, lookup::get));
@@ -89,13 +98,24 @@ class PresetResolutionTest {
     }
 
     @Test
-    void danglingParentIsError() {
+    void danglingExtendsIsError() {
         Identifier leafId = id("leaf");
-        Map<Identifier, PresetRE> lookup = Map.of(leafId, decode("{\"parent\":\"urbex:ghost\"}"));
+        Map<Identifier, PresetRE> lookup = Map.of(leafId, decode("{\"extends\":\"urbex:ghost\"}"));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> Presets.resolve(leafId, lookup::get));
         assertTrue(ex.getMessage().contains("urbex:ghost"));
+    }
+
+    @Test
+    void danglingExtendsNamesBothEnds() {
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> Presets.resolve(Identifier.fromNamespaceAndPath("urbex", "child"),
+                        id -> id.getPath().equals("child")
+                                ? presetWithExtends(Identifier.fromNamespaceAndPath("urbex", "nope"))
+                                : null));
+        assertTrue(e.getMessage().contains("urbex:nope"));
+        assertTrue(e.getMessage().contains("urbex:child"));
     }
 
     /**

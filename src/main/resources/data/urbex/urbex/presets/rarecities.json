@@ -1,5 +1,5 @@
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "description": "Cities are rare",
   "icon": "textures/gui/icon_rarecities.png",
   "cities": { "cityChance": 0.001 },

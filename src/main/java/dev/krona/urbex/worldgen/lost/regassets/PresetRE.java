@@ -22,18 +22,18 @@ import java.util.Set;
 
 /**
  * The datapack-facing preset format: every field is optional, and only the fields actually
- * present in the JSON are applied on top of a parent chain (see {@code Presets.resolve}). Mirrors
- * the {@code WorldStyleRE} registry-entry idiom.
+ * present in the JSON are applied on top of an {@code extends} chain (see {@code Presets.resolve}).
+ * Mirrors the {@code WorldStyleRE} registry-entry idiom.
  */
-public class PresetRE implements IAsset<PresetRE> {
+public class PresetRE implements IAsset<PresetRE>, Extendable {
 
-    public static final Set<String> KEYS = Set.of("parent", "description", "extraDescription", "warning", "icon",
+    public static final Set<String> KEYS = Set.of("extends", "description", "extraDescription", "warning", "icon",
             "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
             "spawn", "atmosphere", "misc");
 
     private static final Codec<PresetRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Identifier.CODEC.optionalFieldOf("parent").forGetter(PresetRE::parent),
+                    Identifier.CODEC.optionalFieldOf("extends").forGetter(PresetRE::getExtends),
                     Codec.STRING.optionalFieldOf("description").forGetter(PresetRE::description),
                     Codec.STRING.optionalFieldOf("extraDescription").forGetter(PresetRE::extraDescription),
                     Codec.STRING.optionalFieldOf("warning").forGetter(PresetRE::warning),
@@ -56,7 +56,7 @@ public class PresetRE implements IAsset<PresetRE> {
 
     private Identifier name;
 
-    private final Optional<Identifier> parent;
+    private final Optional<Identifier> extendsId;
     private final Optional<String> description;
     private final Optional<String> extraDescription;
     private final Optional<String> warning;
@@ -73,7 +73,7 @@ public class PresetRE implements IAsset<PresetRE> {
     private final Optional<AtmosphereSettings> atmosphere;
     private final Optional<MiscSettings> misc;
 
-    public PresetRE(Optional<Identifier> parent,
+    public PresetRE(Optional<Identifier> extendsId,
                      Optional<String> description,
                      Optional<String> extraDescription,
                      Optional<String> warning,
@@ -89,7 +89,7 @@ public class PresetRE implements IAsset<PresetRE> {
                      Optional<SpawnSettings> spawn,
                      Optional<AtmosphereSettings> atmosphere,
                      Optional<MiscSettings> misc) {
-        this.parent = parent;
+        this.extendsId = extendsId;
         this.description = description;
         this.extraDescription = extraDescription;
         this.warning = warning;
@@ -107,8 +107,9 @@ public class PresetRE implements IAsset<PresetRE> {
         this.misc = misc;
     }
 
-    public Optional<Identifier> parent() {
-        return parent;
+    @Override
+    public Optional<Identifier> getExtends() {
+        return extendsId;
     }
 
     public Optional<String> description() {

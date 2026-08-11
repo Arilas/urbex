@@ -86,7 +86,7 @@ class ShippedPresetsTest {
     }
 
     @Test
-    void nonDefaultPresetsParentDefault() throws Exception {
+    void nonDefaultPresetsExtendDefault() throws Exception {
         Map<Identifier, PresetRE> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
@@ -95,15 +95,15 @@ class ShippedPresetsTest {
             PresetRE preset = entry.getValue();
 
             if (id.getPath().equals("default")) {
-                // Default preset should not have a parent
-                assertTrue(preset.parent().isEmpty(),
-                        "Default preset should not have a parent");
+                // Default preset should not extend anything
+                assertTrue(preset.getExtends().isEmpty(),
+                        "Default preset should not have an extends");
             } else {
-                // All other presets should have urbex:default as parent
-                assertTrue(preset.parent().isPresent(),
-                        "Non-default preset " + id + " should have a parent");
-                assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), preset.parent().get(),
-                        "Preset " + id + " should have urbex:default as parent");
+                // All other presets should extend urbex:default
+                assertTrue(preset.getExtends().isPresent(),
+                        "Non-default preset " + id + " should have an extends");
+                assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), preset.getExtends().get(),
+                        "Preset " + id + " should have urbex:default as extends");
             }
         }
     }

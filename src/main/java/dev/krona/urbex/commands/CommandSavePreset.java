@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Exports the sender dimension's resolved (parent chain flattened, overrides applied) preset to a
+/** Exports the sender dimension's resolved (extends chain flattened, overrides applied) preset to a
  *  standalone JSON file, for sharing or as a starting point for a new datapack preset. */
 public class CommandSavePreset implements Command<CommandSourceStack> {
 

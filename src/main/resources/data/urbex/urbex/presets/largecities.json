@@ -1,5 +1,5 @@
 {
-  "parent": "urbex:default",
+  "extends": "urbex:default",
   "icon": "textures/gui/icon_default.png",
   "cities": {
     "cityChance": -1,
