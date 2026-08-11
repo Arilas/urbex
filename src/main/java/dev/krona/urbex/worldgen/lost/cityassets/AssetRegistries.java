@@ -148,9 +148,25 @@ public class AssetRegistries {
      * {@code PREDEFINED_CITIES} is absent for an unrelated reason: {@link #loadPredefinedStuff}
      * loads it, under the same lock.
      * <p>
-     * Order is deliberate only in one place: {@code VARIANTS} before {@code PALETTES}, because
-     * compiling a palette entry that names a variant reaches into that registry. The lookup is
-     * lazy, so this is tidiness rather than a requirement.
+     * <b>Two orderings below are requirements, not tidiness, and both are silent when broken.</b>
+     * {@link RegistryAssetRegistry#getIterable()} returns the <em>resolved cache</em> -
+     * {@code assets.values()}, which {@link RegistryAssetRegistry#reset()} empties and only
+     * {@code loadAll} refills - so any step that iterates a registry must run after that registry's
+     * {@code loadAll}, and iterating early yields an empty sweep rather than an error:
+     * <ul>
+     * <li>{@code WORLDSTYLES.loadAll} before {@link #loadReachableCityStyles}, whose first act is
+     *     {@code for (WorldStyle style : WORLDSTYLES.getIterable())}. Moved after it, route 1 - the
+     *     world style {@code citystyles} selectors, the primary route and the one most of that
+     *     method's doc is about - sweeps zero city styles. Nothing fails: the world loads, the suite
+     *     stays green and the digests stay clean, and a city style whose chain leaves a required
+     *     field undeclared goes back to throwing from a worldgen worker mid-generation, which is the
+     *     exact failure this method exists to prevent.</li>
+     * <li>{@code STUFF.loadAll} before the {@code groupStuffByTag(STUFF.getIterable())} below, for
+     *     the same reason: reordered, the tag index is published empty but flagged loaded, and
+     *     {@code Stuff.generateStuff} silently places nothing.</li>
+     * </ul>
+     * Only {@code VARIANTS} before {@code PALETTES} is tidiness: compiling a palette entry that names
+     * a variant reaches into that registry, but through {@code get}, which resolves on demand.
      * <p>
      * Called from two places, for two different reasons. {@code ServerEventHandlers} calls it from
      * {@code ServerLevelEvents.LOAD} so the validation above happens while the world is loading and

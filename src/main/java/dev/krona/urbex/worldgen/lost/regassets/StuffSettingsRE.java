@@ -8,6 +8,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.BlockMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,7 +26,7 @@ import java.util.Optional;
  */
 public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
 
-    public static final Codec<StuffSettingsRE> CODEC = RecordCodecBuilder.create(instance ->
+    private static final Codec<StuffSettingsRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(Codec.STRING).optionalFieldOf("tags").forGetter(l -> Optional.ofNullable(l.tags)),
@@ -42,6 +43,9 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
                     BlockMatcher.CODEC.optionalFieldOf("upperblocks").forGetter(l -> Optional.ofNullable(l.upperBlockMatcher)),
                     IdentifierMatcher.CODEC.optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildingMatcher))
             ).apply(instance, StuffSettingsRE::new));
+
+    /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
+    public static final Codec<StuffSettingsRE> CODEC = RetiredKeys.reject(RAW, "stuff entry");
 
     private Identifier name;
     private final Optional<Identifier> extendsId;
@@ -185,18 +189,34 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
     }
 
     /**
-     * The four getters below unbox fields that are null on an entry which does not declare them.
-     * Generation only ever sees a settings object that came out of {@link #resolve}, which has
-     * already failed the load if the chain left one of them undeclared.
+     * Required, so never null on a resolved object: {@link #requireResolved} fails the load if the
+     * chain left it undeclared. Same for {@link #getMincount}, {@link #getMaxcount} and
+     * {@link #getAttempts}, whose {@code int} return types unbox it. Those four are the whole
+     * required set - the getters between them here are <em>not</em> required; see
+     * {@link #getMinheight}.
+     * <p>
+     * Generation only ever sees a settings object that came out of {@link #resolve}, so it may read
+     * all four without a null check.
      */
     public String getColumn() {
         return column;
     }
 
+    /**
+     * <b>Deliberately not required, and null here is a value, not a fault.</b> Null means the chain
+     * declared no {@code minheight}, and {@code Stuff.generateStuff} derives one from the building
+     * context instead ({@code worldgen/gen/Stuff.java}, right after it reads these two) - the path
+     * most stuff assets rely on, since few declare either bound. {@link #getMaxheight} is the same.
+     * <p>
+     * So these return {@code Integer}, not {@code int}, and adding them to {@link #requireResolved}
+     * would fail the load on assets that are correct; deleting the null handling in
+     * {@code Stuff.generateStuff} on the strength of the note above would NPE.
+     */
     public Integer getMinheight() {
         return minheight;
     }
 
+    /** Not required; see {@link #getMinheight} for what null means and who derives the default. */
     public Integer getMaxheight() {
         return maxheight;
     }

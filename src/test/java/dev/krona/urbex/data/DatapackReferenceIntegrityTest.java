@@ -17,10 +17,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Every cross-reference in the bundled datapack must be fully namespaced ("urbex:...") and
- * resolve to an existing asset file. Bare names would still work at runtime (they default to
- * the urbex namespace), but the shipped pack is fully qualified so it stays unambiguous next
- * to third-party datapacks — the same convention LCMT uses. The field map here mirrors
- * docs/superpowers/specs/2026-08-10-cleanup-dimension-worldstyle-namespacing-design.md.
+ * resolve to an existing asset file. A bare name is a load error, not a shorthand:
+ * {@code DataTools.fromName} refuses it rather than defaulting it to the urbex namespace, so this
+ * test enforces at build time the rule the game enforces at load time — and the shipped pack stays
+ * unambiguous next to third-party datapacks, the same convention LCMT uses. The field map here
+ * mirrors docs/superpowers/specs/2026-08-11-explicit-references-and-extends-design.md.
  */
 class DatapackReferenceIntegrityTest {
 
