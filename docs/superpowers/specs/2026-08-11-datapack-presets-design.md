@@ -71,9 +71,14 @@ Top level of a preset file:
   `destruction` (ruins, explosions, rubble), `decoration` (foliage, loot and
   lighting densities), `spawn`, `atmosphere` (fog, horizon).
 
-Every field is `optionalFieldOf` in the codec. Unknown keys are a load error
-(codec strictness), not silence: the old format's "accept anything, drop it
-on write" behavior is gone.
+Every field is `optionalFieldOf` in the codec. Decoding is lenient — unknown
+keys never fail a load (matching the other twelve registries and preserving
+forward compatibility with presets written for newer Urbex versions) — but
+unknown keys are logged as a warning naming the key and the preset, so typos
+stay discoverable. Keys starting with `_` (e.g. `_comment`) are a blessed
+spot for pack metadata: exempt from the warning and allowed by the schema.
+The old format's silent "accept anything, drop it on write" disease is dead
+regardless, because stored presets are never rewritten.
 
 The `worldStyle` field does not exist in the format (§7). The old category
 names (`lostcity`, `explosions`, `cities`, `client`) and the

@@ -16,7 +16,7 @@
 - User-facing and internal naming is "preset", not "profile" (spec §1). Exception: the runtime class keeps `UrbexProfile`'s UPPER_SNAKE public field names (e.g. `RUIN_CHANCE`) to make the worldgen migration a pure type rename.
 - Preset ids are namespaced `Identifier`s; bare names default to the `urbex` namespace via `DataTools.fromName` (spec §3).
 - `useAvgHeightmap` code default flips to `true`; every shipped preset carries an explicit `lightingDensity` (spec §6).
-- Unknown JSON keys are a load error, not silence (spec §4).
+- Unknown JSON keys never fail a load: they log one WARN naming key and preset; keys starting with `_` are silently allowed as pack metadata (spec §4).
 - Commit style: conventional commits (`feat:`, `fix:`, `docs:`, `test:`) as in recent history.
 - Test command: `./gradlew test`. Full build: `./gradlew build`.
 - The digest goldens (`digest.golden`, `digest-features.golden`) are regenerated ONCE, in Task 6, after all worldgen-affecting changes have landed. Tasks 1–5 must NOT regenerate them; the digest run configs are expected to fail during the transition.
@@ -26,7 +26,7 @@
 ```
 src/main/java/dev/krona/urbex/
   worldgen/lost/regassets/PresetRE.java              (new — codec record)
-  worldgen/lost/regassets/data/preset/               (new package — 11 section records + StrictKeys)
+  worldgen/lost/regassets/data/preset/               (new package — 11 section records + UnknownKeys)
   config/Preset.java                                 (new — resolved runtime class; replaces UrbexProfile)
   config/Presets.java                                (new — resolver + cache + tag listing)
   config/UrbexProfile.java, Configuration.java,
@@ -82,7 +82,7 @@ comments as JSON Schema `description`s in Task 7.
 
 **Files:**
 - Create: `src/main/java/dev/krona/urbex/worldgen/lost/regassets/PresetRE.java`
-- Create: `src/main/java/dev/krona/urbex/worldgen/lost/regassets/data/preset/` — `TerrainSettings.java`, `CitySettings.java`, `BuildingSettings.java`, `RoadSettings.java`, `HighwaySettings.java`, `RailwaySettings.java`, `DestructionSettings.java`, `DecorationSettings.java`, `SpawnSettings.java`, `AtmosphereSettings.java`, `MiscSettings.java`, `StrictKeys.java`
+- Create: `src/main/java/dev/krona/urbex/worldgen/lost/regassets/data/preset/` — `TerrainSettings.java`, `CitySettings.java`, `BuildingSettings.java`, `RoadSettings.java`, `HighwaySettings.java`, `RailwaySettings.java`, `DestructionSettings.java`, `DecorationSettings.java`, `SpawnSettings.java`, `AtmosphereSettings.java`, `MiscSettings.java`, `UnknownKeys.java`
 - Create: `src/main/java/dev/krona/urbex/config/Preset.java`
 - Create: `src/main/java/dev/krona/urbex/config/Presets.java`
 - Modify: `src/main/java/dev/krona/urbex/setup/CustomRegistries.java`
@@ -108,11 +108,14 @@ comments as JSON Schema `description`s in Task 7.
 @Test void minimalFileParses() {
     // {"description":"x","cities":{"cityChance":0.001}} -> PresetRE with only those present
 }
-@Test void unknownTopLevelKeyIsError() {
-    // {"citiez":{}} -> DataResult.error mentioning "citiez"
+@Test void unknownTopLevelKeyParsesButWarns() {
+    // {"citiez":{}} -> parses fine; UnknownKeys.check returns ["citiez"]
 }
-@Test void unknownSectionKeyIsError() {
-    // {"cities":{"cityChanse":0.1}} -> DataResult.error mentioning "cityChanse"
+@Test void unknownSectionKeyParsesButWarns() {
+    // {"cities":{"cityChanse":0.1}} -> parses; check returns ["cities.cityChanse"]
+}
+@Test void underscoreKeysAreSilentlyAllowed() {
+    // {"_comment":"x","cities":{"_note":"y"}} -> parses; check returns []
 }
 @Test void enumValuesParse() {
     // terrain.landscapeType "cavern" -> LandscapeType.CAVERN;
@@ -135,7 +138,7 @@ comments as JSON Schema `description`s in Task 7.
 // PresetRoundTripTest
 @Test void toReEncodesEveryKey() {
     // new Preset(id).toRE() encoded via CODEC: every section present, key set per section
-    // EXACTLY equals the section's StrictKeys allowed set (this is the drift guard's engine)
+    // EXACTLY equals the section's UnknownKeys allowed set (this is the drift guard's engine)
 }
 @Test void roundTripPreservesValues() {
     // mutate a Preset (one field per section), toRE() -> encode -> decode -> resolve
@@ -147,27 +150,31 @@ comments as JSON Schema `description`s in Task 7.
 
 - [ ] **Step 3: Implement.** Key mechanics:
 
-*Strict keys* — DFU codecs ignore unknown keys by default; wrap each `MapCodec` before building:
+*Unknown-key warning* — DFU codecs silently ignore unknown keys; we keep that leniency (loads never fail, forward-compatible) but surface typos with one WARN. Two pieces so the check is pure and testable:
 
 ```java
-// StrictKeys.java
-public static <A> Codec<A> strict(Codec<A> base, Set<String> allowed, String context) {
+// UnknownKeys.java
+/** Pure: unknown top-level keys of a map-shaped Dynamic. Keys starting with "_" are pack metadata and never reported. */
+public static List<String> check(Dynamic<?> dyn, Set<String> allowed) {
+    return dyn.asMapOpt().result().stream().flatMap(s -> s)
+            .map(p -> p.getFirst().asString(""))
+            .filter(k -> !k.startsWith("_") && !allowed.contains(k))
+            .toList();
+}
+
+/** Wraps a codec: decode is unchanged, but unknown keys log one WARN naming them and the context. */
+public static <A> Codec<A> warning(Codec<A> base, Set<String> allowed, String context) {
     return Codec.PASSTHROUGH.comapFlatMap(dyn -> {
-        DataResult<Stream<Pair<Dynamic<?>, Dynamic<?>>>> entries = dyn.asMapOpt();
-        if (entries.result().isPresent()) {
-            List<String> unknown = entries.result().get()
-                .map(p -> p.getFirst().asString(""))
-                .filter(k -> !allowed.contains(k)).toList();
-            if (!unknown.isEmpty()) {
-                return DataResult.error(() -> "Unknown key(s) in " + context + ": " + unknown);
-            }
+        List<String> unknown = check(dyn, allowed);
+        if (!unknown.isEmpty()) {
+            Urbex.getLogger().warn("Ignoring unknown key(s) in preset {}: {}", context, unknown);
         }
         return base.parse(dyn);
     }, a -> new Dynamic<>(JsonOps.INSTANCE, base.encodeStart(JsonOps.INSTANCE, a).getOrThrow()));
 }
 ```
 
-Each section record declares `public static final Set<String> KEYS = Set.of(...)` next to its codec and exposes `CODEC = StrictKeys.strict(RAW_CODEC, KEYS, "cities")`. `PresetRE.CODEC` likewise wraps with its top-level key set (`parent`, metadata, 11 section names). The `toReEncodesEveryKey` test pins KEYS == actual codec fields.
+Each section record declares `public static final Set<String> KEYS = Set.of(...)` next to its codec and exposes `CODEC = UnknownKeys.warning(RAW_CODEC, KEYS, "cities")`. `PresetRE.CODEC` likewise wraps with its top-level key set (`parent`, metadata, 11 section names). The `toReEncodesEveryKey` test pins KEYS == actual codec fields. (The registry loader doesn't hand the codec the file's id, so the warning carries the section name and keys — enough to grep a pack for.)
 
 *>16 fields* — `RecordCodecBuilder.instance.group(...)` caps at 16; `cities` (25), `roads` (23), `destruction` (18) split as `instance.group(f1..f14).and(instance.group(f15..f25)).apply(instance, Ctor)`.
 
@@ -188,7 +195,7 @@ public record RailwaySettings(Optional<Boolean> railwaysEnabled,
             Codec.BOOL.optionalFieldOf("railwaysCanEnd").forGetter(RailwaySettings::railwaysCanEnd),
             Codec.floatRange(0f, 1f).optionalFieldOf("railwayDungeonChance").forGetter(RailwaySettings::railwayDungeonChance)
     ).apply(i, RailwaySettings::new));
-    public static final Codec<RailwaySettings> CODEC = StrictKeys.strict(RAW, KEYS, "railways");
+    public static final Codec<RailwaySettings> CODEC = UnknownKeys.warning(RAW, KEYS, "railways");
 
     public void apply(Preset p) {
         railwaysEnabled.ifPresent(v -> p.RAILWAYS_ENABLED = v);
@@ -485,7 +492,7 @@ Files.writeString(out.resolve(preset.getId().getPath() + ".json"),
 @Test void schemaRejectsUnknownKey() { /* {"cities":{"cityChanse":1}} -> validation error */ }
 ```
 
-- [ ] **Step 2: Write the schema.** Draft 2020-12, `$id` pointing at the repo raw URL, `additionalProperties: false` on the root and every section, types/ranges/enums mirroring the codecs (reuse the min/max mined from `UrbexProfile.init*()` in Task 1 as `minimum`/`maximum`, and the old config comments as `description` strings — that documentation should not die with the class). `parent` is a string with pattern `^([a-z0-9_.-]+:)?[a-z0-9_./-]+$`.
+- [ ] **Step 2: Write the schema.** Draft 2020-12, `$id` pointing at the repo raw URL, `additionalProperties: false` on the root and every section PLUS `"patternProperties": {"^_": {}}` so `_comment`-style pack metadata isn't flagged (mirroring the codec's warning exemption), types/ranges/enums mirroring the codecs (reuse the min/max mined from `UrbexProfile.init*()` in Task 1 as `minimum`/`maximum`, and the old config comments as `description` strings — that documentation should not die with the class). `parent` is a string with pattern `^([a-z0-9_.-]+:)?[a-z0-9_./-]+$`.
 - [ ] **Step 3: Write `docs/presets.md`:** what a preset is; a complete minimal example datapack (`pack.mcmeta`, one delta preset with `parent`, a tag file adding it to `#urbex:presets`); the resolution rules (parent chain, code defaults); `urbex savepreset` as the "show me everything" tool; IDE wiring — VS Code `settings.json`:
 
 ```json
