@@ -43,17 +43,58 @@ public class Palette {
      */
     public Palette(List<PaletteRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        compile(mergeByCharacter(chainRootFirst));
+    }
+
+    public Palette(String name) {
+        this.name = Identifier.fromNamespaceAndPath(Urbex.MODID, name);
+    }
+
+    /**
+     * Builds the inline {@code palette} block a part or building carries, merged along that asset's
+     * own {@code extends} chain.
+     * <p>
+     * An inline palette is a keyed collection exactly like a registered one, so it merges by
+     * character too: a part that extends another and declares an inline palette repainting two
+     * markers keeps the rest of its ancestor's. Replacing wholesale here would reproduce, one level
+     * down, the very failure {@link #Palette(List)} exists to prevent.
+     *
+     * @param owner          the part or building the block is written in, for error messages and
+     *                       for the synthetic palette name
+     * @param chainRootFirst the inline blocks along the owner's chain, root first
+     */
+    public static Palette inline(Identifier owner, List<PaletteRE> chainRootFirst) {
+        for (PaletteRE re : chainRootFirst) {
+            // The codec accepts 'extends' wherever a PaletteRE is embedded, but an inline block is
+            // not a registry entry, so nothing can resolve it. Rejecting is the honest option:
+            // silently dropping a key the codec accepted is how a datapack quietly means something
+            // other than what it says.
+            if (re.getExtends().isPresent()) {
+                throw new IllegalStateException("The inline palette in '" + owner + "' declares "
+                        + "extends '" + re.getExtends().get() + "', but an inline palette is not a "
+                        + "registry entry and nothing can resolve that. Use 'refpalette' to build "
+                        + "on a registered palette, or put 'extends' on '" + owner + "' itself.");
+            }
+        }
+        Palette palette = new Palette("__local__" + owner.getPath());
+        palette.compile(mergeByCharacter(chainRootFirst));
+        return palette;
+    }
+
+    /**
+     * Later entries overwrite the characters they declare and leave the rest alone. Only the
+     * surviving entries are handed on to {@link #compile}, so an overridden entry takes its
+     * {@code damaged} mapping with it rather than leaving it keyed on a block that is no longer
+     * placed.
+     */
+    private static Collection<PaletteEntry> mergeByCharacter(List<PaletteRE> chainRootFirst) {
         Map<Character, PaletteEntry> merged = new LinkedHashMap<>();
         for (PaletteRE re : chainRootFirst) {
             for (PaletteEntry entry : re.getPaletteEntries()) {
                 merged.put(entry.getChr().charAt(0), entry);
             }
         }
-        compile(merged.values());
-    }
-
-    public Palette(String name) {
-        this.name = Identifier.fromNamespaceAndPath(Urbex.MODID, name);
+        return merged.values();
     }
 
     public void merge(Palette other) {
@@ -75,15 +116,6 @@ public class Palette {
 
     public Map<Character, PE> getPalette() {
         return palette;
-    }
-
-    /**
-     * Compiles one raw palette entry list into this palette. Used for the inline {@code palette}
-     * blocks a part or building can carry, which are not registry entries and so have no
-     * {@code extends} chain of their own.
-     */
-    public void parsePaletteArray(PaletteRE paletteRE) {
-        compile(paletteRE.getPaletteEntries());
     }
 
     private void compile(Collection<PaletteEntry> entries) {

@@ -10,7 +10,14 @@
   of the eleven are more than a rename. **Palettes merge per character**, not per position: a child
   that repaints two markers out of thirty overwrites exactly those two and keeps the other
   twenty-eight, and an overridden entry takes its `damaged` mapping with it rather than leaving it
-  keyed on a block the palette no longer places. **Parts inherit their ancestor's geometry**:
+  keyed on a block the palette no longer places. That applies to the inline `palette` block a part
+  or building can carry as well as to a registered `palettes` entry - a part that extends another
+  and repaints two markers inline keeps the rest, rather than silently starting from nothing. An
+  `extends` written *inside* an inline `palette` block is now a load error naming the owning asset:
+  the codec accepts the key wherever a palette is embedded, but an inline block is not a registry
+  entry, so nothing can resolve it and silently dropping it would let a file mean something other
+  than what it says. Use `refpalette`, or put `extends` on the part or building itself.
+  **Parts inherit their ancestor's geometry**:
   `xsize`, `zsize` and `slices` each come from the last file in the chain that declares one, so
   `{"extends": "urbex:radiotower", "refpalette": "urbexmt:radiotower_rusted"}` is a complete part
   file. Those three keys are therefore no longer required on a part; a part whose whole chain

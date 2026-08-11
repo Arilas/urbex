@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
@@ -47,6 +48,8 @@ public class Building {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<PartRef> partRefs = new ArrayList<>();
         List<PartRef> partRefs2 = new ArrayList<>();
+        List<PaletteRE> inlinePalettes = new ArrayList<>();
+        String refPalette = null;
         for (BuildingRE object : chainRootFirst) {
             if (object.getMinFloors() != -1) {
                 minFloors = object.getMinFloors();
@@ -76,20 +79,26 @@ public class Building {
             if (object.getRubbleBlock() != null) {
                 rubbleBlock = object.getRubbleBlock();
             }
-            // refpalette and an inline palette say the same thing two ways, so the later entry's
-            // choice wins outright rather than layering onto the earlier one's.
+            // Inline palettes stack: they are a keyed collection like a registered palette, so a
+            // later block repaints the characters it declares and keeps the rest. Naming a palette
+            // with refpalette instead is a different choice, not another layer, so it drops them.
             if (object.getLocalPalette() != null) {
-                localPalette = new Palette("__local__" + name.getPath());
-                localPalette.parsePaletteArray(object.getLocalPalette()); // @todo get the full palette instead
-                refPaletteName = null;
+                inlinePalettes.add(object.getLocalPalette());
+                refPalette = null;
             } else if (object.getRefPaletteName() != null) {
-                refPaletteName = object.getRefPaletteName();
-                localPalette = null;
+                refPalette = object.getRefPaletteName();
+                inlinePalettes.clear();
             }
             Mergeable.apply(partRefs, object.getParts());
             if (object.getParts2() != null) {
                 Mergeable.apply(partRefs2, object.getParts2());
             }
+        }
+
+        if (!inlinePalettes.isEmpty()) {
+            localPalette = Palette.inline(name, inlinePalettes); // @todo get the full palette instead
+        } else if (refPalette != null) {
+            refPaletteName = refPalette;
         }
 
         readParts(this.parts, partRefs);

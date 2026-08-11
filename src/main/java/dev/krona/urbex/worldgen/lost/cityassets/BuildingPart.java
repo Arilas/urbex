@@ -66,7 +66,7 @@ public class BuildingPart implements IBuildingPart {
         Integer declaredXSize = null;
         Integer declaredZSize = null;
         String[] declaredSlices = null;
-        PaletteRE localPaletteRE = null;
+        List<PaletteRE> inlinePalettes = new ArrayList<>();
         String refPalette = null;
         List<PartMeta> meta = new ArrayList<>();
         for (BuildingPartRE re : chainRootFirst) {
@@ -79,14 +79,15 @@ public class BuildingPart implements IBuildingPart {
             if (re.getSlices() != null) {
                 declaredSlices = re.getSlices();
             }
-            // refpalette and an inline palette are two ways to say the same thing, so the later
-            // entry's choice wins outright rather than layering onto the earlier one's.
+            // Inline palettes stack: they are a keyed collection like a registered palette, so a
+            // later block repaints the characters it declares and keeps the rest. Naming a palette
+            // with refpalette instead is a different choice, not another layer, so it drops them.
             if (re.getLocalPalette() != null) {
-                localPaletteRE = re.getLocalPalette();
+                inlinePalettes.add(re.getLocalPalette());
                 refPalette = null;
             } else if (re.getRefPaletteName() != null) {
                 refPalette = re.getRefPaletteName();
-                localPaletteRE = null;
+                inlinePalettes.clear();
             }
             if (re.getMetadata() != null) {
                 Mergeable.apply(meta, re.getMetadata());
@@ -107,9 +108,8 @@ public class BuildingPart implements IBuildingPart {
         checkGeometry(declaredSlices);
         slices = declaredSlices;
 
-        if (localPaletteRE != null) {
-            localPalette = new Palette("__local__" + name.getPath());
-            localPalette.parsePaletteArray(localPaletteRE); // @todo get the full palette instead
+        if (!inlinePalettes.isEmpty()) {
+            localPalette = Palette.inline(name, inlinePalettes); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
         }

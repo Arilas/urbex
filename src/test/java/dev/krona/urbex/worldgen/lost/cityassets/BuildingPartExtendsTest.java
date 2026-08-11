@@ -1,11 +1,15 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -135,6 +139,72 @@ class BuildingPartExtendsTest {
         assertTrue(appended.getMetaBoolean("support"), "{\"replace\": false} keeps the inherited meta");
     }
 
+    @Test
+    void anInlinePaletteMergesByCharacterAlongTheChainJustLikeARegisteredOne() {
+        // An inline palette is a keyed collection too. Replacing it wholesale would reproduce, one
+        // level down, exactly the failure the keyed-collection rule exists to prevent: a child
+        // repainting one marker would silently lose the other two.
+        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER)
+                .inlinePalette(entry('a', "minecraft:stone"),
+                        entry('b', "minecraft:bricks"),
+                        entry('c', "minecraft:glass")));
+        BuildingPartRE child = part("tower_rusted", inherits("urbex:tower")
+                .inlinePalette(entry('a', "minecraft:deepslate")));
+
+        Palette resolved = new BuildingPart(List.of(parent, child)).getLocalPalette(null);
+
+        assertEquals(3, resolved.getPalette().size(),
+                "the two characters the child never mentions must survive");
+        assertEquals("minecraft:deepslate", blockOf(resolved, 'a'), "the child's character wins");
+        assertEquals("minecraft:bricks", blockOf(resolved, 'b'));
+        assertEquals("minecraft:glass", blockOf(resolved, 'c'));
+    }
+
+    @Test
+    void namingAPaletteWithRefpaletteDropsAnInheritedInlineOne() {
+        // refpalette and an inline block are two ways to say the same thing, not two layers.
+        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER)
+                .inlinePalette(entry('a', "minecraft:stone")));
+        BuildingPartRE child = part("tower_ref", inherits("urbex:tower")
+                .refpalette("urbex:somewhere_else"));
+
+        BuildingPart resolved = new BuildingPart(List.of(parent, child));
+
+        assertEquals("urbex:somewhere_else", resolved.getRefPaletteName());
+        // The inherited inline palette is gone: getLocalPalette has to go to the registry for the
+        // named one now (and blows up without a level) instead of handing back a prebuilt local.
+        assertThrows(RuntimeException.class, () -> resolved.getLocalPalette(null),
+                "an ancestor's inline palette must not survive the child naming a refpalette");
+    }
+
+    @Test
+    void anExtendsInsideAnInlinePaletteIsRejectedRatherThanIgnored() {
+        // PaletteRE.CODEC accepts "extends" wherever it is embedded, but an inline block is not a
+        // registry entry, so nothing can resolve it. Silently dropping it is the one option that
+        // lets a datapack mean something other than what it says.
+        BuildingPartRE part = part("tower", geometry(2, 2, TOWER)
+                .inlinePalette(Optional.of(Identifier.parse("urbex:common")),
+                        entry('a', "minecraft:stone")));
+
+        IllegalStateException error = assertThrows(IllegalStateException.class,
+                () -> new BuildingPart(List.of(part)));
+
+        assertTrue(error.getMessage().contains("urbex:tower"), error::getMessage);
+        assertTrue(error.getMessage().contains("urbex:common"), error::getMessage);
+        assertTrue(error.getMessage().contains("refpalette"), error::getMessage);
+    }
+
+    private static String blockOf(Palette palette, char marker) {
+        BlockState state = (BlockState) palette.getPalette().get(marker).blocks();
+        return BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+    }
+
+    private static PaletteEntry entry(char marker, String block) {
+        return new PaletteEntry(Character.toString(marker), Optional.of(block),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
     private static PartMeta meta(String key) {
         return new PartMeta(key, Boolean.TRUE, null, null, null, null);
     }
@@ -157,6 +227,7 @@ class BuildingPartExtendsTest {
         private Optional<Integer> zSize = Optional.empty();
         private Optional<List<List<String>>> slices = Optional.empty();
         private Optional<String> refpalette = Optional.empty();
+        private Optional<PaletteRE> inlinePalette = Optional.empty();
         private Optional<Mergeable<PartMeta>> meta = Optional.empty();
 
         Builder extendsId(String id) {
@@ -184,13 +255,22 @@ class BuildingPartExtendsTest {
             return this;
         }
 
+        Builder inlinePalette(PaletteEntry... entries) {
+            return inlinePalette(Optional.empty(), entries);
+        }
+
+        Builder inlinePalette(Optional<Identifier> paletteExtends, PaletteEntry... entries) {
+            this.inlinePalette = Optional.of(new PaletteRE(paletteExtends, List.of(entries)));
+            return this;
+        }
+
         Builder meta(boolean replace, PartMeta... values) {
             this.meta = Optional.of(new Mergeable<>(replace, List.of(values)));
             return this;
         }
 
         BuildingPartRE build() {
-            return new BuildingPartRE(extendsId, xSize, zSize, slices, refpalette, Optional.empty(), meta);
+            return new BuildingPartRE(extendsId, xSize, zSize, slices, refpalette, inlinePalette, meta);
         }
     }
 }
