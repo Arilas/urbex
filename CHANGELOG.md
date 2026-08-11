@@ -20,13 +20,16 @@
     families are folded **component by component** now, where a whole `StreetParts` used to be
     swapped in or out - which is what delivers the append opt-in spec section 4 promised for ordered
     part lists: `"straight": {"replace": false, "values": ["urbex:street_straight_alt"]}` adds one
-    variant after the ones the parent declared, while a bare array replaces them. That per-field fold
-    also removes a sentinel bug of the kind this work has been eliminating: the old test was
-    `s.getParts() != StreetParts.DEFAULT`, so a child could never override an inherited family back
-    to the default one. `largeparts` and `tertiaryparts` remain optional *as blocks* and fall back to
+    variant after the ones the parent declared, while a bare array replaces them.
+    `largeparts` and `tertiaryparts` remain optional *as blocks* and fall back to
     `parts` when nothing in the chain declares them - a fallback to parts the pack itself wrote, not
     to a name written in Java - but a family that is declared at all must be complete, or half of it
-    reaches generation as a null list.
+    reaches generation as a null list. The `s.getParts() != StreetParts.DEFAULT` sentinel goes with
+    the constant, though **it was not itself producing a wrong result**, and this entry should not
+    imply it was: `StreetParts` is a record, so `!=` compared references, and the `DEFAULT` *instance*
+    could only ever arise from `StreetSettings`' `orElse` on an absent key - a declared block always
+    decoded to a fresh object, whatever its contents. It was an opaque way of asking "did this file
+    contain the key", not a broken one. What replaces it asks that directly, and per component.
   - *Where a city style's failure lands.* World styles are validated at world load, because
     `AssetRegistries.load` resolves that registry eagerly. `CITYSTYLES` is deliberately not in that
     sweep and is now the one registry with required fields that is left out: resolving every
