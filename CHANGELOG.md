@@ -96,7 +96,10 @@
     `BuiltInRegistries.BLOCK` if it was not. Both are the same registry — blocks are static and
     frozen at mod init — so nothing was ever wrong, but nothing said so either, and it was the last
     place outside the editor that asset compilation reached a server for anything (issue #60).
-  - *An unknown block id still generates as air, warned once.* It used to arrive there through a
+  - *An unknown block id still generates as air, and is warned about once — but only when the mod
+    that would provide it is installed.* A pack naming a block from a mod it does not require is
+    doing the right thing, and a line per optional entry every load is noise; a `minecraft:` id, or
+    one from a mod you do have, that still does not resolve was renamed or mistyped, and stays loud. It used to arrive there through a
     defaulted registry's default value; it is an explicit return now, so the decision issue #91 has
     to make is one line rather than a registry quirk to find. Pinned by `BlockResolutionTest`.
   - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`

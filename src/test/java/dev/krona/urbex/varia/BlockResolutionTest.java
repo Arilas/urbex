@@ -104,6 +104,20 @@ class BlockResolutionTest {
     }
 
     /**
+     * Absent either way - what changes with the provider is only whether anyone is told.
+     * <p>
+     * A pack may name a block from a mod it does not require; #91 skips those entries, and warning
+     * about them would be a line per optional entry, every load, for a pack working as written. The
+     * warning is kept for the case where the block should have been there, which is what
+     * {@code ReferenceProviderTest} pins.
+     */
+    @Test
+    void anAbsentBlockResolvesTheSameWhoeverWouldHaveProvidedIt() {
+        assertNull(Tools.resolveState("somemod:no_such_block", BuiltInRegistries.BLOCK, OWNER));
+        assertNull(Tools.resolveState("minecraft:no_such_block", BuiltInRegistries.BLOCK, OWNER));
+    }
+
+    /**
      * The boundary itself: a lookup that does not have the block answers "not here", even though the
      * process-global registry three lines away does have it. Before the lookup became a parameter
      * there was no way to write this test, because there was no way to say which registry to ask.
