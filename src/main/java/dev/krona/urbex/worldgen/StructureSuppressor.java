@@ -27,13 +27,9 @@ public class StructureSuppressor {
         if (!Config.STRUCTURES_YIELD_TO_CITIES.get()) {
             return false;
         }
-        CityFeature feature = Registration.cityFeature();
-        if (feature == null) {
-            return false;
-        }
-        IDimensionInfo diminfo = feature.getDimensionInfo(level);
+        IDimensionInfo diminfo = GenerationSession.planningFor(level);
         if (diminfo == null) {
-            return false;   // No Lost Cities profile for this dimension
+            return false;   // No Urbex profile for this dimension, or the level is not loaded
         }
 
         // No lock and no setWorld: the city caches are concurrent now, and IDimensionInfo's level

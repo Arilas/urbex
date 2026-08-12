@@ -57,20 +57,24 @@ public class Stuff {
         // observed out of step (emptied index, stale loaded == true), and the guard would wave
         // through exactly the silent chunk it exists to catch. See AssetRegistries.StuffIndex.
         //
-        // Reachable, not hypothetical: AssetRegistries.reset() is called from CityFeature.cleanUp,
-        // which reconcileDirtyCounter invokes when globalDimensionInfoDirtyCounter is bumped, and
-        // ClientEventHandlers.java:42-46 bumps it from ClientPlayConnectionEvents.DISCONNECT on the
-        // client thread - which in single-player fires while the integrated server is still
-        // draining in-flight generation.
+        // No longer reachable by any path this mod owns, and kept anyway. It used to be plainly
+        // reachable: AssetRegistries.reset() ran from CityFeature.cleanUp, which the generation
+        // path invoked whenever a global dirty counter had been bumped, and
+        // ClientPlayConnectionEvents.DISCONNECT bumped it from the client thread while a
+        // single-player integrated server was still draining in-flight generation. reset() is now
+        // called only when a session opens or closes, on the server thread with no level loaded
+        // (GenerationSession, issue #125). This guard is what would say so if that ever stopped
+        // being true - the failure it detects is otherwise completely silent.
         //
-        // Logged rather than thrown, for two reasons. generateStuff is the last statement of
-        // CityGenerator.doCityChunk, which generate() calls at CityGenerator.java:290, well before
-        // ctx.driver.actuallyGenerate(chunk) at :310 - so a throw here would unwind past the commit
-        // and lose the chunk's entire cached write set, costing the whole chunk rather than its
-        // decoration. And it would route through CityFeature.generateFromPipeline's handler into
-        // ErrorLogger.report, which dereferences ServerAccess.getServer() with no null check
-        // (ErrorLogger.java:28-29) - during the shutdown window this fires in, that turns a
-        // decoration bug into a dead worldgen worker.
+        // Logged rather than thrown: generateStuff is the last statement of
+        // CityGenerator.doCityChunk, which generate() calls well before
+        // ctx.driver.actuallyGenerate(chunk) - so a throw here would unwind past the commit and lose
+        // the chunk's entire cached write set, costing the whole chunk rather than its decoration.
+        // (It would also have routed through CityFeature.generateFromPipeline's handler into
+        // ErrorLogger.report, which used to dereference ServerAccess.getServer() with no null check
+        // and so could turn a decoration bug into a dead worldgen worker during exactly the shutdown
+        // window this fires in. That null check exists now - issue #56 - but the reason above stands
+        // on its own.)
         AssetRegistries.StuffIndex stuffIndex = AssetRegistries.stuffIndex();
         if (stuffIndex.byTag().isEmpty() && !stuffIndex.loaded()) {
             if (REPORTED_UNLOADED.compareAndSet(false, true)) {

@@ -1,5 +1,6 @@
 package dev.krona.urbex.setup;
 
+import dev.krona.urbex.worldgen.GenerationSession;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
@@ -74,7 +75,7 @@ public final class MixCheck {
     }
 
     private static void census(ServerLevel level, int radius, int offset, boolean requireAll) {
-        IDimensionInfo provider = Registration.cityFeature().getDimensionInfo(level);
+        IDimensionInfo provider = GenerationSession.planningFor(level);
         if (provider == null) {
             report(FAIL + " (no Urbex preset configured for the overworld)");
             return;

@@ -99,30 +99,20 @@ public class MultiChunk {
         // would split one style's votes in two, and the getId() sort would stop being a total order
         // (two entries comparing equal, ordered by whatever the HashMap handed over).
         //
-        // reset() is not confined to server start/stop, and that is worth being precise about:
-        // CityFeature.cleanUp() calls it, and cleanUp() is invoked lazily from
-        // CityFeature.getDimensionInfo() whenever globalDimensionInfoDirtyCounter differs from that
-        // feature's own. It therefore does fire once per session, since dimensionInfoDirtyCounter
-        // starts at -1 - not necessarily from a generation call, since getDimensionInfo also has
-        // callers in DigestRunner, SpawnPlacement, StructureSuppressor and the commands.
+        // reset() is confined to server start and server stop now, both on the server thread with
+        // no level loaded (GenerationSession.open/close, issue #125). It used to be reachable from
+        // the generation path itself - CityFeature.cleanUp(), invoked lazily from getDimensionInfo
+        // whenever a global dirty counter differed from the feature's own, and that counter was
+        // bumped from ClientPlayConnectionEvents.DISCONNECT on the client thread, which in
+        // single-player fires while the integrated server is still draining in-flight generation.
+        // So a chunk resolved either side of a reset really could hold two instances of one id, and
+        // the split vote below was the mild consequence: the same reset emptied AssetRegistries'
+        // stuff-by-tag index, which alone among the registries has no lazy rebuild, and those
+        // chunks were written and saved with no decoration at all.
         //
-        // What bounds this is narrow, and still does not amount to a guarantee. The first reconcile
-        // is now a single call: CityFeature.reconcileDirtyCounter holds the feature's monitor across
-        // the counter comparison and cleanUp(), so the second thread through waits and then finds
-        // the counters equal instead of resetting the registries underneath the first (Task 5c; the
-        // check-then-act this paragraph used to describe is gone). What remains is a bump arriving
-        // while generation is in flight: globalDimensionInfoDirtyCounter is written only from
-        // client-side paths, but ClientEventHandlers.java:42-46 writes it from
-        // ClientPlayConnectionEvents.DISCONNECT, which in single-player fires while the integrated
-        // server is still draining generation - so "none of them run while a server generates" is an
-        // argument about callers that does not actually hold at shutdown.
-        //
-        // And the split vote below is the mild consequence, not the worst one. The same reset empties
-        // AssetRegistries' stuff-by-tag index, which - alone among the registries - has no lazy
-        // rebuild, so the affected chunks are written and saved with no decoration at all. See
-        // CityFeature.reconcileDirtyCounter and the guard in Stuff.generateStuff, which at least
-        // makes it say so. Closing this loop's own exposure means keying on ids rather than
-        // instances - not a comment.
+        // Keying on ids rather than instances would close this loop's own exposure regardless of
+        // who may reset what, and is still worth doing - it is just no longer load-bearing. The
+        // guard in Stuff.generateStuff is the remaining detector for the wider failure.
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {

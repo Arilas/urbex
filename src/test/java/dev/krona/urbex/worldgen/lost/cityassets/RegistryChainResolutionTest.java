@@ -380,7 +380,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildInheritsTheFillerAndPartsItDoesNotDeclare() {
-        Building resolved = new Building(List.of(
+        Building resolved = new Building(null, List.of(
                 building("library").filler("#").parts("urbex:library_floor").minFloors(2).build(),
                 building("library_burnt").rubble("R").build()));
 
@@ -393,13 +393,13 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedPrefersLonelyBackToZero() {
-        Building resolved = new Building(List.of(
+        Building resolved = new Building(null, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").prefersLonely(0.0f).build()));
 
         assertEquals(0.0f, resolved.getPrefersLonely(),
                 "0.0 is a value a file can mean, not a marker for 'undeclared'");
-        assertEquals(0.8f, new Building(List.of(
+        assertEquals(0.8f, new Building(null, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").build())).getPrefersLonely(),
                 "omitting it still inherits");
@@ -407,7 +407,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedFloorLimitBackToTheLevelDefault() {
-        Building resolved = new Building(List.of(
+        Building resolved = new Building(null, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").minFloors(4).build(),
                 building("tower_short").minFloors(-1).build()));
 

@@ -3,10 +3,12 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.*;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.level.CommonLevelAccessor;
 import net.minecraft.world.level.biome.Biome;
 import org.apache.commons.lang3.tuple.Pair;
@@ -24,18 +26,18 @@ import java.util.function.Predicate;
 
 public class AssetRegistries {
 
-    public static final RegistryAssetRegistry<Variant, VariantRE> VARIANTS = new RegistryAssetRegistry<>(CustomRegistries.VARIANTS_REGISTRY_KEY, Variant::new);
-    public static final RegistryAssetRegistry<Condition, ConditionRE> CONDITIONS = new RegistryAssetRegistry<>(CustomRegistries.CONDITIONS_REGISTRY_KEY, Condition::new);
-    public static final RegistryAssetRegistry<WorldStyle, WorldStyleRE> WORLDSTYLES = new RegistryAssetRegistry<>(CustomRegistries.WORLDSTYLES_REGISTRY_KEY, WorldStyle::new);
-    public static final RegistryAssetRegistry<CityStyle, CityStyleRE> CITYSTYLES = new RegistryAssetRegistry<>(CustomRegistries.CITYSTYLES_REGISTRY_KEY, CityStyle::new);
+    public static final RegistryAssetRegistry<Variant, VariantRE> VARIANTS = new RegistryAssetRegistry<>(CustomRegistries.VARIANTS_REGISTRY_KEY, (access, chain) -> new Variant(chain));
+    public static final RegistryAssetRegistry<Condition, ConditionRE> CONDITIONS = new RegistryAssetRegistry<>(CustomRegistries.CONDITIONS_REGISTRY_KEY, (access, chain) -> new Condition(chain));
+    public static final RegistryAssetRegistry<WorldStyle, WorldStyleRE> WORLDSTYLES = new RegistryAssetRegistry<>(CustomRegistries.WORLDSTYLES_REGISTRY_KEY, (access, chain) -> new WorldStyle(chain));
+    public static final RegistryAssetRegistry<CityStyle, CityStyleRE> CITYSTYLES = new RegistryAssetRegistry<>(CustomRegistries.CITYSTYLES_REGISTRY_KEY, (access, chain) -> new CityStyle(chain));
     public static final RegistryAssetRegistry<BuildingPart, BuildingPartRE> PARTS = new RegistryAssetRegistry<>(CustomRegistries.PART_REGISTRY_KEY, BuildingPart::new);
     public static final RegistryAssetRegistry<Building, BuildingRE> BUILDINGS = new RegistryAssetRegistry<>(CustomRegistries.BUILDING_REGISTRY_KEY, Building::new);
-    public static final RegistryAssetRegistry<MultiBuilding, MultiBuildingRE> MULTI_BUILDINGS = new RegistryAssetRegistry<>(CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, MultiBuilding::new);
-    public static final RegistryAssetRegistry<Style, StyleRE> STYLES = new RegistryAssetRegistry<>(CustomRegistries.STYLE_REGISTRY_KEY, Style::new);
+    public static final RegistryAssetRegistry<MultiBuilding, MultiBuildingRE> MULTI_BUILDINGS = new RegistryAssetRegistry<>(CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, (access, chain) -> new MultiBuilding(chain));
+    public static final RegistryAssetRegistry<Style, StyleRE> STYLES = new RegistryAssetRegistry<>(CustomRegistries.STYLE_REGISTRY_KEY, (access, chain) -> new Style(chain));
     public static final RegistryAssetRegistry<Palette, PaletteRE> PALETTES = new RegistryAssetRegistry<>(CustomRegistries.PALETTE_REGISTRY_KEY, Palette::new);
-    public static final RegistryAssetRegistry<ScatteredBuilding, ScatteredRE> SCATTERED = new RegistryAssetRegistry<>(CustomRegistries.SCATTERED_REGISTRY_KEY, ScatteredBuilding::new);
-    public static final RegistryAssetRegistry<PredefinedCity, PredefinedCityRE> PREDEFINED_CITIES = new RegistryAssetRegistry<>(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, PredefinedCity::new);
-    public static final RegistryAssetRegistry<StuffObject, StuffSettingsRE> STUFF = new RegistryAssetRegistry<>(CustomRegistries.STUFF_REGISTRY_KEY, StuffObject::new);
+    public static final RegistryAssetRegistry<ScatteredBuilding, ScatteredRE> SCATTERED = new RegistryAssetRegistry<>(CustomRegistries.SCATTERED_REGISTRY_KEY, (access, chain) -> new ScatteredBuilding(chain));
+    public static final RegistryAssetRegistry<PredefinedCity, PredefinedCityRE> PREDEFINED_CITIES = new RegistryAssetRegistry<>(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, (access, chain) -> new PredefinedCity(chain));
+    public static final RegistryAssetRegistry<StuffObject, StuffSettingsRE> STUFF = new RegistryAssetRegistry<>(CustomRegistries.STUFF_REGISTRY_KEY, (access, chain) -> new StuffObject(chain));
 
     /**
      * The stuff-by-tag index and whether it was actually loaded, as one value.
@@ -70,9 +72,10 @@ public class AssetRegistries {
      */
     private static volatile StuffIndex stuffIndex = new StuffIndex(Map.of(), false);
 
-    // Guards load() and reset() against each other and against concurrent loads. load() is no
-    // longer confined to the server thread: CityFeature.getDimensionInfo calls it, and generation
-    // runs on the parallel worldgen worker pool (see the "No lock" note in CityFeature).
+    // Guards load() and reset() against each other and against concurrent loads. Both callers are
+    // on the server thread now (GenerationSession opens a session and loads each level's assets;
+    // see issue #125), but the lock stays: it is what makes "load exactly once, and see the whole
+    // result" a property of this class rather than of its callers' threading.
     private static final Object LOAD_LOCK = new Object();
 
     // Volatile, and written after the map it guards is filled, so the fast path out of
@@ -172,14 +175,12 @@ public class AssetRegistries {
      * Only {@code VARIANTS} before {@code PALETTES} is tidiness: compiling a palette entry that names
      * a variant reaches into that registry, but through {@code get}, which resolves on demand.
      * <p>
-     * Called from two places, for two different reasons. {@code ServerEventHandlers} calls it from
-     * {@code ServerLevelEvents.LOAD} so the validation above happens while the world is loading and
-     * a broken pack refuses the world instead of failing later; {@code CityFeature.getDimensionInfo}
-     * calls it on the generation path so that no chunk can ever generate against an unloaded
-     * registry, whenever generation starts and whatever has reset the registries since. The second
-     * caller means this runs on worldgen worker threads, hence the lock: exactly one thread does the
-     * work and the rest wait for it, rather than several racing through {@code loadAll} and building
-     * the tag index from a half-filled {@code STUFF}.
+     * Called by {@code GenerationSession.load}, from {@code ServerLevelEvents.LOAD}, before it
+     * builds that level's runtime - so the validation above happens while the world is loading and a
+     * broken pack refuses the world instead of failing later. It used to have a second caller on the
+     * generation path, so that no chunk could generate against an unloaded registry whatever had
+     * reset them since; nothing resets them from a worker any more (issue #125), and a chunk cannot
+     * generate without a runtime that this call precedes.
      */
     public static void load(CommonLevelAccessor level) {
         if (stuffIndex.loaded()) {
@@ -189,21 +190,58 @@ public class AssetRegistries {
             if (stuffIndex.loaded()) {
                 return;
             }
-            VARIANTS.loadAll(level);
-            PALETTES.loadAll(level);
-            CONDITIONS.loadAll(level);
-            STYLES.loadAll(level);
-            PARTS.loadAll(level);
-            BUILDINGS.loadAll(level);
-            MULTI_BUILDINGS.loadAll(level);
-            SCATTERED.loadAll(level);
-            WORLDSTYLES.loadAll(level);
-            loadReachableCityStyles(level);
-            STUFF.loadAll(level);
+            // One accumulator across every registry, so a pack with problems in three of them is
+            // one report rather than three world loads (issue #56).
+            AssetDiagnostics diagnostics = new AssetDiagnostics();
+            VARIANTS.loadAll(level, diagnostics);
+            PALETTES.loadAll(level, diagnostics);
+            CONDITIONS.loadAll(level, diagnostics);
+            STYLES.loadAll(level, diagnostics);
+            PARTS.loadAll(level, diagnostics);
+            BUILDINGS.loadAll(level, diagnostics);
+            MULTI_BUILDINGS.loadAll(level, diagnostics);
+            SCATTERED.loadAll(level, diagnostics);
+            WORLDSTYLES.loadAll(level, diagnostics);
+            loadReachableCityStyles(level, diagnostics);
+            STUFF.loadAll(level, diagnostics);
+            // Before publication, not after: the flag below says the registries are usable, and a
+            // pack that failed to compile has not earned it.
+            diagnostics.throwIfAny();
             // One write, publishing a map that is complete before the reference escapes - and
             // publishing the flag with it, so the two can never be observed out of step.
             stuffIndex = new StuffIndex(groupStuffByTag(STUFF.getIterable()), true);
         }
+    }
+
+    /**
+     * Re-resolves every registered asset and reports what is wrong, without changing anything.
+     * <p>
+     * What {@code /urbex validate} runs. Every problem it can find has already refused the world at
+     * load - {@link #load} throws on exactly the same set - so on a world that is running this
+     * reports nothing, which is the answer an author installing a pack wants confirmed. It is a
+     * separate pass rather than a re-run of {@code load} because {@code load} caches: asking it
+     * again returns the latch, and clearing the registries to make it answer afresh is precisely the
+     * mid-session reset that issue #125 removed.
+     * <p>
+     * The thirteen registries are frozen at world load (see {@code ServerEventHandlers}), so this
+     * cannot pick up an edit made since - the world has to be reopened for that, as it does for any
+     * vanilla worldgen file.
+     */
+    public static AssetDiagnostics validate(RegistryAccess access) {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        VARIANTS.validate(access, diagnostics);
+        PALETTES.validate(access, diagnostics);
+        CONDITIONS.validate(access, diagnostics);
+        STYLES.validate(access, diagnostics);
+        PARTS.validate(access, diagnostics);
+        BUILDINGS.validate(access, diagnostics);
+        MULTI_BUILDINGS.validate(access, diagnostics);
+        SCATTERED.validate(access, diagnostics);
+        WORLDSTYLES.validate(access, diagnostics);
+        CITYSTYLES.validate(access, diagnostics);
+        PREDEFINED_CITIES.validate(access, diagnostics);
+        STUFF.validate(access, diagnostics);
+        return diagnostics;
     }
 
     /**
@@ -225,9 +263,9 @@ public class AssetRegistries {
      *     field, but arriving as override JSON rather than from a registry entry, so nothing here
      *     can see it. It is user-reachable: {@code CITY_STYLE_ALTERNATIVE} is a free-text box in the
      *     customization GUI ({@code Settings.java:466}), published or restored through
-     *     {@code UrbexData}, and applied by {@code CityFeature.getDimensionInfo}. That one is
-     *     checked where it is built, by the {@link #requireCityStyle} call in {@code CityFeature}
-     *     right after {@code Presets.applyOverrides} - once per dimension, before any chunk work.</li>
+     *     {@code UrbexData}, and applied by {@code DimensionRuntime.create}. That one is checked
+     *     where it is built, by the {@link #requireCityStyle} call in {@code DimensionRuntime} right
+     *     after {@code Presets.applyOverrides} - once per level load, before any chunk work.</li>
      * </ol>
      * {@code BuildingInfo}'s lookup adds no fifth route: the name it passes is the winner of a
      * {@code Counter} over ids of styles the surrounding chunks already resolved through routes 1-4.
@@ -245,24 +283,42 @@ public class AssetRegistries {
      * A null level resolves nothing, matching {@code RegistryAssetRegistry.loadAll}: the caller in
      * {@code AssetsLoadedBeforeGenerationTest} hands one in deliberately.
      */
-    private static void loadReachableCityStyles(CommonLevelAccessor level) {
+    private static void loadReachableCityStyles(CommonLevelAccessor level, AssetDiagnostics diagnostics) {
         if (level == null) {
             return;
         }
         for (WorldStyle style : WORLDSTYLES.getIterable()) {
             for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selector : style.cityStyleSelectors()) {
-                requireCityStyle(level, selector.getRight().getRight(), style.getId());
+                recordCityStyle(level, selector.getRight().getRight(), style.getId(), diagnostics);
             }
         }
         Registry<PresetRE> presets = level.registryAccess().lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
         for (PresetRE preset : presets) {
             preset.cities().flatMap(CitySettings::cityStyleAlternative).ifPresent(
-                    name -> requireCityStyle(level, name, presets.getKey(preset)));
+                    name -> recordCityStyle(level, name, presets.getKey(preset), diagnostics));
         }
         Registry<PredefinedCityRE> cities =
                 level.registryAccess().lookupOrThrow(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY);
         for (PredefinedCityRE city : cities) {
-            requireCityStyle(level, city.getCityStyle(), cities.getKey(city));
+            recordCityStyle(level, city.getCityStyle(), cities.getKey(city), diagnostics);
+        }
+    }
+
+    /**
+     * {@link #requireCityStyle} for the load-time sweep: one unusable city style is one more line in
+     * the report, not the end of the sweep. The throwing form stays for
+     * {@code DimensionRuntime.create}, which checks a single style named by the world's own
+     * selection and has nothing to aggregate with.
+     */
+    private static void recordCityStyle(CommonLevelAccessor level, @Nullable String name,
+                                        Object selectedBy, AssetDiagnostics diagnostics) {
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        try {
+            requireCityStyle(level, name, selectedBy);
+        } catch (RuntimeException e) {
+            diagnostics.record(CITYSTYLES.registryName(), DataTools.fromName(name), e);
         }
     }
 
@@ -271,7 +327,7 @@ public class AssetRegistries {
      * required field undeclared fails here rather than from a worldgen worker.
      * <p>
      * The only place {@code CITYSTYLES} is looked up outside generation, and the entry point route 4
-     * uses: {@code CityFeature.getDimensionInfo} calls it for the preset it has just built, which is
+     * uses: {@code DimensionRuntime.create} calls it for the preset it has just built, which is
      * the only form of the alternative-style setting no registry sweep can reach. Blank is not a
      * name - {@code Preset.CITY_STYLE_ALTERNATIVE} starts as {@code ""} and most presets never set
      * it - so it resolves nothing rather than failing.
@@ -339,7 +395,12 @@ public class AssetRegistries {
             if (loadedPredefined) {
                 return;
             }
-            PREDEFINED_CITIES.loadAll(level);
+            AssetDiagnostics diagnostics = new AssetDiagnostics();
+            PREDEFINED_CITIES.loadAll(level, diagnostics);
+            // Thrown rather than folded into load()'s report: this runs lazily, from wherever a
+            // predefined city is first needed, so there is no world load left to refuse. Aggregated
+            // all the same - one bad predefined city should not hide the other three.
+            diagnostics.throwIfAny();
             loadedPredefined = true;
         }
     }

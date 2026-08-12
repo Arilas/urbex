@@ -9,11 +9,14 @@ import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Everything one chunk's generation needs, built at the start of that generation and discarded at
@@ -33,6 +36,18 @@ public final class ChunkGenContext {
     public final char street;
     public final NoiseBuffers buffers;
     /**
+     * Deferred writes this generation queues for after the driver has run. Owned here, not on the
+     * cached {@link BuildingInfo}: see {@link PostTodoQueue}.
+     */
+    private final PostTodoQueue postTodo = new PostTodoQueue();
+    /**
+     * The level's deferred-work queue, captured with the rest of this generation's epoch. Not
+     * looked up when a task is queued: a worker holding this context must not have to consult the
+     * live session, and the queue it hands work to must be the one belonging to the level this
+     * chunk is being generated for.
+     */
+    private final LevelTaskQueue levelTasks;
+    /**
      * Scratch for {@link CityGenerator#moveDown}'s top-of-column stash. Lives here
      * because the feature instance is shared across worldgen worker threads: as an instance
      * field there, two threads in moveDown at once swapped each other's terrain (issue #43).
@@ -45,7 +60,9 @@ public final class ChunkGenContext {
     public final long seed;
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
-                           IDimensionInfo provider, Preset profile, BuildingInfo info) {
+                           IDimensionInfo provider, Preset profile, BuildingInfo info,
+                           LevelTaskQueue levelTasks) {
+        this.levelTasks = levelTasks;
         this.region = region;
         this.chunk = chunk;
         this.coord = coord;
@@ -67,6 +84,30 @@ public final class ChunkGenContext {
 
     List<LightTodoQueue.Todo> drainLightTodo() {
         return lightTodo.closeAndDrain();
+    }
+
+    /**
+     * Queue a block write for after this chunk has been driven, addressed by {@code pos}. A second
+     * todo at the same position replaces the first.
+     */
+    void addPostTodo(BlockPos pos, Consumer<WorldGenLevel> todo) {
+        postTodo.add(pos, todo);
+    }
+
+    Map<BlockPos, Consumer<WorldGenLevel>> drainPostTodo() {
+        return postTodo.closeAndDrain();
+    }
+
+    /**
+     * Queue work for the server thread, on the level this chunk belongs to.
+     * <p>
+     * Unlike {@link #addPostTodo}, this outlives the generation: post-todos are drained at the end
+     * of this chunk, while these run on a later tick, once the world is a world. Which is exactly
+     * why the queue is the <em>level's</em> and dies with it - work that outlives its level used to
+     * be run against the next world with the same dimension id.
+     */
+    public void addLevelTask(BlockPos pos, LevelTaskQueue.Task task) {
+        levelTasks.add(pos, task);
     }
 
     /**

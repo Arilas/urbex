@@ -8,7 +8,6 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
-import dev.krona.urbex.worldgen.CityFeature;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.network.chat.Component;
@@ -250,13 +249,12 @@ public final class PresetSelection {
         }
         worldStyles = Config.gateMix(worldStyles, "The re-created world's saved selection");
         // Validated BEFORE publishing, not after: Config.overridesFromClient is read on a worldgen
-        // worker thread the moment a chunk generates (CityFeature.getDimensionInfo), so an unparseable
+        // worker thread the moment a chunk generates (DimensionRuntime.create), so an unparseable
         // string must never reach it - publishing it and only catching the parse failure later (in
         // reconcilePendingRestore's best-effort visual reconciliation) would leave the bad JSON sitting
         // in Config while the visual selection quietly fell back to plain.
         String overrides = validatedOverrides(overridesJson, presetId);
 
-        CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetPresetCache();
         Config.presetFromClient = presetId;
         Config.worldStyleMixFromClient = worldStyles;
@@ -271,7 +269,7 @@ public final class PresetSelection {
     /**
      * Validates a saved-data overrides string against {@link PresetRE#CODEC} before it is allowed
      * anywhere near {@link Config#overridesFromClient} - that field is read on a worldgen worker
-     * thread the instant a chunk generates ({@code CityFeature.getDimensionInfo}), so a string that
+     * thread the instant a chunk generates ({@code DimensionRuntime.create}), so a string that
      * fails to parse must never be published in the first place. Returns {@code null} - "plain
      * preset, no overrides" - for a blank input or one that fails to parse (logged either way the
      * failure differs).
@@ -334,7 +332,7 @@ public final class PresetSelection {
      * the abandon path and not the create path; see that mixin for why not {@code ScreenEvents
      * .remove}.
      * <p>
-     * The cache reset and the counter bump mirror {@link #publish()}: this changes what the next
+     * The cache reset mirrors {@link #publish()}: this changes what the next
      * world would generate with just as much as publishing does.
      */
     public void discardPublication() {
@@ -342,7 +340,6 @@ public final class PresetSelection {
                 && Config.overridesFromClient == null) {
             return;
         }
-        CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetPresetCache();
         Config.presetFromClient = null;
         Config.worldStyleMixFromClient = null;
@@ -365,7 +362,6 @@ public final class PresetSelection {
     public void publish() {
         Entry entry = selected;
 
-        CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetPresetCache();
 
         if (DISABLED_ID.equals(entry.id()) || entry.preset() == null) {

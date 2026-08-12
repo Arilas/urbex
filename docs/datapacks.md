@@ -867,3 +867,15 @@ values. For presets, `/urbex savepreset` writes the fully resolved preset for yo
 dimension to disk; [`docs/presets.md`](presets.md) covers it. The other twelve registries have no
 equivalent export yet — for those, the load errors are the feedback loop, which is why they are
 worded to name the asset and the field rather than the file.
+
+Those errors come all at once. Every registered asset is resolved while the world loads, and
+everything that fails is collected and reported together, each line naming the registry, the asset
+and what is missing — so a pack with four mistakes takes one world load to diagnose rather than
+four.
+
+`/urbex validate` runs the same pass on demand and reports the same list, without changing anything.
+On a world that is running it finds nothing, because anything it could find would have refused the
+world already; it is there to confirm that after installing a pack, and to give you the whole list
+in the server log. It cannot see an edit made since the world opened: the thirteen registries are
+dynamic registries, loaded once with the world and frozen, so an edited file needs the world
+reopened — exactly as a vanilla worldgen file does.

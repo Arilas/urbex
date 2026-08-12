@@ -76,7 +76,7 @@ class CommonPaletteLightingTest {
         assertNull(redstoneTorch.getTorch());
         assertNull(redstoneTorch.getLight());
 
-        Palette compiled = new Palette(List.of(common));
+        Palette compiled = new Palette(null, List.of(common));
         LightPool torchPool = compiled.getPalette().get('T').info().light();
         LightPool freePool = compiled.getPalette().get('h').info().light();
         assertNotNull(torchPool);

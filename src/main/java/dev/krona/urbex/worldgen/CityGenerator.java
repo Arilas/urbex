@@ -247,7 +247,13 @@ public class CityGenerator {
         return driver.getY() == minHeight;
     }
 
-    public void generate(WorldGenRegion region, ChunkAccess chunk) {
+    /**
+     * @param runtime the level's runtime, captured by the caller for this one chunk. Everything it
+     *                carries that outlives the chunk - today, the deferred-task queue - reaches
+     *                generation through it, so a reload or an unload landing mid-chunk cannot
+     *                redirect this generation's work to a different epoch (issue #125).
+     */
+    public void generate(DimensionRuntime runtime, WorldGenRegion region, ChunkAccess chunk) {
         long start = System.currentTimeMillis();
 
         int chunkX = chunk.getPos().x();
@@ -264,7 +270,7 @@ public class CityGenerator {
         // order. See Arilas/urbex#24.
         ChunkHeightmap heightmap = new ChunkHeightmap(getHeightmap(coord, provider.getWorld()));
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-        ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info);
+        ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info, runtime.tasks());
 
         boolean doCity = info.isCity;
 
@@ -309,7 +315,7 @@ public class CityGenerator {
         generateDebris(ctx, info);
 
         ctx.driver.actuallyGenerate(chunk);
-        ChunkFixer.fix(provider, coord, region);
+        ChunkFixer.fix(ctx);
         // After the fixer, so the post-todos have placed their blocks and what we see is final
         forgetOverwrittenBlockEntities(chunk);
 
@@ -417,7 +423,7 @@ public class CityGenerator {
                         .canSurvive(snapshotLevel(snapshotLevel, delegate, stateAt), marker));
         for (DeferredLightPlacer.Planned light : planned) {
             driver.currentAbsolute(light.pos()).block(light.state());
-            updateNeeded(info, light.pos(), Block.UPDATE_CLIENTS);
+            updateNeeded(ctx, light.pos(), Block.UPDATE_CLIENTS);
         }
     }
 
@@ -1864,20 +1870,20 @@ public class CityGenerator {
                                     // NBT into a chunk, which only the generating region has.
                                     b = handleSpawner(ctx, info, part, oy, ctx.region, rx, rz, y, b, inf);
                                 } else if (inf.tag() != null) {
-                                    b = handleBlockEntity(info, oy, ctx.region, rx, rz, y, b, inf);
+                                    b = handleBlockEntity(ctx, info, oy, ctx.region, rx, rz, y, b, inf);
                                 }
                             } else if (getStatesNeedingPoiUpdate().contains(b)) {
                                 // If this block has POI data we need to delay setting it
                                 BlockState finalB = b;
                                 BlockPos p = driver.getCurrentCopy();
-                                info.addPostTodo(p, inWorld -> {
+                                ctx.addPostTodo(p, inWorld -> {
                                     if (inWorld.getBlockState(p).getBlock() == Blocks.DIRT) {
                                         inWorld.setBlock(p, finalB, Block.UPDATE_NONE);
                                     }
                                 });
                                 b = Blocks.DIRT.defaultBlockState();
                             } else if (getStatesNeedingLightingUpdate().contains(b)) {
-                                updateNeeded(info, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
+                                updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             } else if (getStatesNeedingTodo().contains(b)) {
                                 b = handleTodo(ctx, info, oy, ctx.region, rx, rz, y, b);
                             }
@@ -1927,7 +1933,7 @@ public class CityGenerator {
         return null;
     }
 
-    private BlockState handleBlockEntity(BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
+    private BlockState handleBlockEntity(ChunkGenContext ctx, BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
         BlockPos pos = info.getRelativePos(rx, oy + y, rz);
         BlockEntityType type = getTypeForBlock(b);
         if (type == null) {
@@ -1941,7 +1947,7 @@ public class CityGenerator {
         tag.putString("id", BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type).toString());
         world.getChunk(pos).setBlockEntityNbt(tag);
         if (b.getBlock() == Blocks.COMMAND_BLOCK) {
-            info.addPostTodo(pos, inWorld -> {
+            ctx.addPostTodo(pos, inWorld -> {
                 ((ServerChunkCache) inWorld.getLevel().getChunkSource()).blockChanged(pos);
                 inWorld.scheduleTick(pos, b.getBlock(), 1);
             });
@@ -2010,7 +2016,7 @@ public class CityGenerator {
         if (!SpecialMarkerPolicy.populateLoot(provider.getSeed(), pos, info.profile)) {
             return;
         }
-        info.addPostTodo(pos, inWorld -> {
+        ctx.addPostTodo(pos, inWorld -> {
             if (!inWorld.getBlockState(pos).isAir()) {
                 inWorld.setBlock(pos, block, Block.UPDATE_CLIENTS);
                 generateLoot(info, inWorld, pos,
@@ -2038,14 +2044,24 @@ public class CityGenerator {
                         // Key the tree it grows on the sapling's position so it is the same tree no
                         // matter when the todo is drained.
                         RandomSource growthRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.VEGETATION_GROWTH);
-                        GlobalTodo.get(world.getLevel()).addTodo(pos, (level) -> {
-                            if (level.hasChunksAt(pos.offset(-1, -1, -1), pos.offset(1, 1, 1)) && level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
+                        ctx.addLevelTask(pos, level -> {
+                            // Not available yet is not the same as nothing to do. This used to
+                            // return either way and the queue counted it done, so a tree whose
+                            // chunk happened to be unloaded when the drain reached it simply never
+                            // grew (issue #127).
+                            if (!level.hasChunksAt(pos.offset(-1, -1, -1), pos.offset(1, 1, 1))) {
+                                return LevelTaskQueue.Outcome.RETRY;
+                            }
+                            if (level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
                                 level.setBlock(pos, finalB, Block.UPDATE_CLIENTS);
                                 saplingBlock.advanceTree(level, pos, finalB, growthRandom);
                             }
+                            // Either it grew, or something else stands there now and no sapling is
+                            // coming back to that position. Retrying would never end.
+                            return LevelTaskQueue.Outcome.DONE;
                         });
                     } else {
-                        info.addPostTodo(pos, inWorld -> {
+                        ctx.addPostTodo(pos, inWorld -> {
                             BlockState state = finalB.setValue(SaplingBlock.STAGE, 1);
                             inWorld.setBlock(pos, state, Block.UPDATE_ALL_IMMEDIATE);
                         });
@@ -2418,8 +2434,14 @@ public class CityGenerator {
         return (x == 0 || x == 15) && (z == 0 || z == 15);
     }
 
-    public static void updateNeeded(BuildingInfo info, BlockPos pos, int flags) {
-        info.addPostTodo(pos, world -> {
+    /**
+     * Queue a place-twice refresh at {@code pos} on the context generating this chunk.
+     * <p>
+     * Takes the context rather than the chunk's {@code BuildingInfo}: the refresh belongs to one
+     * generation, and a cached planning value is not allowed to hold it (issue #127).
+     */
+    public static void updateNeeded(ChunkGenContext ctx, BlockPos pos, int flags) {
+        ctx.addPostTodo(pos, world -> {
             BlockState state = world.getBlockState(pos);
             if (!state.isAir()) {
                 world.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);

@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The invariant Task 5c exists to hold: <strong>no chunk generates against unloaded assets</strong>.
+ * The invariant this file exists to hold: <strong>no chunk generates against unloaded assets</strong>.
  * <p>
  * For the life of the project nothing asserted it, and nothing had to: {@code AssetRegistries.load}
  * was called only from {@code ServerTickEvents.END_LEVEL_TICK}, while {@code prepareLevels()} -
@@ -45,13 +45,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Those chunks were written with no decoration and persisted that way. The failure is entirely
  * silent: {@code Stuff.generateStuff} looks a tag up, gets nothing back, and places nothing.
  * <p>
- * {@link #generationPathLoadsTheStuffIndexBeforeItTouchesTheLevel()} is the guard. It drives
- * {@link CityFeature#getDimensionInfo}, which every generation path reaches first
- * ({@code CarverHookMixin} -> {@code generateFromPipeline} -> {@code getDimensionInfo}, before
- * {@code CityGenerator.generate} is called), through a level that throws the moment anything but
- * {@code registryAccess()} is asked of it. If the load ever moves back off that path, the stuff
- * index is still empty when the level is reached and the test fails.
- * <p>
+ * Its owner has changed (issue #125) and so has the shape of the argument, which is the reason this
+ * file was rewritten rather than deleted. The guarantee used to live on the generation path itself -
+ * {@code CityFeature.getDimensionInfo} called {@code AssetRegistries.load} before any chunk work -
+ * because that same path was where the registries were <em>reset</em>. Nothing resets them from a
+ * worker any more, and enforcement is now two statements that together leave no gap:
+ * <ol>
+ * <li>{@link #theLevelLoadHandlerLoadsAssetsBeforeItReachesTheLevel()} - the level-load handler
+ *     loads the registries before it touches the level it was handed, so a level that has loaded has
+ *     loaded assets. A plain lifecycle event was not enough on its own before; it is now, because of
+ *     the second half.</li>
+ * <li>{@link #generationRefusesALevelWithNoPublishedRuntime()} - generation reads a published
+ *     runtime and does nothing without one. There is no path left that generates first and loads
+ *     afterwards, which is what the generation-path load was compensating for.</li>
+ * </ol>
  * A test that asserted "a cobweb lands at (x, y, z)" would not do this job: it would pass on any
  * arrangement that eventually loads the registries, including one that loads them a tick too late.
  */
@@ -72,64 +79,86 @@ class AssetsLoadedBeforeGenerationTest {
 
     @BeforeEach
     @AfterEach
-    void clearRegistries() {
+    void clearRegistriesAndSession() {
+        GenerationSession session = GenerationSession.current();
+        if (session != null) {
+            GenerationSession.closeFor(session.owner());
+        }
         AssetRegistries.reset();
     }
 
+    /**
+     * The eager half, and the half a deletion would take away silently: the registries are resolved
+     * while the world is loading, so a broken pack refuses the world naming the file instead of
+     * throwing from a worldgen worker mid-generation.
+     * <p>
+     * The ordering within the handler is what is actually pinned here, and the null level is what
+     * pins it - it plays the part the throwing proxy plays below. {@code GenerationSession.load}
+     * loads the assets and then builds the level's runtime, which reads the level; handed nothing,
+     * that second step fails. So the exception says the handler went on to reach the level, and the
+     * latched registries say the load happened before it did. Move the load after the runtime build
+     * and the assertion below fails.
+     * <p>
+     * {@code AssetRegistries.load} latching on a null level is exactly the no-op latch
+     * {@code loadPredefinedStuff} deliberately refuses (issue #67), and none is needed here: nothing
+     * in production ever calls it with a null level. If it ever gains that guard, this test starts
+     * failing while the wiring it pins is intact - the fix then is to give this test a level, not to
+     * delete it.
+     */
     @Test
-    void generationPathLoadsTheStuffIndexBeforeItTouchesTheLevel() {
+    void theLevelLoadHandlerLoadsAssetsBeforeItReachesTheLevel() {
+        assertFalse(AssetRegistries.isLoaded(), "precondition: @BeforeEach reset the registries");
+
+        ServerEventHandlers.register();
+        assertThrows(NullPointerException.class,
+                () -> ServerLevelEvents.LOAD.invoker().onLevelLoad(null, null),
+                "the handler must go on to build the level's runtime, which reads the level");
+
+        assertTrue(AssetRegistries.isLoaded(),
+                "ServerLevelEvents.LOAD must load the asset registries before it reads the level - "
+                        + "it is what keeps the eager validation a load-time check, and what makes "
+                        + "'a loaded level has loaded assets' true for every level");
+    }
+
+    /**
+     * The other half. Generation is gated on a published runtime, and only the level-load handler
+     * above publishes one - so the ordering it guarantees is the only way into generation.
+     * <p>
+     * Asserted through {@link GenerationSession#planningFor}, which is what
+     * {@code CityFeature.generateFromPipeline} calls first and what every other entry point
+     * (commands, spawn placement, structure suppression) shares. Its predecessor,
+     * {@code CityFeature.getDimensionInfo}, would instead have <em>built</em> the missing state on
+     * the spot, from a worldgen worker, which is why it had to load the registries itself.
+     */
+    @Test
+    void generationRefusesALevelWithNoPublishedRuntime() {
+        assertNull(GenerationSession.current(), "precondition: @BeforeEach closed the session");
+
+        assertNull(GenerationSession.runtimeFor(levelThatOnlyAnswersRegistryAccess()),
+                "with no session there is nothing to generate against - and the level is not even "
+                        + "read, let alone used to build state on the spot as getDimensionInfo did");
+
+        GenerationSession session = GenerationSession.open(null);
+        assertEquals(0, session.loadedLevelCount(),
+                "a fresh session generates nowhere until a level load publishes a runtime");
+    }
+
+    /**
+     * The loader populates the index it is asked for. Split out from the ordering test above, which
+     * a null level cannot cover: this one hands the loader a level that answers exactly the one call
+     * it needs and throws for everything else, so it also pins that the load reads nothing more.
+     */
+    @Test
+    void theLoaderPopulatesTheStuffIndexFromNothingButRegistryAccess() {
         assertNull(AssetRegistries.stuffIndex().byTag().get("rubble"),
                 "precondition: nothing is filed under the tag before anything loads");
 
-        WorldGenLevel level = levelThatOnlyAnswersRegistryAccess();
-        CityFeature feature = new CityFeature();
-
-        // getDimensionInfo cannot complete against this level - getLevel() throws. What matters is
-        // how far it got first: the assets have to be loaded before that point, not after it.
-        assertThrows(ReachedTheLevel.class, () -> feature.getDimensionInfo(level));
+        AssetRegistries.load(levelThatOnlyAnswersRegistryAccess());
 
         List<StuffObject> rubble = AssetRegistries.stuffIndex().byTag().get("rubble");
         assertNotNull(rubble, "the stuff tag index must be populated before generation reads the "
                 + "level - an empty index places no decoration and says nothing about it");
         assertEquals(List.of("urbex:cobweb"), rubble.stream().map(StuffObject::getName).toList());
-    }
-
-    /**
-     * The other half of the argument, and the half a deletion would take away silently.
-     * <p>
-     * The test above pins the generation-path load, which is what guarantees a chunk never generates
-     * against unloaded assets. It says nothing about the <em>eager</em> load, and without that one
-     * Task 4a's rule reverts from "a bad asset fails the world load, naming the file" to "a bad
-     * asset throws from a worldgen worker mid-generation" - with every test still green, because
-     * generation would go on loading the registries itself. So the registration is pinned here
-     * directly: register the server events, fire {@code ServerLevelEvents.LOAD}, and require that
-     * something on it loaded the registries.
-     * <p>
-     * A null level is enough to tell the two apart. {@code RegistryAssetRegistry.loadAll} returns
-     * immediately for one, so nothing is actually resolved, but {@code load} still latches - and if
-     * the registration line is gone, the invoker has no callbacks, nothing runs, and the latch stays
-     * false. The registration is left on the static event afterwards; nothing else in the suite
-     * invokes it.
-     * <p>
-     * <b>Why that latch is the signal, and what would break it.</b> {@code load} latching on a null
-     * level is exactly the no-op latch {@code loadPredefinedStuff} deliberately refuses (issue #67 -
-     * see the null guard in {@code AssetRegistries.loadPredefinedStuff}), because for predefined
-     * cities a real level arriving later still has to be able to load. {@code load} has no such
-     * guard, and none is needed in production: nothing ever calls it with a null level, since both
-     * call sites hand it a level they already hold. But if {@code load} ever gains that guard, this
-     * test starts failing while the registration it is pinning is perfectly intact. If that happens,
-     * the fix is to give this test a level rather than to delete it.
-     */
-    @Test
-    void theEagerLoadIsWiredToTheLevelLoadEvent() {
-        assertFalse(AssetRegistries.isLoaded(), "precondition: @BeforeEach reset the registries");
-
-        ServerEventHandlers.register();
-        ServerLevelEvents.LOAD.invoker().onLevelLoad(null, null);
-
-        assertTrue(AssetRegistries.isLoaded(),
-                "ServerLevelEvents.LOAD must load the asset registries - it is what keeps the "
-                        + "eager validation a load-time check instead of a mid-generation one");
     }
 
     @Test
@@ -156,8 +185,9 @@ class AssetsLoadedBeforeGenerationTest {
 
     /**
      * A level that hands over a registry access carrying one tagged stuff entry, and throws for
-     * every other call. {@code AssetRegistries.load} needs nothing else; {@code getDimensionInfo}
-     * needs {@code getLevel()}, which is exactly the line this test wants the load to precede.
+     * every other call - {@code getLevel()} included, which is what makes "the lookup did not even
+     * read the level" an assertion rather than a claim. {@code AssetRegistries.load} needs nothing
+     * else.
      */
     private static WorldGenLevel levelThatOnlyAnswersRegistryAccess() {
         RegistryAccess access = registriesWithOneRubbleStuff();

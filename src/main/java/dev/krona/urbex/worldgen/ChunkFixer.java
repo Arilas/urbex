@@ -1,23 +1,23 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import net.minecraft.world.level.WorldGenLevel;
-
 public class ChunkFixer {
 
-
-    private static void executePostTodo(ChunkCoord coord, IDimensionInfo provider, WorldGenLevel region) {
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-        info.getPostTodo().forEach((pos, todo) -> todo.accept(region));
-        info.clearPostTodo();
+    private ChunkFixer() {
     }
 
     /**
-     * The region, not {@code info.getWorld()}: the post-todos read and write blocks, and only the
-     * region generating this chunk is guaranteed to have the chunks they touch.
+     * Runs the post-generation todos this context queued, once.
+     *
+     * <p>The context, not a re-fetched {@code BuildingInfo}: the todos belong to this generation of
+     * this chunk and nothing else may see them. Draining through the cache was how an evicted entry
+     * lost them and how a second generation of the same chunk inherited the first one's (issue
+     * #127); {@link PostTodoQueue} now refuses a second drain outright.</p>
+     *
+     * <p>They are applied to {@code ctx.region} rather than {@code provider.getWorld()}: the todos
+     * read and write blocks, and only the region generating this chunk is guaranteed to have the
+     * chunks they touch.</p>
      */
-    public static void fix(IDimensionInfo info, ChunkCoord coord, WorldGenLevel region) {
-        executePostTodo(coord, info, region);
+    public static void fix(ChunkGenContext ctx) {
+        ctx.drainPostTodo().forEach((pos, todo) -> todo.accept(ctx.region));
     }
 }

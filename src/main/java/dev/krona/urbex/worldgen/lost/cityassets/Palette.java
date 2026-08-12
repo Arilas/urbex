@@ -5,15 +5,13 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
-import dev.krona.urbex.varia.ServerAccess;
 import org.apache.commons.lang3.tuple.Pair;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -40,9 +38,15 @@ public class Palette {
      * list would silently drop everything the child did not restate. Only the surviving entries are
      * then compiled, so an overridden entry takes its {@code damaged} mapping with it.
      */
-    public Palette(List<PaletteRE> chainRootFirst) {
+    /**
+     * @param access the registries this palette's chain was read from, used to resolve a
+     *               {@code variant} entry against {@code AssetRegistries.VARIANTS}. May be null only
+     *               for a palette that provably names no variant; one that does then fails naming
+     *               itself and the variant rather than reaching for a static server (issue #60).
+     */
+    public Palette(@Nullable RegistryAccess access, List<PaletteRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
-        compile(mergeByCharacter(chainRootFirst, name));
+        compile(access, mergeByCharacter(chainRootFirst, name));
     }
 
     public Palette(String name) {
@@ -62,7 +66,8 @@ public class Palette {
      *                       for the synthetic palette name
      * @param chainRootFirst the inline blocks along the owner's chain, root first
      */
-    public static Palette inline(Identifier owner, List<PaletteRE> chainRootFirst) {
+    public static Palette inline(@Nullable RegistryAccess access, Identifier owner,
+                                 List<PaletteRE> chainRootFirst) {
         for (PaletteRE re : chainRootFirst) {
             // The codec accepts 'extends' wherever a PaletteRE is embedded, but an inline block is
             // not a registry entry, so nothing can resolve it. Rejecting is the honest option:
@@ -76,7 +81,7 @@ public class Palette {
             }
         }
         Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(mergeByCharacter(chainRootFirst, owner));
+        palette.compile(access, mergeByCharacter(chainRootFirst, owner));
         return palette;
     }
 
@@ -129,7 +134,7 @@ public class Palette {
         return palette;
     }
 
-    private void compile(Collection<PaletteEntry> entries) {
+    private void compile(@Nullable RegistryAccess access, Collection<PaletteEntry> entries) {
         for (PaletteEntry entry : entries) {
             Character c = entry.getChr().charAt(0);
             BlockState dmg = null;
@@ -149,9 +154,11 @@ public class Palette {
                 }
             } else if (entry.getVariant() != null) {
                 String variantName = entry.getVariant();
-                MinecraftServer server = ServerAccess.getServer();
-                ServerLevel level = server.getLevel(Level.OVERWORLD);
-                Variant variant = AssetRegistries.VARIANTS.getOrThrow(level, variantName);
+                // The registries this palette came from, not the overworld's. Asking
+                // ServerAccess.getServer().getLevel(OVERWORLD) resolved every dimension's variants
+                // against the overworld, and threw from a worldgen worker when the static server
+                // reference was not populated yet (issue #60).
+                Variant variant = AssetRegistries.VARIANTS.getOrThrow(access, variantName);
                 List<Pair<Integer, BlockState>> blocks = variant.getBlocks();
                 if (dmg != null) {
                     for (Pair<Integer, BlockState> pair : blocks) {

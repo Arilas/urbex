@@ -188,21 +188,21 @@ class DatapackGuideExamplesTest {
         expect(guide, missing, () -> Resolved.require(null, downtown, "streetblocks.parts.stair"));
 
         // A part with no geometry, and a part whose redeclared size contradicts inherited slices.
-        expect(guide, missing, () -> new BuildingPart(List.of(namedPart(tower, null, null, null))));
-        expect(guide, missing, () -> new BuildingPart(List.of(
+        expect(guide, missing, () -> new BuildingPart(null, List.of(namedPart(tower, null, null, null))));
+        expect(guide, missing, () -> new BuildingPart(null, List.of(
                 namedPart(Identifier.fromNamespaceAndPath("urbexmt", "tower_base"), 16, 16,
                         List.of(List.of("x".repeat(256)))),
                 namedPart(tower, 8, null, null))));
 
         // 'extends' inside an inline palette block.
-        expect(guide, missing, () -> Palette.inline(tower, List.of(new PaletteRE(
+        expect(guide, missing, () -> Palette.inline(null, tower, List.of(new PaletteRE(
                 Optional.of(Identifier.fromNamespaceAndPath("urbex", "common")), Optional.empty()))));
 
         // A palette entry that resolves to nothing at all.
         PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        expect(guide, missing, () -> new Palette(List.of(
+        expect(guide, missing, () -> new Palette(null, List.of(
                 new PaletteRE(Optional.empty(), Optional.of(List.of(empty)))
                         .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "x")))));
 

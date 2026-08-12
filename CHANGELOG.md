@@ -2,6 +2,94 @@
 
 ## Unreleased
 
+- **A datapack's mistakes are reported all at once, and `/urbex validate` asks for them on demand.**
+  Load-time asset resolution stopped at the first broken file. That is the right outcome — the world
+  must not load — but the wrong report: an author with four typos fixed one, reloaded the world,
+  found the second, and went round again. Every registered asset is now resolved before anything is
+  reported, and the world refuses to load with one message listing every problem, each line naming
+  the registry, the asset and what is missing (issue #56).
+  - *`/urbex validate`* runs the same pass on demand and changes nothing — it does not populate,
+    replace or clear the compiled assets the running world's chunks are generating against. On a
+    world that is running it finds nothing, which is the answer worth being able to confirm after
+    installing a pack. The full list goes to the server log; chat gets the first ten.
+  - *`ErrorLogger.report` no longer dereferences a null server.* It is called from the handler
+    around chunk generation, and the window it most needs to survive is shutdown — a worker
+    finishing a chunk after the static server reference has been cleared. The error *handler* threw
+    an exception of its own there, turning a reported chunk failure into a dead worldgen worker and
+    losing the message being reported. The report now always reaches the log, whether or not anyone
+    is listening.
+  - *No worldgen change*: both digest goldens are unchanged.
+
+- **A palette's `variant` resolves against its own dimension's registries.** `Palette.compile`
+  looked a variant up through `ServerAccess.getServer().getLevel(Level.OVERWORLD)` — the
+  process-wide server reference, and then unconditionally that server's overworld — ignoring the
+  registries the palette had just been read from. A palette compiled for any other dimension took
+  the overworld's variants, and one compiled on a worldgen worker before the static server
+  reference was populated threw a `NullPointerException` out of asset compilation (issue #60). The
+  registry access now travels with the chain being compiled, which is what
+  `RegistryAssetRegistry` had in hand at every one of its three compile sites all along. A palette
+  compiled with no registry access and a `variant` entry to resolve now says exactly that, naming
+  the variant. *No worldgen change*: both digest goldens are unchanged.
+
+- **Deferred level work belongs to the level, and says whether it actually ran.** `GlobalTodo` was a
+  `static` map keyed by dimension id, and every one of its problems followed from that (issue #127,
+  part b). Nothing ever removed a dimension's bucket, so work queued in one single-player world was
+  still queued when the next world with the same dimension id loaded, and ran against it. Its
+  bucket removal raced its enqueue, so a task queued at the wrong moment went into a bucket that was
+  about to be dropped. And it allocated a `HashMap` copy and a `HashSet` **on every level tick of
+  every dimension** — twenty times a second, empty or not — to discover it had nothing to do.
+  - *A task that could not run is no longer counted as done.* The one task there has ever been —
+    force-grown saplings — checked whether its chunk was available, found it was not, and returned;
+    the queue retired it. That tree never grew. Tasks now answer `DONE` or `RETRY`, and a task that
+    keeps retrying ages out with a log line naming its position rather than being dropped on the
+    first attempt or accumulating forever behind a chunk nobody will load again.
+  - *The queue is drained under a task-count budget and a time budget*, whichever runs out first,
+    and visits each task at most once per tick.
+  - *It dies with its level.* The queue is a component of that level's runtime, retired on unload
+    and at server stop, which reports how many tasks were still waiting instead of losing them
+    quietly.
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`
+    and `runDigestCheckFeatures`.
+
+- **Generation state belongs to the server and the level that own it.** `CityFeature` kept the
+  dimension state for the whole process in one map keyed by dimension id, and kept it honest with a
+  `static volatile int` that the client bumped on disconnect, the world-creation screen bumped on
+  publish, and `/reload` bumped on the server thread. Reconciliation ran *from the generation path*,
+  so a bump could reset the asset registries while a worker was midway through a chunk — and that
+  chunk was written, saved and never revisited with everything the emptied stuff index would have
+  placed missing from it. A `GenerationSession` per running server now owns a `DimensionRuntime` per
+  loaded level, published when the level loads and retired when it unloads (issue #125).
+  - *Leaving a single-player world no longer touches the server's generation state.* The disconnect
+    hook fires on the client thread while the integrated server is still draining in-flight
+    generation; it now clears client state only, and the server's own state is retired at
+    `SERVER_STOPPING` with nothing generating.
+  - *`/reload` republishes each level's runtime instead of clearing the registries.* Block tags do
+    reload and `CityGenerator` caches several of them, so a fresh runtime per level is what makes an
+    edited tag take effect. The thirteen asset registries are frozen at world load and cannot change
+    on a reload whatever is done to them (issue #61), so clearing them bought nothing and was how a
+    running worker got an emptied index. A chunk already generating finishes against the epoch it
+    captured.
+  - *Two worlds in one session cannot share state.* Each server start opens a new session; the
+    previous one is closed rather than inherited, and a stopping server can only close its own.
+  - *Where the "no chunk generates against unloaded assets" rule now lives.* The level-load handler
+    resolves the asset registries before it builds the level's runtime, and generation does nothing
+    at all without a published runtime — so there is no longer a path that generates first and loads
+    afterwards, which is what the load on the generation path was compensating for. Verified on a
+    real server: all three dimensions publish before "Preparing spawn area".
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`
+    and `runDigestCheckFeatures`.
+
+- **Post-generation block writes belong to the generation that queued them.** The deferred writes a
+  chunk queues for after its driver has run — POI blocks, loot chests, command blocks, saplings, the
+  place-twice light refresh — were stored on the cached `BuildingInfo` for that chunk, and the
+  drain re-fetched that cache entry to find them. Three things could go wrong with that and now
+  cannot: the entry could be evicted between the write and the drain, taking the callbacks with it;
+  a second generation of the same chunk found the first one's callbacks still queued and applied
+  them to its own region; and a callback added on a worker thread while another cleared the map was
+  simply lost. They are now owned by the `ChunkGenContext` that queued them, which refuses both a
+  late enqueue and a second drain (issue #127, part a). *No worldgen change*: both digest goldens
+  are unchanged, verified by running `runDigestCheck` and `runDigestCheckFeatures`.
+
 - **Presets, world styles and city styles can name themselves again.** Making every asset reference
   fully qualified (0.2.0) also made the Cities tab and the world-style picker show those ids: the
   preset list read `urbex:default`, `urbex:tallbuildings`, `urbex:wasteland`, and the selector read
