@@ -25,7 +25,10 @@
   (issue #56).
   - *A palette marker's `loot`/`mob` names a condition, which generation dereferences* — so one that
     names nothing refuses the world, like every other dereference.
-  - *A condition's `inpart`/`inbuilding` are matchers.* Naming a part nothing registers does not
+  - *A building's own `parts` entries carry matchers too* — `inpart`, `belowpart`, `inbuilding` —
+    and they are checked the same way. Nothing in the bundled pack writes `belowpart`, so no digest
+    could ever have caught a break here.
+  - *A condition's `inpart`/`belowpart`/`inbuilding` are matchers.* Naming a part nothing registers does not
     crash; the condition silently never fires. That is a warning, not a refusal.
   - *And it is only a warning if the thing that would provide it is installed.* A pack may
     deliberately name a part, mob or loot table from something it does not require, so that players
