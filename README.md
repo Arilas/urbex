@@ -31,16 +31,17 @@ read them as features of the current build.
 
 ## Usage
 
-Urbex does not generate anything until you opt in. A new world looks completely untouched
-unless you pick a profile.
+Urbex does not generate anything until you opt in. A new world looks completely untouched unless
+you pick a preset.
 
 To get cities:
 
-- On the world-creation screen, open the **More** tab and use the **Cities** button to pick a
-  profile before creating the world. With no profile selected (the default) the world generates
-  normally.
-- Server owners can map any dimension to a profile with the `dimensionsWithProfiles` config
-  option (entries look like `minecraft:overworld=default`).
+- On the world-creation screen, open the **Cities** tab and pick a preset before creating the
+  world. **Disabled** is the default and leaves the world alone. **Customize this preset…** edits a
+  copy, which is stored in the world rather than in your config, so it travels with the save.
+- Server owners can map any dimension to a preset with the `dimensionsWithPresets` config option.
+  Entries are `dimension=preset`, optionally `dimension=preset@worldstyle`, and **every id names
+  its namespace**: `minecraft:overworld=urbex:default`, not `minecraft:overworld=default`.
 
 ## Status
 
