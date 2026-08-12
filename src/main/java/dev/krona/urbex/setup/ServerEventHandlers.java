@@ -77,7 +77,18 @@ public class ServerEventHandlers {
             cleanUp();
             GenerationSession.open(server);
         });
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+        // STOPPED, not STOPPING, and the difference is a whole class of ruined chunk.
+        //
+        // STOPPING fires at the top of MinecraftServer.stopServer, while the chunk system is still
+        // being drained - so a chunk finishing generation after it would find its level's runtime
+        // already retired, get no city content at all, and be saved that way next to neighbours that
+        // got theirs. Vanilla terrain in the middle of a city, permanently, from a clean quit.
+        // STOPPED fires once the server has finished stopping, so nothing can still be generating.
+        //
+        // Everything retired here is per-session state that only the next server start reads, and
+        // GenerationSession.open resets the asset registries itself, so nothing depends on this
+        // having happened earlier.
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
             GenerationSession.close(server);
             cleanUp();
             Config.reset();
