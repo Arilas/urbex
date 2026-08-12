@@ -34,7 +34,7 @@ string every other file uses to name it. Directory names are the registry names 
 
 | Registry | What one file is | Required after the chain resolves |
 |---|---|---|
-| `worldstyles` | The top of the tree: which city styles apply in which biomes, the highway and railway wiring, and what gets scattered outside cities | `outsidestyle`, `citystyles`, `parts.highways` (all six), `parts.railways` (all sixteen) |
+| `worldstyles` | The top of the tree: which city styles apply in which biomes, the highway and railway wiring, what gets scattered outside cities, and which blocks rotate with their part | `outsidestyle`, `citystyles`, `parts.highways` (all six), `parts.railways` (all sixteen) — `rotatable` is optional |
 | `citystyles` | What a city is made of: street materials and street parts, plus weighted selectors for buildings, parks, bridges, fountains, stairs | `streetblocks.parts` (all eight) |
 | `buildings` | An ordered stack of parts, with floor and cellar limits | `filler`, `parts` |
 | `parts` | A block of geometry, up to 16×16, written as character slices | `xsize`, `zsize`, `slices` |
@@ -142,6 +142,46 @@ error is worded that way on purpose — the fix might be in any file in it.
 One consequence worth knowing: a value that is present but malformed is still a decode failure, not
 an absence. `"maxfloors": "three"` fails the file; it does not read as "unset" and silently inherit
 an ancestor's number.
+
+### `rotatable`: which blocks turn with their part
+
+A part placed at a rotation only turns the blocks named by a block tag; everything else keeps the
+facing its palette entry authored. That tag is `urbex:rotatable` unless the world style names
+another:
+
+<!-- example: worldstyles -->
+
+```json
+{
+  "outsidestyle": "urbex:outside",
+  "rotatable": "#mypack:rotatable"
+}
+```
+
+Written with the leading `#`, like every other tag reference, and fully qualified — `#rotatable` is
+a load error, not `minecraft:rotatable`. Like `outsidestyle`, it is a scalar: the last entry in the
+chain that declares one wins, and a chain declaring none resolves `urbex:rotatable`.
+
+**Declaring it replaces; it does not merge.** To keep Urbex's own set, name it from your own tag —
+this one is an ordinary Minecraft block tag at `data/mypack/tags/block/rotatable.json`, not a
+registry asset:
+
+<!-- example: none -->
+
+```json
+{
+  "values": [
+    "#urbex:rotatable",
+    "#minecraft:trapdoors",
+    "minecraft:ladder"
+  ]
+}
+```
+
+The alternative is shipping `data/urbex/tags/block/rotatable.json`, which merges into
+`urbex:rotatable` itself and therefore changes **every** world style including `urbex:standard`,
+whether or not the player selected yours. That is why this field exists: a pack that needs banners
+or trapdoors to rotate should be able to say so without reaching into Urbex's namespace.
 
 ### When each asset is resolved
 

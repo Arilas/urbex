@@ -4,6 +4,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.*;
 import net.minecraft.resources.Identifier;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
@@ -27,7 +29,8 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
                     ScatteredSettings.CODEC.optionalFieldOf("scattered").forGetter(l -> Optional.ofNullable(l.scatteredSettings)),
                     PartSelector.Decl.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.partSelector)),
                     Mergeable.codec(CityStyleSelector.CODEC).optionalFieldOf("citystyles").forGetter(l -> Optional.ofNullable(l.cityStyleSelectors)),
-                    Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
+                    Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers)),
+                    DataTools.BLOCK_TAG_CODEC.optionalFieldOf("rotatable").forGetter(l -> Optional.ofNullable(l.rotatable))
             ).apply(instance, WorldStyleRE::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
@@ -43,6 +46,10 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
     private final PartSelector.Decl partSelector;
     private final Mergeable<CityStyleSelector> cityStyleSelectors;
     private final Mergeable<CityBiomeMultiplier> cityBiomeMultipliers;
+    // Null means "not declared here", so the chain reads it from an ancestor. A chain that declares
+    // none at all falls back to urbex:rotatable in WorldStyle -- the behaviour every world style had
+    // before this field existed.
+    private final TagKey<Block> rotatable;
 
     public WorldStyleRE(Optional<Identifier> extendsId,
                         Optional<String> outsideStyle,
@@ -51,7 +58,8 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
                         Optional<ScatteredSettings> scatteredSettings,
                         Optional<PartSelector.Decl> partSelector,
                         Optional<Mergeable<CityStyleSelector>> cityStyleSelector,
-                        Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers) {
+                        Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers,
+                        Optional<TagKey<Block>> rotatable) {
         this.extendsId = extendsId;
         this.outsideStyle = outsideStyle.orElse(null);
         this.multiSettings = multiSettings.orElse(null);
@@ -60,11 +68,17 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
         this.partSelector = partSelector.orElse(null);
         this.cityStyleSelectors = cityStyleSelector.orElse(null);
         this.cityBiomeMultipliers = cityBiomeMultipliers.orElse(null);
+        this.rotatable = rotatable.orElse(null);
     }
 
     @Nullable
     public String getOutsideStyle() {
         return outsideStyle;
+    }
+
+    @Nullable
+    public TagKey<Block> getRotatable() {
+        return rotatable;
     }
 
     @Nullable

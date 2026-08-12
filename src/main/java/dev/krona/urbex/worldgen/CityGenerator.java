@@ -83,6 +83,8 @@ public class CityGenerator {
 
     public final IDimensionInfo provider;
     public final Preset profile;
+    /** Lazily resolved by {@link #rotatableTag()}; see there for why it is safe to cache. */
+    private TagKey<Block> cachedRotatableTag;
 
     private final Statistics statistics = new Statistics();
     private final Map<Block, BlockEntityType> typeCache = new ConcurrentHashMap<>();
@@ -2052,8 +2054,24 @@ public class CityGenerator {
         return b;
     }
 
+    /**
+     * The block tag deciding what rotates with its part, from the active world style.
+     * <p>
+     * Resolved once and cached: {@link #transformBlockState} reads it for every block of every part
+     * placed at a transform other than {@code ROTATE_NONE}, and the world style cannot change under
+     * a running generator. A world style that declares no {@code rotatable} resolves
+     * {@code urbex:rotatable}, which is what this returned unconditionally before world styles could
+     * name their own.
+     */
+    private TagKey<Block> rotatableTag() {
+        if (cachedRotatableTag == null) {
+            cachedRotatableTag = provider.getWorldStyle().getRotatableTag();
+        }
+        return cachedRotatableTag;
+    }
+
     private BlockState transformBlockState(Transform transform, BlockState b) {
-        if (Tools.hasTag(b.getBlock(), UrbexTags.ROTATABLE_TAG)) {
+        if (Tools.hasTag(b.getBlock(), rotatableTag())) {
             // Vanilla structure order: mirror first, then rotate. The mirror used to be
             // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
             // the wrong way (issue #45).

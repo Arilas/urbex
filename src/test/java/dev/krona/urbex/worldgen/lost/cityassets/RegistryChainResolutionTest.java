@@ -340,11 +340,11 @@ class RegistryChainResolutionTest {
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
-                Optional.empty())
+                Optional.empty(), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "standard"));
         WorldStyleRE child = new WorldStyleRE(Optional.empty(), Optional.of("urbex:bleak"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty())
+                Optional.empty(), Optional.empty(), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "bleak"));
 
         WorldStyle resolved = new WorldStyle(List.of(parent, child));

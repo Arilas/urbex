@@ -289,7 +289,7 @@ class RequiredAfterResolutionTest {
         return new WorldStyleRE(Optional.empty(), outsideStyle,
                 Optional.empty(), Optional.empty(), scattered,
                 Optional.of(TestWiring.partSelector()),
-                cityStyles, Optional.empty())
+                cityStyles, Optional.empty(), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_world"));
     }
 
