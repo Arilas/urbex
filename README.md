@@ -1,4 +1,8 @@
-# Urbex
+<p align="center">
+  <img src="art/icon-master.png" alt="Urbex ruined city icon" width="192">
+</p>
+
+<h1 align="center">Urbex</h1>
 
 Procedural abandoned-city worldgen for Minecraft, for Fabric.
 

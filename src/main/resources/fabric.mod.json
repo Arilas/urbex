@@ -12,6 +12,7 @@
     "sources": "https://github.com/Arilas/urbex"
   },
   "license": "MIT",
+  "icon": "assets/urbex/icon.png",
   "environment": "*",
   "accessWidener": "META-INF/${mod_id}.accesswidener",
   "entrypoints": {
