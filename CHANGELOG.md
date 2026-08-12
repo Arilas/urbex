@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **A palette's `variant` resolves against its own dimension's registries.** `Palette.compile`
+  looked a variant up through `ServerAccess.getServer().getLevel(Level.OVERWORLD)` — the
+  process-wide server reference, and then unconditionally that server's overworld — ignoring the
+  registries the palette had just been read from. A palette compiled for any other dimension took
+  the overworld's variants, and one compiled on a worldgen worker before the static server
+  reference was populated threw a `NullPointerException` out of asset compilation (issue #60). The
+  registry access now travels with the chain being compiled, which is what
+  `RegistryAssetRegistry` had in hand at every one of its three compile sites all along. A palette
+  compiled with no registry access and a `variant` entry to resolve now says exactly that, naming
+  the variant. *No worldgen change*: both digest goldens are unchanged.
+
 - **Deferred level work belongs to the level, and says whether it actually ran.** `GlobalTodo` was a
   `static` map keyed by dimension id, and every one of its problems followed from that (issue #127,
   part b). Nothing ever removed a dimension's bucket, so work queued in one single-player world was

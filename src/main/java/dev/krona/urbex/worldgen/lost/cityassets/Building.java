@@ -4,6 +4,7 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
 import org.apache.commons.lang3.tuple.Pair;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.util.RandomSource;
 import java.util.function.Predicate;
+
 
 public class Building {
 
@@ -52,7 +54,7 @@ public class Building {
      * ancestor that set something else. The defaults the fields start at are this class's own
      * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
      */
-    public Building(List<BuildingRE> chainRootFirst) {
+    public Building(@Nullable RegistryAccess access, List<BuildingRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<PartRef> partRefs = new ArrayList<>();
         boolean anyParts = false;
@@ -113,7 +115,7 @@ public class Building {
         Resolved.require(anyParts ? partRefs : null, name, "parts");
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(name, inlinePalettes); // @todo get the full palette instead
+            localPalette = Palette.inline(access, name, inlinePalettes); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
         }

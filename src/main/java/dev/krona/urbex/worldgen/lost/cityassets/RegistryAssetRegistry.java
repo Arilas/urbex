@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 public class RegistryAssetRegistry<T, R> {
 
@@ -26,9 +26,20 @@ public class RegistryAssetRegistry<T, R> {
     // throwaway copy of an immutable asset.
     private final Map<Identifier, T> assets = new ConcurrentHashMap<>();
     private final ResourceKey<Registry<R>> registryKey;
-    private final Function<List<R>, T> assetConstructor;
+    /**
+     * Compiles a resolved {@code extends} chain into the runtime asset.
+     * <p>
+     * It is handed the {@link RegistryAccess} the chain was read from, because compiling an asset
+     * can require resolving a reference into another of these registries - a palette entry naming a
+     * {@code variant} is the case that exists. That used to be done by asking
+     * {@code ServerAccess.getServer().getLevel(OVERWORLD)}, which pinned every dimension's variants
+     * to the overworld's registries and threw from a worldgen worker if the static server reference
+     * was not populated yet (issue #60). The access the caller already holds is the correct one.
+     */
+    private final BiFunction<RegistryAccess, List<R>, T> assetConstructor;
 
-    public RegistryAssetRegistry(ResourceKey<Registry<R>> registryKey, Function<List<R>, T> assetConstructor) {
+    public RegistryAssetRegistry(ResourceKey<Registry<R>> registryKey,
+                                 BiFunction<RegistryAccess, List<R>, T> assetConstructor) {
         this.registryKey = registryKey;
         this.assetConstructor = assetConstructor;
     }
@@ -72,7 +83,8 @@ public class RegistryAssetRegistry<T, R> {
         T t = assets.get(name);
         if (t == null) {
             try {
-                Registry<R> registry = level.registryAccess().lookupOrThrow(registryKey);
+                RegistryAccess access = level.registryAccess();
+                Registry<R> registry = access.lookupOrThrow(registryKey);
                 List<R> chain = ExtendsChain.resolve(name,
                         key -> {
                             R entry = registry.getValue(ResourceKey.create(registryKey, key));
@@ -82,7 +94,7 @@ public class RegistryAssetRegistry<T, R> {
                             return entry;
                         },
                         entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
-                t = assetConstructor.apply(chain);
+                t = assetConstructor.apply(access, chain);
             } catch (Exception e) {
                 throw new RuntimeException("Error getting resource " + name + "!", e);
             }
@@ -107,6 +119,28 @@ public class RegistryAssetRegistry<T, R> {
         return get(access, DataTools.fromName(name));
     }
 
+    /**
+     * @throws RuntimeException naming the registry and the id, including when {@code access} is
+     *                          null - an asset compiled without registry access cannot resolve a
+     *                          cross-reference, and saying so beats a {@code NullPointerException}
+     *                          from somewhere further in.
+     */
+    @Nonnull
+    public T getOrThrow(RegistryAccess access, String name) {
+        if (name == null) {
+            throw new RuntimeException("Invalid name given to " + registryKey.registry() + " getOrThrow!");
+        }
+        if (access == null) {
+            throw new RuntimeException("Cannot resolve '" + name + "' in " + registryKey.registry()
+                    + "! This asset was compiled without registry access.");
+        }
+        T result = get(access, DataTools.fromName(name));
+        if (result == null) {
+            throw new RuntimeException("Can't find '" + name + "' in " + registryKey.registry() + "!");
+        }
+        return result;
+    }
+
     @Nullable
     public T get(RegistryAccess access, Identifier name) {
         if (access == null || name == null) {
@@ -125,7 +159,7 @@ public class RegistryAssetRegistry<T, R> {
                             return entry;
                         },
                         entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
-                t = assetConstructor.apply(chain);
+                t = assetConstructor.apply(access, chain);
             } catch (Exception e) {
                 throw new RuntimeException("Error getting resource " + name + "!", e);
             }
@@ -141,7 +175,8 @@ public class RegistryAssetRegistry<T, R> {
         if (level == null) {
             return;
         }
-        Registry<R> registry = level.registryAccess().lookupOrThrow(registryKey);
+        RegistryAccess access = level.registryAccess();
+        Registry<R> registry = access.lookupOrThrow(registryKey);
         for (R r : registry) {
             Identifier name = registry.getKey(r);
             if (!assets.containsKey(name)) {
@@ -154,7 +189,7 @@ public class RegistryAssetRegistry<T, R> {
                             return entry;
                         },
                         entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
-                T t = assetConstructor.apply(chain);
+                T t = assetConstructor.apply(access, chain);
                 assets.putIfAbsent(name, t);
             }
         }

@@ -5,6 +5,7 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
 
@@ -16,6 +17,8 @@ import java.util.Map;
 /**
  * A structure part
  */
+import javax.annotation.Nullable;
+
 public class BuildingPart implements IBuildingPart {
 
     // Meta values that you can use in assets
@@ -58,7 +61,7 @@ public class BuildingPart implements IBuildingPart {
      * {@code slices} replaces the inherited ones wholesale; declaring a size that contradicts the
      * slices actually in force is a load error rather than a silent truncation.
      */
-    public BuildingPart(List<BuildingPartRE> chainRootFirst) {
+    public BuildingPart(@Nullable RegistryAccess access, List<BuildingPartRE> chainRootFirst) {
         BuildingPartRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
         name = leaf.getRegistryName();
 
@@ -108,7 +111,7 @@ public class BuildingPart implements IBuildingPart {
         slices = declaredSlices;
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(name, inlinePalettes); // @todo get the full palette instead
+            localPalette = Palette.inline(access, name, inlinePalettes); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
         }

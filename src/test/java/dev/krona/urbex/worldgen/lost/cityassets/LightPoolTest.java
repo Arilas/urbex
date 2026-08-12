@@ -62,7 +62,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(List.of(palette)));
+                () -> new Palette(null, List.of(palette)));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("marker 'L'"));
         assertTrue(error.getMessage().contains("floor, wall, ceiling, or free"));
@@ -78,7 +78,7 @@ class LightPoolTest {
                     """.formatted(weight));
 
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                    () -> new Palette(List.of(palette)));
+                    () -> new Palette(null, List.of(palette)));
             assertTrue(error.getMessage().contains("urbex:test_lights"));
             assertTrue(error.getMessage().contains("marker 'L'"));
             assertTrue(error.getMessage().contains("placement 'floor'"));
@@ -246,7 +246,7 @@ class LightPoolTest {
         PaletteRE paletteRE = result.result().orElseThrow()
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "legacy_torch"));
 
-        Palette.PE entry = new Palette(List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(null, List.of(paletteRE)).getPalette().get('L');
         assertInstanceOf(BlockState.class, entry.blocks());
         assertTrue(entry.info().isTorch());
         assertNull(entry.info().light());
@@ -267,7 +267,7 @@ class LightPoolTest {
         PaletteRE paletteRE = result.result().orElseThrow()
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "typed_lights"));
 
-        Palette.PE entry = new Palette(List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(null, List.of(paletteRE)).getPalette().get('L');
         BlockState representative = assertInstanceOf(BlockState.class, entry.blocks());
         assertEquals(Blocks.SOUL_WALL_TORCH, representative.getBlock());
         assertTrue(entry.info().isSpecial());
