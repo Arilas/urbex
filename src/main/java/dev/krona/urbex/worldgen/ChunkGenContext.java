@@ -41,6 +41,13 @@ public final class ChunkGenContext {
      */
     private final PostTodoQueue postTodo = new PostTodoQueue();
     /**
+     * The level's deferred-work queue, captured with the rest of this generation's epoch. Not
+     * looked up when a task is queued: a worker holding this context must not have to consult the
+     * live session, and the queue it hands work to must be the one belonging to the level this
+     * chunk is being generated for.
+     */
+    private final LevelTaskQueue levelTasks;
+    /**
      * Scratch for {@link CityGenerator#moveDown}'s top-of-column stash. Lives here
      * because the feature instance is shared across worldgen worker threads: as an instance
      * field there, two threads in moveDown at once swapped each other's terrain (issue #43).
@@ -53,7 +60,9 @@ public final class ChunkGenContext {
     public final long seed;
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
-                           IDimensionInfo provider, Preset profile, BuildingInfo info) {
+                           IDimensionInfo provider, Preset profile, BuildingInfo info,
+                           LevelTaskQueue levelTasks) {
+        this.levelTasks = levelTasks;
         this.region = region;
         this.chunk = chunk;
         this.coord = coord;
@@ -87,6 +96,18 @@ public final class ChunkGenContext {
 
     Map<BlockPos, Consumer<WorldGenLevel>> drainPostTodo() {
         return postTodo.closeAndDrain();
+    }
+
+    /**
+     * Queue work for the server thread, on the level this chunk belongs to.
+     * <p>
+     * Unlike {@link #addPostTodo}, this outlives the generation: post-todos are drained at the end
+     * of this chunk, while these run on a later tick, once the world is a world. Which is exactly
+     * why the queue is the <em>level's</em> and dies with it - work that outlives its level used to
+     * be run against the next world with the same dimension id.
+     */
+    public void addLevelTask(BlockPos pos, LevelTaskQueue.Task task) {
+        levelTasks.add(pos, task);
     }
 
     /**

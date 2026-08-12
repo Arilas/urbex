@@ -32,14 +32,21 @@ import javax.annotation.Nullable;
  *
  * <p>The record is the phase-1 shape from the milestone plan, deliberately not the final one:
  * {@code planning} holds today's {@link IDimensionInfo} until #129 replaces it with an explicit
- * planning context, and #127's level-owned task queue joins it. {@link #caches()} and
- * {@link #generator()} read like the components they will become while still delegating to the one
- * object that owns them today - two record components holding the same objects would be two owners
- * of one thing, which is the mistake this whole epic is about.</p>
+ * planning context. {@link #caches()} and {@link #generator()} read like the components they will
+ * become while still delegating to the one object that owns them today - two record components
+ * holding the same objects would be two owners of one thing, which is the mistake this whole epic
+ * is about. {@code tasks} is a real component, because nothing else owns it.</p>
  */
-public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning) {
+public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning, LevelTaskQueue tasks) {
 
-    /** A runtime for a level Urbex does not generate in. */
+    public DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning) {
+        this(level, planning, new LevelTaskQueue(level.dimension().identifier().toString()));
+    }
+
+    /**
+     * A runtime for a level Urbex does not generate in. It still carries a task queue: the tick
+     * handler drains whatever runtime the level has, and an empty queue costs nothing.
+     */
     public static DimensionRuntime disabled(ServerLevel level) {
         return new DimensionRuntime(level, null);
     }

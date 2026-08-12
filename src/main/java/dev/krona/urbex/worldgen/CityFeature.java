@@ -83,7 +83,7 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         // rest of worldgen again, as it did before the driver became shared.
         CityGenerator feature = runtime.generator();
         try {
-            feature.generate(region, chunk);
+            feature.generate(runtime, region, chunk);
         } catch (Exception e) {
             Urbex.getLogger().error("Error generating chunk {},{} (preset={}, dimension={})",
                     chunkX, chunkZ, diminfo.getProfile().getId(), diminfo.getType().identifier(), e);

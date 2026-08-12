@@ -104,6 +104,24 @@ class RuntimeRepositoryTest {
         assertNull(second.find("overworld"), "the next server starts with nothing published");
     }
 
+    /**
+     * Closing hands each runtime over on the way out, which is how a stopping server gets to say
+     * what its levels still had queued instead of dropping it silently ({@link LevelTaskQueue}).
+     */
+    @Test
+    void closingHandsEveryRetiredRuntimeToTheCaller() {
+        RuntimeRepository<String, String> repository = new RuntimeRepository<>();
+        repository.publish("overworld", "runtime-1");
+        repository.publish("nether", "runtime-2");
+        List<String> retired = new java.util.ArrayList<>();
+
+        repository.close((key, value) -> retired.add(key + "=" + value));
+
+        assertEquals(List.of("nether=runtime-2", "overworld=runtime-1"),
+                retired.stream().sorted().toList());
+        assertEquals(0, repository.size());
+    }
+
     @Test
     void closingTwiceIsHarmless() {
         RuntimeRepository<String, String> repository = new RuntimeRepository<>();

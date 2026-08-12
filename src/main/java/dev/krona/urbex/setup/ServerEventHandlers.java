@@ -2,7 +2,7 @@ package dev.krona.urbex.setup;
 
 import dev.krona.urbex.commands.ModCommands;
 import dev.krona.urbex.worldgen.GenerationSession;
-import dev.krona.urbex.worldgen.GlobalTodo;
+import dev.krona.urbex.worldgen.DimensionRuntime;
 import dev.krona.urbex.worldgen.lost.City;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
@@ -105,8 +105,18 @@ public class ServerEventHandlers {
         return current != null ? current : GenerationSession.open(server);
     }
 
+    /**
+     * Drains the level's own deferred work, if it has any.
+     * <p>
+     * Two lookups and a volatile read for a level with nothing queued, which is nearly every level
+     * on nearly every tick. {@code GlobalTodo} allocated a {@code HashMap} copy and a
+     * {@code HashSet} here twenty times a second per dimension to reach the same conclusion.
+     */
     private static void onWorldTick(ServerLevel serverLevel) {
-        GlobalTodo.get(serverLevel).executeAndClearTodo(serverLevel);
+        DimensionRuntime runtime = GenerationSession.runtimeFor(serverLevel);
+        if (runtime != null) {
+            runtime.tasks().drain(serverLevel);
+        }
     }
 
     public static void cleanUp() {

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **Deferred level work belongs to the level, and says whether it actually ran.** `GlobalTodo` was a
+  `static` map keyed by dimension id, and every one of its problems followed from that (issue #127,
+  part b). Nothing ever removed a dimension's bucket, so work queued in one single-player world was
+  still queued when the next world with the same dimension id loaded, and ran against it. Its
+  bucket removal raced its enqueue, so a task queued at the wrong moment went into a bucket that was
+  about to be dropped. And it allocated a `HashMap` copy and a `HashSet` **on every level tick of
+  every dimension** — twenty times a second, empty or not — to discover it had nothing to do.
+  - *A task that could not run is no longer counted as done.* The one task there has ever been —
+    force-grown saplings — checked whether its chunk was available, found it was not, and returned;
+    the queue retired it. That tree never grew. Tasks now answer `DONE` or `RETRY`, and a task that
+    keeps retrying ages out with a log line naming its position rather than being dropped on the
+    first attempt or accumulating forever behind a chunk nobody will load again.
+  - *The queue is drained under a task-count budget and a time budget*, whichever runs out first,
+    and visits each task at most once per tick.
+  - *It dies with its level.* The queue is a component of that level's runtime, retired on unload
+    and at server stop, which reports how many tasks were still waiting instead of losing them
+    quietly.
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`
+    and `runDigestCheckFeatures`.
+
 - **Generation state belongs to the server and the level that own it.** `CityFeature` kept the
   dimension state for the whole process in one map keyed by dimension id, and kept it honest with a
   `static volatile int` that the client bumped on disconnect, the world-creation screen bumped on

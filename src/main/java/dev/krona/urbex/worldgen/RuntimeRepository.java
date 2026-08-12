@@ -4,6 +4,7 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 /**
@@ -76,8 +77,21 @@ final class RuntimeRepository<K, V> {
 
     /** Retires everything and refuses further publication. Idempotent. */
     void close() {
+        close((key, value) -> { });
+    }
+
+    /**
+     * Retires everything, handing each retired runtime to {@code onRetire} first, and refuses
+     * further publication. Idempotent - a second close has nothing left to hand over.
+     */
+    void close(BiConsumer<K, V> onRetire) {
         closed = true;
-        published.clear();
+        for (K key : List.copyOf(published.keySet())) {
+            V retired = published.remove(key);
+            if (retired != null) {
+                onRetire.accept(key, retired);
+            }
+        }
     }
 
     boolean isClosed() {

@@ -108,7 +108,7 @@ public final class GenerationSession {
         if (session == null || session.owner != owner) {
             return;
         }
-        session.dimensions.close();
+        session.dimensions.close(GenerationSession::reportUnfinishedWork);
         AssetRegistries.reset();
         current = null;
     }
@@ -164,7 +164,26 @@ public final class GenerationSession {
 
     /** Retires a level's runtime. Chunks already generating keep the runtime they captured. */
     public void unload(ServerLevel level) {
-        dimensions.retire(level);
+        DimensionRuntime retired = dimensions.retire(level);
+        if (retired != null) {
+            reportUnfinishedWork(level, retired);
+        }
+    }
+
+    /**
+     * Says what a retiring runtime still had queued, instead of dropping it silently.
+     *
+     * <p>Deferred level work dying with its level is the point - {@code GlobalTodo} kept its buckets
+     * for the life of the process, so a task queued in one single-player world ran in the next world
+     * with the same dimension id (issue #127). But "the work is gone" and "there was no work" are
+     * different facts, and only one of them is a bug worth chasing.</p>
+     */
+    private static void reportUnfinishedWork(ServerLevel level, DimensionRuntime runtime) {
+        int dropped = runtime.tasks().retire();
+        if (dropped > 0) {
+            Urbex.getLogger().info("Dropped {} deferred Urbex task(s) queued in '{}': the level is no "
+                    + "longer loaded.", dropped, level.dimension().identifier());
+        }
     }
 
     /**

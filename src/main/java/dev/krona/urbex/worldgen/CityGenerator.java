@@ -247,7 +247,13 @@ public class CityGenerator {
         return driver.getY() == minHeight;
     }
 
-    public void generate(WorldGenRegion region, ChunkAccess chunk) {
+    /**
+     * @param runtime the level's runtime, captured by the caller for this one chunk. Everything it
+     *                carries that outlives the chunk - today, the deferred-task queue - reaches
+     *                generation through it, so a reload or an unload landing mid-chunk cannot
+     *                redirect this generation's work to a different epoch (issue #125).
+     */
+    public void generate(DimensionRuntime runtime, WorldGenRegion region, ChunkAccess chunk) {
         long start = System.currentTimeMillis();
 
         int chunkX = chunk.getPos().x();
@@ -264,7 +270,7 @@ public class CityGenerator {
         // order. See Arilas/urbex#24.
         ChunkHeightmap heightmap = new ChunkHeightmap(getHeightmap(coord, provider.getWorld()));
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-        ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info);
+        ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info, runtime.tasks());
 
         boolean doCity = info.isCity;
 
@@ -2038,11 +2044,21 @@ public class CityGenerator {
                         // Key the tree it grows on the sapling's position so it is the same tree no
                         // matter when the todo is drained.
                         RandomSource growthRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.VEGETATION_GROWTH);
-                        GlobalTodo.get(world.getLevel()).addTodo(pos, (level) -> {
-                            if (level.hasChunksAt(pos.offset(-1, -1, -1), pos.offset(1, 1, 1)) && level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
+                        ctx.addLevelTask(pos, level -> {
+                            // Not available yet is not the same as nothing to do. This used to
+                            // return either way and the queue counted it done, so a tree whose
+                            // chunk happened to be unloaded when the drain reached it simply never
+                            // grew (issue #127).
+                            if (!level.hasChunksAt(pos.offset(-1, -1, -1), pos.offset(1, 1, 1))) {
+                                return LevelTaskQueue.Outcome.RETRY;
+                            }
+                            if (level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
                                 level.setBlock(pos, finalB, Block.UPDATE_CLIENTS);
                                 saplingBlock.advanceTree(level, pos, finalB, growthRandom);
                             }
+                            // Either it grew, or something else stands there now and no sapling is
+                            // coming back to that position. Retrying would never end.
+                            return LevelTaskQueue.Outcome.DONE;
                         });
                     } else {
                         ctx.addPostTodo(pos, inWorld -> {
