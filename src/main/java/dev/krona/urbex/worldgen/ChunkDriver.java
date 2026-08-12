@@ -616,7 +616,8 @@ public class ChunkDriver {
 
     private static class S {
         private final BlockState[] section = new BlockState[SECTION_SIZE];
-        private boolean isEmpty = true;
+        // AIR is still a write: it may need to erase terrain already present in the chunk.
+        private boolean touched = false;
     }
 
     private static class SectionCache {
@@ -656,9 +657,7 @@ public class ChunkDriver {
                 if (cache[sectionIdx].section[idx] != state) {
                     dirty = true;
                     cache[sectionIdx].section[idx] = state;
-                    if (!isAir) {
-                        cache[sectionIdx].isEmpty = false;
-                    }
+                    cache[sectionIdx].touched = true;
                 }
                 if (record) {
                     owner.recordWrite(x, y1, z, state);
@@ -709,9 +708,7 @@ public class ChunkDriver {
                 if (st != state && test.test(st)) {
                     dirty = true;
                     cache[sectionIdx].section[idx] = state;
-                    if (!isAir) {
-                        cache[sectionIdx].isEmpty = false;
-                    }
+                    cache[sectionIdx].touched = true;
                     if (record) {
                         owner.recordWrite(x, y1, z, state);
                     }
@@ -741,8 +738,8 @@ public class ChunkDriver {
                 return;
             }
             cache[sectionIdx].section[idx] = state;
+            cache[sectionIdx].touched = true;
             if (!state.isAir()) {
-                cache[sectionIdx].isEmpty = false;
                 if (heightmap[px][pz] < pos.getY()) {
                     heightmap[px][pz] = pos.getY();
                 }
@@ -779,7 +776,7 @@ public class ChunkDriver {
         private void generate(BulkSectionAccess bulk) {
             for (int si = 0 ; si < (maxY - minY) / SECTION_HEIGHT ; si++) {
                 S c = cache[si];
-                if (!c.isEmpty) {
+                if (c.touched) {
                     int cy = si * SECTION_HEIGHT + minY;
                     LevelChunkSection section = bulk.getSection(new BlockPos(cx, cy, cz));
                     if (section == null) {
