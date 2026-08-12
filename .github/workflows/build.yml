@@ -3,6 +3,10 @@ name: build
 on:
   push:
     branches: [main]
+    # Tags build like any other push - same suite, same two digest checks - and then the release
+    # job below attaches the jar that build produced. A release is never built from a separate,
+    # unverified run.
+    tags: ['v*']
   pull_request:
 
 jobs:
@@ -39,3 +43,55 @@ jobs:
         with:
           name: jar
           path: build/libs/*.jar
+
+  # Attaches the built jar to the GitHub release for a v* tag. Modrinth and CurseForge are
+  # uploaded by hand from that same jar, so this job publishes nothing outside GitHub and needs no
+  # secrets beyond the workflow token.
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag must name the version this build produced
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          # gradle.properties carries the Minecraft prefix (26.2-0.1.0); the tag names the mod
+          # version alone (v0.1.0), which is the convention v0.1.0 already set.
+          gradle_version="$(sed -n 's/^version=//p' gradle.properties)"
+          mod_version="${gradle_version#*-}"
+          if [ "$tag_version" != "$mod_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME names $tag_version, but gradle.properties says $mod_version (version=$gradle_version). Bump one to match the other."
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: jar
+          path: dist
+      - name: Attach the jar to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="$GITHUB_REF_NAME"
+          version="${tag#v}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # The release already exists - drafted by hand, or created from the GitHub UI, which
+            # creates the tag and so triggers this run. Only the asset is ours to add.
+            gh release upload "$tag" dist/*.jar --clobber
+          else
+            # A draft, deliberately: every release so far has had a hand-written body (see v0.1.0),
+            # and generated commit notes would be a downgrade. This puts the verified jar somewhere
+            # ready, and publishing stays a decision.
+            prerelease=""
+            case "$version" in
+              0.*) prerelease="--prerelease" ;;
+            esac
+            gh release create "$tag" dist/*.jar \
+              --draft $prerelease \
+              --title "$version" \
+              --notes "Built by \`${GITHUB_WORKFLOW}\` run [\`${GITHUB_RUN_ID}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}), after the test suite and both worldgen digest checks passed.
+
+          Write the notes from \`CHANGELOG.md\` before publishing."
+          fi
