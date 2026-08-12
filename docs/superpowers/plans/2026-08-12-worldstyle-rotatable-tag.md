@@ -351,7 +351,7 @@ Expected: PASS.
 
 - [ ] **Step 4: Run both digest checks**
 
-Run: `./gradlew digestCheck digestCheckFeatures`
+Run: `./gradlew runDigestCheck runDigestCheckFeatures`
 Expected: PASS. Both compare against the committed goldens, and both world styles they exercise declare no `rotatable`, so an identical digest is the proof the default path is untouched.
 
 - [ ] **Step 5: Verify the goldens did not move**
@@ -453,7 +453,7 @@ git commit -m "docs: describe the world style rotatable tag and why it replaces"
 
 - [ ] **Step 1: Confirm the full check suite is green**
 
-Run: `./gradlew check digestCheck digestCheckFeatures`
+Run: `./gradlew check runDigestCheck runDigestCheckFeatures`
 Expected: PASS. Do not open the PR on a red run.
 
 - [ ] **Step 2: Push the branch**
