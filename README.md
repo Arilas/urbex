@@ -57,6 +57,20 @@ preset format specifically.
 
 Requires JDK 25. The jar lands in `build/libs/`.
 
+## Releasing
+
+Tags name the mod version, without the Minecraft prefix `gradle.properties` carries: `v0.1.0` for
+`version=26.2-0.1.0`. CI refuses a tag that says anything else.
+
+1. Bump `version` in `gradle.properties`, move the `CHANGELOG.md` entries under a heading for it.
+2. Push the tag. The tagged commit builds like any other — full suite, both worldgen digest
+   checks — and only then does the release job run, so a release is never built from an unverified
+   run.
+3. That job leaves a **draft** GitHub release with the jar attached. Write the notes from
+   `CHANGELOG.md` and publish. (Creating the release from GitHub's own UI works too: it creates the
+   tag, which triggers the same run, and the job attaches the jar to the release you started.)
+4. Upload that same jar to Modrinth and CurseForge by hand.
+
 ## License
 
 MIT. See `LICENSE` — both the original and the fork's notices apply.
