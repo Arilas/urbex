@@ -132,14 +132,14 @@ other group. Missing even there means missing for every selection containing tha
 selection provably exists. Sound in the only direction that matters - nothing is reported without a
 selection that really breaks - and the shipped pack now reports zero.
 
-*Still not covered*, and neither belongs in this pass:
+**56c — a city style's own character fields.** All fourteen of them, through the same core the part
+check uses, which is why {@code PartPaletteCheck} became `PaletteCharacterCheck`.
+
+*Still not covered:*
 
 - **Condition references** (`inpart`/`belowpart`/`inbuilding`). `Condition` consumes them into a
   `Predicate<ConditionContext>` at construction and does not retain the strings, so reaching them
   means changing that class - a change to a compiled asset, not to the walk.
-- **A city style's character fields** (`streetblock`, `grassblock`, and the seven others). They resolve
-  against the chunk's palette like a part's characters do, but they are not reached through a part, so
-  they need their own usage - the same machinery, a separate pass.
 - **Scattered parts' characters.** A scattered building lands wherever the terrain allows and takes the
   style of the chunk it lands in, which the walk cannot know. Its references are checked; its
   characters are not.

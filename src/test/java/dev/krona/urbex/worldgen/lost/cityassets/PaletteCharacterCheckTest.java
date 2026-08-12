@@ -1,11 +1,14 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
+import dev.krona.urbex.worldgen.lost.regassets.data.StreetSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -35,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code 'a'} and nothing else, and the first version of this check produced 45 warnings about a pack
  * that is correct. {@link #aCharacterReachedThroughAnotherGroupsPaletteIsNotReported} is that bug.
  */
-class PartPaletteCheckTest {
+class PaletteCharacterCheckTest {
 
     @BeforeAll
     static void bootstrap() {
@@ -48,7 +51,7 @@ class PartPaletteCheckTest {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         Style style = style(group(palette("base", entry('a', "minecraft:stone"))));
 
-        PartPaletteCheck.check(part("tower", "ab"), usage(style), diagnostics);
+        PaletteCharacterCheck.check(part("tower", "ab"), usage(style), diagnostics);
 
         assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
         assertTrue(diagnostics.hasFatal(), "no selection can place it, so the world must not load");
@@ -63,7 +66,7 @@ class PartPaletteCheckTest {
                 palette("light", entry('a', "minecraft:stone")),
                 palette("dark", entry('a', "minecraft:deepslate"))));
 
-        PartPaletteCheck.check(part("tower", "aa"), usage(style), diagnostics);
+        PaletteCharacterCheck.check(part("tower", "aa"), usage(style), diagnostics);
 
         assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(""));
     }
@@ -81,7 +84,7 @@ class PartPaletteCheckTest {
                 palette("rich", entry('a', "minecraft:stone"), entry('b', "minecraft:glass")),
                 palette("plain", entry('a', "minecraft:stone"))));
 
-        PartPaletteCheck.check(part("tower", "ab"), usage(style), diagnostics);
+        PaletteCharacterCheck.check(part("tower", "ab"), usage(style), diagnostics);
 
         assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
         assertFalse(diagnostics.hasFatal(), "the world still loads: most draws place this part fine");
@@ -101,7 +104,7 @@ class PartPaletteCheckTest {
                 group(palette("blocks", entry('a', "minecraft:stone"))),
                 group(palette("aliases", fromPalette('@', 'a'))));
 
-        PartPaletteCheck.check(part("tower", "@@"), usage(style), diagnostics);
+        PaletteCharacterCheck.check(part("tower", "@@"), usage(style), diagnostics);
 
         assertTrue(diagnostics.isEmpty(),
                 () -> "every selection resolves '@' through the other group: " + diagnostics.format(""));
@@ -113,13 +116,57 @@ class PartPaletteCheckTest {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         Style style = style(group(palette("base", entry('a', "minecraft:stone"))));
 
-        PartPaletteCheck.check(partWithPalette("tower", "ab", entry('b', "minecraft:glass")),
+        PaletteCharacterCheck.check(partWithPalette("tower", "ab", entry('b', "minecraft:glass")),
                 usage(style), diagnostics);
 
         assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(""));
     }
 
+    /**
+     * A city style's own character fields are the same question from a different line: the generator
+     * resolves {@code streetblock} against the chunk's palette exactly as it resolves a part's slice
+     * characters, and an undefined one was the same crash.
+     */
+    @Test
+    void aCityStyleCharacterNoPaletteDefinesIsALoadErrorNamingTheField() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Style style = style(group(palette("base", entry('a', "minecraft:stone"))));
+
+        PaletteCharacterCheck.checkCityStyle(cityStyle('z'), style, diagnostics);
+
+        assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
+        assertTrue(diagnostics.hasFatal());
+        String message = diagnostics.problems().getFirst().message();
+        assertTrue(message.contains("'z'"), message);
+        assertTrue(message.contains("streetblock"), () -> "the message has to name the field: " + message);
+    }
+
+    @Test
+    void aCityStyleCharacterThePaletteDefinesIsNotReported() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Style style = style(group(palette("base", entry('a', "minecraft:stone"))));
+
+        PaletteCharacterCheck.checkCityStyle(cityStyle('a'), style, diagnostics);
+
+        assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(""));
+    }
+
     // ------------------------------------------------------------------ fixtures
+
+    /** A city style whose {@code streetblock} is the character under test. */
+    private static CityStyle cityStyle(char streetBlock) {
+        return new CityStyle(Identifier.fromNamespaceAndPath("urbex", "citystyle_test"),
+                List.of(new CityStyleDefinition(
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty(),
+                        Optional.of(new StreetSettings(Optional.empty(), Optional.empty(),
+                                Optional.empty(), Optional.of(Character.toString(streetBlock)),
+                                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                                Optional.of(TestWiring.streetParts("street")), Optional.empty(),
+                                Optional.empty())),
+                        Optional.empty())));
+    }
 
     private static PartUsage usage(Style style) {
         return new PartUsage(style, null, false, "parts", Identifier.fromNamespaceAndPath("urbex", "owner"));

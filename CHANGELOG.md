@@ -12,6 +12,9 @@
   - *A character no palette defines refuses the world.* A character only some `randompalettes` choices
     define is a warning instead: those packs generate correctly most of the time, and refusing them
     would be inventing a rule rather than reporting a break.
+  - *A city style's own character fields are checked too* — all fourteen of `streetblock`,
+    `grassblock`, `railmainblock` and the rest — and the message names the field the character was
+    written in.
   - *A street, highway or railway part that is not 16×16 refuses the world.* The driver masks
     coordinates to the chunk, so an oversized road part wrapped round and overwrote its own beginning
     — silently, with no exception and nothing in the log.
