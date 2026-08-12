@@ -98,7 +98,7 @@ public class Railway {
         RandomSource randomRailChunkType = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.RAILWAY);
 
         Preset profile = provider.getProfile();
-        RailwayParts railwayParts = provider.getWorldStyle().getPartSelector().railwayParts();
+        RailwayParts railwayParts = provider.worldStyles().primary().getPartSelector().railwayParts();
 
         // @todo make all settings based on rand below configurable
         float r = randomRailChunkType.nextFloat();

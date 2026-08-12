@@ -276,9 +276,9 @@ public class CustomizeScreen extends Screen {
 
     private void updatePreview() {
         previewDirty = false;
-        // worldStyle is orthogonal to the preset (spec 1a) - a Preset carries no field for it any
+        // worldStyles are orthogonal to the preset (spec 1a) - a Preset carries no field for them any
         // more, so the live value always comes from PresetSelection, not from the copy being edited.
-        preview.update(copy, PresetSelection.CLIENT.effectiveWorldStyle(), currentSeed(), modeForCategory(selectedCategory));
+        preview.update(copy, PresetSelection.CLIENT.effectiveWorldStyles(), currentSeed(), modeForCategory(selectedCategory));
     }
 
     /**

@@ -52,6 +52,20 @@ public class UrbexConfigTest {
     }
 
     @Test
+    public void multiWorldStyleMixingIsOffUnlessAskedFor() {
+        assertFalse(UrbexConfig.DEFAULT.experimentalMultiWorldStyles());
+
+        JsonObject json = new JsonObject();
+        json.addProperty("experimentalMultiWorldStyles", true);
+        UrbexConfig parsed = UrbexConfig.fromJson(json).orElseThrow();
+        assertTrue(parsed.experimentalMultiWorldStyles());
+
+        // Round-trips, so loadGlobal's normalized write-back keeps the opt-in.
+        assertTrue(UrbexConfig.fromJson(UrbexConfig.toJson(parsed)).orElseThrow()
+                .experimentalMultiWorldStyles());
+    }
+
+    @Test
     public void roundTripsThroughJson() {
         UrbexConfig cfg = UrbexConfig.fromJson(new JsonObject()).orElseThrow();
         assertEquals(cfg, UrbexConfig.fromJson(UrbexConfig.toJson(cfg)).orElseThrow());

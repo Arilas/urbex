@@ -85,6 +85,25 @@ soon as more than one is registered, listing every one the world's datapacks pro
 the exception — they are listed from the `#urbex:presets` tag, which
 [`docs/presets.md`](presets.md) explains.
 
+### Sharing a world with another pack
+
+A player who turns on `experimentalMultiWorldStyles` can pick **several** world styles at once,
+weighted — your pack's cities and another's in one world. That does not change how you author a
+world style, but it does change which of its blocks are yours to control, because the blocks do not
+all have the same scope:
+
+| Block | Under a mix |
+|---|---|
+| `citystyles` | **Per city.** Each city centre draws a world style and keeps it, so a city built from your pack is entirely yours. |
+| `outsidestyle`, `rotatable` | **Per chunk**, from the nearest city — a chunk on your city's edge takes your outside style and your rotatable tag. |
+| `scattered` | **Per scatter area**, so your scattered structures appear alongside the other pack's. |
+| `multisettings` | Per multichunk area, except `areasize`, which defines the grid and so comes from the heaviest style. |
+| `parts.highways`, `parts.railways`, `settings`, `citybiomemultipliers` | **From the heaviest style only.** A highway runs for hundreds of chunks between cities; one that changed pack partway along its run would not join up. |
+
+The practical consequence: a pack that is not the heaviest in a mix will not see its highway or
+railway parts used. Nothing about that is worth designing around — author the world style as if it
+were the only one, and it will be, for every city it owns.
+
 ## `extends`
 
 `extends` takes **one fully-qualified id, in the same registry as the file declaring it**:

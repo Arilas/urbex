@@ -5,6 +5,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.gui.NullDimensionInfo;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
@@ -100,6 +101,10 @@ public class CityPreview implements AutoCloseable {
     private static final int DAMAGE_OVERLAY = 0x66ff0000;
     private static final int DAMAGE_COLOR = 0xffff0000;
 
+    /**
+     * {@code worldStyle} is the mix's canonical string rather than one id, so changing a weight -
+     * not just swapping a style - invalidates the preview and it redraws.
+     */
     private record Key(int profileJsonHash, String worldStyle, long seed, Mode mode) {}
 
     @Nullable
@@ -119,21 +124,21 @@ public class CityPreview implements AutoCloseable {
     }
 
     /**
-     * Recomputes the preview iff (preset content, worldStyle, seed, mode) differs from the last call.
-     * {@code preset == null} clears whatever is showing (nothing selected yet). {@code worldStyle} is
-     * a fully-qualified {@code namespace:path} style id, resolved against the registry the preview
-     * was built with.
+     * Recomputes the preview iff (preset content, worldStyles, seed, mode) differs from the last
+     * call. {@code preset == null} clears whatever is showing (nothing selected yet). The whole mix
+     * is passed rather than one id, so a mixed selection previews as a mix - judging a balance
+     * before committing to the world is the point of the control.
      */
-    public void update(@Nullable Preset preset, String worldStyle, long seed, Mode mode) {
+    public void update(@Nullable Preset preset, WorldStyleMix worldStyles, long seed, Mode mode) {
         if (preset == null) {
             key = null;
             closeTexture();
             return;
         }
-        if (!needsRecompute(presetHash(preset), worldStyle, seed, mode)) {
+        if (!needsRecompute(presetHash(preset), worldStyles.format(), seed, mode)) {
             return;
         }
-        recompute(preset, worldStyle, seed, mode);
+        recompute(preset, worldStyles, seed, mode);
     }
 
     /**
@@ -217,7 +222,7 @@ public class CityPreview implements AutoCloseable {
         key = null;
     }
 
-    private void recompute(Preset preset, String worldStyle, long seed, Mode mode) {
+    private void recompute(Preset preset, WorldStyleMix worldStyles, long seed, Mode mode) {
         // The datapack-derived predefined-city/street maps are static (shared with real worldgen)
         // and keyed only by chunk coord, not by preset - drop them so a new preset/seed combo
         // doesn't see another preset's predefined content. Mirrors the old editor's preview
@@ -225,9 +230,8 @@ public class CityPreview implements AutoCloseable {
         City.cleanPredefinedCache();
 
         // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
-        // the preset, so it does not pay to build one there - nor to parse the world style name,
-        // which is why DataTools.fromName sits inside this branch and inside the guard rather than
-        // above it.
+        // the preset, so it does not pay to build one there - nor to resolve the world styles, which
+        // is why that sits inside this branch and inside the guard rather than above it.
         //
         // Two things under the guard can throw, and both must leave the screen standing:
         //   - GridSettings.fromPreset validates the road settings, and a preset can be momentarily
@@ -238,8 +242,7 @@ public class CityPreview implements AutoCloseable {
         //     and taking the screen down mid-drag is no way to say so. Keep showing the last good
         //     preview until the preset makes sense again; a preset still inconsistent at world
         //     creation fails there, with the field named. (IllegalArgumentException.)
-        //   - NullDimensionInfo's world style: DataTools.fromName refuses an unqualified name
-        //     (IllegalArgumentException), and building the fallback placeholder raises the
+        //   - NullDimensionInfo's world styles: building the fallback placeholder raises the
         //     post-resolution requiredness error if a field required of a resolved chain is ever
         //     added and not added to the placeholder (IllegalStateException, out of Resolved.require
         //     - which is the whole reason the placeholder is covered by a test of its own). The
@@ -250,9 +253,9 @@ public class CityPreview implements AutoCloseable {
         NullDimensionInfo diminfo = null;
         if (mode != Mode.CITY) {
             try {
-                // worldStyle (from PresetSelection.effectiveWorldStyle()) is always fully qualified;
-                // fromName is what enforces that rather than assumes it.
-                diminfo = new NullDimensionInfo(preset, DataTools.fromName(worldStyle), seed, registryAccess);
+                // The ids in a WorldStyleMix are validated on construction, so they are already
+                // qualified by the time they reach here.
+                diminfo = new NullDimensionInfo(preset, worldStyles, seed, registryAccess);
             } catch (IllegalArgumentException | IllegalStateException e) {
                 // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
                 // good render. Leaving `mode` alone too keeps the legend describing the image actually

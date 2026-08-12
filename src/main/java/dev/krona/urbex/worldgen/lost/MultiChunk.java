@@ -53,7 +53,9 @@ public class MultiChunk {
      * back into the city caches, which reach back here.
      */
     public static MultiChunk getOrCreate(IDimensionInfo provider, ChunkCoord coord) {
-        int areasize = provider.getWorldStyle().getMultiSettings().areasize();
+        // primary(), unlike the rest of multisettings below: areasize defines the grid getMultiCoord
+        // divides by, so it cannot be read from an area that grid has not identified yet.
+        int areasize = provider.worldStyles().primary().getMultiSettings().areasize();
         ChunkCoord mc = getMultiCoord(coord, areasize);
         return provider.caches().multiChunk.getOrCompute(mc, k -> new MultiChunk(mc, areasize).calculateBuildings(provider));
     }
@@ -72,7 +74,9 @@ public class MultiChunk {
         RandomSource rand = Rng.at(provider.getSeed(), mc.chunkX(), mc.chunkZ(), Rng.Purpose.MULTI);
 
         // Determine how many multibuildings we want to place in this multichunk
-        MultiSettings settings = provider.getWorldStyle().getMultiSettings();
+        // Drawn at this area's own anchor rather than world-wide: how many multi-buildings an area
+        // gets is a property of the pack whose cities stand in it.
+        MultiSettings settings = provider.worldStyles().atMultiArea(mc).getMultiSettings();
         int min = settings.minimum();
         int max = settings.maximum();
         int cnt = min + rand.nextInt(max - min + 1);
@@ -215,7 +219,7 @@ public class MultiChunk {
 
     private boolean canPlaceBuilding(ChunkCoord topleft, IDimensionInfo provider, Preset profile, CityStyle buildingCityStyle, MultiBuilding building,
                                      int cityLevel, int maxCellars, int x, int z) {
-        int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
+        int partlevel = provider.worldStyles().primary().getWorldSettings().railPartHeight6();
         int correctStyle = 0;
         for (int xx = 0 ; xx < building.getDimX() ; xx++) {
             for (int zz = 0 ; zz < building.getDimZ() ; zz++) {
@@ -242,7 +246,7 @@ public class MultiChunk {
                 if (atSurface || !BuildingInfo.isCityRaw(coord, provider, profile) || BuildingInfo.hasHighway(coord, provider, profile)) {
                     return false;
                 }
-                WorldSettings.RailwayAvoidance avoidance = provider.getWorldStyle().getWorldSettings().railwayAvoidance();
+                WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
                 if (type != RailChunkType.NONE && avoidance != WorldSettings.RailwayAvoidance.BLOCK_RAILWAY) {
                     int level = railChunkInfo.getLevel();
                     int max = Math.min(cityLevel - level - partlevel, maxCellars);
@@ -257,7 +261,7 @@ public class MultiChunk {
             }
         }
         // Sufficient chunks need to be the correct cityStyle
-        float correctStyleFactor = provider.getWorldStyle().getMultiSettings().correctStyleFactor();
+        float correctStyleFactor = provider.worldStyles().atMultiArea(mc).getMultiSettings().correctStyleFactor();
         if (correctStyle < building.getDimX() * building.getDimZ() * correctStyleFactor) {
             return false;
         }

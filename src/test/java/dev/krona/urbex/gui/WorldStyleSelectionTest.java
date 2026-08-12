@@ -2,6 +2,7 @@ package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.setup.WorldStyleMix;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
 import net.minecraft.network.chat.Component;
@@ -64,7 +65,7 @@ class WorldStyleSelectionTest {
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
 
         assertEquals("urbex:standard", selection.effectiveWorldStyle());
-        assertNull(selection.selectedWorldStyle());
+        assertNull(selection.selectedWorldStyles());
     }
 
     @Test
@@ -74,14 +75,14 @@ class WorldStyleSelectionTest {
         selection.select(id("default"));
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
 
-        selection.setWorldStyle("urbex:lcmt");
+        selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
 
         assertEquals("urbex:lcmt", selection.effectiveWorldStyle());
 
         selection.publish();
         // A worldStyle choice publishes as its own Config field - no preset customization involved.
         assertEquals(id("default"), Config.presetFromClient);
-        assertEquals(Identifier.parse("urbex:lcmt"), Config.worldStyleFromClient);
+        assertEquals(WorldStyleMix.parse("urbex:lcmt"), Config.worldStyleMixFromClient);
         assertNull(Config.overridesFromClient);
     }
 
@@ -91,23 +92,23 @@ class WorldStyleSelectionTest {
         selection.setAvailablePresets(List.of(entry("default"), entry("alpha")));
         selection.select(id("default"));
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
-        selection.setWorldStyle("urbex:lcmt");
+        selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
 
         selection.select(id("alpha"));
 
-        assertEquals("urbex:lcmt", selection.selectedWorldStyle(), "the preset and the style are independent choices");
+        assertEquals(WorldStyleMix.parse("urbex:lcmt"), selection.selectedWorldStyles(), "the preset and the style are independent choices");
     }
 
     @Test
     void aRegistryThatDropsTheChosenStyleClearsTheOverride() {
         PresetSelection selection = new PresetSelection();
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
-        selection.setWorldStyle("urbex:lcmt");
-        assertEquals("urbex:lcmt", selection.selectedWorldStyle());
+        selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
+        assertEquals(WorldStyleMix.parse("urbex:lcmt"), selection.selectedWorldStyles());
 
         // The registry no longer offers "urbex:lcmt": the stale choice must reset to "the default".
         selection.setAvailableWorldStyles(List.of("urbex:standard"));
 
-        assertNull(selection.selectedWorldStyle());
+        assertNull(selection.selectedWorldStyles());
     }
 }

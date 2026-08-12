@@ -83,7 +83,12 @@ public final class Rng {
         LOOT_DENSITY,
         // The deck a planned primary bridge uses. Addressed at the span's lower endpoint rather
         // than at the chunk being generated, so every chunk of one span draws the same part.
-        LARGE_BRIDGE
+        LARGE_BRIDGE,
+        // Which world style a city, scatter area or multichunk area draws from a weighted mix.
+        // Only reached when the mix has more than one entry: a world created with a single style
+        // never draws here at all, which is what keeps its generation identical to what it was
+        // before mixing existed.
+        WORLD_STYLE
     }
 
     /**

@@ -142,7 +142,7 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         AssetRegistries.requireCityStyle(world, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
         // Built outside the map. Two threads may both build one for the same dimension the
         // first time a chunk is generated - the loser's is simply dropped, caches and all.
-        IDimensionInfo diminfo = new DefaultDimensionInfo(world, preset, choice.worldStyle());
+        IDimensionInfo diminfo = new DefaultDimensionInfo(world, preset, choice.worldStyles());
         IDimensionInfo raced = dimensionInfo.putIfAbsent(type, diminfo);
         return raced != null ? raced : diminfo;
     }

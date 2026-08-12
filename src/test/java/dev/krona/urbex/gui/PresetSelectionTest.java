@@ -2,6 +2,7 @@ package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.setup.WorldStyleMix;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -139,7 +140,7 @@ class PresetSelectionTest {
         selection.publish();
 
         assertNull(Config.presetFromClient);
-        assertNull(Config.worldStyleFromClient);
+        assertNull(Config.worldStyleMixFromClient);
         assertNull(Config.overridesFromClient);
     }
 
@@ -152,7 +153,7 @@ class PresetSelectionTest {
         selection.publish();
 
         assertEquals(id("cavern"), Config.presetFromClient);
-        assertEquals(Config.DEFAULT_WORLD_STYLE, Config.worldStyleFromClient);
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
         assertNull(Config.overridesFromClient);
     }
 
@@ -162,12 +163,12 @@ class PresetSelectionTest {
         selection.setAvailablePresets(List.of(entry("cavern")));
         selection.select(id("cavern"));
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
-        selection.setWorldStyle("urbex:lcmt");
+        selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
 
         selection.publish();
 
         assertEquals(id("cavern"), Config.presetFromClient);
-        assertEquals(id("lcmt"), Config.worldStyleFromClient);
+        assertEquals(WorldStyleMix.of(id("lcmt")), Config.worldStyleMixFromClient);
         assertNull(Config.overridesFromClient);
     }
 
@@ -183,7 +184,7 @@ class PresetSelectionTest {
         selection.publish();
 
         assertEquals(id("default"), Config.presetFromClient, "the base preset id, not the sentinel");
-        assertEquals(Config.DEFAULT_WORLD_STYLE, Config.worldStyleFromClient);
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
         assertNotNull(Config.overridesFromClient);
 
         // The published JSON is a real, parseable PresetRE overlay (not a stringified profile).
@@ -200,12 +201,12 @@ class PresetSelectionTest {
         selection.setAvailablePresets(List.of(entry("default")));
         selection.select(id("default"));
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
-        selection.setWorldStyle("urbex:lcmt");
+        selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
         selection.applyCustomized(preset("default"));
 
         selection.publish();
 
-        assertEquals(id("lcmt"), Config.worldStyleFromClient);
+        assertEquals(WorldStyleMix.of(id("lcmt")), Config.worldStyleMixFromClient);
     }
 
     // ---- restore() (Re-Create flow, issue #85) --------------------------------------------------
@@ -237,7 +238,7 @@ class PresetSelectionTest {
         selection.restore("urbex:rare", "", "");
 
         assertEquals(id("rare"), Config.presetFromClient);
-        assertEquals(Config.DEFAULT_WORLD_STYLE, Config.worldStyleFromClient);
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
         assertNull(Config.overridesFromClient);
     }
 
@@ -247,7 +248,7 @@ class PresetSelectionTest {
 
         selection.restore("urbex:rare", "urbex:lcmt", "");
 
-        assertEquals(id("lcmt"), Config.worldStyleFromClient);
+        assertEquals(WorldStyleMix.of(id("lcmt")), Config.worldStyleMixFromClient);
     }
 
     @Test
@@ -273,7 +274,7 @@ class PresetSelectionTest {
         selection.restore("urbex:default", "", "{not valid json at all");
 
         assertEquals(id("default"), Config.presetFromClient, "the preset id itself is still restored");
-        assertEquals(Config.DEFAULT_WORLD_STYLE, Config.worldStyleFromClient);
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
         assertNull(Config.overridesFromClient, "malformed overrides must never reach Config");
     }
 

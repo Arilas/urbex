@@ -32,7 +32,7 @@ public class Railways {
         ChunkDriver driver = ctx.driver;
         BlockState liquid = feature.liquid;
         BlockState air = Blocks.AIR.defaultBlockState();
-        RailwayParts railwayParts = provider.getWorldStyle().getPartSelector().railwayParts();
+        RailwayParts railwayParts = provider.worldStyles().primary().getPartSelector().railwayParts();
         int height = info.groundLevel + railInfo.getLevel() * CityGenerator.FLOORHEIGHT;
         RailChunkType type = railInfo.getType();
         BuildingPart part;

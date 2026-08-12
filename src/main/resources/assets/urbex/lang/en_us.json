@@ -1,7 +1,9 @@
 {
   "urbex.tab.cities": "Cities",
   "urbex.tab.worldstyle": "World Style",
+  "urbex.tab.worldstyle.mixed": "%s mixed",
   "urbex.screen.worldstyle.title": "Select World Style",
+  "urbex.screen.worldstyle.mix": "Mix",
   "urbex.preview.legend.city": "City",
   "urbex.preview.legend.building": "Building",
   "urbex.preview.legend.water": "Water",
@@ -347,11 +349,9 @@
   "urbex.setting.SPAWN_CHECK_ATTEMPTS.tooltip": "The number of attempts to find a valid spawn location. If this is not enough then this will error",
   "urbex.setting.LANDSCAPE_TYPE": "Landscape Type",
   "urbex.setting.LANDSCAPE_TYPE.tooltip": "Type of landscape",
-
   "urbex.enum.landscapetype.default": "Default",
   "urbex.enum.landscapetype.floating": "Floating",
   "urbex.enum.landscapetype.cavern": "Cavern",
-
   "urbex.enum.multibuildingstreetconflict.block_all": "Block All",
   "urbex.enum.multibuildingstreetconflict.override_minor": "Override Minor Roads",
   "urbex.enum.multibuildingstreetconflict.override_all": "Override All Roads"
