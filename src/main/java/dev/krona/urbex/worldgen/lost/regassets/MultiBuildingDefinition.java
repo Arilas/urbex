@@ -18,9 +18,9 @@ import java.util.Optional;
  * Until that change this registry's every field was required, which made {@code extends} on it
  * purely decorative: a child had to restate the whole grid to decode at all.
  */
-public class MultiBuildingRE implements Extendable {
+public class MultiBuildingDefinition implements Extendable {
 
-    private static final Codec<MultiBuildingRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<MultiBuildingDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.INT.optionalFieldOf("dimx").forGetter(l -> Optional.ofNullable(l.dimX)),
@@ -28,17 +28,17 @@ public class MultiBuildingRE implements Extendable {
                     // A grid, not an ordered list: appending rows would contradict dimx/dimz, so a
                     // declared grid replaces the inherited one wholesale, and an absent one inherits.
                     Codec.list(Codec.list(Codec.STRING)).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildings))
-            ).apply(instance, MultiBuildingRE::new));
+            ).apply(instance, MultiBuildingDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<MultiBuildingRE> CODEC = RetiredKeys.reject(RAW, "multibuilding");
+    public static final Codec<MultiBuildingDefinition> CODEC = RetiredKeys.reject(RAW, "multibuilding");
 
     private final Optional<Identifier> extendsId;
     private final Integer dimX;                 // null when this entry declares none and takes its ancestor's
     private final Integer dimZ;                 // null when this entry declares none and takes its ancestor's
     private final List<List<String>> buildings; // null when this entry declares none and takes its ancestor's
 
-    public MultiBuildingRE(Optional<Identifier> extendsId, Optional<Integer> dimX, Optional<Integer> dimZ,
+    public MultiBuildingDefinition(Optional<Identifier> extendsId, Optional<Integer> dimX, Optional<Integer> dimZ,
                            Optional<List<List<String>>> buildings) {
         this.extendsId = extendsId;
         this.dimX = dimX.orElse(null);

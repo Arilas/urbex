@@ -8,8 +8,8 @@ import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
@@ -95,9 +95,9 @@ class WorldStyleCompletenessTest {
         Set<String> cityStylesNamed = new LinkedHashSet<>();
         for (Path file : worldStyles) {
             List<Path> chain = chainRootFirst("worldstyles", file);
-            List<WorldStyleRE> entries = new ArrayList<>();
+            List<WorldStyleDefinition> entries = new ArrayList<>();
             for (Path link : chain) {
-                entries.add(WorldStyleRE.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow());
+                entries.add(WorldStyleDefinition.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow());
                 cityStylesNamed.addAll(cityStyleRefs(link));
             }
             requireWorldStyleWiring(new WorldStyle(TestAssetId.ANY, entries));
@@ -110,9 +110,9 @@ class WorldStyleCompletenessTest {
         for (String name : cityStylesNamed) {
             Path file = fileFor("citystyles", name);
             assertTrue(Files.isRegularFile(file), name + " does not resolve to " + file);
-            List<CityStyleRE> entries = new ArrayList<>();
+            List<CityStyleDefinition> entries = new ArrayList<>();
             for (Path link : chainRootFirst("citystyles", file)) {
-                entries.add(CityStyleRE.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow());
+                entries.add(CityStyleDefinition.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow());
             }
             requireCityStyleWiring(new CityStyle(TestAssetId.ANY, entries));
         }

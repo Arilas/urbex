@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
+import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import net.minecraft.resources.Identifier;
 
 import java.util.List;
@@ -8,15 +8,15 @@ import java.util.List;
 public class StuffObject {
 
     private final Identifier name;
-    private final StuffSettingsRE settings;
+    private final StuffSettingsDefinition settings;
 
     /**
      * Builds a fully resolved stuff object from its {@code extends} chain, root first. The fold
-     * lives on {@link StuffSettingsRE#resolve} so generation keeps reading one settings object and
+     * lives on {@link StuffSettingsDefinition#resolve} so generation keeps reading one settings object and
      * never has to know a chain was involved.
      */
-    public StuffObject(Identifier id, List<StuffSettingsRE> chainRootFirst) {
-        this.settings = StuffSettingsRE.resolve(id, chainRootFirst);
+    public StuffObject(Identifier id, List<StuffSettingsDefinition> chainRootFirst) {
+        this.settings = StuffSettingsDefinition.resolve(id, chainRootFirst);
         this.name = id;
     }
 
@@ -29,7 +29,7 @@ public class StuffObject {
         return name;
     }
 
-    public StuffSettingsRE getSettings() {
+    public StuffSettingsDefinition getSettings() {
         return settings;
     }
 }

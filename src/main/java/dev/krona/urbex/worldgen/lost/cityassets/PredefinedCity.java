@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
+import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
@@ -31,14 +31,14 @@ public class PredefinedCity {
      * and street lists go through {@link Mergeable} so a declared list replaces unless it opts into
      * appending.
      */
-    public PredefinedCity(Identifier id, List<PredefinedCityRE> chainRootFirst) {
+    public PredefinedCity(Identifier id, List<PredefinedCityDefinition> chainRootFirst) {
         name = id;
         String declaredDimension = null;
         Integer declaredChunkX = null;
         Integer declaredChunkZ = null;
         Integer declaredRadius = null;
         String declaredCityStyle = null;
-        for (PredefinedCityRE object : chainRootFirst) {
+        for (PredefinedCityDefinition object : chainRootFirst) {
             if (object.getDimension() != null) {
                 declaredDimension = object.getDimension();
             }
@@ -61,7 +61,7 @@ public class PredefinedCity {
         chunkZ = Resolved.require(declaredChunkZ, name, "chunkz");
         radius = Resolved.require(declaredRadius, name, "radius");
         cityStyle = Resolved.require(declaredCityStyle, name, "citystyle");
-        for (PredefinedCityRE object : chainRootFirst) {
+        for (PredefinedCityDefinition object : chainRootFirst) {
             if (object.getPredefinedBuildings() != null) {
                 Mergeable.apply(predefinedBuildings, object.getPredefinedBuildings());
             }

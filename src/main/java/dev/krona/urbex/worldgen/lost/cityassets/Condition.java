@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.lost.regassets.ConditionRE;
+import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
@@ -24,11 +24,11 @@ public class Condition {
      * inherits it unchanged. A chain where nothing declares {@code values} is a load error, since
      * the condition would silently hand back null for every draw.
      */
-    public Condition(Identifier id, List<ConditionRE> chainRootFirst) {
+    public Condition(Identifier id, List<ConditionDefinition> chainRootFirst) {
         name = id;
         List<ConditionPart> values = new ArrayList<>();
         boolean anyValues = false;
-        for (ConditionRE object : chainRootFirst) {
+        for (ConditionDefinition object : chainRootFirst) {
             if (object.getValues() != null) {
                 Mergeable.apply(values, object.getValues());
                 anyValues = true;

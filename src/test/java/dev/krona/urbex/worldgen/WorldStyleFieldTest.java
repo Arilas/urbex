@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
@@ -45,11 +45,11 @@ class WorldStyleFieldTest {
     /**
      * A minimal resolvable world style, built by hand rather than from a registry - the same shape
      * {@code NullDimensionInfo}'s preview placeholder uses, which is the only other place in the
-     * tree that constructs a {@code WorldStyleRE} directly. Declares everything
+     * tree that constructs a {@code WorldStyleDefinition} directly. Declares everything
      * {@code WorldStyle} requires after resolution and nothing else.
      */
     private static WorldStyle style(String path) {
-        WorldStyleRE re = new WorldStyleRE(
+        WorldStyleDefinition re = new WorldStyleDefinition(
                 Optional.empty(),
                 // No display name: these exist to be told apart by id, and getName() is what the
                 // field's primary tie-break and this test's assertions read.

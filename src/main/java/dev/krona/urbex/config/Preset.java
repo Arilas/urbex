@@ -2,7 +2,7 @@ package dev.krona.urbex.config;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.ModSetup;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
@@ -26,7 +26,7 @@ import java.util.Optional;
 
 /**
  * A fully-resolved preset: the runtime settings used by worldgen, produced by walking a
- * {@link PresetRE}'s extends chain onto these code defaults (see {@code Presets.resolve}).
+ * {@link PresetDefinition}'s extends chain onto these code defaults (see {@code Presets.resolve}).
  * <p>
  * Public field names match the runtime-generated profile format this class replaced (same names,
  * same types) so that the worldgen consumers migrated by a pure type rename. Exceptions: there is
@@ -184,7 +184,7 @@ public class Preset {
     /**
      * The authored display name, or {@code ""} when nothing in the {@code extends} chain declared
      * one. Callers rendering a label want {@link #getDisplayName()}, which fills that gap in; this
-     * raw form exists so {@link #toRE()} round-trips "no name was authored" as an empty string
+     * raw form exists so {@link #toDefinition()} round-trips "no name was authored" as an empty string
      * rather than inventing the id as an authored value.
      */
     public String getName() {
@@ -432,10 +432,10 @@ public class Preset {
     }
 
     /**
-     * Encodes this preset as a {@link PresetRE} with every field present (fully-populated
+     * Encodes this preset as a {@link PresetDefinition} with every field present (fully-populated
      * sections). Used for round-trip tests, saved-data overrides, and the export command.
      */
-    public PresetRE toRE() {
+    public PresetDefinition toDefinition() {
         TerrainSettings terrain =
                 new TerrainSettings(
                 Optional.of(LANDSCAPE_TYPE),
@@ -583,7 +583,7 @@ public class Preset {
                 Optional.of(EDITMODE),
                 Optional.of(GENERATE_NETHER));
 
-        return new PresetRE(
+        return new PresetDefinition(
                 Optional.empty(),
                 Optional.of(name),
                 Optional.of(description),

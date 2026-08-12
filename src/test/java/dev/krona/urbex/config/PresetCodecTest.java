@@ -5,7 +5,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
@@ -19,19 +19,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Headless: PresetRE and its sections hold only primitives/strings/lists, so decoding needs no MC
+ * Headless: PresetDefinition and its sections hold only primitives/strings/lists, so decoding needs no MC
  * bootstrap.
  */
 class PresetCodecTest {
 
-    private static PresetRE decode(String json) {
+    private static PresetDefinition decode(String json) {
         JsonElement element = JsonParser.parseString(json);
-        return PresetRE.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
+        return PresetDefinition.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
     }
 
     @Test
     void minimalFileParses() {
-        PresetRE re = decode("{\"description\":\"x\",\"cities\":{\"cityChance\":0.001}}");
+        PresetDefinition re = decode("{\"description\":\"x\",\"cities\":{\"cityChance\":0.001}}");
 
         assertEquals("x", re.description().orElseThrow());
         assertTrue(re.cities().isPresent());
@@ -61,14 +61,14 @@ class PresetCodecTest {
 
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         Dynamic<JsonElement> dyn = new Dynamic<>(JsonOps.INSTANCE, root);
-        assertEquals(List.of("citiez"), UnknownKeys.check(dyn, PresetRE.KEYS));
+        assertEquals(List.of("citiez"), UnknownKeys.check(dyn, PresetDefinition.KEYS));
     }
 
     @Test
     void unknownSectionKeyParsesButWarns() {
         String json = "{\"cities\":{\"cityChanse\":0.1}}";
 
-        PresetRE re = decode(json);
+        PresetDefinition re = decode(json);
         assertTrue(re.cities().isPresent());
 
         JsonObject citiesObj = JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("cities");
@@ -80,12 +80,12 @@ class PresetCodecTest {
     void underscoreKeysAreSilentlyAllowed() {
         String json = "{\"_comment\":\"x\",\"cities\":{\"_note\":\"y\"}}";
 
-        PresetRE re = decode(json);
+        PresetDefinition re = decode(json);
         assertTrue(re.cities().isPresent());
 
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         Dynamic<JsonElement> rootDyn = new Dynamic<>(JsonOps.INSTANCE, root);
-        assertEquals(List.of(), UnknownKeys.check(rootDyn, PresetRE.KEYS));
+        assertEquals(List.of(), UnknownKeys.check(rootDyn, PresetDefinition.KEYS));
 
         JsonObject citiesObj = root.getAsJsonObject("cities");
         Dynamic<JsonElement> citiesDyn = new Dynamic<>(JsonOps.INSTANCE, citiesObj);
@@ -94,7 +94,7 @@ class PresetCodecTest {
 
     @Test
     void enumValuesParse() {
-        PresetRE re = decode("{\"terrain\":{\"landscapeType\":\"cavern\"},"
+        PresetDefinition re = decode("{\"terrain\":{\"landscapeType\":\"cavern\"},"
                 + "\"buildings\":{\"multiBuildingStreetConflict\":\"override_all\"}}");
 
         TerrainSettings terrain = re.terrain().orElseThrow();

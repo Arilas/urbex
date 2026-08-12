@@ -15,7 +15,7 @@ import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -142,14 +142,14 @@ public class CityPreview implements AutoCloseable {
     }
 
     /**
-     * A content hash of every field {@link Preset#toRE()} would encode, used as the cache key's
+     * A content hash of every field {@link Preset#toDefinition()} would encode, used as the cache key's
      * stand-in for "did the preset actually change" (the Customize editor mutates one {@link Preset}
-     * instance in place, so identity alone can't tell). {@code toRE()}/the {@code PresetRE} codec are
+     * instance in place, so identity alone can't tell). {@code toDefinition()}/the {@code PresetDefinition} codec are
      * pure value encoding - no registry lookups - so this needs no {@link RegistryAccess}.
      */
     private static int presetHash(Preset preset) {
-        PresetRE re = preset.toRE();
-        JsonElement json = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+        PresetDefinition re = preset.toDefinition();
+        JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
         return json.toString().hashCode();
     }
 

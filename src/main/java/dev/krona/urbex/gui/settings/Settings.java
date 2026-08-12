@@ -419,7 +419,7 @@ public final class Settings {
 
         // Public on Preset since Task 3 (the runtime-generated profile format these replaced kept
         // both private and so never reachable from any editor) - datapack presets can already
-        // override them via the PresetRE terrain section, so the in-game editor gets parity rather
+        // override them via the PresetDefinition terrain section, so the in-game editor gets parity rather
         // than a silent gap.
         r.section("blocks");
         r.text("LIQUID_BLOCK", SettingCategory.TERRAIN,

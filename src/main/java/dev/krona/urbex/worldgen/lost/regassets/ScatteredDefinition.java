@@ -23,7 +23,7 @@ import java.util.Optional;
  * resolved chain must leave at least one - neither is required on its own, so neither can be
  * required here. Declaring both is allowed; {@code Scattered.generate} takes the multibuilding.
  */
-public class ScatteredRE implements Extendable {
+public class ScatteredDefinition implements Extendable {
 
     /**
      * {@code rotatable} was decoded and then thrown away: {@link ScatteredBuilding} never copied it
@@ -42,7 +42,7 @@ public class ScatteredRE implements Extendable {
                     + "Urbex does not implement: a scattered building always generates unrotated. "
                     + "The key used to be parsed and silently ignored; remove it."));
 
-    private static final Codec<ScatteredRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<ScatteredDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(Codec.STRING).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildings)),
@@ -51,10 +51,10 @@ public class ScatteredRE implements Extendable {
                     StringRepresentable.fromEnum(ScatteredBuilding.TerrainHeight::values).optionalFieldOf("terrainheight").forGetter(l -> Optional.ofNullable(l.terrainheight)),
                     StringRepresentable.fromEnum(ScatteredBuilding.TerrainFix::values).optionalFieldOf("terrainfix").forGetter(l -> Optional.ofNullable(l.terrainfix)),
                     Codec.INT.optionalFieldOf("heightoffset").forGetter(l -> Optional.ofNullable(l.heightoffset))
-            ).apply(instance, ScatteredRE::new));
+            ).apply(instance, ScatteredDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<ScatteredRE> CODEC = RetiredKeys.reject(RAW, "scattered building");
+    public static final Codec<ScatteredDefinition> CODEC = RetiredKeys.reject(RAW, "scattered building");
 
     private final Optional<Identifier> extendsId;
     private final ScatteredBuilding.TerrainHeight terrainheight;
@@ -63,7 +63,7 @@ public class ScatteredRE implements Extendable {
     private final Mergeable<String> buildings;
     private final String multibuilding;
 
-    public ScatteredRE(Optional<Identifier> extendsId,
+    public ScatteredDefinition(Optional<Identifier> extendsId,
                        Optional<Mergeable<String>> buildings, Optional<String> multibuilding,
                        // Always empty: UNSUPPORTED_ROTATABLE fails the decode if the key is there
                        // at all, so this parameter exists only to keep the group's arity.

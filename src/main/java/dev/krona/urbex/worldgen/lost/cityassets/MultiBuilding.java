@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingRE;
+import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
 import net.minecraft.resources.Identifier;
 
 import java.util.HashSet;
@@ -21,12 +21,12 @@ public class MultiBuilding {
      * or restate a grid at the size it inherits. The grid replaces its ancestor's wholesale rather
      * than merging, because a half-inherited grid would contradict {@code dimx}/{@code dimz}.
      */
-    public MultiBuilding(Identifier id, List<MultiBuildingRE> chainRootFirst) {
+    public MultiBuilding(Identifier id, List<MultiBuildingDefinition> chainRootFirst) {
         name = id;
         Integer declaredDimX = null;
         Integer declaredDimZ = null;
         List<List<String>> declaredBuildings = null;
-        for (MultiBuildingRE object : chainRootFirst) {
+        for (MultiBuildingDefinition object : chainRootFirst) {
             if (object.getDimX() != null) {
                 declaredDimX = object.getDimX();
             }

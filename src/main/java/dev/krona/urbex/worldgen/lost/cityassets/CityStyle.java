@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
@@ -100,11 +100,11 @@ public class CityStyle {
      * {@link #declare}). Nothing mutates after this returns, so worldgen worker threads share one
      * immutable instance with no locking.
      */
-    public CityStyle(Identifier id, List<CityStyleRE> chainRootFirst) {
-        CityStyleRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
+    public CityStyle(Identifier id, List<CityStyleDefinition> chainRootFirst) {
+        CityStyleDefinition leaf = chainRootFirst.get(chainRootFirst.size() - 1);
         name = id;
         stuffTags.add("all");
-        for (CityStyleRE re : chainRootFirst) {
+        for (CityStyleDefinition re : chainRootFirst) {
             applyFrom(re);
         }
         Resolved.require(streetParts, name, "streetblocks.parts")
@@ -127,7 +127,7 @@ public class CityStyle {
      * Every scalar assignment is conditional on the incoming value being present, so a chain entry
      * that omits a field does not blank out what an earlier entry set.
      */
-    private void applyFrom(CityStyleRE object) {
+    private void applyFrom(CityStyleDefinition object) {
         if (object.getDisplayName() != null) {
             displayName = object.getDisplayName();
         }

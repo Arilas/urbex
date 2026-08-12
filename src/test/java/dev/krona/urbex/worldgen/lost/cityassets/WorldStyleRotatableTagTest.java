@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
@@ -41,8 +41,8 @@ class WorldStyleRotatableTagTest {
         return TagKey.create(Registries.BLOCK, Identifier.fromNamespaceAndPath(namespace, path));
     }
 
-    private static WorldStyleRE worldStyle(String name, Optional<TagKey<Block>> rotatable) {
-        return new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
+    private static WorldStyleDefinition worldStyle(String name, Optional<TagKey<Block>> rotatable) {
+        return new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
@@ -79,7 +79,7 @@ class WorldStyleRotatableTagTest {
 
     @Test
     void aReferenceWithoutTheHashIsALoadError() {
-        var result = WorldStyleRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
+        var result = WorldStyleDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
                 {"outsidestyle": "urbex:outside", "rotatable": "urbexza:rotatable"}
                 """));
 
@@ -91,7 +91,7 @@ class WorldStyleRotatableTagTest {
 
     @Test
     void anUnqualifiedReferenceIsALoadErrorRatherThanAMinecraftDefault() {
-        var result = WorldStyleRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
+        var result = WorldStyleDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
                 {"outsidestyle": "urbex:outside", "rotatable": "#rotatable"}
                 """));
 
@@ -103,7 +103,7 @@ class WorldStyleRotatableTagTest {
 
     @Test
     void aDeclaredTagRoundTripsThroughTheCodec() {
-        var decoded = WorldStyleRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
+        var decoded = WorldStyleDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
                 {"outsidestyle": "urbex:outside", "rotatable": "#urbexza:rotatable"}
                 """)).getOrThrow();
 

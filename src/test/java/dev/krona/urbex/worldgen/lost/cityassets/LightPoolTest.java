@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -55,7 +55,7 @@ class LightPoolTest {
 
     @Test
     void paletteCompilationRejectsPoolWithoutCandidatesWithResourceAndMarkerContext() {
-        PaletteRE palette = decodePalette("""
+        PaletteDefinition palette = decodePalette("""
                 {"palette":[{"char":"L","light":{
                   "floor":[],"wall":[],"ceiling":[],"free":[]
                 }}]}
@@ -71,7 +71,7 @@ class LightPoolTest {
     @Test
     void paletteCompilationRejectsNonpositiveWeightWithFullCandidateContext() {
         for (int weight : List.of(0, -3)) {
-            PaletteRE palette = decodePalette("""
+            PaletteDefinition palette = decodePalette("""
                     {"palette":[{"char":"L","light":{
                       "floor":[{"weight":%d,"block":"minecraft:torch"}]
                     }}]}
@@ -235,7 +235,7 @@ class LightPoolTest {
 
     @Test
     void completeLegacyTorchEntryStillCompilesWithoutTypedPool() {
-        DataResult<PaletteRE> result = PaletteRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
+        DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
                 {"palette":[{
                   "char":"L",
                   "block":"minecraft:wall_torch[facing=north]",
@@ -243,9 +243,9 @@ class LightPoolTest {
                 }]}
                 """));
         assertTrue(result.result().isPresent());
-        PaletteRE paletteRE = result.result().orElseThrow();
+        PaletteDefinition paletteDefinition = result.result().orElseThrow();
 
-        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)).getPalette().get('L');
         assertInstanceOf(BlockState.class, entry.blocks());
         assertTrue(entry.info().isTorch());
         assertNull(entry.info().light());
@@ -253,7 +253,7 @@ class LightPoolTest {
 
     @Test
     void typedLightOnlyEntryUsesRepresentativeState() {
-        DataResult<PaletteRE> result = PaletteRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
+        DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
                 {"palette":[{
                   "char":"L",
                   "light":{"wall":[
@@ -263,9 +263,9 @@ class LightPoolTest {
                 }]}
                 """));
         assertTrue(result.result().isPresent());
-        PaletteRE paletteRE = result.result().orElseThrow();
+        PaletteDefinition paletteDefinition = result.result().orElseThrow();
 
-        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)).getPalette().get('L');
         BlockState representative = assertInstanceOf(BlockState.class, entry.blocks());
         assertEquals(Blocks.SOUL_WALL_TORCH, representative.getBlock());
         assertTrue(entry.info().isSpecial());
@@ -296,8 +296,8 @@ class LightPoolTest {
         return LightSettings.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
     }
 
-    private static PaletteRE decodePalette(String json) {
-        DataResult<PaletteRE> result = PaletteRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
+    private static PaletteDefinition decodePalette(String json) {
+        DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
         assertTrue(result.result().isPresent(), () -> result.error().map(Object::toString).orElse("unknown decode error"));
         return result.result().orElseThrow();
     }

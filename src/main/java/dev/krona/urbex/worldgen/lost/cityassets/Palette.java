@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.core.HolderLookup;
@@ -49,7 +49,7 @@ public class Palette {
      *                    static server (issue #60) or compiling one on the spot (issue #128).
      */
     public Palette(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                   List<PaletteRE> chainRootFirst) {
+                   List<PaletteDefinition> chainRootFirst) {
         name = id;
         compile(blockLookup, variants, mergeByCharacter(chainRootFirst, name));
     }
@@ -73,9 +73,9 @@ public class Palette {
      * @param chainRootFirst the inline blocks along the owner's chain, root first
      */
     public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                                 Identifier owner, List<PaletteRE> chainRootFirst) {
-        for (PaletteRE re : chainRootFirst) {
-            // The codec accepts 'extends' wherever a PaletteRE is embedded, but an inline block is
+                                 Identifier owner, List<PaletteDefinition> chainRootFirst) {
+        for (PaletteDefinition re : chainRootFirst) {
+            // The codec accepts 'extends' wherever a PaletteDefinition is embedded, but an inline block is
             // not a registry entry, so nothing can resolve it. Rejecting is the honest option:
             // silently dropping a key the codec accepted is how a datapack quietly means something
             // other than what it says.
@@ -101,11 +101,11 @@ public class Palette {
      * declares {@code extends} inherits its ancestor's markers; a chain where nothing declares one
      * is a load error rather than a palette that silently maps no characters at all.
      */
-    private static Collection<PaletteEntry> mergeByCharacter(List<PaletteRE> chainRootFirst,
+    private static Collection<PaletteEntry> mergeByCharacter(List<PaletteDefinition> chainRootFirst,
                                                              Identifier owner) {
         Map<Character, PaletteEntry> merged = new LinkedHashMap<>();
         boolean anyEntries = false;
-        for (PaletteRE re : chainRootFirst) {
+        for (PaletteDefinition re : chainRootFirst) {
             if (re.getPaletteEntries() == null) {
                 continue;
             }

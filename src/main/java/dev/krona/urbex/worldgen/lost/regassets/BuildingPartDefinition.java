@@ -21,21 +21,21 @@ import java.util.Optional;
  * geometry. Requiredness is checked after the chain is resolved, in
  * {@link dev.krona.urbex.worldgen.lost.cityassets.BuildingPart}.
  */
-public class BuildingPartRE implements Extendable {
+public class BuildingPartDefinition implements Extendable {
 
-    private static final Codec<BuildingPartRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<BuildingPartDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.INT.optionalFieldOf("xsize").forGetter(l -> Optional.ofNullable(l.xSize)),
                     Codec.INT.optionalFieldOf("zsize").forGetter(l -> Optional.ofNullable(l.zSize)),
-                    Codec.list(Codec.list(Codec.STRING)).optionalFieldOf("slices").forGetter(BuildingPartRE::createSlices),
+                    Codec.list(Codec.list(Codec.STRING)).optionalFieldOf("slices").forGetter(BuildingPartDefinition::createSlices),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
-                    PaletteRE.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
+                    PaletteDefinition.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
                     Mergeable.codec(PartMeta.CODEC).optionalFieldOf("meta").forGetter(l -> Optional.ofNullable(l.metadata))
-            ).apply(instance, BuildingPartRE::new));
+            ).apply(instance, BuildingPartDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<BuildingPartRE> CODEC = RetiredKeys.reject(RAW, "part");
+    public static final Codec<BuildingPartDefinition> CODEC = RetiredKeys.reject(RAW, "part");
 
 
     private final Optional<Identifier> extendsId;
@@ -48,16 +48,16 @@ public class BuildingPartRE implements Extendable {
     private final Integer xSize;
     private final Integer zSize;
 
-    private PaletteRE localPalette = null;
+    private PaletteDefinition localPalette = null;
     private final String refPaletteName;
 
     private final Mergeable<PartMeta> metadata;
 
-    public BuildingPartRE(Optional<Identifier> extendsId, Optional<Integer> xSize, Optional<Integer> zSize,
+    public BuildingPartDefinition(Optional<Identifier> extendsId, Optional<Integer> xSize, Optional<Integer> zSize,
                           Optional<List<List<String>>> slices, Optional<String> refpalette,
-                          Optional<PaletteRE> locpalette, Optional<Mergeable<PartMeta>> metadata) {
+                          Optional<PaletteDefinition> locpalette, Optional<Mergeable<PartMeta>> metadata) {
         this.extendsId = extendsId;
-        this.slices = slices.map(BuildingPartRE::flatten).orElse(null);
+        this.slices = slices.map(BuildingPartDefinition::flatten).orElse(null);
         this.xSize = xSize.orElse(null);
         this.zSize = zSize.orElse(null);
         this.refPaletteName = refpalette.map(String::intern).orElse(null);
@@ -119,7 +119,7 @@ public class BuildingPartRE implements Extendable {
         return zSize;
     }
 
-    public PaletteRE getLocalPalette() {
+    public PaletteDefinition getLocalPalette() {
         return localPalette;
     }
 

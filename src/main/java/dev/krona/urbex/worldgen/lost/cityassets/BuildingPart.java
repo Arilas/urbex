@@ -1,8 +1,8 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
 import net.minecraft.core.HolderLookup;
@@ -62,17 +62,17 @@ public class BuildingPart implements IBuildingPart {
      * slices actually in force is a load error rather than a silent truncation.
      */
     public BuildingPart(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                        AssetIndex<Palette> palettes, List<BuildingPartRE> chainRootFirst) {
-        BuildingPartRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
+                        AssetIndex<Palette> palettes, List<BuildingPartDefinition> chainRootFirst) {
+        BuildingPartDefinition leaf = chainRootFirst.get(chainRootFirst.size() - 1);
         name = id;
 
         Integer declaredXSize = null;
         Integer declaredZSize = null;
         String[] declaredSlices = null;
-        List<PaletteRE> inlinePalettes = new ArrayList<>();
+        List<PaletteDefinition> inlinePalettes = new ArrayList<>();
         String refPalette = null;
         List<PartMeta> meta = new ArrayList<>();
-        for (BuildingPartRE re : chainRootFirst) {
+        for (BuildingPartDefinition re : chainRootFirst) {
             if (re.getxSize() != null) {
                 declaredXSize = re.getxSize();
             }

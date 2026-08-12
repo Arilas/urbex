@@ -6,9 +6,9 @@ import java.util.Optional;
 
 /**
  * A resolved dimension selection: which preset generates it, which world styles it draws from, and
- * an optional {@code PresetRE} JSON overlay applied on top of the resolved preset (a
+ * an optional {@code PresetDefinition} JSON overlay applied on top of the resolved preset (a
  * client-published customization, or a saved-world one). {@code overridesJson}, when present, is
- * parsed with {@code PresetRE.CODEC} and applied via {@code Presets.applyOverrides}.
+ * parsed with {@code PresetDefinition.CODEC} and applied via {@code Presets.applyOverrides}.
  * <p>
  * {@code worldStyles} is a {@link WorldStyleMix} rather than a single id: with
  * {@code experimentalMultiWorldStyles} on it can carry several weighted styles, and every other

@@ -1,16 +1,16 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.ConditionRE;
-import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
-import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
-import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
-import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
@@ -48,7 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  * <p>
  * The bundled datapack uses {@code extends} only in {@code citystyles} and {@code presets}, so
  * every other registry only ever resolves a chain of one in the digest runs and in gameplay -
- * {@link StuffSettingsRE#resolve} even short-circuits that case. Without these tests the fold
+ * {@link StuffSettingsDefinition#resolve} even short-circuits that case. Without these tests the fold
  * bodies would never execute anywhere.
  * <p>
  * {@code stuff} is the dangerous one: {@code AssetRegistries.load} files each {@link StuffObject}
@@ -99,16 +99,16 @@ class RegistryChainResolutionTest {
     void stuffInheritsEveryOptionalScalarTheChildOmits() {
         IdentifierMatcher onlyLibraries = new IdentifierMatcher(
                 Optional.of(List.of("urbex:library")), Optional.empty());
-        StuffSettingsRE parent = stuff("torches")
+        StuffSettingsDefinition parent = stuff("torches")
                 .tags(true, "all")
                 .minheight(40).maxheight(90)
                 .inbuilding(true).seesky(false)
                 .buildings(onlyLibraries)
                 .build();
-        StuffSettingsRE child = stuff("torches_rare").column("XX").counts(2, 9, 7)
+        StuffSettingsDefinition child = stuff("torches_rare").column("XX").counts(2, 9, 7)
                 .undeclaredInbuilding().build();
 
-        StuffSettingsRE resolved = new StuffObject(TestAssetId.ANY, List.of(parent, child)).getSettings();
+        StuffSettingsDefinition resolved = new StuffObject(TestAssetId.ANY, List.of(parent, child)).getSettings();
 
         assertNotSame(child, resolved, "a two-entry chain must actually fold, not hand back the leaf");
         assertEquals(40, resolved.getMinheight(), "minheight is inherited");
@@ -125,7 +125,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void stuffRequiredScalarsComeFromTheLeaf() {
-        StuffSettingsRE resolved = new StuffObject(TestAssetId.ANY, List.of(
+        StuffSettingsDefinition resolved = new StuffObject(TestAssetId.ANY, List.of(
                 stuff("torches").column("AB").counts(1, 2, 3).build(),
                 stuff("torches_rare").column("CD").counts(4, 5, 6).build())).getSettings();
 
@@ -137,7 +137,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void stuffResolvedFromAChainOfOneIsTheEntryItself() {
-        StuffSettingsRE only = stuff("torches").tags(true, "all").build();
+        StuffSettingsDefinition only = stuff("torches").tags(true, "all").build();
 
         assertSame(only, new StuffObject(TestAssetId.ANY, List.of(only)).getSettings());
     }
@@ -214,8 +214,8 @@ class RegistryChainResolutionTest {
                 "'all' is added by the constructor and sorts in with the rest");
     }
 
-    private static CityStyleRE cityStyleWithTags(String... tags) {
-        return new CityStyleRE(
+    private static CityStyleDefinition cityStyleWithTags(String... tags) {
+        return new CityStyleDefinition(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(tags)),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.empty());
@@ -225,7 +225,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void conditionValuesReplaceByDefaultAndAppendWhenTheChildOptsIn() {
-        ConditionRE parent = condition("loot", true, "urbex:common_loot", "urbex:rare_loot");
+        ConditionDefinition parent = condition("loot", true, "urbex:common_loot", "urbex:rare_loot");
 
         assertEquals(Set.of("urbex:barrel_loot"),
                 valuesOf(new Condition(TestAssetId.ANY, List.of(parent, condition("loot_barrel", true, "urbex:barrel_loot")))),
@@ -239,7 +239,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void variantBlocksReplaceByDefaultAndAppendWhenTheChildOptsIn() {
-        VariantRE parent = variant("stones", true,
+        VariantDefinition parent = variant("stones", true,
                 new BlockEntry(1, "minecraft:stone"), new BlockEntry(2, "minecraft:andesite"));
 
         Variant replaced = new Variant(TestAssetId.ANY, BuiltInRegistries.BLOCK, List.of(parent,
@@ -267,7 +267,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void stylePalettesReplaceByDefaultAndAppendWhenTheChildOptsIn() {
-        StyleRE parent = style("nordic", group("urbex:common"));
+        StyleDefinition parent = style("nordic", group("urbex:common"));
 
         assertEquals(List.of(List.of("urbex:snowy")),
                 paletteNamesOf(new Style(TestAssetId.ANY, PALETTES, List.of(parent, style("nordic_snow", group("urbex:snowy"))))),
@@ -281,13 +281,13 @@ class RegistryChainResolutionTest {
 
     @Test
     void scatteredChildInheritsTheTerrainHandlingItDoesNotDeclare() {
-        ScatteredRE parent = new ScatteredRE(Optional.empty(),
+        ScatteredDefinition parent = new ScatteredDefinition(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of("urbex:oilrig"))), Optional.empty(),
                 Optional.empty(),
                 Optional.of(ScatteredBuilding.TerrainHeight.OCEAN),
                 Optional.of(ScatteredBuilding.TerrainFix.CLEAR),
                 Optional.of(3));
-        ScatteredRE child = new ScatteredRE(Optional.empty(),
+        ScatteredDefinition child = new ScatteredDefinition(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of("urbex:oilrig_burnt"))), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
@@ -304,13 +304,13 @@ class RegistryChainResolutionTest {
 
     @Test
     void predefinedCityChildInheritsEverythingButThePositionItMoves() {
-        PredefinedCityRE parent = new PredefinedCityRE(Optional.empty(),
+        PredefinedCityDefinition parent = new PredefinedCityDefinition(Optional.empty(),
                 Optional.of("minecraft:overworld"), Optional.of(10), Optional.of(20), Optional.of(7),
                 Optional.of("urbex:citystyle_common"),
                 Optional.of(new Mergeable<>(true,
                         List.of(new PredefinedBuilding("urbex:townhall", 0, 0, false, false)))),
                 Optional.empty());
-        PredefinedCityRE child = new PredefinedCityRE(Optional.empty(),
+        PredefinedCityDefinition child = new PredefinedCityDefinition(Optional.empty(),
                 Optional.empty(), Optional.of(100), Optional.of(200), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty());
 
@@ -331,13 +331,13 @@ class RegistryChainResolutionTest {
     @Test
     void worldStyleChildInheritsTheSelectorsAndSettingsItDoesNotDeclare() {
         ScatteredSettings scattered = new ScatteredSettings(24, 0.25f, 4, List.of());
-        WorldStyleRE parent = new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:standard"),
+        WorldStyleDefinition parent = new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:standard"),
                 Optional.empty(), Optional.empty(), Optional.of(scattered),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
                 Optional.empty(), Optional.empty());
-        WorldStyleRE child = new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:bleak"),
+        WorldStyleDefinition child = new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:bleak"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty());
 
@@ -353,10 +353,10 @@ class RegistryChainResolutionTest {
 
     @Test
     void multiBuildingChildInheritsTheGridItDoesNotDeclare() {
-        MultiBuildingRE parent = new MultiBuildingRE(Optional.empty(),
+        MultiBuildingDefinition parent = new MultiBuildingDefinition(Optional.empty(),
                 Optional.of(1), Optional.of(2),
                 Optional.of(List.of(List.of("urbex:oilrig00", "urbex:oilrig01"))));
-        MultiBuildingRE child = new MultiBuildingRE(Optional.empty(),
+        MultiBuildingDefinition child = new MultiBuildingDefinition(Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty());
 
         MultiBuilding resolved = new MultiBuilding(TestAssetId.ANY, List.of(parent, child));
@@ -427,15 +427,15 @@ class RegistryChainResolutionTest {
     }
 
     @SafeVarargs
-    private static StyleRE style(String path, List<PaletteSelector>... groups) {
-        return new StyleRE(Optional.empty(), groups.length == 0
+    private static StyleDefinition style(String path, List<PaletteSelector>... groups) {
+        return new StyleDefinition(Optional.empty(), groups.length == 0
                 ? Optional.empty()
                 : Optional.of(new Mergeable<>(true, List.of(groups))));
     }
 
     @SafeVarargs
-    private static StyleRE styleAppending(String path, List<PaletteSelector>... groups) {
-        return new StyleRE(Optional.empty(), Optional.of(new Mergeable<>(false, List.of(groups))));
+    private static StyleDefinition styleAppending(String path, List<PaletteSelector>... groups) {
+        return new StyleDefinition(Optional.empty(), Optional.of(new Mergeable<>(false, List.of(groups))));
     }
 
     private static BuildingBuilder building(String path) {
@@ -488,8 +488,8 @@ class RegistryChainResolutionTest {
                     Optional.empty());
         }
 
-        BuildingRE build() {
-            return new BuildingRE(Optional.empty(), Optional.empty(), Optional.empty(),
+        BuildingDefinition build() {
+            return new BuildingDefinition(Optional.empty(), Optional.empty(), Optional.empty(),
                     filler, rubble,
                     Optional.empty(), minFloors, Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(),
@@ -535,18 +535,18 @@ class RegistryChainResolutionTest {
         };
     }
 
-    private static ConditionRE condition(String path, boolean replace, String... values) {
+    private static ConditionDefinition condition(String path, boolean replace, String... values) {
         List<ConditionPart> parts = List.of(values).stream()
                 .map(value -> new ConditionPart(1.0f, value,
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()))
                 .toList();
-        return new ConditionRE(Optional.empty(), Optional.of(new Mergeable<>(replace, parts)));
+        return new ConditionDefinition(Optional.empty(), Optional.of(new Mergeable<>(replace, parts)));
     }
 
-    private static VariantRE variant(String path, boolean replace, BlockEntry... blocks) {
-        return new VariantRE(Optional.empty(), Optional.of(new Mergeable<>(replace, List.of(blocks))));
+    private static VariantDefinition variant(String path, boolean replace, BlockEntry... blocks) {
+        return new VariantDefinition(Optional.empty(), Optional.of(new Mergeable<>(replace, List.of(blocks))));
     }
 
     private static StuffBuilder stuff(String path) {
@@ -627,8 +627,8 @@ class RegistryChainResolutionTest {
             return this;
         }
 
-        StuffSettingsRE build() {
-            return new StuffSettingsRE(Optional.empty(), tags, column, minheight, maxheight,
+        StuffSettingsDefinition build() {
+            return new StuffSettingsDefinition(Optional.empty(), tags, column, minheight, maxheight,
                     mincount, maxcount, attempts, inbuilding, seesky,
                     Optional.empty(), Optional.empty(), Optional.empty(), buildings);
         }

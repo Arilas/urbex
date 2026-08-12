@@ -3,7 +3,7 @@ package dev.krona.urbex.config;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
@@ -34,9 +34,9 @@ class PresetOverrideCacheTest {
         Bootstrap.bootStrap();
     }
 
-    private static PresetRE decode(String json) {
+    private static PresetDefinition decode(String json) {
         JsonElement element = JsonParser.parseString(json);
-        return PresetRE.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
+        return PresetDefinition.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
     }
 
     @Test
@@ -47,7 +47,7 @@ class PresetOverrideCacheTest {
         assertEquals(Blocks.WATER.defaultBlockState(), base.getLiquidBlock());
         assertEquals(Blocks.STONE.defaultBlockState(), base.getBaseBlock());
 
-        PresetRE overrides = decode("{\"terrain\":{\"liquidBlock\":\"minecraft:lava\","
+        PresetDefinition overrides = decode("{\"terrain\":{\"liquidBlock\":\"minecraft:lava\","
                 + "\"baseBlock\":\"minecraft:granite\"}}");
 
         Preset overridden = Presets.applyOverrides(base, overrides);

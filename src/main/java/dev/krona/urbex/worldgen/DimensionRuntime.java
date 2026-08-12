@@ -9,7 +9,7 @@ import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.PresetChoice;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -112,7 +112,7 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo plann
             // level. PresetSelection.restore() already validates before publishing, so this guard is
             // a backstop against corrupted saved data reaching this far, not the primary defense.
             try {
-                PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE,
+                PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE,
                         JsonParser.parseString(choice.overridesJson().get())).getOrThrow();
                 preset = Presets.applyOverrides(preset, re);
             } catch (Exception e) {

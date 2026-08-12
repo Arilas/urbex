@@ -2,10 +2,10 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
-import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
-import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
@@ -96,7 +96,7 @@ class AssetCompilerTest {
     void stuffSharingATagIsOrderedByIdRatherThanByHash() {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         RegistryAccess access = registries();
-        MappedRegistry<StuffSettingsRE> stuff = new MappedRegistry<>(
+        MappedRegistry<StuffSettingsDefinition> stuff = new MappedRegistry<>(
                 CustomRegistries.STUFF_REGISTRY_KEY, Lifecycle.stable());
         // Registered in reverse order on purpose: if the index leaked registration or hash order,
         // this is what would show it.
@@ -163,30 +163,30 @@ class AssetCompilerTest {
 
     private record Entry<T>(ResourceKey<Registry<T>> key, Identifier id, T value) { }
 
-    private static Entry<VariantRE> variant(String path, String block) {
+    private static Entry<VariantDefinition> variant(String path, String block) {
         return new Entry<>(CustomRegistries.VARIANTS_REGISTRY_KEY, id(path),
-                new VariantRE(Optional.empty(),
+                new VariantDefinition(Optional.empty(),
                         Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block))))));
     }
 
-    private static Entry<PaletteRE> paletteNamingVariant(String path, char marker, String variant) {
+    private static Entry<PaletteDefinition> paletteNamingVariant(String path, char marker, String variant) {
         PaletteEntry entry = new PaletteEntry(Character.toString(marker), Optional.empty(),
                 Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         return new Entry<>(CustomRegistries.PALETTE_REGISTRY_KEY, id(path),
-                new PaletteRE(Optional.empty(), Optional.of(List.of(entry))));
+                new PaletteDefinition(Optional.empty(), Optional.of(List.of(entry))));
     }
 
     /** A city style declaring nothing: complete only through a child that extends it. */
-    private static Entry<CityStyleRE> abstractBaseCityStyle(String path) {
+    private static Entry<CityStyleDefinition> abstractBaseCityStyle(String path) {
         return new Entry<>(CustomRegistries.CITYSTYLES_REGISTRY_KEY, id(path),
-                new CityStyleRE(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                new CityStyleDefinition(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
     }
 
-    private static StuffSettingsRE stuffTagged(String path, String tag) {
-        return new StuffSettingsRE(Optional.empty(),
+    private static StuffSettingsDefinition stuffTagged(String path, String tag) {
+        return new StuffSettingsDefinition(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of(tag))),
                 Optional.of("\\"),
                 Optional.empty(), Optional.empty(),

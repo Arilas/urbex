@@ -32,7 +32,7 @@ public abstract class ConditionContext {
      * comparison and in all nine places one is written. Three fields take one -
      * {@code belowpart}, {@code inpart} and {@code inbuilding} - and three blocks declare all
      * three: a building's {@code parts[]} and {@code parts2[]} (both are {@code PartRef}, bound
-     * twice by {@code BuildingRE}) and a condition's own {@code values[]}
+     * twice by {@code BuildingDefinition}) and a condition's own {@code values[]}
      * ({@code ConditionPart}). {@code inbiome} is the fourth field of both records and is
      * deliberately not in this list: it is a biome id, not an asset name.
      * {@code DatapackReferenceIntegrityTest} walks the same nine.

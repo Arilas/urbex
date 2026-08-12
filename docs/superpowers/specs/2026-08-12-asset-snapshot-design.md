@@ -121,6 +121,17 @@ required and both digest runs confirmed by logging no warning.
 never hides a semantic change. Also retires `IAsset.setRegistryName`: identity travels beside the
 decoded value instead of being written into it.
 
+*Landed as two PRs, logic first.* `setRegistryName` goes in its own PR — a compiled asset takes its
+id as a constructor argument from the compiler that already has it — and the rename follows as a pure
+mechanical change on top.
+
+*No `*Patch`.* Every `*RE` became `*Definition`. The `*Patch` half of the name was for a type that is
+only ever an overlay onto something already resolved, and there isn't one: each of the thirteen is a
+registry entry that may also be a link in an `extends` chain, which is what `Mergeable` and the chain
+fold handle. `PresetDefinition` is the closest — it doubles as the customization-overrides payload
+`Presets.applyOverrides` takes — but splitting that one type's two roles is a semantic change, not a
+rename, so it does not belong in a mechanical PR.
+
 **Then #56's remainder** becomes possible — the palette-character / slice-size / dangling-reference
 walk, which needs the compile-time palette merge 128a introduces. See the sequencing comment on #56.
 

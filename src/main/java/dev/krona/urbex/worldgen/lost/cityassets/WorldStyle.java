@@ -5,7 +5,7 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.UrbexTags;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.*;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
@@ -48,7 +48,7 @@ public class WorldStyle {
      * nothing, which is how a third-party pack could generate parts it never mentioned. It is
      * folded field by field, so a child can append one tunnel variant without restating the group.
      */
-    public WorldStyle(Identifier id, List<WorldStyleRE> chainRootFirst) {
+    public WorldStyle(Identifier id, List<WorldStyleDefinition> chainRootFirst) {
         name = id;
         String outside = null;
         ScatteredSettings scattered = null;
@@ -59,7 +59,7 @@ public class WorldStyle {
         List<CityStyleSelector> selectors = new ArrayList<>();
         boolean anySelectors = false;
         List<CityBiomeMultiplier> multipliers = new ArrayList<>();
-        for (WorldStyleRE object : chainRootFirst) {
+        for (WorldStyleDefinition object : chainRootFirst) {
             if (object.getOutsideStyle() != null) {
                 outside = object.getOutsideStyle();
             }
@@ -120,9 +120,9 @@ public class WorldStyle {
      * (that would require the chain to be complete, which is worldgen's check to make, not a
      * dropdown's).
      */
-    public static String displayNameOf(List<WorldStyleRE> chainRootFirst, Identifier id) {
+    public static String displayNameOf(List<WorldStyleDefinition> chainRootFirst, Identifier id) {
         String display = null;
-        for (WorldStyleRE object : chainRootFirst) {
+        for (WorldStyleDefinition object : chainRootFirst) {
             if (object.getDisplayName() != null) {
                 display = object.getDisplayName();
             }

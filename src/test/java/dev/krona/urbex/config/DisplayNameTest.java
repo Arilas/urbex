@@ -3,7 +3,7 @@ package dev.krona.urbex.config;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
@@ -24,9 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DisplayNameTest {
 
-    private static PresetRE decode(String json) {
+    private static PresetDefinition decode(String json) {
         JsonElement element = JsonParser.parseString(json);
-        return PresetRE.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
+        return PresetDefinition.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
     }
 
     private static Identifier id(String path) {
@@ -36,7 +36,7 @@ class DisplayNameTest {
     @Test
     void anAuthoredNameIsWhatTheUiShows() {
         Identifier presetId = id("tallbuildings");
-        Map<Identifier, PresetRE> lookup = Map.of(presetId, decode("{\"name\": \"Tall Buildings\"}"));
+        Map<Identifier, PresetDefinition> lookup = Map.of(presetId, decode("{\"name\": \"Tall Buildings\"}"));
 
         Preset p = Presets.resolve(presetId, lookup::get);
 
@@ -47,7 +47,7 @@ class DisplayNameTest {
     @Test
     void noNameAnywhereFallsBackToTheFullyQualifiedId() {
         Identifier presetId = id("tallbuildings");
-        Map<Identifier, PresetRE> lookup = Map.of(presetId, decode("{}"));
+        Map<Identifier, PresetDefinition> lookup = Map.of(presetId, decode("{}"));
 
         Preset p = Presets.resolve(presetId, lookup::get);
 
@@ -59,7 +59,7 @@ class DisplayNameTest {
     @Test
     void anEmptyStringIsTreatedAsNoNameRatherThanAsABlankLabel() {
         Identifier presetId = id("blank");
-        Map<Identifier, PresetRE> lookup = Map.of(presetId, decode("{\"name\": \"\"}"));
+        Map<Identifier, PresetDefinition> lookup = Map.of(presetId, decode("{\"name\": \"\"}"));
 
         assertEquals("urbex:blank", Presets.resolve(presetId, lookup::get).getDisplayName());
     }
@@ -73,7 +73,7 @@ class DisplayNameTest {
     void aChildInheritsItsParentsNameWhenItDeclaresNone() {
         Identifier parent = id("default");
         Identifier child = id("largecities");
-        Map<Identifier, PresetRE> lookup = Map.of(
+        Map<Identifier, PresetDefinition> lookup = Map.of(
                 parent, decode("{\"name\": \"Default\"}"),
                 child, decode("{\"extends\": \"urbex:default\"}"));
 
@@ -84,7 +84,7 @@ class DisplayNameTest {
     void aChildsOwnNameWinsOverTheOneItExtends() {
         Identifier parent = id("default");
         Identifier child = id("largecities");
-        Map<Identifier, PresetRE> lookup = Map.of(
+        Map<Identifier, PresetDefinition> lookup = Map.of(
                 parent, decode("{\"name\": \"Default\"}"),
                 child, decode("{\"extends\": \"urbex:default\", \"name\": \"Large Cities\"}"));
 
@@ -93,18 +93,18 @@ class DisplayNameTest {
 
     /**
      * The customized-preset path: the Cities tab's "Customize this preset…" entry is published as a
-     * {@code PresetRE} overlay built by {@code toRE()}, and rebuilt from it on a Re-Create. A name
+     * {@code PresetDefinition} overlay built by {@code toDefinition()}, and rebuilt from it on a Re-Create. A name
      * dropped anywhere along that round trip would rename the row on reload.
      */
     @Test
     void theNameSurvivesCopyAndTheToReRoundTrip() {
         Identifier presetId = id("wasteland");
-        Map<Identifier, PresetRE> lookup = Map.of(presetId, decode("{\"name\": \"Wasteland\"}"));
+        Map<Identifier, PresetDefinition> lookup = Map.of(presetId, decode("{\"name\": \"Wasteland\"}"));
         Preset resolved = Presets.resolve(presetId, lookup::get);
 
         assertEquals("Wasteland", resolved.copy().getDisplayName());
 
-        Preset rebuilt = Presets.applyOverrides(new Preset(presetId), resolved.toRE());
+        Preset rebuilt = Presets.applyOverrides(new Preset(presetId), resolved.toDefinition());
         assertEquals("Wasteland", rebuilt.getDisplayName());
     }
 
@@ -112,7 +112,7 @@ class DisplayNameTest {
     @Test
     void aNameNeedsNoNamespaceAndMayContainSpacesAndPunctuation() {
         Identifier presetId = id("fancy");
-        Map<Identifier, PresetRE> lookup =
+        Map<Identifier, PresetDefinition> lookup =
                 Map.of(presetId, decode("{\"name\": \"Cities & Ruins (heavy)\"}"));
 
         assertEquals("Cities & Ruins (heavy)", Presets.resolve(presetId, lookup::get).getDisplayName());
@@ -123,9 +123,9 @@ class DisplayNameTest {
         Preset p = new Preset(id("x"));
         p.setName("Example");
 
-        JsonElement json = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, p.toRE()).getOrThrow();
+        JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, p.toDefinition()).getOrThrow();
 
-        assertTrue(json.getAsJsonObject().has("name"), "toRE() must carry the name");
+        assertTrue(json.getAsJsonObject().has("name"), "toDefinition() must carry the name");
         assertEquals("Example", json.getAsJsonObject().get("name").getAsString());
         // The metadata block is a MapCodec purely to buy a seventeenth field back from
         // RecordCodecBuilder's sixteen-field limit; it must stay flattened into the file's own

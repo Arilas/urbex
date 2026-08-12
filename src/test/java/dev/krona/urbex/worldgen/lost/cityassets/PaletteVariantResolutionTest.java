@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
-import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
@@ -99,17 +99,17 @@ class PaletteVariantResolutionTest {
         return BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
     }
 
-    private static PaletteRE paletteNamingVariant() {
+    private static PaletteDefinition paletteNamingVariant() {
         PaletteEntry entry = new PaletteEntry("V", Optional.empty(), Optional.of("urbex:rubble"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        return new PaletteRE(Optional.empty(), Optional.of(List.of(entry)));
+        return new PaletteDefinition(Optional.empty(), Optional.of(List.of(entry)));
     }
 
     /** An index whose only {@code urbex:rubble} variant is one weighted block. */
     private static AssetIndex<Variant> variantsWith(String block) {
         Identifier id = Identifier.fromNamespaceAndPath("urbex", "rubble");
-        VariantRE definition = new VariantRE(Optional.empty(),
+        VariantDefinition definition = new VariantDefinition(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block)))));
         return new AssetIndex<>("urbex:variants", Map.of(id, new Variant(id, BuiltInRegistries.BLOCK, List.of(definition))));
     }

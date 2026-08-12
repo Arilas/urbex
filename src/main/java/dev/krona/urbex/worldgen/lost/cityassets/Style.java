@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import net.minecraft.resources.Identifier;
@@ -27,11 +27,11 @@ public class Style {
      *                 {@link #getRandomPalette}, from a worldgen worker, which is why that method took
      *                 an {@code IDimensionInfo} it otherwise had no use for (issue #128).
      */
-    public Style(Identifier id, AssetIndex<Palette> palettes, List<StyleRE> chainRootFirst) {
+    public Style(Identifier id, AssetIndex<Palette> palettes, List<StyleDefinition> chainRootFirst) {
         name = id;
         List<List<PaletteSelector>> groups = new ArrayList<>();
         boolean anyGroups = false;
-        for (StyleRE object : chainRootFirst) {
+        for (StyleDefinition object : chainRootFirst) {
             if (object.getRandomPaletteChoices() != null) {
                 Mergeable.apply(groups, object.getRandomPaletteChoices());
                 anyGroups = true;

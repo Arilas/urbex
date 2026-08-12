@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import net.minecraft.resources.Identifier;
 
@@ -37,7 +37,7 @@ final class TestProfiles {
      * {@code urbex:test_street_*} ids that no test here places.
      */
     static CityStyle cityStyle() {
-        return new CityStyle(Identifier.fromNamespaceAndPath("urbex", "test_citystyle"), List.of(new CityStyleRE(
+        return new CityStyle(Identifier.fromNamespaceAndPath("urbex", "test_citystyle"), List.of(new CityStyleDefinition(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),
