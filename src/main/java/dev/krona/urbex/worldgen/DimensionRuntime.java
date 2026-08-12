@@ -37,19 +37,26 @@ import javax.annotation.Nullable;
  * become while still delegating to the one object that owns them today - two record components
  * holding the same objects would be two owners of one thing, which is the mistake this whole epic
  * is about. {@code tasks} is a real component, because nothing else owns it.</p>
+ *
+ * <p>{@code tagEpoch} is the server's, not this level's: it is the same instance in every loaded
+ * level's runtime, because block tags come from the server's reloadable resources. It is a slot
+ * rather than a {@link TagSnapshot} so that a {@code /reload} can swap the epoch without rebuilding
+ * anything here - which is the whole of what a reload changes (issue #128).</p>
  */
-public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning, LevelTaskQueue tasks) {
+public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning, LevelTaskQueue tasks,
+                               @Nullable TagEpoch tagEpoch) {
 
-    public DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning) {
-        this(level, planning, new LevelTaskQueue(level.dimension().identifier().toString()));
+    public DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning, @Nullable TagEpoch tagEpoch) {
+        this(level, planning, new LevelTaskQueue(level.dimension().identifier().toString()), tagEpoch);
     }
 
     /**
      * A runtime for a level Urbex does not generate in. It still carries a task queue: the tick
-     * handler drains whatever runtime the level has, and an empty queue costs nothing.
+     * handler drains whatever runtime the level has, and an empty queue costs nothing. It carries no
+     * tag epoch, for the same reason it carries no planning context - nothing generates here.
      */
     public static DimensionRuntime disabled(ServerLevel level) {
-        return new DimensionRuntime(level, null);
+        return new DimensionRuntime(level, null, null);
     }
 
     public boolean isEnabled() {
@@ -67,6 +74,17 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo plann
     }
 
     /**
+     * The block tags a chunk starting now generates against. Never call on a disabled runtime.
+     * <p>
+     * Call it <em>once</em>, at the start of a generation, and pass the result down: this is the
+     * live slot, so a second call later in the same chunk may answer from a different epoch. That is
+     * what {@link ChunkGenContext} holds it for.
+     */
+    public TagSnapshot tags() {
+        return tagEpoch.current();
+    }
+
+    /**
      * Builds the runtime for {@code level}.
      *
      * <p>Everything here used to happen lazily on the generation path, the first time a chunk of the
@@ -77,9 +95,10 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo plann
      *
      * <p>The snapshot arrives already compiled; {@link GenerationSession#load} is the one caller and
      * builds it before calling this. A runtime cannot exist without one, which is what makes "no
-     * chunk generates against unloaded assets" structural rather than a check.</p>
+     * chunk generates against unloaded assets" structural rather than a check. The tag epoch arrives
+     * the same way and for the same reason.</p>
      */
-    static DimensionRuntime create(ServerLevel level, AssetSnapshot assets) {
+    static DimensionRuntime create(ServerLevel level, AssetSnapshot assets, TagEpoch tagEpoch) {
         ResourceKey<Level> type = level.dimension();
         PresetChoice choice = Config.getPresetChoiceForDimension(level, type);
         if (choice == null) {
@@ -112,7 +131,7 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo plann
         // fallback - City.getCityStyle would simply hand null on to generation.
         requireCityStyle(assets, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
         return new DimensionRuntime(level,
-                new DefaultDimensionInfo(level, assets, preset, choice.worldStyles()));
+                new DefaultDimensionInfo(level, assets, preset, choice.worldStyles()), tagEpoch);
     }
 
     /**

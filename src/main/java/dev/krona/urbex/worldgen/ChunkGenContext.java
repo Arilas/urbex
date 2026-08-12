@@ -36,6 +36,13 @@ public final class ChunkGenContext {
     public final char street;
     public final NoiseBuffers buffers;
     /**
+     * The block tags this generation answers from, captured with the rest of its epoch. Read once
+     * from the level's {@link TagEpoch} by the caller, never per block: a {@code /reload} landing
+     * mid-chunk must not be able to give one slice of a building the old tag membership and the
+     * next slice the new one (issue #128).
+     */
+    public final TagSnapshot tags;
+    /**
      * Deferred writes this generation queues for after the driver has run. Owned here, not on the
      * cached {@link BuildingInfo}: see {@link PostTodoQueue}.
      */
@@ -61,8 +68,9 @@ public final class ChunkGenContext {
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
                            IDimensionInfo provider, Preset profile, BuildingInfo info,
-                           LevelTaskQueue levelTasks) {
+                           LevelTaskQueue levelTasks, TagSnapshot tags) {
         this.levelTasks = levelTasks;
+        this.tags = tags;
         this.region = region;
         this.chunk = chunk;
         this.coord = coord;

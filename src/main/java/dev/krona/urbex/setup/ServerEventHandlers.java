@@ -52,18 +52,18 @@ public class ServerEventHandlers {
         // reload, so an edited building or palette JSON needs the world reopened whatever we do
         // here, exactly as a vanilla worldgen file does.
         //
-        // Block tags are a different matter: those do reload, and Urbex reads several of them once
-        // and caches the result. CityGenerator's constructor expands urbex:lights and
-        // urbex:needspoi into BlockState sets and holds them for the lifetime of the runtime, so
-        // without this an edited tag kept generating against the pre-reload membership, silently,
-        // until the world was reopened. Republishing every level's runtime rebuilds those sets and
-        // drops the per-level caches, so the next chunk plans from what the reload produced.
+        // Block tags are a different matter: those do reload, and they are the whole of what this
+        // hook has to refresh. GenerationSession.reload re-captures them into the server's one
+        // TagEpoch, which the next chunk to start reads and a chunk already generating does not.
         //
-        // What it no longer does is reset the asset registries. That is not a capability being
-        // dropped: they cannot change on a reload (see above), and clearing them from the server
-        // thread while workers were generating is precisely how a chunk got written and saved with
-        // an emptied stuff index behind it. A republished runtime replaces what the next chunk
-        // picks up and leaves chunks already in flight on the epoch they captured.
+        // What it no longer does is rebuild anything else. It used to republish every loaded
+        // level's runtime, because CityGenerator's constructor expanded urbex:lights and
+        // urbex:needspoi into BlockState sets, so a fresh generator was the only way to see an
+        // edited tag - and a fresh generator brought a fresh road field, fresh heightmaps and an
+        // empty plan cache with it, none of which a tag can affect (issue #128). Nor does it reset
+        // the asset registries: they cannot change on a reload (see above), and clearing them from
+        // the server thread while workers were generating is precisely how a chunk got written and
+        // saved with an emptied stuff index behind it.
         ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resourceManager, success) -> {
             if (success) {
                 GenerationSession current = GenerationSession.current();
