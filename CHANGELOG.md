@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- **A datapack reference that names nothing is now a message about a file, not a crashed chunk.**
+  Every cross-asset reference a world can reach — a city style's building and part selectors, a world
+  style's highway and railway wiring, a building's `parts`, a multibuilding's grid, a scattered
+  entry's list, a predefined city's buildings — is resolved when the world loads and reported with
+  everything else that is wrong (issue #56).
+  - *These references are names, not objects.* Generation resolved them one at a time, on whichever
+    chunk first needed one — about forty `getOrThrow` sites across the generator, highways, railways
+    and scattered placement. A building naming a part no datapack registers surfaced as an exception
+    from a worldgen worker, on a chunk somewhere out in the world, long after the world opened.
+  - *Scoped to what a world can select*, following the rule city styles already used: a part only an
+    unreachable city style names is not a broken pack, and refusing a world over a file nothing uses
+    is worse than not checking.
+  - *One bad name does not hide the rest.* An unqualified reference is a line in the report, not the
+    exception that ends the walk.
+  - *`/urbex validate` gets it for free*, since it runs the same compile.
+  - *No worldgen change*: both digest goldens are unchanged.
+
 - **The authored asset types are named `*Definition`, not `*RE`.** Thirteen classes and every
   reference to them; a `PaletteRE` is a `PaletteDefinition`, `Preset.toRE()` is
   `Preset.toDefinition()`. Mechanical only — no behaviour, no logic, nothing else in the same change

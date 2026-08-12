@@ -140,6 +140,25 @@ public class Building {
         return name;
     }
 
+    /**
+     * Every part name this building can place, from both {@code parts} and {@code parts2}, with the
+     * conditions stripped off.
+     * <p>
+     * For {@link AssetGraph}, which asks "what could this reach" rather than "what will this pick":
+     * a condition that never fires in one world fires in the next, so a reference behind one is
+     * still a reference. Duplicates are not removed - the caller dedupes by asset, not by mention.
+     */
+    List<String> partNames() {
+        List<String> names = new ArrayList<>(parts.size() + parts2.size());
+        for (Pair<Predicate<ConditionContext>, String> part : parts) {
+            names.add(part.getRight());
+        }
+        for (Pair<Predicate<ConditionContext>, String> part : parts2) {
+            names.add(part.getRight());
+        }
+        return names;
+    }
+
     public Palette getLocalPalette() {
         return localPalette;
     }
