@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+- **Open lots generate at street level, not one block above it.** `urbex:default` now sets
+  `roads.parkElevation: false`. Reported from a live world: a raised lot next to a building stands a
+  one-block lip directly across the doorway, so the door opens into a wall of dirt. The same
+  behaviour was confirmed on upstream Lost Cities, so this is a tuning mismatch inherited with the
+  algorithm rather than a regression here - which is why the fix is a shipped default and not a code
+  change. Lost Cities rolled for parks per chunk, so raised beds were sparse and read as nature
+  pushing up through the ruins; Urbex makes *every* chunk that is neither road nor building an open
+  lot, so the same rule fires almost everywhere. `BuildingInfo.isElevatedParkSection` counts how many
+  of the eight neighbours are open (`isStreetOrParkSection`, i.e. `isCity && !hasBuilding`) and
+  elevates at `PARK_STREET_THRESHOLD` or more, default 3. A neighbouring building does not *veto*
+  elevation - it only fails to increment that counter - so a lot with three open neighbours elevates
+  on their strength no matter what it is standing against. With the toggle off, `CityGenerator` still
+  writes the elevation layer at `height` but no longer increments `height`, so `generateParkSection`
+  overwrites that row: the lot replaces the street surface underneath instead of resting on top of
+  it.
+  - *Scope.* The key is set once, on `urbex:default`; the other eleven shipped presets extend it and
+    declare no `roads` of their own, so all twelve inherit it. `Preset.PARK_ELEVATION` stays `true`
+    as the code default, so this changes what Urbex ships, not what the engine does - a pack that
+    wants raised beds sets `roads.parkElevation: true`, and `ParkSettings.parkelevation` still
+    overrides per city style.
+  - *Both goldens moved; third deliberate regeneration.* `digest.golden`
+    `88af6b69e7762fbc` -> `eb6253f3f5363937`, `digest-features.golden` `7c297c1e4ec1ce38` ->
+    `203d8a44769da0c7`, each reproduced by two runs. Attributed rather than accepted: block-state
+    dumps before and after differ in 5135 of 850353 final cells (0.6%), of which 3478 are literal
+    one-block downward shifts (`after[y] == before[y+1]`). The two largest transitions are
+    `stone_bricks -> grass_block` (1831), the surface landing on the row the elevation block used to
+    hold, and `grass_block -> air` (654), the row above it emptying. Changes sit in three narrow Y
+    bands - the sample's three street levels - so nothing below the surface or inside a building
+    moved, and 2257 distinct columns are touched, which is the "open lots are everywhere" premise
+    showing up as a measurement. The features window still holds both features it guards
+    (`bridgeChunks=3`, `slopeChunks=2`), so it did not need relocating; `unsafeReads=0` on both.
+
 - **`inherit` and `parent` are refused by name, in all thirteen registries.** The spec said from the
   start that they were "deleted, not aliased" and that a file using either would fail to load naming
   the replacement key - and nothing implemented it, so the promise was the one thing standing between

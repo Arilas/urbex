@@ -1,5 +1,11 @@
 {
   "description": "Default generation, common cities, explosions",
   "icon": "textures/gui/icon_default.png",
-  "decoration": { "lightingDensity": 0.15, "lootDensity": 0.65 }
+  "roads": {
+    "parkElevation": false
+  },
+  "decoration": {
+    "lightingDensity": 0.15,
+    "lootDensity": 0.65
+  }
 }
