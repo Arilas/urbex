@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+- **A world can be generated from several world styles at once, balanced by weight.** Turn on
+  `experimentalMultiWorldStyles` in `config/urbex/urbex.json` and the Cities tab's **World Style**
+  picker grows a **Mix** mode: tick several styles, give each a weight, read back the normalized
+  percentages. Each city draws its own style and keeps it, so one world can hold cities from several
+  datapacks instead of one pack replacing another. Server owners get the same in
+  `dimensionsWithPresets`, with `+` between entries and `*` before a weight:
+  `minecraft:overworld=urbex:default@urbex:standard*0.1+urbexmt:moderntweaks*0.9`.
+  - *A world style was never one scope, and mixing forces that to become explicit.*
+    `IDimensionInfo.getWorldStyle()` is replaced by `worldStyles()`, returning a `WorldStyleField`
+    that answers per scope rather than per dimension — a call site now has to say which it means,
+    and the compiler makes it. `citystyles` come from the city's own centre; `outsidestyle` and
+    `rotatable` from the nearest city; `scattered` from the scatter area's anchor; the rest of
+    `multisettings` from the multichunk anchor. Highway and railway `parts`, `settings`,
+    `citybiomemultipliers` and the two grid sizes come from the heaviest style — a highway that
+    changed pack partway along its run would not join up, and a per-area `areasize` would have to be
+    read out of a grid it has not defined yet.
+  - *Off by default, and the flag gates the value rather than only the UI.* A save or a config line
+    hand-edited to carry a mix is reduced to its heaviest style, with the reduction logged, on an
+    install that never opted in.
+  - *Both goldens unchanged*, verified by running both digest checks. A single-entry mix draws no
+    randomness at all — every accessor short-circuits to the one style — so a world created before
+    mixing existed, or on an install with the flag off, generates exactly what it did. The one
+    deliberate layout change is `Rng.Purpose.WORLD_STYLE`, **appended** after `LARGE_BRIDGE`;
+    appending leaves every existing ordinal alone, which is why the digests hold, and `RngTest`'s
+    `PURPOSE_COUNT`, `LAST_PURPOSE`, `GOLDEN_LAST` and `PURPOSE_ORDER` are repinned in the same
+    commit.
+  - *Verified against a real second pack, not just unit tests.* `runMixCheck` is a headless census
+    of what a mix actually produces, sibling to the digest checks — a digest proves generation did
+    not change, this proves it did, in the way the feature claims. Against Urbex-ModernTweaks at
+    `0.1`/`0.9` over a radius-40 square: 6 of 65 city centres and 11 of 121 scatter areas on the
+    `0.1` style (9.2% and 9.1% against a nominal 10%), both packs' city styles reached
+    (`urbex:citystyle_standard`, `urbex:citystyle_desert`, `urbexmt:citystyle_standard`,
+    `urbexmt:citystyle_desert`, `urbexmt:citystyle_jungle`) and both packs' scattered structures
+    reached (`urbex:radiotower`, `urbex:oilrig`, `urbex:cabin`, `urbexmt:cabin`). The same run with
+    no pack reports one style and the same 65 centres, so mixing moves no city — only its
+    attribution.
+
 - **The README's usage instructions were describing 0.1.0.** They named a **More** tab and a
   **Cities** button (it is a Cities tab now), the `dimensionsWithProfiles` config option (the key is
   `dimensionsWithPresets`), and gave `minecraft:overworld=default` as the example — an unqualified
