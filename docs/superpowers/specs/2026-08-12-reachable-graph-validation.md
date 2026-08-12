@@ -123,6 +123,27 @@ check 1. The traversal is the expensive part to get right and is what checks 2 a
 
 **56b — characters and role sizes.** Checks 2 and 3, on the pairings 56a's walk already produces.
 
+*Outcome.* The guaranteed-character formula above is **wrong as written** and was replaced. Testing a
+choice on its own reports every `frompalette` that points at a character another group supplies -
+`urbex:glass_side_variant_glass` maps `'@'` to `'a'` and nothing else - which is the shipped pack's own
+idiom, and produced 45 warnings about a pack that is correct. The check constructs a *witness*
+instead: for each choice, look the character up in the merge of that choice with every choice of every
+other group. Missing even there means missing for every selection containing that choice, so a failing
+selection provably exists. Sound in the only direction that matters - nothing is reported without a
+selection that really breaks - and the shipped pack now reports zero.
+
+*Still not covered*, and neither belongs in this pass:
+
+- **Condition references** (`inpart`/`belowpart`/`inbuilding`). `Condition` consumes them into a
+  `Predicate<ConditionContext>` at construction and does not retain the strings, so reaching them
+  means changing that class - a change to a compiled asset, not to the walk.
+- **A city style's character fields** (`streetblock`, `grassblock`, and the seven others). They resolve
+  against the chunk's palette like a part's characters do, but they are not reached through a part, so
+  they need their own usage - the same machinery, a separate pass.
+- **Scattered parts' characters.** A scattered building lands wherever the terrain allows and takes the
+  style of the chunk it lands in, which the walk cannot know. Its references are checked; its
+  characters are not.
+
 ## Digest expectations
 
 Neither PR may move a golden. Both are load-time refusals over data the bundled pack already

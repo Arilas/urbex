@@ -1,12 +1,15 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
+import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
+import dev.krona.urbex.worldgen.lost.regassets.data.StreetSettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -149,6 +152,42 @@ class AssetGraphTest {
         assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
     }
 
+    /**
+     * A street, highway or railway part is addressed as a whole chunk and nothing clamps it:
+     * {@code ChunkDriver.current} converts chunk-local to absolute unchanged, and {@code block()}
+     * masks the result with {@code & 0xf}. A part wider than 16 therefore wraps round and overwrites
+     * its own beginning - no exception, nothing in the log, just a road that comes out wrong.
+     * {@code BuildingPart.checkGeometry} proves a part is self-consistent; this is the separate
+     * question of whether it fits the slot it was wired into.
+     */
+    @Test
+    void aRoadPartThatIsNotChunkSizedIsALoadError() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Fixture fixture = new Fixture().part("too_wide", 24, 16);
+
+        AssetGraph.validate(fixture.snapshot(), List.of(fixture.cityStyleWiring("urbex:too_wide")),
+                diagnostics);
+
+        assertTrue(diagnostics.hasFatal(), () -> diagnostics.format("expected a refusal"));
+        String message = diagnostics.problems().getFirst().message();
+        assertTrue(message.contains("24x16"), message);
+        assertTrue(message.contains("16x16"), message);
+    }
+
+    /** A building part is placed at a computed offset inside a chunk, so its size is its own business. */
+    @Test
+    void aBuildingPartThatIsNotChunkSizedIsFine() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Fixture fixture = new Fixture()
+                .part("narrow", 4, 4)
+                .building("tower", "urbex:narrow")
+                .city("downtown", building("urbex:tower"));
+
+        AssetGraph.validate(fixture.snapshot(), List.of(), diagnostics);
+
+        assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(""));
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private static PredefinedBuilding building(String name) {
@@ -165,6 +204,7 @@ class AssetGraphTest {
         private final Map<Identifier, Building> buildings = new HashMap<>();
         private final Map<Identifier, MultiBuilding> multiBuildings = new HashMap<>();
         private final Map<Identifier, PredefinedCity> cities = new HashMap<>();
+        private final Map<Identifier, BuildingPart> extraParts = new HashMap<>();
 
         Fixture building(String path, String partName) {
             PartRef ref = new PartRef(partName, Optional.empty(), Optional.empty(), Optional.empty(),
@@ -188,6 +228,37 @@ class AssetGraphTest {
             return this;
         }
 
+        /** A part of an explicit size, for the road-geometry check. */
+        Fixture part(String path, int xSize, int zSize) {
+            Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
+            List<List<String>> slices = List.of(List.of("a".repeat(xSize * zSize)));
+            extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK, null,
+                    AssetIndex.empty("urbex:palettes"), List.of(new BuildingPartDefinition(
+                    Optional.empty(), Optional.of(xSize), Optional.of(zSize), Optional.of(slices),
+                    Optional.empty(), Optional.empty(), Optional.empty()))));
+            return this;
+        }
+
+        /**
+         * A city style whose whole street family is one part, so the walk reaches it as a road. It
+         * declares no {@code style}, which leaves the character check without a palette context and
+         * the geometry check as the only thing this asserts.
+         */
+        CityStyle cityStyleWiring(String partName) {
+            Optional<Mergeable<String>> one = Optional.of(new Mergeable<>(true, List.of(partName)));
+            StreetParts.Decl family = new StreetParts.Decl(one, one, one, one, one, one, one, one);
+            return new CityStyle(Identifier.fromNamespaceAndPath("urbex", "citystyle_roads"),
+                    List.of(new CityStyleDefinition(
+                            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                            Optional.empty(), Optional.empty(),
+                            Optional.of(new StreetSettings(Optional.empty(), Optional.empty(),
+                                    Optional.empty(), Optional.empty(), Optional.empty(),
+                                    Optional.empty(), Optional.empty(), Optional.empty(),
+                                    Optional.of(family), Optional.empty(), Optional.empty())),
+                            Optional.empty())));
+        }
+
         Fixture city(String path, PredefinedBuilding... contents) {
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
             cities.put(id, new PredefinedCity(id, List.of(new PredefinedCityDefinition(
@@ -207,6 +278,7 @@ class AssetGraphTest {
                     Optional.empty(), Optional.of(1), Optional.of(1),
                     Optional.of(List.of(List.of("a"))), Optional.empty(), Optional.empty(),
                     Optional.empty()))));
+            parts.putAll(extraParts);
             return new AssetSnapshot(empty.variants(), empty.palettes(), empty.conditions(),
                     empty.styles(), new AssetIndex<>("urbex:parts", parts),
                     new AssetIndex<>("urbex:buildings", buildings),

@@ -214,6 +214,12 @@ public final class GenerationSession {
         AssetSnapshot assets = AssetCompiler.compile(level.registryAccess(), diagnostics);
         // Before publication, not after: a snapshot nobody validated is exactly the partially
         // compiled view this whole issue removes.
+        if (!diagnostics.isEmpty()) {
+            // Logged whether or not it refuses the world: a warning is a thing an author wants to
+            // see, and throwIfAny only speaks when something is fatal.
+            Urbex.getLogger().warn(diagnostics.format(
+                    diagnostics.size() + " Urbex asset problem(s) found while compiling this world:"));
+        }
         diagnostics.throwIfAny();
         Compiled world = new Compiled(assets, new TagEpoch(TagSnapshot.capture(assets)));
         compiled = world;

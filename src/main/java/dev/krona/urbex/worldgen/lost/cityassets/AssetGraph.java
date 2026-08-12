@@ -9,15 +9,22 @@ import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredReference;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.biome.Biome;
+import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Walks every asset a world can reach and reports the references that name nothing.
@@ -54,6 +61,20 @@ public final class AssetGraph {
     private final AssetDiagnostics diagnostics;
     /** Every (kind, id) already walked, so a diamond in the graph is visited once and a cycle ends. */
     private final Set<String> seen = new HashSet<>();
+    /**
+     * Every (part, style, building, road) already checked. Separate from {@link #seen} on purpose: a
+     * missing reference is reported once per asset, but a character is a question about a
+     * <em>usage</em>, and the same part under two styles is two questions with two answers.
+     */
+    private final Set<String> checkedUsages = new HashSet<>();
+    /** Every dangling reference already reported, so four paths to one typo are one line. */
+    private final Set<String> reported = new HashSet<>();
+    /**
+     * The reachable city styles by id, so a world style can pair its road wiring with the styles that
+     * world can actually put under it. Built from the collection handed in - this is not a lookup
+     * into the snapshot's city-style index, which would make this class a name-resolution site.
+     */
+    private final Map<Identifier, CityStyle> reachable = new HashMap<>();
     private final Deque<Runnable> pending = new ArrayDeque<>();
 
     private AssetGraph(AssetSnapshot assets, AssetDiagnostics diagnostics) {
@@ -78,6 +99,9 @@ public final class AssetGraph {
     public static void validate(AssetSnapshot assets, Collection<CityStyle> reachableCityStyles,
                                 AssetDiagnostics diagnostics) {
         AssetGraph graph = new AssetGraph(assets, diagnostics);
+        for (CityStyle style : reachableCityStyles) {
+            graph.reachable.put(style.getId(), style);
+        }
         for (WorldStyle style : assets.worldStyles().all()) {
             graph.walkWorldStyle(style);
         }
@@ -111,31 +135,48 @@ public final class AssetGraph {
                 scattered(owner, reference.getName(), "scattered.list");
             }
         }
+        // A road part is placed in whatever chunk the road runs through, so the palette it is drawn
+        // against is that chunk's city style - not the world style's. Pairing with each city style
+        // this world style can select is the precise answer; checking against every reachable style
+        // would report combinations no world can produce, which is the direction that costs someone a
+        // world. The style-less usage is what carries the geometry check when a world style selects
+        // nothing that resolved.
+        List<Style> roadStyles = new ArrayList<>();
+        roadStyles.add(null);
+        for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selected : style.cityStyleSelectors()) {
+            CityStyle city = reachable.get(DataTools.fromName(selected.getRight().getRight()));
+            if (city != null) {
+                Style resolved = assets.styles().get(city.getStyle());
+                if (resolved != null) {
+                    roadStyles.add(resolved);
+                }
+            }
+        }
         PartSelector selector = style.getPartSelector();
         HighwayParts highways = selector.highwayParts();
-        parts(owner, highways.tunnel(), "parts.highways.tunnel");
-        parts(owner, highways.open(), "parts.highways.open");
-        parts(owner, highways.bridge(), "parts.highways.bridge");
-        parts(owner, highways.tunnelBi(), "parts.highways.tunnelbi");
-        parts(owner, highways.openBi(), "parts.highways.openbi");
-        parts(owner, highways.bridgeBi(), "parts.highways.bridgebi");
+        roadParts(owner, highways.tunnel(), "parts.highways.tunnel", roadStyles);
+        roadParts(owner, highways.open(), "parts.highways.open", roadStyles);
+        roadParts(owner, highways.bridge(), "parts.highways.bridge", roadStyles);
+        roadParts(owner, highways.tunnelBi(), "parts.highways.tunnelbi", roadStyles);
+        roadParts(owner, highways.openBi(), "parts.highways.openbi", roadStyles);
+        roadParts(owner, highways.bridgeBi(), "parts.highways.bridgebi", roadStyles);
         RailwayParts railways = selector.railwayParts();
-        parts(owner, railways.stationUnderground(), "parts.railways.stationunderground");
-        parts(owner, railways.stationOpen(), "parts.railways.stationopen");
-        parts(owner, railways.stationUndergroundStairs(), "parts.railways.stationundergroundstairs");
-        parts(owner, railways.stationStaircase(), "parts.railways.stationstaircase");
-        parts(owner, railways.stationStaircaseSurface(), "parts.railways.stationstaircasesurface");
-        parts(owner, railways.rails3Split(), "parts.railways.rails3split");
-        parts(owner, railways.railsDown2(), "parts.railways.railsdown2");
-        parts(owner, railways.railsDown1(), "parts.railways.railsdown1");
-        parts(owner, railways.railsBend(), "parts.railways.railsbend");
-        parts(owner, railways.railsFlat(), "parts.railways.railsflat");
-        parts(owner, railways.railsHorizontal(), "parts.railways.railshorizontal");
-        parts(owner, railways.railsHorizontalEnd(), "parts.railways.railshorizontalend");
-        parts(owner, railways.railsHorizontalWater(), "parts.railways.railshorizontalwater");
-        parts(owner, railways.railsVertical(), "parts.railways.railsvertical");
-        parts(owner, railways.railsVerticalWater(), "parts.railways.railsverticalwater");
-        parts(owner, railways.stationOpenRoof(), "parts.railways.stationopenroof");
+        roadParts(owner, railways.stationUnderground(), "parts.railways.stationunderground", roadStyles);
+        roadParts(owner, railways.stationOpen(), "parts.railways.stationopen", roadStyles);
+        roadParts(owner, railways.stationUndergroundStairs(), "parts.railways.stationundergroundstairs", roadStyles);
+        roadParts(owner, railways.stationStaircase(), "parts.railways.stationstaircase", roadStyles);
+        roadParts(owner, railways.stationStaircaseSurface(), "parts.railways.stationstaircasesurface", roadStyles);
+        roadParts(owner, railways.rails3Split(), "parts.railways.rails3split", roadStyles);
+        roadParts(owner, railways.railsDown2(), "parts.railways.railsdown2", roadStyles);
+        roadParts(owner, railways.railsDown1(), "parts.railways.railsdown1", roadStyles);
+        roadParts(owner, railways.railsBend(), "parts.railways.railsbend", roadStyles);
+        roadParts(owner, railways.railsFlat(), "parts.railways.railsflat", roadStyles);
+        roadParts(owner, railways.railsHorizontal(), "parts.railways.railshorizontal", roadStyles);
+        roadParts(owner, railways.railsHorizontalEnd(), "parts.railways.railshorizontalend", roadStyles);
+        roadParts(owner, railways.railsHorizontalWater(), "parts.railways.railshorizontalwater", roadStyles);
+        roadParts(owner, railways.railsVertical(), "parts.railways.railsvertical", roadStyles);
+        roadParts(owner, railways.railsVerticalWater(), "parts.railways.railsverticalwater", roadStyles);
+        roadParts(owner, railways.stationOpenRoof(), "parts.railways.stationopenroof", roadStyles);
     }
 
     private void walkCityStyle(CityStyle style) {
@@ -144,60 +185,87 @@ public final class AssetGraph {
         }
         Identifier owner = style.getId();
         style(owner, style.getStyle(), "style");
+        Style palette = assets.styles().get(style.getStyle());
         for (ObjectSelector selector : style.selectorList(CityStyle.Sel.BUILDING)) {
-            building(owner, selector.value(), "selectors.buildings");
+            building(owner, selector.value(), "selectors.buildings", palette);
         }
         for (ObjectSelector selector : style.selectorList(CityStyle.Sel.MULTI_BUILDING)) {
-            multiBuilding(owner, selector.value(), "selectors.multibuildings");
+            multiBuilding(owner, selector.value(), "selectors.multibuildings", palette);
         }
-        selectorParts(owner, style, CityStyle.Sel.BRIDGE, "selectors.bridges");
-        selectorParts(owner, style, CityStyle.Sel.LARGE_BRIDGE, "selectors.largebridges");
-        selectorParts(owner, style, CityStyle.Sel.PARK, "selectors.parks");
-        selectorParts(owner, style, CityStyle.Sel.FOUNTAIN, "selectors.fountains");
-        selectorParts(owner, style, CityStyle.Sel.STAIR, "selectors.stairs");
-        selectorParts(owner, style, CityStyle.Sel.FRONT, "selectors.fronts");
-        selectorParts(owner, style, CityStyle.Sel.RAIL_DUNGEON, "selectors.raildungeons");
-        streetParts(owner, style.getStreetParts(), "streetblocks.parts");
-        streetParts(owner, style.getLargeStreetParts(), "streetblocks.largeparts");
-        streetParts(owner, style.getTertiaryStreetParts(), "streetblocks.tertiaryparts");
+        selectorParts(owner, style, CityStyle.Sel.BRIDGE, "selectors.bridges", palette);
+        selectorParts(owner, style, CityStyle.Sel.LARGE_BRIDGE, "selectors.largebridges", palette);
+        selectorParts(owner, style, CityStyle.Sel.PARK, "selectors.parks", palette);
+        selectorParts(owner, style, CityStyle.Sel.FOUNTAIN, "selectors.fountains", palette);
+        selectorParts(owner, style, CityStyle.Sel.STAIR, "selectors.stairs", palette);
+        selectorParts(owner, style, CityStyle.Sel.FRONT, "selectors.fronts", palette);
+        selectorParts(owner, style, CityStyle.Sel.RAIL_DUNGEON, "selectors.raildungeons", palette);
+        streetParts(owner, style.getStreetParts(), "streetblocks.parts", palette);
+        streetParts(owner, style.getLargeStreetParts(), "streetblocks.largeparts", palette);
+        streetParts(owner, style.getTertiaryStreetParts(), "streetblocks.tertiaryparts", palette);
     }
 
-    private void selectorParts(Identifier owner, CityStyle style, CityStyle.Sel kind, String field) {
+    private void selectorParts(Identifier owner, CityStyle style, CityStyle.Sel kind, String field,
+                               @Nullable Style palette) {
         for (ObjectSelector selector : style.selectorList(kind)) {
-            part(owner, selector.value(), field);
+            // Not a road: bridges, parks, fountains and the rest are placed inside a chunk at a
+            // computed offset, so their size is theirs to choose.
+            part(owner, selector.value(), field, usage(palette, null, false, field, owner));
         }
     }
 
-    private void streetParts(Identifier owner, @Nullable StreetParts family, String field) {
+    /** One road usage per style the part can be drawn against, so the geometry is checked once. */
+    private void roadParts(Identifier owner, @Nullable List<String> names, String field,
+                           List<Style> roadStyles) {
+        if (names == null) {
+            return;
+        }
+        for (String name : names) {
+            for (Style roadStyle : roadStyles) {
+                part(owner, name, field, new PartUsage(roadStyle, null, true, field, owner));
+            }
+        }
+    }
+
+    private void streetParts(Identifier owner, @Nullable StreetParts family, String field,
+                            @Nullable Style palette) {
         if (family == null) {
             return;
         }
-        parts(owner, family.straight(), field + ".straight");
-        parts(owner, family.end(), field + ".end");
-        parts(owner, family.bend(), field + ".bend");
-        parts(owner, family.t(), field + ".t");
-        parts(owner, family.none(), field + ".none");
-        parts(owner, family.all(), field + ".all");
-        parts(owner, family.connector(), field + ".connector");
-        parts(owner, family.stair(), field + ".stair");
+        roadParts(owner, family.straight(), field + ".straight", java.util.Arrays.asList(null, palette));
+        roadParts(owner, family.end(), field + ".end", java.util.Arrays.asList(null, palette));
+        roadParts(owner, family.bend(), field + ".bend", java.util.Arrays.asList(null, palette));
+        roadParts(owner, family.t(), field + ".t", java.util.Arrays.asList(null, palette));
+        roadParts(owner, family.none(), field + ".none", java.util.Arrays.asList(null, palette));
+        roadParts(owner, family.all(), field + ".all", java.util.Arrays.asList(null, palette));
+        roadParts(owner, family.connector(), field + ".connector", java.util.Arrays.asList(null, palette));
+        roadParts(owner, family.stair(), field + ".stair", java.util.Arrays.asList(null, palette));
     }
 
-    private void walkBuilding(Building building) {
-        if (!first("building", building.getId())) {
+    /**
+     * A building's parts are checked under the style that reached it, so the same building selected by
+     * two city styles is two sets of answers - which is the whole reason a usage exists.
+     * {@link #seen} still gates the <em>reference</em> walk to once per building; the character check
+     * has its own gate on the usage.
+     */
+    private void walkBuilding(Building building, @Nullable Style palette) {
+        // Keyed by the style as well as the building: the same building under two city styles is two
+        // sets of character answers, and both have to be reached. Finite either way, so a cycle still
+        // ends - there are only so many (building, style) pairs.
+        if (!first("building/" + styleKey(palette), building.getId())) {
             return;
         }
         for (String name : building.partNames()) {
-            part(building.getId(), name, "parts");
+            part(building.getId(), name, "parts", usage(palette, building, false, "parts", building.getId()));
         }
     }
 
-    private void walkMultiBuilding(MultiBuilding multi) {
-        if (!first("multibuilding", multi.getId())) {
+    private void walkMultiBuilding(MultiBuilding multi, @Nullable Style palette) {
+        if (!first("multibuilding/" + styleKey(palette), multi.getId())) {
             return;
         }
         if (multi.getBuildingSet() != null) {
             for (String name : multi.getBuildingSet()) {
-                building(multi.getId(), name, "buildings");
+                building(multi.getId(), name, "buildings", palette);
             }
         }
     }
@@ -208,12 +276,14 @@ public final class AssetGraph {
         }
         // Either arm may be absent: a scattered entry declares 'buildings' or 'multibuilding', and
         // the constructor requires one of the two rather than both.
+        // No style: a scattered building lands wherever the terrain allows and takes the style of
+        // the chunk it lands in, which the walk cannot know. Its references are still checked.
         if (scattered.getBuildings() != null) {
             for (String name : scattered.getBuildings()) {
-                building(scattered.getId(), name, "buildings");
+                building(scattered.getId(), name, "buildings", null);
             }
         }
-        multiBuilding(scattered.getId(), scattered.getMultibuilding(), "multibuilding");
+        multiBuilding(scattered.getId(), scattered.getMultibuilding(), "multibuilding", null);
     }
 
     private void walkPredefinedCity(PredefinedCity city) {
@@ -224,35 +294,94 @@ public final class AssetGraph {
             return;
         }
         for (PredefinedBuilding building : city.getPredefinedBuildings()) {
+            // The predefined city names its own city style, and the compiler has already checked that
+            // it resolves; the palette context comes from there when it does.
+            Style palette = paletteOf(city.getCityStyle());
             if (building.multi()) {
-                multiBuilding(city.getId(), building.building(), "buildings");
+                multiBuilding(city.getId(), building.building(), "buildings", palette);
             } else {
-                building(city.getId(), building.building(), "buildings");
+                building(city.getId(), building.building(), "buildings", palette);
             }
         }
     }
 
     // ------------------------------------------------------------------ one reference
 
-    private void parts(Identifier owner, @Nullable List<String> names, String field) {
+    private void parts(Identifier owner, @Nullable List<String> names, String field,
+                       @Nullable PartUsage usage) {
         if (names == null) {
             return;
         }
         for (String name : names) {
-            part(owner, name, field);
+            part(owner, name, field, usage);
         }
     }
 
-    private void part(Identifier owner, @Nullable String name, String field) {
-        resolve(owner, name, field, assets.parts(), this::walkPart);
+    private void part(Identifier owner, @Nullable String name, String field, @Nullable PartUsage usage) {
+        resolve(owner, name, field, assets.parts(), part -> checkPart(part, usage));
     }
 
-    private void building(Identifier owner, @Nullable String name, String field) {
-        resolve(owner, name, field, assets.buildings(), this::walkBuilding);
+    /**
+     * Everything that is a question about a part <em>where it is used</em>, rather than about the
+     * part on its own.
+     *
+     * <p>{@code usage} is null where the walk reached a part without knowing the style it will be
+     * drawn against - today only a scattered building's parts, whose chunk takes its style from the
+     * terrain around it. Those keep the reference check and skip the character check rather than
+     * being checked against a style they might not be used with.</p>
+     */
+    private void checkPart(BuildingPart part, @Nullable PartUsage usage) {
+        if (usage == null || !checkedUsages.add(usage.key(part.getId()))) {
+            return;
+        }
+        if (usage.road()) {
+            checkRoadGeometry(part, usage);
+        }
+        PartPaletteCheck.check(part, usage, diagnostics);
     }
 
-    private void multiBuilding(Identifier owner, @Nullable String name, String field) {
-        resolve(owner, name, field, assets.multiBuildings(), this::walkMultiBuilding);
+    /**
+     * A part wired into a street, highway or railway slot is addressed as a whole chunk, and nothing
+     * clamps it: {@code ChunkDriver.current} converts chunk-local to absolute unchanged and
+     * {@code block()} masks the result with {@code & 0xf}, so a part wider than 16 <strong>wraps
+     * around and overwrites its own beginning</strong> - no exception, nothing in the log, just a
+     * road that comes out wrong. {@code BuildingPart.checkGeometry} proves a part is self-consistent;
+     * this is the separate question of whether it fits where it was wired in.
+     */
+    private void checkRoadGeometry(BuildingPart part, PartUsage usage) {
+        if (part.getXSize() != 16 || part.getZSize() != 16) {
+            diagnostics.record("urbex:parts", part.getId(),
+                    "is wired into '" + usage.owner() + "' (" + usage.field() + ") as a road piece, "
+                            + "which is placed as a whole chunk, but it is " + part.getXSize() + "x"
+                            + part.getZSize() + " rather than 16x16; the driver masks coordinates to "
+                            + "the chunk, so the overflow would silently overwrite the part's own start");
+        }
+    }
+
+    private void building(Identifier owner, @Nullable String name, String field, @Nullable Style palette) {
+        resolve(owner, name, field, assets.buildings(), building -> walkBuilding(building, palette));
+    }
+
+    private void multiBuilding(Identifier owner, @Nullable String name, String field,
+                               @Nullable Style palette) {
+        resolve(owner, name, field, assets.multiBuildings(), multi -> walkMultiBuilding(multi, palette));
+    }
+
+    /** A usage, or null when there is no style to check characters against. */
+    @Nullable
+    private static PartUsage usage(@Nullable Style palette, @Nullable Building building, boolean road,
+                                   String field, Identifier owner) {
+        return palette == null && !road ? null : new PartUsage(palette, building, road, field, owner);
+    }
+
+    /** The style a city style draws from, or null if that reference is the thing that is broken. */
+    @Nullable
+    private Style paletteOf(@Nullable String cityStyleName) {
+        if (cityStyleName == null) {
+            return null;
+        }
+        CityStyle city = reachable.get(DataTools.fromName(cityStyleName));
+        return city == null ? null : assets.styles().get(city.getStyle());
     }
 
     private void scattered(Identifier owner, @Nullable String name, String field) {
@@ -284,14 +413,20 @@ public final class AssetGraph {
         try {
             id = DataTools.fromName(name);
         } catch (RuntimeException e) {
-            diagnostics.record(index.registry(), owner,
-                    "'" + field + "' names '" + name + "', which is not a valid asset id: " + e.getMessage());
+            if (reported.add(index.registry() + "|" + owner + "|" + field + "|" + name)) {
+                diagnostics.record(index.registry(), owner,
+                        "'" + field + "' names '" + name + "', which is not a valid asset id: " + e.getMessage());
+            }
             return;
         }
         T found = index.get(id);
         if (found == null) {
-            diagnostics.record(index.registry(), owner,
-                    "'" + field + "' names '" + name + "', which no loaded datapack registers");
+            // Deduped on the reference itself, not on the walk: the same bad name reached by four
+            // paths is one thing to fix, and the walk now visits a building once per style.
+            if (reported.add(index.registry() + "|" + owner + "|" + field + "|" + name)) {
+                diagnostics.record(index.registry(), owner,
+                        "'" + field + "' names '" + name + "', which no loaded datapack registers");
+            }
             return;
         }
         pending.add(() -> walk.accept(found));
@@ -300,5 +435,9 @@ public final class AssetGraph {
     /** True the first time this asset is reached, so a diamond costs one visit and a cycle ends. */
     private boolean first(String kind, Identifier id) {
         return seen.add(kind + "/" + id);
+    }
+
+    private static String styleKey(@Nullable Style palette) {
+        return palette == null ? "-" : palette.getId().toString();
     }
 }
