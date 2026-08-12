@@ -49,6 +49,29 @@ city — and that disagreement is then written back into the shared cache by the
 `avoidVillages` **defaults to true**, so this is not a corner configuration — but see the digest
 section: default-on turned out not to mean the sampled windows contain a village, and they do not.
 
+## `StructureSuppressor` is the precedent, and it reframes the choice
+
+There is already a deterministic answer to the mirror of this problem, shipping. `StructureSuppressor`
++ `StructureStartMixin` cancel *structure* placement inside a city, and its javadoc states the
+relationship plainly: "the 'avoidStructures' options solve this the other way around, by moving the
+city out of the way; this one lets the city win instead."
+
+They are two policies for one conflict, both config-gated, and the defaults pick *city yields*
+(`avoidVillages=true`, `structuresYieldToCities=false`). So the avoid path cannot simply be deleted.
+
+What matters for this issue is **how the suppressor gets a deterministic answer**: it asks
+`BuildingInfo.isCity(coord, diminfo)` - pure seed and coordinate, no neighbour reads - at structure
+placement time. It queries *planning* from *generation*, which is cheap and order-independent.
+
+The avoid path needs the reverse - "is there a structure here?" asked at planning time - and that is
+the hard direction, because structure placement is not seed-pure: candidate chunks are seed-derived
+but pass a biome/terrain check at generation. That asymmetry is the whole difficulty of option 1
+below, and the suppressor does not share it.
+
+It also means option 2 has a working precedent in this codebase rather than being the compromise: the
+suppressor already cancels one side of the conflict locally, at generation, without touching planning.
+Cancelling the city's *rendering* in a structure chunk is its exact mirror.
+
 ## What has to be decided before code
 
 **The structure-avoidance semantic.** The issue offers two, and they are not equivalent:
@@ -60,7 +83,8 @@ section: default-on turned out not to mean the sampled windows contain a village
 
 (1) preserves the current intent and is the one the acceptance criteria imply ("suppressed chunks
 should affect neighbors"). It also needs a source of structure positions that does not read
-neighbouring chunks.
+neighbouring chunks - and see the section above: that source is not seed-pure, which is the cost
+option 2 does not pay.
 
 **Unverified, and step one of the implementation:** whether this Minecraft version exposes structure
 placement as a pure function of seed and settings that Urbex can call at plan time - the

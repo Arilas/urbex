@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
@@ -189,10 +190,21 @@ public final class DigestRunner {
      */
     private static int countAvoidedChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
         int count = 0;
+        StringBuilder where = new StringBuilder();
         for (ChunkPos pos : chunkPositions) {
-            if (CityGenerator.hasBlacklistedStructure(level, pos.x(), pos.z()) != CityGenerator.AvoidChunk.NO) {
+            CityGenerator.AvoidChunk avoid = CityGenerator.hasBlacklistedStructure(level, pos.x(), pos.z());
+            if (avoid != CityGenerator.AvoidChunk.NO) {
                 count++;
+                where.append(' ').append(pos.x()).append(',').append(pos.z()).append('=').append(avoid);
             }
+        }
+        // The production method, not a reimplementation of it. It answers "skip" for a chunk the
+        // region does not hold, which is exactly the order-dependence issue #126 is about - so a
+        // count taken through it is the honest one: it says what avoidance would actually have done,
+        // not what a perfectly-loaded world would say. If those two ever disagree, that disagreement
+        // is the bug, and hiding it behind a second loop here would be the wrong place to find out.
+        if (count > 0) {
+            Urbex.getLogger().info("AVOIDEDCHUNKS{}", where);
         }
         return count;
     }
