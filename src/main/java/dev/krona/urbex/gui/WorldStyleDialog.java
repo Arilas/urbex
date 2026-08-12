@@ -14,14 +14,19 @@ import net.minecraft.network.chat.Component;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 /**
  * The modal "Select World Style" picker raised from the {@link CitiesTab} world-style button: a
- * scrollable {@link ObjectSelectionList} of the registered style ids plus a cancel button. Vanilla
+ * scrollable {@link ObjectSelectionList} of the registered styles plus a cancel button. Vanilla
  * ships no combobox, so this is the dropdown - a click on a row hands the chosen id to the caller and
  * closes; cancel (or Escape) leaves the current style untouched. The currently effective style opens
  * pre-selected and tinted, so the player sees what generates now before changing it.
+ * <p>
+ * A row shows the style's <em>display name</em> over its id in grey. The id stays on screen because
+ * it is the thing a datapack author has to type, and because two packs are free to give their
+ * styles the same name - the id is what tells them apart.
  * <p>
  * {@link #preselectIndex} is the one pure, headless-testable piece ({@code WorldStyleDialogTest});
  * everything else is GL widget code exercised only manually. Nothing here lays widgets at fixed
@@ -30,21 +35,27 @@ import java.util.function.Consumer;
  */
 public class WorldStyleDialog extends Screen {
 
-    /** Beyond this the single-column list of short ids just gets emptier; cap and centre instead. */
+    /** Beyond this the single-column list just gets emptier; cap and centre instead. */
     private static final int MAX_WIDTH = 220;
     private static final int SCREEN_MARGIN = 20;
-    private static final int ROW_HEIGHT = 20;
+    /** Two stacked text lines (name over id) plus 4px of breathing room above and below. */
+    private static final int ROW_HEIGHT = 26;
     private static final int BUTTON_HEIGHT = 20;
     private static final int GAP = 6;
     private static final int TITLE_GAP = 8;
     private static final int TEXT_INSET = 6;
+    private static final int LINE_GAP = 1;
 
     private static final int STYLE_COLOR = 0xffffffff;
     /** The style that generates right now, so it reads as "current" even after the player arrows away. */
     private static final int CURRENT_STYLE_COLOR = 0xffffff55;
+    /** The id line: present but subordinate to the name above it. */
+    private static final int ID_COLOR = 0xff9f9f9f;
 
     private final Screen parent;
     private final List<String> styles;
+    /** Style id -> label; a style missing from it falls back to showing its id as the name. */
+    private final Map<String, String> names;
     private final String current;
     private final Consumer<String> onSelect;
 
@@ -52,12 +63,19 @@ public class WorldStyleDialog extends Screen {
     private StyleList list;
     private int titleY;
 
-    public WorldStyleDialog(Screen parent, List<String> styles, String current, Consumer<String> onSelect) {
+    public WorldStyleDialog(Screen parent, List<String> styles, Map<String, String> names,
+                            String current, Consumer<String> onSelect) {
         super(Component.translatable("urbex.screen.worldstyle.title"));
         this.parent = parent;
         this.styles = List.copyOf(styles);
+        this.names = Map.copyOf(names);
         this.current = current == null ? "" : current;
         this.onSelect = onSelect;
+    }
+
+    /** The label for a style id, falling back to the id itself when the caller supplied none. */
+    private String nameOf(String style) {
+        return names.getOrDefault(style, style);
     }
 
     /**
@@ -167,7 +185,7 @@ public class WorldStyleDialog extends Screen {
 
             @Override
             public Component getNarration() {
-                return Component.literal(style);
+                return Component.literal(nameOf(style) + " (" + style + ")");
             }
 
             @Override
@@ -179,9 +197,20 @@ public class WorldStyleDialog extends Screen {
             @Override
             public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float partialTick) {
                 Font font = Minecraft.getInstance().font;
-                int textY = getContentY() + Math.max(0, (getContentHeight() - font.lineHeight) / 2);
+                String name = nameOf(style);
+                int x = getContentX() + TEXT_INSET;
                 int color = style.equals(current) ? CURRENT_STYLE_COLOR : STYLE_COLOR;
-                graphics.text(font, Component.literal(style), getContentX() + TEXT_INSET, textY, color);
+                // A style with no name of its own is already labelled by its id, so the second line
+                // would repeat it verbatim; draw the single line centred instead.
+                if (name.equals(style)) {
+                    int textY = getContentY() + Math.max(0, (getContentHeight() - font.lineHeight) / 2);
+                    graphics.text(font, Component.literal(style), x, textY, color);
+                    return;
+                }
+                int block = font.lineHeight * 2 + LINE_GAP;
+                int top = getContentY() + Math.max(0, (getContentHeight() - block) / 2);
+                graphics.text(font, Component.literal(name), x, top, color);
+                graphics.text(font, Component.literal(style), x, top + font.lineHeight + LINE_GAP, ID_COLOR);
             }
         }
     }

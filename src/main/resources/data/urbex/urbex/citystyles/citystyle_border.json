@@ -1,4 +1,5 @@
 {
+  "name": "Border",
   "style": "urbex:standard_border",
   "extends": "urbex:citystyle_common",
   "buildingsettings": {

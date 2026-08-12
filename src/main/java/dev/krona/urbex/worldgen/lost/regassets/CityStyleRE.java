@@ -16,6 +16,7 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
                     Codec.FLOAT.optionalFieldOf("explosionchance").forGetter(l -> Optional.ofNullable(l.explosionChance)),
                     Codec.STRING.optionalFieldOf("style").forGetter(l -> Optional.ofNullable(l.style)),
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(CityStyleRE::getExtends),
+                    Codec.STRING.optionalFieldOf("name").forGetter(l -> Optional.ofNullable(l.displayName)),
                     Codec.STRING.listOf().optionalFieldOf("stuff_tags").forGetter(l -> Optional.ofNullable(l.stuffTags)),
                     GeneralSettings.CODEC.optionalFieldOf("generalblocks").forGetter(l -> Optional.ofNullable(l.generalSettings)),
                     BuildingSettings.CODEC.optionalFieldOf("buildingsettings").forGetter(l -> Optional.ofNullable(l.buildingSettings)),
@@ -35,6 +36,10 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
     private final String style;
     private final Optional<Identifier> extendsId;
 
+    // The human-readable label for this city style. Null means "not declared here", so the chain
+    // reads it from an ancestor; a chain that declares none anywhere falls back to the id.
+    private final String displayName;
+
     private final List<String> stuffTags;
 
     private final GeneralSettings generalSettings;
@@ -50,6 +55,7 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
             Optional<Float> explosionChance,
             Optional<String> style,
             Optional<Identifier> extendsId,
+            Optional<String> displayName,
             Optional<List<String>> stuffTags,
             Optional<GeneralSettings> generalSettings,
             Optional<BuildingSettings> buildingSettings,
@@ -61,6 +67,7 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
         this.explosionChance = explosionChance.orElse(null);
         this.style = style.orElse(null);
         this.extendsId = extendsId;
+        this.displayName = displayName.orElse(null);
         this.stuffTags = stuffTags.orElse(null);
         this.generalSettings = generalSettings.orElse(null);
         this.buildingSettings = buildingSettings.orElse(null);
@@ -73,6 +80,11 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
 
     public Float getExplosionChance() {
         return explosionChance;
+    }
+
+    @Nullable
+    public String getDisplayName() {
+        return displayName;
     }
 
     @Nullable

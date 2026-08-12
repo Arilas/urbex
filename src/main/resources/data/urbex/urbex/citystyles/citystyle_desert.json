@@ -1,4 +1,5 @@
 {
+  "name": "Desert",
   "style": "urbex:desert",
   "extends": "urbex:citystyle_common"
 }

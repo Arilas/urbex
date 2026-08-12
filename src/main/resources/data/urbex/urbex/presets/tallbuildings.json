@@ -1,5 +1,6 @@
 {
   "extends": "urbex:default",
+  "name": "Tall Buildings",
   "description": "Very tall buildings (performance heavy)",
   "icon": "textures/gui/icon_tallbuildings.png",
   "buildings": {

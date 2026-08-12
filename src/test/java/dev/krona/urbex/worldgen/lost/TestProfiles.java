@@ -40,6 +40,7 @@ final class TestProfiles {
         return new CityStyle(List.of(new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.empty())));
+                Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),
+                Optional.empty())));
     }
 }

@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- **Presets, world styles and city styles can name themselves again.** Making every asset reference
+  fully qualified (0.2.0) also made the Cities tab and the world-style picker show those ids: the
+  preset list read `urbex:default`, `urbex:tallbuildings`, `urbex:wasteland`, and the selector read
+  *World Style: urbex:standard*. All three registries now take an optional top-level **`name`** — a
+  plain human label, not an id and not a translation key — and it is what the UI shows.
+  - *Nothing is required to have one.* A file that declares no `name` is labelled by its
+    fully-qualified id, which is exactly what it read as before, so an unnamed third-party pack is
+    drab rather than blank. An empty string counts as "no name" for the same reason.
+  - *It is inherited, like every other scalar*, which is a trap worth stating: a world style
+    extending `urbex:standard` without a `name` of its own is now listed as **Standard**. The
+    bundled pack therefore names all twelve presets, its world style and its three *selectable*
+    city styles, and deliberately leaves the two abstract bases (`urbex:citystyle_common`,
+    `urbex:citystyle_config`) unnamed so an unnamed child of theirs keeps its own id.
+    `ShippedPresetsTest` fails the build if a shipped preset omits its name or shares one.
+  - *The id is still reachable where it matters.* The world-style dropdown shows the name over the
+    id in grey — two packs may pick the same label, and the id is what an author has to type — and
+    a preset row narrates as "*name* (*id*)". `/urbex debug` prints the city style as
+    `name (id)`; before this it printed the id alone and city styles had no label at all.
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`.
+    `PresetRE` did have to fold its six metadata keys behind a `MapCodec` to get past
+    `RecordCodecBuilder`'s sixteen-field limit; the keys stay top-level in the JSON and no preset
+    file changes shape.
+
 - **The README's usage instructions were describing 0.1.0.** They named a **More** tab and a
   **Cities** button (it is a Cities tab now), the `dimensionsWithProfiles` config option (the key is
   `dimensionsWithPresets`), and gave `minecraft:overworld=default` as the example — an unqualified

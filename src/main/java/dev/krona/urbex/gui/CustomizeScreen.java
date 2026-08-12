@@ -75,7 +75,7 @@ public class CustomizeScreen extends Screen {
     private final Screen parent;
     @Nullable
     private final CreateWorldScreen createWorldScreen;
-    /** Display name only ({@code base.getId().toString()}) - not the editor's own state. */
+    /** Display name only ({@code base.getDisplayName()}) - not the editor's own state. */
     private final String baseName;
     private final Preset base;
     private Preset copy;
@@ -104,11 +104,11 @@ public class CustomizeScreen extends Screen {
     private boolean suppressSearchResponder;
 
     public CustomizeScreen(Screen parent, Preset base) {
-        super(Component.translatable("urbex.screen.customize.title", base.getId().toString()));
+        super(Component.translatable("urbex.screen.customize.title", base.getDisplayName()));
         this.parent = parent;
         this.createWorldScreen = parent instanceof CreateWorldScreen cws ? cws : null;
         this.base = base;
-        this.baseName = base.getId().toString();
+        this.baseName = base.getDisplayName();
         this.copy = base.copy();
         this.preview = new CityPreview(previewRegistries(createWorldScreen));
         this.previewSeedFallback = random.nextLong();

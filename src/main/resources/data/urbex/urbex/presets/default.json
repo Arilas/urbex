@@ -1,4 +1,5 @@
 {
+  "name": "Default",
   "description": "Default generation, common cities, explosions",
   "icon": "textures/gui/icon_default.png",
   "roads": {
