@@ -181,6 +181,9 @@ public class NullDimensionInfo implements IDimensionInfo {
     private static WorldStyleRE placeholderStyle() {
         return new WorldStyleRE(
                 Optional.empty(),
+                // No display name: this style is never offered in the picker, so nothing would read
+                // one, and inventing a label here would put a name on screen if that ever changed.
+                Optional.empty(),
                 // Fully qualified, like every other asset reference: a bare name throws out of
                 // DataTools.fromName the moment anything resolves it.
                 Optional.of(PLACEHOLDER_OUTSIDE_STYLE),

@@ -23,6 +23,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
     private static final Codec<WorldStyleRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
+                    Codec.STRING.optionalFieldOf("name").forGetter(l -> Optional.ofNullable(l.displayName)),
                     Codec.STRING.optionalFieldOf("outsidestyle").forGetter(l -> Optional.ofNullable(l.outsideStyle)),
                     MultiSettings.CODEC.optionalFieldOf("multisettings").forGetter(l -> Optional.ofNullable(l.multiSettings)),
                     WorldSettings.CODEC.optionalFieldOf("settings").forGetter(l -> Optional.ofNullable(l.worldSettings)),
@@ -38,6 +39,10 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
 
     private Identifier name;
     private final Optional<Identifier> extendsId;
+    // The human-readable label the world-style picker shows instead of the id. Null means "not
+    // declared here", so the chain reads it from an ancestor; a chain that declares none anywhere
+    // falls back to the id in WorldStyle, which is what the picker showed before the field existed.
+    private final String displayName;
     // Null on either of these means "not declared here", so the chain reads it from an ancestor.
     private final String outsideStyle;
     private final MultiSettings multiSettings;
@@ -52,6 +57,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
     private final TagKey<Block> rotatable;
 
     public WorldStyleRE(Optional<Identifier> extendsId,
+                        Optional<String> displayName,
                         Optional<String> outsideStyle,
                         Optional<MultiSettings> multiSettings,
                         Optional<WorldSettings> worldSettings,
@@ -61,6 +67,7 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
                         Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers,
                         Optional<TagKey<Block>> rotatable) {
         this.extendsId = extendsId;
+        this.displayName = displayName.orElse(null);
         this.outsideStyle = outsideStyle.orElse(null);
         this.multiSettings = multiSettings.orElse(null);
         this.worldSettings = worldSettings.orElse(null);
@@ -69,6 +76,11 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
         this.cityStyleSelectors = cityStyleSelector.orElse(null);
         this.cityBiomeMultipliers = cityBiomeMultipliers.orElse(null);
         this.rotatable = rotatable.orElse(null);
+    }
+
+    @Nullable
+    public String getDisplayName() {
+        return displayName;
     }
 
     @Nullable

@@ -52,6 +52,9 @@ Every one of them accepts `extends`, and every one of them merges by the same ru
 uniformity is deliberate: you should never have to look up whether *this* asset type supports
 extension.
 
+Three of them — `presets`, `worldstyles` and `citystyles` — also accept an optional `name`. See
+[Display names](#display-names) below.
+
 The last column is what the load-time check enforces, and it is not quite the same as "what a
 working asset needs". Three city-style fields are needed but unchecked: `style`, which names the
 `styles` entry its buildings are painted from, and the `streetblocks` characters `street` and
@@ -201,6 +204,36 @@ The alternative is shipping `data/urbex/tags/block/rotatable.json`, which merges
 `urbex:rotatable` itself and therefore changes **every** world style including `urbex:standard`,
 whether or not the player selected yours. That is why this field exists: a pack that needs banners
 or trapdoors to rotate should be able to say so without reaching into Urbex's namespace.
+
+## Display names
+
+`presets`, `worldstyles` and `citystyles` accept an optional top-level `name`: the human label the
+game shows in place of the id.
+
+<!-- example: worldstyles -->
+
+```json
+{
+  "name": "Modern Tweaks",
+  "outsidestyle": "urbex:outside"
+}
+```
+
+Plain text, not an id and not a translation key — anything you'd want a player to read. Without it
+the Cities tab and the world-style picker show the fully-qualified id, which is what they showed
+before the field existed. That fallback is why `name` is optional rather than required: an unnamed
+asset is drab, not broken.
+
+Set one on **everything a player picks from**. The picker shows the name over the id, so two packs
+naming a style "Standard" still tell each other apart there — but a preset list shows the name
+alone, and two identical rows is a real problem.
+
+**It is inherited, like every other scalar: the last entry in the chain that declares one wins.**
+That is the trap. A world style extending `urbex:standard` without a `name` of its own is listed as
+**Standard**, because that is the name Urbex's own file declares. Restate it. For the same reason,
+leave `name` **off** the abstract bases meant to be extended (`urbex:citystyle_common`,
+`urbex:citystyle_config`): a base with no name lets an unnamed child fall back to its own id, which
+is wrong but at least unique, instead of borrowing a label that belongs to something else.
 
 ### When each asset is resolved
 

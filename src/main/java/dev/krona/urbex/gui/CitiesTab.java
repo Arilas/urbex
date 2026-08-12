@@ -6,6 +6,8 @@ import dev.krona.urbex.gui.preview.CityPreview;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.setup.WorldStyleMix;
+import dev.krona.urbex.worldgen.lost.cityassets.ExtendsChain;
+import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import net.minecraft.ChatFormatting;
@@ -36,7 +38,9 @@ import net.minecraft.util.RandomSource;
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -100,6 +104,13 @@ public class CitiesTab extends GridLayoutTab {
     private final CityPreview preview;
     private final RandomSource random = RandomSource.create();
 
+    /**
+     * Fully-qualified worldStyle id -> the label to show for it, in the order the selector lists
+     * them. Read once in the constructor: the registry cannot change while this tab is alive (a
+     * datapack toggle rebuilds the whole screen, and with it this tab).
+     */
+    private final Map<String, String> worldStyleNames;
+
     private final PresetListWidget list;
     private final StringWidget nameLabel;
     private final MultiLineTextWidget infoText;
@@ -145,7 +156,8 @@ public class CitiesTab extends GridLayoutTab {
         // being created, read straight off the load context's registry - the state layer only needs
         // the enumerated lists, so the tab injects them rather than have PresetSelection reach into a
         // registry it can't see.
-        List<String> worldStyles = registeredWorldStyles(screen);
+        this.worldStyleNames = registeredWorldStyles(screen);
+        List<String> worldStyles = List.copyOf(worldStyleNames.keySet());
         PresetSelection.CLIENT.setAvailableWorldStyles(worldStyles);
         PresetSelection.CLIENT.setAvailablePresets(registeredPresets(screen));
 
@@ -317,7 +329,7 @@ public class CitiesTab extends GridLayoutTab {
     private void openWorldStyleDropdown() {
         requestReopenOnCitiesTab();
         List<String> choices = PresetSelection.CLIENT.styleChoices();
-        Minecraft.getInstance().gui.setScreen(new WorldStyleDialog(screen, choices,
+        Minecraft.getInstance().gui.setScreen(new WorldStyleDialog(screen, choices, worldStyleNames,
                 PresetSelection.CLIENT.effectiveWorldStyles(),
                 Config.EXPERIMENTAL_MULTI_WORLD_STYLES.get(),
                 this::onWorldStylesChanged));
@@ -340,21 +352,21 @@ public class CitiesTab extends GridLayoutTab {
     }
 
     /**
-     * The selector's label: the lang-keyed "World Style" prefix followed by the effective style id,
-     * unchanged from before mixing existed - or, for a mix, how many styles are in it. The
-     * per-style percentages go in the tooltip rather than onto a button that still has to fit at GUI
-     * scale 4.
+     * The selector's label: the lang-keyed "World Style" prefix followed by the effective style's
+     * display name (its id when the datapack declares no {@code name}) - or, for a mix, how many
+     * styles are in it. The per-style shares go in the tooltip rather than onto a button that still
+     * has to fit at GUI scale 4.
      */
-    private static Component worldStyleLabel(WorldStyleMix styles) {
+    private Component worldStyleLabel(WorldStyleMix styles) {
         Component value = styles.isSingle()
-                ? Component.literal(styles.primary().toString())
+                ? Component.literal(displayName(styles.primary()))
                 : Component.translatable("urbex.tab.worldstyle.mixed", styles.entries().size());
         return Component.translatable("urbex.tab.worldstyle").append(": ").append(value);
     }
 
-    /** Each style and its normalized share, for a mix; nothing for a single style. */
+    /** Each style and its normalized share, for a mix; nothing to add for a single style. */
     @Nullable
-    private static Tooltip worldStyleTooltip(WorldStyleMix styles) {
+    private Tooltip worldStyleTooltip(WorldStyleMix styles) {
         if (styles.isSingle()) {
             return null;
         }
@@ -369,39 +381,59 @@ public class CitiesTab extends GridLayoutTab {
                 lines.append(CommonComponents.NEW_LINE);
             }
             first = false;
-            lines.append(Component.literal(entry.style() + "  " + Math.round(entry.weight() / total * 100f) + "%"));
+            lines.append(Component.literal(displayName(entry.style())
+                    + "  " + Math.round(entry.weight() / total * 100f) + "%"));
         }
         return Tooltip.create(lines);
     }
 
-    /**
-     * The registered worldStyle ids, read from the datapack registry loaded for the world being
-     * created (short {@code urbex}-namespace names, others kept as {@code namespace:path}), ordered
-     * {@code standard} first then alphabetical. Empty when the registry isn't reachable yet - the
-     * selector then just stays hidden.
-     */
-    private static List<String> registeredWorldStyles(CreateWorldScreen screen) {
-        RegistryAccess access = screen.getUiState().getSettings().worldgenLoadContext();
-        Optional<Registry<WorldStyleRE>> registry = access.lookup(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
-        if (registry.isEmpty()) {
-            return List.of();
-        }
-        List<String> ids = new ArrayList<>();
-        for (Identifier key : registry.get().keySet()) {
-            ids.add(worldStyleName(key));
-        }
-        ids.sort(Comparator.comparingInt((String s) -> STANDARD_STYLE.equals(s) ? 0 : 1)
-                .thenComparing(Comparator.naturalOrder()));
-        return ids;
+    /** A style's label, falling back to its fully-qualified id when its pack declares no name. */
+    private String displayName(Identifier style) {
+        String id = style.toString();
+        return worldStyleNames.getOrDefault(id, id);
     }
 
     /**
-     * The name a worldStyle registry key is shown/published as: its full {@code namespace:path},
-     * unabbreviated - once a second datapack is installed, a bare "standard" next to a bare
-     * "moderntweaks" would not say which pack owns which, so every entry is qualified.
+     * The registered worldStyles, read from the datapack registry loaded for the world being
+     * created: fully-qualified id -> the label to show for it, ordered {@code standard} first then
+     * alphabetical <em>by id</em> (not by label - the order must not shuffle when a pack renames
+     * itself). Empty when the registry isn't reachable yet - the selector then just stays hidden.
+     * <p>
+     * Ids stay the currency everywhere else: {@link PresetSelection} stores and publishes them, and
+     * this map only decides what the player reads. See {@link #worldStyleDisplayName}.
      */
-    private static String worldStyleName(Identifier key) {
-        return key.toString();
+    private static Map<String, String> registeredWorldStyles(CreateWorldScreen screen) {
+        RegistryAccess access = screen.getUiState().getSettings().worldgenLoadContext();
+        Optional<Registry<WorldStyleRE>> registry = access.lookup(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
+        if (registry.isEmpty()) {
+            return Map.of();
+        }
+        List<Identifier> keys = new ArrayList<>(registry.get().keySet());
+        keys.sort(Comparator.comparingInt((Identifier k) -> STANDARD_STYLE.equals(k.toString()) ? 0 : 1)
+                .thenComparing(Comparator.comparing(Identifier::toString)));
+        Map<String, String> names = new LinkedHashMap<>();
+        for (Identifier key : keys) {
+            names.put(key.toString(), worldStyleDisplayName(registry.get(), key));
+        }
+        return names;
+    }
+
+    /**
+     * The label for one worldStyle: its {@code name}, folded over the {@code extends} chain by the
+     * same {@link WorldStyle#displayNameOf} worldgen uses, falling back to the fully-qualified id.
+     * <p>
+     * A chain this screen cannot walk - a dangling {@code extends}, or a cycle - falls back to the
+     * id rather than propagating: the world will refuse to load with a message that names the real
+     * cause, and a dropdown that throws out of its own constructor would take the create-world
+     * screen down before the player ever got that message.
+     */
+    private static String worldStyleDisplayName(Registry<WorldStyleRE> registry, Identifier id) {
+        try {
+            return WorldStyle.displayNameOf(
+                    ExtendsChain.resolve(id, registry::getValue, WorldStyleRE::getExtends), id);
+        } catch (RuntimeException e) {
+            return id.toString();
+        }
     }
 
     /**
@@ -428,7 +460,9 @@ public class CitiesTab extends GridLayoutTab {
         List<PresetSelection.Entry> entries = new ArrayList<>();
         for (Identifier id : Presets.listBrowsable(access)) {
             Preset preset = Presets.resolve(id, registry.get()::getValue);
-            entries.add(new PresetSelection.Entry(id, Component.literal(id.toString()), preset));
+            // The preset's authored name, falling back to the id for a datapack that declares none -
+            // which is what every row read as before the field existed.
+            entries.add(new PresetSelection.Entry(id, Component.literal(preset.getDisplayName()), preset));
         }
         return entries;
     }

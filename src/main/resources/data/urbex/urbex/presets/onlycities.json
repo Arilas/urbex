@@ -1,5 +1,6 @@
 {
   "extends": "urbex:default",
+  "name": "Only Cities",
   "description": "The entire world is a city",
   "icon": "textures/gui/icon_onlycities.png",
   "cities": {

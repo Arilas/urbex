@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
@@ -29,17 +30,40 @@ import java.util.Set;
  */
 public class PresetRE implements IAsset<PresetRE>, Extendable {
 
-    public static final Set<String> KEYS = Set.of("extends", "description", "extraDescription", "warning", "icon",
-            "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
+    public static final Set<String> KEYS = Set.of("extends", "name", "description", "extraDescription", "warning",
+            "icon", "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
             "spawn", "atmosphere", "misc");
+
+    /**
+     * The six non-section keys, as one {@link MapCodec} inlined into the preset's own JSON object -
+     * {@code "name"} and its five neighbours stay top-level keys, exactly where they were authored.
+     * <p>
+     * Not a shape anyone asked for: {@code RecordCodecBuilder.group} tops out at sixteen fields, and
+     * adding {@code name} made seventeen. Bundling the metadata behind a {@code MapCodec} is the one
+     * way to buy a field back without moving a key or nesting one, so this record exists purely to
+     * be flattened again and never appears in the format.
+     */
+    private record Meta(Optional<Identifier> extendsId,
+                        Optional<String> name,
+                        Optional<String> description,
+                        Optional<String> extraDescription,
+                        Optional<String> warning,
+                        Optional<String> icon) {
+    }
+
+    private static final MapCodec<Meta> META = RecordCodecBuilder.mapCodec(instance ->
+            instance.group(
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(Meta::extendsId),
+                    Codec.STRING.optionalFieldOf("name").forGetter(Meta::name),
+                    Codec.STRING.optionalFieldOf("description").forGetter(Meta::description),
+                    Codec.STRING.optionalFieldOf("extraDescription").forGetter(Meta::extraDescription),
+                    Codec.STRING.optionalFieldOf("warning").forGetter(Meta::warning),
+                    Codec.STRING.optionalFieldOf("icon").forGetter(Meta::icon)
+            ).apply(instance, Meta::new));
 
     private static final Codec<PresetRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
-                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(PresetRE::getExtends),
-                    Codec.STRING.optionalFieldOf("description").forGetter(PresetRE::description),
-                    Codec.STRING.optionalFieldOf("extraDescription").forGetter(PresetRE::extraDescription),
-                    Codec.STRING.optionalFieldOf("warning").forGetter(PresetRE::warning),
-                    Codec.STRING.optionalFieldOf("icon").forGetter(PresetRE::icon),
+                    META.forGetter(PresetRE::meta),
                     TerrainSettings.CODEC.optionalFieldOf("terrain").forGetter(PresetRE::terrain),
                     CitySettings.CODEC.optionalFieldOf("cities").forGetter(PresetRE::cities),
                     BuildingSettings.CODEC.optionalFieldOf("buildings").forGetter(PresetRE::buildings),
@@ -66,6 +90,7 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
     private Identifier name;
 
     private final Optional<Identifier> extendsId;
+    private final Optional<String> displayName;
     private final Optional<String> description;
     private final Optional<String> extraDescription;
     private final Optional<String> warning;
@@ -83,6 +108,7 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
     private final Optional<MiscSettings> misc;
 
     public PresetRE(Optional<Identifier> extendsId,
+                     Optional<String> displayName,
                      Optional<String> description,
                      Optional<String> extraDescription,
                      Optional<String> warning,
@@ -98,11 +124,30 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
                      Optional<SpawnSettings> spawn,
                      Optional<AtmosphereSettings> atmosphere,
                      Optional<MiscSettings> misc) {
-        this.extendsId = extendsId;
-        this.description = description;
-        this.extraDescription = extraDescription;
-        this.warning = warning;
-        this.icon = icon;
+        this(new Meta(extendsId, displayName, description, extraDescription, warning, icon),
+                terrain, cities, buildings, roads, highways, railways, destruction, decoration,
+                spawn, atmosphere, misc);
+    }
+
+    /** The codec's own constructor; see {@link Meta} for why the metadata arrives bundled. */
+    private PresetRE(Meta meta,
+                     Optional<TerrainSettings> terrain,
+                     Optional<CitySettings> cities,
+                     Optional<BuildingSettings> buildings,
+                     Optional<RoadSettings> roads,
+                     Optional<HighwaySettings> highways,
+                     Optional<RailwaySettings> railways,
+                     Optional<DestructionSettings> destruction,
+                     Optional<DecorationSettings> decoration,
+                     Optional<SpawnSettings> spawn,
+                     Optional<AtmosphereSettings> atmosphere,
+                     Optional<MiscSettings> misc) {
+        this.extendsId = meta.extendsId();
+        this.displayName = meta.name();
+        this.description = meta.description();
+        this.extraDescription = meta.extraDescription();
+        this.warning = meta.warning();
+        this.icon = meta.icon();
         this.terrain = terrain;
         this.cities = cities;
         this.buildings = buildings;
@@ -119,6 +164,19 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
     @Override
     public Optional<Identifier> getExtends() {
         return extendsId;
+    }
+
+    private Meta meta() {
+        return new Meta(extendsId, displayName, description, extraDescription, warning, icon);
+    }
+
+    /**
+     * The human-readable label the Cities tab shows instead of the id. Inherited through
+     * {@code extends} exactly like {@link #description()}, so a pack that extends
+     * {@code urbex:default} and forgets to restate it is labelled "Default" - restate it.
+     */
+    public Optional<String> displayName() {
+        return displayName;
     }
 
     public Optional<String> description() {
@@ -183,6 +241,7 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
 
     /** Applies metadata (if present) then each present section's {@code apply}, onto {@code p}. */
     public void applyTo(Preset p) {
+        displayName.ifPresent(p::setName);
         description.ifPresent(p::setDescription);
         extraDescription.ifPresent(p::setExtraDescription);
         warning.ifPresent(p::setWarning);

@@ -51,6 +51,9 @@ class WorldStyleFieldTest {
     private static WorldStyle style(String path) {
         WorldStyleRE re = new WorldStyleRE(
                 Optional.empty(),
+                // No display name: these exist to be told apart by id, and getName() is what the
+                // field's primary tie-break and this test's assertions read.
+                Optional.empty(),
                 Optional.of("urbex:standard"),
                 Optional.empty(),
                 Optional.empty(),

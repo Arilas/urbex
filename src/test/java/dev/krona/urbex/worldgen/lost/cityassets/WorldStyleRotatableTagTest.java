@@ -42,7 +42,7 @@ class WorldStyleRotatableTagTest {
     }
 
     private static WorldStyleRE worldStyle(String name, Optional<TagKey<Block>> rotatable) {
-        return new WorldStyleRE(Optional.empty(), Optional.of("urbex:outside"),
+        return new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,

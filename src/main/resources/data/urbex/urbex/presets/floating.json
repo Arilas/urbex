@@ -1,5 +1,6 @@
 {
   "extends": "urbex:default",
+  "name": "Floating",
   "description": "Cities on floating islands",
   "extraDescription": "Note! No mineshafts or strongholds in this profile!",
   "warning": "Preferably use this in combination with the Lost Worlds 'islands' world type",

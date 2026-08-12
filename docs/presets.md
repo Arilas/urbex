@@ -28,12 +28,18 @@ or selectable.
 
 Every field in the file is **optional**. A preset only needs to state what it changes; anything
 left out falls through to what it `extends` (see [Resolution rules](#resolution-rules) below). The
-top-level object has five plain metadata fields (`extends`, `description`, `extraDescription`,
+top-level object has six plain metadata fields (`extends`, `name`, `description`, `extraDescription`,
 `warning`, `icon`) plus eleven **sections**, each grouping related settings: `terrain`, `cities`,
 `buildings`, `roads`, `highways`, `railways`, `destruction`, `decoration`, `spawn`, `atmosphere`,
 `misc`. A section is only applied if it's present in the file, and within a present section only
 the fields you actually write are overridden — you never have to restate a whole section to change
 one number in it.
+
+`name` is what the Cities tab puts on the row: a plain human label like `Tall Buildings`, not an id
+and not a translation key. Leave it out and the list falls back to showing the fully-qualified id,
+which is what every preset looked like before the field existed. Set it — and set it on **every**
+preset you ship, because like all the others it is inherited: a preset extending `urbex:default`
+that doesn't restate `name` is listed as **Default**, next to the real one.
 
 The full field list, types, numeric ranges and enum values are documented in the JSON Schema at
 [`docs/schema/preset.schema.json`](schema/preset.schema.json) (see [IDE wiring](#ide-wiring) to get
@@ -85,6 +91,7 @@ the fields that change from `urbex:default` need to be listed:
 ```json
 {
   "extends": "urbex:default",
+  "name": "Ruins",
   "description": "Heavily ruined cities, no spawners",
   "destruction": {
     "ruinChance": 0.6,
@@ -113,7 +120,8 @@ rather than overwriting it:
 
 Zip the `myruinspack` folder's contents (not the folder itself) into `myruinspack.zip`, drop it in
 your world's `datapacks/` folder (or the global `resourcepacks`-style datapack folder your server
-uses), and `mypack:ruins` appears in the **Cities** tab's preset list next to the built-ins.
+uses), and **Ruins** appears in the **Cities** tab's preset list next to the built-ins. (Drop the
+`name` and the row reads `mypack:ruins` instead.)
 
 ## Resolution rules
 

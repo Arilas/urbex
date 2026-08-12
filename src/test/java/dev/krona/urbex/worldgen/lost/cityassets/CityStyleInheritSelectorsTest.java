@@ -77,7 +77,8 @@ class CityStyleInheritSelectorsTest {
         return new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.of(selectors));
+                Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),
+                Optional.of(selectors));
     }
 
     private static List<String> values(CityStyle style, CityStyle.Sel kind) {

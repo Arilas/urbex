@@ -13,6 +13,7 @@ import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
 import dev.krona.urbex.worldgen.lost.Railway;
+import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
@@ -67,7 +68,10 @@ public class CommandDebug implements Command<CommandSourceStack> {
         line(context, "isCity = " + info.isCity);
         line(context, "chunkX = " + info.coord.chunkX());
         line(context, "chunkZ = " + info.coord.chunkZ());
-        line(context, "getCityStyle() = " + BuildingInfo.getChunkCharacteristics(info.coord, info.provider).cityStyle.getName());
+        CityStyle cityStyle = BuildingInfo.getChunkCharacteristics(info.coord, info.provider).cityStyle;
+        // Name first, id after: the id is what you edit, the name is what the world-style picker
+        // showed you, and a debug dump is the one place both are worth having side by side.
+        line(context, "getCityStyle() = " + cityStyle.getDisplayName() + " (" + cityStyle.getName() + ")");
         line(context, "streetType = " + info.streetType);
         line(context, "ruinHeight = " + info.ruinHeight);
         line(context, "tunnel0 = " + info.isTunnel(0));

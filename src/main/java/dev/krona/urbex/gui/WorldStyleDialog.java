@@ -27,12 +27,16 @@ import java.util.function.Consumer;
  * The modal "Select World Style" picker raised from the {@link CitiesTab} world-style button.
  * <p>
  * Two modes share one dialog. <b>Single</b> - the only mode when
- * {@code experimentalMultiWorldStyles} is off - is unchanged: a scrollable {@link ObjectSelectionList}
- * of the registered style ids plus a cancel button, where a click on a row hands the chosen id to
- * the caller and closes, and cancel (or Escape) leaves the current style untouched. Vanilla ships no
- * combobox, so that list is the dropdown. <b>Mix</b> is the experimental editor: every registered
- * style gets a row with an enable toggle, a weight stepper and a live normalized percentage, and
- * Done commits the whole weighted set.
+ * {@code experimentalMultiWorldStyles} is off - is a scrollable {@link ObjectSelectionList} of the
+ * registered styles plus a cancel button, where a click on a row hands the chosen style to the
+ * caller and closes. Vanilla ships no combobox, so that list is the dropdown. <b>Mix</b> is the
+ * experimental editor: every registered style gets a row with an enable toggle, a weight stepper and
+ * a live normalized percentage, and Done commits the whole weighted set.
+ * <p>
+ * Every row is labelled by the style's own {@code name} with its id underneath, so a pack that names
+ * itself reads as "Modern Tweaks" rather than {@code urbexmt:moderntweaks} - and the id stays
+ * visible, because it is what a config line or a bug report has to say. A style with no name is
+ * drawn as one centred id line rather than the same text twice.
  * <p>
  * Weights are raw rather than percentages. A player types the balance they mean - {@code 0.1} and
  * {@code 0.9} - and reads back {@code 10%} / {@code 90%}; being made to produce numbers that sum to
@@ -48,22 +52,24 @@ public class WorldStyleDialog extends Screen {
 
     /** Beyond this the single-column list of short ids just gets emptier; cap and centre instead. */
     private static final int MAX_WIDTH = 220;
-    /** The mix editor carries four controls per row, so it needs more than the plain list does. */
-    private static final int MAX_MIX_WIDTH = 340;
+    /** The mix editor carries four controls per row on top of the label, so it needs more room. */
+    private static final int MAX_MIX_WIDTH = 360;
     private static final int SCREEN_MARGIN = 20;
-    private static final int ROW_HEIGHT = 20;
+    /** Two stacked text lines (name over id) plus 4px of breathing room above and below. */
+    private static final int ROW_HEIGHT = 26;
     private static final int BUTTON_HEIGHT = 20;
     private static final int GAP = 6;
     private static final int TITLE_GAP = 8;
     private static final int TEXT_INSET = 6;
+    private static final int LINE_GAP = 1;
 
     /** Widths of the mix row's fixed-size controls, right to left from the row's trailing edge. */
-    private static final int CHECKBOX_SIZE = 20;
+    private static final int TOGGLE_WIDTH = 18;
     private static final int STEP_BUTTON_WIDTH = 16;
     private static final int WEIGHT_TEXT_WIDTH = 34;
     private static final int PERCENT_TEXT_WIDTH = 34;
 
-    /** Bounds and granularity of a weight stepper. Relative values, so the range is generous. */
+    /** Bounds and granularity of a weight stepper. Weights are relative, so the range is generous. */
     static final float MIN_WEIGHT = 0.05f;
     static final float MAX_WEIGHT = 10.0f;
     static final float WEIGHT_STEP = 0.05f;
@@ -71,10 +77,15 @@ public class WorldStyleDialog extends Screen {
     private static final int STYLE_COLOR = 0xffffffff;
     /** The style that generates right now, so it reads as "current" even after the player arrows away. */
     private static final int CURRENT_STYLE_COLOR = 0xffffff55;
-    private static final int DISABLED_COLOR = 0xff808080;
+    /** The id line: present but subordinate to the name above it. */
+    private static final int ID_COLOR = 0xff9f9f9f;
+    /** A row that is not in the mix, dimmed so the enabled set reads at a glance. */
+    private static final int DISABLED_COLOR = 0xff707070;
 
     private final Screen parent;
     private final List<String> styles;
+    /** Style id -> label; a style missing from it falls back to showing its id as the name. */
+    private final Map<String, String> names;
     private final WorldStyleMix current;
     private final boolean allowMixing;
     private final Consumer<WorldStyleMix> onSelect;
@@ -94,11 +105,12 @@ public class WorldStyleDialog extends Screen {
     public record MixRow(String style, boolean enabled, float weight) {
     }
 
-    public WorldStyleDialog(Screen parent, List<String> styles, WorldStyleMix current,
-                            boolean allowMixing, Consumer<WorldStyleMix> onSelect) {
+    public WorldStyleDialog(Screen parent, List<String> styles, Map<String, String> names,
+                            WorldStyleMix current, boolean allowMixing, Consumer<WorldStyleMix> onSelect) {
         super(Component.translatable("urbex.screen.worldstyle.title"));
         this.parent = parent;
         this.styles = List.copyOf(styles);
+        this.names = Map.copyOf(names);
         this.current = current;
         // Mixing needs something to mix: with one registered style the editor would be a single row
         // pinned on at 100%, which is exactly what the plain list already says.
@@ -110,10 +122,15 @@ public class WorldStyleDialog extends Screen {
         this.mixing = this.allowMixing && !current.isSingle();
     }
 
+    /** The label for a style id, falling back to the id itself when the caller supplied none. */
+    private String nameOf(String style) {
+        return names.getOrDefault(style, style);
+    }
+
     /**
      * The index of {@code current} within {@code choices} - the row to pre-select and highlight - or
-     * {@code -1} when {@code current} is absent (the disabled row's empty style, or a stale id a
-     * registry change dropped). Pure: no widget or game state.
+     * {@code -1} when {@code current} is absent (a stale id a registry change dropped). Pure: no
+     * widget or game state.
      */
     static int preselectIndex(List<String> choices, @Nullable String current) {
         if (current == null) {
@@ -221,7 +238,7 @@ public class WorldStyleDialog extends Screen {
         }
 
         if (mixing) {
-            int buttonWidth = (width - GAP) / 2;
+            int buttonWidth = Math.min(100, (width - GAP) / 2);
             addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> choose(toMix(rows)))
                     .bounds(x + width - buttonWidth * 2 - GAP, buttonY, buttonWidth, BUTTON_HEIGHT).build());
             addRenderableWidget(Button.builder(CommonComponents.GUI_CANCEL, b -> onClose())
@@ -237,9 +254,9 @@ public class WorldStyleDialog extends Screen {
     /**
      * Switches between the plain picker and the mix editor, rebuilding the widgets.
      * <p>
-     * Leaving mix mode keeps the heaviest enabled row and drops the rest, so the single-mode list
-     * has one unambiguous current style to highlight rather than silently keeping a mix the player
-     * can no longer see.
+     * Leaving mix mode keeps the heaviest enabled row and drops the rest, so the single-mode list has
+     * one unambiguous current style to highlight rather than silently keeping a mix the player can no
+     * longer see.
      */
     private void setMixing(boolean enabled) {
         if (mixing == enabled) {
@@ -258,13 +275,9 @@ public class WorldStyleDialog extends Screen {
         rebuildWidgets();
     }
 
-    private void setRow(int index, MixRow row) {
-        rows.set(index, row);
-    }
-
     private void stepWeight(int index, float delta) {
         MixRow row = rows.get(index);
-        setRow(index, new MixRow(row.style(), row.enabled(),
+        rows.set(index, new MixRow(row.style(), row.enabled(),
                 Mth.clamp(Math.round((row.weight() + delta) / WEIGHT_STEP) * WEIGHT_STEP, MIN_WEIGHT, MAX_WEIGHT)));
     }
 
@@ -273,7 +286,7 @@ public class WorldStyleDialog extends Screen {
         if (row.enabled() && !canDisable(rows, index)) {
             return;
         }
-        setRow(index, new MixRow(row.style(), !row.enabled(), row.weight()));
+        rows.set(index, new MixRow(row.style(), !row.enabled(), row.weight()));
     }
 
     /** Commits a chosen selection to the caller and closes back to the parent screen. */
@@ -357,10 +370,18 @@ public class WorldStyleDialog extends Screen {
 
             @Override
             public Component getNarration() {
-                return Component.literal(style);
+                String name = nameOf(style);
+                Component label = name.equals(style)
+                        ? Component.literal(style) : Component.literal(name + " (" + style + ")");
+                if (!mixing) {
+                    return label;
+                }
+                MixRow row = rows.get(index);
+                int percent = normalize(rows).get(index);
+                return Component.literal((row.enabled() ? percent + "%, " : "off, ")).append(label);
             }
 
-            /** The x of the row's leading control edge for a control {@code n} slots from the right. */
+            /** The x of a control's leading edge, given how many pixels of row sit to its right. */
             private int trailingX(int fromRight, int controlWidth) {
                 return getContentX() + getContentWidth() - fromRight - controlWidth;
             }
@@ -393,8 +414,8 @@ public class WorldStyleDialog extends Screen {
                 } else if (mouseX >= plusX() && mouseX < plusX() + STEP_BUTTON_WIDTH) {
                     stepWeight(index, WEIGHT_STEP);
                 } else {
-                    // Anywhere else on the row toggles it - a bigger target than the checkbox alone,
-                    // and the id itself is the natural thing to click.
+                    // Anywhere else on the row toggles it - a bigger target than a checkbox alone,
+                    // and the name itself is the natural thing to click.
                     toggleRow(index);
                 }
                 return true;
@@ -403,22 +424,39 @@ public class WorldStyleDialog extends Screen {
             @Override
             public void extractContent(GuiGraphicsExtractor graphics, int mouseX, int mouseY, boolean hovered, float partialTick) {
                 Font font = Minecraft.getInstance().font;
-                int textY = getContentY() + Math.max(0, (getContentHeight() - font.lineHeight) / 2);
-                if (!mixing) {
-                    int color = style.equals(current.primary().toString()) ? CURRENT_STYLE_COLOR : STYLE_COLOR;
-                    graphics.text(font, Component.literal(style), getContentX() + TEXT_INSET, textY, color);
+                boolean enabled = !mixing || rows.get(index).enabled();
+                int labelX = getContentX() + (mixing ? TOGGLE_WIDTH : TEXT_INSET);
+                int color = enabled
+                        ? (style.equals(current.primary().toString()) ? CURRENT_STYLE_COLOR : STYLE_COLOR)
+                        : DISABLED_COLOR;
+
+                if (mixing) {
+                    MixRow row = rows.get(index);
+                    int mid = getContentY() + Math.max(0, (getContentHeight() - font.lineHeight) / 2);
+                    graphics.text(font, Component.literal(row.enabled() ? "[x]" : "[ ]"),
+                            getContentX(), mid, color);
+                    graphics.text(font, Component.literal("-"), minusX() + 5, mid, color);
+                    graphics.text(font, Component.literal(String.format(Locale.ROOT, "%.2f", row.weight())),
+                            weightX(), mid, color);
+                    graphics.text(font, Component.literal("+"), plusX() + 5, mid, color);
+                    int percent = normalize(rows).get(index);
+                    graphics.text(font, Component.literal(percent < 0 ? "-" : percent + "%"),
+                            percentX(), mid, color);
+                }
+
+                // A style with no name of its own is already labelled by its id, so the second line
+                // would repeat it verbatim; draw the single line centred instead.
+                String name = nameOf(style);
+                if (name.equals(style)) {
+                    int textY = getContentY() + Math.max(0, (getContentHeight() - font.lineHeight) / 2);
+                    graphics.text(font, Component.literal(style), labelX, textY, color);
                     return;
                 }
-                MixRow row = rows.get(index);
-                int color = row.enabled() ? STYLE_COLOR : DISABLED_COLOR;
-                graphics.text(font, Component.literal(row.enabled() ? "[x]" : "[ ]"), getContentX(), textY, color);
-                graphics.text(font, Component.literal(style), getContentX() + CHECKBOX_SIZE, textY, color);
-                graphics.text(font, Component.literal("-"), minusX() + 5, textY, color);
-                graphics.text(font, Component.literal(String.format(Locale.ROOT, "%.2f", row.weight())),
-                        weightX(), textY, color);
-                graphics.text(font, Component.literal("+"), plusX() + 5, textY, color);
-                int percent = normalize(rows).get(index);
-                graphics.text(font, Component.literal(percent < 0 ? "-" : percent + "%"), percentX(), textY, color);
+                int block = font.lineHeight * 2 + LINE_GAP;
+                int top = getContentY() + Math.max(0, (getContentHeight() - block) / 2);
+                graphics.text(font, Component.literal(name), labelX, top, color);
+                graphics.text(font, Component.literal(style), labelX, top + font.lineHeight + LINE_GAP,
+                        enabled ? ID_COLOR : DISABLED_COLOR);
             }
         }
     }

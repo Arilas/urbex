@@ -1,4 +1,5 @@
 {
+  "name": "Standard",
   "style": "urbex:standard",
   "extends": "urbex:citystyle_common"
 }
