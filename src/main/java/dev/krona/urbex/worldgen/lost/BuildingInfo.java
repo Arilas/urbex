@@ -98,6 +98,7 @@ public class BuildingInfo {
     private Palette palette = null;             // written once, in the constructor
     private volatile CompiledPalette compiledPalette = null;
     private volatile Boolean isOcean = null;
+    private volatile WorldStyle chunkWorldStyle = null;
 
     private volatile boolean xBridgeTypeCalculated = false;
     private volatile boolean zBridgeTypeCalculated = false;
@@ -195,8 +196,28 @@ public class BuildingInfo {
         return damageArea;
     }
 
+    /**
+     * The world style governing this chunk: the dominant nearby city's, so a chunk on a city's edge
+     * takes that city's look rather than a coin flip, and a world that mixes datapacks does not
+     * produce half-and-half cities.
+     * <p>
+     * Memoised because a {@link BuildingInfo} is per-chunk and long-lived while the lookup behind
+     * it walks the city neighbourhood - and because {@code CityGenerator.transformBlockState} reads
+     * the rotatable tag off it for every block of every rotated part. Racy single-check like the
+     * other lazy fields here: the value is a pure function of the coordinate, so a lost race just
+     * recomputes it.
+     */
+    public WorldStyle worldStyle() {
+        WorldStyle known = chunkWorldStyle;
+        if (known == null) {
+            known = provider.worldStyles().atChunk(provider, coord);
+            chunkWorldStyle = known;
+        }
+        return known;
+    }
+
     public Style getOutsideStyle() {
-        return AssetRegistries.STYLES.get(provider.getWorld(), provider.getWorldStyle().getOutsideStyle());
+        return AssetRegistries.STYLES.get(provider.getWorld(), worldStyle().getOutsideStyle());
     }
 
     private void createPalette(RandomSource rand) {
@@ -687,7 +708,7 @@ public class BuildingInfo {
         groundLevel = profile.GROUNDLEVEL;
         int wl = profile.SEALEVEL;
         waterLevel = wl == -1 ? Tools.getSeaLevel(provider.getWorld()) : wl;
-        WorldSettings.RailwayAvoidance avoidance = provider.getWorldStyle().getWorldSettings().railwayAvoidance();
+        WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
 
         // In a multi building we copy all information from the top-left chunk
         if (multiBuildingPos.isMulti() && !multiBuildingPos.isTopLeft()) {
@@ -759,7 +780,7 @@ public class BuildingInfo {
                     maxUnder = getMaxHighwayLevel();
                 }
 
-                int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
+                int partlevel = provider.worldStyles().primary().getWorldSettings().railPartHeight6();
                 fb = Math.min(cityLevel - maxUnder - partlevel, fb);
                 if (fb < 0) {
                     fb = 0;
@@ -790,7 +811,7 @@ public class BuildingInfo {
             Railway.RailChunkInfo railInfo = getRailInfo();
             if (railInfo != Railway.RailChunkInfo.NOTHING) {
                 int lowestLevel = cityLevel - cellars;
-                int partlevel = provider.getWorldStyle().getWorldSettings().railPartHeight6();
+                int partlevel = provider.worldStyles().primary().getWorldSettings().railPartHeight6();
                 if (lowestLevel <= railInfo.getLevel() + partlevel - 1) {
                     // There is a collision
                     Railway.removeRailChunkType(provider, coord);

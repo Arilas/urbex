@@ -46,6 +46,9 @@ public class Config {
     /** {@code preset[@worldstyle]} entries with no explicit worldstyle resolve to this. */
     public static final Identifier DEFAULT_WORLD_STYLE = Identifier.fromNamespaceAndPath("urbex", "standard");
 
+    /** The single-entry mix every path that does not name its own styles resolves to. */
+    public static final WorldStyleMix DEFAULT_WORLD_STYLE_MIX = WorldStyleMix.of(DEFAULT_WORLD_STYLE);
+
     /** The currently active config: global, with the running world's overrides applied. */
     private static volatile UrbexConfig active = UrbexConfig.DEFAULT;
     /** The global config alone, restored when a world's overrides are dropped. */
@@ -63,6 +66,25 @@ public class Config {
     public static final Supplier<Boolean> AVOID_VILLAGES = () -> active.avoidVillages();
     public static final Supplier<Boolean> AVOID_VILLAGES_ADJACENT = () -> active.avoidVillagesAdjacent();
     public static final Supplier<Boolean> AVOID_FLATTENING = () -> active.avoidFlattening();
+    public static final Supplier<Boolean> EXPERIMENTAL_MULTI_WORLD_STYLES = () -> active.experimentalMultiWorldStyles();
+
+    /**
+     * Applies the {@code experimentalMultiWorldStyles} opt-in to a mix that arrived from anywhere -
+     * a config line, a client publication, a saved world. With the flag off a multi-entry mix is
+     * reduced to its primary style and the reduction logged.
+     * <p>
+     * The gate is on the value rather than only on the UI: a save or a config file hand-edited to
+     * carry a mix must not quietly get one on an install that never opted in.
+     */
+    public static WorldStyleMix gateMix(WorldStyleMix mix, String context) {
+        if (mix.isSingle() || EXPERIMENTAL_MULTI_WORLD_STYLES.get()) {
+            return mix;
+        }
+        WorldStyleMix reduced = mix.reducedToPrimary();
+        Urbex.getLogger().warn("{} names {} world styles, but experimentalMultiWorldStyles is off; "
+                + "generating with '{}' alone.", context, mix.entries().size(), reduced.primary());
+        return reduced;
+    }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
@@ -172,7 +194,7 @@ public class Config {
 
     // Selection as published by the client.
     public static Identifier presetFromClient = null;
-    public static Identifier worldStyleFromClient = null;
+    public static WorldStyleMix worldStyleMixFromClient = null;
     public static String overridesFromClient = null;
 
     // Lazily filled from avoidStructures by cacheAvoidedStructures(). Must start out null:
@@ -181,7 +203,7 @@ public class Config {
 
     public static void reset() {
         presetFromClient = null;
-        worldStyleFromClient = null;
+        worldStyleMixFromClient = null;
         overridesFromClient = null;
         dimensionPresetCache = null;
         AVOID_STRUCTURES_SET = null;
@@ -233,15 +255,17 @@ public class Config {
 
         String presetPart = split[1];
         String presetName = presetPart;
-        Identifier worldStyle = DEFAULT_WORLD_STYLE;
+        WorldStyleMix worldStyles = DEFAULT_WORLD_STYLE_MIX;
         int at = presetPart.indexOf('@');
         if (at >= 0) {
             presetName = presetPart.substring(0, at);
             String stylePart = presetPart.substring(at + 1);
             try {
-                worldStyle = DataTools.fromName(stylePart);
+                // The whole tail, not one id: a single qualified id is just a one-entry mix, so the
+                // pre-mixing form parses unchanged.
+                worldStyles = gateMix(WorldStyleMix.parse(stylePart), "dimensionsWithPresets entry '" + entry + "'");
             } catch (Exception e) {
-                Urbex.getLogger().error("Bad worldstyle id in config value: '{}'! {}", entry, e.getMessage());
+                Urbex.getLogger().error("Bad worldstyle spec in config value: '{}'! {}", entry, e.getMessage());
                 return Optional.empty();
             }
         }
@@ -254,7 +278,7 @@ public class Config {
             return Optional.empty();
         }
 
-        return Optional.of(Map.entry(dimensionType, new PresetChoice(presetId, worldStyle, Optional.empty())));
+        return Optional.of(Map.entry(dimensionType, new PresetChoice(presetId, worldStyles, Optional.empty())));
     }
 
     /**
@@ -284,7 +308,7 @@ public class Config {
 
         UrbexData data = UrbexData.getData(level);
         Identifier selectedPreset = null;
-        Identifier selectedWorldStyle = null;
+        WorldStyleMix selectedWorldStyles = null;
         String selectedOverrides = null;
 
         // A world that already recorded a choice keeps it, even with a client selection published.
@@ -299,10 +323,12 @@ public class Config {
         boolean worldHasOwnChoice = !data.getSelectedPreset().isEmpty();
         if (presetFromClient != null && !worldHasOwnChoice) {
             selectedPreset = presetFromClient;
-            selectedWorldStyle = worldStyleFromClient != null ? worldStyleFromClient : DEFAULT_WORLD_STYLE;
+            selectedWorldStyles = gateMix(
+                    worldStyleMixFromClient != null ? worldStyleMixFromClient : DEFAULT_WORLD_STYLE_MIX,
+                    "The world being created");
             selectedOverrides = overridesFromClient;
             // Remember the client's selection in SavedData.
-            data.setChoice(selectedPreset.toString(), selectedWorldStyle.toString(),
+            data.setChoice(selectedPreset.toString(), selectedWorldStyles,
                     selectedOverrides == null ? "" : selectedOverrides);
         } else {
             String savedPreset = data.getSelectedPreset();
@@ -311,16 +337,9 @@ public class Config {
                 if (selectedPreset == null) {
                     Urbex.getLogger().error("Malformed saved preset id '{}' in world data; treating the overworld's selection as unset.", savedPreset);
                 } else {
-                    String savedStyle = data.getSelectedWorldStyle();
-                    if (savedStyle.isEmpty()) {
-                        selectedWorldStyle = DEFAULT_WORLD_STYLE;
-                    } else {
-                        selectedWorldStyle = Identifier.tryParse(savedStyle);
-                        if (selectedWorldStyle == null) {
-                            Urbex.getLogger().error("Malformed saved worldstyle id '{}' in world data; using {}.", savedStyle, DEFAULT_WORLD_STYLE);
-                            selectedWorldStyle = DEFAULT_WORLD_STYLE;
-                        }
-                    }
+                    // getSelectedWorldStyles is itself fail-soft: a corrupted or hand-edited save
+                    // degrades to the default rather than taking a worldgen worker down.
+                    selectedWorldStyles = gateMix(data.getSelectedWorldStyles(), "This world's saved selection");
                     String savedOverrides = data.getSelectedOverrides();
                     selectedOverrides = savedOverrides.isEmpty() ? null : savedOverrides;
                 }
@@ -328,9 +347,12 @@ public class Config {
                 String globalPreset = Config.SELECTED_PRESET.get();
                 if (globalPreset != null && !globalPreset.isEmpty()) {
                     selectedPreset = DataTools.fromName(globalPreset);
+                    // The global config's own selection stays a single id: it is the overworld-only
+                    // default for installs that never open the Cities tab, and a mix there would add
+                    // a third place to look for one setting without adding any reach.
                     String globalStyle = Config.SELECTED_WORLD_STYLE.get();
-                    selectedWorldStyle = globalStyle == null || globalStyle.isEmpty()
-                            ? DEFAULT_WORLD_STYLE : DataTools.fromName(globalStyle);
+                    selectedWorldStyles = globalStyle == null || globalStyle.isEmpty()
+                            ? DEFAULT_WORLD_STYLE_MIX : WorldStyleMix.of(DataTools.fromName(globalStyle));
                 }
             }
         }
@@ -345,15 +367,25 @@ public class Config {
                 Urbex.getLogger().error("Unknown Urbex preset '{}' selected for the overworld; ignoring. Valid presets: {}",
                         selectedPreset, String.join(", ", sortedIds(presets)));
                 selectedPreset = null;
-            } else if (worldStyles.get(selectedWorldStyle).isEmpty()) {
-                Urbex.getLogger().error("Unknown Urbex worldstyle '{}' selected for the overworld; using {}. Valid worldstyles: {}",
-                        selectedWorldStyle, DEFAULT_WORLD_STYLE, String.join(", ", sortedIds(worldStyles)));
-                selectedWorldStyle = DEFAULT_WORLD_STYLE;
+            } else {
+                // Per entry rather than all-or-nothing: one datapack going missing should cost that
+                // pack's cities, not the whole mix. Only an empty remainder falls back to the default.
+                List<WorldStyleMix.Entry> known = new ArrayList<>();
+                for (WorldStyleMix.Entry candidate : selectedWorldStyles.entries()) {
+                    if (worldStyles.get(candidate.style()).isPresent()) {
+                        known.add(candidate);
+                    } else {
+                        Urbex.getLogger().error("Unknown Urbex worldstyle '{}' selected for the overworld; "
+                                        + "dropping it from the mix. Valid worldstyles: {}",
+                                candidate.style(), String.join(", ", sortedIds(worldStyles)));
+                    }
+                }
+                selectedWorldStyles = known.isEmpty() ? DEFAULT_WORLD_STYLE_MIX : WorldStyleMix.of(known);
             }
         }
 
         if (selectedPreset != null) {
-            cache.put(Level.OVERWORLD, new PresetChoice(selectedPreset, selectedWorldStyle, Optional.ofNullable(selectedOverrides)));
+            cache.put(Level.OVERWORLD, new PresetChoice(selectedPreset, selectedWorldStyles, Optional.ofNullable(selectedOverrides)));
         }
 
         // Read the half-built map directly. This used to call back into getProfileForDimension,
@@ -377,7 +409,7 @@ public class Config {
             }
             if (overworldPreset.GENERATE_NETHER) {
                 cache.put(Level.NETHER, new PresetChoice(
-                        Identifier.fromNamespaceAndPath("urbex", "cavern"), DEFAULT_WORLD_STYLE, Optional.empty()));
+                        Identifier.fromNamespaceAndPath("urbex", "cavern"), DEFAULT_WORLD_STYLE_MIX, Optional.empty()));
             }
         }
         return cache;
@@ -411,7 +443,9 @@ public class Config {
             // Malformed entries are reported by parseDimensionPresetEntry itself; not this method's concern.
             parsed.ifPresent(e -> {
                 requirePreset(presets, e.getValue().preset(), "dimensionsWithPresets entry '" + dp + "'");
-                requireWorldStyle(worldStyles, e.getValue().worldStyle(), "dimensionsWithPresets entry '" + dp + "'");
+                for (Identifier style : e.getValue().worldStyles().styles()) {
+                    requireWorldStyle(worldStyles, style, "dimensionsWithPresets entry '" + dp + "'");
+                }
             });
         }
     }

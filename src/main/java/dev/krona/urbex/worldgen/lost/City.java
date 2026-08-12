@@ -214,7 +214,10 @@ public class City {
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         RandomSource cityStyleForCenterRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
-        return provider.getWorldStyle().getRandomCityStyle(provider, coord, cityStyleForCenterRandom);
+        // The centre's own world style, drawn at the centre: this is what makes one city internally
+        // coherent when a world mixes several datapacks, since every chunk of that city asks here.
+        return provider.worldStyles().atCityCenter(coord)
+                .getRandomCityStyle(provider, coord, cityStyleForCenterRandom);
     }
 
     // Calculate the citystyle based on all surrounding cities
@@ -270,7 +273,8 @@ public class City {
 
         String cityStyleName;
         if (styles.isEmpty()) {
-            cityStyleName = provider.getWorldStyle().getRandomCityStyle(provider, coord, cityStyleRandom);
+            cityStyleName = provider.worldStyles().atChunk(provider, coord)
+                    .getRandomCityStyle(provider, coord, cityStyleRandom);
         } else {
             Pair<Float, String> fromList = Tools.getRandomFromList(cityStyleRandom, styles, Pair::getLeft);
             if (fromList == null) {
@@ -350,10 +354,13 @@ public class City {
         }
 
         if (factor > 0.0001 && provider.registryAccess() != null) {
-            // The compiled style is already on the dimension info (DefaultDimensionInfo /
-            // NullDimensionInfo resolve it once at construction) - Preset itself carries no
+            // The compiled styles are already on the dimension info (DefaultDimensionInfo /
+            // NullDimensionInfo resolve them once at construction) - Preset itself carries no
             // worldStyle any more, so there is nothing left to re-resolve here.
-            float multiplier = provider.getWorldStyle().getCityChanceMultiplier(provider, coord);
+            //
+            // primary(), not the chunk's style: this decides whether a city exists at all, so
+            // attributing it to a nearby city would be circular.
+            float multiplier = provider.worldStyles().primary().getCityChanceMultiplier(provider, coord);
             factor *= multiplier;
         }
 

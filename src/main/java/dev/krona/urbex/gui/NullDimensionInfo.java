@@ -8,7 +8,9 @@ import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.DimensionCaches;
+import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.WorldStyleField;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
@@ -32,6 +34,7 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -110,7 +113,7 @@ public class NullDimensionInfo implements IDimensionInfo {
     };
 
     private final Preset profile;
-    private final WorldStyle style;
+    private final WorldStyleField styles;
     private final Random random;
     private final long seed;
 
@@ -121,20 +124,34 @@ public class NullDimensionInfo implements IDimensionInfo {
     private final DimensionCaches caches;
     private final RoadField roadField;
 
-    public NullDimensionInfo(Preset profile, Identifier worldStyle, long seed, @Nullable RegistryAccess registryAccess) {
+    /**
+     * The preview's dimension info. Takes the whole {@link WorldStyleMix} the player chose, so a
+     * mixed selection previews as a mix rather than as its primary alone - judging a balance before
+     * committing to the world is the point of the control.
+     * <p>
+     * Every id resolves independently: one style the datapacks no longer ship falls back to the
+     * placeholder for that entry alone, rather than taking the whole preview with it.
+     */
+    public NullDimensionInfo(Preset profile, WorldStyleMix worldStyles, long seed, @Nullable RegistryAccess registryAccess) {
         this.profile = profile;
         this.caches = new DimensionCaches(seed);
-        WorldStyle resolved = null;
-        if (registryAccess != null) {
-            try {
-                resolved = AssetRegistries.WORLDSTYLES.get(registryAccess, worldStyle);
-            } catch (RuntimeException e) {
-                // Preview only: fall back to the placeholder below if the chosen style isn't
-                // registered (e.g. a stale GUI worldStyle no longer shipped by any datapack).
-                Urbex.LOGGER.debug("Preview could not resolve worldstyle '{}'; using the placeholder.", worldStyle, e);
+        List<WorldStyleField.Weighted> resolvedEntries = new ArrayList<>(worldStyles.entries().size());
+        for (WorldStyleMix.Entry entry : worldStyles.entries()) {
+            WorldStyle resolved = null;
+            if (registryAccess != null) {
+                try {
+                    resolved = AssetRegistries.WORLDSTYLES.get(registryAccess, entry.style());
+                } catch (RuntimeException e) {
+                    // Preview only: fall back to the placeholder below if the chosen style isn't
+                    // registered (e.g. a stale GUI worldStyle no longer shipped by any datapack).
+                    Urbex.LOGGER.debug("Preview could not resolve worldstyle '{}'; using the placeholder.",
+                            entry.style(), e);
+                }
             }
+            resolvedEntries.add(new WorldStyleField.Weighted(entry.weight(),
+                    resolved != null ? resolved : new WorldStyle(List.of(placeholderStyle()))));
         }
-        style = resolved != null ? resolved : new WorldStyle(List.of(placeholderStyle()));
+        styles = new WorldStyleField(seed, resolvedEntries);
         this.seed = seed;
         random = new Random(seed);
         feature = new CityGenerator(this, profile);
@@ -229,8 +246,8 @@ public class NullDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public WorldStyle getWorldStyle() {
-        return style;
+    public WorldStyleField worldStyles() {
+        return styles;
     }
 
     /** The config preview renderer's own source. Nothing here places generated blocks. */

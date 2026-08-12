@@ -37,6 +37,36 @@ public class Scattered {
         return Highway.hasHighway(info.coord, feature.provider, feature.profile);
     }
 
+    /**
+     * The size of a scatter area, from the primary world style.
+     * <p>
+     * From {@code primary()} rather than from whichever style governs the area, for the same reason
+     * {@code MultiChunk}'s {@code areasize} is: it defines the grid, so it cannot be read out of a
+     * cell of a grid it has not defined yet. Which pack's <em>structure</em> stands in a cell is a
+     * separate question, and that one does vary - see {@link #areaAnchor}'s callers.
+     * <p>
+     * {@code 1} when the primary style declares no {@code scattered} block at all, so the anchor
+     * maths stays well defined; the caller checks for null settings before generating anything.
+     */
+    private static int primaryAreasize(IDimensionInfo provider) {
+        ScatteredSettings settings = provider.worldStyles().primary().getScatteredSettings();
+        return settings == null ? 1 : settings.getAreasize();
+    }
+
+    /**
+     * The anchor chunk of the scatter area {@code coord} falls in.
+     * <p>
+     * Public because the caller has to know which area a chunk is in <em>before</em> it can ask
+     * which world style governs that area, and every chunk of one area has to get the same answer.
+     */
+    public static ChunkCoord areaAnchor(IDimensionInfo provider, ChunkCoord coord) {
+        int areasize = primaryAreasize(provider);
+        // Add a large amount so the division is over positive coordinates.
+        int ax = (coord.chunkX() + 2000000) / areasize;
+        int az = (coord.chunkZ() + 2000000) / areasize;
+        return new ChunkCoord(provider.getType(), ax * areasize - 2000000, az * areasize - 2000000);
+    }
+
     public static void generateScattered(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, ScatteredSettings scatteredSettings) {
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();

@@ -15,6 +15,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 import javax.annotation.Nullable;
+import dev.krona.urbex.setup.WorldStyleMix;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,7 +36,6 @@ public final class PresetSelection {
     public static final Identifier CUSTOMIZED_ID = Identifier.fromNamespaceAndPath("urbex", "customized");
 
     private static final Gson GSON = new Gson();
-    private static final String DEFAULT_STYLE_NAME = Config.DEFAULT_WORLD_STYLE.toString();
 
     /**
      * One selectable row. {@code preset} is {@code null} only for the Disabled row; every other
@@ -69,7 +70,7 @@ public final class PresetSelection {
 
     private List<String> availableWorldStyles = List.of();
     @Nullable
-    private String selectedWorldStyle = null;
+    private WorldStyleMix selectedWorldStyles = null;
 
     @Nullable
     private PendingRestore pendingRestore = null;
@@ -131,14 +132,24 @@ public final class PresetSelection {
     /**
      * The worldStyle ids the Cities tab renders in its selector, injected from the live registry.
      * The tab hides the control when this has {@code <= 1} entries (the common "standard-only" case).
-     * Injecting a list that no longer contains the chosen style clears the override back to "use the
-     * default", so a stale choice never survives a registry that dropped it.
+     * <p>
+     * A style the injected list no longer carries is pruned from the chosen mix rather than
+     * clearing the whole selection: turning one datapack off on the Data Packs screen should cost
+     * that pack's cities, not the balance the player set up for the others. Only when nothing is
+     * left does the override go back to "use the default".
      */
     public void setAvailableWorldStyles(List<String> ids) {
         this.availableWorldStyles = ids == null ? List.of() : List.copyOf(ids);
-        if (selectedWorldStyle != null && !availableWorldStyles.contains(selectedWorldStyle)) {
-            selectedWorldStyle = null;
+        if (selectedWorldStyles == null) {
+            return;
         }
+        List<WorldStyleMix.Entry> kept = new ArrayList<>();
+        for (WorldStyleMix.Entry entry : selectedWorldStyles.entries()) {
+            if (availableWorldStyles.contains(entry.style().toString())) {
+                kept.add(entry);
+            }
+        }
+        selectedWorldStyles = kept.isEmpty() ? null : WorldStyleMix.of(kept);
     }
 
     /** What the Cities tab renders in its worldStyle selector; empty until injected. */
@@ -147,22 +158,32 @@ public final class PresetSelection {
     }
 
     /**
-     * Records the player's chosen worldStyle - orthogonal to the preset (spec 1a): a {@link Preset}
+     * Records the player's chosen worldStyles - orthogonal to the preset (spec 1a): a {@link Preset}
      * carries no worldStyle field of its own any more. {@code null} means "no override - use the
      * default". Doesn't publish - the caller republishes so the change reaches the server.
      */
-    public void setWorldStyle(String id) {
-        this.selectedWorldStyle = id;
+    public void setWorldStyles(WorldStyleMix styles) {
+        this.selectedWorldStyles = styles;
     }
 
     /** The chosen worldStyle override, or {@code null} for "use the default". */
-    public String selectedWorldStyle() {
-        return selectedWorldStyle;
+    @Nullable
+    public WorldStyleMix selectedWorldStyles() {
+        return selectedWorldStyles;
     }
 
-    /** The fully-qualified worldStyle that will actually generate: the chosen override, or the default. */
+    /** The worldStyles that will actually generate: the chosen override, or the default. */
+    public WorldStyleMix effectiveWorldStyles() {
+        return selectedWorldStyles != null ? selectedWorldStyles : Config.DEFAULT_WORLD_STYLE_MIX;
+    }
+
+    /**
+     * One representative fully-qualified worldStyle id - the mix's primary. For the places that
+     * still want a single name: the tab's label when only one style is chosen, and diagnostics. A
+     * single selection therefore reads exactly as it did before mixing existed.
+     */
     public String effectiveWorldStyle() {
-        return selectedWorldStyle != null ? selectedWorldStyle : DEFAULT_STYLE_NAME;
+        return effectiveWorldStyles().primary().toString();
     }
 
     public Entry selected() {
@@ -184,7 +205,7 @@ public final class PresetSelection {
         availablePresets = List.of();
         selected = DISABLED_ENTRY;
         customized = null;
-        selectedWorldStyle = null;
+        selectedWorldStyles = null;
         availableWorldStyles = List.of();
         pendingRestore = null;
     }
@@ -216,13 +237,18 @@ public final class PresetSelection {
             Urbex.getLogger().warn("Re-created world used a malformed Urbex preset id '{}'; ignoring", preset);
             return;
         }
-        Identifier worldStyleId = (worldStyle == null || worldStyle.isEmpty())
-                ? Config.DEFAULT_WORLD_STYLE : Identifier.tryParse(worldStyle);
-        if (worldStyleId == null) {
-            Urbex.getLogger().warn("Re-created world used a malformed Urbex worldstyle id '{}'; using {}.",
-                    worldStyle, Config.DEFAULT_WORLD_STYLE);
-            worldStyleId = Config.DEFAULT_WORLD_STYLE;
+        // A bare qualified id parses as a one-entry mix, so a world saved before mixing existed
+        // restores exactly as it always did.
+        WorldStyleMix worldStyles;
+        try {
+            worldStyles = (worldStyle == null || worldStyle.isEmpty())
+                    ? Config.DEFAULT_WORLD_STYLE_MIX : WorldStyleMix.parse(worldStyle);
+        } catch (IllegalArgumentException e) {
+            Urbex.getLogger().warn("Re-created world used a malformed Urbex worldstyle spec '{}'; using {}.",
+                    worldStyle, Config.DEFAULT_WORLD_STYLE_MIX.format());
+            worldStyles = Config.DEFAULT_WORLD_STYLE_MIX;
         }
+        worldStyles = Config.gateMix(worldStyles, "The re-created world's saved selection");
         // Validated BEFORE publishing, not after: Config.overridesFromClient is read on a worldgen
         // worker thread the moment a chunk generates (CityFeature.getDimensionInfo), so an unparseable
         // string must never reach it - publishing it and only catching the parse failure later (in
@@ -233,11 +259,11 @@ public final class PresetSelection {
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetPresetCache();
         Config.presetFromClient = presetId;
-        Config.worldStyleFromClient = worldStyleId;
+        Config.worldStyleMixFromClient = worldStyles;
         Config.overridesFromClient = overrides;
         Urbex.getLogger().info("Restored Urbex preset '{}' for world re-creation", presetId);
 
-        this.selectedWorldStyle = worldStyleId.toString();
+        this.selectedWorldStyles = worldStyles;
         this.pendingRestore = new PendingRestore(presetId, overrides);
         reconcilePendingRestore();
     }
@@ -312,14 +338,14 @@ public final class PresetSelection {
      * world would generate with just as much as publishing does.
      */
     public void discardPublication() {
-        if (Config.presetFromClient == null && Config.worldStyleFromClient == null
+        if (Config.presetFromClient == null && Config.worldStyleMixFromClient == null
                 && Config.overridesFromClient == null) {
             return;
         }
         CityFeature.globalDimensionInfoDirtyCounter++;
         Config.resetPresetCache();
         Config.presetFromClient = null;
-        Config.worldStyleFromClient = null;
+        Config.worldStyleMixFromClient = null;
         Config.overridesFromClient = null;
         Urbex.getLogger().debug("World creation abandoned; discarded the published Urbex selection");
     }
@@ -344,14 +370,14 @@ public final class PresetSelection {
 
         if (DISABLED_ID.equals(entry.id()) || entry.preset() == null) {
             Config.presetFromClient = null;
-            Config.worldStyleFromClient = null;
+            Config.worldStyleMixFromClient = null;
             Config.overridesFromClient = null;
             return;
         }
 
-        // effectiveWorldStyle() is always fully qualified (see DEFAULT_STYLE_NAME and setWorldStyle),
-        // so this can go through the same strict resolution as any other reference.
-        Config.worldStyleFromClient = DataTools.fromName(effectiveWorldStyle());
+        // Gated here as well as server-side: with experimentalMultiWorldStyles off, what the client
+        // publishes must already be what a non-opted-in install would generate.
+        Config.worldStyleMixFromClient = Config.gateMix(effectiveWorldStyles(), "The world being created");
 
         if (CUSTOMIZED_ID.equals(entry.id())) {
             Preset preset = entry.preset();

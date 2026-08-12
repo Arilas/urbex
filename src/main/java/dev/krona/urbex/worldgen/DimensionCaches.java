@@ -12,6 +12,7 @@ import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
 import dev.krona.urbex.worldgen.lost.MultiChunk;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
+import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,6 +35,12 @@ public final class DimensionCaches {
     public final TimedCache<ChunkCoord, ChunkCharacteristics> characteristics = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, Integer> cityLevel = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, CityStyle> cityStyle = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
+    /**
+     * Which world style governs a chunk, when the world was created with several. Only ever
+     * populated for a genuine mix: {@link WorldStyleField#atChunk} short-circuits before reaching
+     * the cache when there is one style, so a single-style world does not allocate here at all.
+     */
+    public final TimedCache<ChunkCoord, WorldStyle> worldStyle = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, MultiChunk> multiChunk = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, BiomeInfo> biomeInfo = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final ConcurrentHashMap<ChunkCoord, Railway.RailChunkInfo> railInfo = new ConcurrentHashMap<>();
@@ -81,6 +88,7 @@ public final class DimensionCaches {
         characteristics.clear();
         cityLevel.clear();
         cityStyle.clear();
+        worldStyle.clear();
         multiChunk.clear();
         biomeInfo.clear();
         railInfo.clear();

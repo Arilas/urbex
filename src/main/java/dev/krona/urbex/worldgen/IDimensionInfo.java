@@ -3,7 +3,6 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
@@ -57,7 +56,15 @@ public interface IDimensionInfo {
 
     Preset getProfile();
 
-    WorldStyle getWorldStyle();
+    /**
+     * The world styles this dimension generates from, and which one applies where.
+     * <p>
+     * Replaces the old single {@code getWorldStyle()} deliberately. A world style is not one scope
+     * - a city's {@code citystyles} against a highway network's {@code parts} - and once a world can
+     * mix several, a call site that silently took a dimension-wide style would be wrong without
+     * saying so. Ask the field for the scope you mean.
+     */
+    WorldStyleField worldStyles();
 
     CityGenerator getFeature();
 

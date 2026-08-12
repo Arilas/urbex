@@ -3,7 +3,9 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.gui.preview.CityPreview;
+import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import net.minecraft.ChatFormatting;
@@ -164,11 +166,9 @@ public class CitiesTab extends GridLayoutTab {
         // Only offer the selector when there's an actual choice to make (more than one registered
         // style); a single-style install keeps the tab exactly as it was.
         if (worldStyles.size() > 1) {
-            String initial = PresetSelection.CLIENT.effectiveWorldStyle();
-            if (!worldStyles.contains(initial)) {
-                initial = worldStyles.get(0);
-            }
+            WorldStyleMix initial = PresetSelection.CLIENT.effectiveWorldStyles();
             this.worldStyleButton = Button.builder(worldStyleLabel(initial), b -> openWorldStyleDropdown()).build();
+            this.worldStyleButton.setTooltip(worldStyleTooltip(initial));
         } else {
             this.worldStyleButton = null;
         }
@@ -293,10 +293,9 @@ public class CitiesTab extends GridLayoutTab {
         // preset's own; either way the selector's label must show what actually generates. The disabled
         // row has no style ("" is never a choice), so its button simply keeps its last label.
         if (worldStyleButton != null) {
-            String effective = PresetSelection.CLIENT.effectiveWorldStyle();
-            if (PresetSelection.CLIENT.styleChoices().contains(effective)) {
-                worldStyleButton.setMessage(worldStyleLabel(effective));
-            }
+            WorldStyleMix effective = PresetSelection.CLIENT.effectiveWorldStyles();
+            worldStyleButton.setMessage(worldStyleLabel(effective));
+            worldStyleButton.setTooltip(worldStyleTooltip(effective));
         }
         refreshSeedControls();
         if (lastTabArea != null) {
@@ -318,9 +317,10 @@ public class CitiesTab extends GridLayoutTab {
     private void openWorldStyleDropdown() {
         requestReopenOnCitiesTab();
         List<String> choices = PresetSelection.CLIENT.styleChoices();
-        String current = PresetSelection.CLIENT.effectiveWorldStyle();
-        Minecraft.getInstance().gui.setScreen(
-                new WorldStyleDialog(screen, choices, current, this::onWorldStyleChanged));
+        Minecraft.getInstance().gui.setScreen(new WorldStyleDialog(screen, choices,
+                PresetSelection.CLIENT.effectiveWorldStyles(),
+                Config.EXPERIMENTAL_MULTI_WORLD_STYLES.get(),
+                this::onWorldStylesChanged));
     }
 
     /**
@@ -330,19 +330,48 @@ public class CitiesTab extends GridLayoutTab {
      * render pass, so it follows on its own; the selector's own size is unchanged, so no relayout is
      * needed.
      */
-    private void onWorldStyleChanged(String style) {
-        PresetSelection.CLIENT.setWorldStyle(style);
+    private void onWorldStylesChanged(WorldStyleMix styles) {
+        PresetSelection.CLIENT.setWorldStyles(styles);
         PresetSelection.CLIENT.publish();
         if (worldStyleButton != null) {
-            worldStyleButton.setMessage(worldStyleLabel(style));
+            worldStyleButton.setMessage(worldStyleLabel(styles));
+            worldStyleButton.setTooltip(worldStyleTooltip(styles));
         }
     }
 
-    /** The selector's label: the lang-keyed "World Style" prefix followed by the effective style id. */
-    private static Component worldStyleLabel(String style) {
-        return Component.translatable("urbex.tab.worldstyle")
-                .append(": ")
-                .append(Component.literal(style));
+    /**
+     * The selector's label: the lang-keyed "World Style" prefix followed by the effective style id,
+     * unchanged from before mixing existed - or, for a mix, how many styles are in it. The
+     * per-style percentages go in the tooltip rather than onto a button that still has to fit at GUI
+     * scale 4.
+     */
+    private static Component worldStyleLabel(WorldStyleMix styles) {
+        Component value = styles.isSingle()
+                ? Component.literal(styles.primary().toString())
+                : Component.translatable("urbex.tab.worldstyle.mixed", styles.entries().size());
+        return Component.translatable("urbex.tab.worldstyle").append(": ").append(value);
+    }
+
+    /** Each style and its normalized share, for a mix; nothing for a single style. */
+    @Nullable
+    private static Tooltip worldStyleTooltip(WorldStyleMix styles) {
+        if (styles.isSingle()) {
+            return null;
+        }
+        float total = 0;
+        for (WorldStyleMix.Entry entry : styles.entries()) {
+            total += entry.weight();
+        }
+        MutableComponent lines = Component.empty();
+        boolean first = true;
+        for (WorldStyleMix.Entry entry : styles.entries()) {
+            if (!first) {
+                lines.append(CommonComponents.NEW_LINE);
+            }
+            first = false;
+            lines.append(Component.literal(entry.style() + "  " + Math.round(entry.weight() / total * 100f) + "%"));
+        }
+        return Tooltip.create(lines);
     }
 
     /**
@@ -495,9 +524,9 @@ public class CitiesTab extends GridLayoutTab {
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
             Preset preset = PresetSelection.CLIENT.selected().preset();
-            // worldStyle is orthogonal to the preset (spec 1a): the chosen override if any, else the
-            // default. Empty for the disabled row is irrelevant - update() below no-ops on a null preset.
-            String worldStyle = PresetSelection.CLIENT.effectiveWorldStyle();
+            // worldStyles is orthogonal to the preset (spec 1a): the chosen override if any, else the
+            // default. Irrelevant for the disabled row - update() below no-ops on a null preset.
+            WorldStyleMix worldStyle = PresetSelection.CLIENT.effectiveWorldStyles();
             long seed = CityPreview.seedFromUi(screen.getUiState().getSeed(), previewSeedFallback);
             // A no-op unless (preset, worldstyle, seed) actually changed, so driving it from the
             // render pass is what makes the preview follow selection changes, seed edits and tab

@@ -83,8 +83,6 @@ public class CityGenerator {
 
     public final IDimensionInfo provider;
     public final Preset profile;
-    /** Lazily resolved by {@link #rotatableTag()}; see there for why it is safe to cache. */
-    private TagKey<Block> cachedRotatableTag;
 
     private final Statistics statistics = new Statistics();
     private final Map<Block, BlockEntityType> typeCache = new ConcurrentHashMap<>();
@@ -441,7 +439,11 @@ public class CityGenerator {
         Bridges.generateBridges(ctx, this, info);
         Highways.generateHighways(ctx, this, info);
 
-        ScatteredSettings scatteredSettings = provider.getWorldStyle().getScatteredSettings();
+        // Drawn at the scatter area's own anchor, so every chunk of one area agrees about which
+        // pack's structure stands there - the same rule Scattered already applies to the reference
+        // itself (issue #38). This is what makes scattered structures mix along with cities.
+        ScatteredSettings scatteredSettings = provider.worldStyles()
+                .atScatterArea(Scattered.areaAnchor(provider, info.coord)).getScatteredSettings();
         if (scatteredSettings != null) {
             if (!Scattered.avoidScattered(this, info)) {
                 Scattered.generateScattered(ctx, this, info, scatteredSettings);
@@ -1827,7 +1829,7 @@ public class CityGenerator {
                         Palette.Info inf = compiledPalette.getInfo(c);
 
                         if (transform != Transform.ROTATE_NONE) {
-                            b = transformBlockState(transform, b);
+                            b = transformBlockState(info, transform, b);
                         }
 
                         // We don't replace the world where the part is empty (air)
@@ -2055,23 +2057,18 @@ public class CityGenerator {
     }
 
     /**
-     * The block tag deciding what rotates with its part, from the active world style.
+     * Applies a part's transform to one block state, using the {@code rotatable} tag of the world
+     * style governing this chunk.
      * <p>
-     * Resolved once and cached: {@link #transformBlockState} reads it for every block of every part
-     * placed at a transform other than {@code ROTATE_NONE}, and the world style cannot change under
-     * a running generator. A world style that declares no {@code rotatable} resolves
-     * {@code urbex:rotatable}, which is what this returned unconditionally before world styles could
-     * name their own.
+     * The tag used to be resolved once and cached on the generator, because the world style could
+     * not change under a running generator. It can now: two cities in one world can come from
+     * different packs whose {@code rotatable} tags differ, so the tag has to follow the chunk.
+     * {@link BuildingInfo#worldStyle()} memoises it per chunk, so this stays a field read in the hot
+     * path rather than a neighbourhood walk. A world style that declares no {@code rotatable}
+     * resolves {@code urbex:rotatable}, as before.
      */
-    private TagKey<Block> rotatableTag() {
-        if (cachedRotatableTag == null) {
-            cachedRotatableTag = provider.getWorldStyle().getRotatableTag();
-        }
-        return cachedRotatableTag;
-    }
-
-    private BlockState transformBlockState(Transform transform, BlockState b) {
-        if (Tools.hasTag(b.getBlock(), rotatableTag())) {
+    private BlockState transformBlockState(BuildingInfo info, Transform transform, BlockState b) {
+        if (Tools.hasTag(b.getBlock(), info.worldStyle().getRotatableTag())) {
             // Vanilla structure order: mirror first, then rotate. The mirror used to be
             // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
             // the wrong way (issue #45).

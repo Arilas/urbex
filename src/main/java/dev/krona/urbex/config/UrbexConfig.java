@@ -18,6 +18,11 @@ import java.util.Optional;
  * One flat schema serves two files: the global {@code config/urbex/urbex.json} and an optional
  * per-world {@code <world>/serverconfig/urbex.json} whose keys override the global ones (the
  * merge happens at the JSON level, so a world file only needs the keys it changes).
+ *
+ * @param experimentalMultiWorldStyles opts in to selecting several world styles at once, balanced
+ *        by weight, so cities from several datapacks can share one world. Off by default, and
+ *        gating behaviour rather than only the UI: a save or a config line hand-edited to carry a
+ *        mix is reduced to its primary style on an install that never opted in.
  */
 public record UrbexConfig(
         List<String> dimensionsWithPresets,
@@ -33,7 +38,8 @@ public record UrbexConfig(
         boolean structuresYieldToCities,
         boolean avoidVillages,
         boolean avoidVillagesAdjacent,
-        boolean avoidFlattening) {
+        boolean avoidFlattening,
+        boolean experimentalMultiWorldStyles) {
 
     public static final UrbexConfig DEFAULT = new UrbexConfig(
             List.of(),
@@ -50,7 +56,8 @@ public record UrbexConfig(
             false,
             true,
             false,
-            true);
+            true,
+            false);
 
     public static final Codec<UrbexConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf("dimensionsWithPresets", DEFAULT.dimensionsWithPresets()).forGetter(UrbexConfig::dimensionsWithPresets),
@@ -66,7 +73,8 @@ public record UrbexConfig(
             Codec.BOOL.optionalFieldOf("structuresYieldToCities", DEFAULT.structuresYieldToCities()).forGetter(UrbexConfig::structuresYieldToCities),
             Codec.BOOL.optionalFieldOf("avoidVillages", DEFAULT.avoidVillages()).forGetter(UrbexConfig::avoidVillages),
             Codec.BOOL.optionalFieldOf("avoidVillagesAdjacent", DEFAULT.avoidVillagesAdjacent()).forGetter(UrbexConfig::avoidVillagesAdjacent),
-            Codec.BOOL.optionalFieldOf("avoidFlattening", DEFAULT.avoidFlattening()).forGetter(UrbexConfig::avoidFlattening)
+            Codec.BOOL.optionalFieldOf("avoidFlattening", DEFAULT.avoidFlattening()).forGetter(UrbexConfig::avoidFlattening),
+            Codec.BOOL.optionalFieldOf("experimentalMultiWorldStyles", DEFAULT.experimentalMultiWorldStyles()).forGetter(UrbexConfig::experimentalMultiWorldStyles)
     ).apply(instance, UrbexConfig::new));
 
     /** Parses a config from JSON; empty if any present key fails validation. */

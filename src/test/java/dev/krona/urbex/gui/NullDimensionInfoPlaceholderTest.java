@@ -1,6 +1,7 @@
 package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
@@ -48,7 +49,7 @@ class NullDimensionInfoPlaceholderTest {
         Preset preset = new Preset(Identifier.fromNamespaceAndPath("urbex", "test-placeholder"));
         // Null registry access is the GUI's own fallback, and it is also the only way to reach the
         // placeholder without a loaded registry to fail a lookup against.
-        return new NullDimensionInfo(preset, Identifier.fromNamespaceAndPath("urbex", "standard"),
+        return new NullDimensionInfo(preset, WorldStyleMix.of(Identifier.fromNamespaceAndPath("urbex", "standard")),
                 1234L, null);
     }
 
@@ -56,12 +57,12 @@ class NullDimensionInfoPlaceholderTest {
     void thePreviewBuildsWithoutRegistryAccess() {
         NullDimensionInfo diminfo = assertDoesNotThrow(NullDimensionInfoPlaceholderTest::placeholderPreview,
                 "the preview must fall back to the placeholder world style, not throw");
-        assertNotNull(diminfo.getWorldStyle(), "the placeholder world style must be built");
+        assertNotNull(diminfo.worldStyles().primary(), "the placeholder world style must be built");
     }
 
     @Test
     void thePlaceholderDeclaresEveryFieldRequiredAfterResolution() {
-        WorldStyle style = placeholderPreview().getWorldStyle();
+        WorldStyle style = placeholderPreview().worldStyles().primary();
 
         // outsidestyle and citystyles are required by WorldStyle itself; parts is required and then
         // required component by component by PartSelector.requireComplete. Reaching this line at all
@@ -90,7 +91,7 @@ class NullDimensionInfoPlaceholderTest {
 
     @Test
     void thePlaceholderNamesNoUnqualifiedAsset() {
-        WorldStyle style = placeholderPreview().getWorldStyle();
+        WorldStyle style = placeholderPreview().worldStyles().primary();
         // A bare name would throw out of DataTools.fromName the moment anything resolved it, which is
         // the load error this branch introduced for datapacks - src/main must not write one either.
         Identifier outside = assertDoesNotThrow(() -> DataTools.fromName(style.getOutsideStyle()),

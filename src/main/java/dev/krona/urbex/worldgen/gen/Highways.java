@@ -45,7 +45,7 @@ public class Highways {
     private static void generateHighwayPart(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, int level, Transform transform, BuildingInfo adjacent1, BuildingInfo adjacent2, boolean bidirectional) {
         ChunkDriver driver = ctx.driver;
         int highwayGroundLevel = info.groundLevel + level * CityGenerator.FLOORHEIGHT;
-        HighwayParts highwayParts = info.provider.getWorldStyle().getPartSelector().highwayParts();
+        HighwayParts highwayParts = info.provider.worldStyles().primary().getPartSelector().highwayParts();
 
         BuildingPart part;
         if (info.isTunnel(level)) {
