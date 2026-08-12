@@ -1,29 +1,21 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import com.mojang.serialization.Lifecycle;
-import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.SharedConstants;
-import net.minecraft.core.MappedRegistry;
-import net.minecraft.core.RegistrationInfo;
-import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,15 +23,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A palette entry naming a {@code variant} resolves it against the registries the palette itself
- * came from (issue #60).
+ * A palette entry naming a {@code variant} resolves it against the variants it was handed (issue
+ * #60), which after issue #128 means the ones its own world's compiler had already built.
  * <p>
  * It used to resolve against {@code ServerAccess.getServer().getLevel(Level.OVERWORLD)} - the
  * process-wide server reference, and then unconditionally that server's overworld. Two things were
  * wrong with that, and only the second is visible in a single-dimension world: a palette compiled
- * for any other dimension took the overworld's variants, and a palette compiled on a worldgen
- * worker before the static server reference was populated threw a {@link NullPointerException} out
- * of asset compilation.
+ * for any other dimension took the overworld's variants, and a palette compiled on a worldgen worker
+ * before the static server reference was populated threw a {@link NullPointerException} out of asset
+ * compilation.
+ * <p>
+ * {@link AssetCompilerTest} covers the same resolution through the compiler, which is how production
+ * reaches it. This covers the seam itself, including the case the compiler cannot produce.
  */
 class PaletteVariantResolutionTest {
 
@@ -49,32 +44,22 @@ class PaletteVariantResolutionTest {
         Bootstrap.bootStrap();
     }
 
-    @BeforeEach
-    @AfterEach
-    void clearRegistries() {
-        // AssetRegistries.VARIANTS caches by id, and these tests deliberately register different
-        // blocks under the same id in different registry accesses.
-        AssetRegistries.reset();
-    }
-
     @Test
-    void aVariantResolvesAgainstTheRegistriesThePaletteCameFrom() {
-        RegistryAccess access = variantsWith("minecraft:deepslate");
-
-        Palette compiled = new Palette(access, List.of(paletteNamingVariant()));
+    void aVariantResolvesAgainstTheIndexThePaletteWasGiven() {
+        Palette compiled = new Palette(variantsWith("minecraft:deepslate"),
+                List.of(paletteNamingVariant()));
 
         assertEquals(List.of("minecraft:deepslate"), blocksOf(compiled, 'V'));
     }
 
     /**
-     * The bug, stated as a test. Two dimensions whose registries define {@code urbex:rubble}
-     * differently must each get their own - the old code handed both the overworld's.
+     * The bug, stated as a test. Two worlds whose packs define {@code urbex:rubble} differently must
+     * each get their own - the old code handed both the overworld's.
      */
     @Test
-    void twoRegistryAccessesResolveTheSameVariantIdIndependently() {
+    void twoIndexesResolveTheSameVariantIdIndependently() {
         Palette fromFirst = new Palette(variantsWith("minecraft:deepslate"),
                 List.of(paletteNamingVariant()));
-        AssetRegistries.reset();
         Palette fromSecond = new Palette(variantsWith("minecraft:sandstone"),
                 List.of(paletteNamingVariant()));
 
@@ -84,21 +69,18 @@ class PaletteVariantResolutionTest {
     }
 
     /**
-     * Compiling a variant entry with no registry access to resolve it against is refused, naming
-     * the variant. The old shape's answer to the same situation was a {@code NullPointerException}
-     * from {@code server.getLevel(...)}, in asset compilation, on a worker thread.
+     * Compiling a variant entry with no variants to resolve it against is refused, naming the
+     * palette, the marker and the variant. The old shape's answer to the same situation was a
+     * {@code NullPointerException} from {@code server.getLevel(...)}, in asset compilation, on a
+     * worker thread.
      */
     @Test
-    void aVariantEntryWithNoRegistryAccessFailsNamingTheVariant() {
-        RuntimeException failure = assertThrows(RuntimeException.class,
+    void aVariantEntryWithNoVariantIndexFailsNamingWhatItWanted() {
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
                 () -> new Palette(null, List.of(paletteNamingVariant())));
 
-        String message = String.valueOf(rootCause(failure).getMessage());
-        assertTrue(message.contains("urbex:rubble"), () -> "message must name the variant: " + message);
-    }
-
-    private static Throwable rootCause(Throwable t) {
-        return t.getCause() == null ? t : rootCause(t.getCause());
+        assertTrue(failure.getMessage().contains("urbex:rubble"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("variant-palette"), failure.getMessage());
     }
 
     private static List<String> blocksOf(Palette palette, char marker) {
@@ -123,16 +105,12 @@ class PaletteVariantResolutionTest {
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "variant-palette"));
     }
 
-    /** A registry access whose only {@code urbex:rubble} variant is one weighted block. */
-    private static RegistryAccess variantsWith(String block) {
-        MappedRegistry<VariantRE> variants = new MappedRegistry<>(
-                CustomRegistries.VARIANTS_REGISTRY_KEY, Lifecycle.stable());
-        variants.register(
-                ResourceKey.create(CustomRegistries.VARIANTS_REGISTRY_KEY,
-                        Identifier.fromNamespaceAndPath("urbex", "rubble")),
-                new VariantRE(Optional.empty(),
-                        Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block))))),
-                RegistrationInfo.BUILT_IN);
-        return new RegistryAccess.ImmutableRegistryAccess(List.<Registry<?>>of(variants.freeze())).freeze();
+    /** An index whose only {@code urbex:rubble} variant is one weighted block. */
+    private static AssetIndex<Variant> variantsWith(String block) {
+        Identifier id = Identifier.fromNamespaceAndPath("urbex", "rubble");
+        VariantRE definition = new VariantRE(Optional.empty(),
+                Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block)))));
+        definition.setRegistryName(id);
+        return new AssetIndex<>("urbex:variants", Map.of(id, new Variant(List.of(definition))));
     }
 }

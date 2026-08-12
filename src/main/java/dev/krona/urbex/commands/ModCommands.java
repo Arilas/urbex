@@ -6,7 +6,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.worldgen.GenerationSession;
+import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.Building;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import net.minecraft.commands.CommandSourceStack;
@@ -60,7 +61,11 @@ public class ModCommands {
     @Nonnull
     static SuggestionProvider<CommandSourceStack> getPartSuggestionProvider() {
         return (context, builder) -> {
-            Stream<BuildingPart> stream = StreamSupport.stream(AssetRegistries.PARTS.getIterable().spliterator(), false);
+            IDimensionInfo provider = GenerationSession.planningFor(context.getSource().getLevel());
+            if (provider == null) {
+                return builder.buildFuture();
+            }
+            Stream<BuildingPart> stream = provider.assets().parts().all().stream();
             return SharedSuggestionProvider.suggest(stream.map(b -> b.getId().toString()), builder);
         };
     }
@@ -68,7 +73,11 @@ public class ModCommands {
     @Nonnull
     static SuggestionProvider<CommandSourceStack> getBuildingSuggestionProvider() {
         return (context, builder) -> {
-            Stream<Building> stream = StreamSupport.stream(AssetRegistries.BUILDINGS.getIterable().spliterator(), false);
+            IDimensionInfo provider = GenerationSession.planningFor(context.getSource().getLevel());
+            if (provider == null) {
+                return builder.buildFuture();
+            }
+            Stream<Building> stream = provider.assets().buildings().all().stream();
             return SharedSuggestionProvider.suggest(stream.map(b -> b.getId().toString()), builder);
         };
     }

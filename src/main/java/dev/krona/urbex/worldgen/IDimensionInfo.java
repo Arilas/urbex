@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
@@ -41,6 +42,16 @@ public interface IDimensionInfo {
         WorldGenLevel world = getWorld();
         return world != null ? world.registryAccess() : null;
     }
+
+    /**
+     * The compiled assets this dimension generates from.
+     * <p>
+     * One snapshot per world load, shared by every level in that world - the asset registries are
+     * frozen when the world loads, so there is nothing per-level about what they compile to. Every
+     * asset lookup goes through here rather than through a static registry, which is what makes
+     * "compilation finished before generation started" a fact rather than a hope (issue #128).
+     */
+    AssetSnapshot assets();
 
     /** The per-dimension caches. Dropped with the dimension. */
     DimensionCaches caches();

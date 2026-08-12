@@ -1,6 +1,5 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.AfterEach;
@@ -40,7 +39,6 @@ class GenerationSessionTest {
         if (session != null) {
             GenerationSession.closeFor(session.owner());
         }
-        AssetRegistries.reset();
     }
 
     @Test

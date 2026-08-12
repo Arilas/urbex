@@ -49,22 +49,22 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         Identifier name = context.getArgument("name", Identifier.class);
         Integer floors = context.getArgument("floors", Integer.class);
         Integer cellars = context.getArgument("cellars", Integer.class);
-        Building building = AssetRegistries.BUILDINGS.get(context.getSource().getLevel(), name);
+        ServerPlayer player = context.getSource().getPlayerOrException();
+        ServerLevel level = (ServerLevel) player.level();
+        // The provider first: the building is looked up in this level's compiled assets (issue #128).
+        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        if (dimInfo == null) {
+            context.getSource().sendFailure(Component.literal("Urbex does not generate in this dimension!"));
+            return 0;
+        }
+        Building building = dimInfo.assets().buildings().get(name);
         if (building == null) {
             context.getSource().sendFailure(Component.literal("Cannot find building: " + name + "!"));
             return 0;
         }
-
-        ServerPlayer player = context.getSource().getPlayerOrException();
-        ServerLevel level = (ServerLevel) player.level();
         WorldCoordinates pos = context.getArgument("pos", WorldCoordinates.class);
         BlockPos bottom = pos.getBlockPos(context.getSource());
 
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
-        if (dimInfo == null) {
-            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
-            return 0;
-        }
         ChunkCoord coord = new ChunkCoord(level.dimension(), bottom.getX() >> 4, bottom.getZ() >> 4);
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
         info.setBuildingType(building, cellars, floors, bottom.getY());
@@ -98,8 +98,8 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
     private static void generatePart(Level level, ChunkPos cp, BuildingInfo info, IBuildingPart part, int oy) {
         CompiledPalette compiledPalette = info.getCompiledPalette();
         // Cache the combined palette?
-        Palette partPalette = part.getLocalPalette(level);
-        Palette buildingPalette = info.getBuilding().getLocalPalette(level);
+        Palette partPalette = part.getLocalPalette();
+        Palette buildingPalette = info.getBuilding().getLocalPalette();
         if (partPalette != null || buildingPalette != null) {
             compiledPalette = new CompiledPalette(compiledPalette, partPalette, buildingPalette);
         }

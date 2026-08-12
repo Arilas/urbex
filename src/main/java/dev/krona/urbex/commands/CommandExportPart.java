@@ -14,7 +14,6 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
@@ -58,27 +57,27 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             return 0;
         }
 
-        // editorInfo.getPartName() is Editor.startEditing's recorded part id - always qualified.
-        BuildingPart part = AssetRegistries.PARTS.get(context.getSource().getLevel(), DataTools.fromName(editorInfo.getPartName()));
-        if (part == null) {
-            context.getSource().sendFailure(Component.literal("Error finding part '" + editorInfo.getPartName() + "'!").withStyle(ChatFormatting.RED));
+        BlockPos start = editorInfo.getBottomLocation();
+        ServerLevel level = (ServerLevel) player.level();
+        // The provider first: the part is looked up in this level's compiled assets (issue #128).
+        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        if (dimInfo == null) {
+            context.getSource().sendFailure(Component.literal("Urbex does not generate in this dimension!").withStyle(ChatFormatting.RED));
             return 0;
         }
 
-        BlockPos start = editorInfo.getBottomLocation();
-
-        ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
-        if (dimInfo == null) {
-            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
+        // editorInfo.getPartName() is Editor.startEditing's recorded part id - always qualified.
+        BuildingPart part = dimInfo.assets().parts().get(DataTools.fromName(editorInfo.getPartName()));
+        if (part == null) {
+            context.getSource().sendFailure(Component.literal("Error finding part '" + editorInfo.getPartName() + "'!").withStyle(ChatFormatting.RED));
             return 0;
         }
 
         ChunkCoord coord = new ChunkCoord(dimInfo.getType(), start.getX() >> 4, start.getZ() >> 4);
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
         CompiledPalette palette = info.getCompiledPalette();
-        Palette partPalette = part.getLocalPalette(level);
-        Palette buildingPalette = info.getBuilding().getLocalPalette(level);
+        Palette partPalette = part.getLocalPalette();
+        Palette buildingPalette = info.getBuilding().getLocalPalette();
         if (partPalette != null || buildingPalette != null) {
             palette = new CompiledPalette(palette, partPalette, buildingPalette);
         }

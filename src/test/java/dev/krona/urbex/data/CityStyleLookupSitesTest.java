@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Every place that looks a city style up by name, so that adding one fails the build.
  * <p>
  * Since part wiring became required, a city style that does not resolve is a load error - but only
- * where something resolves it at load. {@code AssetRegistries.loadReachableCityStyles} does that by
+ * where something resolves it at load. {@code AssetCompiler} does that by compiling every registered style, and
  * enumerating the routes a name can arrive by, and that list is maintained by hand: a new selection
  * path that forgets to register there reverts silently to failing from a worldgen worker,
  * mid-generation, with the whole suite still green. Nothing in the type system prevents it.
@@ -32,9 +32,14 @@ class CityStyleLookupSitesTest {
 
     private static final Path MAIN = Path.of("src/main/java");
 
-    /** A lookup, not {@code reset()} or a field reference: the four methods that resolve a name. */
+    /**
+     * A lookup on the snapshot's city-style index, not a field reference: the four methods that
+     * resolve a name. The shape changed with issue #128 - {@code AssetRegistries.CITYSTYLES.get(level,
+     * name)} became {@code assets().cityStyles().get(name)} - so this pattern matches the accessor
+     * rather than a static field.
+     */
     private static final Pattern LOOKUP =
-            Pattern.compile("CITYSTYLES\\s*\\.\\s*(get|getOrThrow|getOrWarn|getIterable)\\s*\\(");
+            Pattern.compile("cityStyles\\s*\\(\\s*\\)\\s*\\.\\s*(get|getOrThrow|getOrWarn|all)\\s*\\(");
 
     @Test
     void onlyTheKnownCallSitesResolveACityStyleByName() throws IOException {
@@ -48,12 +53,13 @@ class CityStyleLookupSitesTest {
         }
 
         assertEquals(List.of(
-                        // The load-time sweep, and the one wrapper CityFeature's route-4 check uses.
-                        "AssetRegistries.java",
                         // The style of the chunk, blended from the styles its neighbours resolved.
                         "BuildingInfo.java",
                         // The world style's selectors, the preset alternative, the predefined city.
-                        "City.java"),
+                        "City.java",
+                        // Route 4: the per-world cityStyleAlternative override, which arrives as JSON
+                        // rather than from a registry, so no compile-time sweep can see it.
+                        "DimensionRuntime.java"),
                 List.copyOf(found),
                 "a new city-style lookup site appeared; see this test's javadoc before adding it here");
     }

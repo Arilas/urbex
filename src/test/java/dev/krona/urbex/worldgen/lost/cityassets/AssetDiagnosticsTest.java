@@ -36,8 +36,8 @@ class AssetDiagnosticsTest {
     @Test
     void everyProblemIsNamedAtOnceRatherThanOnePerWorldLoad() {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
-        diagnostics.record("urbex/buildings", id("radiotower"), "declares no 'filler'");
-        diagnostics.record("urbex/parts", id("floor"), "declares no 'xsize'");
+        diagnostics.record("urbex:buildings", id("radiotower"), "declares no 'filler'");
+        diagnostics.record("urbex:parts", id("floor"), "declares no 'xsize'");
 
         IllegalStateException failure = assertThrows(IllegalStateException.class, diagnostics::throwIfAny);
 
@@ -54,13 +54,13 @@ class AssetDiagnosticsTest {
     @Test
     void problemsAreReportedInAStableOrderRatherThanRegistryWalkOrder() {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
-        diagnostics.record("urbex/parts", id("zzz"), "second");
-        diagnostics.record("urbex/buildings", id("mmm"), "first");
-        diagnostics.record("urbex/parts", id("aaa"), "also second");
+        diagnostics.record("urbex:parts", id("zzz"), "second");
+        diagnostics.record("urbex:buildings", id("mmm"), "first");
+        diagnostics.record("urbex:parts", id("aaa"), "also second");
 
-        assertEquals(List.of("urbex/buildings / urbex:mmm: first",
-                        "urbex/parts / urbex:aaa: also second",
-                        "urbex/parts / urbex:zzz: second"),
+        assertEquals(List.of("urbex:buildings / urbex:mmm: first",
+                        "urbex:parts / urbex:aaa: also second",
+                        "urbex:parts / urbex:zzz: second"),
                 diagnostics.problems().stream().map(AssetDiagnostics.Problem::toString).toList());
     }
 
@@ -74,18 +74,18 @@ class AssetDiagnosticsTest {
         Exception root = new IllegalStateException("'urbex:radiotower' declares no 'filler'");
         Exception wrapped = new RuntimeException("Error getting resource urbex:radiotower!", root);
 
-        diagnostics.record("urbex/buildings", id("radiotower"), wrapped);
+        diagnostics.record("urbex:buildings", id("radiotower"), wrapped);
 
-        assertEquals("urbex/buildings / urbex:radiotower: 'urbex:radiotower' declares no 'filler'",
+        assertEquals("urbex:buildings / urbex:radiotower: 'urbex:radiotower' declares no 'filler'",
                 diagnostics.problems().getFirst().toString());
     }
 
     @Test
     void aProblemWithNoOneAssetToBlameStillSaysWhereItCameFrom() {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
-        diagnostics.record("urbex/worldstyles", null, "nothing selects a city style");
+        diagnostics.record("urbex:worldstyles", null, "nothing selects a city style");
 
-        assertEquals("urbex/worldstyles: nothing selects a city style",
+        assertEquals("urbex:worldstyles: nothing selects a city style",
                 diagnostics.problems().getFirst().toString());
     }
 

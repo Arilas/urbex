@@ -6,7 +6,6 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.*;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity;
 import net.minecraft.core.BlockPos;
@@ -94,7 +93,7 @@ public class SpawnPlacement {
                     needsCheck = true;
                 }
             } else if (!profile.SPAWN_CITY.isEmpty()) {
-                final PredefinedCity city = AssetRegistries.PREDEFINED_CITIES.get(world, profile.SPAWN_CITY);
+                final PredefinedCity city = dimensionInfo.assets().predefinedCities().get(profile.SPAWN_CITY);
                 if (city == null) {
                     ModSetup.getLogger().error("Cannot find city '{}' for the player to spawn in !", profile.SPAWN_CITY);
                 } else {

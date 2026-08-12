@@ -9,7 +9,6 @@ import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import net.minecraft.util.RandomSource;
@@ -118,7 +117,7 @@ public final class PrimaryBridgePlanner {
         CityStyle style = City.getCityStyle(anchor, provider, provider.getProfile());
         RandomSource rand = Rng.at(provider.getSeed(), anchor.chunkX(), anchor.chunkZ(), Rng.Purpose.LARGE_BRIDGE);
         String name = style.getRandomLargeBridge(rand, anchor);
-        return name == null ? null : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), name);
+        return name == null ? null : provider.assets().parts().getOrWarn(name);
     }
 
     /**

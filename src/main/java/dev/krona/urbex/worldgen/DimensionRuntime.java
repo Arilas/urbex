@@ -7,7 +7,8 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.PresetChoice;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
+import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
@@ -74,10 +75,11 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo plann
      * anything - which is also what makes the {@code CITY_STYLE_ALTERNATIVE} check below a load-time
      * refusal rather than an exception from a worker.</p>
      *
-     * <p>Callers must have loaded the asset registries first; {@link GenerationSession#load} is the
-     * one caller and does exactly that.</p>
+     * <p>The snapshot arrives already compiled; {@link GenerationSession#load} is the one caller and
+     * builds it before calling this. A runtime cannot exist without one, which is what makes "no
+     * chunk generates against unloaded assets" structural rather than a check.</p>
      */
-    static DimensionRuntime create(ServerLevel level) {
+    static DimensionRuntime create(ServerLevel level, AssetSnapshot assets) {
         ResourceKey<Level> type = level.dimension();
         PresetChoice choice = Config.getPresetChoiceForDimension(level, type);
         if (choice == null) {
@@ -108,7 +110,30 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo plann
         // deliberately not fail-soft like the overrides parse above: a malformed payload can be
         // ignored and the un-overridden preset used, but a style that cannot resolve has no such
         // fallback - City.getCityStyle would simply hand null on to generation.
-        AssetRegistries.requireCityStyle(level, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
-        return new DimensionRuntime(level, new DefaultDimensionInfo(level, preset, choice.worldStyles()));
+        requireCityStyle(assets, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
+        return new DimensionRuntime(level,
+                new DefaultDimensionInfo(level, assets, preset, choice.worldStyles()));
+    }
+
+    /**
+     * Refuses the level if its per-world {@code cityStyleAlternative} override names a city style the
+     * pack does not have.
+     * <p>
+     * The one city-style reference no load-time sweep can see: it arrives as override JSON from the
+     * customization GUI through {@code UrbexData} rather than from a registry entry, so the compiler
+     * never walked it. Checked here, once per level load and before any chunk work, and deliberately
+     * not fail-soft like the overrides parse above - a malformed payload can be ignored and the
+     * un-overridden preset used, but a style that cannot resolve has no such fallback:
+     * {@code City.getCityStyle} would hand null on to generation.
+     */
+    private static void requireCityStyle(AssetSnapshot assets, @Nullable String name, Object selectedBy) {
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        CityStyle style = assets.cityStyles().get(name);
+        if (style == null) {
+            throw new IllegalStateException("City style '" + name + "', selected by '" + selectedBy
+                    + "', is not registered by any loaded datapack.");
+        }
     }
 }

@@ -1,6 +1,5 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
@@ -15,14 +14,20 @@ public class Style {
 
     private final Identifier name;
 
-    private final List<List<Pair<Float, String>>> randomPaletteChoices = new ArrayList<>();
+    private final List<List<Pair<Float, Palette>>> randomPaletteChoices = new ArrayList<>();
 
     /**
      * Builds a fully resolved style from its {@code extends} chain, root first: a declared
      * {@code randompalettes} replaces the inherited groups unless it opts into appending, and an
      * absent one inherits them unchanged. A chain where nothing declares it is a load error.
      */
-    public Style(List<StyleRE> chainRootFirst) {
+    /**
+     * @param palettes the compiled palettes this style's {@code randompalettes} name. Resolved here
+     *                 rather than on the first chunk that needs one: the lookup used to happen inside
+     *                 {@link #getRandomPalette}, from a worldgen worker, which is why that method took
+     *                 an {@code IDimensionInfo} it otherwise had no use for (issue #128).
+     */
+    public Style(AssetIndex<Palette> palettes, List<StyleRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<List<PaletteSelector>> groups = new ArrayList<>();
         boolean anyGroups = false;
@@ -34,16 +39,19 @@ public class Style {
         }
         Resolved.require(anyGroups ? groups : null, name, "randompalettes");
         for (List<PaletteSelector> array : groups) {
-            List<Pair<Float, String>> palettes = new ArrayList<>();
+            // Weights checked before references are resolved, so a group nothing could ever be drawn
+            // from says exactly that rather than reporting whichever of its palettes is missing. Both
+            // are load errors; this one is about the group and is the more useful of the two.
             float total = 0;
             for (PaletteSelector selector : array) {
-                float factor = selector.factor();
-                String palette = selector.palette();
-                total += factor;
-                palettes.add(Pair.of(factor, palette));
+                total += selector.factor();
             }
-            requireDrawable(palettes, total);
-            randomPaletteChoices.add(palettes);
+            requireDrawable(array, total);
+            List<Pair<Float, Palette>> resolved = new ArrayList<>(array.size());
+            for (PaletteSelector selector : array) {
+                resolved.add(Pair.of(selector.factor(), palettes.getOrThrow(selector.palette())));
+            }
+            randomPaletteChoices.add(resolved);
         }
     }
 
@@ -54,7 +62,7 @@ public class Style {
      * first that drives it to zero, so an empty group or one whose factors sum to zero (or less)
      * leaves nothing selected and the caller merges null.
      */
-    private void requireDrawable(List<Pair<Float, String>> palettes, float total) {
+    private void requireDrawable(List<PaletteSelector> palettes, float total) {
         if (palettes.isEmpty()) {
             throw new IllegalStateException("Style '" + name + "' declares an empty "
                     + "'randompalettes' group; every group must offer at least one palette");
@@ -77,18 +85,17 @@ public class Style {
 
     /**
      * The resolved {@code randompalettes}, for tests. The public surface offers only a weighted
-     * draw that resolves each choice against the palette registry, so without this the chain fold
-     * is unobservable without a level.
+     * draw, so without this the chain fold is unobservable.
      */
-    List<List<Pair<Float, String>>> paletteChoices() {
+    List<List<Pair<Float, Palette>>> paletteChoices() {
         return randomPaletteChoices;
     }
 
-    public Palette getRandomPalette(IDimensionInfo provider, RandomSource random) {
+    public Palette getRandomPalette(RandomSource random) {
         Palette palette = new Palette("__random__");
-        for (List<Pair<Float, String>> pairs : randomPaletteChoices) {
+        for (List<Pair<Float, Palette>> pairs : randomPaletteChoices) {
             float totalweight = 0;
-            for (Pair<Float, String> pair : pairs) {
+            for (Pair<Float, Palette> pair : pairs) {
                 totalweight += pair.getKey();
             }
             float r = random.nextFloat() * totalweight;
@@ -98,15 +105,15 @@ public class Style {
             // same arithmetic, and r can survive the whole walk by an ulp. Falling out with null
             // and merging it is a NullPointerException on a worldgen worker; the last entry is the
             // one the walk was an ulp short of choosing.
-            Pair<Float, String> chosen = pairs.get(pairs.size() - 1);
-            for (Pair<Float, String> pair : pairs) {
+            Pair<Float, Palette> chosen = pairs.get(pairs.size() - 1);
+            for (Pair<Float, Palette> pair : pairs) {
                 r -= pair.getKey();
                 if (r <= 0) {
                     chosen = pair;
                     break;
                 }
             }
-            palette.merge(AssetRegistries.PALETTES.getOrThrow(provider.getWorld(), chosen.getRight()));
+            palette.merge(chosen.getRight());
         }
 
         return palette;

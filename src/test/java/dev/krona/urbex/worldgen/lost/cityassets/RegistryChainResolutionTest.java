@@ -160,7 +160,7 @@ class RegistryChainResolutionTest {
         // in - hash("urbex:cobweb") lands in a lower bucket than hash("urbex:chains") - so this
         // fails if the sort is ever dropped, rather than passing by luck of the input order.
         assertEquals(List.of("urbex:chains", "urbex:cobweb"),
-                namesOf(AssetRegistries.groupStuffByTag(List.of(cobweb, chains)).get("rubble")));
+                namesOf(AssetCompiler.groupStuffByTag(List.of(cobweb, chains)).get("rubble")));
     }
 
     @Test
@@ -173,7 +173,7 @@ class RegistryChainResolutionTest {
         StuffObject thirdPartySoot = new StuffObject(List.of(stuff("urbexmt", "soot").tags(true, "rubble").build()));
 
         assertEquals(List.of("urbex:rope", "urbexmt:soot", "urbex:vines"),
-                namesOf(AssetRegistries.groupStuffByTag(List.of(ownVines, thirdPartySoot, ownRope)).get("rubble")));
+                namesOf(AssetCompiler.groupStuffByTag(List.of(ownVines, thirdPartySoot, ownRope)).get("rubble")));
     }
 
     @Test
@@ -181,7 +181,7 @@ class RegistryChainResolutionTest {
         StuffObject both = new StuffObject(List.of(stuff("torches").tags(true, "all", "indoor").build()));
         StuffObject indoorOnly = new StuffObject(List.of(stuff("banners").tags(true, "indoor").build()));
 
-        Map<String, List<StuffObject>> byTag = AssetRegistries.groupStuffByTag(List.of(both, indoorOnly));
+        Map<String, List<StuffObject>> byTag = AssetCompiler.groupStuffByTag(List.of(both, indoorOnly));
 
         assertEquals(List.of("all", "indoor"), List.copyOf(byTag.keySet()),
                 "the tag map is sorted too - Stuff walks the tags in one pass, so their order is "
@@ -258,7 +258,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void styleThatDeclaresNoPalettesKeepsItsAncestors() {
-        Style resolved = new Style(List.of(
+        Style resolved = new Style(PALETTES, List.of(
                 style("nordic", group("urbex:common")),
                 style("nordic_rare")));
 
@@ -271,10 +271,10 @@ class RegistryChainResolutionTest {
         StyleRE parent = style("nordic", group("urbex:common"));
 
         assertEquals(List.of(List.of("urbex:snowy")),
-                paletteNamesOf(new Style(List.of(parent, style("nordic_snow", group("urbex:snowy"))))),
+                paletteNamesOf(new Style(PALETTES, List.of(parent, style("nordic_snow", group("urbex:snowy"))))),
                 "a bare array replaces");
         assertEquals(List.of(List.of("urbex:common"), List.of("urbex:snowy")),
-                paletteNamesOf(new Style(List.of(parent, styleAppending("nordic_snow", group("urbex:snowy"))))),
+                paletteNamesOf(new Style(PALETTES, List.of(parent, styleAppending("nordic_snow", group("urbex:snowy"))))),
                 "{\"replace\": false} keeps the inherited groups, in order");
     }
 
@@ -380,7 +380,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildInheritsTheFillerAndPartsItDoesNotDeclare() {
-        Building resolved = new Building(null, List.of(
+        Building resolved = new Building(null, PALETTES, List.of(
                 building("library").filler("#").parts("urbex:library_floor").minFloors(2).build(),
                 building("library_burnt").rubble("R").build()));
 
@@ -393,13 +393,13 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedPrefersLonelyBackToZero() {
-        Building resolved = new Building(null, List.of(
+        Building resolved = new Building(null, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").prefersLonely(0.0f).build()));
 
         assertEquals(0.0f, resolved.getPrefersLonely(),
                 "0.0 is a value a file can mean, not a marker for 'undeclared'");
-        assertEquals(0.8f, new Building(null, List.of(
+        assertEquals(0.8f, new Building(null, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").build())).getPrefersLonely(),
                 "omitting it still inherits");
@@ -407,7 +407,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedFloorLimitBackToTheLevelDefault() {
-        Building resolved = new Building(null, List.of(
+        Building resolved = new Building(null, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").minFloors(4).build(),
                 building("tower_short").minFloors(-1).build()));
 
@@ -419,9 +419,17 @@ class RegistryChainResolutionTest {
 
     private static List<List<String>> paletteNamesOf(Style style) {
         return style.paletteChoices().stream()
-                .map(group -> group.stream().map(Pair::getRight).toList())
+                .map(group -> group.stream().map(pair -> pair.getRight().getName()).toList())
                 .toList();
     }
+
+    /**
+     * The palettes these styles name. Needed because a style resolves its {@code randompalettes} when
+     * it is compiled now, rather than on the first chunk that draws from it (issue #128).
+     */
+    private static final AssetIndex<Palette> PALETTES = new AssetIndex<>("urbex:palettes", Map.of(
+            Identifier.fromNamespaceAndPath("urbex", "common"), new Palette("common"),
+            Identifier.fromNamespaceAndPath("urbex", "snowy"), new Palette("snowy")));
 
     private static List<PaletteSelector> group(String... palettes) {
         return List.of(palettes).stream().map(p -> new PaletteSelector(1.0f, p)).toList();

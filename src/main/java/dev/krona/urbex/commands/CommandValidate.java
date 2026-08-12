@@ -4,8 +4,8 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetDiagnostics;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -39,7 +39,11 @@ public class CommandValidate implements Command<CommandSourceStack> {
     @Override
     public int run(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
-        AssetDiagnostics diagnostics = AssetRegistries.validate(source.registryAccess());
+        // A throwaway compile, not the live snapshot: the running world's chunks are generating
+        // against theirs, and asking what is wrong must not replace it. Compiling a second one costs
+        // a few milliseconds and leaves nothing behind (issue #128).
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        AssetCompiler.compile(source.registryAccess(), diagnostics);
 
         if (diagnostics.isEmpty()) {
             source.sendSuccess(() -> Component.literal("Urbex assets: no problems found.")

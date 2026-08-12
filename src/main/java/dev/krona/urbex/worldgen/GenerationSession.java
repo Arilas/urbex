@@ -1,7 +1,11 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.config.Presets;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetDiagnostics;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ServerLevelAccessor;
@@ -63,6 +67,14 @@ public final class GenerationSession {
     @Nullable
     private final Object owner;
     private final RuntimeRepository<ServerLevel, DimensionRuntime> dimensions = new RuntimeRepository<>();
+    /**
+     * Compiled once, by the first level to load, and shared by every level in this world. The asset
+     * registries are frozen when the world loads (issue #61), so there is nothing per-level about
+     * what they compile to - and nothing a reload can change, which is why {@link #reload} leaves
+     * this alone.
+     */
+    @Nullable
+    private volatile AssetSnapshot assets;
 
     private GenerationSession(@Nullable Object owner) {
         this.owner = owner;
@@ -90,7 +102,12 @@ public final class GenerationSession {
         if (previous != null) {
             previous.dimensions.close();
         }
-        AssetRegistries.reset();
+        // The canonical-copy pools and the preset resolution cache are the two pieces of asset
+        // state that are not in the snapshot, because they are deduplication caches rather than
+        // compiled assets. They still have the session's lifetime: without this they would hold every
+        // palette entry of every world this process ever loaded.
+        PaletteEntry.clearPools();
+        Presets.reset();
         GenerationSession session = new GenerationSession(owner);
         current = session;
         return session;
@@ -109,7 +126,8 @@ public final class GenerationSession {
             return;
         }
         session.dimensions.close(GenerationSession::reportUnfinishedWork);
-        AssetRegistries.reset();
+        PaletteEntry.clearPools();
+        Presets.reset();
         current = null;
     }
 
@@ -150,8 +168,7 @@ public final class GenerationSession {
      * reads the level; nothing before it does.</p>
      */
     public DimensionRuntime load(ServerLevel level) {
-        AssetRegistries.load(level);
-        DimensionRuntime runtime = DimensionRuntime.create(level);
+        DimensionRuntime runtime = DimensionRuntime.create(level, compileAssetsOnce(level));
         // Logged per level, at debug, because the ordering this line sits in is the invariant: in a
         // real server log every one of these lands before "Preparing spawn area", which is what a
         // unit test cannot show. (Verified on the digest run's dedicated server: overworld, nether
@@ -160,6 +177,34 @@ public final class GenerationSession {
         Urbex.getLogger().debug("Published the Urbex runtime for '{}' ({})", level.dimension().identifier(),
                 runtime.isEnabled() ? "generating" : "no preset for this dimension");
         return dimensions.publish(level, runtime);
+    }
+
+    /**
+     * Compiles this world's assets, once, before the first level that needs them can generate.
+     *
+     * <p>The whole of the asset-load invariant, in one place: a runtime cannot be built without a
+     * snapshot, a snapshot is only built here, and a pack that does not compile refuses the world
+     * naming every problem at once rather than failing from a worldgen worker on the first chunk that
+     * touches the broken file.</p>
+     */
+    private synchronized AssetSnapshot compileAssetsOnce(ServerLevel level) {
+        AssetSnapshot known = assets;
+        if (known != null) {
+            return known;
+        }
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        AssetSnapshot compiled = AssetCompiler.compile(level.registryAccess(), diagnostics);
+        // Before publication, not after: a snapshot nobody validated is exactly the partially
+        // compiled view this whole issue removes.
+        diagnostics.throwIfAny();
+        assets = compiled;
+        return compiled;
+    }
+
+    /** This world's compiled assets, or null before the first level has loaded. */
+    @Nullable
+    public AssetSnapshot assets() {
+        return assets;
     }
 
     /** Retires a level's runtime. Chunks already generating keep the runtime they captured. */
@@ -201,7 +246,7 @@ public final class GenerationSession {
      * runtime it captured.</p>
      */
     public void reload() {
-        dimensions.republish(level -> DimensionRuntime.create(level));
+        dimensions.republish(level -> DimensionRuntime.create(level, compileAssetsOnce(level)));
     }
 
     /** Who this session belongs to, for a caller that has to close it without holding that server. */

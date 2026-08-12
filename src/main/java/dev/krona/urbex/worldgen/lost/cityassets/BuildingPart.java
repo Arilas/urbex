@@ -5,7 +5,6 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
 
@@ -43,11 +42,10 @@ public class BuildingPart implements IBuildingPart {
     // stopped being serialised. There are a couple of hundred parts and each is tiny.
     private final char[][] vslices;
 
-    // Cannot be resolved in the constructor when it is a *reference* to another palette: that needs
-    // the level to reach the registry, and the level is not available here. Volatile, and the
-    // resolution is idempotent (the registry hands back the same Palette), so a race just means two
-    // threads look the same thing up.
-    private volatile Palette localPalette = null;
+    // The palette this part paints with: its own inline one, or the refpalette it names, resolved by
+    // the compiler before this object is published (issue #128). A reference used to be resolved
+    // lazily from the first chunk that asked, which is why it needed a level.
+    private Palette localPalette = null;
     private String refPaletteName;
 
     private final Map<String, Object> metadata = new HashMap<>();
@@ -61,7 +59,8 @@ public class BuildingPart implements IBuildingPart {
      * {@code slices} replaces the inherited ones wholesale; declaring a size that contradicts the
      * slices actually in force is a load error rather than a silent truncation.
      */
-    public BuildingPart(@Nullable RegistryAccess access, List<BuildingPartRE> chainRootFirst) {
+    public BuildingPart(@Nullable AssetIndex<Variant> variants, AssetIndex<Palette> palettes,
+                        List<BuildingPartRE> chainRootFirst) {
         BuildingPartRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
         name = leaf.getRegistryName();
 
@@ -111,9 +110,13 @@ public class BuildingPart implements IBuildingPart {
         slices = declaredSlices;
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(access, name, inlinePalettes); // @todo get the full palette instead
+            localPalette = Palette.inline(variants, name, inlinePalettes); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
+            // Resolved here, not on the first chunk that asks. The lazy version cached the answer on
+            // this asset and needed a CommonLevelAccessor to reach the palette registry, so a
+            // refpalette naming something absent surfaced from a worldgen worker (issue #128).
+            localPalette = palettes.getOrThrow(refPalette);
         }
         vslices = buildVslices();
         for (PartMeta m : meta) {
@@ -227,13 +230,8 @@ public class BuildingPart implements IBuildingPart {
     }
 
     @Override
-    public Palette getLocalPalette(CommonLevelAccessor level) {
-        Palette p = localPalette;
-        if (p == null && refPaletteName != null) {
-            p = AssetRegistries.PALETTES.getOrThrow(level, refPaletteName);
-            localPalette = p;
-        }
-        return p;
+    public Palette getLocalPalette() {
+        return localPalette;
     }
 
     @Override

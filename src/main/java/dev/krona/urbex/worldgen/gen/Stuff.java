@@ -8,7 +8,6 @@ import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
@@ -21,7 +20,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Stuff {
 
@@ -30,66 +28,14 @@ public class Stuff {
     // palettes. Report each such combination once instead of on every city chunk.
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
-    /**
-     * Latches while the registries are unloaded so the report below fires once per episode rather
-     * than once per chunk, and re-arms as soon as they are loaded again.
-     */
-    private static final AtomicBoolean REPORTED_UNLOADED = new AtomicBoolean();
-
     public static void generateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
-        // The index is taken once, as a snapshot, and every tag below is read out of it. That is
-        // not a micro-optimisation: AssetRegistries.reset() replaces the whole index in one write
-        // (see the field), so holding the reference means a reset landing while this method is
-        // running cannot half-decorate the chunk - the walk either sees the old index throughout or
-        // the new one throughout. Asking per tag would leave exactly that sliver.
-        //
-        // Generating with the registries unloaded is never legitimate here, and it is the one
-        // failure in this file that says nothing: every tag misses, the loop below places nothing,
-        // and the chunk is written and saved undecorated - exactly the shipped defect Task 5c
-        // removed, reappearing one chunk at a time. Every other registry heals itself on the next
-        // lookup (RegistryAssetRegistry.get re-resolves on a miss); this index has no lazy rebuild,
-        // so nothing would ever notice.
-        //
-        // Both conditions are required. An empty index alone is legitimate - a pack may ship no
-        // stuff files at all - and the flag alone would fire on the harmless ordering where the
-        // reset lands after the snapshot was taken, which this chunk survives intact. They come off
-        // one record and one volatile read on purpose: as two separate volatile fields they could be
-        // observed out of step (emptied index, stale loaded == true), and the guard would wave
-        // through exactly the silent chunk it exists to catch. See AssetRegistries.StuffIndex.
-        //
-        // No longer reachable by any path this mod owns, and kept anyway. It used to be plainly
-        // reachable: AssetRegistries.reset() ran from CityFeature.cleanUp, which the generation
-        // path invoked whenever a global dirty counter had been bumped, and
-        // ClientPlayConnectionEvents.DISCONNECT bumped it from the client thread while a
-        // single-player integrated server was still draining in-flight generation. reset() is now
-        // called only when a session opens or closes, on the server thread with no level loaded
-        // (GenerationSession, issue #125). This guard is what would say so if that ever stopped
-        // being true - the failure it detects is otherwise completely silent.
-        //
-        // Logged rather than thrown: generateStuff is the last statement of
-        // CityGenerator.doCityChunk, which generate() calls well before
-        // ctx.driver.actuallyGenerate(chunk) - so a throw here would unwind past the commit and lose
-        // the chunk's entire cached write set, costing the whole chunk rather than its decoration.
-        // (It would also have routed through CityFeature.generateFromPipeline's handler into
-        // ErrorLogger.report, which used to dereference ServerAccess.getServer() with no null check
-        // and so could turn a decoration bug into a dead worldgen worker during exactly the shutdown
-        // window this fires in. That null check exists now - issue #56 - but the reason above stands
-        // on its own.)
-        AssetRegistries.StuffIndex stuffIndex = AssetRegistries.stuffIndex();
-        if (stuffIndex.byTag().isEmpty() && !stuffIndex.loaded()) {
-            if (REPORTED_UNLOADED.compareAndSet(false, true)) {
-                Urbex.getLogger().error(
-                        "Generating chunk {},{} with the Urbex asset registries unloaded: no decoration will be " +
-                                "placed in this chunk or any other until they are loaded again, and the chunks are " +
-                                "saved that way. Something called AssetRegistries.reset() while generation was in " +
-                                "flight. Reported once per occurrence, not once per chunk.",
-                        ctx.coord.chunkX(), ctx.coord.chunkZ());
-            }
-            return;
-        }
-        if (REPORTED_UNLOADED.get()) {
-            REPORTED_UNLOADED.set(false);
-        }
+        // No unloaded-registries guard here any more, and none is possible: the stuff index is a
+        // component of the AssetSnapshot this chunk's provider was built with, and a snapshot cannot
+        // be cleared, half-built or swapped underneath a generation (issue #128). The guard that
+        // stood here detected exactly that - a reset landing mid-chunk, which emptied the tag index
+        // and made this method place nothing while the chunk was written and saved anyway - and it
+        // was needed because AssetRegistries.reset() was reachable from the client thread. Removing
+        // the state removed the failure; there is nothing left to detect.
         // Each stuff object gets its own address, and within it each placement attempt gets its
         // own, derived from the loop indices. An attempt therefore draws the same values however
         // many attempts before it were abandoned - and whether an attempt is abandoned depends on
@@ -104,8 +50,8 @@ public class Stuff {
         BiomeInfo biome = BiomeInfo.getBiomeInfo(feature.provider, info.coord);
         CompiledPalette palette = info.getCompiledPalette();
         for (String tag : info.getCityStyle().getStuffTags()) {
-            List<StuffObject> stuffs = stuffIndex.byTag().get(tag);
-            if (stuffs != null) {
+            List<StuffObject> stuffs = feature.provider.assets().stuffFor(tag);
+            {
                 for (StuffObject stuff : stuffs) {
                     StuffSettingsRE settings = stuff.getSettings();
                     // Never null: 'inbuilding' is required of the resolved chain, precisely because

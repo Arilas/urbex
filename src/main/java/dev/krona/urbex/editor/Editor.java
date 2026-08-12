@@ -20,8 +20,8 @@ public class Editor {
         ChunkCoord coord = new ChunkCoord(dimInfo.getType(), start.getX() >> 4, start.getZ() >> 4);
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
         CompiledPalette palette = info.getCompiledPalette();
-        Palette partPalette = part.getLocalPalette(level);
-        Palette buildingPalette = info.getBuilding().getLocalPalette(level);
+        Palette partPalette = part.getLocalPalette();
+        Palette buildingPalette = info.getBuilding().getLocalPalette();
         if (partPalette != null || buildingPalette != null) {
             palette = new CompiledPalette(palette, partPalette, buildingPalette);
         }

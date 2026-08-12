@@ -6,7 +6,7 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.City;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.CommonLevelAccessor;
@@ -75,10 +75,10 @@ public final class WorldStyleField {
      * Resolves every id in {@code mix} against the world style registry, once, at dimension
      * construction - the same point {@code DefaultDimensionInfo} used to resolve its single style.
      */
-    public static WorldStyleField resolve(CommonLevelAccessor level, long seed, WorldStyleMix mix) {
+    public static WorldStyleField resolve(AssetSnapshot assets, long seed, WorldStyleMix mix) {
         List<Weighted> resolved = new ArrayList<>(mix.entries().size());
         for (WorldStyleMix.Entry entry : mix.entries()) {
-            resolved.add(new Weighted(entry.weight(), AssetRegistries.WORLDSTYLES.get(level, entry.style())));
+            resolved.add(new Weighted(entry.weight(), assets.worldStyles().get(entry.style())));
         }
         return new WorldStyleField(seed, resolved);
     }

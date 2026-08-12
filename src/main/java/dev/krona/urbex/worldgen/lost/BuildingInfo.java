@@ -168,7 +168,7 @@ public class BuildingInfo {
         // building's own entries merged in) must never be visible to another chunk's thread.
         CompiledPalette built = new CompiledPalette(palette);
         if (hasBuilding) {
-            Palette buildingPalette = buildingType.getLocalPalette(provider.getWorld());
+            Palette buildingPalette = buildingType.getLocalPalette();
             if (buildingPalette != null) {
                 built = new CompiledPalette(built, buildingPalette);
             }
@@ -205,7 +205,7 @@ public class BuildingInfo {
     }
 
     public Style getOutsideStyle() {
-        return AssetRegistries.STYLES.get(provider.getWorld(), worldStyle().getOutsideStyle());
+        return provider.assets().styles().get(worldStyle().getOutsideStyle());
     }
 
     private void createPalette(RandomSource rand) {
@@ -214,9 +214,9 @@ public class BuildingInfo {
             style = getOutsideStyle();
         } else {
             String name = getCityStyle().getStyle();
-            style = AssetRegistries.STYLES.getOrThrow(provider.getWorld(), name);
+            style = provider.assets().styles().getOrThrow(name);
         }
-        palette = style.getRandomPalette(provider, rand);
+        palette = style.getRandomPalette(rand);
     }
 
     public BuildingInfo getXmin() {
@@ -380,7 +380,7 @@ public class BuildingInfo {
                     }
                 }
             }
-            cityStyle = AssetRegistries.CITYSTYLES.get(world, counter.getMostOccuring(Comparator.naturalOrder()));
+            cityStyle = provider.assets().cityStyles().get(counter.getMostOccuring(Comparator.naturalOrder()));
         } else {
             cityStyle = City.getCityStyle(coord, provider, profile);
         }
@@ -391,7 +391,7 @@ public class BuildingInfo {
 //                characteristics.multiBuilding = topleft.multiBuilding;
             if (characteristics.multiBuilding != null) {
                 String b = characteristics.multiBuilding.getBuilding(characteristics.multiPos.x(), characteristics.multiPos.z());
-                characteristics.buildingType = AssetRegistries.BUILDINGS.getOrThrow(world, b);
+                characteristics.buildingType = provider.assets().buildings().getOrThrow(b);
             } else {
                 // @todo is this even possible?
                 characteristics.buildingType = topleft.buildingType;
@@ -400,7 +400,7 @@ public class BuildingInfo {
                 }
             }
         } else {
-            PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(world, coord);
+            PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider, coord);
             if (characteristics.multiPos.isTopLeft()) {
 //                    String name = cityStyle.getRandomMultiBuilding(rand);
 //                    if (predefinedBuilding != null) {
@@ -408,7 +408,7 @@ public class BuildingInfo {
 //                    }
 //                    characteristics.multiBuilding = AssetRegistries.MULTI_BUILDINGS.get(world, name);
                 String b = characteristics.multiBuilding.getBuilding(0, 0);
-                characteristics.buildingType = AssetRegistries.BUILDINGS.getOrThrow(world, b);
+                characteristics.buildingType = provider.assets().buildings().getOrThrow(b);
             } else {
 //                    characteristics.multiBuilding = null;
                 String name = cityStyle.getRandomBuilding(rand, coord);
@@ -418,7 +418,7 @@ public class BuildingInfo {
                 if (name == null) {
                     throw new RuntimeException("Invalid building for multibuilding!");
                 }
-                characteristics.buildingType = AssetRegistries.BUILDINGS.getOrThrow(world, name);
+                characteristics.buildingType = provider.assets().buildings().getOrThrow(name);
             }
         }
 
@@ -492,8 +492,8 @@ public class BuildingInfo {
      */
     private static ChunkContentResolver.ChunkFacts chunkFacts(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         return new ChunkContentResolver.ChunkFacts(
-                () -> City.getPredefinedBuildingAtTopLeft(provider.getWorld(), coord) != null,
-                () -> City.getPredefinedStreet(provider.getWorld(), coord) != null,
+                () -> City.getPredefinedBuildingAtTopLeft(provider, coord) != null,
+                () -> City.getPredefinedStreetAt(provider, coord) != null,
                 () -> City.getCityStyle(coord, provider, profile),
                 () -> effectiveRoadType(coord, provider, profile),
                 () -> hasHighway(coord, provider, profile),
@@ -512,7 +512,7 @@ public class BuildingInfo {
             City.PreDefBuildingOffset predefinedBuilding = City.getPredefinedBuilding(provider, coord);
             if (predefinedBuilding != null) {
                 if (predefinedBuilding.building().multi()) {
-                    MultiBuilding building = AssetRegistries.MULTI_BUILDINGS.getOrThrow(provider.getWorld(), predefinedBuilding.building().building());
+                    MultiBuilding building = provider.assets().multiBuildings().getOrThrow(predefinedBuilding.building().building());
                     characteristics.multiPos = new MultiPos(predefinedBuilding.offsetX(), predefinedBuilding.offsetZ(), building.getDimX(), building.getDimZ());
                     characteristics.multiBuilding = building;
                     return;
@@ -531,7 +531,7 @@ public class BuildingInfo {
             return;
         }
 
-        MultiBuilding building = AssetRegistries.MULTI_BUILDINGS.getOrThrow(provider.getWorld(), multiBuilding.name());
+        MultiBuilding building = provider.assets().multiBuildings().getOrThrow(multiBuilding.name());
         characteristics.multiPos = new MultiPos(multiBuilding.offsetX(), multiBuilding.offsetZ(), building.getDimX(), building.getDimZ());
         characteristics.multiBuilding = building;
     }
@@ -656,12 +656,12 @@ public class BuildingInfo {
                 }
             };
             String part = building.getRandomPart(rand, conditionContext);
-            floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), part);
+            floorTypes[i] = provider.assets().parts().getOrThrow(part);
             // getRandomPart2 derives the parts2 context from this one, so it sees this floor's
             // parts[] pick as the current part and the floor below as the part below - see the
             // constructor's copy of this loop.
             String part2 = building.getRandomPart2(rand, conditionContext, part);
-            floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
+            floorTypes2[i] = provider.assets().parts().get(part2);    // null is legal
             // Last in the body: the next iteration's parts[] context is what reads this.
             belowPart = part;
         }
@@ -716,14 +716,14 @@ public class BuildingInfo {
             compiledPalette = topleft.getCompiledPalette();
             ruinHeight = topleft.ruinHeight;
         } else {
-            PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider.getWorld(), key);
+            PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider, key);
             highwayXLevel = Highway.getXHighwayLevel(key, provider, profile);
             highwayZLevel = Highway.getZHighwayLevel(key, provider, profile);
 
             streetType = content.streetType();
             float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
             if (rand.nextFloat() < fountainChance) {
-                fountainType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomFountain(rand, this.coord));
+                fountainType = provider.assets().parts().getOrWarn(cs.getRandomFountain(rand, this.coord));
             } else {
                 fountainType = null;
             }
@@ -731,7 +731,7 @@ public class BuildingInfo {
             // only whether the chosen part is kept follows the open-lot park chance. A road, a
             // building or anything outside a city keeps nothing: the park surface is an open lot's,
             // and a part with no lot under it would sit on the carriageway.
-            BuildingPart park = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomPark(rand, this.coord));
+            BuildingPart park = provider.assets().parts().getOrWarn(cs.getRandomPark(rand, this.coord));
             parkType = content.parkPart() ? park : null;
             float cityFactor = City.getCityFactor(coord, provider, profile);
 
@@ -780,8 +780,8 @@ public class BuildingInfo {
             cellars = fb;
 
             doorBlock = getRandomDoor(rand);
-            bridgeType = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), cs.getRandomBridge(rand, this.coord));
-            stairType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), cs.getRandomStair(rand, this.coord));
+            bridgeType = provider.assets().parts().getOrThrow(cs.getRandomBridge(rand, this.coord));
+            stairType = provider.assets().parts().getOrWarn(cs.getRandomStair(rand, this.coord));
             stairPriority = rand.nextFloat();
             createPalette(rand);
             // Preserve the legacy building stream slot formerly used by buildingWithoutLootChance.
@@ -841,7 +841,7 @@ public class BuildingInfo {
             if (part == null) {
                 throw new RuntimeException("Misconfiguration! Floor were generated for a building where no part condition matches!");
             }
-            floorTypes[i] = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), part);
+            floorTypes[i] = provider.assets().parts().getOrThrow(part);
 
             // parts2[] is the second part of *this* floor, so it does have a current part - the
             // parts[] pick just made - while "the part below" is still the previous floor's.
@@ -849,7 +849,7 @@ public class BuildingInfo {
             // rather than being handed one, which is what stops belowPart being poisoned the way it
             // used to be when this loop advanced it before building a second context by hand.
             String part2 = building.getRandomPart2(rand, conditionContext, part);
-            floorTypes2[i] = AssetRegistries.PARTS.get(provider.getWorld(), part2);    // null is legal
+            floorTypes2[i] = provider.assets().parts().get(part2);    // null is legal
             // Last in the body: what still reads this local is the *next* iteration's parts[]
             // context, at the top of the loop, which must see the floor below rather than this one.
             belowPart = part;
@@ -876,7 +876,7 @@ public class BuildingInfo {
 
         if (rand.nextFloat() < profile.RAILWAY_DUNGEON_CHANCE) {
             if (!hasBuilding || (Railway.RAILWAY_LEVEL_OFFSET < (cityLevel - cellars))) {
-                railDungeon = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomRailDungeon(rand, this.coord));
+                railDungeon = provider.assets().parts().getOrWarn(getCityStyle().getRandomRailDungeon(rand, this.coord));
             } else {
                 railDungeon = null;
             }
@@ -886,7 +886,7 @@ public class BuildingInfo {
 
         float frontChance = cs.getFrontChance() != null ? cs.getFrontChance() : profile.BUILDING_FRONTCHANCE;
         if (rand.nextFloat() < frontChance) {
-            frontType = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getCityStyle().getRandomFront(rand, this.coord));
+            frontType = provider.assets().parts().getOrWarn(getCityStyle().getRandomFront(rand, this.coord));
         } else {
             frontType = null;
         }

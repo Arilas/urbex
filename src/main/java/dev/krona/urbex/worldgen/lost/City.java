@@ -35,7 +35,7 @@ public class City {
     private static final Map<ChunkCoord, PreDefBuildingOffset> OCCUPIED_CHUNKS_BUILDING = new ConcurrentHashMap<>();
     private static final Map<ChunkCoord, PredefinedStreet> OCCUPIED_CHUNKS_STREET = new ConcurrentHashMap<>();
 
-    // All five are filled by walking AssetRegistries.PREDEFINED_CITIES.getIterable(), which is a
+    // All five are filled by walking provider.assets().predefinedCities().all(), which is a
     // ConcurrentHashMap's values - Identifier hash-bucket order. Two predefined cities that claim
     // the same chunk therefore resolve last-writer-wins by hash, and renaming either file could
     // flip which one that is. Left as is deliberately: unlike the stuff ordinal, this is not a
@@ -66,14 +66,12 @@ public class City {
         OCCUPIED_CHUNKS_STREET.clear();
     }
 
-    public static PredefinedCity getPredefinedCity(CommonLevelAccessor level, ChunkCoord coord) {
-        AssetRegistries.loadPredefinedStuff(level);
-        // Guarded on level != null for the same reason as AssetRegistries.loadedPredefined (#67):
-        // a null level (the preview's NullDimensionInfo.getWorld()) means nothing was actually
-        // loaded above, so latching "ready" here would permanently stop a later real level from
-        // ever populating this map.
-        if (!predefinedCityMapReady && level != null) {
-            for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
+    public static PredefinedCity getPredefinedCity(IDimensionInfo provider, ChunkCoord coord) {
+        // Guarded on a real level (#67): the preview's NullDimensionInfo has none, and its snapshot
+        // may be empty, so latching "ready" over it would permanently stop a later real level from
+        // populating this map.
+        if (!predefinedCityMapReady && provider.getWorld() != null) {
+            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
                 PREDEFINED_CITY_MAP.put(new ChunkCoord(city.getDimension(), city.getChunkX(), city.getChunkZ()), city);
             }
             predefinedCityMapReady = true;
@@ -84,8 +82,8 @@ public class City {
         return PREDEFINED_CITY_MAP.get(coord);
     }
 
-    public static PredefinedBuilding getPredefinedBuildingAtTopLeft(CommonLevelAccessor level, ChunkCoord coord) {
-        calculateMap(level);
+    public static PredefinedBuilding getPredefinedBuildingAtTopLeft(IDimensionInfo provider, ChunkCoord coord) {
+        calculateMap(provider);
         return PREDEFINED_BUILDING_MAP.get(coord);
     }
 
@@ -111,12 +109,12 @@ public class City {
         // null world (the preview) these bodies run on whatever's currently in the datapack-derived
         // maps - usually nothing yet - and must not latch "ready" over that.
         if (!occupiedBuildingReady && world != null) {
-            calculateMap(world);
+            calculateMap(provider);
             for (Map.Entry<ChunkCoord, PredefinedBuilding> entry : PREDEFINED_BUILDING_MAP.entrySet()) {
                 PredefinedBuilding pb = entry.getValue();
                 ChunkCoord root = entry.getKey();
                 if (pb.multi()) {
-                    MultiBuilding building = AssetRegistries.MULTI_BUILDINGS.getOrThrow(world, pb.building());
+                    MultiBuilding building = provider.assets().multiBuildings().getOrThrow(pb.building());
                     // Add all occupied chunkcoords for the building to the occupied set
                     for (int x = 0 ; x < building.getDimX() ; x++) {
                         for (int z = 0 ; z < building.getDimZ() ; z++) {
@@ -129,9 +127,8 @@ public class City {
             }
             occupiedBuildingReady = true;
         }
-        AssetRegistries.loadPredefinedStuff(world);
         if (!occupiedStreetReady && world != null) {
-            for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
+            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
                 for (PredefinedStreet street : city.getPredefinedStreets()) {
                     OCCUPIED_CHUNKS_STREET.put(new ChunkCoord(city.getDimension(),
                             city.getChunkX() + street.relChunkX(), city.getChunkZ() + street.relChunkZ()), street);
@@ -141,10 +138,9 @@ public class City {
         }
     }
 
-    private static void calculateMap(CommonLevelAccessor level) {
-        AssetRegistries.loadPredefinedStuff(level);
-        if (!predefinedBuildingMapReady && level != null) {
-            for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
+    private static void calculateMap(IDimensionInfo provider) {
+        if (!predefinedBuildingMapReady && provider.getWorld() != null) {
+            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
                 for (PredefinedBuilding building : city.getPredefinedBuildings()) {
                     PREDEFINED_BUILDING_MAP.put(new ChunkCoord(city.getDimension(),
                             city.getChunkX() + building.relChunkX(), city.getChunkZ() + building.relChunkZ()), building);
@@ -154,10 +150,17 @@ public class City {
         }
     }
 
-    public static PredefinedStreet getPredefinedStreet(CommonLevelAccessor level, ChunkCoord coord) {
-        AssetRegistries.loadPredefinedStuff(level);
-        if (!predefinedStreetMapReady && level != null) {
-            for (PredefinedCity city : AssetRegistries.PREDEFINED_CITIES.getIterable()) {
+    /**
+     * The predefined street declared <em>at</em> {@code coord}, or null.
+     * <p>
+     * Renamed out of an overload collision: this and {@link #getPredefinedStreet} were both called
+     * {@code getPredefinedStreet}, separated only by whether the caller passed a level or a provider,
+     * and they answer different questions - this one reads the street map, that one reads the
+     * occupancy map. Two names, because the argument type is no longer the distinction.
+     */
+    public static PredefinedStreet getPredefinedStreetAt(IDimensionInfo provider, ChunkCoord coord) {
+        if (!predefinedStreetMapReady && provider.getWorld() != null) {
+            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
                 for (PredefinedStreet street : city.getPredefinedStreets()) {
                     PREDEFINED_STREET_MAP.put(new ChunkCoord(city.getDimension(),
                             city.getChunkX() + street.relChunkX(), city.getChunkZ() + street.relChunkZ()), street);
@@ -173,7 +176,7 @@ public class City {
 
 
     public static boolean isCityCenter(ChunkCoord coord, IDimensionInfo provider) {
-        PredefinedCity city = getPredefinedCity(provider.getWorld(), coord);
+        PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             return true;
         }
@@ -187,7 +190,7 @@ public class City {
      * Return the radius of the city with the given center
      */
     public static float getCityRadius(ChunkCoord coord, IDimensionInfo provider) {
-        PredefinedCity city = getPredefinedCity(provider.getWorld(), coord);
+        PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             return city.getRadius();
         }
@@ -204,7 +207,7 @@ public class City {
 
     // Call this on a city center to get the style of that city
     public static String getCityStyleForCityCenter(ChunkCoord coord, IDimensionInfo provider) {
-        PredefinedCity city = getPredefinedCity(provider.getWorld(), coord);
+        PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             if (city.getCityStyle() != null) {
                 return city.getCityStyle();
@@ -283,31 +286,31 @@ public class City {
                 cityStyleName = fromList.getRight();
             }
         }
-        return AssetRegistries.CITYSTYLES.get(provider.getWorld(), cityStyleName);
+        return provider.assets().cityStyles().get(cityStyleName);
     }
 
     public static float getCityFactor(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         ResourceKey<Level> type = provider.getType();
         // If we have a predefined building here we force a high city factor
 
-        PredefinedBuilding predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord);
+        PredefinedBuilding predefinedBuilding = getPredefinedBuildingAtTopLeft(provider, coord);
         if (predefinedBuilding != null) {
             return 1.0f;
         }
-        PredefinedStreet predefinedStreet = getPredefinedStreet(provider.getWorld(), coord);
+        PredefinedStreet predefinedStreet = getPredefinedStreetAt(provider, coord);
         if (predefinedStreet != null) {
             return 1.0f;
         }
 
-        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord.west());
+        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider, coord.west());
         if (predefinedBuilding != null && predefinedBuilding.multi()) {
             return 1.0f;
         }
-        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord.northWest());
+        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider, coord.northWest());
         if (predefinedBuilding != null && predefinedBuilding.multi()) {
             return 1.0f;
         }
-        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider.getWorld(), coord.north());
+        predefinedBuilding = getPredefinedBuildingAtTopLeft(provider, coord.north());
         if (predefinedBuilding != null && predefinedBuilding.multi()) {
             return 1.0f;
         }
