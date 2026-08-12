@@ -135,6 +135,30 @@ loom {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
             }
         }
+        // The window that covers structure avoidance at all. Neither of the two above does:
+        // avoidedChunks is 0 in both, because seed 1337 has no village near either sample, so the
+        // suppression branch never executed and a change to it could not move their goldens. This one
+        // turns on avoidSurfaceStructures, which the ruined portals and shipwrecks that *are* there do
+        // trigger, and gates on requireAvoided so a window that stops containing one fails instead of
+        // passing in silence - the same guard requireBridge and requireSlope are for the features
+        // window.
+        digestCheckAvoid {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoid')
+            // NOT YET SITED. offset 100 / radius 6 contains no surface structure, so requireAvoided
+            // fails here by design rather than by accident - the gate is doing its job and the window
+            // still has to be found. The wide probe that found ruined portals and shipwrecks covered
+            // radius 24 around this offset, so one exists nearby; narrowing it is the remaining work.
+            vmArg '-Durbex.digestCheck=6,rowmajor,100'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
         // The weighted-world-style-mix census. Not a golden check and not run by CI: mixing needs a
         // second datapack registering a second world style, and this repository ships only its own.
         // Point it at one or more with `-PurbexMixPack=<jar>[,<jar>...]` and run `./gradlew runMixCheck`;
@@ -160,7 +184,7 @@ loom {
 // loop, holding that thread far past max-tick-time; the generation itself still fans out to the
 // worker pool, so this is not a serial baseline. Shared by every digest run config, each against
 // its own run directory so the two checks cannot clobber each other's world.
-def registerPrepareDigestCheck = { String taskName, String runDirPath ->
+def registerPrepareDigestCheck = { String taskName, String runDirPath, String extraConfig = '' ->
     tasks.register(taskName) {
         notCompatibleWithConfigurationCache("writes the run directory")
         doLast {
@@ -178,13 +202,19 @@ motd=urbex digest check
 '''
             def cfgDir = new File(dir, 'world/serverconfig')
             cfgDir.mkdirs()
-            new File(cfgDir, 'urbex.json').text = '{ "selectedPreset": "urbex:default" }\n'
+            new File(cfgDir, 'urbex.json').text = '{ "selectedPreset": "urbex:default"' + extraConfig + ' }\n'
         }
     }
 }
 registerPrepareDigestCheck('prepareDigestCheck', 'runs/digestcheck')
 registerPrepareDigestCheck('prepareDigestCheckFeatures', 'runs/digestcheckfeatures')
 registerPrepareDigestCheck('prepareDigestCheckShuffled', 'runs/digestcheckshuffled')
+// avoidSurfaceStructures rather than the default avoidVillages, because seed 1337 has no village
+// anywhere near either sample - a radius-24 probe found 842 chunks with structure references and not
+// one village, so a window relying on avoidVillages would test nothing. Ruined portals and shipwrecks
+// are there, both surface-step, so this is the flag that fires on a world we already have.
+registerPrepareDigestCheck('prepareDigestCheckAvoid', 'runs/digestcheckavoid',
+        ', "avoidSurfaceStructures": true')
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
     dependsOn 'prepareDigestCheck'
@@ -194,6 +224,9 @@ tasks.matching { it.name == 'runDigestCheckFeatures' }.configureEach {
 }
 tasks.matching { it.name == 'runDigestCheckShuffled' }.configureEach {
     dependsOn 'prepareDigestCheckShuffled'
+}
+tasks.matching { it.name == 'runDigestCheckAvoid' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoid'
 }
 
 // The mix census needs a different world config from the digest runs - the experimental flag on,

@@ -249,9 +249,18 @@ public class CityGenerator {
         if (!info.multiBuildingPos.isMulti()) {
             avoidChunk = hasBlacklistedStructure(region, chunkX, chunkZ);
             if (avoidChunk != AvoidChunk.NO) {
+                // Only this chunk's rendering. The cached BuildingInfo and ChunkCharacteristics used
+                // to be rewritten here too - isCity flipped to false, from the thread generating this
+                // chunk, on values every neighbour had already read and derived from. Everything they
+                // had settled off isCity == true stayed settled; only chunks planned after the flip
+                // saw it, so what a world looked like depended on generation order (issue #126).
+                //
+                // Suppression is local now, which is the same shape StructureSuppressor already uses
+                // for the opposite policy: it cancels a structure inside a city without touching the
+                // city's plan, and this cancels the city inside a structure without touching it
+                // either. Neighbours keep planning as though the city were here, which is the honest
+                // cost of the change - see the note on AvoidChunk.
                 doCity = false;
-                info.isCity = false;
-                BuildingInfo.setCityRaw(coord, provider, false);
             }
         }
 
@@ -305,10 +314,25 @@ public class CityGenerator {
         }
     }
 
+    /**
+     * Whether structure avoidance suppresses this chunk's city.
+     *
+     * <p>{@code ADJACENT} is gone with the neighbourhood probe that produced it. It meant "a chunk
+     * next to this one has an avoided structure", and answering that needed reading neighbouring
+     * chunks - which the probe did through {@code level.hasChunk}, treating whatever the region did
+     * not happen to hold as clear. That made the answer a property of generation order rather than of
+     * the world (issue #126).</p>
+     *
+     * <p>It could not be made deterministic the way {@code StructureSuppressor} is. That one asks
+     * planning a question from generation - {@code BuildingInfo.isCity}, pure seed and coordinate -
+     * and the reverse, "is there a structure at that coordinate", has no seed-pure answer: vanilla
+     * picks candidate chunks from the seed and then accepts or rejects each one against biome and
+     * terrain at generation time. A mask built from candidates alone suppresses cities around
+     * villages that never appear.</p>
+     */
     public enum AvoidChunk {
         NO,
-        YES,
-        ADJACENT
+        YES
     }
 
     /**
@@ -318,35 +342,23 @@ public class CityGenerator {
      * on the generation path (issue #126).
      */
     static AvoidChunk hasBlacklistedStructure(WorldGenLevel level, int chunkX, int chunkZ) {
-        boolean doAdjacent = Config.AVOID_VILLAGES_ADJACENT.get() || Config.AVOID_STRUCTURES_ADJACENT.get();
-        if (doAdjacent || Config.AVOID_VILLAGES.get() || Config.AVOID_SURFACE_STRUCTURES.get() || Config.hasAvoidedStructures()) {
-            if (doAdjacent) {
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        // Chunks that are not part of this region are unknown and assumed to be ok.
-                        // Skip them, but keep testing the ones we can see.
-                        if (level.hasChunk(chunkX + dx, chunkZ + dz)) {
-                            ChunkAccess ch = level.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.STRUCTURE_REFERENCES);
-                            boolean center = dx == 0 && dz == 0;
-                            if (testBlacklistedStructure(level, ch, center)) {
-                                return center ? AvoidChunk.YES : AvoidChunk.ADJACENT;
-                            }
-                        }
-                    }
-                }
-            } else {
-                if (level.hasChunk(chunkX, chunkZ)) {
-                    ChunkAccess ch = level.getChunk(chunkX, chunkZ, ChunkStatus.STRUCTURE_REFERENCES);
-                    return testBlacklistedStructure(level, ch, true) ? AvoidChunk.YES : AvoidChunk.NO;
-                } else {
-                    return AvoidChunk.NO; // If we have unknown chunks we assume it is ok
-                }
-            }
+        if (!Config.AVOID_VILLAGES.get() && !Config.AVOID_SURFACE_STRUCTURES.get()
+                && !Config.hasAvoidedStructures()) {
+            return AvoidChunk.NO;
         }
-        return AvoidChunk.NO;
+        // This chunk only. It is the one being generated, so its own structure references are already
+        // settled and reading them is a property of the chunk rather than of what else happens to be
+        // loaded - which is the whole of what made the 3x3 probe this replaces order-dependent
+        // (issue #126). The guard is kept for the one caller that asks about a chunk it does not hold:
+        // DigestRunner's coverage counter, after generation.
+        if (!level.hasChunk(chunkX, chunkZ)) {
+            return AvoidChunk.NO;
+        }
+        ChunkAccess ch = level.getChunk(chunkX, chunkZ, ChunkStatus.STRUCTURE_REFERENCES);
+        return testBlacklistedStructure(level, ch) ? AvoidChunk.YES : AvoidChunk.NO;
     }
 
-    private static boolean testBlacklistedStructure(WorldGenLevel level, ChunkAccess ch, boolean center) {
+    private static boolean testBlacklistedStructure(WorldGenLevel level, ChunkAccess ch) {
         if (ch.hasAnyStructureReferences()) {
             var structures = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
             var references = ch.getAllReferences();
@@ -354,22 +366,18 @@ public class CityGenerator {
                 if (!entry.getValue().isEmpty()) {
                     Structure structure = entry.getKey();
                     Optional<ResourceKey<Structure>> key = structures.getResourceKey(structure);
-                    if (Config.AVOID_VILLAGES.get()) {
-                        if (center || Config.AVOID_VILLAGES_ADJACENT.get()) {
-                            if (key.map(k -> structures.getOrThrow(k).is(StructureTags.VILLAGE)).orElse(false)) {
-                                return true;
-                            }
-                        }
+                    if (Config.AVOID_VILLAGES.get()
+                            && key.map(k -> structures.getOrThrow(k).is(StructureTags.VILLAGE)).orElse(false)) {
+                        return true;
                     }
-                    if (center || Config.AVOID_STRUCTURES_ADJACENT.get()) {
-                        // Catch-all for structure mods: everything that builds at the surface step
-                        if (Config.AVOID_SURFACE_STRUCTURES.get() && structure.step() == GenerationStep.Decoration.SURFACE_STRUCTURES) {
-                            return true;
-                        }
-                        // An unregistered structure has no id to match against the blacklist
-                        if (key.isPresent() && Config.isAvoidedStructure(key.get().identifier())) {
-                            return true;
-                        }
+                    // Catch-all for structure mods: everything that builds at the surface step
+                    if (Config.AVOID_SURFACE_STRUCTURES.get()
+                            && structure.step() == GenerationStep.Decoration.SURFACE_STRUCTURES) {
+                        return true;
+                    }
+                    // An unregistered structure has no id to match against the blacklist
+                    if (key.isPresent() && Config.isAvoidedStructure(key.get().identifier())) {
+                        return true;
                     }
                 }
             }

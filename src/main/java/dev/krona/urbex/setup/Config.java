@@ -60,11 +60,9 @@ public class Config {
     public static final Supplier<Boolean> FORCE_SAPLING_GROWTH = () -> active.forceSaplingGrowth();
     public static final Supplier<Integer> CACHE_CLEANUP_SECONDS = () -> active.cacheCleanupSeconds();
     public static final Supplier<Integer> HEIGHT_SAMPLE_SIZE = () -> active.heightSampleSize();
-    public static final Supplier<Boolean> AVOID_STRUCTURES_ADJACENT = () -> active.avoidStructuresAdjacent();
     public static final Supplier<Boolean> AVOID_SURFACE_STRUCTURES = () -> active.avoidSurfaceStructures();
     public static final Supplier<Boolean> STRUCTURES_YIELD_TO_CITIES = () -> active.structuresYieldToCities();
     public static final Supplier<Boolean> AVOID_VILLAGES = () -> active.avoidVillages();
-    public static final Supplier<Boolean> AVOID_VILLAGES_ADJACENT = () -> active.avoidVillagesAdjacent();
     public static final Supplier<Boolean> AVOID_FLATTENING = () -> active.avoidFlattening();
     public static final Supplier<Boolean> EXPERIMENTAL_MULTI_WORLD_STYLES = () -> active.experimentalMultiWorldStyles();
 

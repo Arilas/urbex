@@ -192,6 +192,12 @@ public final class DigestRunner {
         int count = 0;
         StringBuilder where = new StringBuilder();
         for (ChunkPos pos : chunkPositions) {
+            // Loaded first, then asked through the production method. Not a reimplementation of the
+            // matching - that stays in one place - but the residency guard inside it answers "no"
+            // for a chunk the level does not hold, and after generation some of the sample is not
+            // resident. A coverage counter that inherited that would report "nothing to cover" for a
+            // window full of structures, which is the opposite of its job.
+            level.getChunk(pos.x(), pos.z(), ChunkStatus.STRUCTURE_REFERENCES, true);
             CityGenerator.AvoidChunk avoid = CityGenerator.hasBlacklistedStructure(level, pos.x(), pos.z());
             if (avoid != CityGenerator.AvoidChunk.NO) {
                 count++;
