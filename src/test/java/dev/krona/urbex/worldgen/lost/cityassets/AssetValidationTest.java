@@ -11,17 +11,14 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -41,17 +38,13 @@ class AssetValidationTest {
         Bootstrap.bootStrap();
     }
 
-    @BeforeEach
-    @AfterEach
-    void clearRegistries() {
-        AssetRegistries.reset();
-    }
 
     @Test
     void everyBrokenAssetIsReportedRatherThanOnlyTheFirst() {
         RegistryAccess access = registriesWithBrokenVariants("rubble", "leaves", "gravel");
 
-        AssetDiagnostics diagnostics = AssetRegistries.validate(access);
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        AssetCompiler.compile(access, diagnostics);
 
         assertEquals(3, diagnostics.size(),
                 () -> "all three must be named at once, not one per world load: "
@@ -69,30 +62,30 @@ class AssetValidationTest {
     void aPackWithNothingWrongReportsNothing() {
         RegistryAccess access = registriesWithBrokenVariants();
 
-        assertTrue(AssetRegistries.validate(access).isEmpty());
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        AssetCompiler.compile(access, diagnostics);
+
+        assertTrue(diagnostics.isEmpty(), () -> diagnostics.format("unexpected"));
     }
 
     /**
-     * Validation is a throwaway pass. The live compiled assets belong to the loaded world and chunks
-     * are generating against them, so asking what is wrong must not populate, replace or clear them -
-     * clearing them mid-session is exactly what issue #125 removed.
+     * Compiling for a report publishes nothing. What {@code /urbex validate} needs is a second,
+     * throwaway snapshot: the running world's chunks are generating against theirs, and asking what
+     * is wrong must not replace it. There is no longer a static registry to leave alone - that is the
+     * point of issue #128 - so what is asserted is that two compiles of the same registries are
+     * independent objects rather than one shared, mutable view.
      */
     @Test
-    void validatingLeavesTheLiveRegistriesAlone() {
-        RegistryAccess access = registriesWithBrokenVariants("rubble");
+    void compilingForAReportPublishesNothing() {
+        RegistryAccess access = registriesWithBrokenVariants();
 
-        AssetRegistries.validate(access);
+        AssetSnapshot first = AssetCompiler.compile(access, new AssetDiagnostics());
+        AssetSnapshot second = AssetCompiler.compile(access, new AssetDiagnostics());
 
-        assertFalse(AssetRegistries.isLoaded(), "validation does not latch the registries as loaded");
-        assertEquals(List.of(), copyOf(AssetRegistries.VARIANTS.getIterable()),
-                "nor cache anything it compiled on the way");
+        assertNotSame(first, second);
+        assertNotSame(first.variants(), second.variants());
     }
 
-    private static List<Object> copyOf(Iterable<?> iterable) {
-        List<Object> copy = new ArrayList<>();
-        iterable.forEach(copy::add);
-        return copy;
-    }
 
     /**
      * A registry access holding every registry {@code validate} walks, all empty except
@@ -120,7 +113,9 @@ class AssetValidationTest {
                 empty(CustomRegistries.WORLDSTYLES_REGISTRY_KEY),
                 empty(CustomRegistries.CITYSTYLES_REGISTRY_KEY),
                 empty(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY),
-                empty(CustomRegistries.STUFF_REGISTRY_KEY))).freeze();
+                empty(CustomRegistries.STUFF_REGISTRY_KEY),
+                // Read by the compiler's city-style reachability walk, not compiled by it.
+                empty(CustomRegistries.PRESET_REGISTRY_KEY))).freeze();
     }
 
     private static <T> Registry<T> empty(ResourceKey<Registry<T>> key) {

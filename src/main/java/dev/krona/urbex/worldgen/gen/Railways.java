@@ -9,7 +9,6 @@ import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.Transform;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import net.minecraft.world.level.block.Blocks;
@@ -47,31 +46,31 @@ public class Railways {
                 if (railInfo.getLevel() < info.cityLevel) {
                     // Even for a surface station extension we switch to underground if we are an extension
                     // that is at a spot where the city is higher then where the station is
-                    part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationUnderground()));
+                    part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationUnderground()));
                 } else {
                     if (railInfo.getPart() != null) {
-                        part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railInfo.getPart()));
+                        part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railInfo.getPart()));
                     } else {
-                        part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationOpen()));
+                        part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationOpen()));
                     }
                 }
                 clearUpper = true;
                 break;
             case STATION_UNDERGROUND:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationUndergroundStairs()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationUndergroundStairs()));
                 needsStaircase = true;
                 break;
             case STATION_EXTENSION_UNDERGROUND:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationUnderground()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationUnderground()));
                 break;
             case RAILS_END_HERE:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsHorizontalEnd()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsHorizontalEnd()));
                 if (railInfo.getDirection() == Railway.RailDirection.EAST) {
                     transform = Transform.MIRROR_X;
                 }
                 break;
             case HORIZONTAL:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsHorizontal()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsHorizontal()));
 
                 // If the adjacent chunks are also horizontal we take a sample of the blocks around us to see if we are in water
                 RailChunkType type1 = info.getXmin().getRailInfo().getType();
@@ -83,51 +82,51 @@ public class Railways {
                             driver.getBlock(12, height + 2, 12) == liquid &&
                             driver.getBlock(3, height + 4, 7) == liquid &&
                             driver.getBlock(12, height + 4, 8) == liquid) {
-                        part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsHorizontalWater()));
+                        part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsHorizontalWater()));
                     }
                 }
                 break;
             case VERTICAL:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsVertical()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsVertical()));
                 if (driver.getBlock(3, height + 2, 3) == liquid &&
                         driver.getBlock(12, height + 2, 3) == liquid &&
                         driver.getBlock(3, height + 2, 12) == liquid &&
                         driver.getBlock(12, height + 2, 12) == liquid &&
                         driver.getBlock(3, height + 4, 7) == liquid &&
                         driver.getBlock(12, height + 4, 8) == liquid) {
-                    part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsVerticalWater()));
+                    part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsVerticalWater()));
                 }
                 if (railInfo.getDirection() == Railway.RailDirection.EAST) {
                     transform = Transform.MIRROR_X;
                 }
                 break;
             case THREE_SPLIT:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.rails3Split()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.rails3Split()));
                 if (railInfo.getDirection() == Railway.RailDirection.EAST) {
                     transform = Transform.MIRROR_X;
                 }
                 break;
             case GOING_DOWN_TWO_FROM_SURFACE:
             case GOING_DOWN_FURTHER:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsDown2()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsDown2()));
                 if (railInfo.getDirection() == Railway.RailDirection.EAST) {
                     transform = Transform.MIRROR_X;
                 }
                 break;
             case GOING_DOWN_ONE_FROM_SURFACE:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsDown1()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsDown1()));
                 if (railInfo.getDirection() == Railway.RailDirection.EAST) {
                     transform = Transform.MIRROR_X;
                 }
                 break;
             case DOUBLE_BEND:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsBend()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsBend()));
                 if (railInfo.getDirection() == Railway.RailDirection.EAST) {
                     transform = Transform.MIRROR_X;
                 }
                 break;
             default:
-                part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.railsFlat()));
+                part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsFlat()));
                 break;
         }
         int h = feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
@@ -241,13 +240,13 @@ public class Railways {
         }
 
         if (needsStaircase) {
-            part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationStaircase()));
+            part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationStaircase()));
             for (int i = railInfo.getLevel() + 1; i < info.cityLevel; i++) {
                 height = info.groundLevel + i * CityGenerator.FLOORHEIGHT;
                 feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
             }
             height = info.groundLevel + info.cityLevel * CityGenerator.FLOORHEIGHT;
-            part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), feature.getRandomPart(ctx, railwayParts.stationStaircaseSurface()));
+            part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationStaircaseSurface()));
             feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         }
     }

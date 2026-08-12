@@ -1642,7 +1642,7 @@ public class CityGenerator {
         if (parts.stair().isEmpty()) {
             return;
         }
-        BuildingPart part = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.stair()));
+        BuildingPart part = provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.stair()));
         if (part != null) {
             generatePart(ctx, info, part, slopeDirection.getRotation(), 0, height, 0, HardAirSetting.VOID);
         }
@@ -1662,7 +1662,7 @@ public class CityGenerator {
         // and throw. A null part here is already handled below (no render, no connectors).
         BuildingPart part = switch (cnt) {
             case 0 -> parts.none().isEmpty() ? null
-                    : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.none()));
+                    : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.none()));
             case 1 -> {
                 if (xmin) {
                 } else if (xmax) {
@@ -1673,7 +1673,7 @@ public class CityGenerator {
                     transform = Transform.ROTATE_270;
                 }
                 yield parts.end().isEmpty() ? null
-                        : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.end()));
+                        : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.end()));
             }
             case 2 -> {
                 if (xmin == xmax || zmin == zmax) {
@@ -1686,7 +1686,7 @@ public class CityGenerator {
                         transform = Transform.ROTATE_270;
                     }
                     yield parts.straight().isEmpty() ? null
-                            : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.straight()));
+                            : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.straight()));
                 } else {
                     if (xmin && zmin) {
                     } else if (xmin && zmax) {
@@ -1697,7 +1697,7 @@ public class CityGenerator {
                         transform = Transform.ROTATE_180;
                     }
                     yield parts.bend().isEmpty() ? null
-                            : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.bend()));
+                            : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.bend()));
                 }
             }
             case 3 -> {
@@ -1709,10 +1709,10 @@ public class CityGenerator {
                     transform = Transform.ROTATE_180;
                 }
                 yield parts.t().isEmpty() ? null
-                        : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.t()));
+                        : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.t()));
             }
             case 4 -> parts.all().isEmpty() ? null
-                    : AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.all()));
+                    : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.all()));
             default -> throw new RuntimeException("Not possible!");
         };
         if (part != null) {
@@ -1740,7 +1740,7 @@ public class CityGenerator {
     private void generateMinorStreetConnector(ChunkGenContext ctx, BuildingInfo info, BuildingInfo adjacent,
                                               StreetParts parts, int height, Transform transform) {
         if (BuildingInfo.hasRoadConnection(info, adjacent) && !adjacent.isPrimaryRoad()) {
-            BuildingPart connector = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), getRandomPart(ctx, parts.connector()));
+            BuildingPart connector = provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.connector()));
             if (connector != null) {
                 generatePart(ctx, info, connector, transform, 0, height, 0, HardAirSetting.VOID);
             }
@@ -1757,7 +1757,7 @@ public class CityGenerator {
                 if (adjacent.getStreetSlopeDirection() == direction.getOpposite()) {
                     StreetParts slopeParts = getStreetParts(adjacent);
                     if (!slopeParts.stair().isEmpty()) {
-                        BuildingPart slope = AssetRegistries.PARTS.getOrWarn(provider.getWorld(), slopeParts.stair().get(0));
+                        BuildingPart slope = provider.assets().parts().getOrWarn(slopeParts.stair().get(0));
                         if (slope != null) {
                             Integer z1 = slope.getMetaInteger(BuildingPart.META_Z_1);
                             Integer z2 = slope.getMetaInteger(BuildingPart.META_Z_2);
@@ -1908,7 +1908,7 @@ public class CityGenerator {
     public CompiledPalette computePalette(BuildingInfo info, IBuildingPart part) {
         CompiledPalette compiledPalette = info.getCompiledPalette();
         // Cache the combined palette?
-        Palette partPalette = part.getLocalPalette(provider.getWorld());
+        Palette partPalette = part.getLocalPalette();
         if (partPalette != null) {
             compiledPalette = new CompiledPalette(compiledPalette, partPalette);
         }
@@ -2107,7 +2107,7 @@ public class CityGenerator {
 
     public static Identifier getRandomSpawnerMob(Level world, RandomSource random, IDimensionInfo diminfo, BuildingInfo info, BuildingInfo.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();
-        Condition cnd = AssetRegistries.CONDITIONS.getOrThrow(world, condition);
+        Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
         int level = (pos.getY() - diminfo.getProfile().GROUNDLEVEL) / FLOORHEIGHT;
         int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
         String belowFloor = ConditionContext.NO_PART;
@@ -2152,7 +2152,7 @@ public class CityGenerator {
                         return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
                     }
                 };
-                String randomValue = AssetRegistries.CONDITIONS.getOrThrow(world, lootTable).getRandomValue(random, conditionContext);
+                String randomValue = diminfo.assets().conditions().getOrThrow(lootTable).getRandomValue(random, conditionContext);
 //                ((LockableLootTileEntity) tileentity).setLootTable(Identifier.fromNamespaceAndPath(randomValue), random.nextLong());
 //                tileentity.markDirty();
 //                    Urbex.setup.getLogger().debug("createLootChest: loot=" + randomValue + " pos=" + pos.toString());

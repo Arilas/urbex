@@ -2,15 +2,25 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
+import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.biome.Biome;
+import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 /**
  * Builds one {@link AssetSnapshot} from a world's frozen registries.
@@ -55,44 +65,99 @@ public final class AssetCompiler {
     public static AssetSnapshot compile(RegistryAccess access, AssetDiagnostics diagnostics) {
         AssetIndex<Variant> variants = AssetStage.compileAll(access,
                 CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(chain), diagnostics);
-        // The access, not the variants index, until Palette's dependency is narrowed: Palette still
-        // reaches AssetRegistries.VARIANTS for a `variant` entry. Both resolve the same registry, so
-        // the compiled result is identical; see the design note for the sequencing.
         AssetIndex<Palette> palettes = AssetStage.compileAll(access,
-                CustomRegistries.PALETTE_REGISTRY_KEY, (id, chain) -> new Palette(access, chain), diagnostics);
+                CustomRegistries.PALETTE_REGISTRY_KEY, (id, chain) -> new Palette(variants, chain), diagnostics);
         AssetIndex<Condition> conditions = AssetStage.compileAll(access,
                 CustomRegistries.CONDITIONS_REGISTRY_KEY, (id, chain) -> new Condition(chain), diagnostics);
         AssetIndex<Style> styles = AssetStage.compileAll(access,
-                CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(chain), diagnostics);
+                CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(palettes, chain), diagnostics);
         AssetIndex<BuildingPart> parts = AssetStage.compileAll(access,
-                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(access, chain), diagnostics);
+                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(variants, palettes, chain), diagnostics);
         AssetIndex<Building> buildings = AssetStage.compileAll(access,
-                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(access, chain), diagnostics);
+                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(variants, palettes, chain), diagnostics);
         AssetIndex<MultiBuilding> multiBuildings = AssetStage.compileAll(access,
                 CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, (id, chain) -> new MultiBuilding(chain), diagnostics);
         AssetIndex<ScatteredBuilding> scattered = AssetStage.compileAll(access,
                 CustomRegistries.SCATTERED_REGISTRY_KEY, (id, chain) -> new ScatteredBuilding(chain), diagnostics);
         AssetIndex<WorldStyle> worldStyles = AssetStage.compileAll(access,
                 CustomRegistries.WORLDSTYLES_REGISTRY_KEY, (id, chain) -> new WorldStyle(chain), diagnostics);
-        // Wholesale, unlike AssetRegistries.load's reachability sweep. The sweep existed because
-        // resolving every registered city style refuses a world over a file that is not wrong - an
-        // abstract base that is complete only through its children. Aggregated diagnostics change
-        // that calculus: an unreachable base that fails to resolve is a line in a report, and the
-        // caller decides. Reachability then becomes a question about which failures are fatal, which
-        // is #56's remaining half, not about which files get compiled.
+        // City styles are the one kind where "failed to compile" is not the same as "wrong", so they
+        // are compiled into a local report and only the reachable failures are promoted into the
+        // caller's. Requiredness is a property of the end of a chain, and a city style may exist only
+        // to be extended: the bundled citystyle_config declares a street width and nothing else, and
+        // is complete only through citystyle_common, which extends it. Resolving every registered
+        // style and failing on any of them refuses a world over a file that is not wrong - which is
+        // exactly what an earlier draft of this compiler did.
+        AssetDiagnostics cityStyleProblems = new AssetDiagnostics();
         AssetIndex<CityStyle> cityStyles = AssetStage.compileAll(access,
-                CustomRegistries.CITYSTYLES_REGISTRY_KEY, (id, chain) -> new CityStyle(chain), diagnostics);
+                CustomRegistries.CITYSTYLES_REGISTRY_KEY, (id, chain) -> new CityStyle(chain), cityStyleProblems);
         AssetIndex<PredefinedCity> predefinedCities = AssetStage.compileAll(access,
                 CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, (id, chain) -> new PredefinedCity(chain), diagnostics);
         AssetIndex<StuffObject> stuff = AssetStage.compileAll(access,
                 CustomRegistries.STUFF_REGISTRY_KEY, (id, chain) -> new StuffObject(chain), diagnostics);
 
+        promoteReachableCityStyleProblems(access, worldStyles, cityStyles, cityStyleProblems, diagnostics);
+
         AssetSnapshot snapshot = new AssetSnapshot(variants, palettes, conditions, styles, parts,
                 buildings, multiBuildings, scattered, worldStyles, cityStyles, predefinedCities,
-                stuff, groupStuffByTag(stuff));
+                stuff, groupStuffByTag(stuff.all()));
         Urbex.getLogger().info("Compiled {} Urbex assets ({} problem(s))",
                 snapshot.totalAssets(), diagnostics.size());
         return snapshot;
+    }
+
+    /**
+     * Turns "this city style did not compile" into a load error only when something can select it.
+     *
+     * <p>Three routes name a city style from inside the registries, and this walks all three: a world
+     * style's {@code citystyles} selectors, a preset's {@code cities.cityStyleAlternative}, and a
+     * predefined city's {@code citystyle}. A fourth exists and cannot be seen from here - the
+     * per-world override that arrives as JSON through {@code UrbexData} - and is checked by
+     * {@code DimensionRuntime.create} against the compiled index instead.</p>
+     *
+     * <p>Presets and predefined cities are read one raw registry entry at a time rather than through
+     * their own {@code extends} resolution: a value declared anywhere in a chain is a value some asset
+     * in that chain resolves to, so the union over raw entries is the same set of city styles, and
+     * reading them raw means a broken preset chain is not turned into a city-style failure.</p>
+     */
+    private static void promoteReachableCityStyleProblems(RegistryAccess access,
+                                                          AssetIndex<WorldStyle> worldStyles,
+                                                          AssetIndex<CityStyle> cityStyles,
+                                                          AssetDiagnostics candidates,
+                                                          AssetDiagnostics fatal) {
+        Set<Identifier> reachable = new HashSet<>();
+        for (WorldStyle style : worldStyles.all()) {
+            for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selector : style.cityStyleSelectors()) {
+                reachable.add(DataTools.fromName(selector.getRight().getRight()));
+            }
+        }
+        for (PresetRE preset : access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY)) {
+            preset.cities().flatMap(CitySettings::cityStyleAlternative)
+                    .filter(name -> !name.isBlank())
+                    .ifPresent(name -> reachable.add(DataTools.fromName(name)));
+        }
+        for (PredefinedCityRE city : access.lookupOrThrow(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY)) {
+            if (city.getCityStyle() != null && !city.getCityStyle().isBlank()) {
+                reachable.add(DataTools.fromName(city.getCityStyle()));
+            }
+        }
+        for (AssetDiagnostics.Problem problem : candidates.problems()) {
+            if (problem.asset() != null && reachable.contains(problem.asset())) {
+                fatal.record(problem.registry(), problem.asset(), problem.message());
+            } else {
+                // Not an error: a root nothing names is never resolved, exactly as before.
+                Urbex.getLogger().debug("Unreachable Urbex city style did not resolve, which is legal: {}",
+                        problem);
+            }
+        }
+        for (Identifier name : reachable) {
+            if (cityStyles.get(name) == null && candidates.problems().stream()
+                    .noneMatch(problem -> name.equals(problem.asset()))) {
+                fatal.record(cityStyles.registry(), name,
+                        "is selected by a world style, preset or predefined city, but no loaded "
+                                + "datapack registers it");
+            }
+        }
     }
 
     /**
@@ -109,9 +174,9 @@ public final class AssetCompiler {
      * {@code MultiChunk}'s city-style sort uses, so one asset kind is not ordered two ways in two
      * places.
      */
-    static SortedMap<String, List<StuffObject>> groupStuffByTag(AssetIndex<StuffObject> stuff) {
+    static SortedMap<String, List<StuffObject>> groupStuffByTag(Iterable<StuffObject> stuff) {
         SortedMap<String, List<StuffObject>> byTag = new TreeMap<>();
-        for (StuffObject object : stuff.all()) {
+        for (StuffObject object : stuff) {
             for (String tag : object.getSettings().getTags()) {
                 byTag.computeIfAbsent(tag, t -> new ArrayList<>()).add(object);
             }

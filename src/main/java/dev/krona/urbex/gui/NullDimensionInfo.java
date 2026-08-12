@@ -12,7 +12,9 @@ import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.WorldStyleField;
 import dev.krona.urbex.worldgen.CityGenerator;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetDiagnostics;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
@@ -118,6 +120,7 @@ public class NullDimensionInfo implements IDimensionInfo {
     private final long seed;
 
     private final RegistryAccess registryAccess;
+    private final AssetSnapshot assets;
     @Nullable
     private final Registry<Biome> biomeRegistry;
     private final CityGenerator feature;
@@ -135,12 +138,20 @@ public class NullDimensionInfo implements IDimensionInfo {
     public NullDimensionInfo(Preset profile, WorldStyleMix worldStyles, long seed, @Nullable RegistryAccess registryAccess) {
         this.profile = profile;
         this.caches = new DimensionCaches(seed);
+        // The preview compiles its own snapshot and owns it, rather than reaching for the server's.
+        // It has no session - it runs on the client, on the world-creation screen, before any server
+        // exists - and must not acquire one. Diagnostics are discarded on purpose: a broken pack is
+        // the world load's business to refuse, and a preview that threw would leave the player unable
+        // to see why. Individual ids still fall back to the placeholder below.
+        this.assets = registryAccess == null
+                ? AssetSnapshot.empty()
+                : AssetCompiler.compile(registryAccess, new AssetDiagnostics());
         List<WorldStyleField.Weighted> resolvedEntries = new ArrayList<>(worldStyles.entries().size());
         for (WorldStyleMix.Entry entry : worldStyles.entries()) {
             WorldStyle resolved = null;
             if (registryAccess != null) {
                 try {
-                    resolved = AssetRegistries.WORLDSTYLES.get(registryAccess, entry.style());
+                    resolved = assets.worldStyles().get(entry.style());
                 } catch (RuntimeException e) {
                     // Preview only: fall back to the placeholder below if the chosen style isn't
                     // registered (e.g. a stale GUI worldStyle no longer shipped by any datapack).
@@ -223,6 +234,11 @@ public class NullDimensionInfo implements IDimensionInfo {
     }
 
     @Nullable
+    @Override
+    public AssetSnapshot assets() {
+        return assets;
+    }
+
     @Override
     public RegistryAccess registryAccess() {
         return registryAccess;

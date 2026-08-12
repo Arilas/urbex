@@ -95,14 +95,14 @@ public class Scattered {
             // Nothing matches
             return;
         }
-        ScatteredBuilding scattered = AssetRegistries.SCATTERED.getOrThrow(provider.getWorld(), reference.getName());
+        ScatteredBuilding scattered = provider.assets().scattered().getOrThrow(reference.getName());
 
         // Find the size of the scattered building
         int w;
         int h;
         MultiBuilding multiBuilding;
         if (scattered.getMultibuilding() != null) {
-            multiBuilding = AssetRegistries.MULTI_BUILDINGS.getOrThrow(provider.getWorld(), scattered.getMultibuilding());
+            multiBuilding = provider.assets().multiBuildings().getOrThrow(scattered.getMultibuilding());
             w = multiBuilding.getDimX();
             h = multiBuilding.getDimZ();
         } else {
@@ -152,7 +152,7 @@ public class Scattered {
             } else {
                 buildingName = buildings.get(scatteredRandom.nextInt(buildings.size()));
             }
-            Building building = AssetRegistries.BUILDINGS.getOrThrow(provider.getWorld(), buildingName);
+            Building building = provider.assets().buildings().getOrThrow(buildingName);
             int lowestLevel = scatteredLevel(feature, scattered, minheight, maxheight, avgheight);
             if (lowestLevel < -4000) {
                 Preset profile = feature.provider.getProfile();
@@ -168,7 +168,7 @@ public class Scattered {
             int relx = chunkX - tlChunkX;
             int relz = chunkZ - tlChunkZ;
             String buildingName = multiBuilding.getBuilding(relx, relz);
-            Building building = AssetRegistries.BUILDINGS.getOrThrow(provider.getWorld(), buildingName);
+            Building building = provider.assets().buildings().getOrThrow(buildingName);
             generateScatteredBuilding(ctx, feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
         }
     }
@@ -310,13 +310,13 @@ public class Scattered {
             BlockState air = Blocks.AIR.defaultBlockState();
             BlockState liquid = feature.liquid;
             String partName = building.getRandomPart(rand, conditionContext);
-            BuildingPart part = AssetRegistries.PARTS.getOrThrow(provider.getWorld(), partName);
+            BuildingPart part = provider.assets().parts().getOrThrow(partName);
             // getRandomPart2 derives its own context (ConditionContext.withPart) with partName as
             // the current part. This used to pass conditionContext itself, whose part is NO_PART,
             // so a scattered building's parts2[] "inpart" could never match while a city
             // building's matched normally - one field, two meanings.
             String part2Name = building.getRandomPart2(rand, conditionContext, partName);
-            BuildingPart part2 = AssetRegistries.PARTS.get(provider.getWorld(), part2Name);    // Null is legal
+            BuildingPart part2 = provider.assets().parts().get(part2Name);    // Null is legal
             // Read by the next iteration's parts[] context, at the top of the loop.
             belowFloor = partName;
 

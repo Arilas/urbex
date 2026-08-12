@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.CommonLevelAccessor;
 
 public interface IBuildingPart {
     Character getMetaChar(String key);
@@ -22,7 +21,7 @@ public interface IBuildingPart {
 
     char[] getVSlice(int x, int z);
 
-    Palette getLocalPalette(CommonLevelAccessor level);
+    Palette getLocalPalette();
 
     int getSliceCount();
 

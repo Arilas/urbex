@@ -5,7 +5,6 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.state.BlockState;
@@ -39,14 +38,14 @@ public class Palette {
      * then compiled, so an overridden entry takes its {@code damaged} mapping with it.
      */
     /**
-     * @param access the registries this palette's chain was read from, used to resolve a
-     *               {@code variant} entry against {@code AssetRegistries.VARIANTS}. May be null only
-     *               for a palette that provably names no variant; one that does then fails naming
-     *               itself and the variant rather than reaching for a static server (issue #60).
+     * @param variants the compiled variants this palette's {@code variant} entries resolve against.
+     *                 May be null only for a palette that provably names none; one that does then
+     *                 fails naming itself and the variant rather than reaching for a static server
+     *                 (issue #60) or compiling one on the spot (issue #128).
      */
-    public Palette(@Nullable RegistryAccess access, List<PaletteRE> chainRootFirst) {
+    public Palette(@Nullable AssetIndex<Variant> variants, List<PaletteRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
-        compile(access, mergeByCharacter(chainRootFirst, name));
+        compile(variants, mergeByCharacter(chainRootFirst, name));
     }
 
     public Palette(String name) {
@@ -66,7 +65,7 @@ public class Palette {
      *                       for the synthetic palette name
      * @param chainRootFirst the inline blocks along the owner's chain, root first
      */
-    public static Palette inline(@Nullable RegistryAccess access, Identifier owner,
+    public static Palette inline(@Nullable AssetIndex<Variant> variants, Identifier owner,
                                  List<PaletteRE> chainRootFirst) {
         for (PaletteRE re : chainRootFirst) {
             // The codec accepts 'extends' wherever a PaletteRE is embedded, but an inline block is
@@ -81,7 +80,7 @@ public class Palette {
             }
         }
         Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(access, mergeByCharacter(chainRootFirst, owner));
+        palette.compile(variants, mergeByCharacter(chainRootFirst, owner));
         return palette;
     }
 
@@ -134,7 +133,7 @@ public class Palette {
         return palette;
     }
 
-    private void compile(@Nullable RegistryAccess access, Collection<PaletteEntry> entries) {
+    private void compile(@Nullable AssetIndex<Variant> variants, Collection<PaletteEntry> entries) {
         for (PaletteEntry entry : entries) {
             Character c = entry.getChr().charAt(0);
             BlockState dmg = null;
@@ -154,11 +153,18 @@ public class Palette {
                 }
             } else if (entry.getVariant() != null) {
                 String variantName = entry.getVariant();
-                // The registries this palette came from, not the overworld's. Asking
-                // ServerAccess.getServer().getLevel(OVERWORLD) resolved every dimension's variants
-                // against the overworld, and threw from a worldgen worker when the static server
-                // reference was not populated yet (issue #60).
-                Variant variant = AssetRegistries.VARIANTS.getOrThrow(access, variantName);
+                // The compiled variants of this palette's own world, handed in by the compiler.
+                // This used to ask ServerAccess.getServer().getLevel(OVERWORLD), which resolved every
+                // dimension's variants against the overworld and threw from a worldgen worker when
+                // the static server reference was not populated yet (issue #60); then it asked a
+                // static registry that compiled on demand (issue #128). Now the variant it needs was
+                // compiled before this palette was.
+                if (variants == null) {
+                    throw new IllegalStateException("Palette '" + name + "' entry '" + c
+                            + "' names variant '" + variantName + "', but this palette was compiled "
+                            + "without a variant index to resolve it against");
+                }
+                Variant variant = variants.getOrThrow(variantName);
                 List<Pair<Integer, BlockState>> blocks = variant.getBlocks();
                 if (dmg != null) {
                     for (Pair<Integer, BlockState> pair : blocks) {

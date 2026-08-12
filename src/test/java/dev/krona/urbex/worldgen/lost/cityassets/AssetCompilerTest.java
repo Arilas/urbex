@@ -44,13 +44,6 @@ class AssetCompilerTest {
         Bootstrap.bootStrap();
     }
 
-    @BeforeEach
-    @AfterEach
-    void clearRegistries() {
-        // Palette's `variant` lookup still routes through the old static registry; see the note in
-        // AssetCompiler. Until that is narrowed, a cached variant could otherwise leak between tests.
-        AssetRegistries.reset();
-    }
 
     @Test
     void aStageCanReadWhatAnEarlierStageCompiled() {
@@ -178,7 +171,8 @@ class AssetCompilerTest {
                 CustomRegistries.PART_REGISTRY_KEY, CustomRegistries.BUILDING_REGISTRY_KEY,
                 CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, CustomRegistries.SCATTERED_REGISTRY_KEY,
                 CustomRegistries.WORLDSTYLES_REGISTRY_KEY, CustomRegistries.CITYSTYLES_REGISTRY_KEY,
-                CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, CustomRegistries.STUFF_REGISTRY_KEY)) {
+                CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, CustomRegistries.STUFF_REGISTRY_KEY,
+                CustomRegistries.PRESET_REGISTRY_KEY)) {
             all.add(fill(key, entries));
         }
         return new RegistryAccess.ImmutableRegistryAccess(all).freeze();

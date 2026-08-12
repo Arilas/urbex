@@ -94,7 +94,7 @@ public class BelowPartConditionTest {
     private static Building buildingWithParts2Condition(Set<String> belowPart, Set<String> inpart) {
         PartRef floor = partRef(FLOOR, null, null);
         PartRef second = partRef("urbex:second_part", belowPart, inpart);
-        return new Building(null, List.of(new BuildingRE(
+        return new Building(null, AssetIndex.empty("urbex:palettes"), List.of(new BuildingRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of('#'), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),

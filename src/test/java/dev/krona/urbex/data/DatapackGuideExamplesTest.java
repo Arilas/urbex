@@ -8,6 +8,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.ExtendsChain;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetIndex;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
 import dev.krona.urbex.worldgen.lost.cityassets.Style;
@@ -188,8 +189,8 @@ class DatapackGuideExamplesTest {
         expect(guide, missing, () -> Resolved.require(null, downtown, "streetblocks.parts.stair"));
 
         // A part with no geometry, and a part whose redeclared size contradicts inherited slices.
-        expect(guide, missing, () -> new BuildingPart(null, List.of(namedPart(tower, null, null, null))));
-        expect(guide, missing, () -> new BuildingPart(null, List.of(
+        expect(guide, missing, () -> new BuildingPart(null, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
+        expect(guide, missing, () -> new BuildingPart(null, NO_PALETTES, List.of(
                 namedPart(Identifier.fromNamespaceAndPath("urbexmt", "tower_base"), 16, 16,
                         List.of(List.of("x".repeat(256)))),
                 namedPart(tower, 8, null, null))));
@@ -208,7 +209,7 @@ class DatapackGuideExamplesTest {
 
         // A 'randompalettes' group nothing could ever be drawn from, and a stuff entry whose two
         // count bounds contradict. Both are checked at the chain fold rather than per field.
-        expect(guide, missing, () -> new Style(List.of(
+        expect(guide, missing, () -> new Style(NO_PALETTES, List.of(
                 new StyleRE(Optional.empty(), Optional.of(new Mergeable<>(true,
                         List.of(List.of(new PaletteSelector(0f, "urbex:common"))))))
                         .setRegistryName(downtown))));
@@ -272,6 +273,12 @@ class DatapackGuideExamplesTest {
             missing.add(GUIDE + " does not contain: " + message);
         }
     }
+
+    /**
+     * Empty on purpose: every failure exercised here is refused before a palette reference would be
+     * resolved, so handing over a populated index would hide which check actually fired.
+     */
+    private static final AssetIndex<Palette> NO_PALETTES = AssetIndex.empty("urbex:palettes");
 
     private static BuildingPartRE namedPart(Identifier id, Integer xSize, Integer zSize,
                                             List<List<String>> slices) {

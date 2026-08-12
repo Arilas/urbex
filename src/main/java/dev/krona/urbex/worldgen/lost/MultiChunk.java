@@ -9,7 +9,6 @@ import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.Building;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.cityassets.MultiBuilding;
@@ -140,7 +139,7 @@ public class MultiChunk {
         for (int i = 0 ; i < cnt ; i++) {
             CityStyle cityStyle = Tools.getRandomFromList(rand, styleList, style -> (float) cityStyleCounter.get(style));
             String multiBuilding = cityStyle.getRandomMultiBuilding(rand, topleft);
-            MultiBuilding mb = AssetRegistries.MULTI_BUILDINGS.get(provider.getWorld(), multiBuilding);
+            MultiBuilding mb = provider.assets().multiBuildings().get(multiBuilding);
             if (mb == null) {
                 throw new RuntimeException("Cannot find multibuilding: " + multiBuilding);
             }
@@ -157,7 +156,7 @@ public class MultiChunk {
             // Find the maximum possible number of cellars for all buildings in this multibuilding
             int maxCellars = 0;
             for (String b : mb.getBuildingSet()) {
-                Building building = AssetRegistries.BUILDINGS.get(provider.getWorld(), b);
+                Building building = provider.assets().buildings().get(b);
                 if (building == null) {
                     throw new RuntimeException("Cannot find building: " + b);
                 }

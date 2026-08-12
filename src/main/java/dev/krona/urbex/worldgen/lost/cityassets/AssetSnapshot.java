@@ -59,18 +59,18 @@ public record AssetSnapshot(
     /** An empty snapshot, for a context that has no registries at all (a test, a null level). */
     public static AssetSnapshot empty() {
         return new AssetSnapshot(
-                AssetIndex.empty("urbex/variants"),
-                AssetIndex.empty("urbex/palettes"),
-                AssetIndex.empty("urbex/conditions"),
-                AssetIndex.empty("urbex/styles"),
-                AssetIndex.empty("urbex/parts"),
-                AssetIndex.empty("urbex/buildings"),
-                AssetIndex.empty("urbex/multibuildings"),
-                AssetIndex.empty("urbex/scattered"),
-                AssetIndex.empty("urbex/worldstyles"),
-                AssetIndex.empty("urbex/citystyles"),
-                AssetIndex.empty("urbex/predefinedcities"),
-                AssetIndex.empty("urbex/stuff"),
+                AssetIndex.empty("urbex:variants"),
+                AssetIndex.empty("urbex:palettes"),
+                AssetIndex.empty("urbex:conditions"),
+                AssetIndex.empty("urbex:styles"),
+                AssetIndex.empty("urbex:parts"),
+                AssetIndex.empty("urbex:buildings"),
+                AssetIndex.empty("urbex:multibuildings"),
+                AssetIndex.empty("urbex:scattered"),
+                AssetIndex.empty("urbex:worldstyles"),
+                AssetIndex.empty("urbex:citystyles"),
+                AssetIndex.empty("urbex:predefinedcities"),
+                AssetIndex.empty("urbex:stuff"),
                 java.util.Collections.emptySortedMap());
     }
 }

@@ -4,7 +4,6 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
 import org.apache.commons.lang3.tuple.Pair;
@@ -31,9 +30,10 @@ public class Building {
     private Character rubbleBlock;      // Block used for destroyed building rubble
     private float prefersLonely = 0.0f; // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
-    // See BuildingPart.localPalette: a reference to another palette needs the level to resolve, so
-    // this one cannot be done in the constructor. Volatile; resolving it twice is harmless.
-    private volatile Palette localPalette = null;
+    // The palette this building paints with: its own inline one, or the refpalette it names,
+    // resolved by the compiler before this object is published (issue #128). It used to be filled
+    // lazily from the first chunk that asked, which is why it needed a level.
+    private Palette localPalette = null;
     private String refPaletteName;
 
     private final List<Pair<Predicate<ConditionContext>, String>> parts = new ArrayList<>();
@@ -54,7 +54,8 @@ public class Building {
      * ancestor that set something else. The defaults the fields start at are this class's own
      * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
      */
-    public Building(@Nullable RegistryAccess access, List<BuildingRE> chainRootFirst) {
+    public Building(@Nullable AssetIndex<Variant> variants, AssetIndex<Palette> palettes,
+                        List<BuildingRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<PartRef> partRefs = new ArrayList<>();
         boolean anyParts = false;
@@ -115,9 +116,13 @@ public class Building {
         Resolved.require(anyParts ? partRefs : null, name, "parts");
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(access, name, inlinePalettes); // @todo get the full palette instead
+            localPalette = Palette.inline(variants, name, inlinePalettes); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
+            // Resolved here, not on the first chunk that asks. The lazy version cached the answer on
+            // this asset and needed a CommonLevelAccessor to reach the palette registry, so a
+            // refpalette naming something absent surfaced from a worldgen worker (issue #128).
+            localPalette = palettes.getOrThrow(refPalette);
         }
 
         readParts(this.parts, partRefs);
@@ -133,13 +138,8 @@ public class Building {
         return name;
     }
 
-    public Palette getLocalPalette(CommonLevelAccessor level) {
-        Palette p = localPalette;
-        if (p == null && refPaletteName != null) {
-            p = AssetRegistries.PALETTES.getOrThrow(level, refPaletteName);
-            localPalette = p;
-        }
-        return p;
+    public Palette getLocalPalette() {
+        return localPalette;
     }
 
     private void readParts(List<Pair<Predicate<ConditionContext>, String>> p, List<PartRef> partRefs) {

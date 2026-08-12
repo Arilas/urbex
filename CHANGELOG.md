@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- **Compiled assets are one immutable snapshot, finished before any chunk generates.** Twelve
+  `static` registries, a readiness latch and a `reset()` are gone. Every asset is now compiled once
+  per world load into an `AssetSnapshot` the level's runtime holds, and every lookup goes through it
+  (issue #128).
+  - *Nothing is compiled on demand any more.* A lookup either finds a finished asset or finds
+    nothing. A style's `randompalettes`, and a part's or building's `refpalette`, used to be resolved
+    by the first chunk that needed them — which is why they took a level argument, and why a typo in
+    one surfaced from a worldgen worker mid-chunk instead of at load. They resolve at compile time,
+    and those level arguments are gone.
+  - *Compilation runs in dependency order*, so a stage can read what earlier stages built:
+    variants → palettes → styles/parts/buildings → … → stuff. A stage above its dependency would not
+    fail; it would read an empty index and compile assets referencing nothing.
+  - *The preview compiles its own snapshot* from the client's registries and owns it, rather than
+    reaching for a server's.
+  - *A broken pack still refuses the world, naming everything at once* — except for city styles
+    nothing can select, which are allowed to be incomplete because a style may exist only to be
+    extended.
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`
+    and `runDigestCheckFeatures`.
+
 - **A datapack's mistakes are reported all at once, and `/urbex validate` asks for them on demand.**
   Load-time asset resolution stopped at the first broken file. That is the right outcome — the world
   must not load — but the wrong report: an author with four typos fixed one, reloaded the world,

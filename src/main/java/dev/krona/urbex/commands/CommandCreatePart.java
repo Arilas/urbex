@@ -7,7 +7,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.editor.Editor;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -36,25 +35,19 @@ public class CommandCreatePart implements Command<CommandSourceStack> {
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         Identifier name = context.getArgument("name", Identifier.class);
-        BuildingPart part = null;
-        try {
-            part = AssetRegistries.PARTS.get(context.getSource().getLevel(), name);
-        } catch (Exception e) {
-            part = null;
-        }
-        if (part == null) {
-            context.getSource().sendFailure(Component.literal("Error finding part '" + name + "'!").withStyle(ChatFormatting.RED));
-            return 0;
-        }
-
         ServerPlayer player = context.getSource().getPlayerOrException();
         WorldCoordinates start = context.getArgument("pos", WorldCoordinates.class);
-
-
         ServerLevel level = (ServerLevel) player.level();
+        // The provider first: the part is looked up in this level's compiled assets, so there is
+        // nothing to look it up in until the level has one (issue #128).
         IDimensionInfo dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
-            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
+            context.getSource().sendFailure(Component.literal("Urbex does not generate in this dimension!").withStyle(ChatFormatting.RED));
+            return 0;
+        }
+        BuildingPart part = dimInfo.assets().parts().get(name);
+        if (part == null) {
+            context.getSource().sendFailure(Component.literal("Error finding part '" + name + "'!").withStyle(ChatFormatting.RED));
             return 0;
         }
 

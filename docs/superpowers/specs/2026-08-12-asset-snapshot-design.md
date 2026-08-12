@@ -70,6 +70,14 @@ variants → palettes → conditions → styles → parts → buildings
 Diagnostics aggregate through `AssetDiagnostics` (already in place from #56's first half), so a pack
 with problems in four stages is one report.
 
+**City styles are the exception, and it is not optional.** Requiredness is a property of the end of a
+chain, and a city style may exist only to be extended — the bundled `citystyle_config` declares a
+street width and nothing else, and is complete only through `citystyle_common`. So every registered
+style is compiled (a chunk may name any of them), but a compile failure is only *fatal* when
+something can select it: a world style's `citystyles` selectors, a preset's `cityStyleAlternative`,
+or a predefined city's `citystyle`. An earlier draft of the compiler failed on all of them and
+refused the shipped pack's own world; the digest run caught it.
+
 ## The PRs
 
 Each is one boundary and each leaves the tree green.

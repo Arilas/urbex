@@ -6,7 +6,6 @@ import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.Transform;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import net.minecraft.tags.BlockTags;
@@ -50,12 +49,12 @@ public class Highways {
         BuildingPart part;
         if (info.isTunnel(level)) {
             // We know we need a tunnel
-            part = AssetRegistries.PARTS.getOrThrow(info.provider.getWorld(), feature.getRandomPart(ctx, highwayParts.tunnel(bidirectional)));
+            part = info.provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, highwayParts.tunnel(bidirectional)));
             feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
         } else {
             if (info.isCity && level <= adjacent1.cityLevel && level <= adjacent2.cityLevel && adjacent1.isCity && adjacent2.isCity) {
                 // Simple highway in the city
-                part = AssetRegistries.PARTS.getOrThrow(info.provider.getWorld(), feature.getRandomPart(ctx, highwayParts.open(bidirectional)));
+                part = info.provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, highwayParts.open(bidirectional)));
                 int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
                 // Clear a bit more above the highway
                 if (!info.profile.isCavern()) {
@@ -68,7 +67,7 @@ public class Highways {
                     }
                 }
             } else {
-                part = AssetRegistries.PARTS.getOrThrow(info.provider.getWorld(), feature.getRandomPart(ctx, highwayParts.bridge(bidirectional)));
+                part = info.provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, highwayParts.bridge(bidirectional)));
                 int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
                 // Clear a bit more above the highway
                 if (!info.profile.isCavern()) {

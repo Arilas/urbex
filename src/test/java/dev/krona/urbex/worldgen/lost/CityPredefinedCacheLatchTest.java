@@ -2,10 +2,9 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
-import net.minecraft.world.level.CommonLevelAccessor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 import org.junit.jupiter.api.BeforeAll;
@@ -23,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * ready-flags (predefinedCityMapReady, predefinedBuildingMapReady, occupiedBuildingReady,
  * occupiedStreetReady) must not latch to true off a preview call (a null level/world) - doing so
  * would permanently stop a later real dimension from ever loading its predefined content, exactly
- * the #67-style bug already fixed for AssetRegistries.loadedPredefined.
+ * the #67-style bug that the old AssetRegistries.loadedPredefined latch also had.
  * <p>
  * AssetRegistries.loadedPredefined is forced true in {@link #resetState()} so that every call here
  * reaches City's own guard directly, without needing real datapack-registered
@@ -47,38 +46,37 @@ class CityPredefinedCacheLatchTest {
     void resetState() throws Exception {
         coord = new ChunkCoord(Level.OVERWORLD, 3, 4);
         City.cleanPredefinedCache();
-        setStaticBoolean(AssetRegistries.class, "loadedPredefined", true);
     }
 
     @Test
     void nullLevelDoesNotLatchPredefinedCityMapReady() throws Exception {
-        City.getPredefinedCity(null, coord);
+        City.getPredefinedCity(fakeProvider(null), coord);
         assertFalse(getStaticBoolean(City.class, "predefinedCityMapReady"),
-                "a preview call (null level) must not latch the ready flag");
+                "a preview call (a provider with no level) must not latch the ready flag");
 
-        City.getPredefinedCity(harmlessLevel(), coord);
+        City.getPredefinedCity(fakeProvider(harmlessLevel()), coord);
         assertTrue(getStaticBoolean(City.class, "predefinedCityMapReady"),
                 "a real level must still be able to latch it afterwards");
     }
 
     @Test
     void nullLevelDoesNotLatchPredefinedBuildingMapReady() throws Exception {
-        City.getPredefinedBuildingAtTopLeft(null, coord);
+        City.getPredefinedBuildingAtTopLeft(fakeProvider(null), coord);
         assertFalse(getStaticBoolean(City.class, "predefinedBuildingMapReady"),
-                "a preview call (null level) must not latch the ready flag");
+                "a preview call (a provider with no level) must not latch the ready flag");
 
-        City.getPredefinedBuildingAtTopLeft(harmlessLevel(), coord);
+        City.getPredefinedBuildingAtTopLeft(fakeProvider(harmlessLevel()), coord);
         assertTrue(getStaticBoolean(City.class, "predefinedBuildingMapReady"),
                 "a real level must still be able to latch it afterwards");
     }
 
     @Test
     void nullLevelDoesNotLatchPredefinedStreetMapReady() throws Exception {
-        City.getPredefinedStreet((CommonLevelAccessor) null, coord);
+        City.getPredefinedStreetAt(fakeProvider(null), coord);
         assertFalse(getStaticBoolean(City.class, "predefinedStreetMapReady"),
-                "a preview call (null level) must not latch the ready flag");
+                "a preview call (a provider with no level) must not latch the ready flag");
 
-        City.getPredefinedStreet(harmlessLevel(), coord);
+        City.getPredefinedStreetAt(fakeProvider(harmlessLevel()), coord);
         assertTrue(getStaticBoolean(City.class, "predefinedStreetMapReady"),
                 "a real level must still be able to latch it afterwards");
     }
@@ -111,18 +109,16 @@ class CityPredefinedCacheLatchTest {
     }
 
     /**
-     * A non-null CommonLevelAccessor/WorldGenLevel that's never actually invoked here:
-     * AssetRegistries.loadedPredefined is forced true above, so AssetRegistries.loadPredefinedStuff
-     * short-circuits before touching it, and City's own guarded bodies only read from the
-     * (empty, but present) AssetRegistries iterables - only its non-nullness matters for this test.
+     * A non-null level that is never actually invoked: City's guarded bodies only read the (empty)
+     * predefined-city index off the provider's snapshot, so only the level's non-nullness matters.
      */
     private static WorldGenLevel harmlessLevel() {
         return (WorldGenLevel) Proxy.newProxyInstance(
                 WorldGenLevel.class.getClassLoader(),
                 new Class<?>[]{WorldGenLevel.class},
                 (proxy, method, args) -> {
-                    throw new AssertionError("Unexpected call to " + method + " - AssetRegistries.loadedPredefined "
-                            + "should have short-circuited before any level method was needed");
+                    throw new AssertionError("Unexpected call to " + method + " - City should not need "
+                            + "anything from the level itself, only whether it has one");
                 });
     }
 
@@ -133,6 +129,9 @@ class CityPredefinedCacheLatchTest {
                 (proxy, method, args) -> {
                     if ("getWorld".equals(method.getName())) {
                         return world;
+                    }
+                    if ("assets".equals(method.getName())) {
+                        return AssetSnapshot.empty();
                     }
                     if (method.getDeclaringClass() == Object.class) {
                         return switch (method.getName()) {

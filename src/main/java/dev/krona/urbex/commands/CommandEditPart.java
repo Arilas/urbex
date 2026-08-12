@@ -9,7 +9,6 @@ import dev.krona.urbex.editor.EditModeData;
 import dev.krona.urbex.editor.Editor;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.commands.CommandSourceStack;
@@ -50,7 +49,7 @@ public class CommandEditPart implements Command<CommandSourceStack> {
         ChunkPos cp = ChunkPos.containing(start);
         for (EditModeData.PartData data : EditModeData.getData().getPartData(new ChunkCoord(level.dimension(), cp.x(), cp.z()))) {
             // data.partName() is CityGenerator.generatePart's recorded part id - always qualified.
-            BuildingPart part = AssetRegistries.PARTS.get(level, DataTools.fromName(data.partName()));
+            BuildingPart part = dimInfo.assets().parts().get(DataTools.fromName(data.partName()));
             if (part == null) {
                 context.getSource().sendFailure(Component.literal("Unknown part '" + data.partName() + "' in this chunk!"));
                 return 0;

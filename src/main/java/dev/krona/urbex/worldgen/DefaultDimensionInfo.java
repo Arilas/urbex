@@ -5,6 +5,7 @@ import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.setup.WorldStyleMix;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -30,6 +31,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     // cannot be swapped out from under a worker thread, which is what the per-dimension lock in
     // CityFeature.place used to be protecting.
     private final WorldGenLevel world;
+    private final AssetSnapshot assets;
     private final Preset profile;
     private final WorldStyleField styles;
     private final DimensionCaches caches;
@@ -38,11 +40,13 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     private final CityGenerator feature;
     private final RoadField roadField;
 
-    public DefaultDimensionInfo(WorldGenLevel world, Preset preset, WorldStyleMix worldStyles) {
+    public DefaultDimensionInfo(WorldGenLevel world, AssetSnapshot assets, Preset preset,
+                                WorldStyleMix worldStyles) {
         this.world = world.getLevel();
+        this.assets = assets;
         this.profile = preset;
         this.caches = new DimensionCaches(this.world.getSeed());
-        styles = WorldStyleField.resolve(this.world, this.world.getSeed(), worldStyles);
+        styles = WorldStyleField.resolve(assets, this.world.getSeed(), worldStyles);
         feature = new CityGenerator(this, preset);
         biomeRegistry = this.world.registryAccess().lookupOrThrow(Registries.BIOME);
         roadField = new GridRoadField(this.world.getSeed(), getType().identifier().toString(),
@@ -52,6 +56,11 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     @Override
     public long getSeed() {
         return world.getSeed();
+    }
+
+    @Override
+    public AssetSnapshot assets() {
+        return assets;
     }
 
     @Override
