@@ -147,17 +147,23 @@ loom {
             setConfigName('Urbex Digest Check (structure avoidance)')
             ideConfigGenerated(false)
             runDir('runs/digestcheckavoid')
-            // NOT YET SITED. offset 100 / radius 6 contains no surface structure, so requireAvoided
-            // fails here by design rather than by accident - the gate is doing its job and the window
-            // still has to be found. The wide probe that found ruined portals and shipwrecks covered
-            // radius 24 around this offset, so one exists nearby; narrowing it is the remaining work.
-            vmArg '-Durbex.digestCheck=6,rowmajor,100'
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
             vmArg '-Durbex.digestCheck.requireAvoided'
             vmArg '-Durbex.digestCheck.failOnUnsafeRead'
-            def golden = file('digest-avoid.golden')
-            if (golden.exists()) {
-                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
-            }
+            // NO GOLDEN, deliberately. Two fresh runs of this window disagree - 995b19892c47e848 and
+            // 89d790a9182cff3f, identical in every count including blocks=5330728 and
+            // avoidedChunks=108, different in the digest. Pinning either would pin a coin flip.
+            //
+            // That instability is what this window was built to look for and the first place it has
+            // ever been visible: the other three windows contain no avoided structure, so their
+            // goldens have been stable while this path was free to wobble. Making local suppression
+            // order-independent was necessary and is not sufficient - something in generating a chunk
+            // that carries a structure is still run-to-run unstable, and whether that predates the
+            // local-suppression change or was introduced by it is the next thing to establish
+            // (stash it, run this window twice, compare).
+            //
+            // requireAvoided stays on so the window cannot quietly stop covering the path while that
+            // is worked out.
         }
         // The weighted-world-style-mix census. Not a golden check and not run by CI: mixing needs a
         // second datapack registering a second world style, and this repository ships only its own.
@@ -184,7 +190,7 @@ loom {
 // loop, holding that thread far past max-tick-time; the generation itself still fans out to the
 // worker pool, so this is not a serial baseline. Shared by every digest run config, each against
 // its own run directory so the two checks cannot clobber each other's world.
-def registerPrepareDigestCheck = { String taskName, String runDirPath, String extraConfig = '' ->
+def registerPrepareDigestCheck = { String taskName, String runDirPath, String extraConfig = '', String seed = '1337' ->
     tasks.register(taskName) {
         notCompatibleWithConfigurationCache("writes the run directory")
         doLast {
@@ -192,14 +198,14 @@ def registerPrepareDigestCheck = { String taskName, String runDirPath, String ex
             project.delete(new File(dir, 'world'))
             dir.mkdirs()
             new File(dir, 'eula.txt').text = 'eula=true\n'
-            new File(dir, 'server.properties').text = '''\
-level-seed=1337
+            new File(dir, 'server.properties').text = """\
+level-seed=${seed}
 online-mode=false
 spawn-protection=0
 view-distance=6
 max-tick-time=-1
 motd=urbex digest check
-'''
+"""
             def cfgDir = new File(dir, 'world/serverconfig')
             cfgDir.mkdirs()
             new File(cfgDir, 'urbex.json').text = '{ "selectedPreset": "urbex:default"' + extraConfig + ' }\n'
@@ -213,8 +219,12 @@ registerPrepareDigestCheck('prepareDigestCheckShuffled', 'runs/digestcheckshuffl
 // anywhere near either sample - a radius-24 probe found 842 chunks with structure references and not
 // one village, so a window relying on avoidVillages would test nothing. Ruined portals and shipwrecks
 // are there, both surface-step, so this is the flag that fires on a world we already have.
-registerPrepareDigestCheck('prepareDigestCheckAvoid', 'runs/digestcheckavoid',
-        ', "avoidSurfaceStructures": true')
+// A different seed from the other three, and the only place in this file that needs one: seed 1337
+// has no village within radius 24 of either sample window (measured - 842 chunks with structure
+// references, not one village), so avoidVillages - which is on by default and is the flag this window
+// exists to cover - can never fire there. This seed spawns beside one.
+registerPrepareDigestCheck('prepareDigestCheckAvoid', 'runs/digestcheckavoid', '',
+        '135132278163449878')
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
     dependsOn 'prepareDigestCheck'

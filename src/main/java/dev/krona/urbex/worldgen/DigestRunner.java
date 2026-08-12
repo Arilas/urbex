@@ -209,6 +209,8 @@ public final class DigestRunner {
         // count taken through it is the honest one: it says what avoidance would actually have done,
         // not what a perfectly-loaded world would say. If those two ever disagree, that disagreement
         // is the bug, and hiding it behind a second loop here would be the wrong place to find out.
+        // Logged when it fires, so a window that loses its structure says where it used to be -
+        // the same job the comments over digestCheckFeatures do by hand for the bridge and the slope.
         if (count > 0) {
             Urbex.getLogger().info("AVOIDEDCHUNKS{}", where);
         }
