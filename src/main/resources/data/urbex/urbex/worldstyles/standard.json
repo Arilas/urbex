@@ -1,4 +1,5 @@
 {
+  "name": "Standard",
   "outsidestyle": "urbex:outside",
   "settings": {
     "railwayavoidance": "ignore",

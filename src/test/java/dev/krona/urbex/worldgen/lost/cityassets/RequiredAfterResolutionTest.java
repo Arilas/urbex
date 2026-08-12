@@ -300,7 +300,7 @@ class RequiredAfterResolutionTest {
     private static WorldStyleRE worldStyle(Optional<String> outsideStyle,
                                            Optional<Mergeable<CityStyleSelector>> cityStyles,
                                            Optional<ScatteredSettings> scattered) {
-        return new WorldStyleRE(Optional.empty(), outsideStyle,
+        return new WorldStyleRE(Optional.empty(), Optional.empty(), outsideStyle,
                 Optional.empty(), Optional.empty(), scattered,
                 Optional.of(TestWiring.partSelector()),
                 cityStyles, Optional.empty(), Optional.empty())

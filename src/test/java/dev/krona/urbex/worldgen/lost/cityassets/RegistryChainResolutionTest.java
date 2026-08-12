@@ -216,7 +216,7 @@ class RegistryChainResolutionTest {
 
     private static CityStyleRE cityStyleWithTags(String... tags) {
         return new CityStyleRE(
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(tags)),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(tags)),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "citystyle_" + tags[0]));
@@ -336,14 +336,14 @@ class RegistryChainResolutionTest {
     @Test
     void worldStyleChildInheritsTheSelectorsAndSettingsItDoesNotDeclare() {
         ScatteredSettings scattered = new ScatteredSettings(24, 0.25f, 4, List.of());
-        WorldStyleRE parent = new WorldStyleRE(Optional.empty(), Optional.of("urbex:standard"),
+        WorldStyleRE parent = new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:standard"),
                 Optional.empty(), Optional.empty(), Optional.of(scattered),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
                 Optional.empty(), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "standard"));
-        WorldStyleRE child = new WorldStyleRE(Optional.empty(), Optional.of("urbex:bleak"),
+        WorldStyleRE child = new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:bleak"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "bleak"));

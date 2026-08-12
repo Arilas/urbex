@@ -38,6 +38,7 @@ public class Preset {
 
     private final Identifier id;
 
+    private String name = "";
     private String description = "Default generation, common cities, explosions";
     private String extraDescription = "";
     private String warning = "";
@@ -180,6 +181,29 @@ public class Preset {
         return id;
     }
 
+    /**
+     * The authored display name, or {@code ""} when nothing in the {@code extends} chain declared
+     * one. Callers rendering a label want {@link #getDisplayName()}, which fills that gap in; this
+     * raw form exists so {@link #toRE()} round-trips "no name was authored" as an empty string
+     * rather than inventing the id as an authored value.
+     */
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * What a UI should label this preset: the authored {@code name}, falling back to the
+     * fully-qualified id. The fallback is what every preset showed before the field existed, so a
+     * datapack that declares no name reads exactly as it did then rather than going blank.
+     */
+    public String getDisplayName() {
+        return name == null || name.isEmpty() ? id.toString() : name;
+    }
+
     public String getDescription() {
         return description;
     }
@@ -265,6 +289,7 @@ public class Preset {
     /** Field-by-field clone, used by the GUI editor to stage changes without mutating the original. */
     public Preset copy() {
         Preset p = new Preset(id);
+        p.name = name;
         p.description = description;
         p.extraDescription = extraDescription;
         p.warning = warning;
@@ -560,6 +585,7 @@ public class Preset {
 
         return new PresetRE(
                 Optional.empty(),
+                Optional.of(name),
                 Optional.of(description),
                 Optional.of(extraDescription),
                 Optional.of(warning),

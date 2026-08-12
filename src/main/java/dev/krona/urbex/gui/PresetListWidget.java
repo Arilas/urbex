@@ -120,9 +120,14 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
             return entry;
         }
 
+        /**
+         * The label plus the preset's id. The row itself shows only the label - since presets grew a
+         * {@code name}, that is a human phrase and no longer says which datapack owns the preset -
+         * and this is where the id stays reachable without costing the row a second line.
+         */
         @Override
         public Component getNarration() {
-            return label;
+            return Component.literal(label.getString() + " (" + entry.id() + ")");
         }
 
         @Override

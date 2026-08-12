@@ -24,6 +24,7 @@ import java.util.function.Predicate;
 public class WorldStyle {
 
     private final Identifier name;
+    private final String displayName;
     private final String outsideStyle;
 
     private final ScatteredSettings scatteredSettings;
@@ -85,6 +86,7 @@ public class WorldStyle {
                 Mergeable.apply(multipliers, object.getCityBiomeMultipliers());
             }
         }
+        this.displayName = displayNameOf(chainRootFirst, name);
         this.outsideStyle = Resolved.require(outside, name, "outsidestyle");
         Resolved.require(anySelectors ? selectors : null, name, "citystyles");
         this.scatteredSettings = scattered;
@@ -106,6 +108,28 @@ public class WorldStyle {
         }
     }
 
+    /**
+     * Folds a resolved chain's {@code name} declarations the same way every other scalar field is
+     * folded - last declaring link wins - and fills the gap with {@code id} when nothing declared
+     * one. {@code name} is optional like {@code rotatable} rather than required like
+     * {@code outsidestyle}: a chain that names itself nowhere is labelled by its id, exactly as
+     * every world style was before the field existed.
+     * <p>
+     * Static and taking the chain rather than reading instance state, because the world-style
+     * picker needs the same label from a registry it cannot build a whole {@link WorldStyle} out of
+     * (that would require the chain to be complete, which is worldgen's check to make, not a
+     * dropdown's).
+     */
+    public static String displayNameOf(List<WorldStyleRE> chainRootFirst, Identifier id) {
+        String display = null;
+        for (WorldStyleRE object : chainRootFirst) {
+            if (object.getDisplayName() != null) {
+                display = object.getDisplayName();
+            }
+        }
+        return display == null || display.isEmpty() ? id.toString() : display;
+    }
+
     /** The fully-qualified id, e.g. {@code "urbex:standard"}. */
     public String getName() {
         return name.toString();
@@ -113,6 +137,14 @@ public class WorldStyle {
 
     public Identifier getId() {
         return name;
+    }
+
+    /**
+     * What a UI should label this world style: the {@code name} the last declaring link in the chain
+     * authored, or the fully-qualified id when nothing did. Never null and never empty.
+     */
+    public String getDisplayName() {
+        return displayName;
     }
 
     public String getOutsideStyle() {

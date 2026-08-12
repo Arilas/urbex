@@ -1,5 +1,7 @@
 {
   "extends": "urbex:default",
+  "name": "Large Cities",
+  "description": "Large sprawling cities, taller buildings, more lighting",
   "icon": "textures/gui/icon_default.png",
   "cities": {
     "cityChance": -1,

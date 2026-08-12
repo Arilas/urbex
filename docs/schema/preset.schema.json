@@ -16,6 +16,10 @@
       "$ref": "#/$defs/qualifiedIdentifier",
       "description": "Asset this preset builds on. Fully qualified, e.g. `urbex:default`."
     },
+    "name": {
+      "type": "string",
+      "description": "The label shown for this preset in the Cities tab, e.g. `Tall Buildings`. Falls back to the fully-qualified id when no entry in the 'extends' chain declares one. Inherited like every other field, so a preset extending 'urbex:default' that does not restate this is labelled `Default` — restate it."
+    },
     "description": {
       "type": "string",
       "description": "The description of this preset, shown in the profile-selection UI."

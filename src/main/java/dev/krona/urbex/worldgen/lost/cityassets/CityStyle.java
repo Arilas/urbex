@@ -15,6 +15,9 @@ public class CityStyle {
 
     private final Identifier name;
 
+    /** The last {@code name} declared anywhere in the chain; null until {@code applyFrom} sees one. */
+    private String displayName;
+
     /**
      * Sorted, not a {@code HashSet}: {@code Stuff.generateStuff} iterates these tags and assigns a
      * running {@code stuffOrdinal} across all of them, and that ordinal is the RNG slot address
@@ -125,6 +128,9 @@ public class CityStyle {
      * that omits a field does not blank out what an earlier entry set.
      */
     private void applyFrom(CityStyleRE object) {
+        if (object.getDisplayName() != null) {
+            displayName = object.getDisplayName();
+        }
         if (object.getStyle() != null) {
             style = object.getStyle();
         }
@@ -269,6 +275,14 @@ public class CityStyle {
     /** The fully-qualified id, e.g. {@code "urbex:citystyle_common"}. */
     public String getName() {
         return name.toString();
+    }
+
+    /**
+     * What a UI should label this city style: the {@code name} the last declaring link in the chain
+     * authored, or the fully-qualified id when nothing did. Never null and never empty.
+     */
+    public String getDisplayName() {
+        return displayName == null || displayName.isEmpty() ? name.toString() : displayName;
     }
 
     public Identifier getId() {
