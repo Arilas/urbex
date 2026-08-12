@@ -115,7 +115,7 @@ loom {
         }
         // The weighted-world-style-mix census. Not a golden check and not run by CI: mixing needs a
         // second datapack registering a second world style, and this repository ships only its own.
-        // Point it at one with `-PurbexMixPack=<path to a pack jar>` and run `./gradlew runMixCheck`;
+        // Point it at one or more with `-PurbexMixPack=<jar>[,<jar>...]` and run `./gradlew runMixCheck`;
         // the jar is copied into the run's mods folder, which is where an Urbex asset pack goes.
         // Without a pack it still runs and reports the one built-in style, which is the useful
         // negative case: it proves the single-style path answers without ever drawing.
@@ -195,22 +195,26 @@ motd=urbex mix check
         def mods = new File(dir, 'mods')
         project.delete(mods)
         if (packPath) {
-            def pack = file(packPath)
-            if (!pack.exists()) {
-                throw new GradleException("urbexMixPack '${packPath}' does not exist")
+            // Comma-separated, so several packs can be mixed in one run - which is the case worth
+            // checking, since a mix is only interesting once two packs have to coexist.
+            def packs = packPath.split(',').collect { it.trim() }.findAll { it }.collect { file(it) }
+            packs.each { pack ->
+                if (!pack.exists()) {
+                    throw new GradleException("urbexMixPack '${pack}' does not exist")
+                }
             }
             // mods/, not world/datapacks/: an Urbex asset pack ships as a Fabric mod jar, and
             // Minecraft's datapack repository only accepts directories and .zip files, so a jar
             // dropped in world/datapacks is silently ignored.
             mods.mkdirs()
             project.copy {
-                from pack
+                from packs
                 into mods
             }
             def mixStyles = project.findProperty('urbexMixStyles')
                     ?: 'urbex:standard*0.1+urbexmt:moderntweaks*0.9'
             styles = mixStyles
-            logger.lifecycle("mixCheck: ${pack.name} -> mods/, styles ${styles}")
+            logger.lifecycle("mixCheck: ${packs*.name.join(', ')} -> mods/, styles ${styles}")
         } else {
             logger.lifecycle("mixCheck: no -PurbexMixPack given; running the single-style case")
         }
