@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
 import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
@@ -111,6 +112,33 @@ class AssetCompilerTest {
                 snapshot.stuffFor("rubble").stream().map(StuffObject::getName).toList());
     }
 
+    /**
+     * A city style that does not compile is only a load error when something can select it.
+     * <p>
+     * Requiredness is a property of the end of a chain, and a city style may exist only to be
+     * extended: the bundled {@code citystyle_config} declares a street width and nothing else and is
+     * complete only through {@code citystyle_common}. An earlier draft of this compiler treated every
+     * city-style failure as fatal and refused the shipped pack's own world - the digest run caught it,
+     * no unit test did, so here is the unit test.
+     * <p>
+     * The converse - a style something <em>does</em> select must resolve - is not unit-tested here,
+     * because building a preset or a world style to name one takes more scaffolding than the assertion
+     * is worth. It is covered end to end on every digest run, where the shipped world style names
+     * {@code urbex:citystyle_standard} and the world would refuse to load if it stopped resolving.
+     */
+    @Test
+    void aCityStyleNothingCanSelectIsAllowedToBeIncomplete() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        RegistryAccess access = registries(abstractBaseCityStyle("citystyle_config"));
+
+        AssetSnapshot snapshot = AssetCompiler.compile(access, diagnostics);
+
+        assertTrue(diagnostics.isEmpty(),
+                () -> "an unreachable base is not wrong: " + diagnostics.format("reported"));
+        assertNull(snapshot.cityStyles().get("urbex:citystyle_config"),
+                "it did not compile, which is why nothing may resolve it either");
+    }
+
     /** A tag nothing files under is empty, not null - a pack may ship no stuff for another's tag. */
     @Test
     void aTagNothingIsFiledUnderIsEmptyRatherThanNull() {
@@ -146,6 +174,14 @@ class AssetCompilerTest {
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         return new Entry<>(CustomRegistries.PALETTE_REGISTRY_KEY, id(path),
                 new PaletteRE(Optional.empty(), Optional.of(List.of(entry))));
+    }
+
+    /** A city style declaring nothing: complete only through a child that extends it. */
+    private static Entry<CityStyleRE> abstractBaseCityStyle(String path) {
+        return new Entry<>(CustomRegistries.CITYSTYLES_REGISTRY_KEY, id(path),
+                new CityStyleRE(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
     }
 
     private static StuffSettingsRE stuffTagged(String path, String tag) {
