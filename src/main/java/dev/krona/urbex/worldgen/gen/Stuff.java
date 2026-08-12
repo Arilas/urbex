@@ -66,14 +66,15 @@ public class Stuff {
         // (GenerationSession, issue #125). This guard is what would say so if that ever stopped
         // being true - the failure it detects is otherwise completely silent.
         //
-        // Logged rather than thrown, for two reasons. generateStuff is the last statement of
-        // CityGenerator.doCityChunk, which generate() calls at CityGenerator.java:290, well before
-        // ctx.driver.actuallyGenerate(chunk) at :310 - so a throw here would unwind past the commit
-        // and lose the chunk's entire cached write set, costing the whole chunk rather than its
-        // decoration. And it would route through CityFeature.generateFromPipeline's handler into
-        // ErrorLogger.report, which dereferences ServerAccess.getServer() with no null check
-        // (ErrorLogger.java:28-29) - during the shutdown window this fires in, that turns a
-        // decoration bug into a dead worldgen worker.
+        // Logged rather than thrown: generateStuff is the last statement of
+        // CityGenerator.doCityChunk, which generate() calls well before
+        // ctx.driver.actuallyGenerate(chunk) - so a throw here would unwind past the commit and lose
+        // the chunk's entire cached write set, costing the whole chunk rather than its decoration.
+        // (It would also have routed through CityFeature.generateFromPipeline's handler into
+        // ErrorLogger.report, which used to dereference ServerAccess.getServer() with no null check
+        // and so could turn a decoration bug into a dead worldgen worker during exactly the shutdown
+        // window this fires in. That null check exists now - issue #56 - but the reason above stands
+        // on its own.)
         AssetRegistries.StuffIndex stuffIndex = AssetRegistries.stuffIndex();
         if (stuffIndex.byTag().isEmpty() && !stuffIndex.loaded()) {
             if (REPORTED_UNLOADED.compareAndSet(false, true)) {

@@ -171,7 +171,15 @@ public class RegistryAssetRegistry<T, R> {
         return t;
     }
 
-    public void loadAll(CommonLevelAccessor level) {
+    /**
+     * Resolves and caches every registered entry, recording what fails instead of stopping at it.
+     * <p>
+     * A pack with four broken files used to cost four world loads to diagnose, because the first
+     * failure threw out of the whole sweep. The world still refuses to load - {@code AssetRegistries
+     * .load} throws once the sweep is complete - but it now says everything that is wrong (issue
+     * #56). An entry that fails is simply not cached; nothing half-built is published.
+     */
+    public void loadAll(CommonLevelAccessor level, AssetDiagnostics diagnostics) {
         if (level == null) {
             return;
         }
@@ -179,20 +187,56 @@ public class RegistryAssetRegistry<T, R> {
         Registry<R> registry = access.lookupOrThrow(registryKey);
         for (R r : registry) {
             Identifier name = registry.getKey(r);
-            if (!assets.containsKey(name)) {
-                List<R> chain = ExtendsChain.resolve(name,
-                        key -> {
-                            R entry = registry.getValue(ResourceKey.create(registryKey, key));
-                            if (entry instanceof IAsset asset) {
-                                asset.setRegistryName(key);
-                            }
-                            return entry;
-                        },
-                        entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
-                T t = assetConstructor.apply(access, chain);
-                assets.putIfAbsent(name, t);
+            if (assets.containsKey(name)) {
+                continue;
+            }
+            try {
+                assets.putIfAbsent(name, compile(access, registry, name));
+            } catch (Exception e) {
+                diagnostics.record(registryName(), name, e);
             }
         }
+    }
+
+    /**
+     * Resolves every registered entry into a throwaway, recording what fails - without touching
+     * what is already cached.
+     * <p>
+     * This is what {@code /urbex validate} runs. It deliberately does not populate {@link #assets}:
+     * the live compiled assets belong to the loaded world and chunks are generating against them,
+     * so a validation pass must be able to fail without leaving anything different behind.
+     */
+    public void validate(RegistryAccess access, AssetDiagnostics diagnostics) {
+        if (access == null) {
+            return;
+        }
+        Registry<R> registry = access.lookupOrThrow(registryKey);
+        for (R r : registry) {
+            Identifier name = registry.getKey(r);
+            try {
+                compile(access, registry, name);
+            } catch (Exception e) {
+                diagnostics.record(registryName(), name, e);
+            }
+        }
+    }
+
+    private T compile(RegistryAccess access, Registry<R> registry, Identifier name) {
+        List<R> chain = ExtendsChain.resolve(name,
+                key -> {
+                    R entry = registry.getValue(ResourceKey.create(registryKey, key));
+                    if (entry instanceof IAsset asset) {
+                        asset.setRegistryName(key);
+                    }
+                    return entry;
+                },
+                entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
+        return assetConstructor.apply(access, chain);
+    }
+
+    /** The registry's own id, for a diagnostic that has to say where it came from. */
+    public String registryName() {
+        return registryKey.registry().toString();
     }
 
     public Iterable<T> getIterable() {

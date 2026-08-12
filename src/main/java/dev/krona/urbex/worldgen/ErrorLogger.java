@@ -20,15 +20,30 @@ public class ErrorLogger {
 
     private static long lastReportTime = -1;
 
+    /**
+     * Tells whoever is playing that a chunk went wrong, at most once every ten seconds.
+     * <p>
+     * The null guard is not defensive tidiness. This is called from the handler around chunk
+     * generation, and the window it most wants to survive is shutdown - a worker finishing a chunk
+     * after {@code SERVER_STOPPED} has cleared the static server reference. Without it the error
+     * <em>handler</em> threw a {@link NullPointerException} of its own, turning a reported chunk
+     * failure into a dead worldgen worker and losing the message that was being reported (issue
+     * #56). The log line below is not a fallback for the chat message; it is where the report has
+     * always actually belonged, and now happens whether or not anyone is listening.
+     */
     public static void report(String message) {
         long time = System.currentTimeMillis();
-        if (lastReportTime == -1 || lastReportTime < (time-10000)) {
-            // Not reported before or too long ago
-            lastReportTime = time;
-            MinecraftServer server = ServerAccess.getServer();
-            for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-                player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.RED));
-            }
+        if (lastReportTime != -1 && lastReportTime >= (time - 10000)) {
+            return;
+        }
+        lastReportTime = time;
+        Urbex.getLogger().error(message);
+        MinecraftServer server = ServerAccess.getServer();
+        if (server == null) {
+            return;
+        }
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(Component.literal(message).withStyle(ChatFormatting.RED));
         }
     }
 

@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **A datapack's mistakes are reported all at once, and `/urbex validate` asks for them on demand.**
+  Load-time asset resolution stopped at the first broken file. That is the right outcome — the world
+  must not load — but the wrong report: an author with four typos fixed one, reloaded the world,
+  found the second, and went round again. Every registered asset is now resolved before anything is
+  reported, and the world refuses to load with one message listing every problem, each line naming
+  the registry, the asset and what is missing (issue #56).
+  - *`/urbex validate`* runs the same pass on demand and changes nothing — it does not populate,
+    replace or clear the compiled assets the running world's chunks are generating against. On a
+    world that is running it finds nothing, which is the answer worth being able to confirm after
+    installing a pack. The full list goes to the server log; chat gets the first ten.
+  - *`ErrorLogger.report` no longer dereferences a null server.* It is called from the handler
+    around chunk generation, and the window it most needs to survive is shutdown — a worker
+    finishing a chunk after the static server reference has been cleared. The error *handler* threw
+    an exception of its own there, turning a reported chunk failure into a dead worldgen worker and
+    losing the message being reported. The report now always reaches the log, whether or not anyone
+    is listening.
+  - *No worldgen change*: both digest goldens are unchanged.
+
 - **A palette's `variant` resolves against its own dimension's registries.** `Palette.compile`
   looked a variant up through `ServerAccess.getServer().getLevel(Level.OVERWORLD)` — the
   process-wide server reference, and then unconditionally that server's overworld — ignoring the

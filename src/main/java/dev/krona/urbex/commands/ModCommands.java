@@ -35,6 +35,7 @@ public class ModCommands {
                         .then(CommandListParts.register())
                         .then(CommandExportPart.register())
                         .then(CommandDigest.register())
+                        .then(CommandValidate.register())
         );
 
         dispatcher.register(Commands.literal("ubx").redirect(commands));
