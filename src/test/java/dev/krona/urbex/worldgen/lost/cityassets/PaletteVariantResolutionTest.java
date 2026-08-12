@@ -46,7 +46,7 @@ class PaletteVariantResolutionTest {
 
     @Test
     void aVariantResolvesAgainstTheIndexThePaletteWasGiven() {
-        Palette compiled = new Palette(variantsWith("minecraft:deepslate"),
+        Palette compiled = new Palette(BuiltInRegistries.BLOCK, variantsWith("minecraft:deepslate"),
                 List.of(paletteNamingVariant()));
 
         assertEquals(List.of("minecraft:deepslate"), blocksOf(compiled, 'V'));
@@ -58,9 +58,9 @@ class PaletteVariantResolutionTest {
      */
     @Test
     void twoIndexesResolveTheSameVariantIdIndependently() {
-        Palette fromFirst = new Palette(variantsWith("minecraft:deepslate"),
+        Palette fromFirst = new Palette(BuiltInRegistries.BLOCK, variantsWith("minecraft:deepslate"),
                 List.of(paletteNamingVariant()));
-        Palette fromSecond = new Palette(variantsWith("minecraft:sandstone"),
+        Palette fromSecond = new Palette(BuiltInRegistries.BLOCK, variantsWith("minecraft:sandstone"),
                 List.of(paletteNamingVariant()));
 
         assertEquals(List.of("minecraft:deepslate"), blocksOf(fromFirst, 'V'));
@@ -77,7 +77,7 @@ class PaletteVariantResolutionTest {
     @Test
     void aVariantEntryWithNoVariantIndexFailsNamingWhatItWanted() {
         IllegalStateException failure = assertThrows(IllegalStateException.class,
-                () -> new Palette(null, List.of(paletteNamingVariant())));
+                () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(paletteNamingVariant())));
 
         assertTrue(failure.getMessage().contains("urbex:rubble"), failure.getMessage());
         assertTrue(failure.getMessage().contains("variant-palette"), failure.getMessage());
@@ -111,6 +111,6 @@ class PaletteVariantResolutionTest {
         VariantRE definition = new VariantRE(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block)))));
         definition.setRegistryName(id);
-        return new AssetIndex<>("urbex:variants", Map.of(id, new Variant(List.of(definition))));
+        return new AssetIndex<>("urbex:variants", Map.of(id, new Variant(BuiltInRegistries.BLOCK, List.of(definition))));
     }
 }

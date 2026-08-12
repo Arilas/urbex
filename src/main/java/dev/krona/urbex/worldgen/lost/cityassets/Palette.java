@@ -5,8 +5,10 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -38,14 +40,17 @@ public class Palette {
      * then compiled, so an overridden entry takes its {@code damaged} mapping with it.
      */
     /**
-     * @param variants the compiled variants this palette's {@code variant} entries resolve against.
-     *                 May be null only for a palette that provably names none; one that does then
-     *                 fails naming itself and the variant rather than reaching for a static server
-     *                 (issue #60) or compiling one on the spot (issue #128).
+     * @param blockLookup the block registry every block string in this palette resolves against,
+     *                    handed down by the compiler from the world being loaded.
+     * @param variants    the compiled variants this palette's {@code variant} entries resolve
+     *                    against. May be null only for a palette that provably names none; one that
+     *                    does then fails naming itself and the variant rather than reaching for a
+     *                    static server (issue #60) or compiling one on the spot (issue #128).
      */
-    public Palette(@Nullable AssetIndex<Variant> variants, List<PaletteRE> chainRootFirst) {
+    public Palette(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+                   List<PaletteRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
-        compile(variants, mergeByCharacter(chainRootFirst, name));
+        compile(blockLookup, variants, mergeByCharacter(chainRootFirst, name));
     }
 
     public Palette(String name) {
@@ -59,14 +64,15 @@ public class Palette {
      * An inline palette is a keyed collection exactly like a registered one, so it merges by
      * character too: a part that extends another and declares an inline palette repainting two
      * markers keeps the rest of its ancestor's. Replacing wholesale here would reproduce, one level
-     * down, the very failure {@link #Palette(List)} exists to prevent.
+     * down, the very failure {@link #mergeByCharacter} exists to prevent.
      *
+     * @param blockLookup    the block registry the inline entries resolve against
      * @param owner          the part or building the block is written in, for error messages and
      *                       for the synthetic palette name
      * @param chainRootFirst the inline blocks along the owner's chain, root first
      */
-    public static Palette inline(@Nullable AssetIndex<Variant> variants, Identifier owner,
-                                 List<PaletteRE> chainRootFirst) {
+    public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+                                 Identifier owner, List<PaletteRE> chainRootFirst) {
         for (PaletteRE re : chainRootFirst) {
             // The codec accepts 'extends' wherever a PaletteRE is embedded, but an inline block is
             // not a registry entry, so nothing can resolve it. Rejecting is the honest option:
@@ -80,7 +86,7 @@ public class Palette {
             }
         }
         Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(variants, mergeByCharacter(chainRootFirst, owner));
+        palette.compile(blockLookup, variants, mergeByCharacter(chainRootFirst, owner));
         return palette;
     }
 
@@ -133,20 +139,22 @@ public class Palette {
         return palette;
     }
 
-    private void compile(@Nullable AssetIndex<Variant> variants, Collection<PaletteEntry> entries) {
+    private void compile(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+                         Collection<PaletteEntry> entries) {
         for (PaletteEntry entry : entries) {
             Character c = entry.getChr().charAt(0);
             BlockState dmg = null;
             if (entry.getDamaged() != null) {
-                dmg = Tools.stringToState(entry.getDamaged(), name);
+                dmg = Tools.stringToState(entry.getDamaged(), blockLookup, name);
             }
-            LightPool light = entry.getLight() == null ? null : LightPool.compile(name, c, entry.getLight());
+            LightPool light = entry.getLight() == null ? null
+                    : LightPool.compile(blockLookup, name, c, entry.getLight());
             Info info = new Info(entry.getMob(), entry.getLoot(),
                     entry.getTorch() != null && entry.getTorch(), light, entry.getTag());
 
             if (entry.getBlock() != null) {
                 String block = entry.getBlock();
-                BlockState state = Tools.stringToState(block, name);
+                BlockState state = Tools.stringToState(block, blockLookup, name);
                 palette.put(c, new PE(state, info));
                 if (dmg != null) {
                     damaged.put(state, dmg);
@@ -181,7 +189,7 @@ public class Palette {
                 for (BlockEntry ob : entryBlocks) {
                     Integer f = ob.random();
                     String block = ob.block();
-                    BlockState state = Tools.stringToState(block, name);
+                    BlockState state = Tools.stringToState(block, blockLookup, name);
                     blocks.add(Pair.of(f, state));
                     if (dmg != null) {
                         damaged.put(state, dmg);

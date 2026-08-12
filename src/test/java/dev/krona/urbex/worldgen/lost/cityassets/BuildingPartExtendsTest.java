@@ -47,7 +47,7 @@ class BuildingPartExtendsTest {
         BuildingPartRE child = part("radiotower_rusted", inherits("urbex:radiotower")
                 .refpalette("urbexmt:radiotower_rusted"));
 
-        BuildingPart resolved = new BuildingPart(null, PALETTES, List.of(parent, child));
+        BuildingPart resolved = new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child));
 
         assertEquals(2, resolved.getXSize());
         assertEquals(2, resolved.getZSize());
@@ -64,7 +64,7 @@ class BuildingPartExtendsTest {
         BuildingPartRE child = part("tower_short", inherits("urbex:tower")
                 .slices(List.of(List.of("ij", "kl"))));
 
-        BuildingPart resolved = new BuildingPart(null, PALETTES, List.of(parent, child));
+        BuildingPart resolved = new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child));
 
         assertEquals(1, resolved.getSliceCount());
         assertArrayEquals(new String[]{"ijkl"}, resolved.getSlices());
@@ -78,7 +78,7 @@ class BuildingPartExtendsTest {
         BuildingPartRE child = part("tower_wide", inherits("urbex:tower").xsize(3));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(null, PALETTES, List.of(parent, child)));
+                () -> new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)));
 
         assertTrue(error.getMessage().contains("urbex:tower_wide"),
                 () -> "the error must name the part: " + error.getMessage());
@@ -94,7 +94,7 @@ class BuildingPartExtendsTest {
         BuildingPartRE child = part("tower_deep", inherits("urbex:tower").zsize(5));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(null, PALETTES, List.of(parent, child)));
+                () -> new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)));
 
         assertTrue(error.getMessage().contains("urbex:tower_deep"),
                 () -> "the error must name the part: " + error.getMessage());
@@ -107,7 +107,7 @@ class BuildingPartExtendsTest {
                 .refpalette("urbex:rusted"));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(null, PALETTES, List.of(parent, child)));
+                () -> new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)));
 
         assertTrue(error.getMessage().contains("urbex:tower_rusted"),
                 () -> "the error must name the part that failed to resolve: " + error.getMessage());
@@ -120,7 +120,7 @@ class BuildingPartExtendsTest {
         BuildingPartRE parent = part("sliced_only", new Builder().slices(TOWER));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(null, PALETTES, List.of(parent)));
+                () -> new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent)));
 
         assertTrue(error.getMessage().contains("urbex:sliced_only"), error::getMessage);
     }
@@ -131,11 +131,11 @@ class BuildingPartExtendsTest {
         BuildingPartRE replacing = part("tower_a", inherits("urbex:tower").meta(true, meta("nowater")));
         BuildingPartRE appending = part("tower_b", inherits("urbex:tower").meta(false, meta("nowater")));
 
-        BuildingPart replaced = new BuildingPart(null, PALETTES, List.of(parent, replacing));
+        BuildingPart replaced = new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, replacing));
         assertTrue(replaced.getMetaBoolean("nowater"));
         assertFalse(replaced.getMetaBoolean("support"), "a bare array replaces");
 
-        BuildingPart appended = new BuildingPart(null, PALETTES, List.of(parent, appending));
+        BuildingPart appended = new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, appending));
         assertTrue(appended.getMetaBoolean("nowater"));
         assertTrue(appended.getMetaBoolean("support"), "{\"replace\": false} keeps the inherited meta");
     }
@@ -152,7 +152,7 @@ class BuildingPartExtendsTest {
         BuildingPartRE child = part("tower_rusted", inherits("urbex:tower")
                 .inlinePalette(entry('a', "minecraft:deepslate")));
 
-        Palette resolved = new BuildingPart(null, PALETTES, List.of(parent, child)).getLocalPalette();
+        Palette resolved = new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)).getLocalPalette();
 
         assertEquals(3, resolved.getPalette().size(),
                 "the two characters the child never mentions must survive");
@@ -173,7 +173,7 @@ class BuildingPartExtendsTest {
         // built at all unless the named palette exists. That is the compile-time resolution doing its
         // job: this used to build fine and blow up on the first chunk that asked for the palette.
         RuntimeException failure = assertThrows(RuntimeException.class,
-                () -> new BuildingPart(null, PALETTES, List.of(parent, child)),
+                () -> new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)),
                 "an ancestor's inline palette must not survive the child naming a refpalette");
         assertTrue(failure.getMessage().contains("urbex:somewhere_else"), failure.getMessage());
     }
@@ -188,7 +188,7 @@ class BuildingPartExtendsTest {
                         entry('a', "minecraft:stone")));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(null, PALETTES, List.of(part)));
+                () -> new BuildingPart(BuiltInRegistries.BLOCK, null, PALETTES, List.of(part)));
 
         assertTrue(error.getMessage().contains("urbex:tower"), error::getMessage);
         assertTrue(error.getMessage().contains("urbex:common"), error::getMessage);

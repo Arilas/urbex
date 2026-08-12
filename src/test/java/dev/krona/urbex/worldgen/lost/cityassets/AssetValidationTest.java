@@ -8,6 +8,7 @@ import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistrationInfo;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
@@ -102,6 +103,9 @@ class AssetValidationTest {
                     RegistrationInfo.BUILT_IN);
         }
         return new RegistryAccess.ImmutableRegistryAccess(List.of(
+                // Compilation resolves block strings against the world's own block registry, so an
+                // access built by hand has to carry it.
+                BuiltInRegistries.BLOCK,
                 variants.freeze(),
                 empty(CustomRegistries.PALETTE_REGISTRY_KEY),
                 empty(CustomRegistries.CONDITIONS_REGISTRY_KEY),

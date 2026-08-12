@@ -79,7 +79,7 @@ class RotatableTagCoversShippedBlocksTest {
 
         Set<String> problems = new TreeSet<>();
         for (Ref ref : refs) {
-            BlockState state = Tools.stringToState(ref.value(), ref.file());
+            BlockState state = Tools.stringToState(ref.value(), BuiltInRegistries.BLOCK, ref.file());
             boolean turns = state.rotate(Rotation.CLOCKWISE_90) != state
                     || state.mirror(Mirror.FRONT_BACK) != state;
             Identifier id = BuiltInRegistries.BLOCK.getKey(state.getBlock());

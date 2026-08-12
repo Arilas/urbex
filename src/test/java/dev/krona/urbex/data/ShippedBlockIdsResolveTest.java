@@ -25,10 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Minecraft version actually has.
  * <p>
  * Nothing checked this, and the failure mode is silent rather than loud: {@code Tools.stringToState}
- * ends at {@code BuiltInRegistries.BLOCK.getValue(id)}, and that returns the block registry's
- * <em>default</em> value - {@code minecraft:air} - for an id it does not know, so the
- * {@code value == null} guard below it never fires. An id that a Minecraft version renames
- * therefore turns into air everywhere it is used, with no exception and no log line.
+ * ends by returning {@code minecraft:air} for an id it cannot resolve. An id that a Minecraft
+ * version renames therefore turns into air everywhere it is used, with no exception and one warning
+ * in the log that nobody reads while playing. (It used to reach that outcome by accident, through
+ * {@code BuiltInRegistries.BLOCK.getValue} handing back a defaulted registry's default; it is
+ * written out as a return now, and pinned by {@code BlockResolutionTest}, so #91 has one line to
+ * change.)
  * <p>
  * Two shipped entries were in exactly that state when this test was written, both surfaced by
  * Task 5c making the load-time validation actually run: {@code minecraft:chain} (renamed

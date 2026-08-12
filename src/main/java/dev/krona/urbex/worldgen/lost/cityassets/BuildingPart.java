@@ -5,8 +5,10 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
+import net.minecraft.world.level.block.Block;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -59,8 +61,8 @@ public class BuildingPart implements IBuildingPart {
      * {@code slices} replaces the inherited ones wholesale; declaring a size that contradicts the
      * slices actually in force is a load error rather than a silent truncation.
      */
-    public BuildingPart(@Nullable AssetIndex<Variant> variants, AssetIndex<Palette> palettes,
-                        List<BuildingPartRE> chainRootFirst) {
+    public BuildingPart(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+                        AssetIndex<Palette> palettes, List<BuildingPartRE> chainRootFirst) {
         BuildingPartRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
         name = leaf.getRegistryName();
 
@@ -110,7 +112,7 @@ public class BuildingPart implements IBuildingPart {
         slices = declaredSlices;
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(variants, name, inlinePalettes); // @todo get the full palette instead
+            localPalette = Palette.inline(blockLookup, variants, name, inlinePalettes); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
             // Resolved here, not on the first chunk that asks. The lazy version cached the answer on

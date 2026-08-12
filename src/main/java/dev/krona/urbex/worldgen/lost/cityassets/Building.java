@@ -4,8 +4,10 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.CommonLevelAccessor;
+import net.minecraft.world.level.block.Block;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
@@ -54,8 +56,8 @@ public class Building {
      * ancestor that set something else. The defaults the fields start at are this class's own
      * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
      */
-    public Building(@Nullable AssetIndex<Variant> variants, AssetIndex<Palette> palettes,
-                        List<BuildingRE> chainRootFirst) {
+    public Building(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+                        AssetIndex<Palette> palettes, List<BuildingRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<PartRef> partRefs = new ArrayList<>();
         boolean anyParts = false;
@@ -116,7 +118,7 @@ public class Building {
         Resolved.require(anyParts ? partRefs : null, name, "parts");
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(variants, name, inlinePalettes); // @todo get the full palette instead
+            localPalette = Palette.inline(blockLookup, variants, name, inlinePalettes); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
             // Resolved here, not on the first chunk that asks. The lazy version cached the answer on

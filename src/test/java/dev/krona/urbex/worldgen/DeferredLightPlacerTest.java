@@ -6,6 +6,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
@@ -195,7 +196,7 @@ class DeferredLightPlacerTest {
                                   List<LightSettings.Entry> wall,
                                   List<LightSettings.Entry> ceiling,
                                   List<LightSettings.Entry> free) {
-        return LightPool.compile(PALETTE_ID, 'L', new LightSettings(floor, wall, ceiling, free));
+        return LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', new LightSettings(floor, wall, ceiling, free));
     }
 
     private static LightSettings.Entry entry(int weight, String block) {

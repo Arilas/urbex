@@ -31,6 +31,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
@@ -189,21 +190,21 @@ class DatapackGuideExamplesTest {
         expect(guide, missing, () -> Resolved.require(null, downtown, "streetblocks.parts.stair"));
 
         // A part with no geometry, and a part whose redeclared size contradicts inherited slices.
-        expect(guide, missing, () -> new BuildingPart(null, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
-        expect(guide, missing, () -> new BuildingPart(null, NO_PALETTES, List.of(
+        expect(guide, missing, () -> new BuildingPart(BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
+        expect(guide, missing, () -> new BuildingPart(BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(
                 namedPart(Identifier.fromNamespaceAndPath("urbexmt", "tower_base"), 16, 16,
                         List.of(List.of("x".repeat(256)))),
                 namedPart(tower, 8, null, null))));
 
         // 'extends' inside an inline palette block.
-        expect(guide, missing, () -> Palette.inline(null, tower, List.of(new PaletteRE(
+        expect(guide, missing, () -> Palette.inline(BuiltInRegistries.BLOCK, null, tower, List.of(new PaletteRE(
                 Optional.of(Identifier.fromNamespaceAndPath("urbex", "common")), Optional.empty()))));
 
         // A palette entry that resolves to nothing at all.
         PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        expect(guide, missing, () -> new Palette(null, List.of(
+        expect(guide, missing, () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(
                 new PaletteRE(Optional.empty(), Optional.of(List.of(empty)))
                         .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "x")))));
 
