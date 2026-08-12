@@ -1,6 +1,8 @@
 package dev.krona.urbex.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import dev.krona.urbex.Urbex;
@@ -20,24 +22,38 @@ public class ModCommands {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         LiteralCommandNode<CommandSourceStack> commands = dispatcher.register(
                 Commands.literal(Urbex.MODID)
-                        .then(CommandCreateBuilding.register(dispatcher))
-                        .then(CommandDebug.register(dispatcher))
-                        .then(CommandStats.register(dispatcher))
-                        .then(CommandMap.register(dispatcher))
-                        .then(CommandSavePreset.register(dispatcher))
-                        .then(CommandCreatePart.register(dispatcher))
-                        .then(CommandLocatePart.register(dispatcher))
-                        .then(CommandLocate.register(dispatcher))
-                        .then(CommandEditPart.register(dispatcher))
-                        .then(CommandResumeEdit.register(dispatcher))
-                        .then(CommandListParts.register(dispatcher))
-                        .then(CommandExportPart.register(dispatcher))
-                        .then(CommandDigest.register(dispatcher))
+                        .then(CommandCreateBuilding.register())
+                        .then(CommandDebug.register())
+                        .then(CommandStats.register())
+                        .then(CommandMap.register())
+                        .then(CommandSavePreset.register())
+                        .then(CommandCreatePart.register())
+                        .then(CommandLocatePart.register())
+                        .then(CommandLocate.register())
+                        .then(CommandEditPart.register())
+                        .then(CommandResumeEdit.register())
+                        .then(CommandListParts.register())
+                        .then(CommandExportPart.register())
+                        .then(CommandDigest.register())
         );
 
         dispatcher.register(Commands.literal("ubx").redirect(commands));
         // @todo 1.21
 //        ResetChunksCommand.register(dispatcher);
+    }
+
+    /**
+     * The {@code radius} argument, or {@code fallback} when the sender left it off.
+     * <p>
+     * Brigadier binds one {@link com.mojang.brigadier.Command} to both the two- and three-argument
+     * forms of a command, and asking for an argument the parsed node never supplied throws
+     * {@code IllegalArgumentException} out of the executor. Checking the parsed nodes is how a
+     * command distinguishes the two forms without duplicating its body.
+     */
+    static int optionalRadius(CommandContext<CommandSourceStack> context, int fallback) {
+        boolean given = context.getNodes().stream()
+                .anyMatch(node -> "radius".equals(node.getNode().getName()));
+        return given ? IntegerArgumentType.getInteger(context, "radius") : fallback;
     }
 
     @Nonnull

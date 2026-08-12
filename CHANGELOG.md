@@ -2,6 +2,91 @@
 
 ## Unreleased
 
+- **`urbex:rotatable` covers what the generator actually rotates.** The tag named
+  `#minecraft:stairs` and nothing else, while `CityGenerator.transformBlockState` applies the part's
+  mirror/rotation to any block in it - so every rotated or mirrored copy of a part placed the
+  ladders, iron trapdoor, doors, barrels, levers, wall torches and rails of Urbex's own palettes
+  facing the way the *unrotated* part was authored. A ladder or wall torch that survives that is
+  attached to nothing. The tag now names the vanilla tags for stairs, doors, trapdoors, banners,
+  signs, rails, beds, buttons, fence gates, fences, walls, bars, anvils, shulker boxes, glazed
+  terracotta and campfires, plus the individual directional blocks that have no tag of their own.
+  - *Guarded mechanically, not by a list.* `RotatableTagCoversShippedBlocksTest` asks each shipped
+    block state whether `rotate`/`mirror` returns something different, and fails the build if one
+    that turns is outside the tag - so a new palette entry for a directional block cannot ship the
+    same defect. It expands `#tag` references out of the vanilla data on the classpath, so it checks
+    what the game resolves rather than the file's literal contents.
+  - *Both goldens unchanged*, verified by running both digest checks: nothing in the two sampled
+    windows (49 and 361 chunks) places a newly-covered block under a transform, so this is latent
+    for the bundled pack today and load-bearing for any pack whose rotated parts use one. The one
+    entry with a behavioural edge is `#minecraft:rails`: `Railways` places some parts with
+    `MIRROR_X`, and a mirrored `ascending_east` rail now becomes `ascending_west` rather than
+    ascending into the mirrored wall.
+
+- **Datapack mistakes that used to be silent or late are load errors naming the file.**
+  - `stuff` now requires `inbuilding` of the resolved chain. It was optional with no default, and
+    `Stuff.generateStuff` matches on `inbuilding == hasBuilding`, so an entry without it matched no
+    chunk at all: registered, indexed under its tags, walked on every city chunk, placing nothing.
+  - `mincount`/`maxcount` are bounded to `[0, 4095]` and `attempts` to `[1, 4096]`, the width of the
+    fields `Stuff.slot` packs them into. Above that they carry into the next field and two distinct
+    placement attempts share one RNG stream, drawing the same position - a silent wrong answer
+    rather than a failure. A fold-level check also rejects `mincount` above `maxcount`.
+  - A palette marker must be exactly one character. `char`, `filler` and `rubble` were read with a
+    raw `charAt(0)`, so `""` threw `StringIndexOutOfBoundsException` out of the decode with no file
+    named and `"ab"` quietly meant `"a"`.
+  - A `randompalettes` group whose factors total zero is refused at the fold. It used to leave the
+    weighted draw with no winner and `NullPointerException` out of `Palette.merge` on a worldgen
+    worker; the draw now also falls back to the last entry rather than null, for float drift.
+  - `scattered` rejects `rotatable` instead of parsing and discarding it: nothing ever read it, and
+    a scattered building always generates unrotated.
+
+- **A world creation the player backs out of no longer rewrites another world's preset.**
+  `PresetSelection.publish()` writes the choice into three process-global `Config` fields, and
+  nothing took them back - so abandoning the create screen and then loading a *different* existing
+  world made that world generate with the leftovers and, worse, persisted them into its own
+  `UrbexData`, overwriting the selection it was created with. Cleared now from `CreateWorldScreen
+  .onClose`, which is the abandon path and not the create path (`createWorldAndCleanup` calls
+  `popScreen()` directly), so the published values still survive exactly as long as they are needed.
+  `Config.buildPresetCache` additionally ignores a client selection for a world that already
+  recorded one, which makes the overwrite unreachable rather than merely unlikely.
+
+- **`/reload` no longer generates against pre-reload block tags.** `CityGenerator` expands
+  `urbex:lights` and `urbex:needspoi` into `BlockState` sets once and holds them for the lifetime of
+  the dimension info, so an edited tag kept generating against the old membership until the world
+  was reopened. `END_DATA_PACK_RELOAD` now bumps the dimension-info dirty counter. It does *not*
+  make the thirteen asset registries reloadable - those go through Fabric's `DynamicRegistries` into
+  `RegistryDataLoader.WORLDGEN_REGISTRIES`, which is loaded once at world load and frozen, exactly
+  like a vanilla worldgen file.
+
+- **`PaletteEntry`'s dedup pools no longer leak or race.** `LIST_POOL`/`TAG_POOL` were
+  unsynchronized `ObjectOpenHashSet`s mutated from registry decode (which runs on a worker pool) and
+  never cleared, so they retained every palette of every world loaded in the process. Now
+  `ConcurrentHashMap`s, cleared by `AssetRegistries.reset()`.
+
+- **Command batch.** `/urbex debug` and `/urbex map` write to the player who ran them instead of the
+  server's stdout, where the person who asked could not see it (and `map` was `LEVEL_ALL`, so any
+  player could print 41x41 characters into the console on demand; it is `LEVEL_GAMEMASTERS` now).
+  `locate` and `locatepart` take an optional radius, say so when they find nothing, and stop the
+  spiral once they have six hits rather than only the inner loop. Every command returns a real
+  Brigadier success count, so `/execute if` and command blocks can branch on one. `digest` suggests
+  its three legal orders. The unused `CommandDispatcher` parameter is gone from twelve `register`
+  methods.
+
+- **Build and packaging.** The jar is `urbex-fabric-26.2-0.1.0.jar`, not
+  `urbex-fabric-26.2-26.2-0.1.0.jar`. `src/generated/resources` is gone - it held six hand-written
+  tag files under a directory named "generated", with no datagen entry point anywhere - and those
+  files now live in `src/main/resources` where they are written. `fabric.mod.json` pins
+  `fabric-api` to `>=` the version this compiles against rather than `*`, which turned an old API
+  into `NoClassDefFoundError` instead of a dependency error. Deleted: the inherited probot
+  `.github/stale.yml` (`daysUntilStale: 100000`) and the Fuzs maven repository, left over from
+  `forgeconfigapiport`. CI uploads the JUnit reports, including on failure.
+
+- **Dead code.** `ConditionContext.parseTest(JsonElement)`, a 75-line hand-rolled Gson duplicate of
+  the codec-driven overload that had silently diverged from it; `TerrainHeight.byName`/
+  `TerrainFix.byName` and their maps, superseded by the `StringRepresentable` codec.
+  `ObjectSelector`'s encoder had constant getters (`v -> 0`) for `minSpawnDistance`,
+  `maxSpawnDistance` and `feather`, so any round trip through `PresetRE.CODEC` - `urbex savepreset`,
+  or the create-world screen's overrides overlay - silently reset all three.
+
 - **Palette weights are absolute slot counts again, filled in declaration order.** A weighted
   palette or variant entry's `random` is how many of the 128 slots it takes, and the list stops once
   the array is full - Lost Cities' rule (`CompiledPalette.addEntries`), which every pack in existence

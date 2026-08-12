@@ -1,7 +1,6 @@
 package dev.krona.urbex.commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -23,7 +22,7 @@ public class CommandListParts implements Command<CommandSourceStack> {
 
     private static final CommandListParts CMD = new CommandListParts();
 
-    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register() {
         return Commands.literal("listparts")
                 .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                 .executes(CMD);
@@ -51,6 +50,11 @@ public class CommandListParts implements Command<CommandSourceStack> {
         for (EditModeData.PartData pd : data) {
             context.getSource().sendSuccess(() -> Component.literal("Found '" + pd.partName() + "' at " + pd.y()), false);
         }
-        return 0;
+        if (data.isEmpty()) {
+            context.getSource().sendFailure(Component.literal("No generated parts recorded in this chunk."));
+        }
+        // The count, so a command block or /execute can branch on it. (This lists the parts of the
+        // chunk the sender is standing in, not the part registry - see #72.)
+        return data.size();
     }
 }

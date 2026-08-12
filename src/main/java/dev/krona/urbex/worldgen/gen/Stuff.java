@@ -104,12 +104,14 @@ public class Stuff {
             if (stuffs != null) {
                 for (StuffObject stuff : stuffs) {
                     StuffSettingsRE settings = stuff.getSettings();
-                    Boolean inBuilding = settings.isInBuilding();
-                    if (inBuilding != null && inBuilding == info.hasBuilding) {
+                    // Never null: 'inbuilding' is required of the resolved chain, precisely because
+                    // the null branch this used to carry made the stuff object silently inert.
+                    boolean inBuilding = settings.isInBuilding();
+                    if (inBuilding == info.hasBuilding) {
                         IdentifierMatcher buildingMatcher = settings.getBuildingMatcher();
                         if (buildingMatcher.isAny() || buildingMatcher.test(info.buildingType.getId())) {
                             if (settings.getBiomeMatcher().test(biome.getMainBiome())) {
-                                actuallyGenerateStuff(ctx, feature, info, stuff, palette, stuffOrdinal++, inBuilding == Boolean.TRUE);
+                                actuallyGenerateStuff(ctx, feature, info, stuff, palette, stuffOrdinal++, inBuilding);
                             }
                         }
                     }

@@ -2,13 +2,12 @@ package dev.krona.urbex.worldgen.lost.regassets.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.nbt.CompoundTag;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * An entry in a palette
@@ -17,7 +16,7 @@ public class PaletteEntry {
 
     public static final Codec<PaletteEntry> CODEC = RecordCodecBuilder.create(instance ->
             instance.group(
-                    Codec.STRING.fieldOf("char").forGetter(PaletteEntry::getChr),
+                    DataTools.PALETTE_CHAR_STRING.fieldOf("char").forGetter(PaletteEntry::getChr),
                     Codec.STRING.optionalFieldOf("block").forGetter(l -> Optional.ofNullable(l.getBlock())),
                     Codec.STRING.optionalFieldOf("variant").forGetter(l -> Optional.ofNullable(l.getVariant())),
                     Codec.STRING.optionalFieldOf("frompalette").forGetter(l -> Optional.ofNullable(l.getFrompalette())),
@@ -30,9 +29,27 @@ public class PaletteEntry {
                     CompoundTag.CODEC.optionalFieldOf("tag").forGetter(l -> Optional.ofNullable(l.getTag()))
             ).apply(instance, PaletteEntry::new));
 
-    // Used for reducing the memory usage when stored in the game client, we shouldn't even have duplicate pools as they're very expensive - Quan
-    private static final ObjectOpenHashSet<List<BlockEntry>> LIST_POOL = new ObjectOpenHashSet<>(512);
-    private static final ObjectOpenHashSet<CompoundTag> TAG_POOL = new ObjectOpenHashSet<>(512);
+    /**
+     * Canonical copies of the two values a palette repeats most: the weighted {@code blocks} list
+     * and the block-entity {@code tag}. Both are large relative to an entry and both recur verbatim
+     * across dozens of files, so one copy shared by every entry that decodes to it is worth keeping.
+     * <p>
+     * {@link ConcurrentHashMap} rather than the {@code ObjectOpenHashSet} this used to be, for two
+     * reasons that were both live. The sets were unsynchronized and mutated from
+     * {@code RegistryDataLoader}'s decode, which runs its registries on a worker pool - two entries
+     * decoding at once could interleave a resize and corrupt the table. And nothing ever emptied
+     * them: they are static, so every palette of every world loaded in a process lifetime stayed
+     * reachable through them until the JVM exited. {@link #clearPools()} is now called from
+     * {@code AssetRegistries.reset()} with the rest of the asset state.
+     */
+    private static final Map<List<BlockEntry>, List<BlockEntry>> LIST_POOL = new ConcurrentHashMap<>();
+    private static final Map<CompoundTag, CompoundTag> TAG_POOL = new ConcurrentHashMap<>();
+
+    /** Drops both canonical-copy pools; called from {@code AssetRegistries.reset()}. */
+    public static void clearPools() {
+        LIST_POOL.clear();
+        TAG_POOL.clear();
+    }
 
     private String chr;
     private String block;
@@ -116,13 +133,8 @@ public class PaletteEntry {
             return null;
         }
         List<BlockEntry> immutable = List.copyOf(incoming);
-        List<BlockEntry> existing = LIST_POOL.get(immutable);
-        if (existing != null) {
-            return existing;
-        }
-
-        LIST_POOL.add(immutable);
-        return immutable;
+        List<BlockEntry> existing = LIST_POOL.putIfAbsent(immutable, immutable);
+        return existing != null ? existing : immutable;
     }
 
     private static CompoundTag deduplicateTag(CompoundTag incoming) {
@@ -130,12 +142,8 @@ public class PaletteEntry {
             return null;
         }
 
-        CompoundTag existing = TAG_POOL.get(incoming);
-        if (existing != null) {
-            return existing;
-        }
-        TAG_POOL.add(incoming);
-        return incoming;
+        CompoundTag existing = TAG_POOL.putIfAbsent(incoming, incoming);
+        return existing != null ? existing : incoming;
     }
 
     public PaletteEntry(String chr, Optional<String> block, Optional<String> variant, Optional<String> frompalette,

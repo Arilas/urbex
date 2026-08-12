@@ -35,12 +35,34 @@ public class Style {
         Resolved.require(anyGroups ? groups : null, name, "randompalettes");
         for (List<PaletteSelector> array : groups) {
             List<Pair<Float, String>> palettes = new ArrayList<>();
+            float total = 0;
             for (PaletteSelector selector : array) {
                 float factor = selector.factor();
                 String palette = selector.palette();
+                total += factor;
                 palettes.add(Pair.of(factor, palette));
             }
+            requireDrawable(palettes, total);
             randomPaletteChoices.add(palettes);
+        }
+    }
+
+    /**
+     * A group whose weights cannot produce a winner is a load error, because the alternative is a
+     * {@code NullPointerException} out of {@link #getRandomPalette}'s {@code merge} on a worldgen
+     * worker thread - the group is walked subtracting each factor from {@code r} and taking the
+     * first that drives it to zero, so an empty group or one whose factors sum to zero (or less)
+     * leaves nothing selected and the caller merges null.
+     */
+    private void requireDrawable(List<Pair<Float, String>> palettes, float total) {
+        if (palettes.isEmpty()) {
+            throw new IllegalStateException("Style '" + name + "' declares an empty "
+                    + "'randompalettes' group; every group must offer at least one palette");
+        }
+        if (total <= 0) {
+            throw new IllegalStateException("Style '" + name + "' declares a 'randompalettes' group "
+                    + "whose factors total " + total + "; no palette could ever be drawn from it. "
+                    + "At least one palette in each group needs a factor above zero.");
         }
     }
 
@@ -70,15 +92,21 @@ public class Style {
                 totalweight += pair.getKey();
             }
             float r = random.nextFloat() * totalweight;
-            Palette tomerge = null;
+            // The last entry, not null, when the subtractions never drive r to zero. The
+            // constructor has already refused a group that cannot produce a winner, so reaching
+            // here means float drift: summing the factors and subtracting them again are not the
+            // same arithmetic, and r can survive the whole walk by an ulp. Falling out with null
+            // and merging it is a NullPointerException on a worldgen worker; the last entry is the
+            // one the walk was an ulp short of choosing.
+            Pair<Float, String> chosen = pairs.get(pairs.size() - 1);
             for (Pair<Float, String> pair : pairs) {
                 r -= pair.getKey();
                 if (r <= 0) {
-                    tomerge = AssetRegistries.PALETTES.getOrThrow(provider.getWorld(), pair.getRight());
+                    chosen = pair;
                     break;
                 }
             }
-            palette.merge(tomerge);
+            palette.merge(AssetRegistries.PALETTES.getOrThrow(provider.getWorld(), chosen.getRight()));
         }
 
         return palette;

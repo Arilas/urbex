@@ -95,7 +95,7 @@ public class BelowPartConditionTest {
         PartRef floor = partRef(FLOOR, null, null);
         PartRef second = partRef("urbex:second_part", belowPart, inpart);
         return new Building(List.of(new BuildingRE(
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of("#"), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of('#'), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of(floor))),

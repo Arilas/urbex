@@ -1,6 +1,7 @@
 package dev.krona.urbex.mixin;
 
 import dev.krona.urbex.gui.CitiesTab;
+import dev.krona.urbex.gui.PresetSelection;
 import net.minecraft.client.gui.components.tabs.MenuTabBar;
 import net.minecraft.client.gui.components.tabs.Tab;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -45,6 +46,27 @@ public abstract class CreateWorldScreenTabMixin {
         Tab[] withCities = Arrays.copyOf(tabs, tabs.length + 1);
         withCities[tabs.length] = new CitiesTab((CreateWorldScreen) (Object) this);
         return withCities;
+    }
+
+    /**
+     * Un-publishes the Urbex selection when the player backs out of world creation (issue #113).
+     * <p>
+     * {@code PresetSelection.publish()} writes the selection into three process-global
+     * {@code Config} fields, which is how it reaches the integrated server. Nothing used to take
+     * them back: abandon the screen, load a <em>different</em> existing world, and
+     * {@code Config.buildPresetCache} read the leftovers, generated that world with them and wrote
+     * them into its {@code UrbexData} - overwriting the selection that world was created with.
+     * <p>
+     * {@code onClose} is the one hook that means "abandoned" and only that.
+     * {@code ScreenEvents.remove} fires whenever the screen is replaced, including a trip to the
+     * Urbex customize editor, and clearing there would drop a selection the player is still
+     * editing. World <em>creation</em> does not come through here either: {@code
+     * createWorldAndCleanup} calls {@code popScreen()} directly rather than {@code onClose()}, so
+     * the published values survive exactly as long as they are needed.
+     */
+    @Inject(method = "onClose", at = @At("HEAD"))
+    private void urbex$discardAbandonedSelection(CallbackInfo ci) {
+        PresetSelection.CLIENT.discardPublication();
     }
 
     /**

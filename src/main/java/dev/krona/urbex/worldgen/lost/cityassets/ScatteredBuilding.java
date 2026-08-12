@@ -7,10 +7,7 @@ import net.minecraft.util.StringRepresentable;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 public class ScatteredBuilding {
 
@@ -109,17 +106,11 @@ public class ScatteredBuilding {
         OCEAN("ocean")
         ;
 
-        private static final Map<String, TerrainHeight> BY_NAME = Arrays.stream(values()).collect(Collectors.toMap(TerrainHeight::getSerializedName, (v) -> v));
-
         TerrainHeight(String name) {
             this.name = name;
         }
 
         private final String name;
-
-        public static final TerrainHeight byName(String name) {
-            return BY_NAME.get(name);
-        }
 
         @Override
         public String toString() {
@@ -138,17 +129,11 @@ public class ScatteredBuilding {
         REPEATSLICE("repeatslice")  // Repeat the bottom slice downwards until it hits a solid block
         ;
 
-        private static final Map<String, TerrainFix> BY_NAME = Arrays.stream(values()).collect(Collectors.toMap(TerrainFix::getSerializedName, (v) -> v));
-
         TerrainFix(String name) {
             this.name = name;
         }
 
         private final String name;
-
-        public static final TerrainFix byName(String name) {
-            return BY_NAME.get(name);
-        }
 
         @Override
         public String toString() {

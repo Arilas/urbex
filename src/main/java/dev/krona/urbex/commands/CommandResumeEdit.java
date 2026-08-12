@@ -1,7 +1,6 @@
 package dev.krona.urbex.commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -25,7 +24,7 @@ public class CommandResumeEdit implements Command<CommandSourceStack> {
 
     private static final CommandResumeEdit CMD = new CommandResumeEdit();
 
-    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register() {
         return Commands.literal("resumeedit")
                 .requires(Commands.hasPermission(Commands.LEVEL_ADMINS)).executes(CMD);
     }
@@ -58,7 +57,7 @@ public class CommandResumeEdit implements Command<CommandSourceStack> {
             if (data.y() <= start.getY() && start.getY() < data.y() + part.getSliceCount()) {
                 context.getSource().sendSuccess(() -> Component.literal("Start editing part '" + data.partName() + "'!"), false);
                 Editor.startEditing(part, player, new BlockPos(start.getX(), data.y(), start.getZ()), level, dimInfo, false);
-                return 0;
+                return Command.SINGLE_SUCCESS;
             }
         }
 

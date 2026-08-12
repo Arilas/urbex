@@ -12,8 +12,13 @@ public record ObjectSelector(float factor, String value, int minSpawnDistance, i
             instance.group(
                     Codec.FLOAT.fieldOf("factor").forGetter(ObjectSelector::factor),
                     Codec.STRING.fieldOf("value").forGetter(ObjectSelector::value),
-                    Codec.INT.optionalFieldOf("minSpawnDistance", 0).forGetter(v -> 0),
-                    Codec.INT.optionalFieldOf("maxSpawnDistance", Integer.MAX_VALUE).forGetter(v -> Integer.MAX_VALUE),
-                    Codec.INT.optionalFieldOf("feather", 0).forGetter(v -> 0)
+                    // Real getters, not the constants this used to encode. The decode side has
+                    // always been correct, so the tuning survived a round trip only by accident of
+                    // never being encoded: `urbex savepreset` and the create-world screen's
+                    // overrides overlay both go through PresetRE.CODEC, and a selector re-encoded
+                    // with v -> 0 would have silently reset every distance and feather it carried.
+                    Codec.INT.optionalFieldOf("minSpawnDistance", 0).forGetter(ObjectSelector::minSpawnDistance),
+                    Codec.INT.optionalFieldOf("maxSpawnDistance", Integer.MAX_VALUE).forGetter(ObjectSelector::maxSpawnDistance),
+                    Codec.INT.optionalFieldOf("feather", 0).forGetter(ObjectSelector::feather)
             ).apply(instance, ObjectSelector::new));
 }

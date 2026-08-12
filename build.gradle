@@ -10,7 +10,9 @@ group = "dev.krona"
 version = project.version
 
 base {
-    archivesName = "${mod_id}-fabric-${minecraft_version}"
+    // No Minecraft version here: `version` already starts with it (gradle.properties:
+    // 26.2-0.1.0), and having both produced urbex-fabric-26.2-26.2-0.1.0.jar.
+    archivesName = "${mod_id}-fabric"
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(Integer.parseInt(java_version))
@@ -21,14 +23,6 @@ if (System.getenv('BUILD_NUMBER') != null) {
 
 repositories {
     mavenCentral()
-    maven {
-        name = "Fuzs Mod Resources"
-        url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/"
-    }
-}
-
-sourceSets.main.resources {
-    srcDir 'src/generated/resources'
 }
 
 loom {
@@ -163,6 +157,10 @@ tasks.matching { it.name == 'runDigestCheckFeatures' }.configureEach {
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+    // Plain `implementation`, not `modImplementation`: Loom 1.17.17 does not define the mod*
+    // configurations at all (the call fails with "Could not find method modImplementation()"), and
+    // it needs neither here - fabric-loader and fabric-api are published against the same mappings
+    // this build compiles in, so there is nothing to remap.
     implementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
 }
@@ -208,6 +206,7 @@ processResources {
             'mod_name'             : mod_name,
             'minecraft_version'    : minecraft_version,
             'fabric_loader_version': fabric_loader_version,
+            'fabric_version'       : fabric_version,
             'java_version'         : java_version
     ]
     filesMatching('fabric.mod.json') {

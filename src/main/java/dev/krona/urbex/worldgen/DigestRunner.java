@@ -72,6 +72,14 @@ public final class DigestRunner {
     }
 
     /**
+     * The generation orders {@link #chunkSquare} accepts, in the order they are offered for
+     * tab-completion. Public so {@code CommandDigest} suggests exactly what this switch accepts -
+     * the two used to drift, and the command's failure message listed values its own argument
+     * offered no completion for.
+     */
+    public static final List<String> ORDERS = List.of("rowmajor", "reverse", "shuffled");
+
+    /**
      * The chunk square {@code (offset±radius, offset±radius)} arranged in the requested
      * generation order: {@code rowmajor}, {@code reverse} or {@code shuffled}.
      *
@@ -88,7 +96,7 @@ public final class DigestRunner {
             case "rowmajor" -> { /* already row-major */ }
             case "reverse" -> Collections.reverse(chunks);
             case "shuffled" -> Collections.shuffle(chunks, new Random(0xC0FFEE));
-            default -> throw new IllegalArgumentException("order must be one of: rowmajor, reverse, shuffled");
+            default -> throw new IllegalArgumentException("order must be one of: " + String.join(", ", ORDERS));
         }
         return chunks;
     }

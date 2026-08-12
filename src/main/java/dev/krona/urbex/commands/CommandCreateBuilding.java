@@ -1,7 +1,6 @@
 package dev.krona.urbex.commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -33,7 +32,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
 
     private static final CommandCreateBuilding CMD = new CommandCreateBuilding();
 
-    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register() {
         return Commands.literal("createbuilding")
                 .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                 .then(Commands.argument("name", IdentifierArgument.id())
@@ -93,7 +92,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
             height += FLOORHEIGHT;    // We currently only support 6 here
         }
 
-        return 0;
+        return Command.SINGLE_SUCCESS;
     }
 
     private static void generatePart(Level level, ChunkPos cp, BuildingInfo info, IBuildingPart part, int oy) {

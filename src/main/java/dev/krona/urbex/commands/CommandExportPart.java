@@ -2,7 +2,6 @@ package dev.krona.urbex.commands;
 
 import com.google.gson.*;
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -42,7 +41,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
 
     private static final CommandExportPart CMD = new CommandExportPart();
 
-    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register() {
         return Commands.literal("exportpart")
                 .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                 .then(Commands.argument("name", StringArgumentType.word()).executes(CMD));
@@ -167,8 +166,9 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             context.getSource().sendSuccess(() -> Component.literal("Exported part to '" + target + "'!"), false);
         } catch (IllegalArgumentException | IOException e) {
             context.getSource().sendFailure(Component.literal("Error writing file '" + filename + "': " + e.getMessage()).withStyle(ChatFormatting.RED));
+            return 0;
         }
 
-        return 0;
+        return Command.SINGLE_SUCCESS;
     }
 }

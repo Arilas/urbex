@@ -16,6 +16,17 @@ jobs:
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew build --no-daemon
+      # if: always() - a failing suite is exactly when the reports are worth having, and `build`
+      # stops the job before the upload below would otherwise run.
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            build/reports/tests/test
+            build/test-results/test
+          if-no-files-found: warn
       - name: Worldgen digest check
         run: |
           ./gradlew runDigestCheck --no-daemon | tee digest-check.log

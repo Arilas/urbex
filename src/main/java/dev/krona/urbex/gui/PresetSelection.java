@@ -298,6 +298,33 @@ public final class PresetSelection {
     }
 
     /**
+     * Takes back whatever {@link #publish()} or {@link #restore} put in {@link Config}, for a world
+     * creation that never happened (issue #113).
+     * <p>
+     * The three fields are process-global and used to survive an abandoned create screen until the
+     * next DISCONNECT, so the next world loaded in the same session - a completely different,
+     * already-existing one - generated with them and had them written into its own
+     * {@code UrbexData}. Called from {@code CreateWorldScreenTabMixin} on {@code onClose}, which is
+     * the abandon path and not the create path; see that mixin for why not {@code ScreenEvents
+     * .remove}.
+     * <p>
+     * The cache reset and the counter bump mirror {@link #publish()}: this changes what the next
+     * world would generate with just as much as publishing does.
+     */
+    public void discardPublication() {
+        if (Config.presetFromClient == null && Config.worldStyleFromClient == null
+                && Config.overridesFromClient == null) {
+            return;
+        }
+        CityFeature.globalDimensionInfoDirtyCounter++;
+        Config.resetPresetCache();
+        Config.presetFromClient = null;
+        Config.worldStyleFromClient = null;
+        Config.overridesFromClient = null;
+        Urbex.getLogger().debug("World creation abandoned; discarded the published Urbex selection");
+    }
+
+    /**
      * Publishes the current selection so it reaches world generation: the three {@link Config}
      * fields the server reads in {@code Config.buildPresetCache}.
      * <ul>

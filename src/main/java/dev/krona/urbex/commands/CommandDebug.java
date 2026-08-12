@@ -1,7 +1,6 @@
 package dev.krona.urbex.commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -18,6 +17,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.permissions.PermissionCheck;
 import net.minecraft.world.level.WorldGenLevel;
 
@@ -27,60 +27,73 @@ public class CommandDebug implements Command<CommandSourceStack> {
 
     private static final CommandDebug CMD = new CommandDebug();
 
-    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register() {
         return Commands.literal("debug")
                 .requires(Commands.hasPermission(Commands.LEVEL_ALL))
                 .executes(CMD);
     }
 
 
-    @SuppressWarnings("UseOfSystemOutOrSystemErr")
+    /**
+     * Sends one debug line to whoever ran the command.
+     * <p>
+     * Everything here used to go to {@code System.out}, so the player who typed {@code /urbex
+     * debug} saw nothing at all and the answer landed in the server console - on a dedicated server,
+     * a machine they may not have. Not {@code sendSuccess}: these are ~50 lines of diagnostics, and
+     * broadcasting them to every other operator (which {@code sendSuccess(.., true)} does) is noise;
+     * the sender asked, so the sender is told.
+     */
+    private static void line(CommandContext<CommandSourceStack> context, String text) {
+        context.getSource().sendSystemMessage(Component.literal(text));
+    }
+
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         BlockPos position = player.blockPosition();
         IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo((WorldGenLevel) player.level());
-        if (dimInfo != null) {
-            ChunkCoord coord = new ChunkCoord(dimInfo.getType(), position.getX() >> 4, position.getZ() >> 4);
-            BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
-            System.out.println("profile = " + info.profile.getId());
-//            System.out.println("provider.hasMansion = " + info.provider.hasMansion(info.chunkX, info.chunkZ));
-            System.out.println("buildingType = " + info.buildingType.getName());
-            System.out.println("floors = " + info.getNumFloors());
-            System.out.println("floorsBelowGround = " + info.cellars);
-            System.out.println("cityLevel = " + info.cityLevel);
-            System.out.println("cityGroundLevel = " + info.getCityGroundLevel());
-            System.out.println("isCity = " + info.isCity);
-            System.out.println("chunkX = " + info.coord.chunkX());
-            System.out.println("chunkZ = " + info.coord.chunkZ());
-            System.out.println("getCityStyle() = " + BuildingInfo.getChunkCharacteristics(info.coord, info.provider).cityStyle.getName());
-            System.out.println("streetType = " + info.streetType);
-            System.out.println("ruinHeight = " + info.ruinHeight);
-            System.out.println("tunnel0 = " + info.isTunnel(0));
-            System.out.println("tunnel1 = " + info.isTunnel(1));
-            System.out.println("getHighwayXLevel() = " + info.getHighwayXLevel());
-            System.out.println("getHighwayZLevel() = " + info.getHighwayZLevel());
-
-            Railway.RailChunkInfo railInfo = Railway.getRailChunkType(info.coord, info.provider, info.profile);
-            System.out.println("railInfo.getType() = " + railInfo.getType());
-            System.out.println("railInfo.getLevel() = " + railInfo.getLevel());
-            System.out.println("railInfo.getDirection() = " + railInfo.getDirection());
-            System.out.println("railInfo.getRails() = " + railInfo.getRails());
-
-            int explosions = info.getExplosions().size();
-            System.out.println("explosions = " + explosions);
-
-            ChunkHeightmap heightmap = dimInfo.getFeature().getHeightmap(info.coord, (WorldGenLevel) player.level());
-            System.out.println("Chunk height (heightmap): " + heightmap.getHeight());
-
-            System.out.println("dimInfo.getProfile().BUILDING_MINFLOORS = " + dimInfo.getProfile().BUILDING_MINFLOORS);
-            System.out.println("dimInfo.getProfile().BUILDING_MAXFLOORS = " + dimInfo.getProfile().BUILDING_MAXFLOORS);
-            System.out.println("dimInfo.getProfile().CITY_CHANCE = " + dimInfo.getProfile().CITY_CHANCE);
-            System.out.println("info.isOcean() = " + info.isOcean());
-
-            printRoadDebug(info, dimInfo);
+        if (dimInfo == null) {
+            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
+            return 0;
         }
-        return 0;
+        ChunkCoord coord = new ChunkCoord(dimInfo.getType(), position.getX() >> 4, position.getZ() >> 4);
+        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
+        line(context, "profile = " + info.profile.getId());
+        line(context, "buildingType = " + info.buildingType.getName());
+        line(context, "floors = " + info.getNumFloors());
+        line(context, "floorsBelowGround = " + info.cellars);
+        line(context, "cityLevel = " + info.cityLevel);
+        line(context, "cityGroundLevel = " + info.getCityGroundLevel());
+        line(context, "isCity = " + info.isCity);
+        line(context, "chunkX = " + info.coord.chunkX());
+        line(context, "chunkZ = " + info.coord.chunkZ());
+        line(context, "getCityStyle() = " + BuildingInfo.getChunkCharacteristics(info.coord, info.provider).cityStyle.getName());
+        line(context, "streetType = " + info.streetType);
+        line(context, "ruinHeight = " + info.ruinHeight);
+        line(context, "tunnel0 = " + info.isTunnel(0));
+        line(context, "tunnel1 = " + info.isTunnel(1));
+        line(context, "getHighwayXLevel() = " + info.getHighwayXLevel());
+        line(context, "getHighwayZLevel() = " + info.getHighwayZLevel());
+
+        Railway.RailChunkInfo railInfo = Railway.getRailChunkType(info.coord, info.provider, info.profile);
+        line(context, "railInfo.getType() = " + railInfo.getType());
+        line(context, "railInfo.getLevel() = " + railInfo.getLevel());
+        line(context, "railInfo.getDirection() = " + railInfo.getDirection());
+        line(context, "railInfo.getRails() = " + railInfo.getRails());
+
+        int explosions = info.getExplosions().size();
+        line(context, "explosions = " + explosions);
+
+        ChunkHeightmap heightmap = dimInfo.getFeature().getHeightmap(info.coord, (WorldGenLevel) player.level());
+        line(context, "Chunk height (heightmap): " + heightmap.getHeight());
+
+        line(context, "dimInfo.getProfile().BUILDING_MINFLOORS = " + dimInfo.getProfile().BUILDING_MINFLOORS);
+        line(context, "dimInfo.getProfile().BUILDING_MAXFLOORS = " + dimInfo.getProfile().BUILDING_MAXFLOORS);
+        line(context, "dimInfo.getProfile().CITY_CHANCE = " + dimInfo.getProfile().CITY_CHANCE);
+        line(context, "info.isOcean() = " + info.isOcean());
+
+        printRoadDebug(context, info, dimInfo);
+        return 1;
     }
 
     /**
@@ -89,47 +102,46 @@ public class CommandDebug implements Command<CommandSourceStack> {
      * without the raw field ever knowing), the block geometry the road field derived this chunk from,
      * and anything that can override or interrupt it (a planned bridge span, the conflict policy, the
      * containing multi-building). Printed only on command - never during ordinary generation - and
-     * grouped under three headers so the three kinds of information don't run together in the log.
+     * grouped under three headers so the three kinds of information don't run together.
      */
-    @SuppressWarnings("UseOfSystemOutOrSystemErr")
-    private static void printRoadDebug(BuildingInfo info, IDimensionInfo dimInfo) {
+    private static void printRoadDebug(CommandContext<CommandSourceStack> context, BuildingInfo info, IDimensionInfo dimInfo) {
         RoadCell road = dimInfo.roadField().at(info.coord.chunkX(), info.coord.chunkZ());
 
-        System.out.println("-- roads: raw vs effective --");
-        System.out.println("road.raw = " + road.type());
-        System.out.println("road.effective = " + info.getEffectiveRoadType());
-        System.out.println("road.connections = north=" + road.north() + " south=" + road.south()
+        line(context, "-- roads: raw vs effective --");
+        line(context, "road.raw = " + road.type());
+        line(context, "road.effective = " + info.getEffectiveRoadType());
+        line(context, "road.connections = north=" + road.north() + " south=" + road.south()
                 + " west=" + road.west() + " east=" + road.east());
 
-        System.out.println("-- roads: block geometry --");
-        System.out.println("road.block = (" + road.blockX() + ", " + road.blockZ() + ")");
-        System.out.println("road.bounds = x[" + road.westX() + ".." + road.eastX()
+        line(context, "-- roads: block geometry --");
+        line(context, "road.block = (" + road.blockX() + ", " + road.blockZ() + ")");
+        line(context, "road.bounds = x[" + road.westX() + ".." + road.eastX()
                 + "] z[" + road.northZ() + ".." + road.southZ() + "]");
-        System.out.println("road.density = " + road.density());
-        System.out.println("road.secondaryX = " + road.secondaryX());
-        System.out.println("road.secondaryZ = " + road.secondaryZ());
+        line(context, "road.density = " + road.density());
+        line(context, "road.secondaryX = " + road.secondaryX());
+        line(context, "road.secondaryZ = " + road.secondaryZ());
         TertiarySegment tertiary = road.tertiary();
         if (tertiary == null) {
-            System.out.println("road.tertiary = none");
+            line(context, "road.tertiary = none");
         } else {
-            System.out.println("road.tertiary = origin=(" + tertiary.originX() + ", " + tertiary.originZ()
+            line(context, "road.tertiary = origin=(" + tertiary.originX() + ", " + tertiary.originZ()
                     + ") direction=" + tertiary.direction() + " length=" + tertiary.length());
         }
 
-        System.out.println("-- roads: bridge / conflict --");
+        line(context, "-- roads: bridge / conflict --");
         Optional<PrimaryBridgePlanner.BridgeSpan> bridge = PrimaryBridgePlanner.spanAt(info.coord, dimInfo);
         if (bridge.isEmpty()) {
-            System.out.println("road.bridgeSpan = none");
+            line(context, "road.bridgeSpan = none");
         } else {
             PrimaryBridgePlanner.BridgeSpan span = bridge.get();
-            System.out.println("road.bridgeSpan = " + span.orientation()
+            line(context, "road.bridgeSpan = " + span.orientation()
                     + " (" + span.fromX() + ", " + span.fromZ() + ") -> (" + span.toX() + ", " + span.toZ() + ")");
         }
-        System.out.println("road.conflictPolicy = " + dimInfo.getProfile().MULTI_BUILDING_STREET_CONFLICT);
+        line(context, "road.conflictPolicy = " + dimInfo.getProfile().MULTI_BUILDING_STREET_CONFLICT);
         if (info.multiBuildingPos.isMulti() && info.multiBuilding != null) {
-            System.out.println("road.multiBuilding = " + info.multiBuilding.getName());
+            line(context, "road.multiBuilding = " + info.multiBuilding.getName());
         } else {
-            System.out.println("road.multiBuilding = none");
+            line(context, "road.multiBuilding = none");
         }
     }
 }

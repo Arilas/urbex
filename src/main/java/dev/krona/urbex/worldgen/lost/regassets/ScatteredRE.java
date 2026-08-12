@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.cityassets.ScatteredBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
@@ -24,12 +25,29 @@ import java.util.Optional;
  */
 public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
 
+    /**
+     * {@code rotatable} was decoded and then thrown away: {@link ScatteredBuilding} never copied it
+     * off the chain and nothing read it, so an author who wrote it got a scattered building that
+     * generated exactly as if they had not. It is rejected rather than deleted from the codec
+     * because deleting it would restore the same silence from the other side - {@code
+     * RecordCodecBuilder} ignores keys it does not know.
+     * <p>
+     * There is nothing to rotate against yet: {@code Scattered.generate} passes
+     * {@code Transform.ROTATE_NONE} for every part, and a multi-chunk scattered structure (the
+     * bundled {@code oilrig} is one) would need its whole grid rotated coherently across chunks
+     * before the flag could mean anything.
+     */
+    private static final Codec<Boolean> UNSUPPORTED_ROTATABLE = Codec.BOOL.validate(
+            value -> DataResult.error(() -> "This scattered building declares 'rotatable', which "
+                    + "Urbex does not implement: a scattered building always generates unrotated. "
+                    + "The key used to be parsed and silently ignored; remove it."));
+
     private static final Codec<ScatteredRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(Codec.STRING).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildings)),
                     Codec.STRING.optionalFieldOf("multibuilding").forGetter(l -> Optional.ofNullable(l.multibuilding)),
-                    Codec.BOOL.optionalFieldOf("rotatable").forGetter(l -> Optional.ofNullable(l.rotatable)),
+                    UNSUPPORTED_ROTATABLE.optionalFieldOf("rotatable").forGetter(l -> Optional.<Boolean>empty()),
                     StringRepresentable.fromEnum(ScatteredBuilding.TerrainHeight::values).optionalFieldOf("terrainheight").forGetter(l -> Optional.ofNullable(l.terrainheight)),
                     StringRepresentable.fromEnum(ScatteredBuilding.TerrainFix::values).optionalFieldOf("terrainfix").forGetter(l -> Optional.ofNullable(l.terrainfix)),
                     Codec.INT.optionalFieldOf("heightoffset").forGetter(l -> Optional.ofNullable(l.heightoffset))
@@ -43,12 +61,13 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
     private final ScatteredBuilding.TerrainHeight terrainheight;
     private final ScatteredBuilding.TerrainFix terrainfix;
     private final Integer heightoffset;
-    private final Boolean rotatable;
     private final Mergeable<String> buildings;
     private final String multibuilding;
 
     public ScatteredRE(Optional<Identifier> extendsId,
                        Optional<Mergeable<String>> buildings, Optional<String> multibuilding,
+                       // Always empty: UNSUPPORTED_ROTATABLE fails the decode if the key is there
+                       // at all, so this parameter exists only to keep the group's arity.
                        Optional<Boolean> rotatable,
                        Optional<ScatteredBuilding.TerrainHeight> terrainheight,
                        Optional<ScatteredBuilding.TerrainFix> terrainfix,
@@ -56,15 +75,9 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
         this.extendsId = extendsId;
         this.buildings = buildings.orElse(null);
         this.multibuilding = multibuilding.map(String::intern).orElse(null);
-        this.rotatable = rotatable.orElse(null);
         this.terrainheight = terrainheight.orElse(null);
         this.terrainfix = terrainfix.orElse(null);
         this.heightoffset = heightoffset.orElse(null);
-    }
-
-    @Nullable
-    public Boolean isRotatable() {
-        return rotatable;
     }
 
     @Nullable

@@ -10,6 +10,8 @@ import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.ExtendsChain;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
+import dev.krona.urbex.worldgen.lost.cityassets.Style;
+import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
@@ -24,7 +26,9 @@ import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
@@ -143,7 +147,7 @@ class DatapackGuideExamplesTest {
      * <p>
      * Whitespace is collapsed on both sides, because the guide wraps long messages across lines.
      * <p>
-     * Six rows of the guide's common-errors table stay hand-checked, for two different reasons.
+     * Seven rows of the guide's common-errors table stay hand-checked, for two different reasons.
      * Four are unreachable from a headless test: the {@code Can't find} and {@code Cannot find}
      * part lookups and {@code Error getting resource} need a level and a registry, and the
      * renamed-block warning is a log line rather than a thrown message, so it needs an appender. The
@@ -151,7 +155,9 @@ class DatapackGuideExamplesTest {
      * {@code declares no 'streetblocks.largeparts.connector'} - are trivially reachable, but the
      * table abbreviates both with an ellipsis, so there is no verbatim string to match. They are the
      * same {@link Resolved#require} sentence as the {@code streetblocks.parts.stair} case asserted
-     * below, differing only in the field name they carry.
+     * below, differing only in the field name they carry - as is the seventh, the stuff
+     * {@code declares no 'inbuilding'} row, whose cell uses the table's {@code 'urbexmt:x'}
+     * placeholder rather than a real id.
      */
     @Test
     void quotedErrorMessagesAreTheOnesTheCodeProduces() throws IOException {
@@ -200,6 +206,20 @@ class DatapackGuideExamplesTest {
                 new PaletteRE(Optional.empty(), Optional.of(List.of(empty)))
                         .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "x")))));
 
+        // A 'randompalettes' group nothing could ever be drawn from, and a stuff entry whose two
+        // count bounds contradict. Both are checked at the chain fold rather than per field.
+        expect(guide, missing, () -> new Style(List.of(
+                new StyleRE(Optional.empty(), Optional.of(new Mergeable<>(true,
+                        List.of(List.of(new PaletteSelector(0f, "urbex:common"))))))
+                        .setRegistryName(downtown))));
+        expect(guide, missing, () -> new StuffObject(List.of(
+                stuffCounts(downtown, 5, 2))));
+
+        // The two DataResult errors below are not throws, so they cannot go through expect(): a
+        // marker that is not one character, and a count above what the RNG slot address holds.
+        expectDataResult(guide, missing, DataTools.PALETTE_CHAR_STRING, "\"ab\"");
+        expectDataResult(guide, missing, Codec.intRange(0, 4095), "5000");
+
         // The retired-key rejection, which is a DataResult error rather than a throw, so it cannot
         // go through expect(). Taken from the codec that ships, not from RetiredKeys.problem, so the
         // guide is pinned to what a pack author actually sees.
@@ -214,6 +234,28 @@ class DatapackGuideExamplesTest {
         assertTrue(missing.isEmpty(),
                 () -> missing.size() + " quoted message(s) the guide does not contain verbatim:\n"
                         + String.join("\n", missing));
+    }
+
+    /** A stuff entry declaring everything required, with the two count bounds the caller names. */
+    private static StuffSettingsRE stuffCounts(Identifier id, int mincount, int maxcount) {
+        return new StuffSettingsRE(Optional.empty(),
+                Optional.of(new Mergeable<>(true, List.of("rubble"))), Optional.of("AA"),
+                Optional.empty(), Optional.empty(),
+                Optional.of(mincount), Optional.of(maxcount), Optional.of(1),
+                Optional.of(false), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())
+                .setRegistryName(id);
+    }
+
+    /** Decodes {@code json} through {@code codec} and records the error message it must produce. */
+    private static void expectDataResult(String guide, List<String> missing, Codec<?> codec, String json) {
+        String message = codec.parse(JsonOps.INSTANCE, JsonParser.parseString(json))
+                .error()
+                .orElseThrow(() -> new AssertionError("expected '" + json + "' to be rejected"))
+                .message();
+        if (!guide.contains(collapse(message))) {
+            missing.add(GUIDE + " does not contain: " + message);
+        }
     }
 
     /** Runs {@code shouldThrow}, and records its message unless {@code guide} already contains it. */
