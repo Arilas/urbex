@@ -57,11 +57,14 @@ public class Stuff {
         // observed out of step (emptied index, stale loaded == true), and the guard would wave
         // through exactly the silent chunk it exists to catch. See AssetRegistries.StuffIndex.
         //
-        // Reachable, not hypothetical: AssetRegistries.reset() is called from CityFeature.cleanUp,
-        // which reconcileDirtyCounter invokes when globalDimensionInfoDirtyCounter is bumped, and
-        // ClientEventHandlers.java:42-46 bumps it from ClientPlayConnectionEvents.DISCONNECT on the
-        // client thread - which in single-player fires while the integrated server is still
-        // draining in-flight generation.
+        // No longer reachable by any path this mod owns, and kept anyway. It used to be plainly
+        // reachable: AssetRegistries.reset() ran from CityFeature.cleanUp, which the generation
+        // path invoked whenever a global dirty counter had been bumped, and
+        // ClientPlayConnectionEvents.DISCONNECT bumped it from the client thread while a
+        // single-player integrated server was still draining in-flight generation. reset() is now
+        // called only when a session opens or closes, on the server thread with no level loaded
+        // (GenerationSession, issue #125). This guard is what would say so if that ever stopped
+        // being true - the failure it detects is otherwise completely silent.
         //
         // Logged rather than thrown, for two reasons. generateStuff is the last statement of
         // CityGenerator.doCityChunk, which generate() calls at CityGenerator.java:290, well before

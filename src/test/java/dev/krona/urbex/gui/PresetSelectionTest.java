@@ -263,9 +263,9 @@ class PresetSelectionTest {
 
     /**
      * Regression: an unparseable overridesJson must never reach {@code Config.overridesFromClient} -
-     * that field is read on a worldgen worker thread the instant a chunk generates
-     * ({@code CityFeature.getDimensionInfo}'s unguarded {@code PresetRE.CODEC.parse(...).getOrThrow()}),
-     * so a corrupted/hand-edited save's garbage JSON must be rejected before publish, not after.
+     * that field is read when a level loads and its runtime is built
+     * ({@code DimensionRuntime.create}'s {@code PresetRE.CODEC.parse(...).getOrThrow()}), so a
+     * corrupted/hand-edited save's garbage JSON must be rejected before publish, not after.
      */
     @Test
     void restoreWithMalformedOverridesJsonPublishesThePlainPresetInstead() {

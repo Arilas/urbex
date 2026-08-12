@@ -70,9 +70,10 @@ public class AssetRegistries {
      */
     private static volatile StuffIndex stuffIndex = new StuffIndex(Map.of(), false);
 
-    // Guards load() and reset() against each other and against concurrent loads. load() is no
-    // longer confined to the server thread: CityFeature.getDimensionInfo calls it, and generation
-    // runs on the parallel worldgen worker pool (see the "No lock" note in CityFeature).
+    // Guards load() and reset() against each other and against concurrent loads. Both callers are
+    // on the server thread now (GenerationSession opens a session and loads each level's assets;
+    // see issue #125), but the lock stays: it is what makes "load exactly once, and see the whole
+    // result" a property of this class rather than of its callers' threading.
     private static final Object LOAD_LOCK = new Object();
 
     // Volatile, and written after the map it guards is filled, so the fast path out of
@@ -172,14 +173,12 @@ public class AssetRegistries {
      * Only {@code VARIANTS} before {@code PALETTES} is tidiness: compiling a palette entry that names
      * a variant reaches into that registry, but through {@code get}, which resolves on demand.
      * <p>
-     * Called from two places, for two different reasons. {@code ServerEventHandlers} calls it from
-     * {@code ServerLevelEvents.LOAD} so the validation above happens while the world is loading and
-     * a broken pack refuses the world instead of failing later; {@code CityFeature.getDimensionInfo}
-     * calls it on the generation path so that no chunk can ever generate against an unloaded
-     * registry, whenever generation starts and whatever has reset the registries since. The second
-     * caller means this runs on worldgen worker threads, hence the lock: exactly one thread does the
-     * work and the rest wait for it, rather than several racing through {@code loadAll} and building
-     * the tag index from a half-filled {@code STUFF}.
+     * Called by {@code GenerationSession.load}, from {@code ServerLevelEvents.LOAD}, before it
+     * builds that level's runtime - so the validation above happens while the world is loading and a
+     * broken pack refuses the world instead of failing later. It used to have a second caller on the
+     * generation path, so that no chunk could generate against an unloaded registry whatever had
+     * reset them since; nothing resets them from a worker any more (issue #125), and a chunk cannot
+     * generate without a runtime that this call precedes.
      */
     public static void load(CommonLevelAccessor level) {
         if (stuffIndex.loaded()) {
@@ -225,9 +224,9 @@ public class AssetRegistries {
      *     field, but arriving as override JSON rather than from a registry entry, so nothing here
      *     can see it. It is user-reachable: {@code CITY_STYLE_ALTERNATIVE} is a free-text box in the
      *     customization GUI ({@code Settings.java:466}), published or restored through
-     *     {@code UrbexData}, and applied by {@code CityFeature.getDimensionInfo}. That one is
-     *     checked where it is built, by the {@link #requireCityStyle} call in {@code CityFeature}
-     *     right after {@code Presets.applyOverrides} - once per dimension, before any chunk work.</li>
+     *     {@code UrbexData}, and applied by {@code DimensionRuntime.create}. That one is checked
+     *     where it is built, by the {@link #requireCityStyle} call in {@code DimensionRuntime} right
+     *     after {@code Presets.applyOverrides} - once per level load, before any chunk work.</li>
      * </ol>
      * {@code BuildingInfo}'s lookup adds no fifth route: the name it passes is the winner of a
      * {@code Counter} over ids of styles the surrounding chunks already resolved through routes 1-4.
@@ -271,7 +270,7 @@ public class AssetRegistries {
      * required field undeclared fails here rather than from a worldgen worker.
      * <p>
      * The only place {@code CITYSTYLES} is looked up outside generation, and the entry point route 4
-     * uses: {@code CityFeature.getDimensionInfo} calls it for the preset it has just built, which is
+     * uses: {@code DimensionRuntime.create} calls it for the preset it has just built, which is
      * the only form of the alternative-style setting no registry sweep can reach. Blank is not a
      * name - {@code Preset.CITY_STYLE_ALTERNATIVE} starts as {@code ""} and most presets never set
      * it - so it resolves nothing rather than failing.

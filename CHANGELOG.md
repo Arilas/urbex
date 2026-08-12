@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+- **Generation state belongs to the server and the level that own it.** `CityFeature` kept the
+  dimension state for the whole process in one map keyed by dimension id, and kept it honest with a
+  `static volatile int` that the client bumped on disconnect, the world-creation screen bumped on
+  publish, and `/reload` bumped on the server thread. Reconciliation ran *from the generation path*,
+  so a bump could reset the asset registries while a worker was midway through a chunk — and that
+  chunk was written, saved and never revisited with everything the emptied stuff index would have
+  placed missing from it. A `GenerationSession` per running server now owns a `DimensionRuntime` per
+  loaded level, published when the level loads and retired when it unloads (issue #125).
+  - *Leaving a single-player world no longer touches the server's generation state.* The disconnect
+    hook fires on the client thread while the integrated server is still draining in-flight
+    generation; it now clears client state only, and the server's own state is retired at
+    `SERVER_STOPPING` with nothing generating.
+  - *`/reload` republishes each level's runtime instead of clearing the registries.* Block tags do
+    reload and `CityGenerator` caches several of them, so a fresh runtime per level is what makes an
+    edited tag take effect. The thirteen asset registries are frozen at world load and cannot change
+    on a reload whatever is done to them (issue #61), so clearing them bought nothing and was how a
+    running worker got an emptied index. A chunk already generating finishes against the epoch it
+    captured.
+  - *Two worlds in one session cannot share state.* Each server start opens a new session; the
+    previous one is closed rather than inherited, and a stopping server can only close its own.
+  - *Where the "no chunk generates against unloaded assets" rule now lives.* The level-load handler
+    resolves the asset registries before it builds the level's runtime, and generation does nothing
+    at all without a published runtime — so there is no longer a path that generates first and loads
+    afterwards, which is what the load on the generation path was compensating for. Verified on a
+    real server: all three dimensions publish before "Preparing spawn area".
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`
+    and `runDigestCheckFeatures`.
+
 - **Post-generation block writes belong to the generation that queued them.** The deferred writes a
   chunk queues for after its driver has run — POI blocks, loot chests, command blocks, saplings, the
   place-twice light refresh — were stored on the cached `BuildingInfo` for that chunk, and the

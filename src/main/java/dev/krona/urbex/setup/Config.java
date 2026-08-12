@@ -394,7 +394,7 @@ public class Config {
         PresetChoice overworldChoice = cache.get(Level.OVERWORLD);
         if (overworldChoice != null) {
             Preset overworldPreset = Presets.resolve(level.registryAccess(), overworldChoice.preset());
-            // The GENERATE_NETHER probe must see the same preset CityFeature.getDimensionInfo will
+            // The GENERATE_NETHER probe must see the same preset DimensionRuntime.create will
             // actually generate with - including any client-published/saved overrides overlay - or an
             // override that flips GENERATE_NETHER (on or off) would silently not count here.
             if (overworldChoice.overridesJson().isPresent()) {

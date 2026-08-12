@@ -1,5 +1,6 @@
 package dev.krona.urbex.commands;
 
+import dev.krona.urbex.worldgen.GenerationSession;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.mojang.brigadier.Command;
@@ -8,7 +9,6 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.config.Preset;
-import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import net.fabricmc.loader.api.FabricLoader;
@@ -37,7 +37,7 @@ public class CommandSavePreset implements Command<CommandSourceStack> {
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         // The source's own level, not the player's: this has to work from the server console too.
-        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo(context.getSource().getLevel());
+        IDimensionInfo dimInfo = GenerationSession.planningFor(context.getSource().getLevel());
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("No dimension info found!").withStyle(ChatFormatting.RED));
             return 0;

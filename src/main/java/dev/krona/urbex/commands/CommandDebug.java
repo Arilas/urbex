@@ -1,12 +1,12 @@
 package dev.krona.urbex.commands;
 
+import dev.krona.urbex.worldgen.GenerationSession;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.plan.RoadCell;
 import dev.krona.urbex.plan.TertiarySegment;
-import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
@@ -52,7 +52,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         BlockPos position = player.blockPosition();
-        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo((WorldGenLevel) player.level());
+        IDimensionInfo dimInfo = GenerationSession.planningFor((WorldGenLevel) player.level());
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;

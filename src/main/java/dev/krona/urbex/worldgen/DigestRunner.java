@@ -1,6 +1,5 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
@@ -178,7 +177,7 @@ public final class DigestRunner {
      * configured for this dimension - the driver-writes check already fails that case loudly.
      */
     private static int countBridgeChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
-        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo(level);
+        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             return 0;
         }
@@ -199,7 +198,7 @@ public final class DigestRunner {
      * for this dimension - the driver-writes check already fails that case loudly.
      */
     private static int countSlopeChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
-        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo(level);
+        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             return 0;
         }

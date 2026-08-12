@@ -1,5 +1,6 @@
 package dev.krona.urbex.setup;
 
+import dev.krona.urbex.worldgen.GenerationSession;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
@@ -75,7 +76,7 @@ public class SpawnPlacement {
     public static boolean onCreateSpawnPoint(ServerLevel serverLevel, ServerLevelData settings) {
         LevelAccessor world = serverLevel;
         {
-            IDimensionInfo dimensionInfo = Registration.cityFeature().getDimensionInfo(serverLevel);
+            IDimensionInfo dimensionInfo = GenerationSession.planningFor(serverLevel);
             if (dimensionInfo == null) {
                 return false;
             }

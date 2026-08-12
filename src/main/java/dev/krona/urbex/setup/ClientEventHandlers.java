@@ -3,7 +3,6 @@ package dev.krona.urbex.setup;
 import dev.krona.urbex.gui.CitiesTab;
 import dev.krona.urbex.gui.PresetSelection;
 import dev.krona.urbex.gui.RecreateProfileRestore;
-import dev.krona.urbex.worldgen.CityFeature;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -38,11 +37,17 @@ public class ClientEventHandlers {
             }
         });
 
-        // Clean up client-side state when leaving a world/server
+        // Clean up client-side state when leaving a world/server.
+        //
+        // Client state only. This used to bump CityFeature's dimension-info counter as well, to
+        // drop the integrated server's cached dimension state on the way out of a single-player
+        // world - which fired on the client thread while that server was still draining in-flight
+        // generation, and could reset the asset registries underneath a worker (issue #125). The
+        // server's own state is retired by GenerationSession at SERVER_STOPPING, on the server
+        // thread, with nothing generating.
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             PresetSelection.CLIENT.reset();
             Config.reset();
-            CityFeature.globalDimensionInfoDirtyCounter++;
         });
     }
 }

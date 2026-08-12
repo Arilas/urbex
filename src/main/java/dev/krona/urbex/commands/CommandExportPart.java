@@ -1,5 +1,6 @@
 package dev.krona.urbex.commands;
 
+import dev.krona.urbex.worldgen.GenerationSession;
 import com.google.gson.*;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -9,7 +10,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.editor.EditorInfo;
-import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
@@ -68,7 +68,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         BlockPos start = editorInfo.getBottomLocation();
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo(level);
+        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
