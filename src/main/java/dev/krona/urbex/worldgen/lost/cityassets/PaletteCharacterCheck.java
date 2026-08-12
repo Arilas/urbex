@@ -5,7 +5,9 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -52,23 +54,76 @@ import java.util.TreeSet;
  * the shipped pack's own idiom, and made this check produce 45 warnings about a pack that is
  * correct.</p>
  */
-final class PartPaletteCheck {
+final class PaletteCharacterCheck {
 
-    private PartPaletteCheck() {
+    private PaletteCharacterCheck() {
     }
 
     static void check(BuildingPart part, PartUsage usage, AssetDiagnostics diagnostics) {
         if (usage.style() == null) {
             return;
         }
-        SortedSet<Character> used = charactersUsedBy(part);
+        check("urbex:parts", part.getId(), charactersUsedBy(part), usage.style(),
+                usage.building() == null ? null : usage.building().getLocalPalette(),
+                part.getLocalPalette(), describe(usage) + " uses", diagnostics);
+    }
+
+    /**
+     * A city style's own character fields - {@code streetblock}, {@code grassblock} and the rest.
+     * <p>
+     * They are the same question as a part's characters and were the same crash, from a different
+     * line: the generator resolves them against the chunk's palette too. There is no part or building
+     * layer here, because these are placed on the street rather than inside anything.
+     */
+    static void checkCityStyle(CityStyle cityStyle, Style style, AssetDiagnostics diagnostics) {
+        Map<Character, List<String>> fields = new LinkedHashMap<>();
+        declare(fields, "streetblock", cityStyle.getStreetBlock());
+        declare(fields, "streetbaseblock", cityStyle.getStreetBaseBlock());
+        declare(fields, "streetvariantblock", cityStyle.getStreetVariantBlock());
+        declare(fields, "borderblock", cityStyle.getBorderBlock());
+        declare(fields, "wallblock", cityStyle.getWallBlock());
+        declare(fields, "railmainblock", cityStyle.getRailMainBlock());
+        declare(fields, "grassblock", cityStyle.getGrassBlock());
+        declare(fields, "ironbarsblock", cityStyle.getIronbarsBlock());
+        declare(fields, "glowstoneblock", cityStyle.getGlowstoneBlock());
+        declare(fields, "leavesblock", cityStyle.getLeavesBlock());
+        declare(fields, "rubbledirtblock", cityStyle.getRubbleDirtBlock());
+        declare(fields, "parkelevationblock", cityStyle.getParkElevationBlock());
+        declare(fields, "corridorroofblock", cityStyle.getCorridorRoofBlock());
+        declare(fields, "corridorglassblock", cityStyle.getCorridorGlassBlock());
+        if (fields.isEmpty()) {
+            return;
+        }
+        namedFields = fields;
+        try {
+            check("urbex:citystyles", cityStyle.getId(), new TreeSet<>(fields.keySet()), style,
+                    null, null, "declares", diagnostics);
+        } finally {
+            namedFields = null;
+        }
+    }
+
+    private static void declare(Map<Character, List<String>> fields, String name, @Nullable Character c) {
+        if (c != null) {
+            fields.computeIfAbsent(c, key -> new ArrayList<>()).add(name);
+        }
+    }
+
+    /**
+     * Which field each character came from, for the message, while a city style is being checked.
+     * A thread local is not needed - compilation is single-threaded - and threading it through every
+     * signature would put a parameter on the part path that only the city-style path ever reads.
+     */
+    @Nullable
+    private static Map<Character, List<String>> namedFields;
+
+    private static void check(String registry, Identifier asset, SortedSet<Character> used, Style style,
+                              @Nullable Palette building, @Nullable Palette local, String verb,
+                              AssetDiagnostics diagnostics) {
         if (used.isEmpty()) {
             return;
         }
-        List<List<Pair<Float, Palette>>> groups = usage.style().paletteChoices();
-        Palette local = part.getLocalPalette();
-        Palette building = usage.building() == null ? null : usage.building().getLocalPalette();
-
+        List<List<Pair<Float, Palette>>> groups = style.paletteChoices();
         CompiledPalette everything = merge(groups.stream().flatMap(List::stream)
                 .map(Pair::getRight).toList(), building, local);
 
@@ -83,16 +138,14 @@ final class PartPaletteCheck {
         }
 
         if (!never.isEmpty()) {
-            diagnostics.record("urbex:parts", part.getId(), describe(usage)
-                    + " uses character(s) " + quote(never)
-                    + " that no palette there defines, so generating it would fail on the first chunk "
-                    + "that places it");
+            diagnostics.record(registry, asset, verb + " character(s) " + quote(never)
+                    + " that no palette there defines, so generating would fail on the first chunk "
+                    + "that needs one");
         }
         if (!sometimes.isEmpty()) {
-            diagnostics.warn("urbex:parts", part.getId(), describe(usage)
-                    + " uses character(s) " + quote(sometimes)
-                    + " that only some 'randompalettes' choices of '" + usage.style().getName()
-                    + "' define, so whether this part generates depends on the draw");
+            diagnostics.warn(registry, asset, verb + " character(s) " + quote(sometimes)
+                    + " that only some 'randompalettes' choices of '" + style.getName()
+                    + "' define, so whether it generates depends on the draw");
         }
     }
 
@@ -159,10 +212,13 @@ final class PartPaletteCheck {
                 + " under style '" + usage.style().getName() + "', this part";
     }
 
+    /** Quotes each character, naming the field it was written in when there is one. */
     private static String quote(SortedSet<Character> characters) {
+        Map<Character, List<String>> fields = namedFields;
         List<String> quoted = new ArrayList<>(characters.size());
         for (char c : characters) {
-            quoted.add("'" + c + "'");
+            List<String> names = fields == null ? null : fields.get(c);
+            quoted.add("'" + c + "'" + (names == null ? "" : " (" + String.join(", ", names) + ")"));
         }
         return String.join(", ", quoted);
     }

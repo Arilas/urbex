@@ -186,6 +186,9 @@ public final class AssetGraph {
         Identifier owner = style.getId();
         style(owner, style.getStyle(), "style");
         Style palette = assets.styles().get(style.getStyle());
+        if (palette != null) {
+            PaletteCharacterCheck.checkCityStyle(style, palette, diagnostics);
+        }
         for (ObjectSelector selector : style.selectorList(CityStyle.Sel.BUILDING)) {
             building(owner, selector.value(), "selectors.buildings", palette);
         }
@@ -337,7 +340,7 @@ public final class AssetGraph {
         if (usage.road()) {
             checkRoadGeometry(part, usage);
         }
-        PartPaletteCheck.check(part, usage, diagnostics);
+        PaletteCharacterCheck.check(part, usage, diagnostics);
     }
 
     /**
