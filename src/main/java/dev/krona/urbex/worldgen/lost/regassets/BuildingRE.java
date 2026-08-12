@@ -21,7 +21,7 @@ import java.util.Optional;
  * are values a file may legitimately mean, and under a sentinel a child could not override an
  * inherited {@code 0.8} back down to {@code 0.0}.
  */
-public class BuildingRE implements IAsset<BuildingRE>, Extendable {
+public class BuildingRE implements Extendable {
 
     private static final Codec<BuildingRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -46,7 +46,6 @@ public class BuildingRE implements IAsset<BuildingRE>, Extendable {
     public static final Codec<BuildingRE> CODEC = RetiredKeys.reject(RAW, "building");
 
 
-    private Identifier name;
 
     private final Optional<Identifier> extendsId;
 
@@ -95,16 +94,7 @@ public class BuildingRE implements IAsset<BuildingRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public BuildingRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 
     @Nullable
     public Integer getMinFloors() {

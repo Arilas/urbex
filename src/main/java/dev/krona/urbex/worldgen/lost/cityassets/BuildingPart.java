@@ -61,10 +61,10 @@ public class BuildingPart implements IBuildingPart {
      * {@code slices} replaces the inherited ones wholesale; declaring a size that contradicts the
      * slices actually in force is a load error rather than a silent truncation.
      */
-    public BuildingPart(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public BuildingPart(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
                         AssetIndex<Palette> palettes, List<BuildingPartRE> chainRootFirst) {
         BuildingPartRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
-        name = leaf.getRegistryName();
+        name = id;
 
         Integer declaredXSize = null;
         Integer declaredZSize = null;

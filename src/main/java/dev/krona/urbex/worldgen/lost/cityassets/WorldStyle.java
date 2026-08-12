@@ -48,8 +48,8 @@ public class WorldStyle {
      * nothing, which is how a third-party pack could generate parts it never mentioned. It is
      * folded field by field, so a child can append one tunnel variant without restating the group.
      */
-    public WorldStyle(List<WorldStyleRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public WorldStyle(Identifier id, List<WorldStyleRE> chainRootFirst) {
+        name = id;
         String outside = null;
         ScatteredSettings scattered = null;
         PartSelector parts = null;

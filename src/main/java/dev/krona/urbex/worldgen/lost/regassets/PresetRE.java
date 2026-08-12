@@ -28,7 +28,7 @@ import java.util.Set;
  * present in the JSON are applied on top of an {@code extends} chain (see {@code Presets.resolve}).
  * Mirrors the {@code WorldStyleRE} registry-entry idiom.
  */
-public class PresetRE implements IAsset<PresetRE>, Extendable {
+public class PresetRE implements Extendable {
 
     public static final Set<String> KEYS = Set.of("extends", "name", "description", "extraDescription", "warning",
             "icon", "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
@@ -87,7 +87,6 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
             dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys.warning(RAW, KEYS, "preset"),
             "preset");
 
-    private Identifier name;
 
     private final Optional<Identifier> extendsId;
     private final Optional<String> displayName;
@@ -259,14 +258,5 @@ public class PresetRE implements IAsset<PresetRE>, Extendable {
         misc.ifPresent(s -> s.apply(p));
     }
 
-    @Override
-    public PresetRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

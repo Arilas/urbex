@@ -23,7 +23,7 @@ import java.util.Optional;
  * resolved chain must leave at least one - neither is required on its own, so neither can be
  * required here. Declaring both is allowed; {@code Scattered.generate} takes the multibuilding.
  */
-public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
+public class ScatteredRE implements Extendable {
 
     /**
      * {@code rotatable} was decoded and then thrown away: {@link ScatteredBuilding} never copied it
@@ -56,7 +56,6 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<ScatteredRE> CODEC = RetiredKeys.reject(RAW, "scattered building");
 
-    private Identifier name;
     private final Optional<Identifier> extendsId;
     private final ScatteredBuilding.TerrainHeight terrainheight;
     private final ScatteredBuilding.TerrainFix terrainfix;
@@ -110,14 +109,5 @@ public class ScatteredRE implements IAsset<ScatteredRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public ScatteredRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

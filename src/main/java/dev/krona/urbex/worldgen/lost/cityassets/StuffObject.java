@@ -15,9 +15,9 @@ public class StuffObject {
      * lives on {@link StuffSettingsRE#resolve} so generation keeps reading one settings object and
      * never has to know a chain was involved.
      */
-    public StuffObject(List<StuffSettingsRE> chainRootFirst) {
-        this.settings = StuffSettingsRE.resolve(chainRootFirst);
-        this.name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public StuffObject(Identifier id, List<StuffSettingsRE> chainRootFirst) {
+        this.settings = StuffSettingsRE.resolve(id, chainRootFirst);
+        this.name = id;
     }
 
     /** The fully-qualified id, e.g. {@code "urbex:signs"}. */

@@ -19,7 +19,7 @@ import java.util.Optional;
  * after the {@code extends} chain is resolved, in
  * {@link dev.krona.urbex.worldgen.lost.cityassets.Style}.
  */
-public class StyleRE implements IAsset<StyleRE>, Extendable {
+public class StyleRE implements Extendable {
 
     private static final Codec<StyleRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -30,7 +30,6 @@ public class StyleRE implements IAsset<StyleRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<StyleRE> CODEC = RetiredKeys.reject(RAW, "style");
 
-    private Identifier name;
 
     private final Optional<Identifier> extendsId;
     private final Mergeable<List<PaletteSelector>> randomPaletteChoices;   // null when undeclared
@@ -50,14 +49,5 @@ public class StyleRE implements IAsset<StyleRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public StyleRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

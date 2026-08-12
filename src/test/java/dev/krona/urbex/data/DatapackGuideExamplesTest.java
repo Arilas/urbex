@@ -1,5 +1,6 @@
 package dev.krona.urbex.data;
 
+import dev.krona.urbex.worldgen.lost.cityassets.TestAssetId;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -190,8 +191,8 @@ class DatapackGuideExamplesTest {
         expect(guide, missing, () -> Resolved.require(null, downtown, "streetblocks.parts.stair"));
 
         // A part with no geometry, and a part whose redeclared size contradicts inherited slices.
-        expect(guide, missing, () -> new BuildingPart(BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
-        expect(guide, missing, () -> new BuildingPart(BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(
+        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
+        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(
                 namedPart(Identifier.fromNamespaceAndPath("urbexmt", "tower_base"), 16, 16,
                         List.of(List.of("x".repeat(256)))),
                 namedPart(tower, 8, null, null))));
@@ -204,17 +205,15 @@ class DatapackGuideExamplesTest {
         PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        expect(guide, missing, () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(
-                new PaletteRE(Optional.empty(), Optional.of(List.of(empty)))
-                        .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "x")))));
+        expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, null, List.of(
+                new PaletteRE(Optional.empty(), Optional.of(List.of(empty))))));
 
         // A 'randompalettes' group nothing could ever be drawn from, and a stuff entry whose two
         // count bounds contradict. Both are checked at the chain fold rather than per field.
-        expect(guide, missing, () -> new Style(NO_PALETTES, List.of(
+        expect(guide, missing, () -> new Style(Identifier.fromNamespaceAndPath("urbexmt", "downtown"), NO_PALETTES, List.of(
                 new StyleRE(Optional.empty(), Optional.of(new Mergeable<>(true,
-                        List.of(List.of(new PaletteSelector(0f, "urbex:common"))))))
-                        .setRegistryName(downtown))));
-        expect(guide, missing, () -> new StuffObject(List.of(
+                        List.of(List.of(new PaletteSelector(0f, "urbex:common")))))))));
+        expect(guide, missing, () -> new StuffObject(downtown, List.of(
                 stuffCounts(downtown, 5, 2))));
 
         // The two DataResult errors below are not throws, so they cannot go through expect(): a
@@ -245,8 +244,7 @@ class DatapackGuideExamplesTest {
                 Optional.empty(), Optional.empty(),
                 Optional.of(mincount), Optional.of(maxcount), Optional.of(1),
                 Optional.of(false), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())
-                .setRegistryName(id);
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /** Decodes {@code json} through {@code codec} and records the error message it must produce. */
@@ -285,7 +283,7 @@ class DatapackGuideExamplesTest {
                                             List<List<String>> slices) {
         return new BuildingPartRE(Optional.empty(), Optional.ofNullable(xSize),
                 Optional.ofNullable(zSize), Optional.ofNullable(slices), Optional.empty(),
-                Optional.empty(), Optional.empty()).setRegistryName(id);
+                Optional.empty(), Optional.empty());
     }
 
     /** Collapses runs of whitespace to one space, so a message wrapped in Markdown still matches. */

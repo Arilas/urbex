@@ -74,7 +74,7 @@ class RegistryChainResolutionTest {
     void stuffThatDeclaresNoTagsKeepsItsAncestors() {
         // The silent-damage case: dropping these would unfile the object from the tag index and it
         // would never be selected for placement again.
-        StuffObject resolved = new StuffObject(List.of(
+        StuffObject resolved = new StuffObject(TestAssetId.ANY, List.of(
                 stuff("torches").tags(true, "all", "indoor").build(),
                 stuff("torches_rare").build()));
 
@@ -83,12 +83,12 @@ class RegistryChainResolutionTest {
 
     @Test
     void stuffTagsReplaceByDefaultAndAppendWhenTheChildOptsIn() {
-        StuffObject replaced = new StuffObject(List.of(
+        StuffObject replaced = new StuffObject(TestAssetId.ANY, List.of(
                 stuff("torches").tags(true, "all", "indoor").build(),
                 stuff("torches_rare").tags(true, "rare").build()));
         assertEquals(List.of("rare"), replaced.getSettings().getTags(), "a bare array replaces");
 
-        StuffObject appended = new StuffObject(List.of(
+        StuffObject appended = new StuffObject(TestAssetId.ANY, List.of(
                 stuff("torches").tags(true, "all", "indoor").build(),
                 stuff("torches_rare").tags(false, "rare").build()));
         assertEquals(List.of("all", "indoor", "rare"), appended.getSettings().getTags(),
@@ -108,7 +108,7 @@ class RegistryChainResolutionTest {
         StuffSettingsRE child = stuff("torches_rare").column("XX").counts(2, 9, 7)
                 .undeclaredInbuilding().build();
 
-        StuffSettingsRE resolved = new StuffObject(List.of(parent, child)).getSettings();
+        StuffSettingsRE resolved = new StuffObject(TestAssetId.ANY, List.of(parent, child)).getSettings();
 
         assertNotSame(child, resolved, "a two-entry chain must actually fold, not hand back the leaf");
         assertEquals(40, resolved.getMinheight(), "minheight is inherited");
@@ -118,14 +118,14 @@ class RegistryChainResolutionTest {
                 "seesky is inherited - and 'declared false' must not read as 'undeclared'");
         assertSame(onlyLibraries, resolved.getBuildingMatcher(), "the matcher is inherited");
         assertSame(IdentifierMatcher.ANY,
-                new StuffObject(List.of(stuff("plain").build(), stuff("plain_child").build()))
+                new StuffObject(TestAssetId.of("plain"), List.of(stuff("plain").build(), stuff("plain_child").build()))
                         .getSettings().getBuildingMatcher(),
                 "a matcher no entry in the chain declares still reads as ANY");
     }
 
     @Test
     void stuffRequiredScalarsComeFromTheLeaf() {
-        StuffSettingsRE resolved = new StuffObject(List.of(
+        StuffSettingsRE resolved = new StuffObject(TestAssetId.ANY, List.of(
                 stuff("torches").column("AB").counts(1, 2, 3).build(),
                 stuff("torches_rare").column("CD").counts(4, 5, 6).build())).getSettings();
 
@@ -139,7 +139,7 @@ class RegistryChainResolutionTest {
     void stuffResolvedFromAChainOfOneIsTheEntryItself() {
         StuffSettingsRE only = stuff("torches").tags(true, "all").build();
 
-        assertSame(only, new StuffObject(List.of(only)).getSettings());
+        assertSame(only, new StuffObject(TestAssetId.ANY, List.of(only)).getSettings());
     }
 
     // ------------------------------------------- stuff ordering (RNG addresses)
@@ -153,8 +153,8 @@ class RegistryChainResolutionTest {
      */
     @Test
     void stuffFiledUnderATagIsOrderedByIdRatherThanByArrivalOrder() {
-        StuffObject cobweb = new StuffObject(List.of(stuff("cobweb").tags(true, "rubble").build()));
-        StuffObject chains = new StuffObject(List.of(stuff("chains").tags(true, "rubble").build()));
+        StuffObject cobweb = new StuffObject(TestAssetId.of("cobweb"), List.of(stuff("cobweb").tags(true, "rubble").build()));
+        StuffObject chains = new StuffObject(TestAssetId.of("chains"), List.of(stuff("chains").tags(true, "rubble").build()));
 
         // Deliberately the order AssetRegistries' ConcurrentHashMap actually hands these two over
         // in - hash("urbex:cobweb") lands in a lower bucket than hash("urbex:chains") - so this
@@ -168,9 +168,9 @@ class RegistryChainResolutionTest {
         // Identifier's own order, the same one MultiChunk sorts city styles by and BuildingInfo
         // breaks its cityStyle vote on. Ordering on toString() instead would put both urbex entries
         // ahead of the third-party one and silently relocate its decoration the day it is installed.
-        StuffObject ownRope = new StuffObject(List.of(stuff("urbex", "rope").tags(true, "rubble").build()));
-        StuffObject ownVines = new StuffObject(List.of(stuff("urbex", "vines").tags(true, "rubble").build()));
-        StuffObject thirdPartySoot = new StuffObject(List.of(stuff("urbexmt", "soot").tags(true, "rubble").build()));
+        StuffObject ownRope = new StuffObject(Identifier.fromNamespaceAndPath("urbex", "rope"), List.of(stuff("urbex", "rope").tags(true, "rubble").build()));
+        StuffObject ownVines = new StuffObject(Identifier.fromNamespaceAndPath("urbex", "vines"), List.of(stuff("urbex", "vines").tags(true, "rubble").build()));
+        StuffObject thirdPartySoot = new StuffObject(Identifier.fromNamespaceAndPath("urbexmt", "soot"), List.of(stuff("urbexmt", "soot").tags(true, "rubble").build()));
 
         assertEquals(List.of("urbex:rope", "urbexmt:soot", "urbex:vines"),
                 namesOf(AssetCompiler.groupStuffByTag(List.of(ownVines, thirdPartySoot, ownRope)).get("rubble")));
@@ -178,8 +178,8 @@ class RegistryChainResolutionTest {
 
     @Test
     void stuffWithSeveralTagsIsFiledUnderEachOfThem() {
-        StuffObject both = new StuffObject(List.of(stuff("torches").tags(true, "all", "indoor").build()));
-        StuffObject indoorOnly = new StuffObject(List.of(stuff("banners").tags(true, "indoor").build()));
+        StuffObject both = new StuffObject(TestAssetId.of("torches"), List.of(stuff("torches").tags(true, "all", "indoor").build()));
+        StuffObject indoorOnly = new StuffObject(TestAssetId.of("banners"), List.of(stuff("banners").tags(true, "indoor").build()));
 
         Map<String, List<StuffObject>> byTag = AssetCompiler.groupStuffByTag(List.of(both, indoorOnly));
 
@@ -205,7 +205,7 @@ class RegistryChainResolutionTest {
      */
     @Test
     void cityStyleStuffTagsIterateInASortedOrderRegardlessOfHowTheyWereDeclared() {
-        CityStyle style = new CityStyle(List.of(
+        CityStyle style = new CityStyle(TestAssetId.ANY, List.of(
                 cityStyleWithTags("indoor", "rubble"),
                 cityStyleWithTags("banners", "cobbles")));
 
@@ -218,8 +218,7 @@ class RegistryChainResolutionTest {
         return new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(List.of(tags)),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "citystyle_" + tags[0]));
+                Optional.empty(), Optional.of(TestWiring.streetSettings()), Optional.empty());
     }
 
     // ----------------------------------------------------------- conditions
@@ -229,10 +228,10 @@ class RegistryChainResolutionTest {
         ConditionRE parent = condition("loot", true, "urbex:common_loot", "urbex:rare_loot");
 
         assertEquals(Set.of("urbex:barrel_loot"),
-                valuesOf(new Condition(List.of(parent, condition("loot_barrel", true, "urbex:barrel_loot")))),
+                valuesOf(new Condition(TestAssetId.ANY, List.of(parent, condition("loot_barrel", true, "urbex:barrel_loot")))),
                 "a bare array replaces");
         assertEquals(Set.of("urbex:common_loot", "urbex:rare_loot", "urbex:barrel_loot"),
-                valuesOf(new Condition(List.of(parent, condition("loot_barrel", false, "urbex:barrel_loot")))),
+                valuesOf(new Condition(TestAssetId.ANY, List.of(parent, condition("loot_barrel", false, "urbex:barrel_loot")))),
                 "{\"replace\": false} keeps the inherited values");
     }
 
@@ -243,12 +242,12 @@ class RegistryChainResolutionTest {
         VariantRE parent = variant("stones", true,
                 new BlockEntry(1, "minecraft:stone"), new BlockEntry(2, "minecraft:andesite"));
 
-        Variant replaced = new Variant(BuiltInRegistries.BLOCK, List.of(parent,
+        Variant replaced = new Variant(TestAssetId.ANY, BuiltInRegistries.BLOCK, List.of(parent,
                 variant("stones_deep", true, new BlockEntry(3, "minecraft:deepslate"))));
         assertEquals(List.of("minecraft:deepslate"), blockIdsOf(replaced), "a bare array replaces");
         assertEquals(List.of(3), replaced.getBlocks().stream().map(org.apache.commons.lang3.tuple.Pair::getLeft).toList());
 
-        Variant appended = new Variant(BuiltInRegistries.BLOCK, List.of(parent,
+        Variant appended = new Variant(TestAssetId.ANY, BuiltInRegistries.BLOCK, List.of(parent,
                 variant("stones_deep", false, new BlockEntry(3, "minecraft:deepslate"))));
         assertEquals(List.of("minecraft:stone", "minecraft:andesite", "minecraft:deepslate"),
                 blockIdsOf(appended), "{\"replace\": false} keeps the inherited blocks, in order");
@@ -258,7 +257,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void styleThatDeclaresNoPalettesKeepsItsAncestors() {
-        Style resolved = new Style(PALETTES, List.of(
+        Style resolved = new Style(TestAssetId.ANY, PALETTES, List.of(
                 style("nordic", group("urbex:common")),
                 style("nordic_rare")));
 
@@ -271,10 +270,10 @@ class RegistryChainResolutionTest {
         StyleRE parent = style("nordic", group("urbex:common"));
 
         assertEquals(List.of(List.of("urbex:snowy")),
-                paletteNamesOf(new Style(PALETTES, List.of(parent, style("nordic_snow", group("urbex:snowy"))))),
+                paletteNamesOf(new Style(TestAssetId.ANY, PALETTES, List.of(parent, style("nordic_snow", group("urbex:snowy"))))),
                 "a bare array replaces");
         assertEquals(List.of(List.of("urbex:common"), List.of("urbex:snowy")),
-                paletteNamesOf(new Style(PALETTES, List.of(parent, styleAppending("nordic_snow", group("urbex:snowy"))))),
+                paletteNamesOf(new Style(TestAssetId.ANY, PALETTES, List.of(parent, styleAppending("nordic_snow", group("urbex:snowy"))))),
                 "{\"replace\": false} keeps the inherited groups, in order");
     }
 
@@ -287,14 +286,12 @@ class RegistryChainResolutionTest {
                 Optional.empty(),
                 Optional.of(ScatteredBuilding.TerrainHeight.OCEAN),
                 Optional.of(ScatteredBuilding.TerrainFix.CLEAR),
-                Optional.of(3))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "oilrig"));
+                Optional.of(3));
         ScatteredRE child = new ScatteredRE(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of("urbex:oilrig_burnt"))), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "oilrig_burnt"));
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
-        ScatteredBuilding resolved = new ScatteredBuilding(List.of(parent, child));
+        ScatteredBuilding resolved = new ScatteredBuilding(TestAssetId.ANY, List.of(parent, child));
 
         assertEquals(ScatteredBuilding.TerrainHeight.OCEAN, resolved.getTerrainheight());
         assertEquals(ScatteredBuilding.TerrainFix.CLEAR, resolved.getTerrainfix());
@@ -312,14 +309,12 @@ class RegistryChainResolutionTest {
                 Optional.of("urbex:citystyle_common"),
                 Optional.of(new Mergeable<>(true,
                         List.of(new PredefinedBuilding("urbex:townhall", 0, 0, false, false)))),
-                Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "capital"));
+                Optional.empty());
         PredefinedCityRE child = new PredefinedCityRE(Optional.empty(),
                 Optional.empty(), Optional.of(100), Optional.of(200), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "colony"));
+                Optional.empty(), Optional.empty(), Optional.empty());
 
-        PredefinedCity resolved = new PredefinedCity(List.of(parent, child));
+        PredefinedCity resolved = new PredefinedCity(TestAssetId.ANY, List.of(parent, child));
 
         assertEquals(100, resolved.getChunkX(), "the child moves the city");
         assertEquals(200, resolved.getChunkZ());
@@ -341,14 +336,12 @@ class RegistryChainResolutionTest {
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
-                Optional.empty(), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "standard"));
+                Optional.empty(), Optional.empty());
         WorldStyleRE child = new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:bleak"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "bleak"));
+                Optional.empty(), Optional.empty(), Optional.empty());
 
-        WorldStyle resolved = new WorldStyle(List.of(parent, child));
+        WorldStyle resolved = new WorldStyle(TestAssetId.ANY, List.of(parent, child));
 
         assertEquals("urbex:bleak", resolved.getOutsideStyle(), "what the child declares wins");
         assertSame(scattered, resolved.getScatteredSettings(), "the settings block is inherited");
@@ -362,13 +355,11 @@ class RegistryChainResolutionTest {
     void multiBuildingChildInheritsTheGridItDoesNotDeclare() {
         MultiBuildingRE parent = new MultiBuildingRE(Optional.empty(),
                 Optional.of(1), Optional.of(2),
-                Optional.of(List.of(List.of("urbex:oilrig00", "urbex:oilrig01"))))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "oilrig"));
+                Optional.of(List.of(List.of("urbex:oilrig00", "urbex:oilrig01"))));
         MultiBuildingRE child = new MultiBuildingRE(Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "oilrig_burnt"));
+                Optional.empty(), Optional.empty(), Optional.empty());
 
-        MultiBuilding resolved = new MultiBuilding(List.of(parent, child));
+        MultiBuilding resolved = new MultiBuilding(TestAssetId.ANY, List.of(parent, child));
 
         assertEquals(1, resolved.getDimX());
         assertEquals(2, resolved.getDimZ());
@@ -380,7 +371,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildInheritsTheFillerAndPartsItDoesNotDeclare() {
-        Building resolved = new Building(BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
                 building("library").filler("#").parts("urbex:library_floor").minFloors(2).build(),
                 building("library_burnt").rubble("R").build()));
 
@@ -393,13 +384,13 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedPrefersLonelyBackToZero() {
-        Building resolved = new Building(BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").prefersLonely(0.0f).build()));
 
         assertEquals(0.0f, resolved.getPrefersLonely(),
                 "0.0 is a value a file can mean, not a marker for 'undeclared'");
-        assertEquals(0.8f, new Building(BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        assertEquals(0.8f, new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").build())).getPrefersLonely(),
                 "omitting it still inherits");
@@ -407,7 +398,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedFloorLimitBackToTheLevelDefault() {
-        Building resolved = new Building(BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").minFloors(4).build(),
                 building("tower_short").minFloors(-1).build()));
 
@@ -439,14 +430,12 @@ class RegistryChainResolutionTest {
     private static StyleRE style(String path, List<PaletteSelector>... groups) {
         return new StyleRE(Optional.empty(), groups.length == 0
                 ? Optional.empty()
-                : Optional.of(new Mergeable<>(true, List.of(groups))))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
+                : Optional.of(new Mergeable<>(true, List.of(groups))));
     }
 
     @SafeVarargs
     private static StyleRE styleAppending(String path, List<PaletteSelector>... groups) {
-        return new StyleRE(Optional.empty(), Optional.of(new Mergeable<>(false, List.of(groups))))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
+        return new StyleRE(Optional.empty(), Optional.of(new Mergeable<>(false, List.of(groups))));
     }
 
     private static BuildingBuilder building(String path) {
@@ -504,8 +493,7 @@ class RegistryChainResolutionTest {
                     filler, rubble,
                     Optional.empty(), minFloors, Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(),
-                    prefersLonely, parts, Optional.empty())
-                    .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
+                    prefersLonely, parts, Optional.empty());
         }
     }
 
@@ -554,13 +542,11 @@ class RegistryChainResolutionTest {
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()))
                 .toList();
-        return new ConditionRE(Optional.empty(), Optional.of(new Mergeable<>(replace, parts)))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
+        return new ConditionRE(Optional.empty(), Optional.of(new Mergeable<>(replace, parts)));
     }
 
     private static VariantRE variant(String path, boolean replace, BlockEntry... blocks) {
-        return new VariantRE(Optional.empty(), Optional.of(new Mergeable<>(replace, List.of(blocks))))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
+        return new VariantRE(Optional.empty(), Optional.of(new Mergeable<>(replace, List.of(blocks))));
     }
 
     private static StuffBuilder stuff(String path) {
@@ -644,8 +630,7 @@ class RegistryChainResolutionTest {
         StuffSettingsRE build() {
             return new StuffSettingsRE(Optional.empty(), tags, column, minheight, maxheight,
                     mincount, maxcount, attempts, inbuilding, seesky,
-                    Optional.empty(), Optional.empty(), Optional.empty(), buildings)
-                    .setRegistryName(Identifier.fromNamespaceAndPath(namespace, path));
+                    Optional.empty(), Optional.empty(), Optional.empty(), buildings);
         }
     }
 }

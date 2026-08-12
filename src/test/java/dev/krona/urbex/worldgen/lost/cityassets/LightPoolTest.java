@@ -62,7 +62,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(palette)));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("marker 'L'"));
         assertTrue(error.getMessage().contains("floor, wall, ceiling, or free"));
@@ -78,7 +78,7 @@ class LightPoolTest {
                     """.formatted(weight));
 
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                    () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(palette)));
+                    () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
             assertTrue(error.getMessage().contains("urbex:test_lights"));
             assertTrue(error.getMessage().contains("marker 'L'"));
             assertTrue(error.getMessage().contains("placement 'floor'"));
@@ -243,10 +243,9 @@ class LightPoolTest {
                 }]}
                 """));
         assertTrue(result.result().isPresent());
-        PaletteRE paletteRE = result.result().orElseThrow()
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "legacy_torch"));
+        PaletteRE paletteRE = result.result().orElseThrow();
 
-        Palette.PE entry = new Palette(BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
         assertInstanceOf(BlockState.class, entry.blocks());
         assertTrue(entry.info().isTorch());
         assertNull(entry.info().light());
@@ -264,10 +263,9 @@ class LightPoolTest {
                 }]}
                 """));
         assertTrue(result.result().isPresent());
-        PaletteRE paletteRE = result.result().orElseThrow()
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "typed_lights"));
+        PaletteRE paletteRE = result.result().orElseThrow();
 
-        Palette.PE entry = new Palette(BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
         BlockState representative = assertInstanceOf(BlockState.class, entry.blocks());
         assertEquals(Blocks.SOUL_WALL_TORCH, representative.getBlock());
         assertTrue(entry.info().isSpecial());
@@ -301,6 +299,6 @@ class LightPoolTest {
     private static PaletteRE decodePalette(String json) {
         DataResult<PaletteRE> result = PaletteRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
         assertTrue(result.result().isPresent(), () -> result.error().map(Object::toString).orElse("unknown decode error"));
-        return result.result().orElseThrow().setRegistryName(PALETTE_ID);
+        return result.result().orElseThrow();
     }
 }

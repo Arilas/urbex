@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Compilation no longer writes registry ids into the definitions it reads.** A compiled asset takes
+  its id as a constructor argument, from the compiler that already has it, instead of reading it off
+  a definition that `IAsset.setRegistryName` had written it into on the way past. The interface, the
+  setter and the field on all thirteen definition types are gone (issue #128).
+  - *Compiling a datapack was mutating the authored model.* Resolving an `extends` chain assigned
+    each link's registry id onto the decoded object, so an entry's identity depended on something
+    having walked a chain that reached it — and two compilations of the same registry were writing
+    to the same objects.
+  - *No worldgen change*: both digest goldens are unchanged. The id an asset ends up with is the same
+    one; only the direction it travels changed.
+
 - **A datapack naming a block you do not have still generates the rest of itself.** A block from an
   uninstalled mod, or one a Minecraft version renamed, drops out of its weighted list and the blocks
   that remain share its part of the draw; a palette character left with nothing generates as air.

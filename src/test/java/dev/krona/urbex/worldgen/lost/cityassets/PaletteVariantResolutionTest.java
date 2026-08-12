@@ -38,6 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PaletteVariantResolutionTest {
 
+    private static final Identifier PALETTE_ID = Identifier.fromNamespaceAndPath("urbex", "variant-palette");
+
     @BeforeAll
     static void bootstrap() {
         SharedConstants.tryDetectVersion();
@@ -46,7 +48,7 @@ class PaletteVariantResolutionTest {
 
     @Test
     void aVariantResolvesAgainstTheIndexThePaletteWasGiven() {
-        Palette compiled = new Palette(BuiltInRegistries.BLOCK, variantsWith("minecraft:deepslate"),
+        Palette compiled = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, variantsWith("minecraft:deepslate"),
                 List.of(paletteNamingVariant()));
 
         assertEquals(List.of("minecraft:deepslate"), blocksOf(compiled, 'V'));
@@ -58,9 +60,9 @@ class PaletteVariantResolutionTest {
      */
     @Test
     void twoIndexesResolveTheSameVariantIdIndependently() {
-        Palette fromFirst = new Palette(BuiltInRegistries.BLOCK, variantsWith("minecraft:deepslate"),
+        Palette fromFirst = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, variantsWith("minecraft:deepslate"),
                 List.of(paletteNamingVariant()));
-        Palette fromSecond = new Palette(BuiltInRegistries.BLOCK, variantsWith("minecraft:sandstone"),
+        Palette fromSecond = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, variantsWith("minecraft:sandstone"),
                 List.of(paletteNamingVariant()));
 
         assertEquals(List.of("minecraft:deepslate"), blocksOf(fromFirst, 'V'));
@@ -77,7 +79,7 @@ class PaletteVariantResolutionTest {
     @Test
     void aVariantEntryWithNoVariantIndexFailsNamingWhatItWanted() {
         IllegalStateException failure = assertThrows(IllegalStateException.class,
-                () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(paletteNamingVariant())));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteNamingVariant())));
 
         assertTrue(failure.getMessage().contains("urbex:rubble"), failure.getMessage());
         assertTrue(failure.getMessage().contains("variant-palette"), failure.getMessage());
@@ -101,8 +103,7 @@ class PaletteVariantResolutionTest {
         PaletteEntry entry = new PaletteEntry("V", Optional.empty(), Optional.of("urbex:rubble"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        return new PaletteRE(Optional.empty(), Optional.of(List.of(entry)))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "variant-palette"));
+        return new PaletteRE(Optional.empty(), Optional.of(List.of(entry)));
     }
 
     /** An index whose only {@code urbex:rubble} variant is one weighted block. */
@@ -110,7 +111,6 @@ class PaletteVariantResolutionTest {
         Identifier id = Identifier.fromNamespaceAndPath("urbex", "rubble");
         VariantRE definition = new VariantRE(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block)))));
-        definition.setRegistryName(id);
-        return new AssetIndex<>("urbex:variants", Map.of(id, new Variant(BuiltInRegistries.BLOCK, List.of(definition))));
+        return new AssetIndex<>("urbex:variants", Map.of(id, new Variant(id, BuiltInRegistries.BLOCK, List.of(definition))));
     }
 }

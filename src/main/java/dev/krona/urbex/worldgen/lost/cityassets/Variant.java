@@ -30,8 +30,8 @@ public class Variant {
      *               registries. Taken rather than fetched: resolution used to reach a static server
      *               reference from wherever it happened to run (issues #60, #128).
      */
-    public Variant(HolderLookup<Block> blockLookup, List<VariantRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public Variant(Identifier id, HolderLookup<Block> blockLookup, List<VariantRE> chainRootFirst) {
+        name = id;
         List<BlockEntry> entries = new ArrayList<>();
         boolean anyBlocks = false;
         for (VariantRE object : chainRootFirst) {

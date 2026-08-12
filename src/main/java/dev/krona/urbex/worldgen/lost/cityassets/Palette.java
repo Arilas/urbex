@@ -48,9 +48,9 @@ public class Palette {
      *                    does then fails naming itself and the variant rather than reaching for a
      *                    static server (issue #60) or compiling one on the spot (issue #128).
      */
-    public Palette(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public Palette(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
                    List<PaletteRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        name = id;
         compile(blockLookup, variants, mergeByCharacter(chainRootFirst, name));
     }
 

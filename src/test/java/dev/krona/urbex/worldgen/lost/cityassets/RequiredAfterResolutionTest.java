@@ -57,7 +57,7 @@ class RequiredAfterResolutionTest {
         StuffSettingsRE parent = stuff().column("y").counts(2, 5, 10).inbuilding(true).tags("rubble").build();
         StuffSettingsRE child = stuff().tags("debris").build();
 
-        StuffObject resolved = new StuffObject(List.of(parent, child));
+        StuffObject resolved = new StuffObject(TestAssetId.of("test_stuff"), List.of(parent, child));
 
         assertEquals(2, resolved.getSettings().getMincount(),
                 "a field the child omits comes from the chain, not from a codec default");
@@ -73,7 +73,7 @@ class RequiredAfterResolutionTest {
     @Test
     void stuffFieldNoEntryInTheChainDeclaresIsALoadErrorNamingBoth() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new StuffObject(List.of(stuff().column("y").tags("debris").build())));
+                () -> new StuffObject(TestAssetId.of("test_stuff"), List.of(stuff().column("y").tags("debris").build())));
 
         assertTrue(e.getMessage().contains("mincount"), e.getMessage());
         assertTrue(e.getMessage().contains("urbex:test_stuff"), e.getMessage());
@@ -85,7 +85,7 @@ class RequiredAfterResolutionTest {
         // so an undeclared one matched no chunk at all and the decoration was registered, indexed
         // and walked on every city chunk while placing nothing, silently.
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new StuffObject(List.of(stuff().column("y").counts(1, 2, 3).tags("debris").build())));
+                () -> new StuffObject(TestAssetId.of("test_stuff"), List.of(stuff().column("y").counts(1, 2, 3).tags("debris").build())));
 
         assertTrue(e.getMessage().contains("inbuilding"), e.getMessage());
         assertTrue(e.getMessage().contains("urbex:test_stuff"), e.getMessage());
@@ -97,7 +97,7 @@ class RequiredAfterResolutionTest {
         StuffSettingsRE middle = stuff().counts(3, 6, 11).build();
         StuffSettingsRE leaf = stuff().tags("debris").build();
 
-        StuffSettingsRE resolved = new StuffObject(List.of(root, middle, leaf)).getSettings();
+        StuffSettingsRE resolved = new StuffObject(TestAssetId.of("test_stuff"), List.of(root, middle, leaf)).getSettings();
 
         assertEquals("y", resolved.getColumn(), "from the root, two links up");
         assertEquals(3, resolved.getMincount(), "the nearest ancestor that declares one wins");
@@ -112,7 +112,7 @@ class RequiredAfterResolutionTest {
         MultiBuildingRE child = multiBuilding(Optional.empty(), Optional.empty(),
                 Optional.of(List.of(List.of("urbex:w", "urbex:x"), List.of("urbex:y", "urbex:z"))));
 
-        MultiBuilding resolved = new MultiBuilding(List.of(parent, child));
+        MultiBuilding resolved = new MultiBuilding(TestAssetId.of("test_multi"), List.of(parent, child));
 
         assertEquals(2, resolved.getDimX(), "dimx comes from the parent");
         assertEquals(2, resolved.getDimZ(), "dimz comes from the parent");
@@ -126,13 +126,13 @@ class RequiredAfterResolutionTest {
                 Optional.of(List.of(List.of("urbex:tower"))));
         MultiBuildingRE child = multiBuilding(Optional.of(1), Optional.of(1), Optional.empty());
 
-        assertEquals("urbex:tower", new MultiBuilding(List.of(parent, child)).getBuilding(0, 0));
+        assertEquals("urbex:tower", new MultiBuilding(TestAssetId.of("test_multi"), List.of(parent, child)).getBuilding(0, 0));
     }
 
     @Test
     void multiBuildingFieldNoEntryInTheChainDeclaresIsALoadErrorNamingBoth() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new MultiBuilding(List.of(multiBuilding(Optional.empty(), Optional.empty(),
+                () -> new MultiBuilding(TestAssetId.of("test_multi"), List.of(multiBuilding(Optional.empty(), Optional.empty(),
                         Optional.of(List.of(List.of("urbex:a")))))));
 
         assertTrue(e.getMessage().contains("dimx"), e.getMessage());
@@ -153,7 +153,7 @@ class RequiredAfterResolutionTest {
         MultiBuildingRE child = multiBuilding(Optional.of(2), Optional.of(2), Optional.empty());
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new MultiBuilding(List.of(parent, child)));
+                () -> new MultiBuilding(TestAssetId.of("test_multi"), List.of(parent, child)));
 
         assertTrue(e.getMessage().contains("urbex:test_multi"), e.getMessage());
         assertTrue(e.getMessage().contains("dimx"), e.getMessage());
@@ -166,7 +166,7 @@ class RequiredAfterResolutionTest {
                 Optional.of(List.of(List.of("urbex:a", "urbex:b"), List.of("urbex:c"))));
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new MultiBuilding(List.of(entry)));
+                () -> new MultiBuilding(TestAssetId.of("test_multi"), List.of(entry)));
 
         assertTrue(e.getMessage().contains("urbex:test_multi"), e.getMessage());
         assertTrue(e.getMessage().contains("dimz"), e.getMessage());
@@ -175,7 +175,7 @@ class RequiredAfterResolutionTest {
     @Test
     void multiBuildingWithNoGridAnywhereInTheChainIsALoadError() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new MultiBuilding(List.of(
+                () -> new MultiBuilding(TestAssetId.of("test_multi"), List.of(
                         multiBuilding(Optional.of(1), Optional.of(1), Optional.empty()))));
 
         assertTrue(e.getMessage().contains("buildings"), e.getMessage());
@@ -194,7 +194,7 @@ class RequiredAfterResolutionTest {
     @Test
     void scatteredWithNeitherBuildingsNorMultiBuildingInTheChainIsALoadError() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new ScatteredBuilding(List.of(scattered(Optional.empty(), Optional.empty()))));
+                () -> new ScatteredBuilding(TestAssetId.of("test_scattered"), List.of(scattered(Optional.empty(), Optional.empty()))));
 
         assertTrue(e.getMessage().contains("urbex:test_scattered"), e.getMessage());
         assertTrue(e.getMessage().contains("buildings"), e.getMessage());
@@ -207,7 +207,7 @@ class RequiredAfterResolutionTest {
                 Optional.empty());
         ScatteredRE child = scattered(Optional.empty(), Optional.empty());
 
-        ScatteredBuilding resolved = new ScatteredBuilding(List.of(parent, child));
+        ScatteredBuilding resolved = new ScatteredBuilding(TestAssetId.of("test_scattered"), List.of(parent, child));
 
         assertEquals(List.of("urbex:cabin"), resolved.getBuildings(),
                 "a child that only restates terrain still inherits the chain's building list");
@@ -215,7 +215,7 @@ class RequiredAfterResolutionTest {
 
     @Test
     void scatteredSatisfiesThePairWithMultiBuildingAlone() {
-        ScatteredBuilding resolved = new ScatteredBuilding(List.of(
+        ScatteredBuilding resolved = new ScatteredBuilding(TestAssetId.of("test_scattered"), List.of(
                 scattered(Optional.empty(), Optional.of("urbex:oilrig"))));
 
         assertEquals("urbex:oilrig", resolved.getMultibuilding());
@@ -233,7 +233,7 @@ class RequiredAfterResolutionTest {
                 Optional.empty());
         WorldStyleRE child = worldStyle(Optional.empty(), Optional.empty(), Optional.of(scattered));
 
-        WorldStyle resolved = new WorldStyle(List.of(parent, child));
+        WorldStyle resolved = new WorldStyle(TestAssetId.of("test_world"), List.of(parent, child));
 
         assertEquals("urbex:standard", resolved.getOutsideStyle(),
                 "outsidestyle comes from the parent");
@@ -245,7 +245,7 @@ class RequiredAfterResolutionTest {
     @Test
     void worldStyleFieldNoEntryInTheChainDeclaresIsALoadErrorNamingBoth() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new WorldStyle(List.of(worldStyle(Optional.empty(), Optional.empty(),
+                () -> new WorldStyle(TestAssetId.of("test_world"), List.of(worldStyle(Optional.empty(), Optional.empty(),
                         Optional.of(new ScatteredSettings(16, 0.5f, 10, List.of()))))));
 
         assertTrue(e.getMessage().contains("outsidestyle"), e.getMessage());
@@ -255,7 +255,7 @@ class RequiredAfterResolutionTest {
     @Test
     void worldStyleWithNoCityStylesAnywhereInTheChainIsALoadError() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new WorldStyle(List.of(
+                () -> new WorldStyle(TestAssetId.of("test_world"), List.of(
                         worldStyle(Optional.of("urbex:standard"), Optional.empty(), Optional.empty()))));
 
         assertTrue(e.getMessage().contains("citystyles"), e.getMessage());
@@ -264,7 +264,7 @@ class RequiredAfterResolutionTest {
 
     @Test
     void worldStyleThatDeclaresAnEmptyCityStyleListHasDeclaredIt() {
-        WorldStyle resolved = new WorldStyle(List.of(worldStyle(Optional.of("urbex:standard"),
+        WorldStyle resolved = new WorldStyle(TestAssetId.of("test_world"), List.of(worldStyle(Optional.of("urbex:standard"),
                 Optional.of(new Mergeable<>(true, List.of())), Optional.empty())));
 
         assertEquals(List.of(), cityStyleNames(resolved),
@@ -281,14 +281,12 @@ class RequiredAfterResolutionTest {
                                          Optional<String> multibuilding) {
         return new ScatteredRE(Optional.empty(), buildings, multibuilding, Optional.empty(),
                 Optional.of(ScatteredBuilding.TerrainHeight.AVERAGE),
-                Optional.of(ScatteredBuilding.TerrainFix.NONE), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_scattered"));
+                Optional.of(ScatteredBuilding.TerrainFix.NONE), Optional.empty());
     }
 
     private static MultiBuildingRE multiBuilding(Optional<Integer> dimX, Optional<Integer> dimZ,
                                                  Optional<List<List<String>>> buildings) {
-        return new MultiBuildingRE(Optional.empty(), dimX, dimZ, buildings)
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_multi"));
+        return new MultiBuildingRE(Optional.empty(), dimX, dimZ, buildings);
     }
 
     /**
@@ -303,8 +301,7 @@ class RequiredAfterResolutionTest {
         return new WorldStyleRE(Optional.empty(), Optional.empty(), outsideStyle,
                 Optional.empty(), Optional.empty(), scattered,
                 Optional.of(TestWiring.partSelector()),
-                cityStyles, Optional.empty(), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_world"));
+                cityStyles, Optional.empty(), Optional.empty());
     }
 
     private static StuffBuilder stuff() {
@@ -346,8 +343,7 @@ class RequiredAfterResolutionTest {
             return new StuffSettingsRE(Optional.empty(), tags, column,
                     Optional.empty(), Optional.empty(), mincount, maxcount, attempts,
                     inbuilding, Optional.empty(),
-                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())
-                    .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_stuff"));
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         }
     }
 }

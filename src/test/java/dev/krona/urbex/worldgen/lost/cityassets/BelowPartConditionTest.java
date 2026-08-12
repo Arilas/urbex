@@ -95,13 +95,12 @@ public class BelowPartConditionTest {
     private static Building buildingWithParts2Condition(Set<String> belowPart, Set<String> inpart) {
         PartRef floor = partRef(FLOOR, null, null);
         PartRef second = partRef("urbex:second_part", belowPart, inpart);
-        return new Building(BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"), List.of(new BuildingRE(
+        return new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"), List.of(new BuildingRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of('#'), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of(floor))),
-                Optional.of(new Mergeable<>(true, List.of(second))))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_building"))));
+                Optional.of(new Mergeable<>(true, List.of(second))))));
     }
 
     private static PartRef partRef(String part, Set<String> belowPart, Set<String> inpart) {

@@ -24,7 +24,7 @@ import java.util.Optional;
  * than required, because a rarer variant of an existing decoration should not have to restate them.
  * Requiredness is checked after the chain is resolved, in {@link #resolve}.
  */
-public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
+public class StuffSettingsRE implements Extendable {
 
     /**
      * The widest {@code attempts} the RNG slot address can hold, and one more than the widest
@@ -63,7 +63,6 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<StuffSettingsRE> CODEC = RetiredKeys.reject(RAW, "stuff entry");
 
-    private Identifier name;
     private final Optional<Identifier> extendsId;
     private final Mergeable<String> tags;
     // Null on any of these means "not declared here", so the chain reads it from an ancestor.
@@ -115,10 +114,10 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
      * file, so a child inherits them, and a chain where nothing declares one is a load error naming
      * the asset and the field rather than an NPE during generation.
      */
-    public static StuffSettingsRE resolve(List<StuffSettingsRE> chainRootFirst) {
+    public static StuffSettingsRE resolve(Identifier id, List<StuffSettingsRE> chainRootFirst) {
         StuffSettingsRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
         if (chainRootFirst.size() == 1) {
-            return leaf.requireResolved();
+            return leaf.requireResolved(id);
         }
         List<String> tags = new ArrayList<>();
         boolean anyTags = false;
@@ -184,15 +183,18 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
                 Optional.ofNullable(inbuilding), Optional.ofNullable(seesky),
                 Optional.ofNullable(biomeMatcher), Optional.ofNullable(blockMatcher),
                 Optional.ofNullable(upperBlockMatcher), Optional.ofNullable(buildingMatcher))
-                .setRegistryName(leaf.getRegistryName())
-                .requireResolved();
+                .requireResolved(id);
     }
 
     /**
      * Fails the load unless the whole chain, taken together, declared everything generation reads
      * without a fallback. Called on the fold - or on the entry itself when the chain is one long.
+     *
+     * @param name the registry id, for the message. Passed in rather than read off the fold: the
+     *             fold is a synthetic entry no registry holds, and writing an id into it just so an
+     *             error could name it is what {@code IAsset.setRegistryName} was for (issue #128).
      */
-    private StuffSettingsRE requireResolved() {
+    private StuffSettingsRE requireResolved(Identifier name) {
         Resolved.require(column, name, "column");
         Resolved.require(mincount, name, "mincount");
         Resolved.require(maxcount, name, "maxcount");
@@ -298,14 +300,5 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public StuffSettingsRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

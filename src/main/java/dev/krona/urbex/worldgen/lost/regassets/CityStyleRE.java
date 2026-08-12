@@ -9,7 +9,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
+public class CityStyleRE implements Extendable {
 
     private static final Codec<CityStyleRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -30,7 +30,6 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<CityStyleRE> CODEC = RetiredKeys.reject(RAW, "citystyle");
 
-    private Identifier name;
 
     private final Float explosionChance;
     private final String style;
@@ -127,14 +126,5 @@ public class CityStyleRE implements IAsset<CityStyleRE>, Extendable {
         return Optional.ofNullable(selectors);
     }
 
-    @Override
-    public CityStyleRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

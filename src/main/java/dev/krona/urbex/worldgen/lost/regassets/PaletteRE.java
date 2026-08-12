@@ -17,7 +17,7 @@ import java.util.Optional;
  * {@code palette} is optional here rather than required, because requiredness is checked after the
  * {@code extends} chain is resolved, in {@link dev.krona.urbex.worldgen.lost.cityassets.Palette}.
  */
-public class PaletteRE implements IAsset<PaletteRE>, Extendable {
+public class PaletteRE implements Extendable {
 
     private static final Codec<PaletteRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -28,7 +28,6 @@ public class PaletteRE implements IAsset<PaletteRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<PaletteRE> CODEC = RetiredKeys.reject(RAW, "palette");
 
-    private Identifier name;
     private final Optional<Identifier> extendsId;
     // Null when this entry declares no palette of its own and takes its ancestor's.
     private final List<PaletteEntry> paletteEntries;
@@ -48,14 +47,5 @@ public class PaletteRE implements IAsset<PaletteRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public PaletteRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

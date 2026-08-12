@@ -37,7 +37,7 @@ final class TestProfiles {
      * {@code urbex:test_street_*} ids that no test here places.
      */
     static CityStyle cityStyle() {
-        return new CityStyle(List.of(new CityStyleRE(
+        return new CityStyle(Identifier.fromNamespaceAndPath("urbex", "test_citystyle"), List.of(new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),

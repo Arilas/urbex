@@ -24,8 +24,8 @@ public class Condition {
      * inherits it unchanged. A chain where nothing declares {@code values} is a load error, since
      * the condition would silently hand back null for every draw.
      */
-    public Condition(List<ConditionRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public Condition(Identifier id, List<ConditionRE> chainRootFirst) {
+        name = id;
         List<ConditionPart> values = new ArrayList<>();
         boolean anyValues = false;
         for (ConditionRE object : chainRootFirst) {

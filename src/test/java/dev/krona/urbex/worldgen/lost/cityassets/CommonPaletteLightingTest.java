@@ -45,7 +45,7 @@ class CommonPaletteLightingTest {
 
     @Test
     void commonPaletteCompilesExactTypedLightPoolsWithoutRedstoneTorches() throws IOException {
-        PaletteRE common = decodeClasspathPalette(COMMON_PALETTE).setRegistryName(COMMON_ID);
+        PaletteRE common = decodeClasspathPalette(COMMON_PALETTE);
         PaletteEntry torchMarker = entry(common, 'T');
         PaletteEntry freeMarker = entry(common, 'h');
         PaletteEntry redstoneTorch = entry(common, 'g');
@@ -77,7 +77,7 @@ class CommonPaletteLightingTest {
         assertNull(redstoneTorch.getTorch());
         assertNull(redstoneTorch.getLight());
 
-        Palette compiled = new Palette(BuiltInRegistries.BLOCK, null, List.of(common));
+        Palette compiled = new Palette(COMMON_ID, BuiltInRegistries.BLOCK, null, List.of(common));
         LightPool torchPool = compiled.getPalette().get('T').info().light();
         LightPool freePool = compiled.getPalette().get('h').info().light();
         assertNotNull(torchPool);

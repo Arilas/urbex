@@ -40,31 +40,28 @@ class StyleDisplayNameTest {
         return Identifier.fromNamespaceAndPath(namespace, path);
     }
 
-    private static WorldStyleRE worldStyle(Identifier registryName, Optional<String> name) {
+    private static WorldStyleRE worldStyle(Optional<String> name) {
         return new WorldStyleRE(Optional.empty(), name, Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
-                Optional.empty(), Optional.empty())
-                .setRegistryName(registryName);
+                Optional.empty(), Optional.empty());
     }
 
-    private static CityStyleRE cityStyle(Identifier registryName, Optional<String> name) {
+    private static CityStyleRE cityStyle(Optional<String> name) {
         return new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), name,
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),
-                Optional.empty())
-                .setRegistryName(registryName);
+                Optional.empty());
     }
 
     // ---------------------------------------------------------------- world styles
 
     @Test
     void aWorldStyleDeclaringNoNameIsLabelledByItsId() {
-        WorldStyle resolved = new WorldStyle(
-                List.of(worldStyle(id("urbex", "standard"), Optional.empty())));
+        WorldStyle resolved = new WorldStyle(id("urbex", "standard"), List.of(worldStyle(Optional.empty())));
 
         assertEquals("urbex:standard", resolved.getDisplayName(),
                 "every world style written before this field existed must keep reading as its id");
@@ -72,8 +69,7 @@ class StyleDisplayNameTest {
 
     @Test
     void aWorldStyleShowsTheNameItDeclares() {
-        WorldStyle resolved = new WorldStyle(
-                List.of(worldStyle(id("urbex", "standard"), Optional.of("Standard"))));
+        WorldStyle resolved = new WorldStyle(id("urbex", "standard"), List.of(worldStyle(Optional.of("Standard"))));
 
         assertEquals("Standard", resolved.getDisplayName());
     }
@@ -85,9 +81,9 @@ class StyleDisplayNameTest {
      */
     @Test
     void aWorldStyleWithoutANameInheritsItsParents() {
-        WorldStyle resolved = new WorldStyle(List.of(
-                worldStyle(id("urbex", "standard"), Optional.of("Standard")),
-                worldStyle(id("urbexza", "zombie_apocalypse"), Optional.empty())));
+        WorldStyle resolved = new WorldStyle(id("urbexza", "zombie_apocalypse"), List.of(
+                worldStyle(Optional.of("Standard")),
+                worldStyle(Optional.empty())));
 
         assertEquals("Standard", resolved.getDisplayName(),
                 "the inheritance is why every shipped world style restates its own name");
@@ -95,17 +91,16 @@ class StyleDisplayNameTest {
 
     @Test
     void aWorldStylesOwnNameWinsOverTheOneItExtends() {
-        WorldStyle resolved = new WorldStyle(List.of(
-                worldStyle(id("urbex", "standard"), Optional.of("Standard")),
-                worldStyle(id("urbexza", "zombie_apocalypse"), Optional.of("Zombie Apocalypse"))));
+        WorldStyle resolved = new WorldStyle(id("urbexza", "zombie_apocalypse"), List.of(
+                worldStyle(Optional.of("Standard")),
+                worldStyle(Optional.of("Zombie Apocalypse"))));
 
         assertEquals("Zombie Apocalypse", resolved.getDisplayName());
     }
 
     @Test
     void anEmptyWorldStyleNameIsTreatedAsNoneRatherThanAsABlankLabel() {
-        WorldStyle resolved = new WorldStyle(
-                List.of(worldStyle(id("urbex", "standard"), Optional.of(""))));
+        WorldStyle resolved = new WorldStyle(id("urbex", "standard"), List.of(worldStyle(Optional.of(""))));
 
         assertEquals("urbex:standard", resolved.getDisplayName());
     }
@@ -119,28 +114,26 @@ class StyleDisplayNameTest {
     void theStaticFoldTheGuiUsesMatchesWhatTheConstructorResolves() {
         Identifier leaf = id("urbexmt", "moderntweaks");
         List<WorldStyleRE> chain = List.of(
-                worldStyle(id("urbex", "standard"), Optional.of("Standard")),
-                worldStyle(leaf, Optional.of("Modern Tweaks")));
+                worldStyle(Optional.of("Standard")),
+                worldStyle(Optional.of("Modern Tweaks")));
 
-        assertEquals(new WorldStyle(chain).getDisplayName(), WorldStyle.displayNameOf(chain, leaf));
+        assertEquals(new WorldStyle(leaf, chain).getDisplayName(), WorldStyle.displayNameOf(chain, leaf));
         assertEquals("urbexmt:moderntweaks",
-                WorldStyle.displayNameOf(List.of(worldStyle(leaf, Optional.empty())), leaf));
+                WorldStyle.displayNameOf(List.of(worldStyle(Optional.empty())), leaf));
     }
 
     // ---------------------------------------------------------------- city styles
 
     @Test
     void aCityStyleDeclaringNoNameIsLabelledByItsId() {
-        CityStyle resolved = new CityStyle(
-                List.of(cityStyle(id("urbex", "citystyle_standard"), Optional.empty())));
+        CityStyle resolved = new CityStyle(id("urbex", "citystyle_standard"), List.of(cityStyle(Optional.empty())));
 
         assertEquals("urbex:citystyle_standard", resolved.getDisplayName());
     }
 
     @Test
     void aCityStyleShowsTheNameItDeclares() {
-        CityStyle resolved = new CityStyle(
-                List.of(cityStyle(id("urbex", "citystyle_desert"), Optional.of("Desert"))));
+        CityStyle resolved = new CityStyle(id("urbex", "citystyle_desert"), List.of(cityStyle(Optional.of("Desert"))));
 
         assertEquals("Desert", resolved.getDisplayName());
     }
@@ -152,23 +145,23 @@ class StyleDisplayNameTest {
      */
     @Test
     void aCityStyleWithoutANameInheritsItsParents() {
-        CityStyle borrowed = new CityStyle(List.of(
-                cityStyle(id("urbex", "citystyle_common"), Optional.of("Common")),
-                cityStyle(id("mypack", "downtown"), Optional.empty())));
+        CityStyle borrowed = new CityStyle(id("mypack", "downtown"), List.of(
+                cityStyle(Optional.of("Common")),
+                cityStyle(Optional.empty())));
         assertEquals("Common", borrowed.getDisplayName());
 
-        CityStyle ownId = new CityStyle(List.of(
-                cityStyle(id("urbex", "citystyle_common"), Optional.empty()),
-                cityStyle(id("mypack", "downtown"), Optional.empty())));
+        CityStyle ownId = new CityStyle(id("mypack", "downtown"), List.of(
+                cityStyle(Optional.empty()),
+                cityStyle(Optional.empty())));
         assertEquals("mypack:downtown", ownId.getDisplayName(),
                 "an unnamed base is what lets an unnamed child keep its own identity");
     }
 
     @Test
     void aCityStylesOwnNameWinsOverTheOneItExtends() {
-        CityStyle resolved = new CityStyle(List.of(
-                cityStyle(id("urbex", "citystyle_common"), Optional.of("Common")),
-                cityStyle(id("urbexmt", "citystyle_desert"), Optional.of("Modern Desert"))));
+        CityStyle resolved = new CityStyle(id("urbexmt", "citystyle_desert"), List.of(
+                cityStyle(Optional.of("Common")),
+                cityStyle(Optional.of("Modern Desert"))));
 
         assertEquals("Modern Desert", resolved.getDisplayName());
     }
@@ -176,12 +169,10 @@ class StyleDisplayNameTest {
     /** {@code getName()} stays the id: worldgen, logs and conditions all key off it. */
     @Test
     void namingAStyleDoesNotChangeWhatGetNameReturns() {
-        CityStyle city = new CityStyle(
-                List.of(cityStyle(id("urbex", "citystyle_desert"), Optional.of("Desert"))));
+        CityStyle city = new CityStyle(id("urbex", "citystyle_desert"), List.of(cityStyle(Optional.of("Desert"))));
         assertEquals("urbex:citystyle_desert", city.getName());
 
-        WorldStyle world = new WorldStyle(
-                List.of(worldStyle(id("urbex", "standard"), Optional.of("Standard"))));
+        WorldStyle world = new WorldStyle(id("urbex", "standard"), List.of(worldStyle(Optional.of("Standard"))));
         assertEquals("urbex:standard", world.getName());
     }
 }

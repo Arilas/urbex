@@ -92,7 +92,7 @@ class WiringRequiredTest {
 
     @Test
     void aChildAppendsToTheStraightPartsItInheritsWhenItOptsIn() {
-        CityStyle resolved = new CityStyle(List.of(
+        CityStyle resolved = new CityStyle(TestAssetId.of("citystyle_parent"), List.of(
                 cityStyle("parent", TestWiring.streetParts("street")),
                 cityStyle("child", partsWith("straight",
                         new Mergeable<>(false, List.of("urbex:street_straight_alt"))))));
@@ -106,7 +106,7 @@ class WiringRequiredTest {
 
     @Test
     void aChildsBareArrayReplacesTheStraightPartsItInherits() {
-        CityStyle resolved = new CityStyle(List.of(
+        CityStyle resolved = new CityStyle(TestAssetId.of("citystyle_parent"), List.of(
                 cityStyle("parent", TestWiring.streetParts("street")),
                 cityStyle("child", partsWith("straight",
                         new Mergeable<>(true, List.of("urbex:street_straight_alt"))))));
@@ -125,13 +125,13 @@ class WiringRequiredTest {
                         Optional.empty(), Optional.empty(), Optional.empty())),
                 Optional.empty()));
 
-        HighwayParts resolved = new WorldStyle(List.of(parent, child)).getPartSelector().highwayParts();
+        HighwayParts resolved = new WorldStyle(TestAssetId.of("test_world"), List.of(parent, child)).getPartSelector().highwayParts();
 
         assertEquals(List.of("urbex:test_highway_tunnel", "urbex:highway_tunnel_alt"), resolved.tunnel());
         assertEquals(List.of("urbex:test_highway_open"), resolved.open(),
                 "a field the child never mentions is inherited unchanged");
         assertEquals(List.of("urbex:test_rails_bend"),
-                new WorldStyle(List.of(parent, child)).getPartSelector().railwayParts().railsBend(),
+                new WorldStyle(TestAssetId.of("test_world"), List.of(parent, child)).getPartSelector().railwayParts().railsBend(),
                 "and so is the group it never mentions");
     }
 
@@ -140,7 +140,7 @@ class WiringRequiredTest {
     @Test
     void aCityStyleWithNoStreetPartsAnywhereInTheChainIsALoadError() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CityStyle(List.of(cityStyle("bare", null))));
+                () -> new CityStyle(TestAssetId.of("citystyle_bare"), List.of(cityStyle("bare", null))));
 
         assertTrue(e.getMessage().contains("streetblocks.parts"), e.getMessage());
         assertTrue(e.getMessage().contains("urbex:citystyle_bare"), e.getMessage());
@@ -149,7 +149,7 @@ class WiringRequiredTest {
     @Test
     void aCityStyleThatDeclaresHalfAFamilyIsALoadErrorNamingTheMissingComponent() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CityStyle(List.of(cityStyle("half",
+                () -> new CityStyle(TestAssetId.of("citystyle_half"), List.of(cityStyle("half",
                         partsWith("straight", new Mergeable<>(true, List.of("urbex:street_straight")))))));
 
         assertTrue(e.getMessage().contains("streetblocks.parts.end"), e.getMessage());
@@ -158,7 +158,7 @@ class WiringRequiredTest {
 
     @Test
     void aChildThatDeclaresOneComponentStillLoadsWhenAnAncestorCoversTheRest() {
-        CityStyle resolved = new CityStyle(List.of(
+        CityStyle resolved = new CityStyle(TestAssetId.of("citystyle_parent"), List.of(
                 cityStyle("parent", TestWiring.streetParts("street")),
                 cityStyle("child", partsWith("all",
                         new Mergeable<>(true, List.of("urbex:street_all_alt"))))));
@@ -177,14 +177,14 @@ class WiringRequiredTest {
                 Optional.empty());
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CityStyle(List.of(cityStyleRE("halflarge", settings))));
+                () -> new CityStyle(TestAssetId.of("citystyle_halflarge"), List.of(cityStyleRE("halflarge", settings))));
 
         assertTrue(e.getMessage().contains("streetblocks.largeparts.end"), e.getMessage());
     }
 
     @Test
     void theLargeAndTertiaryFamiliesFallBackToTheSecondaryOneWhenNothingDeclaresThem() {
-        CityStyle resolved = new CityStyle(List.of(cityStyle("plain", TestWiring.streetParts("street"))));
+        CityStyle resolved = new CityStyle(TestAssetId.of("citystyle_plain"), List.of(cityStyle("plain", TestWiring.streetParts("street"))));
 
         assertSame(resolved.getStreetParts(), resolved.getLargeStreetParts(),
                 "primary roads draw from the pack's own secondary parts, not from Java's");
@@ -194,7 +194,7 @@ class WiringRequiredTest {
     @Test
     void aWorldStyleWithNoPartsBlockAnywhereInTheChainIsALoadError() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new WorldStyle(List.of(worldStyle("bare", null))));
+                () -> new WorldStyle(TestAssetId.of("bare"), List.of(worldStyle("bare", null))));
 
         assertTrue(e.getMessage().contains("'parts'"), e.getMessage());
         assertTrue(e.getMessage().contains("urbex:bare"), e.getMessage());
@@ -206,7 +206,7 @@ class WiringRequiredTest {
                 TestWiring.partSelector().highways(), Optional.empty());
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new WorldStyle(List.of(worldStyle("nrail", highwaysOnly))));
+                () -> new WorldStyle(TestAssetId.of("nrail"), List.of(worldStyle("nrail", highwaysOnly))));
 
         assertTrue(e.getMessage().contains("parts.railways"), e.getMessage());
         assertTrue(e.getMessage().contains("urbex:nrail"), e.getMessage());
@@ -224,7 +224,7 @@ class WiringRequiredTest {
                         Optional.empty(), Optional.empty(), Optional.empty())));
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new WorldStyle(List.of(worldStyle("halfrail", halfRail))));
+                () -> new WorldStyle(TestAssetId.of("halfrail"), List.of(worldStyle("halfrail", halfRail))));
 
         assertTrue(e.getMessage().contains("parts.railways.stationopen"), e.getMessage());
     }
@@ -254,14 +254,12 @@ class WiringRequiredTest {
         return new CityStyleRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.ofNullable(settings), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "citystyle_" + name));
+                Optional.empty(), Optional.empty(), Optional.ofNullable(settings), Optional.empty());
     }
 
     private static WorldStyleRE worldStyle(String name, PartSelector.Decl parts) {
         return new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.ofNullable(parts),
-                Optional.of(new Mergeable<>(true, List.of())), Optional.empty(), Optional.empty())
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", name));
+                Optional.of(new Mergeable<>(true, List.of())), Optional.empty(), Optional.empty());
     }
 }

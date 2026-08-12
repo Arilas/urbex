@@ -68,8 +68,8 @@ class WorldStyleFieldTest {
                 Optional.of(new Mergeable<>(true, Collections.emptyList())),
                 Optional.empty(),
                 Optional.empty()
-        ).setRegistryName(Identifier.fromNamespaceAndPath("urbextest", path));
-        return new WorldStyle(List.of(re));
+        );
+        return new WorldStyle(Identifier.fromNamespaceAndPath("urbextest", path), List.of(re));
     }
 
     private static Optional<Mergeable<String>> noParts() {

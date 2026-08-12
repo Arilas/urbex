@@ -20,7 +20,7 @@ import java.util.Optional;
  * {@link dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity} - so a sibling city can be
  * "the same city, elsewhere" by declaring nothing but {@code extends} and its two chunk coordinates.
  */
-public class PredefinedCityRE implements IAsset<PredefinedCityRE>, Extendable {
+public class PredefinedCityRE implements Extendable {
 
     private static final Codec<PredefinedCityRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -37,7 +37,6 @@ public class PredefinedCityRE implements IAsset<PredefinedCityRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<PredefinedCityRE> CODEC = RetiredKeys.reject(RAW, "predefined city");
 
-    private Identifier name;
 
     private final Optional<Identifier> extendsId;
     // Null on any of these means "not declared here", so the chain reads it from an ancestor.
@@ -106,14 +105,5 @@ public class PredefinedCityRE implements IAsset<PredefinedCityRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public PredefinedCityRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

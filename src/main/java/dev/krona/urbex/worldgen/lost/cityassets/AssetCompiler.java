@@ -72,23 +72,23 @@ public final class AssetCompiler {
         // been populated by the time it ran (issues #60, #128).
         HolderLookup<Block> blockLookup = access.lookupOrThrow(Registries.BLOCK);
         AssetIndex<Variant> variants = AssetStage.compileAll(access,
-                CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(blockLookup, chain), diagnostics);
+                CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(id, blockLookup, chain), diagnostics);
         AssetIndex<Palette> palettes = AssetStage.compileAll(access,
-                CustomRegistries.PALETTE_REGISTRY_KEY, (id, chain) -> new Palette(blockLookup, variants, chain), diagnostics);
+                CustomRegistries.PALETTE_REGISTRY_KEY, (id, chain) -> new Palette(id, blockLookup, variants, chain), diagnostics);
         AssetIndex<Condition> conditions = AssetStage.compileAll(access,
-                CustomRegistries.CONDITIONS_REGISTRY_KEY, (id, chain) -> new Condition(chain), diagnostics);
+                CustomRegistries.CONDITIONS_REGISTRY_KEY, (id, chain) -> new Condition(id, chain), diagnostics);
         AssetIndex<Style> styles = AssetStage.compileAll(access,
-                CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(palettes, chain), diagnostics);
+                CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(id, palettes, chain), diagnostics);
         AssetIndex<BuildingPart> parts = AssetStage.compileAll(access,
-                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(blockLookup, variants, palettes, chain), diagnostics);
+                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(id, blockLookup, variants, palettes, chain), diagnostics);
         AssetIndex<Building> buildings = AssetStage.compileAll(access,
-                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(blockLookup, variants, palettes, chain), diagnostics);
+                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(id, blockLookup, variants, palettes, chain), diagnostics);
         AssetIndex<MultiBuilding> multiBuildings = AssetStage.compileAll(access,
-                CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, (id, chain) -> new MultiBuilding(chain), diagnostics);
+                CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, (id, chain) -> new MultiBuilding(id, chain), diagnostics);
         AssetIndex<ScatteredBuilding> scattered = AssetStage.compileAll(access,
-                CustomRegistries.SCATTERED_REGISTRY_KEY, (id, chain) -> new ScatteredBuilding(chain), diagnostics);
+                CustomRegistries.SCATTERED_REGISTRY_KEY, (id, chain) -> new ScatteredBuilding(id, chain), diagnostics);
         AssetIndex<WorldStyle> worldStyles = AssetStage.compileAll(access,
-                CustomRegistries.WORLDSTYLES_REGISTRY_KEY, (id, chain) -> new WorldStyle(chain), diagnostics);
+                CustomRegistries.WORLDSTYLES_REGISTRY_KEY, (id, chain) -> new WorldStyle(id, chain), diagnostics);
         // City styles are the one kind where "failed to compile" is not the same as "wrong", so they
         // are compiled into a local report and only the reachable failures are promoted into the
         // caller's. Requiredness is a property of the end of a chain, and a city style may exist only
@@ -98,11 +98,11 @@ public final class AssetCompiler {
         // exactly what an earlier draft of this compiler did.
         AssetDiagnostics cityStyleProblems = new AssetDiagnostics();
         AssetIndex<CityStyle> cityStyles = AssetStage.compileAll(access,
-                CustomRegistries.CITYSTYLES_REGISTRY_KEY, (id, chain) -> new CityStyle(chain), cityStyleProblems);
+                CustomRegistries.CITYSTYLES_REGISTRY_KEY, (id, chain) -> new CityStyle(id, chain), cityStyleProblems);
         AssetIndex<PredefinedCity> predefinedCities = AssetStage.compileAll(access,
-                CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, (id, chain) -> new PredefinedCity(chain), diagnostics);
+                CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, (id, chain) -> new PredefinedCity(id, chain), diagnostics);
         AssetIndex<StuffObject> stuff = AssetStage.compileAll(access,
-                CustomRegistries.STUFF_REGISTRY_KEY, (id, chain) -> new StuffObject(chain), diagnostics);
+                CustomRegistries.STUFF_REGISTRY_KEY, (id, chain) -> new StuffObject(id, chain), diagnostics);
 
         promoteReachableCityStyleProblems(access, worldStyles, cityStyles, cityStyleProblems, diagnostics);
 
