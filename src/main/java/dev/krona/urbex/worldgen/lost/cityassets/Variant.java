@@ -42,8 +42,15 @@ public class Variant {
         }
         Resolved.require(anyBlocks ? entries : null, name, "blocks");
         for (BlockEntry entry : entries) {
-            BlockState state = Tools.stringToState(entry.block(), blockLookup, name);
-            blocks.add(Pair.of(entry.random(), state));
+            BlockState state = Tools.resolveState(entry.block(), blockLookup, name);
+            // Skipped rather than placed as air: this is a weighted list, so dropping the entry
+            // hands its share of the draw to the blocks this game does have, while air at full
+            // weight would punch holes in whatever the variant paints (issue #91). A chain whose
+            // every block is absent resolves to an empty list, which the palette turns into air for
+            // that character - a load error here would refuse the world over an uninstalled mod.
+            if (state != null) {
+                blocks.add(Pair.of(entry.random(), state));
+            }
         }
     }
 

@@ -10,6 +10,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
+import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumMap;
@@ -42,15 +44,31 @@ public final class LightPool {
         this.allCandidates = List.copyOf(flattened);
     }
 
+    /**
+     * Compiles one marker's light pool, or returns {@code null} when every candidate it declared
+     * names a block this game does not have.
+     * <p>
+     * Null and empty are different answers and only one of them is the author's fault. A pool that
+     * declares no candidates anywhere is a mistake in the file and still refuses the world naming
+     * it; a pool whose candidates all came from an uninstalled mod is issue #91's case, and refusing
+     * the world over that is exactly what #91 says not to do. Before this, an absent block resolved
+     * to air and was rejected two lines later for emitting no light - a load error that named the
+     * right file and gave entirely the wrong reason.
+     */
+    @Nullable
     public static LightPool compile(HolderLookup<Block> blockLookup, Identifier paletteId, char marker,
                                     LightSettings settings) {
         EnumMap<Placement, List<Candidate>> candidates = new EnumMap<>(Placement.class);
         EnumMap<Placement, Integer> totalWeights = new EnumMap<>(Placement.class);
-        compileGroup(blockLookup, paletteId, marker, Placement.FLOOR, settings.floor(), candidates, totalWeights);
-        compileGroup(blockLookup, paletteId, marker, Placement.WALL, settings.wall(), candidates, totalWeights);
-        compileGroup(blockLookup, paletteId, marker, Placement.CEILING, settings.ceiling(), candidates, totalWeights);
-        compileGroup(blockLookup, paletteId, marker, Placement.FREE, settings.free(), candidates, totalWeights);
+        boolean[] dropped = new boolean[1];
+        compileGroup(blockLookup, paletteId, marker, Placement.FLOOR, settings.floor(), candidates, totalWeights, dropped);
+        compileGroup(blockLookup, paletteId, marker, Placement.WALL, settings.wall(), candidates, totalWeights, dropped);
+        compileGroup(blockLookup, paletteId, marker, Placement.CEILING, settings.ceiling(), candidates, totalWeights, dropped);
+        compileGroup(blockLookup, paletteId, marker, Placement.FREE, settings.free(), candidates, totalWeights, dropped);
         if (candidates.values().stream().allMatch(List::isEmpty)) {
+            if (dropped[0]) {
+                return null;
+            }
             throw new IllegalArgumentException("Invalid light pool in palette '" + paletteId + "', marker '" + marker
                     + "': expected at least one candidate in floor, wall, ceiling, or free");
         }
@@ -109,7 +127,8 @@ public final class LightPool {
                                      char marker, Placement placement,
                                      List<LightSettings.Entry> entries,
                                      Map<Placement, List<Candidate>> candidates,
-                                     Map<Placement, Integer> totalWeights) {
+                                     Map<Placement, Integer> totalWeights,
+                                     boolean[] dropped) {
         List<Candidate> compiled = new ArrayList<>(entries.size());
         int totalWeight = 0;
         for (int candidateIndex = 0; candidateIndex < entries.size(); candidateIndex++) {
@@ -118,12 +137,21 @@ public final class LightPool {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "weight must be positive", null);
             }
+            // Dropped rather than rejected: a candidate list is a weighted draw like any other, so
+            // an absent block hands its weight to the lights this game does have (issue #91). Null
+            // and thrown are different answers here - resolveState only returns null for a block
+            // this game does not have, and still throws for a property expression that is wrong
+            // whatever is installed, which is what keeps this candidate's context in the message.
             BlockState state;
             try {
-                state = Tools.stringToState(entry.block(), blockLookup, paletteId);
+                state = Tools.resolveState(entry.block(), blockLookup, paletteId);
             } catch (RuntimeException e) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "cannot parse block state", e);
+            }
+            if (state == null) {
+                dropped[0] = true;
+                continue;
             }
             if (state.getLightEmission() <= 0) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),

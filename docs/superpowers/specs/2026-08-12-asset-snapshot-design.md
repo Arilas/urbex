@@ -105,6 +105,18 @@ users. Decide #91 (optional/missing mod blocks) here: "resolve blocks before pub
 aggregated diagnostics *is* the load-time validation #91 asks for, and its weight re-normalization
 over surviving entries is digest-affecting, so it needs its own golden approval.
 
+*Landed as two PRs.* The threading of the block lookup is mechanical and moved no golden; #91's
+semantics are separate. **#91 was decided skip-and-renormalise, never fail**: a block this game does
+not have drops out of its weighted list and the survivors share the draw, a character left with
+nothing generates as air, and each absent id is warned about once. The strict alternative — a typo
+refuses the world — was rejected because a pack written around optional cross-mod blocks would then
+refuse to load on a vanilla install. The line is drawn at the block *id*: a property expression on a
+block this game does have is still a load error, because no amount of installing mods fixes it.
+
+Neither golden moved after all. Re-normalisation is only reachable when something is actually
+dropped, and the bundled pack names no absent block — which `ShippedBlockIdsResolveTest` already
+required and both digest runs confirmed by logging no warning.
+
 **128d — rename `*RE` → `*Definition`/`*Patch`.** Mechanical only, no logic, so the rename noise
 never hides a semantic change. Also retires `IAsset.setRegistryName`: identity travels beside the
 decoded value instead of being written into it.
@@ -116,3 +128,7 @@ walk, which needs the compile-time palette merge 128a introduces. See the sequen
 
 128a, 128b and 128d must not move either golden: they relocate where compiled assets live, not what
 they compile to. 128c may move them via #91 and must isolate that.
+
+*Outcome:* nothing moved. Both goldens are `688914e862e938fb` and `7b5348f28e0a6d23` throughout
+128a–128c, including the #91 semantic change — see the note under 128c for why that is a fact about
+the bundled pack rather than a sign the change is inert.

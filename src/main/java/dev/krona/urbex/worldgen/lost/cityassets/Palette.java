@@ -9,6 +9,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -143,10 +144,13 @@ public class Palette {
                          Collection<PaletteEntry> entries) {
         for (PaletteEntry entry : entries) {
             Character c = entry.getChr().charAt(0);
-            BlockState dmg = null;
-            if (entry.getDamaged() != null) {
-                dmg = Tools.stringToState(entry.getDamaged(), blockLookup, name);
-            }
+            // Null when the damaged block is absent from this game, so the mapping is simply not
+            // written. Air would say "damaging this block deletes it", which is a claim the author
+            // did not make (issue #91).
+            BlockState dmg = entry.getDamaged() == null ? null
+                    : Tools.resolveState(entry.getDamaged(), blockLookup, name);
+            // Also null when every candidate in the pool named an absent block; see
+            // LightPool.compile. An authored-empty pool is still a load error.
             LightPool light = entry.getLight() == null ? null
                     : LightPool.compile(blockLookup, name, c, entry.getLight());
             Info info = new Info(entry.getMob(), entry.getLoot(),
@@ -189,7 +193,14 @@ public class Palette {
                 for (BlockEntry ob : entryBlocks) {
                     Integer f = ob.random();
                     String block = ob.block();
-                    BlockState state = Tools.stringToState(block, blockLookup, name);
+                    // Dropped rather than placed as air, exactly as in a variant: the weights that
+                    // remain are apportioned over the character's 128 slots by
+                    // CompiledPalette.distributeSlots, so the survivors take over the missing
+                    // entry's share instead of competing with invisible blocks (issue #91).
+                    BlockState state = Tools.resolveState(block, blockLookup, name);
+                    if (state == null) {
+                        continue;
+                    }
                     blocks.add(Pair.of(f, state));
                     if (dmg != null) {
                         damaged.put(state, dmg);
@@ -198,13 +209,32 @@ public class Palette {
                 addMappingViaState(c, blocks, info);
             } else if (light != null) {
                 palette.put(c, new PE(light.representative(), info));
+            } else if (entry.getLight() != null) {
+                // A light-only entry whose whole pool named absent blocks. The marker still has to
+                // map to something - a character with no entry at all throws from the driver, which
+                // is the crash issue #91 is removing - and air is what a light that cannot be placed
+                // leaves behind anyway.
+                palette.put(c, new PE(Blocks.AIR.defaultBlockState(), info));
             } else {
                 throw new RuntimeException("Illegal palette " + name + "!");
             }
         }
     }
 
+    /**
+     * Maps {@code c} to a weighted list, or to air when nothing is left in it.
+     * <p>
+     * The empty case is reachable only through issue #91: every block the character named is absent
+     * from this game. It has to be handled here rather than left to
+     * {@code CompiledPalette.distributeSlots}, which refuses weights summing to zero - correctly, for
+     * an authored list - and it has to be air rather than no entry at all, because a character the
+     * palette does not map throws from the driver on the first part that uses it.
+     */
     private Palette addMappingViaState(char c, List<Pair<Integer, BlockState>> randomBlocks, Info info) {
+        if (randomBlocks.isEmpty()) {
+            palette.put(c, new PE(Blocks.AIR.defaultBlockState(), info));
+            return this;
+        }
         palette.put(c, new PE(randomBlocks.toArray(new Pair[randomBlocks.size()]), info));
         return this;
     }

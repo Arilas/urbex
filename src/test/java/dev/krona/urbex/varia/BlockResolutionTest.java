@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -32,6 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * in it (issues #60, #128). It is a parameter now, handed down by {@code AssetCompiler} from the
  * world being loaded, and {@link #resolutionAnswersFromTheLookupItIsGivenNotAGlobalOne} is what
  * makes that a fact rather than a claim.
+ * <p>
+ * The other half of this file is where issue #91 draws its line: a block this game does not have is
+ * absent (dropped from a weighted list, air where there is no list), and a block it does have
+ * written with a property it does not is still a load error.
  */
 class BlockResolutionTest {
 
@@ -59,23 +64,49 @@ class BlockResolutionTest {
     }
 
     /**
-     * The behaviour #91 exists to change, pinned here so that when it does change this test is what
-     * has to be edited — rather than the change being discovered from a moved digest.
-     * <p>
-     * An id this Minecraft version does not have generates as air, silently as far as the world is
-     * concerned and with one warning in the log. That is how {@code minecraft:chain} (renamed
-     * {@code minecraft:iron_chain} in 26.x) made the whole {@code urbex:chains} decoration invisible.
+     * A block this game does not have is {@code null} from {@link Tools#resolveState} and air from
+     * {@link Tools#stringToState} — never an exception, whether or not the string carries
+     * properties. The property-carrying form is the one that used to throw, and since compilation
+     * moved to load time that threw took the whole world with it rather than one chunk (issue #91).
      */
     @Test
-    void anUnknownIdResolvesToAirRatherThanThrowing() {
+    void anAbsentBlockIsNullRatherThanAThrow() {
+        assertNull(Tools.resolveState("somemod:no_such_block", BuiltInRegistries.BLOCK, OWNER));
+        assertNull(Tools.resolveState("somemod:no_such_block[facing=north]", BuiltInRegistries.BLOCK, OWNER));
+
         assertSame(Blocks.AIR.defaultBlockState(),
                 Tools.stringToState("somemod:no_such_block", BuiltInRegistries.BLOCK, OWNER));
+        assertSame(Blocks.AIR.defaultBlockState(),
+                Tools.stringToState("somemod:no_such_block[facing=north]", BuiltInRegistries.BLOCK, OWNER));
+    }
+
+    /**
+     * The line #91 draws, and the reason it is drawn at the block id: a property expression this
+     * game does not have, on a block it <em>does</em>, is a mistake in the file. No amount of
+     * installing mods fixes it, so it stays a load error — which is what keeps {@code LightPool}'s
+     * candidate diagnostics working.
+     */
+    @Test
+    void aBadPropertyOnAKnownBlockIsStillAnError() {
+        assertThrows(RuntimeException.class,
+                () -> Tools.resolveState("minecraft:torch[not_a_property=true]", BuiltInRegistries.BLOCK, OWNER));
+    }
+
+    /**
+     * A string that is not even a legal id resolves as absent rather than throwing. The bundled pack
+     * shipped one — {@code minecraft:red_sandstone@2}, a 1.12 {@code name@meta} string — and because
+     * {@code Identifier.parse} threw on it from inside {@code Palette}'s constructor, it took the
+     * world load with it.
+     */
+    @Test
+    void anIdThatIsNotEvenLegalResolvesAsAbsent() {
+        assertNull(Tools.resolveState("minecraft:red_sandstone@2", BuiltInRegistries.BLOCK, OWNER));
     }
 
     /**
      * The boundary itself: a lookup that does not have the block answers "not here", even though the
-     * process-global registry three lines away does have it. Before this change there was no way to
-     * write this test, because there was no way to say which registry to ask.
+     * process-global registry three lines away does have it. Before the lookup became a parameter
+     * there was no way to write this test, because there was no way to say which registry to ask.
      */
     @Test
     void resolutionAnswersFromTheLookupItIsGivenNotAGlobalOne() {
@@ -83,12 +114,10 @@ class BlockResolutionTest {
 
         assertSame(Blocks.STONE.defaultBlockState(),
                 Tools.stringToState("minecraft:stone", onlyStone, OWNER));
-        assertSame(Blocks.AIR.defaultBlockState(),
-                Tools.stringToState("minecraft:diamond_block", onlyStone, OWNER),
+        assertNull(Tools.resolveState("minecraft:diamond_block", onlyStone, OWNER),
                 "BuiltInRegistries has diamond_block; the lookup handed in does not");
-        assertThrows(RuntimeException.class,
-                () -> Tools.stringToState("minecraft:oak_stairs[facing=east]", onlyStone, OWNER),
-                "and the property-parsing path asks the same lookup");
+        assertNull(Tools.resolveState("minecraft:oak_stairs[facing=east]", onlyStone, OWNER),
+                "and the property-carrying form asks the same lookup for its block");
     }
 
     private static HolderLookup<Block> registryOf(String path, Block block) {
