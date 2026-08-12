@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- **A datapack naming a block you do not have still generates the rest of itself.** A block from an
+  uninstalled mod, or one a Minecraft version renamed, drops out of its weighted list and the blocks
+  that remain share its part of the draw; a palette character left with nothing generates as air.
+  Each absent id is named once in the log (issue #91).
+  - *The crash is gone.* A block string carrying properties — `somemod:fancy_block[facing=north]` —
+    threw out of the block-state parser, and since compilation moved to world load that refused the
+    **world**, not just the chunk. It is now the same skipped entry as any other.
+  - *And the silent hole is gone.* A plain id used to become air at its full weight, so a variant
+    meant as "mostly mossy cobble, occasionally something from another mod" placed air wherever the
+    missing entry won the draw. Dropping the entry is what re-normalises the weights: the survivors
+    are apportioned over the character's slots exactly as if the entry had never been written.
+  - *A typo does not refuse the world*, deliberately. The strict reading of #91 was considered and
+    rejected: a pack written around optional cross-mod blocks would then fail to load on a vanilla
+    install. The line is drawn at the block **id** — a property expression on a block you *do* have
+    is still a load error, because installing a mod cannot fix it.
+  - *No worldgen change*: both digest goldens are unchanged. Re-normalisation is only reachable when
+    something is actually dropped, and the bundled pack names no absent block — both digest runs
+    completed without logging a single one.
+
 - **Asset compilation resolves blocks against the world it is compiling, not against a static server
   reference.** Every block string in a palette, variant or light pool is resolved through a block
   registry the compiler hands down, taken once from the world being loaded (issue #128).

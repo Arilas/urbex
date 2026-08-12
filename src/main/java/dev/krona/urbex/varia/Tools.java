@@ -50,24 +50,12 @@ public class Tools {
     }
 
     /**
-     * Resolves a datapack block string against {@code blockLookup}, naming {@code owner} if it cannot be
-     * resolved.
+     * {@link #resolveState}, with air for a block this game does not have.
      * <p>
-     * <b>An unknown id returns air.</b> That is not a decision made here - it is what this has
-     * always done, and it is why {@code minecraft:chain} (renamed {@code minecraft:iron_chain} in
-     * 26.x) made the whole {@code urbex:chains} decoration invisible without anyone noticing. It
-     * used to happen by accident, through {@code BuiltInRegistries.BLOCK} being a
-     * {@link DefaultedRegistry} whose {@code getValue} hands back {@code minecraft:air} rather than
-     * null; it is spelled out below instead, so that #91 - which decides whether a missing block is
-     * a skipped entry, a load error, or air - has one line to change rather than a registry quirk to
-     * discover. The warning is the part that costs nothing and can move no golden, because the state
-     * returned is unchanged.
-     * <p>
-     * The pre-flattening {@code name@meta} form never reaches {@code upgradeBlock}:
-     * {@code Identifier.parse} throws for it first, {@code @} not being a legal path character - and
-     * {@code BlockStateData.upgradeBlock(String)} does not handle that form anyway (measured: it
-     * returns {@code minecraft:red_sandstone@2} unchanged). That is why the one such string the
-     * bundled pack shipped was a hard crash at palette compile rather than an automatic upgrade.
+     * For the callers that have one block to place and no list to fall back on: a palette's single
+     * {@code block}, and a light pool's stand-in state. An entry in a weighted list must use
+     * {@link #resolveState} and drop itself instead, so the survivors share the draw rather than
+     * competing with an invisible entry (issue #91).
      *
      * @param blockLookup what to resolve against, handed down from
      *                    {@link dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler} out of the
@@ -86,35 +74,81 @@ public class Tools {
      *                    be null; every production caller passes one.
      */
     public static BlockState stringToState(String s, HolderLookup<Block> blockLookup, @Nullable Object owner) {
-        if (s.contains("[")) {
+        BlockState resolved = resolveState(s, blockLookup, owner);
+        return resolved == null ? Blocks.AIR.defaultBlockState() : resolved;
+    }
+
+    /**
+     * Resolves a datapack block string, or {@code null} if this game has no such block.
+     * <p>
+     * <b>Null is "this game does not have that block", not "this string is wrong".</b> The
+     * difference decides whether the world loads, so it is drawn at the block id and nowhere else:
+     * an id no installed mod provides, an id a Minecraft version renamed, and an id that is not even
+     * a legal {@link Identifier} are all null - while a block this game <em>does</em> have, written
+     * with a property expression it does not, still throws. That second case is a mistake in the
+     * file and nothing about installing a mod would fix it, so it keeps the load error and the
+     * message that names the palette, marker, placement and candidate.
+     * <p>
+     * A caller choosing from a weighted list drops a null entry and lets the survivors share the
+     * draw; a caller with one block to place uses air ({@link #stringToState}). Neither refuses the
+     * world, which is the decision issue #91 records: a pack naming one absent block generates the
+     * rest of itself.
+     * <p>
+     * Each distinct string is warned about once, however many entries name it, and that warning is
+     * the only report. This deliberately raises no load-time diagnostic: making an absent block
+     * refuse the world is the strict half of #91 and was not chosen, because a pack written around
+     * optional cross-mod blocks would then refuse to load on a vanilla install.
+     * <p>
+     * The pre-flattening {@code name@meta} form lands here as an unparseable id rather than as an
+     * upgrade: {@code @} is not a legal path character so {@link Identifier#tryParse} rejects it,
+     * and {@code BlockStateData.upgradeBlock(String)} does not handle that form anyway (measured: it
+     * returns {@code minecraft:red_sandstone@2} unchanged). It used to take the whole world load
+     * with it from inside {@code Palette}'s constructor.
+     */
+    @Nullable
+    public static BlockState resolveState(String s, HolderLookup<Block> blockLookup, @Nullable Object owner) {
+        int properties = s.indexOf('[');
+        Identifier id = Identifier.tryParse(properties < 0 ? s : s.substring(0, properties));
+        if (id == null) {
+            return missing(s, owner);
+        }
+        boolean known = blockLookup.get(ResourceKey.create(Registries.BLOCK, id)).isPresent();
+
+        if (properties >= 0) {
+            if (!known) {
+                // The crash half of #91: a property-carrying string whose block is absent threw out
+                // of the parser below, and since compilation moved to load time that refused the
+                // whole world rather than one chunk.
+                return missing(s, owner);
+            }
             try {
-                BlockStateParser.BlockResult parser = BlockStateParser.parseForBlock(blockLookup, new StringReader(s), false);
-                return parser.blockState();
+                return BlockStateParser.parseForBlock(blockLookup, new StringReader(s), false).blockState();
             } catch (CommandSyntaxException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        Optional<Holder.Reference<Block>> requested = blockLookup.get(blockKey(s));
-        if (requested.isPresent()) {
-            return requested.get().value().defaultBlockState();
+        if (known) {
+            return blockLookup.getOrThrow(ResourceKey.create(Registries.BLOCK, id)).value().defaultBlockState();
         }
-
-        Optional<Holder.Reference<Block>> upgraded = blockLookup.get(blockKey(BlockStateData.upgradeBlock(s)));
-        if (upgraded.isPresent()) {
-            return upgraded.get().value().defaultBlockState();
-        }
-        if (WARNED_MISSING_BLOCKS.add(s)) {
-            Urbex.LOGGER.warn(
-                    "Block '{}'{} does not exist in this Minecraft version; it will generate as air. " +
-                            "It was most likely renamed - check the current id and update the asset.",
-                    s, owner == null ? "" : " (in " + owner + ")");
-        }
-        return Blocks.AIR.defaultBlockState();
+        Identifier upgradedId = Identifier.tryParse(BlockStateData.upgradeBlock(s));
+        Optional<Holder.Reference<Block>> upgraded = upgradedId == null
+                ? Optional.empty()
+                : blockLookup.get(ResourceKey.create(Registries.BLOCK, upgradedId));
+        return upgraded.map(block -> block.value().defaultBlockState()).orElseGet(() -> missing(s, owner));
     }
 
-    private static ResourceKey<Block> blockKey(String id) {
-        return ResourceKey.create(Registries.BLOCK, Identifier.parse(id));
+    @Nullable
+    private static BlockState missing(String s, @Nullable Object owner) {
+        if (WARNED_MISSING_BLOCKS.add(s)) {
+            Urbex.LOGGER.warn(
+                    "Block '{}'{} does not exist in this Minecraft version. Entries naming it are "
+                            + "skipped and the remaining ones share the draw; a palette character "
+                            + "left with nothing generates as air. If this is not a block from an "
+                            + "uninstalled mod, it was most likely renamed - check the current id.",
+                    s, owner == null ? "" : " (in " + owner + ")");
+        }
+        return null;
     }
 
     /**
