@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -104,11 +105,17 @@ public final class AssetCompiler {
         AssetIndex<StuffObject> stuff = AssetStage.compileAll(access,
                 CustomRegistries.STUFF_REGISTRY_KEY, (id, chain) -> new StuffObject(id, chain), diagnostics);
 
-        promoteReachableCityStyleProblems(access, worldStyles, cityStyles, cityStyleProblems, diagnostics);
+        Set<Identifier> reachableCityStyles = reachableCityStyles(access, worldStyles);
+        promoteReachableCityStyleProblems(cityStyles, reachableCityStyles, cityStyleProblems, diagnostics);
 
         AssetSnapshot snapshot = new AssetSnapshot(variants, palettes, conditions, styles, parts,
                 buildings, multiBuildings, scattered, worldStyles, cityStyles, predefinedCities,
                 stuff, groupStuffByTag(stuff.all()));
+        // Last, on the finished snapshot: the cross-asset references are names, and resolving them
+        // needs every index built. Generation resolves them one at a time on whichever chunk first
+        // needs one, which is the whole of what issue #56's second half is about.
+        AssetGraph.validate(snapshot, reachableCityStyles.stream()
+                .map(cityStyles::get).filter(Objects::nonNull).toList(), diagnostics);
         Urbex.getLogger().info("Compiled {} Urbex assets ({} problem(s))",
                 snapshot.totalAssets(), diagnostics.size());
         return snapshot;
@@ -128,11 +135,7 @@ public final class AssetCompiler {
      * in that chain resolves to, so the union over raw entries is the same set of city styles, and
      * reading them raw means a broken preset chain is not turned into a city-style failure.</p>
      */
-    private static void promoteReachableCityStyleProblems(RegistryAccess access,
-                                                          AssetIndex<WorldStyle> worldStyles,
-                                                          AssetIndex<CityStyle> cityStyles,
-                                                          AssetDiagnostics candidates,
-                                                          AssetDiagnostics fatal) {
+    static Set<Identifier> reachableCityStyles(RegistryAccess access, AssetIndex<WorldStyle> worldStyles) {
         Set<Identifier> reachable = new HashSet<>();
         for (WorldStyle style : worldStyles.all()) {
             for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selector : style.cityStyleSelectors()) {
@@ -149,6 +152,13 @@ public final class AssetCompiler {
                 reachable.add(DataTools.fromName(city.getCityStyle()));
             }
         }
+        return reachable;
+    }
+
+    private static void promoteReachableCityStyleProblems(AssetIndex<CityStyle> cityStyles,
+                                                          Set<Identifier> reachable,
+                                                          AssetDiagnostics candidates,
+                                                          AssetDiagnostics fatal) {
         for (AssetDiagnostics.Problem problem : candidates.problems()) {
             if (problem.asset() != null && reachable.contains(problem.asset())) {
                 fatal.record(problem.registry(), problem.asset(), problem.message());
