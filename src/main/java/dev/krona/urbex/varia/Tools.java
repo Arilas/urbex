@@ -1,6 +1,7 @@
 package dev.krona.urbex.varia;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.worldgen.lost.cityassets.ReferenceProvider;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -94,10 +95,10 @@ public class Tools {
      * world, which is the decision issue #91 records: a pack naming one absent block generates the
      * rest of itself.
      * <p>
-     * Each distinct string is warned about once, however many entries name it, and that warning is
-     * the only report. This deliberately raises no load-time diagnostic: making an absent block
-     * refuse the world is the strict half of #91 and was not chosen, because a pack written around
-     * optional cross-mod blocks would then refuse to load on a vanilla install.
+     * A missing block is warned about once per string, and only when the mod that would provide it is
+     * installed - see {@link #missing}. This deliberately raises no load-time diagnostic either:
+     * making an absent block refuse the world is the strict half of #91 and was not chosen, because a
+     * pack written around optional cross-mod blocks would then refuse to load on a vanilla install.
      * <p>
      * The pre-flattening {@code name@meta} form lands here as an unparseable id rather than as an
      * upgrade: {@code @} is not a legal path character so {@link Identifier#tryParse} rejects it,
@@ -110,7 +111,9 @@ public class Tools {
         int properties = s.indexOf('[');
         Identifier id = Identifier.tryParse(properties < 0 ? s : s.substring(0, properties));
         if (id == null) {
-            return missing(s, owner);
+            // No namespace to ask about, and nothing optional about it: this is not a legal id in any
+            // installation. Always reported.
+            return missing(s, null, owner);
         }
         boolean known = blockLookup.get(ResourceKey.create(Registries.BLOCK, id)).isPresent();
 
@@ -119,7 +122,7 @@ public class Tools {
                 // The crash half of #91: a property-carrying string whose block is absent threw out
                 // of the parser below, and since compilation moved to load time that refused the
                 // whole world rather than one chunk.
-                return missing(s, owner);
+                return missing(s, id, owner);
             }
             try {
                 return BlockStateParser.parseForBlock(blockLookup, new StringReader(s), false).blockState();
@@ -135,17 +138,32 @@ public class Tools {
         Optional<Holder.Reference<Block>> upgraded = upgradedId == null
                 ? Optional.empty()
                 : blockLookup.get(ResourceKey.create(Registries.BLOCK, upgradedId));
-        return upgraded.map(block -> block.value().defaultBlockState()).orElseGet(() -> missing(s, owner));
+        return upgraded.map(block -> block.value().defaultBlockState())
+                .orElseGet(() -> missing(s, id, owner));
     }
 
+    /**
+     * Absent, and said so only when saying so helps.
+     * <p>
+     * A pack may name a block from a mod it does not require, so that players who have that mod get
+     * the block and everyone else gets the entry skipped - that is what #91 decided the behaviour
+     * should be, and warning about it would mean a line per optional entry, every load, for a pack
+     * working exactly as written. So the warning is kept for the case where the block <em>should</em>
+     * have been there: the mod that would provide it is installed (or it is {@code minecraft}) and the
+     * id still does not resolve, which means it was renamed or mistyped. That is the
+     * {@code minecraft:chain} case, and it stays loud.
+     *
+     * @param id the parsed id, or null when the string is not a legal identifier at all - which is
+     *           nobody's optional content and is always reported
+     */
     @Nullable
-    private static BlockState missing(String s, @Nullable Object owner) {
-        if (WARNED_MISSING_BLOCKS.add(s)) {
+    private static BlockState missing(String s, @Nullable Identifier id, @Nullable Object owner) {
+        if ((id == null || ReferenceProvider.modIsInstalled(id)) && WARNED_MISSING_BLOCKS.add(s)) {
             Urbex.LOGGER.warn(
                     "Block '{}'{} does not exist in this Minecraft version. Entries naming it are "
                             + "skipped and the remaining ones share the draw; a palette character "
-                            + "left with nothing generates as air. If this is not a block from an "
-                            + "uninstalled mod, it was most likely renamed - check the current id.",
+                            + "left with nothing generates as air. It was most likely renamed - "
+                            + "check the current id and update the asset.",
                     s, owner == null ? "" : " (in " + owner + ")");
         }
         return null;

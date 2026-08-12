@@ -28,7 +28,7 @@ import java.util.Set;
  * {@code getOrThrow} throws from a worldgen worker either way; only references that fail softly - a
  * matcher that never fires, a loot table that yields nothing - can be quietly absent.</p>
  */
-final class ReferenceProvider {
+public final class ReferenceProvider {
 
     private ReferenceProvider() {
     }
@@ -36,11 +36,13 @@ final class ReferenceProvider {
     /**
      * For a reference into a mod's registries: a block, an entity type, a loot table.
      *
-     * <p>{@code minecraft} always counts as installed, which is the point of asking - a vanilla id
-     * that stops resolving has been renamed, and that is exactly the failure that made the whole
-     * {@code urbex:chains} decoration invisible (issue #91).</p>
+     * <p>{@code minecraft} always counts as installed, and that is not belt-and-braces: it is the
+     * point of asking. A vanilla id that stops resolving has been renamed, which is exactly the
+     * failure that made the whole {@code urbex:chains} decoration invisible (issue #91), and it must
+     * stay reportable. It is also why this cannot be left to the loader alone - outside a game,
+     * {@code isModLoaded("minecraft")} answers false.</p>
      */
-    static boolean modIsInstalled(Identifier reference) {
+    public static boolean modIsInstalled(Identifier reference) {
         String namespace = reference.getNamespace();
         return "minecraft".equals(namespace) || FabricLoader.getInstance().isModLoaded(namespace);
     }
