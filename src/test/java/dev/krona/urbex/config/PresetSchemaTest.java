@@ -6,7 +6,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Drift-guards {@code docs/schema/preset.schema.json} (hand-written, since the section records are
  * plain DFU codecs with no schema-generation library wired up) against the same two sources of
  * truth {@link PresetRoundTripTest} pins the codecs to: each section's {@code KEYS} constant, and
- * the full key universe {@code toRE()} actually encodes. A field added to a section record without
+ * the full key universe {@code toDefinition()} actually encodes. A field added to a section record without
  * a matching schema edit (or vice versa) fails here instead of silently going undocumented.
  */
 class PresetSchemaTest {
@@ -95,8 +95,8 @@ class PresetSchemaTest {
     void schemaCoversExactlyTheCodecKeys() throws IOException {
         JsonNode schema = readSchemaNode();
 
-        assertEquals(PresetRE.KEYS, propertyNames(schema),
-                "top-level schema properties should exactly match PresetRE.KEYS");
+        assertEquals(PresetDefinition.KEYS, propertyNames(schema),
+                "top-level schema properties should exactly match PresetDefinition.KEYS");
         assertClosedAndBlessesUnderscoreKeys(schema, "root");
 
         JsonNode properties = schema.get("properties");

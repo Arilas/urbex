@@ -26,9 +26,9 @@ import java.util.Set;
 /**
  * The datapack-facing preset format: every field is optional, and only the fields actually
  * present in the JSON are applied on top of an {@code extends} chain (see {@code Presets.resolve}).
- * Mirrors the {@code WorldStyleRE} registry-entry idiom.
+ * Mirrors the {@code WorldStyleDefinition} registry-entry idiom.
  */
-public class PresetRE implements Extendable {
+public class PresetDefinition implements Extendable {
 
     public static final Set<String> KEYS = Set.of("extends", "name", "description", "extraDescription", "warning",
             "icon", "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
@@ -61,21 +61,21 @@ public class PresetRE implements Extendable {
                     Codec.STRING.optionalFieldOf("icon").forGetter(Meta::icon)
             ).apply(instance, Meta::new));
 
-    private static final Codec<PresetRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<PresetDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
-                    META.forGetter(PresetRE::meta),
-                    TerrainSettings.CODEC.optionalFieldOf("terrain").forGetter(PresetRE::terrain),
-                    CitySettings.CODEC.optionalFieldOf("cities").forGetter(PresetRE::cities),
-                    BuildingSettings.CODEC.optionalFieldOf("buildings").forGetter(PresetRE::buildings),
-                    RoadSettings.CODEC.optionalFieldOf("roads").forGetter(PresetRE::roads),
-                    HighwaySettings.CODEC.optionalFieldOf("highways").forGetter(PresetRE::highways),
-                    RailwaySettings.CODEC.optionalFieldOf("railways").forGetter(PresetRE::railways),
-                    DestructionSettings.CODEC.optionalFieldOf("destruction").forGetter(PresetRE::destruction),
-                    DecorationSettings.CODEC.optionalFieldOf("decoration").forGetter(PresetRE::decoration),
-                    SpawnSettings.CODEC.optionalFieldOf("spawn").forGetter(PresetRE::spawn),
-                    AtmosphereSettings.CODEC.optionalFieldOf("atmosphere").forGetter(PresetRE::atmosphere),
-                    MiscSettings.CODEC.optionalFieldOf("misc").forGetter(PresetRE::misc)
-            ).apply(instance, PresetRE::new));
+                    META.forGetter(PresetDefinition::meta),
+                    TerrainSettings.CODEC.optionalFieldOf("terrain").forGetter(PresetDefinition::terrain),
+                    CitySettings.CODEC.optionalFieldOf("cities").forGetter(PresetDefinition::cities),
+                    BuildingSettings.CODEC.optionalFieldOf("buildings").forGetter(PresetDefinition::buildings),
+                    RoadSettings.CODEC.optionalFieldOf("roads").forGetter(PresetDefinition::roads),
+                    HighwaySettings.CODEC.optionalFieldOf("highways").forGetter(PresetDefinition::highways),
+                    RailwaySettings.CODEC.optionalFieldOf("railways").forGetter(PresetDefinition::railways),
+                    DestructionSettings.CODEC.optionalFieldOf("destruction").forGetter(PresetDefinition::destruction),
+                    DecorationSettings.CODEC.optionalFieldOf("decoration").forGetter(PresetDefinition::decoration),
+                    SpawnSettings.CODEC.optionalFieldOf("spawn").forGetter(PresetDefinition::spawn),
+                    AtmosphereSettings.CODEC.optionalFieldOf("atmosphere").forGetter(PresetDefinition::atmosphere),
+                    MiscSettings.CODEC.optionalFieldOf("misc").forGetter(PresetDefinition::misc)
+            ).apply(instance, PresetDefinition::new));
 
     /**
      * Retired-key rejection outside the unknown-key warning, so {@code inherit}/{@code parent} fail
@@ -83,7 +83,7 @@ public class PresetRE implements Extendable {
      * where an unknown key is even mentioned - the other twelve drop it silently - which is exactly
      * why the retired keys cannot be left to that path. See {@link RetiredKeys}.
      */
-    public static final Codec<PresetRE> CODEC = RetiredKeys.reject(
+    public static final Codec<PresetDefinition> CODEC = RetiredKeys.reject(
             dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys.warning(RAW, KEYS, "preset"),
             "preset");
 
@@ -106,7 +106,7 @@ public class PresetRE implements Extendable {
     private final Optional<AtmosphereSettings> atmosphere;
     private final Optional<MiscSettings> misc;
 
-    public PresetRE(Optional<Identifier> extendsId,
+    public PresetDefinition(Optional<Identifier> extendsId,
                      Optional<String> displayName,
                      Optional<String> description,
                      Optional<String> extraDescription,
@@ -129,7 +129,7 @@ public class PresetRE implements Extendable {
     }
 
     /** The codec's own constructor; see {@link Meta} for why the metadata arrives bundled. */
-    private PresetRE(Meta meta,
+    private PresetDefinition(Meta meta,
                      Optional<TerrainSettings> terrain,
                      Optional<CitySettings> cities,
                      Optional<BuildingSettings> buildings,

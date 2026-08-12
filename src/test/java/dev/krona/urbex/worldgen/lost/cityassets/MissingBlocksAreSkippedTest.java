@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
-import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
@@ -152,12 +152,12 @@ class MissingBlocksAreSkippedTest {
         return (Pair<Integer, BlockState>[]) entry.blocks();
     }
 
-    private static VariantRE variantOf(BlockEntry... blocks) {
-        return new VariantRE(Optional.empty(), Optional.of(new Mergeable<>(true, List.of(blocks))));
+    private static VariantDefinition variantOf(BlockEntry... blocks) {
+        return new VariantDefinition(Optional.empty(), Optional.of(new Mergeable<>(true, List.of(blocks))));
     }
 
-    private static PaletteRE paletteOf(PaletteEntry... entries) {
-        return new PaletteRE(Optional.empty(), Optional.of(List.of(entries)));
+    private static PaletteDefinition paletteOf(PaletteEntry... entries) {
+        return new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries)));
     }
 
     private static PaletteEntry single(char marker, String block) {

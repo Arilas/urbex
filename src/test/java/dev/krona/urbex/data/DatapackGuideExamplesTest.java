@@ -14,19 +14,19 @@ import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
 import dev.krona.urbex.worldgen.lost.cityassets.Style;
 import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
-import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
-import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.ConditionRE;
-import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
-import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
-import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
-import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
-import dev.krona.urbex.worldgen.lost.regassets.StyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
@@ -76,25 +76,25 @@ class DatapackGuideExamplesTest {
     /**
      * The thirteen registries, by the directory name the guide (and a datapack) spells them with.
      * <p>
-     * A method rather than a static field: touching any {@code *RE.CODEC} initialises Minecraft's
+     * A method rather than a static field: touching any {@code *Definition.CODEC} initialises Minecraft's
      * built-in registries, and a static field would do that during class initialisation, before
      * {@link #bootstrap()} has run.
      */
     private static Map<String, Codec<?>> codecs() {
         return Map.ofEntries(
-            Map.entry("worldstyles", WorldStyleRE.CODEC),
-            Map.entry("citystyles", CityStyleRE.CODEC),
-            Map.entry("buildings", BuildingRE.CODEC),
-            Map.entry("parts", BuildingPartRE.CODEC),
-            Map.entry("palettes", PaletteRE.CODEC),
-            Map.entry("styles", StyleRE.CODEC),
-            Map.entry("multibuildings", MultiBuildingRE.CODEC),
-            Map.entry("scattered", ScatteredRE.CODEC),
-            Map.entry("conditions", ConditionRE.CODEC),
-            Map.entry("variants", VariantRE.CODEC),
-            Map.entry("stuff", StuffSettingsRE.CODEC),
-            Map.entry("predefinedcities", PredefinedCityRE.CODEC),
-            Map.entry("presets", PresetRE.CODEC));
+            Map.entry("worldstyles", WorldStyleDefinition.CODEC),
+            Map.entry("citystyles", CityStyleDefinition.CODEC),
+            Map.entry("buildings", BuildingDefinition.CODEC),
+            Map.entry("parts", BuildingPartDefinition.CODEC),
+            Map.entry("palettes", PaletteDefinition.CODEC),
+            Map.entry("styles", StyleDefinition.CODEC),
+            Map.entry("multibuildings", MultiBuildingDefinition.CODEC),
+            Map.entry("scattered", ScatteredDefinition.CODEC),
+            Map.entry("conditions", ConditionDefinition.CODEC),
+            Map.entry("variants", VariantDefinition.CODEC),
+            Map.entry("stuff", StuffSettingsDefinition.CODEC),
+            Map.entry("predefinedcities", PredefinedCityDefinition.CODEC),
+            Map.entry("presets", PresetDefinition.CODEC));
     }
 
     @BeforeAll
@@ -198,7 +198,7 @@ class DatapackGuideExamplesTest {
                 namedPart(tower, 8, null, null))));
 
         // 'extends' inside an inline palette block.
-        expect(guide, missing, () -> Palette.inline(BuiltInRegistries.BLOCK, null, tower, List.of(new PaletteRE(
+        expect(guide, missing, () -> Palette.inline(BuiltInRegistries.BLOCK, null, tower, List.of(new PaletteDefinition(
                 Optional.of(Identifier.fromNamespaceAndPath("urbex", "common")), Optional.empty()))));
 
         // A palette entry that resolves to nothing at all.
@@ -206,12 +206,12 @@ class DatapackGuideExamplesTest {
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, null, List.of(
-                new PaletteRE(Optional.empty(), Optional.of(List.of(empty))))));
+                new PaletteDefinition(Optional.empty(), Optional.of(List.of(empty))))));
 
         // A 'randompalettes' group nothing could ever be drawn from, and a stuff entry whose two
         // count bounds contradict. Both are checked at the chain fold rather than per field.
         expect(guide, missing, () -> new Style(Identifier.fromNamespaceAndPath("urbexmt", "downtown"), NO_PALETTES, List.of(
-                new StyleRE(Optional.empty(), Optional.of(new Mergeable<>(true,
+                new StyleDefinition(Optional.empty(), Optional.of(new Mergeable<>(true,
                         List.of(List.of(new PaletteSelector(0f, "urbex:common")))))))));
         expect(guide, missing, () -> new StuffObject(downtown, List.of(
                 stuffCounts(downtown, 5, 2))));
@@ -224,7 +224,7 @@ class DatapackGuideExamplesTest {
         // The retired-key rejection, which is a DataResult error rather than a throw, so it cannot
         // go through expect(). Taken from the codec that ships, not from RetiredKeys.problem, so the
         // guide is pinned to what a pack author actually sees.
-        String retired = CityStyleRE.CODEC
+        String retired = CityStyleDefinition.CODEC
                 .parse(JsonOps.INSTANCE, JsonParser.parseString("{\"inherit\":\"urbex:citystyle_common\"}"))
                 .error().orElseThrow(() -> new AssertionError("expected 'inherit' to be rejected"))
                 .message();
@@ -238,8 +238,8 @@ class DatapackGuideExamplesTest {
     }
 
     /** A stuff entry declaring everything required, with the two count bounds the caller names. */
-    private static StuffSettingsRE stuffCounts(Identifier id, int mincount, int maxcount) {
-        return new StuffSettingsRE(Optional.empty(),
+    private static StuffSettingsDefinition stuffCounts(Identifier id, int mincount, int maxcount) {
+        return new StuffSettingsDefinition(Optional.empty(),
                 Optional.of(new Mergeable<>(true, List.of("rubble"))), Optional.of("AA"),
                 Optional.empty(), Optional.empty(),
                 Optional.of(mincount), Optional.of(maxcount), Optional.of(1),
@@ -279,9 +279,9 @@ class DatapackGuideExamplesTest {
      */
     private static final AssetIndex<Palette> NO_PALETTES = AssetIndex.empty("urbex:palettes");
 
-    private static BuildingPartRE namedPart(Identifier id, Integer xSize, Integer zSize,
+    private static BuildingPartDefinition namedPart(Identifier id, Integer xSize, Integer zSize,
                                             List<List<String>> slices) {
-        return new BuildingPartRE(Optional.empty(), Optional.ofNullable(xSize),
+        return new BuildingPartDefinition(Optional.empty(), Optional.ofNullable(xSize),
                 Optional.ofNullable(zSize), Optional.ofNullable(slices), Optional.empty(),
                 Optional.empty(), Optional.empty());
     }

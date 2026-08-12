@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
+import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.core.HolderLookup;
@@ -30,11 +30,11 @@ public class Variant {
      *               registries. Taken rather than fetched: resolution used to reach a static server
      *               reference from wherever it happened to run (issues #60, #128).
      */
-    public Variant(Identifier id, HolderLookup<Block> blockLookup, List<VariantRE> chainRootFirst) {
+    public Variant(Identifier id, HolderLookup<Block> blockLookup, List<VariantDefinition> chainRootFirst) {
         name = id;
         List<BlockEntry> entries = new ArrayList<>();
         boolean anyBlocks = false;
-        for (VariantRE object : chainRootFirst) {
+        for (VariantDefinition object : chainRootFirst) {
             if (object.getBlocks() != null) {
                 Mergeable.apply(entries, object.getBlocks());
                 anyBlocks = true;

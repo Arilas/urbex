@@ -16,7 +16,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetDiagnostics;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
@@ -181,7 +181,7 @@ public class NullDimensionInfo implements IDimensionInfo {
      * {@code outsidestyle}, {@code citystyles} and the whole of {@code parts}, down to each of the
      * twenty-two wiring components {@code PartSelector.requireComplete} checks. Anything left absent
      * is an {@link IllegalStateException} out of the constructor rather than a decode failure, and
-     * this is the one place in {@code src/main} that builds a {@code WorldStyleRE} by hand instead
+     * this is the one place in {@code src/main} that builds a {@code WorldStyleDefinition} by hand instead
      * of decoding one, so no datapack test covers it; {@code NullDimensionInfoPlaceholderTest} does.
      * <p>
      * The lists are declared and empty rather than absent because the preview draws no parts: it
@@ -193,8 +193,8 @@ public class NullDimensionInfo implements IDimensionInfo {
      * is handed to the {@link WorldStyle} constructor beside this, which is where a load error looking
      * for a name will find it (issue #128).
      */
-    private static WorldStyleRE placeholderStyle() {
-        return new WorldStyleRE(
+    private static WorldStyleDefinition placeholderStyle() {
+        return new WorldStyleDefinition(
                 Optional.empty(),
                 // No display name: this style is never offered in the picker, so nothing would read
                 // one, and inventing a label here would put a name on screen if that ever changed.

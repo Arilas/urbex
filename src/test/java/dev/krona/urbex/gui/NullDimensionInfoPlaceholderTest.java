@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * null deliberately when the biome registry or the parent screen is absent) or because the lookup
  * failed, which is what a stale GUI world style no longer shipped by any datapack looks like. The
  * placeholder is therefore a live user-facing path, not a theoretical one, and it is built from a
- * hand-written {@code WorldStyleRE} rather than from JSON - so nothing about it is checked by the
+ * hand-written {@code WorldStyleDefinition} rather than from JSON - so nothing about it is checked by the
  * datapack tests.
  * <p>
  * That is exactly how it broke: {@code parts} became required of a resolved chain after the

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **The authored asset types are named `*Definition`, not `*RE`.** Thirteen classes and every
+  reference to them; a `PaletteRE` is a `PaletteDefinition`, `Preset.toRE()` is
+  `Preset.toDefinition()`. Mechanical only — no behaviour, no logic, nothing else in the same change
+  (issue #128).
+
 - **Compilation no longer writes registry ids into the definitions it reads.** A compiled asset takes
   its id as a constructor argument, from the compiler that already has it, instead of reading it off
   a definition that `IAsset.setRegistryName` had written it into on the way past. The interface, the

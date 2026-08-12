@@ -3,8 +3,8 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
@@ -117,8 +117,8 @@ class WiringRequiredTest {
 
     @Test
     void aChildAppendsToAHighwayGroupItInherits() {
-        WorldStyleRE parent = worldStyle("parent", TestWiring.partSelector());
-        WorldStyleRE child = worldStyle("child", new PartSelector.Decl(
+        WorldStyleDefinition parent = worldStyle("parent", TestWiring.partSelector());
+        WorldStyleDefinition child = worldStyle("child", new PartSelector.Decl(
                 Optional.of(new HighwayParts.Decl(
                         Optional.of(new Mergeable<>(false, List.of("urbex:highway_tunnel_alt"))),
                         Optional.empty(), Optional.empty(),
@@ -177,7 +177,7 @@ class WiringRequiredTest {
                 Optional.empty());
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
-                () -> new CityStyle(TestAssetId.of("citystyle_halflarge"), List.of(cityStyleRE("halflarge", settings))));
+                () -> new CityStyle(TestAssetId.of("citystyle_halflarge"), List.of(cityStyleDefinition("halflarge", settings))));
 
         assertTrue(e.getMessage().contains("streetblocks.largeparts.end"), e.getMessage());
     }
@@ -246,19 +246,19 @@ class WiringRequiredTest {
         };
     }
 
-    private static CityStyleRE cityStyle(String name, StreetParts.Decl parts) {
-        return cityStyleRE(name, parts == null ? null : TestWiring.streetSettings(parts));
+    private static CityStyleDefinition cityStyle(String name, StreetParts.Decl parts) {
+        return cityStyleDefinition(name, parts == null ? null : TestWiring.streetSettings(parts));
     }
 
-    private static CityStyleRE cityStyleRE(String name, StreetSettings settings) {
-        return new CityStyleRE(
+    private static CityStyleDefinition cityStyleDefinition(String name, StreetSettings settings) {
+        return new CityStyleDefinition(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.ofNullable(settings), Optional.empty());
     }
 
-    private static WorldStyleRE worldStyle(String name, PartSelector.Decl parts) {
-        return new WorldStyleRE(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
+    private static WorldStyleDefinition worldStyle(String name, PartSelector.Decl parts) {
+        return new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.ofNullable(parts),
                 Optional.of(new Mergeable<>(true, List.of())), Optional.empty(), Optional.empty());
     }

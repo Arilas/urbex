@@ -2,8 +2,8 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.CustomRegistries;
-import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityRE;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import net.minecraft.core.Holder;
@@ -139,12 +139,12 @@ public final class AssetCompiler {
                 reachable.add(DataTools.fromName(selector.getRight().getRight()));
             }
         }
-        for (PresetRE preset : access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY)) {
+        for (PresetDefinition preset : access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY)) {
             preset.cities().flatMap(CitySettings::cityStyleAlternative)
                     .filter(name -> !name.isBlank())
                     .ifPresent(name -> reachable.add(DataTools.fromName(name)));
         }
-        for (PredefinedCityRE city : access.lookupOrThrow(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY)) {
+        for (PredefinedCityDefinition city : access.lookupOrThrow(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY)) {
             if (city.getCityStyle() != null && !city.getCityStyle().isBlank()) {
                 reachable.add(DataTools.fromName(city.getCityStyle()));
             }

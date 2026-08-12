@@ -10,7 +10,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -43,7 +43,7 @@ public class CommandSavePreset implements Command<CommandSourceStack> {
             return 0;
         }
         Preset preset = dimInfo.getProfile();
-        JsonElement json = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, preset.toRE()).getOrThrow();
+        JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, preset.toDefinition()).getOrThrow();
         Path out = FabricLoader.getInstance().getGameDir().resolve("urbex-export");
         Path target = out.resolve(preset.getId().getPath() + ".json");
         try {

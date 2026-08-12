@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetIndex;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
@@ -105,7 +105,7 @@ class TagSnapshotTest {
     }
 
     private static WorldStyle worldStyle(String name, Optional<TagKey<Block>> rotatable) {
-        return new WorldStyle(Identifier.fromNamespaceAndPath("urbex", name), List.of(new WorldStyleRE(
+        return new WorldStyle(Identifier.fromNamespaceAndPath("urbex", name), List.of(new WorldStyleDefinition(
                 Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(TestWiring.partSelector()),

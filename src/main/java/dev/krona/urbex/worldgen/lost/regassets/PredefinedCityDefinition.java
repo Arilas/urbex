@@ -20,9 +20,9 @@ import java.util.Optional;
  * {@link dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity} - so a sibling city can be
  * "the same city, elsewhere" by declaring nothing but {@code extends} and its two chunk coordinates.
  */
-public class PredefinedCityRE implements Extendable {
+public class PredefinedCityDefinition implements Extendable {
 
-    private static final Codec<PredefinedCityRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<PredefinedCityDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("dimension").forGetter(l -> Optional.ofNullable(l.dimension)),
@@ -32,10 +32,10 @@ public class PredefinedCityRE implements Extendable {
                     Codec.STRING.optionalFieldOf("citystyle").forGetter(l -> Optional.ofNullable(l.cityStyle)),
                     Mergeable.codec(PredefinedBuilding.CODEC).optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.predefinedBuildings)),
                     Mergeable.codec(PredefinedStreet.CODEC).optionalFieldOf("streets").forGetter(l -> Optional.ofNullable(l.predefinedStreets))
-            ).apply(instance, PredefinedCityRE::new));
+            ).apply(instance, PredefinedCityDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<PredefinedCityRE> CODEC = RetiredKeys.reject(RAW, "predefined city");
+    public static final Codec<PredefinedCityDefinition> CODEC = RetiredKeys.reject(RAW, "predefined city");
 
 
     private final Optional<Identifier> extendsId;
@@ -48,7 +48,7 @@ public class PredefinedCityRE implements Extendable {
     private final Mergeable<PredefinedBuilding> predefinedBuildings;
     private final Mergeable<PredefinedStreet> predefinedStreets;
 
-    public PredefinedCityRE(
+    public PredefinedCityDefinition(
             Optional<Identifier> extendsId,
             Optional<String> dimension,
             Optional<Integer> chunkX, Optional<Integer> chunkZ, Optional<Integer> radius,

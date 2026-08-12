@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Selectors;
@@ -48,17 +48,17 @@ class CityStyleInheritSelectorsTest {
     }
 
     /** A registry entry declaring only {@code buildings} and {@code multibuildings}; null means undeclared. */
-    private static CityStyleRE re(List<ObjectSelector> buildings, List<ObjectSelector> multiBuildings,
+    private static CityStyleDefinition re(List<ObjectSelector> buildings, List<ObjectSelector> multiBuildings,
                                   List<ObjectSelector> parks) {
         return reSelectors(replacing(buildings), replacing(multiBuildings), replacing(parks));
     }
 
     /** A registry entry declaring only {@code buildings}, exactly as the JSON codec would decode it. */
-    private static CityStyleRE reBuildings(Optional<Mergeable<ObjectSelector>> buildings) {
+    private static CityStyleDefinition reBuildings(Optional<Mergeable<ObjectSelector>> buildings) {
         return reSelectors(buildings, Optional.empty(), Optional.empty());
     }
 
-    private static CityStyleRE reSelectors(Optional<Mergeable<ObjectSelector>> buildings,
+    private static CityStyleDefinition reSelectors(Optional<Mergeable<ObjectSelector>> buildings,
                                             Optional<Mergeable<ObjectSelector>> multiBuildings,
                                             Optional<Mergeable<ObjectSelector>> parks) {
         Selectors selectors = new Selectors(
@@ -74,7 +74,7 @@ class CityStyleInheritSelectorsTest {
         // The street wiring is boilerplate here, not part of what these tests assert: since the
         // code-side defaults were deleted, a city style whose chain declares no 'parts' family is a
         // load error, so every entry these tests build has to carry one.
-        return new CityStyleRE(
+        return new CityStyleDefinition(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),
@@ -87,8 +87,8 @@ class CityStyleInheritSelectorsTest {
 
     @Test
     void declaredListReplacesInheritedOneInsteadOfAppending() {
-        CityStyleRE parent = re(sels("b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"), null, null);
-        CityStyleRE child = re(sels("b1", "b2", "b3", "b4", "b5"), null, null);
+        CityStyleDefinition parent = re(sels("b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"), null, null);
+        CityStyleDefinition child = re(sels("b1", "b2", "b3", "b4", "b5"), null, null);
 
         CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
@@ -98,8 +98,8 @@ class CityStyleInheritSelectorsTest {
 
     @Test
     void explicitlyEmptyListMeansEmpty() {
-        CityStyleRE parent = re(null, sels("m1", "m2", "m3"), null);
-        CityStyleRE child = re(null, List.of(), null);
+        CityStyleDefinition parent = re(null, sels("m1", "m2", "m3"), null);
+        CityStyleDefinition child = re(null, List.of(), null);
 
         CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
@@ -109,8 +109,8 @@ class CityStyleInheritSelectorsTest {
 
     @Test
     void undeclaredListStillInheritsWhole() {
-        CityStyleRE parent = re(null, null, sels("p1", "p2"));
-        CityStyleRE child = re(sels("b1"), null, null);
+        CityStyleDefinition parent = re(null, null, sels("p1", "p2"));
+        CityStyleDefinition child = re(sels("b1"), null, null);
 
         CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
@@ -120,8 +120,8 @@ class CityStyleInheritSelectorsTest {
 
     @Test
     void everySelectorKindIsCoveredByTheMerge() {
-        CityStyleRE parent = re(sels("b1"), sels("m1"), sels("p1"));
-        CityStyleRE child = re(null, null, null);
+        CityStyleDefinition parent = re(sels("b1"), sels("m1"), sels("p1"));
+        CityStyleDefinition child = re(null, null, null);
 
         CityStyle parentResolved = new CityStyle(TestAssetId.ANY, List.of(parent));
         CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
@@ -134,8 +134,8 @@ class CityStyleInheritSelectorsTest {
 
     @Test
     void appendModeAddsToTheInheritedEntriesInParentOrder() {
-        CityStyleRE parent = reBuildings(replacing(sels("b1", "b2")));
-        CityStyleRE child = reBuildings(appending(sels("b3")));
+        CityStyleDefinition parent = reBuildings(replacing(sels("b1", "b2")));
+        CityStyleDefinition child = reBuildings(appending(sels("b3")));
 
         CityStyle resolved = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 

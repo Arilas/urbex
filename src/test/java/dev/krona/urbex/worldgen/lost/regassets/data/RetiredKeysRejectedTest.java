@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>
  * The coverage claim is the point of this test, so it is made by enumeration rather than by a list
  * someone has to remember to extend: {@link #everyRegisteredCodecRejectsBothRetiredKeys} reflects
- * the {@code CODEC} field off every {@code *RE} class in the registry package and requires each to
+ * the {@code CODEC} field off every {@code *Definition} class in the registry package and requires each to
  * reject, and {@link #everyDynamicRegistryIsCovered} cross-checks that set against the registry keys
  * {@code CustomRegistries} actually registers, so a fourteenth registry cannot be added uncovered.
  */
@@ -52,12 +52,12 @@ class RetiredKeysRejectedTest {
     private static final Path RE_PACKAGE =
             Path.of("src/main/java/dev/krona/urbex/worldgen/lost/regassets");
 
-    /** Every {@code *RE} class in the registry package, by simple name, with its CODEC. */
+    /** Every {@code *Definition} class in the registry package, by simple name, with its CODEC. */
     private static Map<String, Codec<?>> registryCodecs() throws Exception {
         Map<String, Codec<?>> codecs = new LinkedHashMap<>();
         List<Path> sources;
         try (Stream<Path> files = Files.list(RE_PACKAGE)) {
-            sources = files.filter(p -> p.getFileName().toString().endsWith("RE.java")).sorted().toList();
+            sources = files.filter(p -> p.getFileName().toString().endsWith("Definition.java")).sorted().toList();
         }
         for (Path source : sources) {
             String simple = source.getFileName().toString().replace(".java", "");
@@ -104,7 +104,7 @@ class RetiredKeysRejectedTest {
     /**
      * The reflective sweep above is only a coverage proof if the classes it finds are the classes
      * that get registered. This pins that: {@code CustomRegistries.init()} registers one codec per
-     * registry key, and there are as many registry keys as there are {@code *RE} classes.
+     * registry key, and there are as many registry keys as there are {@code *Definition} classes.
      */
     @Test
     void everyDynamicRegistryIsCovered() throws Exception {
@@ -112,13 +112,13 @@ class RetiredKeysRejectedTest {
                 .filter(f -> Modifier.isStatic(f.getModifiers()) && f.getName().endsWith("_REGISTRY_KEY"))
                 .count();
         assertEquals(registryCodecs().size(), registryKeys,
-                "every dynamic registry key should have exactly one *RE class whose CODEC this test sweeps");
+                "every dynamic registry key should have exactly one *Definition class whose CODEC this test sweeps");
     }
 
     /** A valid file is untouched: the wrapper is a pre-check, not a new required field. */
     @Test
     void aFileWithNeitherKeyStillDecodes() {
-        DataResult<?> result = dev.krona.urbex.worldgen.lost.regassets.PresetRE.CODEC.parse(
+        DataResult<?> result = dev.krona.urbex.worldgen.lost.regassets.PresetDefinition.CODEC.parse(
                 JsonOps.INSTANCE, JsonParser.parseString("{\"extends\":\"urbex:default\"}"));
         assertTrue(result.result().isPresent(), () -> "expected a clean decode, got " + result);
     }
@@ -126,10 +126,10 @@ class RetiredKeysRejectedTest {
     /** Encoding is delegated untouched - the command and GUI export paths depend on it. */
     @Test
     void encodeIsUnaffected() {
-        var re = dev.krona.urbex.worldgen.lost.regassets.PresetRE.CODEC.parse(
+        var re = dev.krona.urbex.worldgen.lost.regassets.PresetDefinition.CODEC.parse(
                 JsonOps.INSTANCE, JsonParser.parseString("{\"extends\":\"urbex:default\"}")).getOrThrow();
         DataResult<JsonElement> encoded =
-                dev.krona.urbex.worldgen.lost.regassets.PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, re);
+                dev.krona.urbex.worldgen.lost.regassets.PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re);
         assertTrue(encoded.result().isPresent(), () -> "expected a clean encode, got " + encoded);
         assertEquals("urbex:default", encoded.getOrThrow().getAsJsonObject().get("extends").getAsString());
     }
@@ -138,10 +138,10 @@ class RetiredKeysRejectedTest {
     @Test
     void bothKeysAtOnceIsDeterministic() {
         String json = "{\"inherit\":\"urbex:a\",\"parent\":\"urbex:b\"}";
-        String first = dev.krona.urbex.worldgen.lost.regassets.CityStyleRE.CODEC
+        String first = dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition.CODEC
                 .parse(JsonOps.INSTANCE, JsonParser.parseString(json)).error().orElseThrow().message();
         for (int i = 0; i < 20; i++) {
-            assertEquals(first, dev.krona.urbex.worldgen.lost.regassets.CityStyleRE.CODEC
+            assertEquals(first, dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition.CODEC
                     .parse(JsonOps.INSTANCE, JsonParser.parseString(json)).error().orElseThrow().message());
         }
         assertTrue(first.contains("'inherit'"), first);

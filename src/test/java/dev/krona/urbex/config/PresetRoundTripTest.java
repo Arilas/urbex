@@ -3,7 +3,7 @@ package dev.krona.urbex.config;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@code toReEncodesEveryKey} is the drift guard's engine: it pins each section's declared
- * {@code KEYS} constant to what {@code toRE()} actually encodes, so a field added to a section
+ * {@code KEYS} constant to what {@code toDefinition()} actually encodes, so a field added to a section
  * record without updating {@code KEYS} (or vice versa) fails a test instead of silently warning
  * at runtime.
  */
@@ -53,9 +53,9 @@ class PresetRoundTripTest {
 
     @Test
     void toReEncodesEveryKey() {
-        PresetRE re = new Preset(ID).toRE();
+        PresetDefinition re = new Preset(ID).toDefinition();
 
-        JsonElement encoded = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+        JsonElement encoded = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
         JsonObject root = encoded.getAsJsonObject();
 
         for (Map.Entry<String, Set<String>> entry : EXPECTED_SECTION_KEYS.entrySet()) {
@@ -82,9 +82,9 @@ class PresetRoundTripTest {
         p.HORIZON = 100f;
         p.EDITMODE = true;
 
-        PresetRE re = p.toRE();
-        JsonElement encoded = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
-        PresetRE decoded = PresetRE.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
+        PresetDefinition re = p.toDefinition();
+        JsonElement encoded = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+        PresetDefinition decoded = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
 
         Preset resolved = Presets.resolve(ID, i -> i.equals(ID) ? decoded : null);
 

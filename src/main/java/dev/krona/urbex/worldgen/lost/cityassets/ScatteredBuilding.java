@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
+import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.StringRepresentable;
@@ -31,7 +31,7 @@ public class ScatteredBuilding {
      * {@link Resolved#require} cannot state. Left unchecked, a chain declaring neither loaded and
      * then threw from {@code Scattered.generate} the first time the entry was placed.
      */
-    public ScatteredBuilding(Identifier id, List<ScatteredRE> chainRootFirst) {
+    public ScatteredBuilding(Identifier id, List<ScatteredDefinition> chainRootFirst) {
         name = id;
         List<String> declaredBuildings = new ArrayList<>();
         boolean anyBuildings = false;
@@ -39,7 +39,7 @@ public class ScatteredBuilding {
         int heightoffset = 0;
         TerrainHeight terrainheight = null;
         TerrainFix terrainfix = null;
-        for (ScatteredRE object : chainRootFirst) {
+        for (ScatteredDefinition object : chainRootFirst) {
             if (object.getBuildings() != null) {
                 Mergeable.apply(declaredBuildings, object.getBuildings());
                 anyBuildings = true;

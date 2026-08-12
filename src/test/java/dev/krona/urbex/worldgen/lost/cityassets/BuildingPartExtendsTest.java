@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
@@ -42,9 +42,9 @@ class BuildingPartExtendsTest {
 
     @Test
     void aPartThatOnlySwapsItsPaletteKeepsItsAncestorsGeometry() {
-        BuildingPartRE parent = part("radiotower", geometry(2, 2, TOWER)
+        BuildingPartDefinition parent = part("radiotower", geometry(2, 2, TOWER)
                 .refpalette("urbex:radiotower"));
-        BuildingPartRE child = part("radiotower_rusted", inherits("urbex:radiotower")
+        BuildingPartDefinition child = part("radiotower_rusted", inherits("urbex:radiotower")
                 .refpalette("urbexmt:radiotower_rusted"));
 
         BuildingPart resolved = new BuildingPart(TestAssetId.of("radiotower_rusted"), BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child));
@@ -60,8 +60,8 @@ class BuildingPartExtendsTest {
 
     @Test
     void declaringSlicesReplacesTheInheritedOnesWholesale() {
-        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER));
-        BuildingPartRE child = part("tower_short", inherits("urbex:tower")
+        BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER));
+        BuildingPartDefinition child = part("tower_short", inherits("urbex:tower")
                 .slices(List.of(List.of("ij", "kl"))));
 
         BuildingPart resolved = new BuildingPart(TestAssetId.of("tower_short"), BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child));
@@ -74,8 +74,8 @@ class BuildingPartExtendsTest {
 
     @Test
     void anXSizeThatContradictsInheritedSlicesIsALoadError() {
-        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER));
-        BuildingPartRE child = part("tower_wide", inherits("urbex:tower").xsize(3));
+        BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER));
+        BuildingPartDefinition child = part("tower_wide", inherits("urbex:tower").xsize(3));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> new BuildingPart(TestAssetId.of("tower_wide"), BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)));
@@ -90,8 +90,8 @@ class BuildingPartExtendsTest {
 
     @Test
     void aZSizeThatContradictsInheritedSlicesIsALoadError() {
-        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER));
-        BuildingPartRE child = part("tower_deep", inherits("urbex:tower").zsize(5));
+        BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER));
+        BuildingPartDefinition child = part("tower_deep", inherits("urbex:tower").zsize(5));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> new BuildingPart(TestAssetId.of("tower_deep"), BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)));
@@ -102,8 +102,8 @@ class BuildingPartExtendsTest {
 
     @Test
     void aChainThatNeverDeclaresSlicesIsALoadError() {
-        BuildingPartRE parent = part("abstract_tower", new Builder().xsize(2).zsize(2));
-        BuildingPartRE child = part("tower_rusted", inherits("urbex:abstract_tower")
+        BuildingPartDefinition parent = part("abstract_tower", new Builder().xsize(2).zsize(2));
+        BuildingPartDefinition child = part("tower_rusted", inherits("urbex:abstract_tower")
                 .refpalette("urbex:rusted"));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
@@ -117,7 +117,7 @@ class BuildingPartExtendsTest {
 
     @Test
     void aChainThatNeverDeclaresDimensionsIsALoadError() {
-        BuildingPartRE parent = part("sliced_only", new Builder().slices(TOWER));
+        BuildingPartDefinition parent = part("sliced_only", new Builder().slices(TOWER));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
                 () -> new BuildingPart(TestAssetId.of("sliced_only"), BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent)));
@@ -127,9 +127,9 @@ class BuildingPartExtendsTest {
 
     @Test
     void metadataFromTheChildReplacesTheParentsUnlessItOptsIntoAppending() {
-        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER).meta(true, meta("support")));
-        BuildingPartRE replacing = part("tower_a", inherits("urbex:tower").meta(true, meta("nowater")));
-        BuildingPartRE appending = part("tower_b", inherits("urbex:tower").meta(false, meta("nowater")));
+        BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER).meta(true, meta("support")));
+        BuildingPartDefinition replacing = part("tower_a", inherits("urbex:tower").meta(true, meta("nowater")));
+        BuildingPartDefinition appending = part("tower_b", inherits("urbex:tower").meta(false, meta("nowater")));
 
         BuildingPart replaced = new BuildingPart(TestAssetId.of("tower_b"), BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, replacing));
         assertTrue(replaced.getMetaBoolean("nowater"));
@@ -145,11 +145,11 @@ class BuildingPartExtendsTest {
         // An inline palette is a keyed collection too. Replacing it wholesale would reproduce, one
         // level down, exactly the failure the keyed-collection rule exists to prevent: a child
         // repainting one marker would silently lose the other two.
-        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER)
+        BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER)
                 .inlinePalette(entry('a', "minecraft:stone"),
                         entry('b', "minecraft:bricks"),
                         entry('c', "minecraft:glass")));
-        BuildingPartRE child = part("tower_rusted", inherits("urbex:tower")
+        BuildingPartDefinition child = part("tower_rusted", inherits("urbex:tower")
                 .inlinePalette(entry('a', "minecraft:deepslate")));
 
         Palette resolved = new BuildingPart(TestAssetId.of("tower_rusted"), BuiltInRegistries.BLOCK, null, PALETTES, List.of(parent, child)).getLocalPalette();
@@ -164,9 +164,9 @@ class BuildingPartExtendsTest {
     @Test
     void namingAPaletteWithRefpaletteDropsAnInheritedInlineOne() {
         // refpalette and an inline block are two ways to say the same thing, not two layers.
-        BuildingPartRE parent = part("tower", geometry(2, 2, TOWER)
+        BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER)
                 .inlinePalette(entry('a', "minecraft:stone")));
-        BuildingPartRE child = part("tower_ref", inherits("urbex:tower")
+        BuildingPartDefinition child = part("tower_ref", inherits("urbex:tower")
                 .refpalette("urbex:somewhere_else"));
 
         // The refpalette wins, and the inherited inline palette is gone - so the part cannot be
@@ -180,10 +180,10 @@ class BuildingPartExtendsTest {
 
     @Test
     void anExtendsInsideAnInlinePaletteIsRejectedRatherThanIgnored() {
-        // PaletteRE.CODEC accepts "extends" wherever it is embedded, but an inline block is not a
+        // PaletteDefinition.CODEC accepts "extends" wherever it is embedded, but an inline block is not a
         // registry entry, so nothing can resolve it. Silently dropping it is the one option that
         // lets a datapack mean something other than what it says.
-        BuildingPartRE part = part("tower", geometry(2, 2, TOWER)
+        BuildingPartDefinition part = part("tower", geometry(2, 2, TOWER)
                 .inlinePalette(Optional.of(Identifier.parse("urbex:common")),
                         entry('a', "minecraft:stone")));
 
@@ -233,7 +233,7 @@ class BuildingPartExtendsTest {
      * longer carries one (issue #128), so it is not written here - it is passed to
      * {@link BuildingPart}'s constructor at each call site, which is where the compiler passes it.
      */
-    private static BuildingPartRE part(String path, Builder builder) {
+    private static BuildingPartDefinition part(String path, Builder builder) {
         return builder.build();
     }
 
@@ -243,7 +243,7 @@ class BuildingPartExtendsTest {
         private Optional<Integer> zSize = Optional.empty();
         private Optional<List<List<String>>> slices = Optional.empty();
         private Optional<String> refpalette = Optional.empty();
-        private Optional<PaletteRE> inlinePalette = Optional.empty();
+        private Optional<PaletteDefinition> inlinePalette = Optional.empty();
         private Optional<Mergeable<PartMeta>> meta = Optional.empty();
 
         Builder extendsId(String id) {
@@ -276,7 +276,7 @@ class BuildingPartExtendsTest {
         }
 
         Builder inlinePalette(Optional<Identifier> paletteExtends, PaletteEntry... entries) {
-            this.inlinePalette = Optional.of(new PaletteRE(paletteExtends, Optional.of(List.of(entries))));
+            this.inlinePalette = Optional.of(new PaletteDefinition(paletteExtends, Optional.of(List.of(entries))));
             return this;
         }
 
@@ -285,8 +285,8 @@ class BuildingPartExtendsTest {
             return this;
         }
 
-        BuildingPartRE build() {
-            return new BuildingPartRE(extendsId, xSize, zSize, slices, refpalette, inlinePalette, meta);
+        BuildingPartDefinition build() {
+            return new BuildingPartDefinition(extendsId, xSize, zSize, slices, refpalette, inlinePalette, meta);
         }
     }
 }

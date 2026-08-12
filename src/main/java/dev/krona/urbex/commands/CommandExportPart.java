@@ -17,8 +17,8 @@ import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
-import dev.krona.urbex.worldgen.lost.regassets.BuildingPartRE;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.fabricmc.loader.api.FabricLoader;
@@ -140,8 +140,8 @@ public class CommandExportPart implements Command<CommandSourceStack> {
                         Optional.empty(),
                         Optional.empty()));
             }
-            PaletteRE paletteRE = new PaletteRE(Optional.empty(), Optional.of(entries));
-            DataResult<JsonElement> result = PaletteRE.CODEC.encodeStart(JsonOps.INSTANCE, paletteRE);
+            PaletteDefinition paletteDefinition = new PaletteDefinition(Optional.empty(), Optional.of(entries));
+            DataResult<JsonElement> result = PaletteDefinition.CODEC.encodeStart(JsonOps.INSTANCE, paletteDefinition);
             root.add("__comment__", new JsonPrimitive("'missingpalette' represents all blockstates that it couldn't find in the palette. These have to be put in a palette. " +
                     "'exportedpart' is the actual exported part"));
             root.add("missingpalette", result.result().get());
@@ -149,10 +149,10 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             root.add("__comment__", new JsonPrimitive("'exportedpart' is the actual exported part"));
         }
 
-        BuildingPartRE buildingPartRE = new BuildingPartRE(Optional.empty(),
+        BuildingPartDefinition buildingPartRE = new BuildingPartDefinition(Optional.empty(),
                 Optional.of(part.getXSize()), Optional.of(part.getZSize()), Optional.of(slices),
                 Optional.ofNullable(part.getRefPaletteName()), Optional.empty(), Optional.empty());
-        DataResult<JsonElement> result = BuildingPartRE.CODEC.encodeStart(JsonOps.INSTANCE, buildingPartRE);
+        DataResult<JsonElement> result = BuildingPartDefinition.CODEC.encodeStart(JsonOps.INSTANCE, buildingPartRE);
         root.add("exportedpart", result.result().get());
 
         String json = gson.toJson(root);

@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
-import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
+import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistrationInfo;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * asking for that diagnosis on a running world changes nothing.
  * <p>
  * Both properties are exercised through the {@code variants} registry, whose entries are the
- * cheapest asset to break: a {@code VariantRE} declaring no {@code blocks} anywhere in its chain is
+ * cheapest asset to break: a {@code VariantDefinition} declaring no {@code blocks} anywhere in its chain is
  * exactly the "a field nothing declares" failure {@link Resolved} raises, and it needs no other
  * registry to be populated to reach it.
  */
@@ -93,13 +93,13 @@ class AssetValidationTest {
      * {@code variants}, which holds one entry per name given - each declaring no {@code blocks}.
      */
     private static RegistryAccess registriesWithBrokenVariants(String... brokenPaths) {
-        MappedRegistry<VariantRE> variants = new MappedRegistry<>(
+        MappedRegistry<VariantDefinition> variants = new MappedRegistry<>(
                 CustomRegistries.VARIANTS_REGISTRY_KEY, Lifecycle.stable());
         for (String path : brokenPaths) {
             variants.register(
                     ResourceKey.create(CustomRegistries.VARIANTS_REGISTRY_KEY,
                             Identifier.fromNamespaceAndPath("urbex", path)),
-                    new VariantRE(Optional.empty(), Optional.empty()),
+                    new VariantDefinition(Optional.empty(), Optional.empty()),
                     RegistrationInfo.BUILT_IN);
         }
         return new RegistryAccess.ImmutableRegistryAccess(List.of(

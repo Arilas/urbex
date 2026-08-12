@@ -8,8 +8,8 @@ import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.lost.cityassets.ExtendsChain;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -404,7 +404,7 @@ public class CitiesTab extends GridLayoutTab {
      */
     private static Map<String, String> registeredWorldStyles(CreateWorldScreen screen) {
         RegistryAccess access = screen.getUiState().getSettings().worldgenLoadContext();
-        Optional<Registry<WorldStyleRE>> registry = access.lookup(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
+        Optional<Registry<WorldStyleDefinition>> registry = access.lookup(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
         if (registry.isEmpty()) {
             return Map.of();
         }
@@ -427,10 +427,10 @@ public class CitiesTab extends GridLayoutTab {
      * cause, and a dropdown that throws out of its own constructor would take the create-world
      * screen down before the player ever got that message.
      */
-    private static String worldStyleDisplayName(Registry<WorldStyleRE> registry, Identifier id) {
+    private static String worldStyleDisplayName(Registry<WorldStyleDefinition> registry, Identifier id) {
         try {
             return WorldStyle.displayNameOf(
-                    ExtendsChain.resolve(id, registry::getValue, WorldStyleRE::getExtends), id);
+                    ExtendsChain.resolve(id, registry::getValue, WorldStyleDefinition::getExtends), id);
         } catch (RuntimeException e) {
             return id.toString();
         }
@@ -453,7 +453,7 @@ public class CitiesTab extends GridLayoutTab {
      */
     private static List<PresetSelection.Entry> registeredPresets(CreateWorldScreen screen) {
         RegistryAccess access = screen.getUiState().getSettings().worldgenLoadContext();
-        Optional<Registry<PresetRE>> registry = access.lookup(CustomRegistries.PRESET_REGISTRY_KEY);
+        Optional<Registry<PresetDefinition>> registry = access.lookup(CustomRegistries.PRESET_REGISTRY_KEY);
         if (registry.isEmpty()) {
             return List.of();
         }

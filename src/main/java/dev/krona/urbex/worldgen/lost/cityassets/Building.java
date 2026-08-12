@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import net.minecraft.core.HolderLookup;
@@ -57,15 +57,15 @@ public class Building {
      * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
      */
     public Building(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                        AssetIndex<Palette> palettes, List<BuildingRE> chainRootFirst) {
+                        AssetIndex<Palette> palettes, List<BuildingDefinition> chainRootFirst) {
         name = id;
         List<PartRef> partRefs = new ArrayList<>();
         boolean anyParts = false;
         List<PartRef> partRefs2 = new ArrayList<>();
-        List<PaletteRE> inlinePalettes = new ArrayList<>();
+        List<PaletteDefinition> inlinePalettes = new ArrayList<>();
         String refPalette = null;
         Character filler = null;
-        for (BuildingRE object : chainRootFirst) {
+        for (BuildingDefinition object : chainRootFirst) {
             if (object.getMinFloors() != null) {
                 minFloors = object.getMinFloors();
             }

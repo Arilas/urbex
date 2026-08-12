@@ -18,9 +18,9 @@ import java.util.Optional;
  * is checked after the chain is resolved, in
  * {@link dev.krona.urbex.worldgen.lost.cityassets.WorldStyle}.
  */
-public class WorldStyleRE implements Extendable {
+public class WorldStyleDefinition implements Extendable {
 
-    private static final Codec<WorldStyleRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<WorldStyleDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("name").forGetter(l -> Optional.ofNullable(l.displayName)),
@@ -32,10 +32,10 @@ public class WorldStyleRE implements Extendable {
                     Mergeable.codec(CityStyleSelector.CODEC).optionalFieldOf("citystyles").forGetter(l -> Optional.ofNullable(l.cityStyleSelectors)),
                     Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers)),
                     DataTools.BLOCK_TAG_CODEC.optionalFieldOf("rotatable").forGetter(l -> Optional.ofNullable(l.rotatable))
-            ).apply(instance, WorldStyleRE::new));
+            ).apply(instance, WorldStyleDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<WorldStyleRE> CODEC = RetiredKeys.reject(RAW, "worldstyle");
+    public static final Codec<WorldStyleDefinition> CODEC = RetiredKeys.reject(RAW, "worldstyle");
 
     private final Optional<Identifier> extendsId;
     // The human-readable label the world-style picker shows instead of the id. Null means "not
@@ -55,7 +55,7 @@ public class WorldStyleRE implements Extendable {
     // before this field existed.
     private final TagKey<Block> rotatable;
 
-    public WorldStyleRE(Optional<Identifier> extendsId,
+    public WorldStyleDefinition(Optional<Identifier> extendsId,
                         Optional<String> displayName,
                         Optional<String> outsideStyle,
                         Optional<MultiSettings> multiSettings,

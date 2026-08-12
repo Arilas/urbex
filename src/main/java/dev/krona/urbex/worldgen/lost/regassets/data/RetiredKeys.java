@@ -73,8 +73,8 @@ public final class RetiredKeys {
 
     /**
      * Wraps a codec so a retired key fails the decode. Encode is delegated untouched - these keys
-     * can never be produced by an encoder, and {@code PaletteRE}/{@code BuildingPartRE}/
-     * {@code PresetRE} encode on live command and GUI paths that inspect the {@link DataResult}
+     * can never be produced by an encoder, and {@code PaletteDefinition}/{@code BuildingPartDefinition}/
+     * {@code PresetDefinition} encode on live command and GUI paths that inspect the {@link DataResult}
      * themselves.
      */
     public static <A> Codec<A> reject(Codec<A> base, String context) {

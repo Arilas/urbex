@@ -10,7 +10,7 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.config.UrbexConfig;
 import dev.krona.urbex.data.UrbexData;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -359,9 +359,9 @@ public class Config {
 
         if (selectedPreset != null) {
             RegistryAccess access = level.registryAccess();
-            Registry<dev.krona.urbex.worldgen.lost.regassets.PresetRE> presets =
+            Registry<dev.krona.urbex.worldgen.lost.regassets.PresetDefinition> presets =
                     access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
-            Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE> worldStyles =
+            Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition> worldStyles =
                     access.lookupOrThrow(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
             if (presets.get(selectedPreset).isEmpty()) {
                 Urbex.getLogger().error("Unknown Urbex preset '{}' selected for the overworld; ignoring. Valid presets: {}",
@@ -399,7 +399,7 @@ public class Config {
             // override that flips GENERATE_NETHER (on or off) would silently not count here.
             if (overworldChoice.overridesJson().isPresent()) {
                 try {
-                    PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE,
+                    PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE,
                             JsonParser.parseString(overworldChoice.overridesJson().get())).getOrThrow();
                     overworldPreset = Presets.applyOverrides(overworldPreset, re);
                 } catch (Exception e) {
@@ -424,9 +424,9 @@ public class Config {
      * Must run after {@link #applyWorldOverrides} so the world's selectedPreset is in effect.
      */
     public static void validateSelectedPresets(MinecraftServer server) {
-        Registry<dev.krona.urbex.worldgen.lost.regassets.PresetRE> presets =
+        Registry<dev.krona.urbex.worldgen.lost.regassets.PresetDefinition> presets =
                 server.registryAccess().lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
-        Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE> worldStyles =
+        Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition> worldStyles =
                 server.registryAccess().lookupOrThrow(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
 
         String selected = SELECTED_PRESET.get();
@@ -450,14 +450,14 @@ public class Config {
         }
     }
 
-    private static void requirePreset(Registry<dev.krona.urbex.worldgen.lost.regassets.PresetRE> presets, Identifier id, String context) {
+    private static void requirePreset(Registry<dev.krona.urbex.worldgen.lost.regassets.PresetDefinition> presets, Identifier id, String context) {
         if (presets.get(id).isEmpty()) {
             throw new IllegalStateException("Unknown Urbex preset '" + id + "' (" + context + "). Valid presets: "
                     + String.join(", ", sortedIds(presets)));
         }
     }
 
-    private static void requireWorldStyle(Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE> worldStyles, Identifier id, String context) {
+    private static void requireWorldStyle(Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition> worldStyles, Identifier id, String context) {
         if (worldStyles.get(id).isEmpty()) {
             throw new IllegalStateException("Unknown Urbex worldstyle '" + id + "' (" + context + "). Valid worldstyles: "
                     + String.join(", ", sortedIds(worldStyles)));

@@ -187,11 +187,11 @@ class PresetSelectionTest {
         assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
         assertNotNull(Config.overridesFromClient);
 
-        // The published JSON is a real, parseable PresetRE overlay (not a stringified profile).
-        com.mojang.serialization.DataResult<dev.krona.urbex.worldgen.lost.regassets.PresetRE> parsed =
-                dev.krona.urbex.worldgen.lost.regassets.PresetRE.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE,
+        // The published JSON is a real, parseable PresetDefinition overlay (not a stringified profile).
+        com.mojang.serialization.DataResult<dev.krona.urbex.worldgen.lost.regassets.PresetDefinition> parsed =
+                dev.krona.urbex.worldgen.lost.regassets.PresetDefinition.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE,
                         com.google.gson.JsonParser.parseString(Config.overridesFromClient));
-        assertTrue(parsed.isSuccess(), "overridesFromClient must decode as a PresetRE: " + parsed);
+        assertTrue(parsed.isSuccess(), "overridesFromClient must decode as a PresetDefinition: " + parsed);
         assertEquals(0.5, parsed.getOrThrow().cities().orElseThrow().cityChance().orElseThrow(), 1e-9);
     }
 
@@ -264,7 +264,7 @@ class PresetSelectionTest {
     /**
      * Regression: an unparseable overridesJson must never reach {@code Config.overridesFromClient} -
      * that field is read when a level loads and its runtime is built
-     * ({@code DimensionRuntime.create}'s {@code PresetRE.CODEC.parse(...).getOrThrow()}), so a
+     * ({@code DimensionRuntime.create}'s {@code PresetDefinition.CODEC.parse(...).getOrThrow()}), so a
      * corrupted/hand-edited save's garbage JSON must be rejected before publish, not after.
      */
     @Test

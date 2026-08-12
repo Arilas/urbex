@@ -24,7 +24,7 @@ import java.util.Optional;
  * than required, because a rarer variant of an existing decoration should not have to restate them.
  * Requiredness is checked after the chain is resolved, in {@link #resolve}.
  */
-public class StuffSettingsRE implements Extendable {
+public class StuffSettingsDefinition implements Extendable {
 
     /**
      * The widest {@code attempts} the RNG slot address can hold, and one more than the widest
@@ -42,7 +42,7 @@ public class StuffSettingsRE implements Extendable {
      */
     public static final int SLOT_FIELD_SIZE = 4096;
 
-    private static final Codec<StuffSettingsRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<StuffSettingsDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Mergeable.codec(Codec.STRING).optionalFieldOf("tags").forGetter(l -> Optional.ofNullable(l.tags)),
@@ -58,10 +58,10 @@ public class StuffSettingsRE implements Extendable {
                     BlockMatcher.CODEC.optionalFieldOf("blocks").forGetter(l -> Optional.ofNullable(l.blockMatcher)),
                     BlockMatcher.CODEC.optionalFieldOf("upperblocks").forGetter(l -> Optional.ofNullable(l.upperBlockMatcher)),
                     IdentifierMatcher.CODEC.optionalFieldOf("buildings").forGetter(l -> Optional.ofNullable(l.buildingMatcher))
-            ).apply(instance, StuffSettingsRE::new));
+            ).apply(instance, StuffSettingsDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<StuffSettingsRE> CODEC = RetiredKeys.reject(RAW, "stuff entry");
+    public static final Codec<StuffSettingsDefinition> CODEC = RetiredKeys.reject(RAW, "stuff entry");
 
     private final Optional<Identifier> extendsId;
     private final Mergeable<String> tags;
@@ -79,7 +79,7 @@ public class StuffSettingsRE implements Extendable {
     private final BlockMatcher upperBlockMatcher;
     private final IdentifierMatcher buildingMatcher;
 
-    public StuffSettingsRE(Optional<Identifier> extendsId,
+    public StuffSettingsDefinition(Optional<Identifier> extendsId,
                            Optional<Mergeable<String>> tags,
                            Optional<String> column,
                            Optional<Integer> minheight, Optional<Integer> maxheight,
@@ -114,8 +114,8 @@ public class StuffSettingsRE implements Extendable {
      * file, so a child inherits them, and a chain where nothing declares one is a load error naming
      * the asset and the field rather than an NPE during generation.
      */
-    public static StuffSettingsRE resolve(Identifier id, List<StuffSettingsRE> chainRootFirst) {
-        StuffSettingsRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
+    public static StuffSettingsDefinition resolve(Identifier id, List<StuffSettingsDefinition> chainRootFirst) {
+        StuffSettingsDefinition leaf = chainRootFirst.get(chainRootFirst.size() - 1);
         if (chainRootFirst.size() == 1) {
             return leaf.requireResolved(id);
         }
@@ -133,7 +133,7 @@ public class StuffSettingsRE implements Extendable {
         BlockMatcher blockMatcher = null;
         BlockMatcher upperBlockMatcher = null;
         IdentifierMatcher buildingMatcher = null;
-        for (StuffSettingsRE re : chainRootFirst) {
+        for (StuffSettingsDefinition re : chainRootFirst) {
             if (re.tags != null) {
                 Mergeable.apply(tags, re.tags);
                 anyTags = true;
@@ -175,7 +175,7 @@ public class StuffSettingsRE implements Extendable {
                 buildingMatcher = re.buildingMatcher;
             }
         }
-        return new StuffSettingsRE(Optional.empty(),
+        return new StuffSettingsDefinition(Optional.empty(),
                 anyTags ? Optional.of(new Mergeable<>(true, List.copyOf(tags))) : Optional.empty(),
                 Optional.ofNullable(column),
                 Optional.ofNullable(minheight), Optional.ofNullable(maxheight),
@@ -194,7 +194,7 @@ public class StuffSettingsRE implements Extendable {
      *             fold is a synthetic entry no registry holds, and writing an id into it just so an
      *             error could name it is what {@code IAsset.setRegistryName} was for (issue #128).
      */
-    private StuffSettingsRE requireResolved(Identifier name) {
+    private StuffSettingsDefinition requireResolved(Identifier name) {
         Resolved.require(column, name, "column");
         Resolved.require(mincount, name, "mincount");
         Resolved.require(maxcount, name, "maxcount");

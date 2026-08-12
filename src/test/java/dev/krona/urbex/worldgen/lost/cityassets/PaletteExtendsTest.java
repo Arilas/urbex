@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -34,11 +34,11 @@ class PaletteExtendsTest {
 
     @Test
     void childOverridesOnlyTheCharactersItDeclares() {
-        PaletteRE parent = palette("parent",
+        PaletteDefinition parent = palette("parent",
                 entry('S', "minecraft:stone"),
                 entry('b', "minecraft:bricks"),
                 entry('g', "minecraft:glass"));
-        PaletteRE child = palette("child", entry('S', "minecraft:deepslate"));
+        PaletteDefinition child = palette("child", entry('S', "minecraft:deepslate"));
 
         Palette resolved = new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
@@ -51,8 +51,8 @@ class PaletteExtendsTest {
 
     @Test
     void aCharacterTheChildAddsJoinsTheOnesItInherits() {
-        PaletteRE parent = palette("parent", entry('S', "minecraft:stone"));
-        PaletteRE child = palette("child", entry('w', "minecraft:oak_planks"));
+        PaletteDefinition parent = palette("parent", entry('S', "minecraft:stone"));
+        PaletteDefinition child = palette("child", entry('w', "minecraft:oak_planks"));
 
         Palette resolved = new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
@@ -63,9 +63,9 @@ class PaletteExtendsTest {
 
     @Test
     void theLastEntryInADeepChainWins() {
-        PaletteRE root = palette("root", entry('S', "minecraft:stone"));
-        PaletteRE middle = palette("middle", entry('S', "minecraft:andesite"));
-        PaletteRE leaf = palette("leaf", entry('S', "minecraft:deepslate"));
+        PaletteDefinition root = palette("root", entry('S', "minecraft:stone"));
+        PaletteDefinition middle = palette("middle", entry('S', "minecraft:andesite"));
+        PaletteDefinition leaf = palette("leaf", entry('S', "minecraft:deepslate"));
 
         assertEquals("minecraft:deepslate", blockOf(new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(root, middle, leaf)), 'S'));
         assertEquals("minecraft:andesite", blockOf(new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(root, middle)), 'S'));
@@ -75,8 +75,8 @@ class PaletteExtendsTest {
     void anOverriddenCharacterTakesItsDamagedMappingWithIt() {
         // The parent's 'S' is replaced wholesale, so its damaged-state mapping must go with it
         // rather than linger keyed on a block the resolved palette no longer places.
-        PaletteRE parent = palette("parent", damagedEntry('S', "minecraft:stone", "minecraft:cobblestone"));
-        PaletteRE child = palette("child", entry('S', "minecraft:deepslate"));
+        PaletteDefinition parent = palette("parent", damagedEntry('S', "minecraft:stone", "minecraft:cobblestone"));
+        PaletteDefinition child = palette("child", entry('S', "minecraft:deepslate"));
 
         Palette resolved = new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
@@ -100,8 +100,8 @@ class PaletteExtendsTest {
         return BuiltInRegistries.BLOCK.getKey(blockState.getBlock()).toString();
     }
 
-    private static PaletteRE palette(String path, PaletteEntry... entries) {
-        return new PaletteRE(Optional.empty(), Optional.of(List.of(entries)));
+    private static PaletteDefinition palette(String path, PaletteEntry... entries) {
+        return new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries)));
     }
 
     private static PaletteEntry entry(char marker, String block) {

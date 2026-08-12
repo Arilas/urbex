@@ -2,7 +2,7 @@ package dev.krona.urbex.config;
 
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.ExtendsChain;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -18,12 +18,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
- * Resolves {@link PresetRE} {@code extends} chains into runtime {@link Preset}s, and lists the
+ * Resolves {@link PresetDefinition} {@code extends} chains into runtime {@link Preset}s, and lists the
  * presets a UI should offer to browse.
  */
 public class Presets {
 
-    public static final TagKey<PresetRE> TAG_BROWSABLE =
+    public static final TagKey<PresetDefinition> TAG_BROWSABLE =
             TagKey.create(CustomRegistries.PRESET_REGISTRY_KEY, Identifier.fromNamespaceAndPath("urbex", "presets"));
 
     private static final Identifier DEFAULT_PRESET_ID = Identifier.fromNamespaceAndPath("urbex", "default");
@@ -44,10 +44,10 @@ public class Presets {
      * @throws IllegalStateException if the extends chain cycles, or a referenced id is unknown to
      *                                {@code lookup}.
      */
-    public static Preset resolve(Identifier id, Function<Identifier, PresetRE> lookup) {
-        List<PresetRE> chain = ExtendsChain.resolve(id, lookup, PresetRE::getExtends);
+    public static Preset resolve(Identifier id, Function<Identifier, PresetDefinition> lookup) {
+        List<PresetDefinition> chain = ExtendsChain.resolve(id, lookup, PresetDefinition::getExtends);
         Preset p = new Preset(id);
-        for (PresetRE re : chain) {
+        for (PresetDefinition re : chain) {
             re.applyTo(p);
         }
         return p;
@@ -59,14 +59,14 @@ public class Presets {
         if (cached != null) {
             return cached;
         }
-        Registry<PresetRE> registry = access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
+        Registry<PresetDefinition> registry = access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
         Preset resolved = resolve(id, registry::getValue);
         Preset raced = CACHE.putIfAbsent(id, resolved);
         return raced != null ? raced : resolved;
     }
 
     /** Clones {@code base} and applies {@code overrides}'s present sections on top of the clone. */
-    public static Preset applyOverrides(Preset base, PresetRE overrides) {
+    public static Preset applyOverrides(Preset base, PresetDefinition overrides) {
         Preset p = base.copy();
         overrides.applyTo(p);
         return p;
@@ -82,9 +82,9 @@ public class Presets {
      * use.
      */
     public static List<Identifier> listBrowsable(RegistryAccess access) {
-        Registry<PresetRE> registry = access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
+        Registry<PresetDefinition> registry = access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY);
         List<Identifier> ids = new ArrayList<>();
-        for (Holder<PresetRE> holder : registry.getTagOrEmpty(TAG_BROWSABLE)) {
+        for (Holder<PresetDefinition> holder : registry.getTagOrEmpty(TAG_BROWSABLE)) {
             holder.unwrapKey().ifPresent(key -> ids.add(key.identifier()));
         }
         if (ids.isEmpty()) {

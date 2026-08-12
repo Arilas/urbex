@@ -1,9 +1,9 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingRE;
-import dev.krona.urbex.worldgen.lost.regassets.ScatteredRE;
-import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredSettings;
@@ -54,8 +54,8 @@ class RequiredAfterResolutionTest {
 
     @Test
     void stuffChildInheritsRequiredScalarsItDoesNotDeclare() {
-        StuffSettingsRE parent = stuff().column("y").counts(2, 5, 10).inbuilding(true).tags("rubble").build();
-        StuffSettingsRE child = stuff().tags("debris").build();
+        StuffSettingsDefinition parent = stuff().column("y").counts(2, 5, 10).inbuilding(true).tags("rubble").build();
+        StuffSettingsDefinition child = stuff().tags("debris").build();
 
         StuffObject resolved = new StuffObject(TestAssetId.of("test_stuff"), List.of(parent, child));
 
@@ -93,11 +93,11 @@ class RequiredAfterResolutionTest {
 
     @Test
     void stuffChildThatDeclaresOnlySomeOfTheChainStillLoadsWhenAnAncestorCoversTheRest() {
-        StuffSettingsRE root = stuff().column("y").counts(2, 5, 10).inbuilding(false).build();
-        StuffSettingsRE middle = stuff().counts(3, 6, 11).build();
-        StuffSettingsRE leaf = stuff().tags("debris").build();
+        StuffSettingsDefinition root = stuff().column("y").counts(2, 5, 10).inbuilding(false).build();
+        StuffSettingsDefinition middle = stuff().counts(3, 6, 11).build();
+        StuffSettingsDefinition leaf = stuff().tags("debris").build();
 
-        StuffSettingsRE resolved = new StuffObject(TestAssetId.of("test_stuff"), List.of(root, middle, leaf)).getSettings();
+        StuffSettingsDefinition resolved = new StuffObject(TestAssetId.of("test_stuff"), List.of(root, middle, leaf)).getSettings();
 
         assertEquals("y", resolved.getColumn(), "from the root, two links up");
         assertEquals(3, resolved.getMincount(), "the nearest ancestor that declares one wins");
@@ -107,9 +107,9 @@ class RequiredAfterResolutionTest {
 
     @Test
     void multiBuildingChildInheritsTheGridSizeItDoesNotDeclare() {
-        MultiBuildingRE parent = multiBuilding(Optional.of(2), Optional.of(2),
+        MultiBuildingDefinition parent = multiBuilding(Optional.of(2), Optional.of(2),
                 Optional.of(List.of(List.of("urbex:a", "urbex:b"), List.of("urbex:c", "urbex:d"))));
-        MultiBuildingRE child = multiBuilding(Optional.empty(), Optional.empty(),
+        MultiBuildingDefinition child = multiBuilding(Optional.empty(), Optional.empty(),
                 Optional.of(List.of(List.of("urbex:w", "urbex:x"), List.of("urbex:y", "urbex:z"))));
 
         MultiBuilding resolved = new MultiBuilding(TestAssetId.of("test_multi"), List.of(parent, child));
@@ -122,9 +122,9 @@ class RequiredAfterResolutionTest {
 
     @Test
     void multiBuildingGridIsInheritedWhenTheChildDeclaresOnlyItsSize() {
-        MultiBuildingRE parent = multiBuilding(Optional.of(1), Optional.of(1),
+        MultiBuildingDefinition parent = multiBuilding(Optional.of(1), Optional.of(1),
                 Optional.of(List.of(List.of("urbex:tower"))));
-        MultiBuildingRE child = multiBuilding(Optional.of(1), Optional.of(1), Optional.empty());
+        MultiBuildingDefinition child = multiBuilding(Optional.of(1), Optional.of(1), Optional.empty());
 
         assertEquals("urbex:tower", new MultiBuilding(TestAssetId.of("test_multi"), List.of(parent, child)).getBuilding(0, 0));
     }
@@ -148,9 +148,9 @@ class RequiredAfterResolutionTest {
      */
     @Test
     void multiBuildingGridSmallerThanTheDeclaredSizeIsALoadError() {
-        MultiBuildingRE parent = multiBuilding(Optional.of(1), Optional.of(1),
+        MultiBuildingDefinition parent = multiBuilding(Optional.of(1), Optional.of(1),
                 Optional.of(List.of(List.of("urbex:tower"))));
-        MultiBuildingRE child = multiBuilding(Optional.of(2), Optional.of(2), Optional.empty());
+        MultiBuildingDefinition child = multiBuilding(Optional.of(2), Optional.of(2), Optional.empty());
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> new MultiBuilding(TestAssetId.of("test_multi"), List.of(parent, child)));
@@ -162,7 +162,7 @@ class RequiredAfterResolutionTest {
 
     @Test
     void multiBuildingRowShorterThanTheDeclaredDepthIsALoadError() {
-        MultiBuildingRE entry = multiBuilding(Optional.of(2), Optional.of(2),
+        MultiBuildingDefinition entry = multiBuilding(Optional.of(2), Optional.of(2),
                 Optional.of(List.of(List.of("urbex:a", "urbex:b"), List.of("urbex:c"))));
 
         IllegalStateException e = assertThrows(IllegalStateException.class,
@@ -203,9 +203,9 @@ class RequiredAfterResolutionTest {
 
     @Test
     void scatteredChildInheritsTheBuildingListItDoesNotDeclare() {
-        ScatteredRE parent = scattered(Optional.of(new Mergeable<>(true, List.of("urbex:cabin"))),
+        ScatteredDefinition parent = scattered(Optional.of(new Mergeable<>(true, List.of("urbex:cabin"))),
                 Optional.empty());
-        ScatteredRE child = scattered(Optional.empty(), Optional.empty());
+        ScatteredDefinition child = scattered(Optional.empty(), Optional.empty());
 
         ScatteredBuilding resolved = new ScatteredBuilding(TestAssetId.of("test_scattered"), List.of(parent, child));
 
@@ -227,11 +227,11 @@ class RequiredAfterResolutionTest {
     @Test
     void worldStyleChildInheritsOutsideStyleAndCityStylesItDoesNotDeclare() {
         ScatteredSettings scattered = new ScatteredSettings(16, 0.5f, 10, List.of());
-        WorldStyleRE parent = worldStyle(Optional.of("urbex:standard"),
+        WorldStyleDefinition parent = worldStyle(Optional.of("urbex:standard"),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:downtown", null)))),
                 Optional.empty());
-        WorldStyleRE child = worldStyle(Optional.empty(), Optional.empty(), Optional.of(scattered));
+        WorldStyleDefinition child = worldStyle(Optional.empty(), Optional.empty(), Optional.of(scattered));
 
         WorldStyle resolved = new WorldStyle(TestAssetId.of("test_world"), List.of(parent, child));
 
@@ -277,16 +277,16 @@ class RequiredAfterResolutionTest {
         return style.cityStyleSelectors().stream().map(pair -> pair.getRight().getRight()).toList();
     }
 
-    private static ScatteredRE scattered(Optional<Mergeable<String>> buildings,
+    private static ScatteredDefinition scattered(Optional<Mergeable<String>> buildings,
                                          Optional<String> multibuilding) {
-        return new ScatteredRE(Optional.empty(), buildings, multibuilding, Optional.empty(),
+        return new ScatteredDefinition(Optional.empty(), buildings, multibuilding, Optional.empty(),
                 Optional.of(ScatteredBuilding.TerrainHeight.AVERAGE),
                 Optional.of(ScatteredBuilding.TerrainFix.NONE), Optional.empty());
     }
 
-    private static MultiBuildingRE multiBuilding(Optional<Integer> dimX, Optional<Integer> dimZ,
+    private static MultiBuildingDefinition multiBuilding(Optional<Integer> dimX, Optional<Integer> dimZ,
                                                  Optional<List<List<String>>> buildings) {
-        return new MultiBuildingRE(Optional.empty(), dimX, dimZ, buildings);
+        return new MultiBuildingDefinition(Optional.empty(), dimX, dimZ, buildings);
     }
 
     /**
@@ -295,10 +295,10 @@ class RequiredAfterResolutionTest {
      * since the code-side defaults were deleted, and has its own coverage in
      * {@link WiringRequiredTest}.
      */
-    private static WorldStyleRE worldStyle(Optional<String> outsideStyle,
+    private static WorldStyleDefinition worldStyle(Optional<String> outsideStyle,
                                            Optional<Mergeable<CityStyleSelector>> cityStyles,
                                            Optional<ScatteredSettings> scattered) {
-        return new WorldStyleRE(Optional.empty(), Optional.empty(), outsideStyle,
+        return new WorldStyleDefinition(Optional.empty(), Optional.empty(), outsideStyle,
                 Optional.empty(), Optional.empty(), scattered,
                 Optional.of(TestWiring.partSelector()),
                 cityStyles, Optional.empty(), Optional.empty());
@@ -339,8 +339,8 @@ class RequiredAfterResolutionTest {
             return this;
         }
 
-        StuffSettingsRE build() {
-            return new StuffSettingsRE(Optional.empty(), tags, column,
+        StuffSettingsDefinition build() {
+            return new StuffSettingsDefinition(Optional.empty(), tags, column,
                     Optional.empty(), Optional.empty(), mincount, maxcount, attempts,
                     inbuilding, Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());

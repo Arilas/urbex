@@ -8,7 +8,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -225,7 +225,7 @@ public final class PresetSelection {
      *
      * @param preset       the saved preset id ({@code namespace:path}); empty means nothing to restore.
      * @param worldStyle   the saved worldStyle id, or empty for {@link Config#DEFAULT_WORLD_STYLE}.
-     * @param overridesJson the saved {@code PresetRE} overrides JSON, or empty for a plain preset.
+     * @param overridesJson the saved {@code PresetDefinition} overrides JSON, or empty for a plain preset.
      */
     public void restore(String preset, String worldStyle, String overridesJson) {
         if (preset == null || preset.isEmpty()) {
@@ -267,7 +267,7 @@ public final class PresetSelection {
     }
 
     /**
-     * Validates a saved-data overrides string against {@link PresetRE#CODEC} before it is allowed
+     * Validates a saved-data overrides string against {@link PresetDefinition#CODEC} before it is allowed
      * anywhere near {@link Config#overridesFromClient} - that field is read on a worldgen worker
      * thread the instant a chunk generates ({@code DimensionRuntime.create}), so a string that
      * fails to parse must never be published in the first place. Returns {@code null} - "plain
@@ -280,7 +280,7 @@ public final class PresetSelection {
             return null;
         }
         try {
-            PresetRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(overridesJson)).getOrThrow();
+            PresetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(overridesJson)).getOrThrow();
             return overridesJson;
         } catch (Exception e) {
             Urbex.getLogger().warn("Re-created world '{}' had malformed Urbex preset overrides; " +
@@ -312,7 +312,7 @@ public final class PresetSelection {
             return;
         }
         try {
-            PresetRE re = PresetRE.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(pending.overridesJson())).getOrThrow();
+            PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(pending.overridesJson())).getOrThrow();
             applyCustomized(Presets.applyOverrides(base.preset(), re));
         } catch (Exception e) {
             Urbex.getLogger().warn("Could not rebuild the restored customized preset '{}'; showing it plain.",
@@ -355,7 +355,7 @@ public final class PresetSelection {
      *   <li>A plain built-in entry: its own id, the effective worldStyle, no overrides.</li>
      *   <li>The transient customized entry: the <em>base</em> preset id it was customized from
      *       (carried, unchanged, in {@code Preset.getId()} through every {@link Preset#copy()}), the
-     *       effective worldStyle, and the full edited preset encoded as a {@link PresetRE} overlay -
+     *       effective worldStyle, and the full edited preset encoded as a {@link PresetDefinition} overlay -
      *       so the server rebuilds exactly what the editor showed, not an approximation.</li>
      * </ul>
      */
@@ -378,8 +378,8 @@ public final class PresetSelection {
         if (CUSTOMIZED_ID.equals(entry.id())) {
             Preset preset = entry.preset();
             Config.presetFromClient = preset.getId();
-            PresetRE re = preset.toRE();
-            JsonElement json = PresetRE.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+            PresetDefinition re = preset.toDefinition();
+            JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
             Config.overridesFromClient = GSON.toJson(json);
         } else {
             Config.presetFromClient = entry.id();

@@ -2,7 +2,7 @@ package dev.krona.urbex.config;
 
 import com.google.gson.JsonElement;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
@@ -17,18 +17,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Headless: {@code Presets.resolve(Identifier, Function)} needs no registry or level. */
 class PresetResolutionTest {
 
-    private static PresetRE decode(String json) {
+    private static PresetDefinition decode(String json) {
         JsonElement element = com.google.gson.JsonParser.parseString(json);
-        return PresetRE.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
+        return PresetDefinition.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
     }
 
     private static Identifier id(String path) {
         return Identifier.fromNamespaceAndPath("urbex", path);
     }
 
-    /** Builds a {@code PresetRE} with only the {@code extends} field set. */
-    private static PresetRE presetWithExtends(Identifier extendsId) {
-        return new PresetRE(Optional.of(extendsId), Optional.empty(), Optional.empty(), Optional.empty(),
+    /** Builds a {@code PresetDefinition} with only the {@code extends} field set. */
+    private static PresetDefinition presetWithExtends(Identifier extendsId) {
+        return new PresetDefinition(Optional.of(extendsId), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty());
@@ -37,7 +37,7 @@ class PresetResolutionTest {
     @Test
     void extendslessPresetGetsCodeDefaults() {
         Identifier presetId = id("leaf");
-        Map<Identifier, PresetRE> lookup = Map.of(presetId, decode("{}"));
+        Map<Identifier, PresetDefinition> lookup = Map.of(presetId, decode("{}"));
 
         Preset p = Presets.resolve(presetId, lookup::get);
 
@@ -51,7 +51,7 @@ class PresetResolutionTest {
         Identifier parentId = id("parent");
         Identifier childId = id("child");
 
-        Map<Identifier, PresetRE> lookup = new HashMap<>();
+        Map<Identifier, PresetDefinition> lookup = new HashMap<>();
         lookup.put(parentId, decode("{\"cities\":{\"cityChance\":0.5}}"));
         lookup.put(childId, decode("{\"extends\":\"urbex:parent\",\"destruction\":{\"ruinChance\":0.9}}"));
 
@@ -70,7 +70,7 @@ class PresetResolutionTest {
         Identifier middleId = id("middle");
         Identifier leafId = id("leaf");
 
-        Map<Identifier, PresetRE> lookup = new HashMap<>();
+        Map<Identifier, PresetDefinition> lookup = new HashMap<>();
         lookup.put(rootId, decode("{\"cities\":{\"cityChance\":0.1}}"));
         lookup.put(middleId, decode("{\"extends\":\"urbex:root\","
                 + "\"cities\":{\"cityChance\":0.2},\"buildings\":{\"buildingChance\":0.3}}"));
@@ -87,7 +87,7 @@ class PresetResolutionTest {
         Identifier aId = id("a");
         Identifier bId = id("b");
 
-        Map<Identifier, PresetRE> lookup = new HashMap<>();
+        Map<Identifier, PresetDefinition> lookup = new HashMap<>();
         lookup.put(aId, decode("{\"extends\":\"urbex:b\"}"));
         lookup.put(bId, decode("{\"extends\":\"urbex:a\"}"));
 
@@ -100,7 +100,7 @@ class PresetResolutionTest {
     @Test
     void danglingExtendsIsError() {
         Identifier leafId = id("leaf");
-        Map<Identifier, PresetRE> lookup = Map.of(leafId, decode("{\"extends\":\"urbex:ghost\"}"));
+        Map<Identifier, PresetDefinition> lookup = Map.of(leafId, decode("{\"extends\":\"urbex:ghost\"}"));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
                 () -> Presets.resolve(leafId, lookup::get));
@@ -134,7 +134,7 @@ class PresetResolutionTest {
     @Test
     void pureResolveReflectsALookupChangeBetweenCalls() {
         Identifier presetId = id("mutable");
-        Map<Identifier, PresetRE> lookup = new HashMap<>();
+        Map<Identifier, PresetDefinition> lookup = new HashMap<>();
         lookup.put(presetId, decode("{\"cities\":{\"cityChance\":0.1}}"));
 
         Preset first = Presets.resolve(presetId, lookup::get);

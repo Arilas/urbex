@@ -3,7 +3,7 @@ package dev.krona.urbex.config;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
@@ -25,8 +25,8 @@ class ShippedPresetsTest {
     private static final Path PRESETS_DIR = Path.of("src/main/resources/data/urbex/urbex/presets");
     private static final Path TAG_FILE = Path.of("src/main/resources/data/urbex/tags/urbex/presets/presets.json");
 
-    private Map<Identifier, PresetRE> loadShippedPresets() throws Exception {
-        Map<Identifier, PresetRE> presets = new HashMap<>();
+    private Map<Identifier, PresetDefinition> loadShippedPresets() throws Exception {
+        Map<Identifier, PresetDefinition> presets = new HashMap<>();
 
         try (var stream = Files.list(PRESETS_DIR)) {
             stream.filter(p -> p.toString().endsWith(".json"))
@@ -38,7 +38,7 @@ class ShippedPresetsTest {
 
                             String json = Files.readString(p);
                             JsonElement element = JsonParser.parseString(json);
-                            PresetRE preset = PresetRE.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
+                            PresetDefinition preset = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, element).getOrThrow();
                             presets.put(id, preset);
                         } catch (Exception e) {
                             throw new RuntimeException(e);
@@ -51,7 +51,7 @@ class ShippedPresetsTest {
 
     @Test
     void allShippedPresetsParseAndResolve() throws Exception {
-        Map<Identifier, PresetRE> presets = loadShippedPresets();
+        Map<Identifier, PresetDefinition> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
         for (Identifier id : presets.keySet()) {
@@ -62,12 +62,12 @@ class ShippedPresetsTest {
 
     @Test
     void everyShippedPresetHasExplicitLightingDensity() throws Exception {
-        Map<Identifier, PresetRE> presets = loadShippedPresets();
+        Map<Identifier, PresetDefinition> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
         for (var entry : presets.entrySet()) {
             Identifier id = entry.getKey();
-            PresetRE preset = entry.getValue();
+            PresetDefinition preset = entry.getValue();
             assertTrue(preset.decoration().isPresent() && preset.decoration().get().lightingDensity().isPresent(),
                     "Preset " + id + " does not have explicit decoration.lightingDensity");
         }
@@ -75,7 +75,7 @@ class ShippedPresetsTest {
 
     @Test
     void avgHeightmapOnEverywhere() throws Exception {
-        Map<Identifier, PresetRE> presets = loadShippedPresets();
+        Map<Identifier, PresetDefinition> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
         for (var entry : presets.entrySet()) {
@@ -88,12 +88,12 @@ class ShippedPresetsTest {
 
     @Test
     void nonDefaultPresetsExtendDefault() throws Exception {
-        Map<Identifier, PresetRE> presets = loadShippedPresets();
+        Map<Identifier, PresetDefinition> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
         for (var entry : presets.entrySet()) {
             Identifier id = entry.getKey();
-            PresetRE preset = entry.getValue();
+            PresetDefinition preset = entry.getValue();
 
             if (id.getPath().equals("default")) {
                 // Default preset should not extend anything
@@ -111,7 +111,7 @@ class ShippedPresetsTest {
 
     @Test
     void tagListsExactlyTheShippedPresets() throws Exception {
-        Map<Identifier, PresetRE> presets = loadShippedPresets();
+        Map<Identifier, PresetDefinition> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
         String tagJson = Files.readString(TAG_FILE);
@@ -136,7 +136,7 @@ class ShippedPresetsTest {
      */
     @Test
     void everyShippedPresetDeclaresItsOwnUniqueName() throws Exception {
-        Map<Identifier, PresetRE> presets = loadShippedPresets();
+        Map<Identifier, PresetDefinition> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
         Map<String, Identifier> byName = new HashMap<>();
@@ -164,7 +164,7 @@ class ShippedPresetsTest {
      */
     @Test
     void everyShippedPresetDeclaresItsOwnDescription() throws Exception {
-        Map<Identifier, PresetRE> presets = loadShippedPresets();
+        Map<Identifier, PresetDefinition> presets = loadShippedPresets();
         assertFalse(presets.isEmpty(), "No preset files found");
 
         for (var entry : presets.entrySet()) {

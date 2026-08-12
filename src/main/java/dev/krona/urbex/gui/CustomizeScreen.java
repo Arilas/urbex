@@ -316,7 +316,7 @@ public class CustomizeScreen extends Screen {
     /**
      * Publishes the edited copy as a world-saved-data overrides overlay (spec §9) - not a file:
      * {@link PresetSelection#applyCustomized} keeps it purely in memory, and {@link PresetSelection#publish()}
-     * encodes it as a {@code PresetRE} overlay over its base preset id ({@code copy.getId()}, unchanged
+     * encodes it as a {@code PresetDefinition} overlay over its base preset id ({@code copy.getId()}, unchanged
      * by {@link Preset#copy()}).
      */
     private void done() {

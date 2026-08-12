@@ -9,13 +9,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-public class CityStyleRE implements Extendable {
+public class CityStyleDefinition implements Extendable {
 
-    private static final Codec<CityStyleRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<CityStyleDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     Codec.FLOAT.optionalFieldOf("explosionchance").forGetter(l -> Optional.ofNullable(l.explosionChance)),
                     Codec.STRING.optionalFieldOf("style").forGetter(l -> Optional.ofNullable(l.style)),
-                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(CityStyleRE::getExtends),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(CityStyleDefinition::getExtends),
                     Codec.STRING.optionalFieldOf("name").forGetter(l -> Optional.ofNullable(l.displayName)),
                     Codec.STRING.listOf().optionalFieldOf("stuff_tags").forGetter(l -> Optional.ofNullable(l.stuffTags)),
                     GeneralSettings.CODEC.optionalFieldOf("generalblocks").forGetter(l -> Optional.ofNullable(l.generalSettings)),
@@ -25,10 +25,10 @@ public class CityStyleRE implements Extendable {
                     RailSettings.CODEC.optionalFieldOf("railblocks").forGetter(l -> Optional.ofNullable(l.railSettings)),
                     StreetSettings.CODEC.optionalFieldOf("streetblocks").forGetter(l -> Optional.ofNullable(l.streetSettings)),
                     Selectors.CODEC.optionalFieldOf("selectors").forGetter(l -> Optional.ofNullable(l.selectors))
-            ).apply(instance, CityStyleRE::new));
+            ).apply(instance, CityStyleDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<CityStyleRE> CODEC = RetiredKeys.reject(RAW, "citystyle");
+    public static final Codec<CityStyleDefinition> CODEC = RetiredKeys.reject(RAW, "citystyle");
 
 
     private final Float explosionChance;
@@ -50,7 +50,7 @@ public class CityStyleRE implements Extendable {
 
     private final Selectors selectors;
 
-    public CityStyleRE(
+    public CityStyleDefinition(
             Optional<Float> explosionChance,
             Optional<String> style,
             Optional<Identifier> extendsId,

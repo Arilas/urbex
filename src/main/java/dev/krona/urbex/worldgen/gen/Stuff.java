@@ -10,7 +10,7 @@ import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
-import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsRE;
+import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import net.minecraft.core.BlockPos;
@@ -53,7 +53,7 @@ public class Stuff {
             List<StuffObject> stuffs = feature.provider.assets().stuffFor(tag);
             {
                 for (StuffObject stuff : stuffs) {
-                    StuffSettingsRE settings = stuff.getSettings();
+                    StuffSettingsDefinition settings = stuff.getSettings();
                     // Never null: 'inbuilding' is required of the resolved chain, precisely because
                     // the null branch this used to carry made the stuff object silently inert.
                     boolean inBuilding = settings.isInBuilding();
@@ -129,7 +129,7 @@ public class Stuff {
     }
 
     private static void actuallyGenerateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, int stuffOrdinal, boolean inBuilding) {
-        StuffSettingsRE settings = stuff.getSettings();
+        StuffSettingsDefinition settings = stuff.getSettings();
         String blocks = settings.getColumn();
         if (!columnResolves(stuff, blocks, palette)) {
             return;

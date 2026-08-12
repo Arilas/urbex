@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.CityStyleRE;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleRE;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
@@ -40,8 +40,8 @@ class StyleDisplayNameTest {
         return Identifier.fromNamespaceAndPath(namespace, path);
     }
 
-    private static WorldStyleRE worldStyle(Optional<String> name) {
-        return new WorldStyleRE(Optional.empty(), name, Optional.of("urbex:outside"),
+    private static WorldStyleDefinition worldStyle(Optional<String> name) {
+        return new WorldStyleDefinition(Optional.empty(), name, Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
@@ -49,8 +49,8 @@ class StyleDisplayNameTest {
                 Optional.empty(), Optional.empty());
     }
 
-    private static CityStyleRE cityStyle(Optional<String> name) {
-        return new CityStyleRE(
+    private static CityStyleDefinition cityStyle(Optional<String> name) {
+        return new CityStyleDefinition(
                 Optional.empty(), Optional.empty(), Optional.empty(), name,
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),
@@ -113,7 +113,7 @@ class StyleDisplayNameTest {
     @Test
     void theStaticFoldTheGuiUsesMatchesWhatTheConstructorResolves() {
         Identifier leaf = id("urbexmt", "moderntweaks");
-        List<WorldStyleRE> chain = List.of(
+        List<WorldStyleDefinition> chain = List.of(
                 worldStyle(Optional.of("Standard")),
                 worldStyle(Optional.of("Modern Tweaks")));
 

@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.SharedConstants;
@@ -45,7 +45,7 @@ class CommonPaletteLightingTest {
 
     @Test
     void commonPaletteCompilesExactTypedLightPoolsWithoutRedstoneTorches() throws IOException {
-        PaletteRE common = decodeClasspathPalette(COMMON_PALETTE);
+        PaletteDefinition common = decodeClasspathPalette(COMMON_PALETTE);
         PaletteEntry torchMarker = entry(common, 'T');
         PaletteEntry freeMarker = entry(common, 'h');
         PaletteEntry redstoneTorch = entry(common, 'g');
@@ -98,7 +98,7 @@ class CommonPaletteLightingTest {
         try (Stream<Path> files = Files.walk(BUNDLED_PALETTES)) {
             for (Path path : files.filter(file -> file.toString().endsWith(".json"))
                     .sorted(Comparator.naturalOrder()).toList()) {
-                DataResult<PaletteRE> decoded = PaletteRE.CODEC.parse(JsonOps.INSTANCE,
+                DataResult<PaletteDefinition> decoded = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE,
                         JsonParser.parseString(Files.readString(path)));
                 assertTrue(decoded.result().isPresent(),
                         () -> path + ": " + decoded.error().map(Object::toString).orElse("unknown decode error"));
@@ -106,10 +106,10 @@ class CommonPaletteLightingTest {
         }
     }
 
-    private static PaletteRE decodeClasspathPalette(String resource) throws IOException {
+    private static PaletteDefinition decodeClasspathPalette(String resource) throws IOException {
         try (InputStream stream = CommonPaletteLightingTest.class.getClassLoader().getResourceAsStream(resource)) {
             assertNotNull(stream, () -> "Missing classpath resource " + resource);
-            DataResult<PaletteRE> decoded = PaletteRE.CODEC.parse(JsonOps.INSTANCE,
+            DataResult<PaletteDefinition> decoded = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE,
                     JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)));
             assertTrue(decoded.result().isPresent(),
                     () -> decoded.error().map(Object::toString).orElse("unknown decode error"));
@@ -117,7 +117,7 @@ class CommonPaletteLightingTest {
         }
     }
 
-    private static PaletteEntry entry(PaletteRE palette, char marker) {
+    private static PaletteEntry entry(PaletteDefinition palette, char marker) {
         return palette.getPaletteEntries().stream()
                 .filter(entry -> entry.getChr().equals(Character.toString(marker)))
                 .findFirst()

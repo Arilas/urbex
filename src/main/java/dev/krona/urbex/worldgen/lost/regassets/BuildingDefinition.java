@@ -21,13 +21,13 @@ import java.util.Optional;
  * are values a file may legitimately mean, and under a sentinel a child could not override an
  * inherited {@code 0.8} back down to {@code 0.0}.
  */
-public class BuildingRE implements Extendable {
+public class BuildingDefinition implements Extendable {
 
-    private static final Codec<BuildingRE> RAW = RecordCodecBuilder.create(instance ->
+    private static final Codec<BuildingDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
-                    PaletteRE.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
+                    PaletteDefinition.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
                     DataTools.PALETTE_CHAR.optionalFieldOf("filler").forGetter(l -> Optional.ofNullable(l.fillerBlock)),
                     DataTools.PALETTE_CHAR.optionalFieldOf("rubble").forGetter(l -> Optional.ofNullable(l.rubbleBlock)),
                     Codec.INT.optionalFieldOf("mincellars").forGetter(l -> Optional.ofNullable(l.minCellars)),
@@ -40,10 +40,10 @@ public class BuildingRE implements Extendable {
                     Codec.FLOAT.optionalFieldOf("preferslonely").forGetter(l -> Optional.ofNullable(l.prefersLonely)),
                     Mergeable.codec(PartRef.CODEC).optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.parts)),
                     Mergeable.codec(PartRef.CODEC).optionalFieldOf("parts2").forGetter(l -> Optional.ofNullable(l.parts2))
-            ).apply(instance, BuildingRE::new));
+            ).apply(instance, BuildingDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<BuildingRE> CODEC = RetiredKeys.reject(RAW, "building");
+    public static final Codec<BuildingDefinition> CODEC = RetiredKeys.reject(RAW, "building");
 
 
 
@@ -61,14 +61,14 @@ public class BuildingRE implements Extendable {
     private final Character rubbleBlock;   // Block used for destroyed building rubble
     private final Float prefersLonely;  // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
-    private PaletteRE localPalette = null;
+    private PaletteDefinition localPalette = null;
     private final String refPaletteName;
 
     private final Mergeable<PartRef> parts;
     private final Mergeable<PartRef> parts2;
 
-    public BuildingRE(Optional<Identifier> extendsId,
-                      Optional<String> refpalette, Optional<PaletteRE> locpalette, Optional<Character> filler, Optional<Character> rubble,
+    public BuildingDefinition(Optional<Identifier> extendsId,
+                      Optional<String> refpalette, Optional<PaletteDefinition> locpalette, Optional<Character> filler, Optional<Character> rubble,
                       Optional<Integer> minCellars, Optional<Integer> minFloors, Optional<Integer> maxCellars, Optional<Integer> maxFloors,
                       Optional<Boolean> allowDoors, Optional<Boolean> allowFillers, Optional<Boolean> overrideFloors,
                       Optional<Float> prefersLonely, Optional<Mergeable<PartRef>> partRefs, Optional<Mergeable<PartRef>> partRefs2) {
@@ -146,7 +146,7 @@ public class BuildingRE implements Extendable {
         return prefersLonely;
     }
 
-    public PaletteRE getLocalPalette() {
+    public PaletteDefinition getLocalPalette() {
         return localPalette;
     }
 
