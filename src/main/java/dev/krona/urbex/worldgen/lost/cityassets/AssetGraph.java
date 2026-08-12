@@ -4,6 +4,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
+import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
@@ -278,6 +279,13 @@ public final class AssetGraph {
         for (String name : building.partNames()) {
             part(building.getId(), name, "parts", usage(palette, building, false, "parts", building.getId()));
         }
+        // The matchers on those same entries. Not dereferences - a parts entry whose 'belowpart'
+        // names nothing simply never fires - so they follow the soft rule, like a condition's.
+        for (PartRef ref : building.partConditions()) {
+            softAssetRefs(building.getId(), ref.getInpart(), "parts.inpart", assets.parts());
+            softAssetRefs(building.getId(), ref.getBelowPart(), "parts.belowpart", assets.parts());
+            softAssetRefs(building.getId(), ref.getInbuilding(), "parts.inbuilding", assets.buildings());
+        }
     }
 
     private void walkMultiBuilding(MultiBuilding multi, @Nullable Style palette) {
@@ -463,6 +471,7 @@ public final class AssetGraph {
         }
         for (ConditionPart entry : condition.entries()) {
             softAssetRefs(condition.getId(), entry.getInpart(), "values.inpart", assets.parts());
+            softAssetRefs(condition.getId(), entry.getBelowPart(), "values.belowpart", assets.parts());
             softAssetRefs(condition.getId(), entry.getInbuilding(), "values.inbuilding", assets.buildings());
             if (entities) {
                 softEntityRef(condition.getId(), entry.getValue());

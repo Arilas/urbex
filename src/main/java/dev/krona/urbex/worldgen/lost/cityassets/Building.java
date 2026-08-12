@@ -40,6 +40,16 @@ public class Building {
 
     private final List<Pair<Predicate<ConditionContext>, String>> parts = new ArrayList<>();
     private final List<Pair<Predicate<ConditionContext>, String>> parts2 = new ArrayList<>();
+    /**
+     * The entries the two lists above were compiled from, kept beside the predicates rather than
+     * instead of them.
+     * <p>
+     * Same reason {@link Condition} keeps its own: {@code readParts} turns each entry's matchers into
+     * one closure, which is the right shape for something tested per floor of every building - but a
+     * closure cannot be asked what it matches on, so a {@code belowpart} naming a part nothing
+     * registers was invisible. The entry just never fired, and nothing said why (issue #56).
+     */
+    private final List<PartRef> partRefs;
 
     /**
      * Builds a fully resolved building from its {@code extends} chain, root first: every scalar
@@ -129,6 +139,10 @@ public class Building {
 
         readParts(this.parts, partRefs);
         readParts(this.parts2, partRefs2);
+        List<PartRef> allRefs = new ArrayList<>(partRefs.size() + partRefs2.size());
+        allRefs.addAll(partRefs);
+        allRefs.addAll(partRefs2);
+        this.partRefs = List.copyOf(allRefs);
     }
 
     /** The fully-qualified id, e.g. {@code "urbex:radiotower"}. */
@@ -138,6 +152,11 @@ public class Building {
 
     public Identifier getId() {
         return name;
+    }
+
+    /** What the {@code parts} and {@code parts2} entries matched on, for the load-time walk. */
+    List<PartRef> partConditions() {
+        return partRefs;
     }
 
     /**

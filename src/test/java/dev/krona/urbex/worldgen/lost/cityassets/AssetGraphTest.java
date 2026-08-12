@@ -14,6 +14,7 @@ import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
+import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetSettings;
@@ -231,6 +232,26 @@ class AssetGraphTest {
                 () -> "nobody has that pack, which is not a defect: " + diagnostics.format(""));
     }
 
+    /**
+     * A building's {@code parts} entries carry matchers of their own, and they were the last
+     * references the walk could not see. Nothing in the bundled pack writes {@code belowpart}, so no
+     * golden can catch a revert of this - which is why it is pinned here.
+     */
+    @Test
+    void aBuildingPartsEntryMatchingOnAMissingPartIsAWarning() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Fixture fixture = new Fixture()
+                .buildingBelow("tower", PRESENT_PART.toString(), "urbex:no_such_floor")
+                .city("downtown", building("urbex:tower"));
+
+        AssetGraph.validate(fixture.snapshot(), List.of(), diagnostics);
+
+        assertFalse(diagnostics.isEmpty(), "a belowpart naming nothing means the entry never fires");
+        assertFalse(diagnostics.hasFatal(), "which is not worth refusing a world for");
+        assertTrue(diagnostics.problems().getFirst().message().contains("belowpart"),
+                diagnostics.problems().getFirst().message());
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private static PredefinedBuilding building(String name) {
@@ -270,6 +291,22 @@ class AssetGraphTest {
             multiBuildings.put(id, new MultiBuilding(id, List.of(new MultiBuildingDefinition(
                     Optional.empty(), Optional.of(names.length), Optional.of(1),
                     Optional.of(List.of(List.of(names)))))));
+            return this;
+        }
+
+        /** A building whose one {@code parts} entry only fires below {@code belowPart}. */
+        Fixture buildingBelow(String path, String partName, String belowPart) {
+            PartRef ref = new PartRef(partName, Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.of(Either.right(belowPart)), Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.empty());
+            Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
+            buildings.put(id, new Building(id, BuiltInRegistries.BLOCK, null,
+                    AssetIndex.empty("urbex:palettes"), List.of(new BuildingDefinition(
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.of('#'), Optional.empty(),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.of(new Mergeable<>(true, List.of(ref))), Optional.empty()))));
             return this;
         }
 

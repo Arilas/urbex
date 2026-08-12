@@ -156,13 +156,15 @@ every load, for a pack working exactly as written — so `ReferenceProvider` ask
 through `FabricLoader.isModLoaded`, while a datapack need not be a mod at all, so an asset reference
 asks whether anything loaded registers assets in that namespace.
 
+**56e — `PartRef`'s own condition fields.** The last references the walk could not see, closed the
+same way `Condition`'s were: `Building` retains the entries beside the compiled predicates. Their
+`belowpart` also revealed one the condition walk had missed, so both now cover all three matchers.
+
 *Still not covered:*
 
 - **Loot table ids.** A condition's values are checkable as entity ids and not as loot tables: loot
   tables live in a reloadable server registry rather than in the frozen ones this compiles against, so
   at this point in the load there is nothing to ask.
-- **`PartRef`'s own condition fields** inside a building. `Building.readParts` discards those strings
-  exactly as `Condition` used to discard its own; the same one-line retention would expose them.
 - **Scattered parts' characters.** A scattered building lands wherever the terrain allows and takes the
   style of the chunk it lands in, which the walk cannot know. Its references are checked; its
   characters are not.
