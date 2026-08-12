@@ -102,7 +102,16 @@ class LevelTaskQueueTest {
         assertEquals(LevelTaskQueue.MAX_ATTEMPTS, attempts.get());
     }
 
-    /** A task that throws is dropped with a log line, and does not take the rest of the pass with it. */
+    /**
+     * A task that throws is dropped with a log line, and does not poison the queue behind it.
+     * <p>
+     * Drained over several ticks rather than in one pass, and the reason is worth stating because
+     * the one-pass version of this test failed in CI and passed locally: logging the failure writes
+     * a stack trace, which on a cold JVM can cost more than the whole 2ms pass budget, so the drain
+     * legitimately ends the tick after handling it. That is the time budget doing its job. What must
+     * hold regardless of how the budget falls is asserted below - the throw does not escape the
+     * drain, the failing task is not retried, and the task behind it is not blocked forever.
+     */
     @Test
     void aThrowingTaskDoesNotStopTheDrain() {
         LevelTaskQueue queue = queue();
@@ -115,9 +124,9 @@ class LevelTaskQueueTest {
             return LevelTaskQueue.Outcome.DONE;
         });
 
-        queue.drain(null);
+        drainUntilEmpty(queue, 4);
 
-        assertEquals(1, later.get(), "the task behind the failure still ran");
+        assertEquals(1, later.get(), "the task behind the failure still ran, and only once");
         assertTrue(queue.isEmpty(), "and the failing one is not retried forever");
     }
 
@@ -195,9 +204,8 @@ class LevelTaskQueueTest {
                 drain.get();
             }
 
-            queue.drain(null);
-            queue.drain(null);
-            assertTrue(ran.contains(99), "the racing task ran, this pass or the next");
+            drainUntilEmpty(queue, 12);
+            assertTrue(ran.contains(99), "the racing task ran, this pass or a later one");
             assertEquals(9, ran.size(), "and nothing ran twice");
             assertTrue(queue.isEmpty());
         }
@@ -232,6 +240,21 @@ class LevelTaskQueueTest {
                 "100,000 empty ticks allocated " + allocated + " bytes; an empty queue must not "
                         + "allocate per tick at all");
         assertFalse(queue.size() > 0);
+    }
+
+    /**
+     * Ticks the queue until it is empty, up to {@code maxTicks}.
+     * <p>
+     * How much a single pass gets through depends on the time budget, and so on how fast the machine
+     * is - which is a property of the drain worth having and not one worth asserting. Tests that care
+     * about what eventually happens tick; the two that care about what one pass does
+     * ({@link #oneTickVisitsEachTaskAtMostOnce}, {@link #aTaskWhoseChunkIsNotAvailableIsRetriedRatherThanDropped})
+     * queue a single task, where the count budget bounds the pass to one attempt whatever the clock does.
+     */
+    private static void drainUntilEmpty(LevelTaskQueue queue, int maxTicks) {
+        for (int tick = 0; tick < maxTicks && !queue.isEmpty(); tick++) {
+            queue.drain(null);
+        }
     }
 
     private static LevelTaskQueue.Task task(List<Integer> ran, int id) {
