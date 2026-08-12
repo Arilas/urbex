@@ -45,7 +45,7 @@ public class Corridors {
                         Character glowstoneChar = info.getCityStyle().getGlowstoneBlock();
                         BlockState glowstone = glowstoneChar == null ? Blocks.GLOWSTONE.defaultBlockState() : ctx.paletteHere(palette, glowstoneChar);
                         driver.add(glowstone);
-                        CityGenerator.updateNeeded(info, pos, Block.UPDATE_CLIENTS);
+                        CityGenerator.updateNeeded(ctx, pos, Block.UPDATE_CLIENTS);
                     } else {
                         BlockState roof = ctx.paletteHere(palette, corridorRoofBlock);
                         driver.add(roof).add(roof);

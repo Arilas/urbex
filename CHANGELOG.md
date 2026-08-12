@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **Post-generation block writes belong to the generation that queued them.** The deferred writes a
+  chunk queues for after its driver has run — POI blocks, loot chests, command blocks, saplings, the
+  place-twice light refresh — were stored on the cached `BuildingInfo` for that chunk, and the
+  drain re-fetched that cache entry to find them. Three things could go wrong with that and now
+  cannot: the entry could be evicted between the write and the drain, taking the callbacks with it;
+  a second generation of the same chunk found the first one's callbacks still queued and applied
+  them to its own region; and a callback added on a worker thread while another cleared the map was
+  simply lost. They are now owned by the `ChunkGenContext` that queued them, which refuses both a
+  late enqueue and a second drain (issue #127, part a). *No worldgen change*: both digest goldens
+  are unchanged, verified by running `runDigestCheck` and `runDigestCheckFeatures`.
+
 - **Presets, world styles and city styles can name themselves again.** Making every asset reference
   fully qualified (0.2.0) also made the Cities tab and the world-style picker show those ids: the
   preset list read `urbex:default`, `urbex:tallbuildings`, `urbex:wasteland`, and the selector read

@@ -28,8 +28,6 @@ import net.minecraft.world.level.block.Blocks;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
 import static dev.krona.urbex.worldgen.CityGenerator.FLOORHEIGHT;
 
@@ -119,9 +117,11 @@ public class BuildingInfo {
     private volatile MinMax desiredTerrainCorrectionHeights = null;
     private volatile MinMax desiredMaxHeight1 = null;
 
-    // The todos run after the chunk is driven, and they need the region that is generating - which
-    // is not something a cached BuildingInfo can know. So it is handed to them.
-    private final Map<BlockPos, Consumer<WorldGenLevel>> postTodo = new ConcurrentHashMap<>();
+    // No per-generation runtime state here, and specifically no post-generation callbacks: those
+    // belong to the ChunkGenContext that queued them (see PostTodoQueue). A BuildingInfo is a
+    // cached, coordinate-addressed planning value shared by every generation that reads this chunk,
+    // so anything on it that belonged to one generation could be evicted, drained by the wrong
+    // region, or lost to a concurrent clear (issue #127).
 
     public static class ConditionTodo {
         private final String condition;
@@ -149,18 +149,6 @@ public class BuildingInfo {
         public String getBuilding() {
             return building;
         }
-    }
-
-    public void addPostTodo(BlockPos index, Consumer<WorldGenLevel> inf) {
-        postTodo.put(index, inf);
-    }
-
-    public Map<BlockPos, Consumer<WorldGenLevel>> getPostTodo() {
-        return postTodo;
-    }
-
-    public void clearPostTodo() {
-        postTodo.clear();
     }
 
     public BlockPos getCenter(int y) {

@@ -46,7 +46,7 @@ public class ChunkDriver {
     //
     // What this does NOT cover: writes this mod makes straight to the world, bypassing the
     // driver. Those are invisible here and so invisible to the digest. Today that is two things:
-    // the post-todo callbacks run out of BuildingInfo.getPostTodo, which write through the
+    // the post-todo callbacks ChunkFixer drains off the ChunkGenContext, which write through the
     // WorldGenLevel; and the border-block shape updates this class defers to vanilla
     // postprocessing (see updateAdjacent) - a matching DRIVERDIGEST no longer proves fence, wall
     // and stair connections at chunk borders are unchanged, because postprocessing writes them

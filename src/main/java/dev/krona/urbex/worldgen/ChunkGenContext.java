@@ -9,11 +9,14 @@ import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
 import javax.annotation.Nullable;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Everything one chunk's generation needs, built at the start of that generation and discarded at
@@ -32,6 +35,11 @@ public final class ChunkGenContext {
     public final CompiledPalette palette;
     public final char street;
     public final NoiseBuffers buffers;
+    /**
+     * Deferred writes this generation queues for after the driver has run. Owned here, not on the
+     * cached {@link BuildingInfo}: see {@link PostTodoQueue}.
+     */
+    private final PostTodoQueue postTodo = new PostTodoQueue();
     /**
      * Scratch for {@link CityGenerator#moveDown}'s top-of-column stash. Lives here
      * because the feature instance is shared across worldgen worker threads: as an instance
@@ -67,6 +75,18 @@ public final class ChunkGenContext {
 
     List<LightTodoQueue.Todo> drainLightTodo() {
         return lightTodo.closeAndDrain();
+    }
+
+    /**
+     * Queue a block write for after this chunk has been driven, addressed by {@code pos}. A second
+     * todo at the same position replaces the first.
+     */
+    void addPostTodo(BlockPos pos, Consumer<WorldGenLevel> todo) {
+        postTodo.add(pos, todo);
+    }
+
+    Map<BlockPos, Consumer<WorldGenLevel>> drainPostTodo() {
+        return postTodo.closeAndDrain();
     }
 
     /**
