@@ -20,6 +20,22 @@
     — silently, with no exception and nothing in the log.
   - *No worldgen change*: both digest goldens are unchanged, and the bundled pack reports nothing.
 
+- **A reference that is *allowed* not to resolve no longer pretends to be a problem.** Conditions
+  are now walked too, and what happens to a broken reference depends on what generation does with it
+  (issue #56).
+  - *A palette marker's `loot`/`mob` names a condition, which generation dereferences* — so one that
+    names nothing refuses the world, like every other dereference.
+  - *A condition's `inpart`/`inbuilding` are matchers.* Naming a part nothing registers does not
+    crash; the condition silently never fires. That is a warning, not a refusal.
+  - *And it is only a warning if the thing that would provide it is installed.* A pack may
+    deliberately name a part, mob or loot table from something it does not require, so that players
+    who have it get the content and everyone else does not — saying so every load would be a warning
+    per optional entry for a pack working exactly as written. A mod is checked with the loader; a
+    datapack, which need not be a mod, by whether anything loaded registers assets in that namespace.
+  - *The predicate is unchanged.* `Condition` compiles its matchers once and tests them per draw,
+    which is the right shape; it just keeps the entries beside them, because a closure cannot be
+    asked what it matches on.
+
 - **A datapack reference that names nothing is now a message about a file, not a crashed chunk.**
   Every cross-asset reference a world can reach — a city style's building and part selectors, a world
   style's highway and railway wiring, a building's `parts`, a multibuilding's grid, a scattered

@@ -1,5 +1,12 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
+import com.mojang.datafixers.util.Either;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
@@ -23,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -188,6 +196,41 @@ class AssetGraphTest {
         assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(""));
     }
 
+    /**
+     * A matcher is not a dereference: a condition naming a part nothing registers does not crash, it
+     * silently never fires. Worth a line, not worth refusing a world for.
+     */
+    @Test
+    void aConditionMatchingOnAMissingPartOfAnInstalledPackIsAWarning() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        // 'urbex' is a namespace this snapshot has assets in, so the pack is installed and the name
+        // is a typo rather than absent content.
+        Fixture fixture = new Fixture().condition("loot_table", "urbex:no_such_part");
+        CityStyle root = fixture.cityStyleNaming("urbex:loot_table");
+
+        AssetGraph.validate(fixture.snapshot(), List.of(root), diagnostics);
+
+        assertFalse(diagnostics.isEmpty(), "a typo in an installed pack is worth saying");
+        assertFalse(diagnostics.hasFatal(), "but the condition merely never fires, so the world loads");
+    }
+
+    /**
+     * The case that must stay quiet. A pack may match on, or hand back, content from a mod it does not
+     * require - so that players who have it get the content and everyone else simply does not. Saying
+     * so every load would be a warning per optional entry for a pack working exactly as written.
+     */
+    @Test
+    void aConditionMatchingOnAnUninstalledPacksPartSaysNothing() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Fixture fixture = new Fixture().condition("loot_table", "somemod:their_part");
+        CityStyle root = fixture.cityStyleNaming("urbex:loot_table");
+
+        AssetGraph.validate(fixture.snapshot(), List.of(root), diagnostics);
+
+        assertTrue(diagnostics.isEmpty(),
+                () -> "nobody has that pack, which is not a defect: " + diagnostics.format(""));
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private static PredefinedBuilding building(String name) {
@@ -205,6 +248,8 @@ class AssetGraphTest {
         private final Map<Identifier, MultiBuilding> multiBuildings = new HashMap<>();
         private final Map<Identifier, PredefinedCity> cities = new HashMap<>();
         private final Map<Identifier, BuildingPart> extraParts = new HashMap<>();
+        private final Map<Identifier, Condition> conditions = new HashMap<>();
+        private final Map<Identifier, Style> styles = new HashMap<>();
 
         Fixture building(String path, String partName) {
             PartRef ref = new PartRef(partName, Optional.empty(), Optional.empty(), Optional.empty(),
@@ -259,6 +304,63 @@ class AssetGraphTest {
                             Optional.empty())));
         }
 
+        /** A condition whose one entry matches on {@code inpart}, which is a matcher, not a lookup. */
+        Fixture condition(String path, String inPart) {
+            Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
+            ConditionPart entry = new ConditionPart(1.0f, "minecraft:chests/simple_dungeon",
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.of(Either.right(inPart)), Optional.empty(), Optional.empty(),
+                    Optional.empty());
+            conditions.put(id, new Condition(id, List.of(new ConditionDefinition(
+                    Optional.empty(), Optional.of(new Mergeable<>(true, List.of(entry)))))));
+            return this;
+        }
+
+        /**
+         * A city style whose style has one palette, whose one marker names {@code conditionName} as
+         * its loot table - which is how a condition is reached at all.
+         */
+        CityStyle cityStyleNaming(String conditionName) {
+            Identifier paletteId = Identifier.fromNamespaceAndPath("urbex", "loot_palette");
+            PaletteEntry marker = new PaletteEntry("L", Optional.of("minecraft:chest"),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.of(conditionName), Optional.empty(), Optional.empty(),
+                    Optional.empty());
+            // 'a' as well as the loot marker: the road part this city style wires in is built from
+            // 'a', and the character check would otherwise fire on the fixture rather than on what
+            // the test is about.
+            PaletteEntry filler = new PaletteEntry("a", Optional.of("minecraft:stone"),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.empty());
+            Palette palette = new Palette(paletteId, BuiltInRegistries.BLOCK, null,
+                    List.of(new PaletteDefinition(Optional.empty(), Optional.of(List.of(marker, filler)))));
+            Identifier styleId = Identifier.fromNamespaceAndPath("urbex", "style_loot");
+            styles.put(styleId, new Style(styleId,
+                    new AssetIndex<>("urbex:palettes", Map.of(paletteId, palette)),
+                    List.of(new StyleDefinition(Optional.empty(), Optional.of(new Mergeable<>(true,
+                            List.of(List.of(new PaletteSelector(1.0f, paletteId.toString())))))))));
+            return new CityStyle(Identifier.fromNamespaceAndPath("urbex", "citystyle_loot"),
+                    List.of(new CityStyleDefinition(
+                            Optional.empty(), Optional.of(styleId.toString()), Optional.empty(),
+                            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                            Optional.empty(), Optional.empty(), Optional.empty(),
+                            Optional.of(new StreetSettings(Optional.empty(), Optional.empty(),
+                                    Optional.empty(), Optional.empty(), Optional.empty(),
+                                    Optional.empty(), Optional.empty(), Optional.empty(),
+                                    Optional.of(roadFamily()), Optional.empty(),
+                                    Optional.empty())),
+                            Optional.empty())));
+        }
+
+        /** Every street slot pointing at one 16x16 part this fixture registers. */
+        private StreetParts.Decl roadFamily() {
+            part("road", 16, 16);
+            Optional<Mergeable<String>> one = Optional.of(new Mergeable<>(true, List.of("urbex:road")));
+            return new StreetParts.Decl(one, one, one, one, one, one, one, one);
+        }
+
         Fixture city(String path, PredefinedBuilding... contents) {
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
             cities.put(id, new PredefinedCity(id, List.of(new PredefinedCityDefinition(
@@ -279,8 +381,9 @@ class AssetGraphTest {
                     Optional.of(List.of(List.of("a"))), Optional.empty(), Optional.empty(),
                     Optional.empty()))));
             parts.putAll(extraParts);
-            return new AssetSnapshot(empty.variants(), empty.palettes(), empty.conditions(),
-                    empty.styles(), new AssetIndex<>("urbex:parts", parts),
+            return new AssetSnapshot(empty.variants(), empty.palettes(),
+                    new AssetIndex<>("urbex:conditions", conditions),
+                    new AssetIndex<>("urbex:styles", styles), new AssetIndex<>("urbex:parts", parts),
                     new AssetIndex<>("urbex:buildings", buildings),
                     new AssetIndex<>("urbex:multibuildings", multiBuildings), empty.scattered(),
                     empty.worldStyles(), empty.cityStyles(),

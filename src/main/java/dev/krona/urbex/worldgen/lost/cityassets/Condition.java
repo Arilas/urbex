@@ -17,6 +17,17 @@ public class Condition {
     private final Identifier name;
 
     private final List<Pair<Predicate<ConditionContext>, Pair<Float, String>>> valueSelector = new ArrayList<>();
+    /**
+     * The entries this was folded from, kept beside the compiled predicates rather than instead of
+     * them.
+     * <p>
+     * {@link ConditionContext#parseTest} turns each entry's matchers into one closure chain, tested
+     * once per draw - that is the right shape and it stays. But a closure cannot be asked what it
+     * matches on, so a condition naming a part no datapack registers used to be invisible: the
+     * predicate simply never fired, and nothing said why. Keeping the entries costs one reference and
+     * lets {@link AssetGraph} report it (issue #56).
+     */
+    private final List<ConditionPart> entries;
 
     /**
      * Builds a fully resolved condition from its {@code extends} chain, root first: a declared
@@ -35,12 +46,18 @@ public class Condition {
             }
         }
         Resolved.require(anyValues ? values : null, name, "values");
+        entries = List.copyOf(values);
         for (ConditionPart cp : values) {
             float factor = cp.getFactor();
             String value = cp.getValue();
             Predicate<ConditionContext> test = ConditionContext.parseTest(cp);
             valueSelector.add(Pair.of(test, Pair.of(factor, value)));
         }
+    }
+
+    /** What each entry matched on and hands back, for the load-time walk. */
+    List<ConditionPart> entries() {
+        return entries;
     }
 
     /** The fully-qualified id, e.g. {@code "urbex:chestloot"}. */
