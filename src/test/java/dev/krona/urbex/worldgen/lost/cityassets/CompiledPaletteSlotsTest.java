@@ -19,10 +19,28 @@ public class CompiledPaletteSlotsTest {
     }
 
     @Test
-    public void overweightEntriesAreScaledProportionally() {
-        // The bundled variants use weights like 1000: 1000/1060 and 60/1060 of 128 slots.
-        assertArrayEquals(new int[]{121, 7},
+    public void anOverfullListFillsInOrderAndTruncates() {
+        // Lost Cities' rule, which every pack is authored against: a weight is an absolute slot
+        // count, entries fill in declaration order, and the list stops when the array is full.
+        // The first entry alone overflows, so it takes everything and the second gets nothing.
+        assertArrayEquals(new int[]{128, 0},
                 CompiledPalette.distributeSlots(new int[]{1000, 60}, 128));
+    }
+
+    @Test
+    public void aTrailingHugeWeightFillsOnlyWhatIsLeft() {
+        // The idiom this exists for: accents first, then "fill the rest". Read as proportions the
+        // last entry would take 115 of 128 slots instead of 15, which is the difference between a
+        // mossy stone wall and a solid moss cube. See CompiledPalette.distributeSlots.
+        assertArrayEquals(new int[]{15, 10, 10, 30, 30, 15, 3, 15},
+                CompiledPalette.distributeSlots(new int[]{15, 10, 10, 30, 30, 15, 3, 1000}, 128));
+    }
+
+    @Test
+    public void theBundledIdiomSplitsEvenlyRatherThanBeingSwamped() {
+        // urbex:blackstone is [32, 32, 1000] -- half accents, half base, not 94% base.
+        assertArrayEquals(new int[]{32, 32, 64},
+                CompiledPalette.distributeSlots(new int[]{32, 32, 1000}, 128));
     }
 
     @Test
@@ -47,7 +65,13 @@ public class CompiledPaletteSlotsTest {
 
     @Test
     public void singleEntryTakesAllSlots() {
+        // Under-full, so it scales up rather than throwing the way Lost Cities did.
         assertArrayEquals(new int[]{128}, CompiledPalette.distributeSlots(new int[]{3}, 128));
+    }
+
+    @Test
+    public void weightsSummingToExactlySlotCountAreUnchangedByEitherPath() {
+        assertArrayEquals(new int[]{64, 64}, CompiledPalette.distributeSlots(new int[]{64, 64}, 128));
     }
 
     @Test

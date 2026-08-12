@@ -42,6 +42,34 @@ public class CompiledPalette {
      * Weights that already sum to exactly {@code slotCount} come back verbatim, so packs authored
      * against the old contract generate identically.
      */
+    /**
+     * How many of {@code slotCount} slots each weighted palette entry gets.
+     * <p>
+     * <b>A weight is an absolute slot count, not a proportion</b>, and entries fill the array in
+     * declaration order until it is full. That is Lost Cities' rule
+     * ({@code CompiledPalette.addEntries}), and every pack in existence is authored against it -
+     * including the ones Urbex's own assets were ported from. The idiom it creates is a trailing
+     * huge weight meaning <em>fill whatever is left</em>:
+     * <pre>
+     * "#": [ stone 15, mossy_stone_slab 10, stone_stairs 10, mossy_stone 30,
+     *        cracked_stone_bricks 30, moss_block 15, iron_bars 3, moss_block 1000 ]
+     * </pre>
+     * 113 slots of varied rubble, then moss fills the remaining 15 - a ruined stone wall with moss
+     * on it. Read as proportions the same list is 91% moss block: a solid green cube.
+     * <p>
+     * Urbex briefly did read them as proportions, as part of issue #58 (a list summing under 128
+     * used to crash, and one summing over was silently truncated). Scaling fixed the crash and
+     * inverted every pack that used the idiom, this repository's own bundled variants among them -
+     * {@code blackstone} is {@code [32, 32, 1000]}, meant as half accents and half base, and it
+     * generated as 94% base. Truncation is not the bug; it is the mechanism the idiom relies on.
+     * <p>
+     * The under-128 case keeps issue #58's leniency, because Lost Cities threw there
+     * ({@code "factor should go up to 128"}) so no pack can be relying on the old behaviour: the
+     * weights are scaled up proportionally, largest fractional part first, rather than crashing.
+     *
+     * @param weights   one per entry, in declaration order; order is significant
+     * @param slotCount the array being filled, always 128 in generation
+     */
     public static int[] distributeSlots(int[] weights, int slotCount) {
         long total = 0;
         for (int w : weights) {
@@ -54,6 +82,16 @@ public class CompiledPalette {
             throw new IllegalArgumentException("Palette weights must sum to a positive value");
         }
         int[] slots = new int[weights.length];
+        if (total >= slotCount) {
+            // Lost Cities' behaviour: take each weight verbatim, in order, and stop when full.
+            int assigned = 0;
+            for (int i = 0; i < weights.length && assigned < slotCount; i++) {
+                slots[i] = (int) Math.min(weights[i], (long) slotCount - assigned);
+                assigned += slots[i];
+            }
+            return slots;
+        }
+        // Under-full: scale up rather than throw, largest remainder first.
         long[] remainders = new long[weights.length];
         int assigned = 0;
         for (int i = 0; i < weights.length; i++) {
@@ -62,8 +100,6 @@ public class CompiledPalette {
             remainders[i] = scaled % total;
             assigned += slots[i];
         }
-        // Fractional parts sum to exactly the shortfall, so this hands out fewer slots than
-        // there are entries and no entry can win twice.
         for (int remaining = slotCount - assigned; remaining > 0; remaining--) {
             int best = 0;
             for (int i = 1; i < weights.length; i++) {

@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+- **Palette weights are absolute slot counts again, filled in declaration order.** A weighted
+  palette or variant entry's `random` is how many of the 128 slots it takes, and the list stops once
+  the array is full - Lost Cities' rule (`CompiledPalette.addEntries`), which every pack in existence
+  is authored against.
+  - *What was wrong.* Issue #58 made the weights proportional. That fixed a real crash (a list
+    summing under 128 threw) but inverted the idiom packs actually use: a trailing huge weight
+    meaning **fill whatever is left**. `stone_building`'s `#` in a Lost Cities pack is 113 slots of
+    varied rubble followed by `moss_block 1000`, so moss takes the last 15 slots - a mossy stone
+    wall. Read as proportions it is 91% moss block: a solid green cube. Reported from a live world
+    as "almost 90% moss".
+  - *Urbex's own assets were affected too*, which is how far this reached: `urbex:blackstone` is
+    `[32, 32, 1000]`, meant as half accents and half base, and it generated as 94% base. Every
+    bundled variant uses the same shape.
+  - *Truncation is the mechanism, not the bug.* Over-full lists truncate, as upstream does. The
+    under-128 case keeps #58's leniency and scales up rather than throwing, because Lost Cities threw
+    there (`"factor should go up to 128"`) so nothing can depend on the old behaviour.
+  - *Both goldens moved; deliberate regeneration.* `digest.golden` `eb6253f3f5363937` ->
+    `688914e862e938fb`, `digest-features.golden` `203d8a44769da0c7` -> `7b5348f28e0a6d23`. Block and
+    chunk counts are unchanged (849,092 / 4,591,882 blocks), so geometry is identical and only which
+    block fills each palette slot differs - the expected signature of this change.
+
 - **A world style can name its own `rotatable` block tag.** New optional `rotatable` field on
   `worldstyles`, holding a `#`-prefixed block tag id; `CityGenerator.transformBlockState` reads the
   resolved tag from the active world style instead of the hardcoded `UrbexTags.ROTATABLE_TAG`. A
