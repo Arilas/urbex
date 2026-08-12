@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- **A world style can name its own `rotatable` block tag.** New optional `rotatable` field on
+  `worldstyles`, holding a `#`-prefixed block tag id; `CityGenerator.transformBlockState` reads the
+  resolved tag from the active world style instead of the hardcoded `UrbexTags.ROTATABLE_TAG`. A
+  chain that declares none resolves `urbex:rotatable`, so nothing that already exists changes
+  meaning.
+  - *Why.* Previously the only way for a pack to widen the rotatable set was to ship
+    `data/urbex/tags/block/rotatable.json`, and a tag file in Urbex's namespace merges into
+    `urbex:rotatable` itself — so it took effect in **every** world style, including
+    `urbex:standard`, whether or not the player selected that pack's style. A pack whose palettes
+    place directional banners, trapdoors or ladders had to choose between shipping mis-facing blocks
+    and changing stock generation for everyone.
+  - *Replaces rather than merges.* A pack that wants Urbex's own set writes `"#urbex:rotatable"` into
+    its own tag's `values`. Tags reference tags across namespaces, so nothing is lost and the
+    composition is visible in data rather than implied by a merge rule.
+  - *Not `TagKey.hashedCodec`.* It decodes the same `#ns:path` shape, but parses the remainder with
+    `Identifier.read`, so `"#rotatable"` would silently become `minecraft:rotatable`. The new
+    `DataTools.BLOCK_TAG_CODEC` goes through `DataTools.fromName`, making an unqualified tag
+    reference the same load error as any other unqualified reference.
+  - *Both goldens unchanged.* `digest.golden` (`eb6253f3f5363937`) and `digest-features.golden`
+    (`203d8a44769da0c7`) are byte-identical after the change. The styles those runs exercise declare
+    no `rotatable`, so an identical digest across 849k and 4.6M placed blocks is the evidence that
+    the default path is untouched.
+
 - **Open lots generate at street level, not one block above it.** `urbex:default` now sets
   `roads.parkElevation: false`. Reported from a live world: a raised lot next to a building stands a
   one-block lip directly across the doorway, so the door opens into a wall of dirt. The same
