@@ -133,13 +133,36 @@ selection provably exists. Sound in the only direction that matters - nothing is
 selection that really breaks - and the shipped pack now reports zero.
 
 **56c — a city style's own character fields.** All fourteen of them, through the same core the part
-check uses, which is why {@code PartPaletteCheck} became `PaletteCharacterCheck`.
+check uses, which is why `PartPaletteCheck` became `PaletteCharacterCheck`.
+
+**56d — condition references, and what a reference is allowed *not* to resolve to.** The predicate is
+kept: it is compiled once and tested per draw, which is the right shape, and re-reading the
+`ConditionTest` fields on every floor of every building would be far worse. `Condition` simply retains
+its entries beside it, because a closure cannot be asked what it matches on.
+
+The rule this settled is worth more than the traversal. What happens to a broken reference depends on
+what generation does with it:
+
+| Kind | At generation | Answer |
+|---|---|---|
+| **Dereference** — a city style's building, a palette marker's `loot`/`mob` condition | `getOrThrow` throws from a worker | **Fatal**, whatever the author intended |
+| **Matcher** — a condition's `inpart` / `inbuilding` | silently never fires | **Warning**, and only if the provider is installed |
+| **Handed to Minecraft** — a condition's entity id | empty spawner | **Warning**, and only if the provider is installed |
+
+A pack may deliberately name content from something it does not require, so that players who have it
+get the content and everyone else does not. Reporting those would be a warning per optional entry,
+every load, for a pack working exactly as written — so `ReferenceProvider` asks whether the
+*provider* is installed before saying anything. The presence test differs by provider: a mod answers
+through `FabricLoader.isModLoaded`, while a datapack need not be a mod at all, so an asset reference
+asks whether anything loaded registers assets in that namespace.
 
 *Still not covered:*
 
-- **Condition references** (`inpart`/`belowpart`/`inbuilding`). `Condition` consumes them into a
-  `Predicate<ConditionContext>` at construction and does not retain the strings, so reaching them
-  means changing that class - a change to a compiled asset, not to the walk.
+- **Loot table ids.** A condition's values are checkable as entity ids and not as loot tables: loot
+  tables live in a reloadable server registry rather than in the frozen ones this compiles against, so
+  at this point in the load there is nothing to ask.
+- **`PartRef`'s own condition fields** inside a building. `Building.readParts` discards those strings
+  exactly as `Condition` used to discard its own; the same one-line retention would expose them.
 - **Scattered parts' characters.** A scattered building lands wherever the terrain allows and takes the
   style of the chunk it lands in, which the walk cannot know. Its references are checked; its
   characters are not.

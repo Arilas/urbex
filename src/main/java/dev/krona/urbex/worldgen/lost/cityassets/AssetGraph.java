@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
@@ -10,6 +11,9 @@ import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredReference;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
 import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.biome.Biome;
 import org.apache.commons.lang3.tuple.Pair;
@@ -77,9 +81,18 @@ public final class AssetGraph {
     private final Map<Identifier, CityStyle> reachable = new HashMap<>();
     private final Deque<Runnable> pending = new ArrayDeque<>();
 
+    /** Every namespace something loaded registers Urbex assets in; see {@link ReferenceProvider}. */
+    private final Set<String> assetNamespaces = new HashSet<>();
+
     private AssetGraph(AssetSnapshot assets, AssetDiagnostics diagnostics) {
         this.assets = assets;
         this.diagnostics = diagnostics;
+        for (Identifier id : assets.parts().ids()) {
+            assetNamespaces.add(id.getNamespace());
+        }
+        for (Identifier id : assets.buildings().ids()) {
+            assetNamespaces.add(id.getNamespace());
+        }
     }
 
     /**
@@ -188,6 +201,11 @@ public final class AssetGraph {
         Style palette = assets.styles().get(style.getStyle());
         if (palette != null) {
             PaletteCharacterCheck.checkCityStyle(style, palette, diagnostics);
+            for (List<Pair<Float, Palette>> group : palette.paletteChoices()) {
+                for (Pair<Float, Palette> choice : group) {
+                    walkPalette(choice.getRight());
+                }
+            }
         }
         for (ObjectSelector selector : style.selectorList(CityStyle.Sel.BUILDING)) {
             building(owner, selector.value(), "selectors.buildings", palette);
@@ -393,6 +411,112 @@ public final class AssetGraph {
 
     private void style(Identifier owner, @Nullable String name, String field) {
         resolve(owner, name, field, assets.styles(), style -> { });
+    }
+
+    /**
+     * The conditions a palette's markers name, and what those conditions in turn reference.
+     *
+     * <p>A {@code loot} or {@code mob} marker holds a <em>condition</em> name, which
+     * {@code CityGenerator.getRandomSpawnerMob} resolves with {@code getOrThrow} - so a marker naming
+     * a condition nothing registers is a crashed chunk, and fatal here like every other dereference.
+     * What the condition then hands back is a loot table or an entity id, which is not, and is
+     * treated as such below.</p>
+     */
+    private void walkPalette(@Nullable Palette palette) {
+        if (palette == null || !first("palette", palette.getId())) {
+            return;
+        }
+        for (Palette.PE entry : palette.getPalette().values()) {
+            Palette.Info info = entry.info();
+            if (info == null) {
+                continue;
+            }
+            condition(palette.getId(), info.loot(), "loot", false);
+            condition(palette.getId(), info.mobId(), "mob", true);
+        }
+    }
+
+    /**
+     * @param entities whether this condition's values are entity ids. A condition is a weighted list
+     *                 of strings and nothing in it says what they are - the marker that named it does:
+     *                 a {@code mob} marker's values are entity types, a {@code loot} marker's are loot
+     *                 tables. Reached as both, it is walked as both.
+     */
+    private void condition(Identifier owner, @Nullable String name, String field, boolean entities) {
+        resolve(owner, name, field, assets.conditions(), condition -> walkCondition(condition, entities));
+    }
+
+    /**
+     * A condition's own references, none of which generation dereferences - so none of them is fatal
+     * and some are not even reported.
+     *
+     * <p>Its matchers ({@code inpart}, {@code inbuilding}) are string membership tests: naming a part
+     * nothing registers does not crash, the condition just silently never fires. Its values are loot
+     * tables and entity ids handed to Minecraft. Both are the shape a pack may deliberately write for
+     * content it does not require, so {@link ReferenceProvider} decides whether the absence is worth a
+     * line at all: it is when the pack or mod that would provide it <em>is</em> installed, and it is
+     * not when nobody has it.</p>
+     */
+    private void walkCondition(Condition condition, boolean entities) {
+        if (!first("condition/" + entities, condition.getId())) {
+            return;
+        }
+        for (ConditionPart entry : condition.entries()) {
+            softAssetRefs(condition.getId(), entry.getInpart(), "values.inpart", assets.parts());
+            softAssetRefs(condition.getId(), entry.getInbuilding(), "values.inbuilding", assets.buildings());
+            if (entities) {
+                softEntityRef(condition.getId(), entry.getValue());
+            }
+        }
+    }
+
+    /** A matcher naming an Urbex asset: reported only when a pack using that namespace is loaded. */
+    private void softAssetRefs(Identifier owner, @Nullable Set<String> names, String field,
+                               AssetIndex<?> index) {
+        if (names == null) {
+            return;
+        }
+        for (String name : names) {
+            Identifier id;
+            try {
+                id = DataTools.fromName(name);
+            } catch (RuntimeException e) {
+                continue;   // an unqualified matcher is the codec's business, not this walk's
+            }
+            if (index.get(id) != null || !ReferenceProvider.packIsInstalled(id, assetNamespaces)) {
+                continue;
+            }
+            if (reported.add(index.registry() + "|" + owner + "|" + field + "|" + name)) {
+                diagnostics.warn(index.registry(), owner,
+                        "'" + field + "' matches on '" + name + "', which no loaded datapack "
+                                + "registers even though other assets in that namespace are loaded; "
+                                + "this condition can never fire for it");
+            }
+        }
+    }
+
+    /**
+     * An entity id a {@code mob} condition hands to a spawner. Never fatal - a spawner with an
+     * unknown entity is an empty spawner, not a crash - and silent unless the mod that would provide
+     * it is installed, which is the case a pack listing another mod's mobs deliberately relies on.
+     * <p>
+     * Loot tables have no equivalent check: they live in a reloadable server registry rather than in
+     * the frozen ones this compiles against, so at this point in the load there is nothing to ask.
+     */
+    private void softEntityRef(Identifier owner, @Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        Identifier id = Identifier.tryParse(value);
+        if (id == null || !ReferenceProvider.modIsInstalled(id)
+                || BuiltInRegistries.ENTITY_TYPE.get(ResourceKey.create(Registries.ENTITY_TYPE, id)).isPresent()) {
+            return;
+        }
+        if (reported.add("entity|" + owner + "|" + value)) {
+            diagnostics.warn(assets.conditions().registry(), owner,
+                    "hands back mob '" + value + "', which '" + id.getNamespace()
+                            + "' is installed but does not provide; a spawner using it stays empty");
+        }
     }
 
     /** A part is a leaf for this walk: its {@code refpalette} was resolved when it compiled. */
