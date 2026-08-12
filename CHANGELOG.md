@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-08-12 (beta)
 
 - **`urbex:rotatable` covers what the generator actually rotates.** The tag named
   `#minecraft:stairs` and nothing else, while `CityGenerator.transformBlockState` applies the part's
@@ -71,14 +71,23 @@
   its three legal orders. The unused `CommandDispatcher` parameter is gone from twelve `register`
   methods.
 
-- **Build and packaging.** The jar is `urbex-fabric-26.2-0.1.0.jar`, not
-  `urbex-fabric-26.2-26.2-0.1.0.jar`. `src/generated/resources` is gone - it held six hand-written
+- **Build and packaging.** The jar is `urbex-fabric-<version>.jar`, not
+  `urbex-fabric-26.2-<version>.jar` - `archivesName` carried a Minecraft version that `version`
+  already starts with. `src/generated/resources` is gone - it held six hand-written
   tag files under a directory named "generated", with no datagen entry point anywhere - and those
   files now live in `src/main/resources` where they are written. `fabric.mod.json` pins
   `fabric-api` to `>=` the version this compiles against rather than `*`, which turned an old API
   into `NoClassDefFoundError` instead of a dependency error. Deleted: the inherited probot
   `.github/stale.yml` (`daysUntilStale: 100000`) and the Fuzs maven repository, left over from
   `forgeconfigapiport`. CI uploads the JUnit reports, including on failure.
+
+- **A mod icon, and releases that build themselves.** `assets/urbex/icon.png` (128x128) fills what
+  was a blank tile in Mod Menu; `art/icon-master.png` keeps the editable original out of the jar. A
+  `v*` tag now builds like any other push - full suite, both worldgen digest checks - and only then
+  attaches that build's jar to a draft GitHub release, so a release cannot be cut from an unverified
+  run and the notes stay hand-written. The tag names the mod version alone (`v0.2.0`) and the job
+  refuses one that disagrees with what the build produced. Modrinth and CurseForge are uploaded by
+  hand from the same jar; `README.md` records the sequence.
 
 - **Dead code.** `ConditionContext.parseTest(JsonElement)`, a 75-line hand-rolled Gson duplicate of
   the codec-driven overload that had silently diverged from it; `TerrainHeight.byName`/
