@@ -37,6 +37,8 @@ public class Urbex implements ModInitializer {
 
         // Headless worldgen regression check; no-op without -Durbex.digestCheck
         DigestCheck.registerIfRequested();
+        // Headless world-style mix census; no-op without -Durbex.mixCheck
+        MixCheck.registerIfRequested();
 
         // Track the current server (replaces NeoForge's ServerLifecycleHooks)
         ServerLifecycleEvents.SERVER_STARTING.register(server -> ServerAccess.setServer(server));

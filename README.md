@@ -43,6 +43,29 @@ To get cities:
   Entries are `dimension=preset`, optionally `dimension=preset@worldstyle`, and **every id names
   its namespace**: `minecraft:overworld=urbex:default`, not `minecraft:overworld=default`.
 
+### Mixing world styles (experimental)
+
+Set `experimentalMultiWorldStyles: true` in `config/urbex/urbex.json` and the **World Style** picker
+on the Cities tab gains a **Mix** mode: tick several styles and give each a weight. Weights are
+relative and shown as percentages, so `0.1` and `0.9` mean roughly one city in ten comes from the
+first style. Each city draws its own style, so one world can hold cities from several datapacks at
+once — which is the point: install a second asset pack and its cities appear alongside the built-in
+ones instead of replacing them. Leave it off, or tick a single style, and everything behaves exactly
+as before.
+
+Server owners get the same thing in `dimensionsWithPresets`, with `+` between entries and `*` before
+a weight:
+
+    minecraft:overworld=urbex:default@urbex:standard*0.1+urbexmt:moderntweaks*0.9
+
+Highways, railways and the world settings come from the heaviest style, so a highway never changes
+pack partway along its run. Scattered structures do mix — they are drawn per scatter area, like
+cities are drawn per centre.
+
+With the flag off, a mix from either source is reduced to its heaviest style and the reduction
+logged, so a config or save carrying one never quietly takes effect on an install that did not opt
+in.
+
 ## Status
 
 Early. See `docs/superpowers/specs/` for the design and `docs/superpowers/plans/` for what is
