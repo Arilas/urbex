@@ -287,7 +287,17 @@ public class Config {
         Identifier selectedWorldStyle = null;
         String selectedOverrides = null;
 
-        if (presetFromClient != null) {
+        // A world that already recorded a choice keeps it, even with a client selection published.
+        // The client fields are how the create-world screen hands its choice to the integrated
+        // server, so they are only ever meant for a world being created - which by definition has
+        // no saved choice yet. Applying them to a world that has one is only reachable when they
+        // outlived the screen that set them (issue #113: abandon world creation, then load an
+        // existing world), and the cost of that was not a wrong preset for one session but a
+        // permanent one: the branch below writes what it resolved into UrbexData, overwriting the
+        // selection that world was created with. PresetSelection.discardPublication clears them at
+        // the source; this makes the overwrite unreachable even if some future path forgets to.
+        boolean worldHasOwnChoice = !data.getSelectedPreset().isEmpty();
+        if (presetFromClient != null && !worldHasOwnChoice) {
             selectedPreset = presetFromClient;
             selectedWorldStyle = worldStyleFromClient != null ? worldStyleFromClient : DEFAULT_WORLD_STYLE;
             selectedOverrides = overridesFromClient;

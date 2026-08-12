@@ -1,6 +1,7 @@
 package dev.krona.urbex.setup;
 
 import dev.krona.urbex.commands.ModCommands;
+import dev.krona.urbex.worldgen.CityFeature;
 import dev.krona.urbex.worldgen.GlobalTodo;
 import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetRegistries;
@@ -39,6 +40,33 @@ public class ServerEventHandlers {
         // validation still happens first, which is the point of having this at all, but the second
         // resolve is not free and is not a fresh requirement being met.
         ServerLevelEvents.LOAD.register((server, level) -> AssetRegistries.load(level));
+        // /reload, and what it can and cannot do for a datapack author.
+        //
+        // It cannot reload the thirteen asset registries. They are registered through Fabric's
+        // DynamicRegistries (CustomRegistries.init), which puts them in
+        // RegistryDataLoader.WORLDGEN_REGISTRIES - loaded once while the world loads and frozen.
+        // Only ReloadableServerRegistries' own list (loot tables and friends) comes back on a
+        // reload, so an edited building or palette JSON needs the world reopened whatever we do
+        // here, exactly as a vanilla worldgen file does.
+        //
+        // Block tags are a different matter: those do reload, and Urbex reads several of them once
+        // and caches the result. CityGenerator's constructor expands urbex:lights and
+        // urbex:needspoi into BlockState sets and holds them for the lifetime of the
+        // IDimensionInfo, so without this an edited tag kept generating against the pre-reload
+        // membership, silently, until the world was reopened. Bumping the counter drops the
+        // dimension info - and with it those sets and every compiled asset - so the next chunk
+        // rebuilds from what the reload produced.
+        //
+        // Same in-flight hazard as every other bump of this counter (see
+        // CityFeature.reconcileDirtyCounter): a chunk already generating can have the registries
+        // reset underneath it and be saved undecorated. /reload is an explicit operator action, and
+        // Stuff.generateStuff logs loudly if it happens, so this is the same trade the DISCONNECT
+        // bump already makes rather than a new one.
+        ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resourceManager, success) -> {
+            if (success) {
+                CityFeature.globalDimensionInfoDirtyCounter++;
+            }
+        });
         ServerTickEvents.END_LEVEL_TICK.register(ServerEventHandlers::onWorldTick);
         ServerLifecycleEvents.SERVER_STARTING.register(server -> cleanUp());
         ServerLifecycleEvents.SERVER_STOPPING.register(server -> {

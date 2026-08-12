@@ -1,7 +1,5 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionTest;
 import net.minecraft.resources.Identifier;
@@ -174,82 +172,6 @@ public abstract class ConditionContext {
         }
         if (element.getRange() != null) {
             String range = element.getRange();
-            String[] split = StringUtils.split(range, ',');
-            try {
-                int l1 = Integer.parseInt(split[0]);
-                int l2 = Integer.parseInt(split[1]);
-                test = combine(test, levelInfo -> levelInfo.isRange(l1, l2));
-            } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-                throw new RuntimeException("Bad range specification: <l1>,<l2>!", e);
-            }
-        }
-        if (test == null) {
-            test = conditionContext -> true;
-        }
-        return test;
-    }
-
-    public static Predicate<ConditionContext> parseTest(JsonElement element) {
-        Predicate<ConditionContext> test = null;
-        JsonObject obj = element.getAsJsonObject();
-        if (obj.has("top")) {
-            boolean top = obj.get("top").getAsBoolean();
-            if (top) {
-                test = combine(test, ConditionContext::isTopOfBuilding);
-            } else {
-                test = combine(test, levelInfo -> !levelInfo.isTopOfBuilding());
-            }
-        }
-        if (obj.has("ground")) {
-            boolean ground = obj.get("ground").getAsBoolean();
-            if (ground) {
-                test = combine(test, ConditionContext::isGroundFloor);
-            } else {
-                test = combine(test, levelInfo -> !levelInfo.isGroundFloor());
-            }
-        }
-        if (obj.has("isbuilding")) {
-            boolean ground = obj.get("isbuilding").getAsBoolean();
-            if (ground) {
-                test = combine(test, ConditionContext::isBuilding);
-            } else {
-                test = combine(test, levelInfo -> !levelInfo.isBuilding());
-            }
-        }
-        if (obj.has("chunkx")) {
-            int chunkX = obj.get("chunkx").getAsInt();
-            test = combine(test, context -> chunkX == context.getChunkX());
-        }
-        if (obj.has("chunkz")) {
-            int chunkZ = obj.get("chunkz").getAsInt();
-            test = combine(test, context -> chunkZ == context.getChunkZ());
-        }
-        if (obj.has("inpart")) {
-            String part = obj.get("inpart").getAsString();
-            test = combine(test, context -> part.equals(context.getPart()));
-        }
-        if (obj.has("inbuilding")) {
-            String building = obj.get("inbuilding").getAsString();
-            test = combine(test, context -> building.equals(context.getBuilding()));
-        }
-        if (obj.has("inbiome")) {
-            String biome = obj.get("inbiome").getAsString();
-            test = combine(test, context -> biome.equals(context.getBiome().toString()));
-        }
-        if (obj.has("cellar")) {
-            boolean cellar = obj.get("cellar").getAsBoolean();
-            if (cellar) {
-                test = combine(test, ConditionContext::isCellar);
-            } else {
-                test = combine(test, levelInfo -> !levelInfo.isCellar());
-            }
-        }
-        if (obj.has("floor")) {
-            int level = obj.get("floor").getAsInt();
-            test = combine(test, levelInfo -> levelInfo.isFloor(level));
-        }
-        if (obj.has("range")) {
-            String range = obj.get("range").getAsString();
             String[] split = StringUtils.split(range, ',');
             try {
                 int l1 = Integer.parseInt(split[0]);

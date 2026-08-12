@@ -443,6 +443,16 @@ public class ChunkDriver {
             // updateShape hands the block a RandomSource; almost none use it, but the level's own
             // source is shared across every chunk being generated, so address one on this
             // position - by reseeding the reused instance, not allocating per block (issue #34)
+            //
+            // One stream per position, deliberately shared across the four directions, because the
+            // reshaped block is the same block. `pos` is the neighbour being reshaped, not the
+            // corrected block, so a position P that neighbours several corrected blocks is entered
+            // once per corrected neighbour and every entry gets the identical stream - same
+            // address, same purpose. That is the invariant, not an oversight (issue #30): keying on
+            // direction as well would make a block's shape depend on which of its neighbours was
+            // corrected first, i.e. on correction order, which is the one thing the whole addressed
+            // -RNG design exists to keep out of generation. Anyone adding direction to this address
+            // is trading determinism for independence no vanilla block asks for.
             shapeRandom.setSeed(Rng.posSeed(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SHAPE));
             newAdjacent = adjacent.updateShape(region, region, pos, direction, pos.relative(direction), state, shapeRandom);
         } catch (Exception e) {

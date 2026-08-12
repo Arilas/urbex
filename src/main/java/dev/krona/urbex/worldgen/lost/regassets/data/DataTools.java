@@ -65,6 +65,26 @@ public class DataTools {
      * of failing. Going through {@link #fromName} instead makes an unqualified tag reference the
      * same load error, with the same message, as any other unqualified reference.
      */
+    /**
+     * A palette marker: the one-character string a slice row is painted with, and the same value a
+     * building's {@code filler} names.
+     * <p>
+     * Both used to be {@code Codec.STRING} read with a raw {@code charAt(0)}, so {@code ""} threw
+     * {@code StringIndexOutOfBoundsException} out of the decode with no file named, and {@code "ab"}
+     * quietly meant {@code "a"} - the second is the worse of the two, because a marker that is not
+     * the one the author wrote paints the wrong block everywhere it is used and nothing says so.
+     * Length is the whole check: a marker may be any character a slice row can hold.
+     */
+    public static final Codec<String> PALETTE_CHAR_STRING = Codec.STRING.validate(
+            s -> s.length() == 1
+                    ? DataResult.success(s)
+                    : DataResult.error(() -> "Palette marker '" + s + "' must be exactly one "
+                    + "character, but is " + s.length() + " characters long"));
+
+    /** {@link #PALETTE_CHAR_STRING} for the fields that hold the marker as a {@code char}. */
+    public static final Codec<Character> PALETTE_CHAR =
+            PALETTE_CHAR_STRING.xmap(s -> s.charAt(0), String::valueOf);
+
     public static final Codec<TagKey<Block>> BLOCK_TAG_CODEC = Codec.STRING.comapFlatMap(
             s -> {
                 if (!s.startsWith("#")) {

@@ -26,6 +26,22 @@ import java.util.Optional;
  */
 public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
 
+    /**
+     * The widest {@code attempts} the RNG slot address can hold, and one more than the widest
+     * {@code maxcount}.
+     * <p>
+     * {@code Stuff.slot} packs one placement attempt's address as
+     * {@code ((stuffOrdinal * 4096) + (j + 1)) * 4096 + i}, with {@code i} the attempt index and
+     * {@code j} the count index. Nothing there is masked, so an {@code attempts} above 4096 makes
+     * {@code i} carry into the {@code j} field and a count above 4095 makes {@code j + 1} carry
+     * into the ordinal's - and two logically distinct attempts then share one stream and draw the
+     * same position, silently, forever. Bounding the two inputs is the cheap half of the fix
+     * (issue #21); widening the packing is the other half, and it would move every decoration in
+     * every world, so it is not done here. Vanilla data is three orders of magnitude below these
+     * bounds.
+     */
+    public static final int SLOT_FIELD_SIZE = 4096;
+
     private static final Codec<StuffSettingsRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
@@ -33,9 +49,9 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
                     Codec.STRING.optionalFieldOf("column").forGetter(l -> Optional.ofNullable(l.column)),
                     Codec.INT.optionalFieldOf("minheight").forGetter(l -> Optional.ofNullable(l.minheight)),
                     Codec.INT.optionalFieldOf("maxheight").forGetter(l -> Optional.ofNullable(l.maxheight)),
-                    Codec.INT.optionalFieldOf("mincount").forGetter(l -> Optional.ofNullable(l.mincount)),
-                    Codec.INT.optionalFieldOf("maxcount").forGetter(l -> Optional.ofNullable(l.maxcount)),
-                    Codec.INT.optionalFieldOf("attempts").forGetter(l -> Optional.ofNullable(l.attempts)),
+                    Codec.intRange(0, SLOT_FIELD_SIZE - 1).optionalFieldOf("mincount").forGetter(l -> Optional.ofNullable(l.mincount)),
+                    Codec.intRange(0, SLOT_FIELD_SIZE - 1).optionalFieldOf("maxcount").forGetter(l -> Optional.ofNullable(l.maxcount)),
+                    Codec.intRange(1, SLOT_FIELD_SIZE).optionalFieldOf("attempts").forGetter(l -> Optional.ofNullable(l.attempts)),
                     Codec.BOOL.optionalFieldOf("inbuilding").forGetter(l -> Optional.ofNullable(l.inbuilding)),
                     Codec.BOOL.optionalFieldOf("seesky").forGetter(l -> Optional.ofNullable(l.seesky)),
                     BiomeMatcher.CODEC.optionalFieldOf("biomes").forGetter(l -> Optional.ofNullable(l.biomeMatcher)),
@@ -181,6 +197,20 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
         Resolved.require(mincount, name, "mincount");
         Resolved.require(maxcount, name, "maxcount");
         Resolved.require(attempts, name, "attempts");
+        // Required for the same reason as the four above, and the reason is stronger: an
+        // undeclared 'inbuilding' does not fail, it disappears. Stuff.generateStuff tests
+        // `inBuilding != null && inBuilding == info.hasBuilding`, so a stuff object that never
+        // declares it matches no chunk at all - it is registered, indexed under its tags, walked
+        // on every city chunk, and places nothing, with no error and no log line. There is no
+        // sensible default either: `false` (outside buildings only) and `true` are both half the
+        // answer, and picking one would place a decoration the author never asked for.
+        Resolved.require(inbuilding, name, "inbuilding");
+        // Spans two fields, so it belongs on the fold rather than on either codec field: each is
+        // individually in range and a child may raise one while inheriting the other.
+        if (maxcount < mincount) {
+            throw new IllegalStateException("Stuff '" + name + "' resolves to mincount " + mincount
+                    + " above maxcount " + maxcount + "; no count could be drawn between them");
+        }
         return this;
     }
 
@@ -247,7 +277,11 @@ public class StuffSettingsRE implements IAsset<StuffSettingsRE>, Extendable {
         return buildingMatcher == null ? IdentifierMatcher.ANY : buildingMatcher;
     }
 
-    public Boolean isInBuilding() {
+    /**
+     * Required, so never null on a resolved object - {@link #requireResolved} fails the load if the
+     * chain left it undeclared, because an undeclared one made the whole stuff object inert.
+     */
+    public boolean isInBuilding() {
         return inbuilding;
     }
 

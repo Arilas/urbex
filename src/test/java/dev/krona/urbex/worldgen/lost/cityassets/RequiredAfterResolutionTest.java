@@ -54,7 +54,7 @@ class RequiredAfterResolutionTest {
 
     @Test
     void stuffChildInheritsRequiredScalarsItDoesNotDeclare() {
-        StuffSettingsRE parent = stuff().column("y").counts(2, 5, 10).tags("rubble").build();
+        StuffSettingsRE parent = stuff().column("y").counts(2, 5, 10).inbuilding(true).tags("rubble").build();
         StuffSettingsRE child = stuff().tags("debris").build();
 
         StuffObject resolved = new StuffObject(List.of(parent, child));
@@ -66,6 +66,8 @@ class RequiredAfterResolutionTest {
         assertEquals("y", resolved.getSettings().getColumn());
         assertEquals(List.of("debris"), resolved.getSettings().getTags(),
                 "what the child does declare still wins");
+        assertEquals(true, resolved.getSettings().isInBuilding(),
+                "'inbuilding' is required of the chain, so it too comes from the ancestor");
     }
 
     @Test
@@ -78,8 +80,20 @@ class RequiredAfterResolutionTest {
     }
 
     @Test
+    void stuffWithoutInbuildingAnywhereInTheChainIsALoadError() {
+        // Not merely a missing value: Stuff.generateStuff matches on `inbuilding == hasBuilding`,
+        // so an undeclared one matched no chunk at all and the decoration was registered, indexed
+        // and walked on every city chunk while placing nothing, silently.
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new StuffObject(List.of(stuff().column("y").counts(1, 2, 3).tags("debris").build())));
+
+        assertTrue(e.getMessage().contains("inbuilding"), e.getMessage());
+        assertTrue(e.getMessage().contains("urbex:test_stuff"), e.getMessage());
+    }
+
+    @Test
     void stuffChildThatDeclaresOnlySomeOfTheChainStillLoadsWhenAnAncestorCoversTheRest() {
-        StuffSettingsRE root = stuff().column("y").counts(2, 5, 10).build();
+        StuffSettingsRE root = stuff().column("y").counts(2, 5, 10).inbuilding(false).build();
         StuffSettingsRE middle = stuff().counts(3, 6, 11).build();
         StuffSettingsRE leaf = stuff().tags("debris").build();
 
@@ -304,6 +318,12 @@ class RequiredAfterResolutionTest {
         private Optional<Integer> mincount = Optional.empty();
         private Optional<Integer> maxcount = Optional.empty();
         private Optional<Integer> attempts = Optional.empty();
+        private Optional<Boolean> inbuilding = Optional.empty();
+
+        StuffBuilder inbuilding(boolean inbuilding) {
+            this.inbuilding = Optional.of(inbuilding);
+            return this;
+        }
 
         StuffBuilder tags(String... values) {
             this.tags = Optional.of(new Mergeable<>(true, List.of(values)));
@@ -325,7 +345,7 @@ class RequiredAfterResolutionTest {
         StuffSettingsRE build() {
             return new StuffSettingsRE(Optional.empty(), tags, column,
                     Optional.empty(), Optional.empty(), mincount, maxcount, attempts,
-                    Optional.empty(), Optional.empty(),
+                    inbuilding, Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())
                     .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "test_stuff"));
         }

@@ -1,7 +1,6 @@
 package dev.krona.urbex.commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -13,6 +12,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.WorldGenLevel;
 
@@ -20,9 +20,13 @@ public class CommandMap implements Command<CommandSourceStack> {
 
     private static final CommandMap CMD = new CommandMap();
 
-    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register() {
         return Commands.literal("map")
-                .requires(Commands.hasPermission(Commands.LEVEL_ALL))
+                // Was LEVEL_ALL, which let any player print a 41x41 block of text into the server
+                // console on demand - trivially spammable, and by the one audience that could not
+                // read the result, since it went to stdout rather than to them. The output now goes
+                // to the sender; the permission matches the other diagnostics.
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .executes(CMD);
     }
 
@@ -32,7 +36,11 @@ public class CommandMap implements Command<CommandSourceStack> {
         ServerPlayer player = context.getSource().getPlayerOrException();
         BlockPos position = player.blockPosition();
         IDimensionInfo dimInfo = Registration.cityFeature().getDimensionInfo((WorldGenLevel) player.level());
-        if (dimInfo != null) {
+        if (dimInfo == null) {
+            context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
+            return 0;
+        }
+        {
             ChunkPos pos = ChunkPos.containing(position);
             for (int z = pos.z() - 20 ; z <= pos.z() + 20 ; z++) {
                 StringBuilder buf = new StringBuilder();
@@ -49,10 +57,11 @@ public class CommandMap implements Command<CommandSourceStack> {
                         buf.append(" ");
                     }
                 }
-                //noinspection UseOfSystemOutOrSystemErr
-                System.out.println(buf);
+                // To the sender, in a monospaced-friendly literal: the map is 41 characters of
+                // aligned columns and only means anything to whoever asked for it.
+                context.getSource().sendSystemMessage(Component.literal(buf.toString()));
             }
         }
-        return 0;
+        return 1;
     }
 }

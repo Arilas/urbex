@@ -15,7 +15,7 @@ public record PartMeta(String key, Boolean bool, String chr, String str,
             instance.group(
                     Codec.STRING.fieldOf("key").forGetter(l -> l.key),
                     Codec.BOOL.optionalFieldOf("boolean").forGetter(l -> Optional.ofNullable(l.bool)),
-                    Codec.STRING.optionalFieldOf("char").forGetter(l -> Optional.ofNullable(l.chr)),
+                    DataTools.PALETTE_CHAR_STRING.optionalFieldOf("char").forGetter(l -> Optional.ofNullable(l.chr)),
                     Codec.STRING.optionalFieldOf("string").forGetter(l -> Optional.ofNullable(l.str)),
                     Codec.INT.optionalFieldOf("integer").forGetter(l -> Optional.ofNullable(l.i)),
                     Codec.FLOAT.optionalFieldOf("float").forGetter(l -> Optional.ofNullable(l.f))

@@ -44,7 +44,7 @@ string every other file uses to name it. Directory names are the registry names 
 | `scattered` | A building placed outside cities, and how it sits on the terrain | `terrainheight`, `terrainfix` |
 | `conditions` | A weighted, conditional set of values — loot tables, mob ids | `values` |
 | `variants` | A weighted set of blockstates behind one palette character | `blocks` |
-| `stuff` | A small decoration pass: cobwebs, chains, rubble | `column`, `mincount`, `maxcount`, `attempts` |
+| `stuff` | A small decoration pass: cobwebs, chains, rubble | `column`, `mincount`, `maxcount`, `attempts`, `inbuilding` |
 | `predefinedcities` | A city pinned to fixed chunk coordinates | `dimension`, `chunkx`, `chunkz`, `radius`, `citystyle` |
 | `presets` | Per-dimension worldgen tuning — see [`docs/presets.md`](presets.md) | *(nothing)* |
 
@@ -561,6 +561,10 @@ inherit, or failing later with a message about a missing field that names neithe
 rejected outright, naming the key and its replacement. This matters mostly if you are converting a
 Lost Cities Modern Tweaks pack, where `inherit` *is* the key.
 
+One more key is rejected rather than ignored, in `scattered` only: **`rotatable`**. It was read and
+then thrown away — a scattered building always generates unrotated — so a pack that set it got
+exactly the world it would have got without it. Remove the key; nothing replaces it yet.
+
 The examples in this guide are machine-checked against the codecs for exactly this: each is decoded
 and then re-encoded, and a key that does not survive the round trip fails the build. A field name
 you read here is one the mod actually reads.
@@ -607,6 +611,11 @@ Three details about that warning:
 | `Part 'urbexmt:tower' declares xsize 8 and zsize 16 but its slices are 16 wide (...)` | A size was redeclared without the matching slices | Declare both together, or neither |
 | `The inline palette in 'urbexmt:tower' declares extends '...'` | `extends` inside an inline `palette` block | Use `refpalette`, or put `extends` on the owning asset |
 | `Illegal palette urbex:x!` | A palette entry names no `block`, `variant`, `blocks`, `frompalette` or `light` | Give the character something to resolve to |
+| `Palette marker 'ab' must be exactly one character, but is 2 characters long` | A `char`, `filler` or `rubble` that is not one character | Write one character. `""` used to throw with no file named, and `"ab"` quietly meant `"a"` |
+| `Style 'urbexmt:downtown' declares a 'randompalettes' group whose factors total 0.0; no palette could ever be drawn from it. At least one palette in each group needs a factor above zero.` | Every palette in one group has a factor of zero or less | Give at least one of them a positive factor |
+| `Stuff 'urbexmt:downtown' resolves to mincount 5 above maxcount 2; no count could be drawn between them` | The two came from different links of the chain and contradict | Declare them together, or fix the one that is wrong |
+| `Value 5000 outside of range [0:4095]` on a stuff `mincount` or `maxcount`, or `[1:4096]` on `attempts` | Above what the decoration's RNG slot address can hold — two attempts would silently share one stream and draw the same position | Keep counts under 4096. Vanilla data is three orders of magnitude below it |
+| `'urbexmt:x' declares no 'inbuilding', and neither does anything it extends` | A `stuff` entry that never says whether it goes inside buildings or outside | Declare it. It used to be optional, and an entry without it matched no chunk at all and placed nothing, silently |
 | `Can't find 'urbexmt:p' in urbex:parts!` | A highway or railway part id resolves to nothing | Check the id; this one throws rather than degrading |
 | `Cannot find 'urbexmt:p' in urbex:parts!` (WARN) | A street part id resolves to nothing | Same, but generation continues without the part |
 | `Block 'minecraft:chain' (in urbex:common) ... it will generate as air` | A renamed or misspelled block id | Update the id; nothing else will tell you. The id in brackets is the palette or variant, not the asset that looks broken |

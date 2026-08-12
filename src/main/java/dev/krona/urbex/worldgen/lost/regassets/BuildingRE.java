@@ -28,8 +28,8 @@ public class BuildingRE implements IAsset<BuildingRE>, Extendable {
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
                     PaletteRE.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
-                    Codec.STRING.optionalFieldOf("filler").forGetter(l -> Optional.ofNullable(l.fillerBlock).map(String::valueOf)),
-                    Codec.STRING.optionalFieldOf("rubble").forGetter(l -> Optional.ofNullable(l.rubbleBlock)),
+                    DataTools.PALETTE_CHAR.optionalFieldOf("filler").forGetter(l -> Optional.ofNullable(l.fillerBlock)),
+                    DataTools.PALETTE_CHAR.optionalFieldOf("rubble").forGetter(l -> Optional.ofNullable(l.rubbleBlock)),
                     Codec.INT.optionalFieldOf("mincellars").forGetter(l -> Optional.ofNullable(l.minCellars)),
                     Codec.INT.optionalFieldOf("minfloors").forGetter(l -> Optional.ofNullable(l.minFloors)),
                     Codec.INT.optionalFieldOf("maxcellars").forGetter(l -> Optional.ofNullable(l.maxCellars)),
@@ -59,7 +59,7 @@ public class BuildingRE implements IAsset<BuildingRE>, Extendable {
     private final Boolean allowFillers; // true means generation for the filler is allowed, for cellars
     private final Boolean overrideFloors;	// This overrides the citystyle/profile all min/max floors, meaning it will ONLY use this building definition's all min/max Floors.
     private final Character fillerBlock; // Block used to fill/close areas. Usually the block of the building itself
-    private final String rubbleBlock;   // Block used for destroyed building rubble
+    private final Character rubbleBlock;   // Block used for destroyed building rubble
     private final Float prefersLonely;  // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
     private PaletteRE localPalette = null;
@@ -69,15 +69,15 @@ public class BuildingRE implements IAsset<BuildingRE>, Extendable {
     private final Mergeable<PartRef> parts2;
 
     public BuildingRE(Optional<Identifier> extendsId,
-                      Optional<String> refpalette, Optional<PaletteRE> locpalette, Optional<String> filler, Optional<String> rubble,
+                      Optional<String> refpalette, Optional<PaletteRE> locpalette, Optional<Character> filler, Optional<Character> rubble,
                       Optional<Integer> minCellars, Optional<Integer> minFloors, Optional<Integer> maxCellars, Optional<Integer> maxFloors,
                       Optional<Boolean> allowDoors, Optional<Boolean> allowFillers, Optional<Boolean> overrideFloors,
                       Optional<Float> prefersLonely, Optional<Mergeable<PartRef>> partRefs, Optional<Mergeable<PartRef>> partRefs2) {
         this.extendsId = extendsId;
         this.refPaletteName = refpalette.map(String::intern).orElse(null);
         this.localPalette = locpalette.orElse(null);
-        this.fillerBlock = filler.map(f -> f.charAt(0)).orElse(null);
-        this.rubbleBlock = rubble.map(String::intern).orElse(null);
+        this.fillerBlock = filler.orElse(null);
+        this.rubbleBlock = rubble.orElse(null);
         this.minCellars = minCellars.orElse(null);
         this.maxCellars = maxCellars.orElse(null);
         this.minFloors = minFloors.orElse(null);
@@ -148,7 +148,7 @@ public class BuildingRE implements IAsset<BuildingRE>, Extendable {
 
     @Nullable
     public Character getRubbleBlock() {
-        return rubbleBlock == null ? null : rubbleBlock.charAt(0);
+        return rubbleBlock;
     }
 
     @Nullable

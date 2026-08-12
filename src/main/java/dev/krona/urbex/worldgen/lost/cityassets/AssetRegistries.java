@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.*;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -116,6 +117,9 @@ public class AssetRegistries {
             PREDEFINED_CITIES.reset();
             STUFF.reset();
             Presets.reset();
+            // Not a registry, but the same lifetime: PaletteEntry's canonical-copy pools are static
+            // and would otherwise hold every palette of every world this process ever loaded.
+            PaletteEntry.clearPools();
             // One write, so no reader can catch the index emptied but still flagged loaded.
             stuffIndex = new StuffIndex(Map.of(), false);
             loadedPredefined = false;

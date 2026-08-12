@@ -3,7 +3,6 @@ package dev.krona.urbex.commands;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -28,7 +27,7 @@ public class CommandSavePreset implements Command<CommandSourceStack> {
 
     private static final CommandSavePreset CMD = new CommandSavePreset();
 
-    public static ArgumentBuilder<CommandSourceStack, ?> register(CommandDispatcher<CommandSourceStack> dispatcher) {
+    public static ArgumentBuilder<CommandSourceStack, ?> register() {
         return Commands.literal("savepreset")
                 .requires(Commands.hasPermission(Commands.LEVEL_ADMINS))
                 .executes(CMD);

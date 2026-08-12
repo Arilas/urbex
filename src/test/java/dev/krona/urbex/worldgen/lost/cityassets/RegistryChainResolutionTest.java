@@ -105,14 +105,15 @@ class RegistryChainResolutionTest {
                 .inbuilding(true).seesky(false)
                 .buildings(onlyLibraries)
                 .build();
-        StuffSettingsRE child = stuff("torches_rare").column("XX").counts(2, 9, 7).build();
+        StuffSettingsRE child = stuff("torches_rare").column("XX").counts(2, 9, 7)
+                .undeclaredInbuilding().build();
 
         StuffSettingsRE resolved = new StuffObject(List.of(parent, child)).getSettings();
 
         assertNotSame(child, resolved, "a two-entry chain must actually fold, not hand back the leaf");
         assertEquals(40, resolved.getMinheight(), "minheight is inherited");
         assertEquals(90, resolved.getMaxheight(), "maxheight is inherited");
-        assertEquals(Boolean.TRUE, resolved.isInBuilding(), "inbuilding is inherited");
+        assertEquals(true, resolved.isInBuilding(), "inbuilding is inherited");
         assertEquals(Boolean.FALSE, resolved.isSeesky(),
                 "seesky is inherited - and 'declared false' must not read as 'undeclared'");
         assertSame(onlyLibraries, resolved.getBuildingMatcher(), "the matcher is inherited");
@@ -447,8 +448,8 @@ class RegistryChainResolutionTest {
     /** Builds a {@code buildings} entry declaring exactly the fields the test names, and no others. */
     private static final class BuildingBuilder {
         private final String path;
-        private Optional<String> filler = Optional.empty();
-        private Optional<String> rubble = Optional.empty();
+        private Optional<Character> filler = Optional.empty();
+        private Optional<Character> rubble = Optional.empty();
         private Optional<Integer> minFloors = Optional.empty();
         private Optional<Float> prefersLonely = Optional.empty();
         private Optional<Mergeable<PartRef>> parts = Optional.empty();
@@ -458,12 +459,12 @@ class RegistryChainResolutionTest {
         }
 
         BuildingBuilder filler(String filler) {
-            this.filler = Optional.of(filler);
+            this.filler = Optional.of(filler.charAt(0));
             return this;
         }
 
         BuildingBuilder rubble(String rubble) {
-            this.rubble = Optional.of(rubble);
+            this.rubble = Optional.of(rubble.charAt(0));
             return this;
         }
 
@@ -572,7 +573,10 @@ class RegistryChainResolutionTest {
         private Optional<Integer> mincount = Optional.of(1);
         private Optional<Integer> maxcount = Optional.of(1);
         private Optional<Integer> attempts = Optional.of(1);
-        private Optional<Boolean> inbuilding = Optional.empty();
+        // Declared by default, like the four scalars above it: 'inbuilding' is required of a
+        // resolved chain (an undeclared one made the stuff object silently inert), so a builder
+        // that left it out would fail every test that is not about that rule.
+        private Optional<Boolean> inbuilding = Optional.of(false);
         private Optional<Boolean> seesky = Optional.empty();
         private Optional<IdentifierMatcher> buildings = Optional.empty();
 
@@ -610,6 +614,12 @@ class RegistryChainResolutionTest {
 
         StuffBuilder inbuilding(boolean inbuilding) {
             this.inbuilding = Optional.of(inbuilding);
+            return this;
+        }
+
+        /** Leaves 'inbuilding' undeclared, for a test about inheriting it from an ancestor. */
+        StuffBuilder undeclaredInbuilding() {
+            this.inbuilding = Optional.empty();
             return this;
         }
 
