@@ -22,8 +22,6 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.tags.BiomeTags;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.TagKey;
 import net.minecraft.tags.StructureTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.*;
@@ -63,14 +61,13 @@ public class CityGenerator {
     private final BlockState base;
     public final BlockState liquid;
 
-    // Every one of these used to be built on first use and cached on this object, which is shared
-    // by the whole dimension. That was safe only because generation held a lock on this feature.
-    // They are all derived from block tags and block states - nothing here needs a Level - so they
-    // are built once in the constructor and never written again.
+    // Built on first use and cached on this object, which is shared by the whole dimension. That was
+    // safe only because generation held a lock on this feature. It is a pure function of two vanilla
+    // blocks - no Level, no tag, no datapack - so it is built once in the constructor and never
+    // written again. The three fields that used to sit beside it were block-tag expansions and have
+    // moved to TagSnapshot, so a /reload can refresh them without rebuilding this generator and
+    // everything the level plans with (issue #128); this one has nothing to reload.
     private final Set<BlockState> railStates;
-    private final Set<BlockState> statesNeedingTodo;
-    private final Set<BlockState> statesNeedingLightingUpdate;
-    private final Set<BlockState> statesNeedingPoiUpdate;
 
     private final NoiseGeneratorPerlin rubbleNoise;
     private final NoiseGeneratorPerlin leavesNoise;
@@ -107,24 +104,6 @@ public class CityGenerator {
         railStates = new HashSet<>();
         addStates(Blocks.RAIL, railStates);
         addStates(Blocks.POWERED_RAIL, railStates);
-
-        statesNeedingTodo = new HashSet<>();
-        for (Holder<Block> bh : Tools.getBlocksForTag(TagKey.create(Registries.BLOCK, Identifier.withDefaultNamespace("saplings")))) {
-            addStates(bh.value(), statesNeedingTodo);
-        }
-        for (Holder<Block> bh : Tools.getBlocksForTag(BlockTags.SMALL_FLOWERS)) {
-            addStates(bh.value(), statesNeedingTodo);
-        }
-
-        statesNeedingLightingUpdate = new HashSet<>();
-        for (Holder<Block> bh : Tools.getBlocksForTag(UrbexTags.LIGHTS_TAG)) {
-            addStates(bh.value(), statesNeedingLightingUpdate);
-        }
-
-        statesNeedingPoiUpdate = new HashSet<>();
-        for (Holder<Block> bh : Tools.getBlocksForTag(UrbexTags.NEEDSPOI_TAG)) {
-            addStates(bh.value(), statesNeedingPoiUpdate);
-        }
 
         randomLeafs = buildRandomLeafs();
         randomDirt = buildRandomDirt();
@@ -221,18 +200,6 @@ public class CityGenerator {
         return railStates;
     }
 
-    private Set<BlockState> getStatesNeedingTodo() {
-        return statesNeedingTodo;
-    }
-
-    private Set<BlockState> getStatesNeedingLightingUpdate() {
-        return statesNeedingLightingUpdate;
-    }
-
-    private Set<BlockState> getStatesNeedingPoiUpdate() {
-        return statesNeedingPoiUpdate;
-    }
-
     private static void addStates(Block block, Set<BlockState> set) {
         set.addAll(block.getStateDefinition().getPossibleStates());
     }
@@ -270,7 +237,10 @@ public class CityGenerator {
         // order. See Arilas/urbex#24.
         ChunkHeightmap heightmap = new ChunkHeightmap(getHeightmap(coord, provider.getWorld()));
         BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-        ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info, runtime.tasks());
+        // runtime.tags() is read here and nowhere else in this generation: one call, at the start,
+        // so a /reload landing mid-chunk cannot be observed halfway through a building (issue #128).
+        ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info,
+                runtime.tasks(), runtime.tags());
 
         boolean doCity = info.isCity;
 
@@ -504,7 +474,7 @@ public class CityGenerator {
                             if (d != air || cury <= info.waterLevel) {
                                 float damage = collectedDamage[x][z];
                                 if (damage >= 0.001) {
-                                    BlockState newd = damageArea.damageBlock(d, provider, cx + x, cury, cz + z, damage, info.getCompiledPalette(), liquid);
+                                    BlockState newd = damageArea.damageBlock(d, provider, ctx.tags, cx + x, cury, cz + z, damage, info.getCompiledPalette(), liquid);
                                     if (newd != d) {
                                         driver.block(newd);
                                         cntDamaged++;
@@ -709,11 +679,11 @@ public class CityGenerator {
     }
 
     // Return true if state is Empty or Plant based - stops (most) funny tree/mushroom action on chunk borders
-    private static boolean isFoliageOrEmpty(BlockState state) {
+    private static boolean isFoliageOrEmpty(TagSnapshot tags, BlockState state) {
         if (isEmpty(state)) {
             return true;
         }
-        return Tools.hasTag(state.getBlock(), UrbexTags.FOLIAGE_TAG);
+        return tags.isFoliage(state);
     }
 
     /**
@@ -739,7 +709,7 @@ public class CityGenerator {
         driver.current(x, height, z);
         int minHeight = provider.getWorld().getMinY();
         // We assume here we are not in a void chunk
-        while (isFoliageOrEmpty(driver.getBlock()) && driver.getY() > minHeight) {
+        while (isFoliageOrEmpty(ctx.tags, driver.getBlock()) && driver.getY() > minHeight) {
             driver.decY();
         }
 
@@ -1835,7 +1805,7 @@ public class CityGenerator {
                         Palette.Info inf = compiledPalette.getInfo(c);
 
                         if (transform != Transform.ROTATE_NONE) {
-                            b = transformBlockState(info, transform, b);
+                            b = transformBlockState(ctx.tags, info, transform, b);
                         }
 
                         // We don't replace the world where the part is empty (air)
@@ -1872,7 +1842,7 @@ public class CityGenerator {
                                 } else if (inf.tag() != null) {
                                     b = handleBlockEntity(ctx, info, oy, ctx.region, rx, rz, y, b, inf);
                                 }
-                            } else if (getStatesNeedingPoiUpdate().contains(b)) {
+                            } else if (ctx.tags.needsPoiUpdate(b)) {
                                 // If this block has POI data we need to delay setting it
                                 BlockState finalB = b;
                                 BlockPos p = driver.getCurrentCopy();
@@ -1882,9 +1852,9 @@ public class CityGenerator {
                                     }
                                 });
                                 b = Blocks.DIRT.defaultBlockState();
-                            } else if (getStatesNeedingLightingUpdate().contains(b)) {
+                            } else if (ctx.tags.needsLightingUpdate(b)) {
                                 updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
-                            } else if (getStatesNeedingTodo().contains(b)) {
+                            } else if (ctx.tags.needsTodo(b)) {
                                 b = handleTodo(ctx, info, oy, ctx.region, rx, rz, y, b);
                             }
                             driver.add(b);
@@ -2082,9 +2052,13 @@ public class CityGenerator {
      * {@link BuildingInfo#worldStyle()} memoises it per chunk, so this stays a field read in the hot
      * path rather than a neighbourhood walk. A world style that declares no {@code rotatable}
      * resolves {@code urbex:rotatable}, as before.
+     * <p>
+     * Membership is answered by the chunk's own {@link TagSnapshot} rather than by a live registry
+     * read, so every block of every part in this chunk sees one tag epoch even if a {@code /reload}
+     * lands halfway through it (issue #128).
      */
-    private BlockState transformBlockState(BuildingInfo info, Transform transform, BlockState b) {
-        if (Tools.hasTag(b.getBlock(), info.worldStyle().getRotatableTag())) {
+    private BlockState transformBlockState(TagSnapshot tags, BuildingInfo info, Transform transform, BlockState b) {
+        if (tags.isRotatable(info.worldStyle().getRotatableTag(), b)) {
             // Vanilla structure order: mirror first, then rotate. The mirror used to be
             // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
             // the wrong way (issue #45).

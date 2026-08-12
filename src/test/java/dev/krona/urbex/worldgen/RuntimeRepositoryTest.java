@@ -18,7 +18,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The lifetime rules {@link GenerationSession} keeps its level runtimes by (issue #125): load,
- * unload, replacement on reload, and the fact that a server's runtimes die with that server.
+ * unload, and the fact that a server's runtimes die with that server.
+ * <p>
+ * A {@code /reload} no longer appears here. It used to rebuild every published runtime through a
+ * {@code republish}; it now swaps one {@link TagEpoch} instead, because block tags were the only
+ * thing in a runtime a reload could change (issue #128). The epoch-retention property those tests
+ * held - a reader keeps what it was handed, a swap decides what the next reader gets - moved with
+ * it, to {@link TagEpochTest}.
  * <p>
  * Driven through plain strings rather than {@code ServerLevel}s. That is why the repository is a
  * separate, generic class: a {@code ServerLevel} cannot be constructed, subclassed usefully or
@@ -51,35 +57,20 @@ class RuntimeRepositoryTest {
 
     /**
      * The property the whole ownership move exists for. A chunk that is already generating holds
-     * the runtime it started with; a reload swaps what the <em>next</em> chunk picks up and cannot
-     * reach into the epoch already in flight. The dirty counter did the opposite - it cleared shared
-     * state in place, from whichever thread happened to notice.
+     * the runtime it started with; publishing a replacement decides what the <em>next</em> chunk
+     * picks up and cannot reach into the epoch already in flight. The dirty counter did the opposite
+     * - it cleared shared state in place, from whichever thread happened to notice.
      */
     @Test
-    void aReloadReplacesWhatTheNextLookupFindsAndLeavesTheOneInFlightAlone() {
+    void publishingAReplacementLeavesTheOneAlreadyInFlightAlone() {
         RuntimeRepository<String, String> repository = new RuntimeRepository<>();
         repository.publish("overworld", "runtime-1");
         String inFlight = repository.find("overworld");
 
-        repository.republish(key -> "runtime-2");
+        repository.publish("overworld", "runtime-2");
 
         assertEquals("runtime-1", inFlight, "work already holding an epoch keeps it");
         assertEquals("runtime-2", repository.find("overworld"));
-    }
-
-    /** A level unloading during a reload must not be brought back by the rebuild that overtook it. */
-    @Test
-    void aReloadDoesNotResurrectALevelRetiredWhileItRan() {
-        RuntimeRepository<String, String> repository = new RuntimeRepository<>();
-        repository.publish("overworld", "runtime-1");
-
-        repository.republish(key -> {
-            repository.retire(key);
-            return "runtime-2";
-        });
-
-        assertNull(repository.find("overworld"));
-        assertEquals(0, repository.size());
     }
 
     /**
@@ -98,7 +89,6 @@ class RuntimeRepositoryTest {
         assertNull(first.find("overworld"));
         assertThrows(IllegalStateException.class, () -> first.publish("overworld", "runtime-2"),
                 "a runtime published into a stopped server would never be retired again");
-        assertThrows(IllegalStateException.class, () -> first.republish(key -> "runtime-2"));
 
         RuntimeRepository<String, String> second = new RuntimeRepository<>();
         assertNull(second.find("overworld"), "the next server starts with nothing published");
@@ -131,12 +121,12 @@ class RuntimeRepositoryTest {
     }
 
     /**
-     * A reload landing while chunks are generating. Every lookup must answer with some complete
-     * runtime - never null, never a half-built one - which is the difference between republishing
-     * and the clear-then-refill the counter protocol performed.
+     * Replacements landing while chunks are generating. Every lookup must answer with some complete
+     * runtime - never null, never a half-built one - which is the difference between publishing a
+     * finished replacement and the clear-then-refill the counter protocol performed.
      */
     @Test
-    void aReloadOverlappingGenerationNeverExposesClearedState() throws Exception {
+    void aReplacementOverlappingGenerationNeverExposesClearedState() throws Exception {
         RuntimeRepository<String, String> repository = new RuntimeRepository<>();
         repository.publish("overworld", "runtime-0");
         AtomicInteger epoch = new AtomicInteger();
@@ -151,32 +141,20 @@ class RuntimeRepositoryTest {
                 }
                 return seen;
             });
-            Future<?> reloads = executor.submit(() -> {
+            Future<?> writers = executor.submit(() -> {
                 readerStarted.await();
                 for (int i = 0; i < 500; i++) {
-                    repository.republish(key -> "runtime-" + epoch.incrementAndGet());
+                    repository.publish("overworld", "runtime-" + epoch.incrementAndGet());
                 }
                 return null;
             });
 
-            reloads.get();
+            writers.get();
             for (String seen : readers.get()) {
-                assertNotNull(seen, "a lookup during a reload must never find the level unpublished");
+                assertNotNull(seen, "a lookup during a replacement must never find the level unpublished");
                 assertTrue(seen.startsWith("runtime-"), "and never a value that is not a runtime");
             }
         }
-    }
-
-    @Test
-    void republishSeesTheKeysThatWerePublished() {
-        RuntimeRepository<String, String> repository = new RuntimeRepository<>();
-        repository.publish("overworld", "runtime-1");
-        repository.publish("nether", "runtime-1");
-
-        repository.republish(key -> key + "-rebuilt");
-
-        assertEquals("overworld-rebuilt", repository.find("overworld"));
-        assertEquals("nether-rebuilt", repository.find("nether"));
     }
 
     @Test

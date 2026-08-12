@@ -68,13 +68,26 @@ public final class GenerationSession {
     private final Object owner;
     private final RuntimeRepository<ServerLevel, DimensionRuntime> dimensions = new RuntimeRepository<>();
     /**
-     * Compiled once, by the first level to load, and shared by every level in this world. The asset
-     * registries are frozen when the world loads (issue #61), so there is nothing per-level about
-     * what they compile to - and nothing a reload can change, which is why {@link #reload} leaves
-     * this alone.
+     * Everything this world compiled, or null until the first level load compiles it. One field
+     * rather than two, because the two halves are captured together and neither is usable without
+     * the other: the tag epoch is expanded <em>from</em> the assets, so a reader that could see one
+     * of them written and not the other would have an epoch that knows about no world style's
+     * {@code rotatable} tag.
      */
     @Nullable
-    private volatile AssetSnapshot assets;
+    private volatile Compiled compiled;
+
+    /**
+     * What one world load produces.
+     *
+     * @param assets compiled once, by the first level to load, and shared by every level in this
+     *               world. The asset registries are frozen when the world loads (issue #61), so
+     *               there is nothing per-level about what they compile to - and nothing a reload can
+     *               change, which is why {@link #reload} leaves this alone.
+     * @param tags   the block tags every level of this world generates against, in the one slot a
+     *               {@code /reload} swaps.
+     */
+    private record Compiled(AssetSnapshot assets, TagEpoch tags) {}
 
     private GenerationSession(@Nullable Object owner) {
         this.owner = owner;
@@ -168,7 +181,8 @@ public final class GenerationSession {
      * reads the level; nothing before it does.</p>
      */
     public DimensionRuntime load(ServerLevel level) {
-        DimensionRuntime runtime = DimensionRuntime.create(level, compileAssetsOnce(level));
+        Compiled world = compileOnce(level);
+        DimensionRuntime runtime = DimensionRuntime.create(level, world.assets(), world.tags());
         // Logged per level, at debug, because the ordering this line sits in is the invariant: in a
         // real server log every one of these lands before "Preparing spawn area", which is what a
         // unit test cannot show. (Verified on the digest run's dedicated server: overworld, nether
@@ -180,31 +194,44 @@ public final class GenerationSession {
     }
 
     /**
-     * Compiles this world's assets, once, before the first level that needs them can generate.
+     * Compiles this world, once, before the first level that needs it can generate.
      *
      * <p>The whole of the asset-load invariant, in one place: a runtime cannot be built without a
      * snapshot, a snapshot is only built here, and a pack that does not compile refuses the world
      * naming every problem at once rather than failing from a worldgen worker on the first chunk that
      * touches the broken file.</p>
+     *
+     * <p>The first tag epoch is opened here too, rather than at session open, because
+     * {@link TagSnapshot#capture} needs the compiled world styles to know which {@code rotatable}
+     * tags to expand.</p>
      */
-    private synchronized AssetSnapshot compileAssetsOnce(ServerLevel level) {
-        AssetSnapshot known = assets;
+    private synchronized Compiled compileOnce(ServerLevel level) {
+        Compiled known = compiled;
         if (known != null) {
             return known;
         }
         AssetDiagnostics diagnostics = new AssetDiagnostics();
-        AssetSnapshot compiled = AssetCompiler.compile(level.registryAccess(), diagnostics);
+        AssetSnapshot assets = AssetCompiler.compile(level.registryAccess(), diagnostics);
         // Before publication, not after: a snapshot nobody validated is exactly the partially
         // compiled view this whole issue removes.
         diagnostics.throwIfAny();
-        assets = compiled;
-        return compiled;
+        Compiled world = new Compiled(assets, new TagEpoch(TagSnapshot.capture(assets)));
+        compiled = world;
+        return world;
     }
 
     /** This world's compiled assets, or null before the first level has loaded. */
     @Nullable
     public AssetSnapshot assets() {
-        return assets;
+        Compiled world = compiled;
+        return world == null ? null : world.assets();
+    }
+
+    /** This world's block-tag epoch, or null before the first level has loaded. */
+    @Nullable
+    public TagEpoch tagEpoch() {
+        Compiled world = compiled;
+        return world == null ? null : world.tags();
     }
 
     /** Retires a level's runtime. Chunks already generating keep the runtime they captured. */
@@ -232,21 +259,28 @@ public final class GenerationSession {
     }
 
     /**
-     * Rebuilds every loaded level's runtime, for a {@code /reload}.
+     * Re-captures the block tags, for a {@code /reload}.
      *
-     * <p>Rebuilding is what {@code /reload} can honestly do. The thirteen asset registries are
-     * Fabric dynamic registries, loaded once with the world and frozen (issue #61), so an edited
-     * building or palette JSON needs the world reopened whatever happens here - the old counter bump
-     * cleared and re-resolved them anyway, which changed nothing an author could see and is exactly
-     * how a running worker ended up reading an emptied stuff index. Block tags <em>do</em> reload,
-     * and {@code CityGenerator} expands several of them into {@code BlockState} sets in its
-     * constructor, so a fresh runtime per level is what makes an edited tag take effect.</p>
+     * <p>That is the whole of what {@code /reload} can honestly do. The thirteen asset registries
+     * are Fabric dynamic registries, loaded once with the world and frozen (issue #61), so an edited
+     * building or palette JSON needs the world reopened whatever happens here. Block tags
+     * <em>do</em> reload, and until this issue they were expanded into {@code BlockState} sets in
+     * {@code CityGenerator}'s constructor - so the only way to refresh them was to rebuild every
+     * loaded level's runtime, discarding its road field, its heightmaps and every chunk plan it had
+     * cached. None of that is derived from a tag; all of it is derived from the seed and the frozen
+     * assets, so all of it was rebuilt to exactly what it already was (issue #128).</p>
      *
-     * <p>Each replacement is published whole; a chunk already generating finishes against the
-     * runtime it captured.</p>
+     * <p>The epoch is swapped, never mutated: a chunk already generating finishes against the
+     * {@link TagSnapshot} it captured, and the swap decides what the next one picks up. Called with
+     * no level loaded - or before the first one has - there is nothing captured yet and nothing to
+     * do; the load that follows captures the reloaded tags itself.</p>
      */
     public void reload() {
-        dimensions.republish(level -> DimensionRuntime.create(level, compileAssetsOnce(level)));
+        Compiled world = compiled;
+        if (world == null) {
+            return;
+        }
+        world.tags().publish(TagSnapshot.capture(world.assets()));
     }
 
     /** Who this session belongs to, for a caller that has to close it without holding that server. */

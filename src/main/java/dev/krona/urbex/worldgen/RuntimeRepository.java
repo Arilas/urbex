@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
-import java.util.function.Function;
 
 /**
  * The publish/retire rules a set of scoped runtimes obeys, with the scope's own types kept out.
@@ -18,10 +17,11 @@ import java.util.function.Function;
  * level-typed edge that uses them.</p>
  *
  * <p>The rule that matters most is what a <em>reader</em> sees. {@link #find} hands back a value,
- * and whoever holds it keeps it: a {@link #republish} or a {@link #retire} that lands afterwards
+ * and whoever holds it keeps it: a {@link #publish} or a {@link #retire} that lands afterwards
  * replaces what the <em>next</em> reader gets and never mutates or empties the value already handed
  * out. That is what lets a chunk that is already generating finish against the epoch it started
- * with, instead of having its assets cleared underneath it (issue #125).</p>
+ * with, instead of having its assets cleared underneath it (issue #125). {@link TagEpoch} keeps the
+ * same rule for the one thing a {@code /reload} can still change.</p>
  */
 final class RuntimeRepository<K, V> {
 
@@ -52,27 +52,6 @@ final class RuntimeRepository<K, V> {
     @Nullable
     V retire(K key) {
         return published.remove(key);
-    }
-
-    /**
-     * Rebuilds every published runtime and swaps each in, one key at a time.
-     *
-     * <p>One key at a time is deliberate, and it is not a weaker guarantee than a whole-map swap:
-     * every reader looks one key up, so the only atomicity a reader can observe is per key, and
-     * {@code ConcurrentHashMap.put} gives that. Building outside the map matters more - a reader
-     * must never see a half-built runtime, so each one is finished before it is published.</p>
-     */
-    void republish(Function<K, V> rebuild) {
-        if (closed) {
-            throw new IllegalStateException("Cannot republish into a closed runtime repository");
-        }
-        for (K key : List.copyOf(published.keySet())) {
-            V rebuilt = rebuild.apply(key);
-            // Not putIfAbsent/replace: the key may have been retired while this ran (a level
-            // unloading during a reload), and a rebuilt runtime for a retired level must not
-            // resurrect it.
-            published.computeIfPresent(key, (k, old) -> rebuilt);
-        }
     }
 
     /** Retires everything and refuses further publication. Idempotent. */

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- **`/reload` refreshes block tags without rebuilding everything a level generates with.** Block tags
+  are the one piece of Urbex's compiled state a reload genuinely changes, and they now live in their
+  own immutable `TagSnapshot` that a reload swaps in a single write (issue #128).
+  - *A reload used to republish every loaded level's runtime.* `CityGenerator` expanded
+    `urbex:lights`, `urbex:needspoi` and the vanilla plant tags into `BlockState` sets in its
+    constructor, so a fresh generator was the only way to see an edited tag — and it took the
+    level's road field, its heightmaps and every chunk plan it had cached with it. None of that is
+    derived from a tag; all of it was rebuilt to exactly what it already was.
+  - *A chunk sees one tag epoch, start to finish.* The snapshot is captured once, when a chunk's
+    generation begins, so a reload landing halfway through a building cannot put one slice of it on
+    the old tag membership and the next slice on the new one.
+  - *Block tags are read in exactly one place now*: while an epoch is being captured, on the thread
+    capturing it. `Tools.hasTag`, which the driver loop called per block, is gone.
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`
+    and `runDigestCheckFeatures`.
+
 - **Compiled assets are one immutable snapshot, finished before any chunk generates.** Twelve
   `static` registries, a readiness latch and a `reset()` are gone. Every asset is now compiled once
   per world load into an `AssetSnapshot` the level's runtime holds, and every lookup goes through it

@@ -105,4 +105,21 @@ class GenerationSessionTest {
 
         assertNull(GenerationSession.current());
     }
+
+    /**
+     * A {@code /reload} on a server whose levels have not loaded yet. Nothing has been compiled, so
+     * there is no epoch to re-capture and no assets to capture one against - and the level load that
+     * follows reads the reloaded tags itself. Worth pinning because the reload hook is registered
+     * at mod init and the session is opened at {@code SERVER_STARTING}, so the ordering is Fabric's
+     * to decide, not ours.
+     */
+    @Test
+    void reloadingBeforeAnyLevelHasLoadedIsHarmless() {
+        GenerationSession session = GenerationSession.openFor(new Object());
+
+        session.reload();
+
+        assertNull(session.assets());
+        assertNull(session.tagEpoch(), "the first level load opens the epoch, not the reload");
+    }
 }

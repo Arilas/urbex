@@ -9,13 +9,11 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.DefaultedRegistry;
-import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerChunkCache;
-import net.minecraft.tags.TagKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.datafix.fixes.BlockStateData;
 import net.minecraft.world.level.LevelReader;
@@ -137,16 +135,6 @@ public class Tools {
             }
         }
         return elements.get(elements.size() - 1);
-    }
-
-    public static Iterable<Holder<Block>> getBlocksForTag(TagKey<Block> rl) {
-        @SuppressWarnings("deprecation") DefaultedRegistry<Block> registry = BuiltInRegistries.BLOCK;
-        return registry.getTagOrEmpty(rl);
-    }
-
-    public static boolean hasTag(Block block, TagKey<Block> tag) {
-        //noinspection deprecation
-        return BuiltInRegistries.BLOCK.get(block.builtInRegistryHolder().key()).get().is(tag);
     }
 
     public static int getSeaLevel(LevelReader level) {
