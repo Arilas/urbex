@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **A palette character that resolves to nothing, and a road part that does not fit its chunk, are
+  caught at load.** Both used to surface from a worldgen worker on the first chunk that placed the
+  part (issue #56).
+  - *Characters are checked where the part is used*, not against the part's own palette. A part's
+    characters resolve against the chunk's style palette, the building's, and the part's own merged
+    together — so the same part reached from two city styles is two questions with two answers. The
+    check builds that merge with the generator's own code rather than reimplementing it.
+  - *A character no palette defines refuses the world.* A character only some `randompalettes` choices
+    define is a warning instead: those packs generate correctly most of the time, and refusing them
+    would be inventing a rule rather than reporting a break.
+  - *A street, highway or railway part that is not 16×16 refuses the world.* The driver masks
+    coordinates to the chunk, so an oversized road part wrapped round and overwrote its own beginning
+    — silently, with no exception and nothing in the log.
+  - *No worldgen change*: both digest goldens are unchanged, and the bundled pack reports nothing.
+
 - **A datapack reference that names nothing is now a message about a file, not a crashed chunk.**
   Every cross-asset reference a world can reach — a city style's building and part selectors, a world
   style's highway and railway wiring, a building's `parts`, a multibuilding's grid, a scattered

@@ -28,18 +28,31 @@ public final class AssetDiagnostics {
      * @param asset    the asset that failed, or null when the problem belongs to the sweep rather
      *                 than to one entry
      * @param message  what is wrong, already phrased for an author
+     * @param fatal    whether this alone must refuse the world. Almost everything here is: a
+     *                 reference that names nothing, a required field nothing declares. The exception
+     *                 is a break that only <em>some</em> worlds hit - a palette character only some
+     *                 {@code randompalettes} choices define - where packs that ship it generate
+     *                 correctly most of the time, and refusing them would be a rule this report
+     *                 invented rather than a break it found (issue #56).
      */
-    public record Problem(String registry, @Nullable Identifier asset, String message) {
+    public record Problem(String registry, @Nullable Identifier asset, String message, boolean fatal) {
         @Override
         public String toString() {
-            return registry + (asset == null ? "" : " / " + asset) + ": " + message;
+            return (fatal ? "" : "[warning] ") + registry
+                    + (asset == null ? "" : " / " + asset) + ": " + message;
         }
     }
 
     private final List<Problem> problems = new ArrayList<>();
 
+    /** Records a problem that must refuse the world. */
     public synchronized void record(String registry, @Nullable Identifier asset, String message) {
-        problems.add(new Problem(registry, asset, message));
+        problems.add(new Problem(registry, asset, message, true));
+    }
+
+    /** Records a problem worth telling the author about that must not refuse the world. */
+    public synchronized void warn(String registry, @Nullable Identifier asset, String message) {
+        problems.add(new Problem(registry, asset, message, false));
     }
 
     /**
@@ -58,8 +71,18 @@ public final class AssetDiagnostics {
         record(registry, asset, message == null ? root.toString() : message);
     }
 
+    /** True when nothing at all was recorded, warnings included. */
     public synchronized boolean isEmpty() {
         return problems.isEmpty();
+    }
+
+    /** True when something here must refuse the world. */
+    public synchronized boolean hasFatal() {
+        return problems.stream().anyMatch(Problem::fatal);
+    }
+
+    public synchronized int fatalCount() {
+        return (int) problems.stream().filter(Problem::fatal).count();
     }
 
     public synchronized int size() {
@@ -85,15 +108,19 @@ public final class AssetDiagnostics {
     }
 
     /**
-     * Refuses the world if anything is wrong, naming everything at once.
+     * Refuses the world if anything fatal is wrong, naming everything at once.
+     *
+     * <p>Warnings travel in the same message rather than in a separate one: an author reading about a
+     * broken reference wants the near-misses in front of them too, and a world that loads has already
+     * had them logged by the caller.</p>
      *
      * @throws IllegalStateException listing every problem
      */
     public void throwIfAny() {
-        if (isEmpty()) {
+        if (!hasFatal()) {
             return;
         }
         throw new IllegalStateException(format(
-                size() + " Urbex asset problem(s) must be fixed before this world can load:"));
+                fatalCount() + " Urbex asset problem(s) must be fixed before this world can load:"));
     }
 }
