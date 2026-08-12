@@ -1,5 +1,6 @@
 package dev.krona.urbex.data;
 
+import dev.krona.urbex.worldgen.lost.cityassets.TestAssetId;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -96,11 +97,10 @@ class WorldStyleCompletenessTest {
             List<Path> chain = chainRootFirst("worldstyles", file);
             List<WorldStyleRE> entries = new ArrayList<>();
             for (Path link : chain) {
-                entries.add(WorldStyleRE.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow()
-                        .setRegistryName(idOf(link)));
+                entries.add(WorldStyleRE.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow());
                 cityStylesNamed.addAll(cityStyleRefs(link));
             }
-            requireWorldStyleWiring(new WorldStyle(entries));
+            requireWorldStyleWiring(new WorldStyle(TestAssetId.ANY, entries));
         }
 
         cityStylesNamed.addAll(namedIn("presets", "cities", "cityStyleAlternative"));
@@ -112,10 +112,9 @@ class WorldStyleCompletenessTest {
             assertTrue(Files.isRegularFile(file), name + " does not resolve to " + file);
             List<CityStyleRE> entries = new ArrayList<>();
             for (Path link : chainRootFirst("citystyles", file)) {
-                entries.add(CityStyleRE.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow()
-                        .setRegistryName(idOf(link)));
+                entries.add(CityStyleRE.CODEC.parse(JsonOps.INSTANCE, read(link)).getOrThrow());
             }
-            requireCityStyleWiring(new CityStyle(entries));
+            requireCityStyleWiring(new CityStyle(TestAssetId.ANY, entries));
         }
     }
 

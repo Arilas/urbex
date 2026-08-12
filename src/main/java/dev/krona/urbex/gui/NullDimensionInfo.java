@@ -160,7 +160,7 @@ public class NullDimensionInfo implements IDimensionInfo {
                 }
             }
             resolvedEntries.add(new WorldStyleField.Weighted(entry.weight(),
-                    resolved != null ? resolved : new WorldStyle(List.of(placeholderStyle()))));
+                    resolved != null ? resolved : new WorldStyle(PLACEHOLDER_ID, List.of(placeholderStyle()))));
         }
         styles = new WorldStyleField(seed, resolvedEntries);
         this.seed = seed;
@@ -188,6 +188,10 @@ public class NullDimensionInfo implements IDimensionInfo {
      * samples biomes, city placement, road classes and rail/highway chunk <em>types</em>, none of
      * which reads a part name. Naming real parts here would be a claim about a datapack that, on
      * this path, either isn't loaded or doesn't have the style the player asked for.
+     * <p>
+     * It carries no id, because a decoded world style no longer carries one: {@link #PLACEHOLDER_ID}
+     * is handed to the {@link WorldStyle} constructor beside this, which is where a load error looking
+     * for a name will find it (issue #128).
      */
     private static WorldStyleRE placeholderStyle() {
         return new WorldStyleRE(
@@ -213,9 +217,7 @@ public class NullDimensionInfo implements IDimensionInfo {
                 // No 'rotatable': the preview places no parts, so nothing is ever rotated, and
                 // naming a tag here would be a claim about a datapack this path has not loaded.
                 Optional.empty()
-                // Named, so the load error names this placeholder rather than 'null' if a field is
-                // ever added to the required set and not added here.
-        ).setRegistryName(PLACEHOLDER_ID);
+        );
     }
 
     /** One wiring component, declared as empty: the preview places no parts. */

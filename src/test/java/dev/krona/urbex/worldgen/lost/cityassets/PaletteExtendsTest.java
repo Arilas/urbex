@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 class PaletteExtendsTest {
 
+    /** Every chain here is leaf-named "child"; the id is the compiler's to supply, not the file's. */
+    private static final Identifier LEAF_ID = Identifier.fromNamespaceAndPath("urbex", "child");
+
     @BeforeAll
     static void bootstrap() {
         SharedConstants.tryDetectVersion();
@@ -37,7 +40,7 @@ class PaletteExtendsTest {
                 entry('g', "minecraft:glass"));
         PaletteRE child = palette("child", entry('S', "minecraft:deepslate"));
 
-        Palette resolved = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent, child));
+        Palette resolved = new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
         assertEquals("minecraft:deepslate", blockOf(resolved, 'S'), "the child's character wins");
         assertEquals("minecraft:bricks", blockOf(resolved, 'b'), "characters it never mentions survive");
@@ -51,7 +54,7 @@ class PaletteExtendsTest {
         PaletteRE parent = palette("parent", entry('S', "minecraft:stone"));
         PaletteRE child = palette("child", entry('w', "minecraft:oak_planks"));
 
-        Palette resolved = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent, child));
+        Palette resolved = new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
         assertEquals(2, resolved.getPalette().size());
         assertEquals("minecraft:stone", blockOf(resolved, 'S'));
@@ -64,8 +67,8 @@ class PaletteExtendsTest {
         PaletteRE middle = palette("middle", entry('S', "minecraft:andesite"));
         PaletteRE leaf = palette("leaf", entry('S', "minecraft:deepslate"));
 
-        assertEquals("minecraft:deepslate", blockOf(new Palette(BuiltInRegistries.BLOCK, null, List.of(root, middle, leaf)), 'S'));
-        assertEquals("minecraft:andesite", blockOf(new Palette(BuiltInRegistries.BLOCK, null, List.of(root, middle)), 'S'));
+        assertEquals("minecraft:deepslate", blockOf(new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(root, middle, leaf)), 'S'));
+        assertEquals("minecraft:andesite", blockOf(new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(root, middle)), 'S'));
     }
 
     @Test
@@ -75,14 +78,14 @@ class PaletteExtendsTest {
         PaletteRE parent = palette("parent", damagedEntry('S', "minecraft:stone", "minecraft:cobblestone"));
         PaletteRE child = palette("child", entry('S', "minecraft:deepslate"));
 
-        Palette resolved = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent, child));
+        Palette resolved = new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
         assertNull(resolved.getDamaged().get(state("minecraft:stone")),
                 "the replaced parent entry must not leave its damaged mapping behind");
         assertEquals(1, resolved.getPalette().size());
 
         // ... and a mapping on a character nobody overrides is still there.
-        Palette parentOnly = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent));
+        Palette parentOnly = new Palette(LEAF_ID, BuiltInRegistries.BLOCK, null, List.of(parent));
         assertNotNull(parentOnly.getDamaged().get(state("minecraft:stone")));
     }
 
@@ -98,8 +101,7 @@ class PaletteExtendsTest {
     }
 
     private static PaletteRE palette(String path, PaletteEntry... entries) {
-        return new PaletteRE(Optional.empty(), Optional.of(List.of(entries)))
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", path));
+        return new PaletteRE(Optional.empty(), Optional.of(List.of(entries)));
     }
 
     private static PaletteEntry entry(char marker, String block) {

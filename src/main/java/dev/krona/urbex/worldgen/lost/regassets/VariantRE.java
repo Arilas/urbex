@@ -17,7 +17,7 @@ import java.util.Optional;
  * {@code blocks} is optional here rather than required, because requiredness is checked after the
  * {@code extends} chain is resolved, in {@link dev.krona.urbex.worldgen.lost.cityassets.Variant}.
  */
-public class VariantRE implements IAsset<VariantRE>, Extendable {
+public class VariantRE implements Extendable {
 
     private static final Codec<VariantRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -28,7 +28,6 @@ public class VariantRE implements IAsset<VariantRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<VariantRE> CODEC = RetiredKeys.reject(RAW, "variant");
 
-    private Identifier name;
     private final Optional<Identifier> extendsId;
     private final Mergeable<BlockEntry> blocks;   // null when this entry declares none
 
@@ -47,14 +46,5 @@ public class VariantRE implements IAsset<VariantRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public VariantRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

@@ -21,8 +21,8 @@ public class MultiBuilding {
      * or restate a grid at the size it inherits. The grid replaces its ancestor's wholesale rather
      * than merging, because a half-inherited grid would contradict {@code dimx}/{@code dimz}.
      */
-    public MultiBuilding(List<MultiBuildingRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public MultiBuilding(Identifier id, List<MultiBuildingRE> chainRootFirst) {
+        name = id;
         Integer declaredDimX = null;
         Integer declaredDimZ = null;
         List<List<String>> declaredBuildings = null;

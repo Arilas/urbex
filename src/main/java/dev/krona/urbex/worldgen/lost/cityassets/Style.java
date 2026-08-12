@@ -27,8 +27,8 @@ public class Style {
      *                 {@link #getRandomPalette}, from a worldgen worker, which is why that method took
      *                 an {@code IDimensionInfo} it otherwise had no use for (issue #128).
      */
-    public Style(AssetIndex<Palette> palettes, List<StyleRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public Style(Identifier id, AssetIndex<Palette> palettes, List<StyleRE> chainRootFirst) {
+        name = id;
         List<List<PaletteSelector>> groups = new ArrayList<>();
         boolean anyGroups = false;
         for (StyleRE object : chainRootFirst) {

@@ -18,7 +18,7 @@ import java.util.Optional;
  * is checked after the chain is resolved, in
  * {@link dev.krona.urbex.worldgen.lost.cityassets.WorldStyle}.
  */
-public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
+public class WorldStyleRE implements Extendable {
 
     private static final Codec<WorldStyleRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -37,7 +37,6 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<WorldStyleRE> CODEC = RetiredKeys.reject(RAW, "worldstyle");
 
-    private Identifier name;
     private final Optional<Identifier> extendsId;
     // The human-readable label the world-style picker shows instead of the id. Null means "not
     // declared here", so the chain reads it from an ancestor; a chain that declares none anywhere
@@ -128,14 +127,5 @@ public class WorldStyleRE implements IAsset<WorldStyleRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public WorldStyleRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

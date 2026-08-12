@@ -100,9 +100,9 @@ public class CityStyle {
      * {@link #declare}). Nothing mutates after this returns, so worldgen worker threads share one
      * immutable instance with no locking.
      */
-    public CityStyle(List<CityStyleRE> chainRootFirst) {
+    public CityStyle(Identifier id, List<CityStyleRE> chainRootFirst) {
         CityStyleRE leaf = chainRootFirst.get(chainRootFirst.size() - 1);
-        name = leaf.getRegistryName();
+        name = id;
         stuffTags.add("all");
         for (CityStyleRE re : chainRootFirst) {
             applyFrom(re);

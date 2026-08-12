@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.Extendable;
-import dev.krona.urbex.worldgen.lost.regassets.IAsset;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
@@ -55,21 +54,16 @@ final class AssetStage {
     /**
      * The {@code extends} chain of one entry, root-first.
      *
-     * <p>{@code setRegistryName} is still called on each link, because a compiled asset reads its own
-     * id off the last link of its chain. Carrying identity beside the decoded value instead of
-     * writing it into it is 128d's job; doing it here would mean touching all twelve asset
-     * constructors in the same PR that moves where they live.</p>
+     * <p>Nothing is written back into the decoded entries. Each link used to have its registry id
+     * assigned onto it here, so that the compiled asset could read its own name off the last link -
+     * which meant compilation mutated the authored model, and a registry entry's identity depended on
+     * something having walked a chain that reached it. The id travels as a parameter now: the caller
+     * already has it, and hands it to the asset constructor beside the chain (issue #128).</p>
      */
     private static <R> List<R> chainOf(Registry<R> registry, ResourceKey<Registry<R>> registryKey,
                                        Identifier id) {
         return ExtendsChain.resolve(id,
-                key -> {
-                    R entry = registry.getValue(ResourceKey.create(registryKey, key));
-                    if (entry instanceof IAsset asset) {
-                        asset.setRegistryName(key);
-                    }
-                    return entry;
-                },
+                key -> registry.getValue(ResourceKey.create(registryKey, key)),
                 entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
     }
 }

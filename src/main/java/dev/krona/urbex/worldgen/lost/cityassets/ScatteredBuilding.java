@@ -31,8 +31,8 @@ public class ScatteredBuilding {
      * {@link Resolved#require} cannot state. Left unchecked, a chain declaring neither loaded and
      * then threw from {@code Scattered.generate} the first time the entry was placed.
      */
-    public ScatteredBuilding(List<ScatteredRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public ScatteredBuilding(Identifier id, List<ScatteredRE> chainRootFirst) {
+        name = id;
         List<String> declaredBuildings = new ArrayList<>();
         boolean anyBuildings = false;
         String multibuilding = null;

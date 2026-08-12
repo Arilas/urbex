@@ -90,7 +90,7 @@ class CityStyleInheritSelectorsTest {
         CityStyleRE parent = re(sels("b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8"), null, null);
         CityStyleRE child = re(sels("b1", "b2", "b3", "b4", "b5"), null, null);
 
-        CityStyle merged = new CityStyle(List.of(parent, child));
+        CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
         assertEquals(List.of("b1", "b2", "b3", "b4", "b5"), values(merged, CityStyle.Sel.BUILDING),
                 "a declared list is the whole list: no parent entries, no duplicates");
@@ -101,7 +101,7 @@ class CityStyleInheritSelectorsTest {
         CityStyleRE parent = re(null, sels("m1", "m2", "m3"), null);
         CityStyleRE child = re(null, List.of(), null);
 
-        CityStyle merged = new CityStyle(List.of(parent, child));
+        CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
         assertTrue(values(merged, CityStyle.Sel.MULTI_BUILDING).isEmpty(),
                 "an explicitly empty list is a declaration of none, not an absence of one");
@@ -112,7 +112,7 @@ class CityStyleInheritSelectorsTest {
         CityStyleRE parent = re(null, null, sels("p1", "p2"));
         CityStyleRE child = re(sels("b1"), null, null);
 
-        CityStyle merged = new CityStyle(List.of(parent, child));
+        CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
         assertEquals(List.of("p1", "p2"), values(merged, CityStyle.Sel.PARK),
                 "a list the child never mentions is inherited unchanged");
@@ -123,8 +123,8 @@ class CityStyleInheritSelectorsTest {
         CityStyleRE parent = re(sels("b1"), sels("m1"), sels("p1"));
         CityStyleRE child = re(null, null, null);
 
-        CityStyle parentResolved = new CityStyle(List.of(parent));
-        CityStyle merged = new CityStyle(List.of(parent, child));
+        CityStyle parentResolved = new CityStyle(TestAssetId.ANY, List.of(parent));
+        CityStyle merged = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
         for (CityStyle.Sel kind : CityStyle.Sel.values()) {
             assertEquals(values(parentResolved, kind), values(merged, kind),
@@ -137,7 +137,7 @@ class CityStyleInheritSelectorsTest {
         CityStyleRE parent = reBuildings(replacing(sels("b1", "b2")));
         CityStyleRE child = reBuildings(appending(sels("b3")));
 
-        CityStyle resolved = new CityStyle(List.of(parent, child));
+        CityStyle resolved = new CityStyle(TestAssetId.ANY, List.of(parent, child));
 
         assertEquals(List.of("b1", "b2", "b3"), values(resolved, CityStyle.Sel.BUILDING),
                 "appended entries follow the parent's, so parent order is stable");

@@ -56,9 +56,9 @@ public class Building {
      * ancestor that set something else. The defaults the fields start at are this class's own
      * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
      */
-    public Building(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public Building(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
                         AssetIndex<Palette> palettes, List<BuildingRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+        name = id;
         List<PartRef> partRefs = new ArrayList<>();
         boolean anyParts = false;
         List<PartRef> partRefs2 = new ArrayList<>();

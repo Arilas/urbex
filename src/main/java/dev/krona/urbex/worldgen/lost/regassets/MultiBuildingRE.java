@@ -18,7 +18,7 @@ import java.util.Optional;
  * Until that change this registry's every field was required, which made {@code extends} on it
  * purely decorative: a child had to restate the whole grid to decode at all.
  */
-public class MultiBuildingRE implements IAsset<MultiBuildingRE>, Extendable {
+public class MultiBuildingRE implements Extendable {
 
     private static final Codec<MultiBuildingRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -33,7 +33,6 @@ public class MultiBuildingRE implements IAsset<MultiBuildingRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<MultiBuildingRE> CODEC = RetiredKeys.reject(RAW, "multibuilding");
 
-    private Identifier name;
     private final Optional<Identifier> extendsId;
     private final Integer dimX;                 // null when this entry declares none and takes its ancestor's
     private final Integer dimZ;                 // null when this entry declares none and takes its ancestor's
@@ -67,14 +66,5 @@ public class MultiBuildingRE implements IAsset<MultiBuildingRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public MultiBuildingRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

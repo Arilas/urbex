@@ -21,7 +21,7 @@ import java.util.Optional;
  * geometry. Requiredness is checked after the chain is resolved, in
  * {@link dev.krona.urbex.worldgen.lost.cityassets.BuildingPart}.
  */
-public class BuildingPartRE implements IAsset<BuildingPartRE>, Extendable {
+public class BuildingPartRE implements Extendable {
 
     private static final Codec<BuildingPartRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -37,7 +37,6 @@ public class BuildingPartRE implements IAsset<BuildingPartRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<BuildingPartRE> CODEC = RetiredKeys.reject(RAW, "part");
 
-    private Identifier name;
 
     private final Optional<Identifier> extendsId;
 
@@ -133,14 +132,5 @@ public class BuildingPartRE implements IAsset<BuildingPartRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public BuildingPartRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

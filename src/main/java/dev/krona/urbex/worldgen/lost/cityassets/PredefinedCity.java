@@ -31,8 +31,8 @@ public class PredefinedCity {
      * and street lists go through {@link Mergeable} so a declared list replaces unless it opts into
      * appending.
      */
-    public PredefinedCity(List<PredefinedCityRE> chainRootFirst) {
-        name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
+    public PredefinedCity(Identifier id, List<PredefinedCityRE> chainRootFirst) {
+        name = id;
         String declaredDimension = null;
         Integer declaredChunkX = null;
         Integer declaredChunkZ = null;

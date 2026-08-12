@@ -19,7 +19,7 @@ import java.util.Optional;
  * Absent means "inherit unchanged", which is what {@code {"replace": false, "values": []}} was
  * being used for.
  */
-public class ConditionRE implements IAsset<ConditionRE>, Extendable {
+public class ConditionRE implements Extendable {
 
     private static final Codec<ConditionRE> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -30,7 +30,6 @@ public class ConditionRE implements IAsset<ConditionRE>, Extendable {
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
     public static final Codec<ConditionRE> CODEC = RetiredKeys.reject(RAW, "condition");
 
-    private Identifier name;
     private final Optional<Identifier> extendsId;
     private final Mergeable<ConditionPart> values;   // null when this entry declares none
 
@@ -49,14 +48,5 @@ public class ConditionRE implements IAsset<ConditionRE>, Extendable {
         return extendsId;
     }
 
-    @Override
-    public ConditionRE setRegistryName(Identifier name) {
-        this.name = name;
-        return this;
-    }
 
-    @Nullable
-    public Identifier getRegistryName() {
-        return name;
-    }
 }

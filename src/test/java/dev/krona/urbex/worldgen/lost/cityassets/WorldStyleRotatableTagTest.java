@@ -47,13 +47,12 @@ class WorldStyleRotatableTagTest {
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
-                Optional.empty(), rotatable)
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", name));
+                Optional.empty(), rotatable);
     }
 
     @Test
     void aChainDeclaringNothingResolvesToUrbexRotatable() {
-        WorldStyle resolved = new WorldStyle(List.of(worldStyle("standard", Optional.empty())));
+        WorldStyle resolved = new WorldStyle(TestAssetId.ANY, List.of(worldStyle("standard", Optional.empty())));
 
         assertEquals(tag("urbex", "rotatable"), resolved.getRotatableTag(),
                 "every asset written before this field existed must keep the old behaviour");
@@ -61,7 +60,7 @@ class WorldStyleRotatableTagTest {
 
     @Test
     void whatTheChildDeclaresWins() {
-        WorldStyle resolved = new WorldStyle(List.of(
+        WorldStyle resolved = new WorldStyle(TestAssetId.ANY, List.of(
                 worldStyle("standard", Optional.empty()),
                 worldStyle("zombie", Optional.of(tag("urbexza", "rotatable")))));
 
@@ -70,7 +69,7 @@ class WorldStyleRotatableTagTest {
 
     @Test
     void aChildThatOmitsItInheritsRatherThanRevertingToTheDefault() {
-        WorldStyle resolved = new WorldStyle(List.of(
+        WorldStyle resolved = new WorldStyle(TestAssetId.ANY, List.of(
                 worldStyle("standard", Optional.of(tag("urbexza", "rotatable"))),
                 worldStyle("child", Optional.empty())));
 

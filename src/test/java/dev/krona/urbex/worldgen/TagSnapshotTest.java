@@ -105,13 +105,12 @@ class TagSnapshotTest {
     }
 
     private static WorldStyle worldStyle(String name, Optional<TagKey<Block>> rotatable) {
-        return new WorldStyle(List.of(new WorldStyleRE(
+        return new WorldStyle(Identifier.fromNamespaceAndPath("urbex", name), List.of(new WorldStyleRE(
                 Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
-                Optional.empty(), rotatable)
-                .setRegistryName(Identifier.fromNamespaceAndPath("urbex", name))));
+                Optional.empty(), rotatable)));
     }
 }
