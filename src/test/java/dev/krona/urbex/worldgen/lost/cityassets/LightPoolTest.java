@@ -45,7 +45,7 @@ class LightPoolTest {
                 }
                 """);
 
-        LightPool pool = LightPool.compile(PALETTE_ID, 'L', settings);
+        LightPool pool = LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings);
         assertEquals(1, pool.weightedOrder(LightPool.Placement.FLOOR, RandomSource.create(1L)).size());
         assertEquals(1, pool.weightedOrder(LightPool.Placement.WALL, RandomSource.create(1L)).size());
         assertEquals(1, pool.weightedOrder(LightPool.Placement.CEILING, RandomSource.create(1L)).size());
@@ -62,7 +62,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(null, List.of(palette)));
+                () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(palette)));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("marker 'L'"));
         assertTrue(error.getMessage().contains("floor, wall, ceiling, or free"));
@@ -78,7 +78,7 @@ class LightPoolTest {
                     """.formatted(weight));
 
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                    () -> new Palette(null, List.of(palette)));
+                    () -> new Palette(BuiltInRegistries.BLOCK, null, List.of(palette)));
             assertTrue(error.getMessage().contains("urbex:test_lights"));
             assertTrue(error.getMessage().contains("marker 'L'"));
             assertTrue(error.getMessage().contains("placement 'floor'"));
@@ -94,7 +94,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> LightPool.compile(PALETTE_ID, 'L', settings));
+                () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("L"));
         assertTrue(error.getMessage().contains("floor"));
@@ -107,7 +107,7 @@ class LightPoolTest {
                 {"floor":[{"weight":1,"block":"minecraft:redstone_torch[lit=true]"}]}
                 """);
 
-        LightPool pool = LightPool.compile(PALETTE_ID, 'L', settings);
+        LightPool pool = LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings);
         LightPool.Candidate candidate = pool.allCandidates().iterator().next();
         assertTrue(candidate.state().getLightEmission() > 0);
     }
@@ -125,7 +125,7 @@ class LightPoolTest {
                     List.of());
 
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                    () -> LightPool.compile(PALETTE_ID, 'L', settings));
+                    () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
             assertTrue(error.getMessage().contains("placement '" + placement.name().toLowerCase() + "'"));
             assertTrue(error.getMessage().contains("cannot orient a horizontal-only state"));
         }
@@ -139,7 +139,7 @@ class LightPoolTest {
                 List.of(), List.of());
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> LightPool.compile(PALETTE_ID, 'L', settings));
+                () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
         assertTrue(error.getMessage().contains("placement 'wall'"));
         assertTrue(error.getMessage().contains("cannot orient a hanging-only state to a wall"));
     }
@@ -152,7 +152,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> LightPool.compile(PALETTE_ID, 'L', settings));
+                () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("L"));
         assertTrue(error.getMessage().contains("ceiling"));
@@ -174,7 +174,7 @@ class LightPoolTest {
 
         BlockState expected = BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:soul_wall_torch"))
                 .defaultBlockState();
-        assertEquals(expected, LightPool.compile(PALETTE_ID, 'L', settings).representative());
+        assertEquals(expected, LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings).representative());
     }
 
     @Test
@@ -186,7 +186,7 @@ class LightPoolTest {
                   {"weight":1,"block":"minecraft:redstone_torch[lit=true]"}
                 ]}
                 """);
-        LightPool pool = LightPool.compile(PALETTE_ID, 'L', settings);
+        LightPool pool = LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings);
         List<LightPool.Candidate> order = pool.weightedOrder(LightPool.Placement.FLOOR, RandomSource.create(5L));
 
         List<Block> states = order.stream()
@@ -212,7 +212,7 @@ class LightPoolTest {
                 List.of(), List.of(), List.of());
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> LightPool.compile(PALETTE_ID, 'L', settings));
+                () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("L"));
         assertTrue(error.getMessage().contains("floor"));
@@ -226,7 +226,7 @@ class LightPoolTest {
                 List.of(), List.of(), List.of());
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> LightPool.compile(PALETTE_ID, 'L', settings));
+                () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("L"));
         assertTrue(error.getMessage().contains("floor"));
@@ -246,7 +246,7 @@ class LightPoolTest {
         PaletteRE paletteRE = result.result().orElseThrow()
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "legacy_torch"));
 
-        Palette.PE entry = new Palette(null, List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
         assertInstanceOf(BlockState.class, entry.blocks());
         assertTrue(entry.info().isTorch());
         assertNull(entry.info().light());
@@ -267,7 +267,7 @@ class LightPoolTest {
         PaletteRE paletteRE = result.result().orElseThrow()
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", "typed_lights"));
 
-        Palette.PE entry = new Palette(null, List.of(paletteRE)).getPalette().get('L');
+        Palette.PE entry = new Palette(BuiltInRegistries.BLOCK, null, List.of(paletteRE)).getPalette().get('L');
         BlockState representative = assertInstanceOf(BlockState.class, entry.blocks());
         assertEquals(Blocks.SOUL_WALL_TORCH, representative.getBlock());
         assertTrue(entry.info().isSpecial());

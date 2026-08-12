@@ -14,6 +14,7 @@ import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistrationInfo;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
@@ -201,6 +202,10 @@ class AssetCompilerTest {
     @SafeVarargs
     private static RegistryAccess registries(Entry<?>... entries) {
         List<Registry<?>> all = new ArrayList<>();
+        // The block registry, because compilation resolves every block string against the world's
+        // own rather than reaching for a static one. A real world always has it; this access is
+        // built by hand, so it has to be said.
+        all.add(BuiltInRegistries.BLOCK);
         for (ResourceKey<? extends Registry<?>> key : List.of(
                 CustomRegistries.VARIANTS_REGISTRY_KEY, CustomRegistries.PALETTE_REGISTRY_KEY,
                 CustomRegistries.CONDITIONS_REGISTRY_KEY, CustomRegistries.STYLE_REGISTRY_KEY,

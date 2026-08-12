@@ -7,9 +7,12 @@ import dev.krona.urbex.worldgen.lost.regassets.PresetRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.block.Block;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
@@ -63,18 +66,23 @@ public final class AssetCompiler {
      *         class exists to make impossible, so don't.
      */
     public static AssetSnapshot compile(RegistryAccess access, AssetDiagnostics diagnostics) {
+        // The block registry the whole compilation resolves against, taken once from the world
+        // being loaded. Every block string below reaches it through a parameter: resolution used
+        // to pick a registry for itself, from a static server reference that may or may not have
+        // been populated by the time it ran (issues #60, #128).
+        HolderLookup<Block> blockLookup = access.lookupOrThrow(Registries.BLOCK);
         AssetIndex<Variant> variants = AssetStage.compileAll(access,
-                CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(chain), diagnostics);
+                CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(blockLookup, chain), diagnostics);
         AssetIndex<Palette> palettes = AssetStage.compileAll(access,
-                CustomRegistries.PALETTE_REGISTRY_KEY, (id, chain) -> new Palette(variants, chain), diagnostics);
+                CustomRegistries.PALETTE_REGISTRY_KEY, (id, chain) -> new Palette(blockLookup, variants, chain), diagnostics);
         AssetIndex<Condition> conditions = AssetStage.compileAll(access,
                 CustomRegistries.CONDITIONS_REGISTRY_KEY, (id, chain) -> new Condition(chain), diagnostics);
         AssetIndex<Style> styles = AssetStage.compileAll(access,
                 CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(palettes, chain), diagnostics);
         AssetIndex<BuildingPart> parts = AssetStage.compileAll(access,
-                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(variants, palettes, chain), diagnostics);
+                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(blockLookup, variants, palettes, chain), diagnostics);
         AssetIndex<Building> buildings = AssetStage.compileAll(access,
-                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(variants, palettes, chain), diagnostics);
+                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(blockLookup, variants, palettes, chain), diagnostics);
         AssetIndex<MultiBuilding> multiBuildings = AssetStage.compileAll(access,
                 CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, (id, chain) -> new MultiBuilding(chain), diagnostics);
         AssetIndex<ScatteredBuilding> scattered = AssetStage.compileAll(access,

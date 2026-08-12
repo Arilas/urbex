@@ -2,8 +2,10 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -40,13 +42,14 @@ public final class LightPool {
         this.allCandidates = List.copyOf(flattened);
     }
 
-    public static LightPool compile(Identifier paletteId, char marker, LightSettings settings) {
+    public static LightPool compile(HolderLookup<Block> blockLookup, Identifier paletteId, char marker,
+                                    LightSettings settings) {
         EnumMap<Placement, List<Candidate>> candidates = new EnumMap<>(Placement.class);
         EnumMap<Placement, Integer> totalWeights = new EnumMap<>(Placement.class);
-        compileGroup(paletteId, marker, Placement.FLOOR, settings.floor(), candidates, totalWeights);
-        compileGroup(paletteId, marker, Placement.WALL, settings.wall(), candidates, totalWeights);
-        compileGroup(paletteId, marker, Placement.CEILING, settings.ceiling(), candidates, totalWeights);
-        compileGroup(paletteId, marker, Placement.FREE, settings.free(), candidates, totalWeights);
+        compileGroup(blockLookup, paletteId, marker, Placement.FLOOR, settings.floor(), candidates, totalWeights);
+        compileGroup(blockLookup, paletteId, marker, Placement.WALL, settings.wall(), candidates, totalWeights);
+        compileGroup(blockLookup, paletteId, marker, Placement.CEILING, settings.ceiling(), candidates, totalWeights);
+        compileGroup(blockLookup, paletteId, marker, Placement.FREE, settings.free(), candidates, totalWeights);
         if (candidates.values().stream().allMatch(List::isEmpty)) {
             throw new IllegalArgumentException("Invalid light pool in palette '" + paletteId + "', marker '" + marker
                     + "': expected at least one candidate in floor, wall, ceiling, or free");
@@ -102,7 +105,8 @@ public final class LightPool {
         return allCandidates;
     }
 
-    private static void compileGroup(Identifier paletteId, char marker, Placement placement,
+    private static void compileGroup(HolderLookup<Block> blockLookup, Identifier paletteId,
+                                     char marker, Placement placement,
                                      List<LightSettings.Entry> entries,
                                      Map<Placement, List<Candidate>> candidates,
                                      Map<Placement, Integer> totalWeights) {
@@ -116,7 +120,7 @@ public final class LightPool {
             }
             BlockState state;
             try {
-                state = Tools.stringToState(entry.block(), paletteId);
+                state = Tools.stringToState(entry.block(), blockLookup, paletteId);
             } catch (RuntimeException e) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "cannot parse block state", e);

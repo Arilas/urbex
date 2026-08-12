@@ -6,6 +6,7 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionTest;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
@@ -94,7 +95,7 @@ public class BelowPartConditionTest {
     private static Building buildingWithParts2Condition(Set<String> belowPart, Set<String> inpart) {
         PartRef floor = partRef(FLOOR, null, null);
         PartRef second = partRef("urbex:second_part", belowPart, inpart);
-        return new Building(null, AssetIndex.empty("urbex:palettes"), List.of(new BuildingRE(
+        return new Building(BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"), List.of(new BuildingRE(
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of('#'), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),

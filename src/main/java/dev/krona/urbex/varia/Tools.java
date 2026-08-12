@@ -9,16 +9,19 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.commands.arguments.blocks.BlockStateParser;
 import net.minecraft.core.DefaultedRegistry;
+import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.util.RandomSource;
 import net.minecraft.util.datafix.fixes.BlockStateData;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 
@@ -47,64 +50,71 @@ public class Tools {
     }
 
     /**
-     * Resolves a datapack block string, naming {@code owner} if it cannot be resolved.
+     * Resolves a datapack block string against {@code blockLookup}, naming {@code owner} if it cannot be
+     * resolved.
      * <p>
-     * <b>An unknown id still returns air, exactly as before.</b> {@code BuiltInRegistries.BLOCK} is
-     * a {@link DefaultedRegistry}, so {@code getValue} hands back the registry's default value -
-     * {@code minecraft:air} - for an id it does not know, never null. The {@code value == null}
-     * guard below has therefore never fired, and an id that a Minecraft version renames becomes air
-     * everywhere it is used with no exception and no log line. That is how {@code minecraft:chain}
-     * (renamed {@code minecraft:iron_chain} in 26.x) made the whole {@code urbex:chains} decoration
-     * invisible without anyone noticing. Turning it into a load error is a contract change for every
-     * third-party pack and is tracked separately; the warning below is the part that costs nothing
-     * and can move no golden, because the state returned is unchanged.
+     * <b>An unknown id returns air.</b> That is not a decision made here - it is what this has
+     * always done, and it is why {@code minecraft:chain} (renamed {@code minecraft:iron_chain} in
+     * 26.x) made the whole {@code urbex:chains} decoration invisible without anyone noticing. It
+     * used to happen by accident, through {@code BuiltInRegistries.BLOCK} being a
+     * {@link DefaultedRegistry} whose {@code getValue} hands back {@code minecraft:air} rather than
+     * null; it is spelled out below instead, so that #91 - which decides whether a missing block is
+     * a skipped entry, a load error, or air - has one line to change rather than a registry quirk to
+     * discover. The warning is the part that costs nothing and can move no golden, because the state
+     * returned is unchanged.
      * <p>
-     * The legacy branch under it is dead in both directions, and is kept only because deleting it is
-     * a separate decision. {@code Identifier.parse} on the line above throws for a pre-flattening
-     * {@code name@meta} string - {@code @} is not a legal path character - so such a string can
-     * never reach {@code upgradeBlock}; and {@code BlockStateData.upgradeBlock(String)} does not
-     * handle that form anyway (measured: it returns {@code minecraft:red_sandstone@2} unchanged).
-     * That is why the one such string the bundled pack shipped was a hard crash at palette compile
-     * rather than an automatic upgrade.
+     * The pre-flattening {@code name@meta} form never reaches {@code upgradeBlock}:
+     * {@code Identifier.parse} throws for it first, {@code @} not being a legal path character - and
+     * {@code BlockStateData.upgradeBlock(String)} does not handle that form anyway (measured: it
+     * returns {@code minecraft:red_sandstone@2} unchanged). That is why the one such string the
+     * bundled pack shipped was a hard crash at palette compile rather than an automatic upgrade.
      *
-     * @param owner the asset the string came from, used only in the warning. This is the asset
-     *              <em>id</em>, not the file path, and for a palette written inline in a part or
-     *              building it is the synthetic {@code urbex:__local__<path>} name
-     *              {@link dev.krona.urbex.worldgen.lost.cityassets.Palette#inline} builds rather
-     *              than the owning part - close enough to find, but not a filename. May be null;
-     *              every production caller passes one.
+     * @param blockLookup what to resolve against, handed down from
+     *                    {@link dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler} out of the
+     *                    world's own {@code RegistryAccess}. It used to be picked here, and which
+     *                    one you got depended on whether {@code ServerAccess.getServer()} happened
+     *                    to be populated yet: the overworld's lookup if it was,
+     *                    {@code BuiltInRegistries.BLOCK} if it was not. The two are the same
+     *                    registry - blocks are static and frozen at mod init - so nothing was ever
+     *                    wrong, but "which registry did this parse against" was answered by timing
+     *                    rather than by the caller (issues #60, #128).
+     * @param owner       the asset the string came from, used only in the warning. This is the
+     *                    asset <em>id</em>, not the file path, and for a palette written inline in a
+     *                    part or building it is the synthetic {@code urbex:__local__<path>} name
+     *                    {@link dev.krona.urbex.worldgen.lost.cityassets.Palette#inline} builds
+     *                    rather than the owning part - close enough to find, but not a filename. May
+     *                    be null; every production caller passes one.
      */
-    public static BlockState stringToState(String s, @Nullable Object owner) {
+    public static BlockState stringToState(String s, HolderLookup<Block> blockLookup, @Nullable Object owner) {
         if (s.contains("[")) {
             try {
-                HolderLookup<Block> blocks = ServerAccess.getServer() == null
-                        ? BuiltInRegistries.BLOCK
-                        : WorldTools.getOverworld().holderLookup(Registries.BLOCK);
-                BlockStateParser.BlockResult parser = BlockStateParser.parseForBlock(blocks, new StringReader(s), false);
+                BlockStateParser.BlockResult parser = BlockStateParser.parseForBlock(blockLookup, new StringReader(s), false);
                 return parser.blockState();
             } catch (CommandSyntaxException e) {
                 throw new RuntimeException(e);
             }
         }
 
-        Identifier requested = Identifier.parse(s);
-        if (BuiltInRegistries.BLOCK.containsKey(requested)) {
-            return BuiltInRegistries.BLOCK.getValue(requested).defaultBlockState();
+        Optional<Holder.Reference<Block>> requested = blockLookup.get(blockKey(s));
+        if (requested.isPresent()) {
+            return requested.get().value().defaultBlockState();
         }
 
-        String converted = BlockStateData.upgradeBlock(s);
-        Identifier convertedId = Identifier.parse(converted);
-        if (!BuiltInRegistries.BLOCK.containsKey(convertedId) && WARNED_MISSING_BLOCKS.add(s)) {
+        Optional<Holder.Reference<Block>> upgraded = blockLookup.get(blockKey(BlockStateData.upgradeBlock(s)));
+        if (upgraded.isPresent()) {
+            return upgraded.get().value().defaultBlockState();
+        }
+        if (WARNED_MISSING_BLOCKS.add(s)) {
             Urbex.LOGGER.warn(
                     "Block '{}'{} does not exist in this Minecraft version; it will generate as air. " +
                             "It was most likely renamed - check the current id and update the asset.",
                     s, owner == null ? "" : " (in " + owner + ")");
         }
-        Block value = BuiltInRegistries.BLOCK.getValue(convertedId);
-        if (value == null) {
-            throw new RuntimeException("Cannot find block: '" + s + "'!");
-        }
-        return value.defaultBlockState();
+        return Blocks.AIR.defaultBlockState();
+    }
+
+    private static ResourceKey<Block> blockKey(String id) {
+        return ResourceKey.create(Registries.BLOCK, Identifier.parse(id));
     }
 
     /**

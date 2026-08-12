@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Asset compilation resolves blocks against the world it is compiling, not against a static server
+  reference.** Every block string in a palette, variant or light pool is resolved through a block
+  registry the compiler hands down, taken once from the world being loaded (issue #128).
+  - *Which registry a block string parsed against used to depend on timing.* `Tools.stringToState`
+    picked the overworld's lookup if the static server reference happened to be populated and
+    `BuiltInRegistries.BLOCK` if it was not. Both are the same registry — blocks are static and
+    frozen at mod init — so nothing was ever wrong, but nothing said so either, and it was the last
+    place outside the editor that asset compilation reached a server for anything (issue #60).
+  - *An unknown block id still generates as air, warned once.* It used to arrive there through a
+    defaulted registry's default value; it is an explicit return now, so the decision issue #91 has
+    to make is one line rather than a registry quirk to find. Pinned by `BlockResolutionTest`.
+  - *No worldgen change*: both digest goldens are unchanged, verified by running `runDigestCheck`
+    and `runDigestCheckFeatures`.
+
 - **`/reload` refreshes block tags without rebuilding everything a level generates with.** Block tags
   are the one piece of Urbex's compiled state a reload genuinely changes, and they now live in their
   own immutable `TagSnapshot` that a reload swaps in a single write (issue #128).

@@ -7,6 +7,7 @@ import dev.krona.urbex.worldgen.lost.regassets.PaletteRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
@@ -76,7 +77,7 @@ class CommonPaletteLightingTest {
         assertNull(redstoneTorch.getTorch());
         assertNull(redstoneTorch.getLight());
 
-        Palette compiled = new Palette(null, List.of(common));
+        Palette compiled = new Palette(BuiltInRegistries.BLOCK, null, List.of(common));
         LightPool torchPool = compiled.getPalette().get('T').info().light();
         LightPool freePool = compiled.getPalette().get('h').info().light();
         assertNotNull(torchPool);

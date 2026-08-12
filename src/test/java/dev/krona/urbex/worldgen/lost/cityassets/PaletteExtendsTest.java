@@ -37,7 +37,7 @@ class PaletteExtendsTest {
                 entry('g', "minecraft:glass"));
         PaletteRE child = palette("child", entry('S', "minecraft:deepslate"));
 
-        Palette resolved = new Palette(null, List.of(parent, child));
+        Palette resolved = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
         assertEquals("minecraft:deepslate", blockOf(resolved, 'S'), "the child's character wins");
         assertEquals("minecraft:bricks", blockOf(resolved, 'b'), "characters it never mentions survive");
@@ -51,7 +51,7 @@ class PaletteExtendsTest {
         PaletteRE parent = palette("parent", entry('S', "minecraft:stone"));
         PaletteRE child = palette("child", entry('w', "minecraft:oak_planks"));
 
-        Palette resolved = new Palette(null, List.of(parent, child));
+        Palette resolved = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
         assertEquals(2, resolved.getPalette().size());
         assertEquals("minecraft:stone", blockOf(resolved, 'S'));
@@ -64,8 +64,8 @@ class PaletteExtendsTest {
         PaletteRE middle = palette("middle", entry('S', "minecraft:andesite"));
         PaletteRE leaf = palette("leaf", entry('S', "minecraft:deepslate"));
 
-        assertEquals("minecraft:deepslate", blockOf(new Palette(null, List.of(root, middle, leaf)), 'S'));
-        assertEquals("minecraft:andesite", blockOf(new Palette(null, List.of(root, middle)), 'S'));
+        assertEquals("minecraft:deepslate", blockOf(new Palette(BuiltInRegistries.BLOCK, null, List.of(root, middle, leaf)), 'S'));
+        assertEquals("minecraft:andesite", blockOf(new Palette(BuiltInRegistries.BLOCK, null, List.of(root, middle)), 'S'));
     }
 
     @Test
@@ -75,14 +75,14 @@ class PaletteExtendsTest {
         PaletteRE parent = palette("parent", damagedEntry('S', "minecraft:stone", "minecraft:cobblestone"));
         PaletteRE child = palette("child", entry('S', "minecraft:deepslate"));
 
-        Palette resolved = new Palette(null, List.of(parent, child));
+        Palette resolved = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent, child));
 
         assertNull(resolved.getDamaged().get(state("minecraft:stone")),
                 "the replaced parent entry must not leave its damaged mapping behind");
         assertEquals(1, resolved.getPalette().size());
 
         // ... and a mapping on a character nobody overrides is still there.
-        Palette parentOnly = new Palette(null, List.of(parent));
+        Palette parentOnly = new Palette(BuiltInRegistries.BLOCK, null, List.of(parent));
         assertNotNull(parentOnly.getDamaged().get(state("minecraft:stone")));
     }
 

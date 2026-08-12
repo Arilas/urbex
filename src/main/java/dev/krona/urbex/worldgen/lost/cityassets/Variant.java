@@ -4,7 +4,9 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.VariantRE;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -23,8 +25,12 @@ public class Variant {
      * Builds a fully resolved variant from its {@code extends} chain, root first: a declared
      * {@code blocks} replaces the inherited list unless it opts into appending, and an absent one
      * inherits it unchanged. A chain where nothing declares {@code blocks} is a load error.
+     *
+     * @param blockLookup what the block strings resolve against, from the compiling world's own
+     *               registries. Taken rather than fetched: resolution used to reach a static server
+     *               reference from wherever it happened to run (issues #60, #128).
      */
-    public Variant(List<VariantRE> chainRootFirst) {
+    public Variant(HolderLookup<Block> blockLookup, List<VariantRE> chainRootFirst) {
         name = chainRootFirst.get(chainRootFirst.size() - 1).getRegistryName();
         List<BlockEntry> entries = new ArrayList<>();
         boolean anyBlocks = false;
@@ -36,7 +42,7 @@ public class Variant {
         }
         Resolved.require(anyBlocks ? entries : null, name, "blocks");
         for (BlockEntry entry : entries) {
-            BlockState state = Tools.stringToState(entry.block(), name);
+            BlockState state = Tools.stringToState(entry.block(), blockLookup, name);
             blocks.add(Pair.of(entry.random(), state));
         }
     }
