@@ -311,7 +311,13 @@ public class CityGenerator {
         ADJACENT
     }
 
-    private static AvoidChunk hasBlacklistedStructure(WorldGenLevel level, int chunkX, int chunkZ) {
+    /**
+     * Package-visible for {@link DigestRunner}, which counts how many sampled chunks this suppresses
+     * so a digest window cannot silently stop covering avoidance. Called there after generation, with
+     * every chunk loaded, so it answers without the neighbourhood gaps that make it order-dependent
+     * on the generation path (issue #126).
+     */
+    static AvoidChunk hasBlacklistedStructure(WorldGenLevel level, int chunkX, int chunkZ) {
         boolean doAdjacent = Config.AVOID_VILLAGES_ADJACENT.get() || Config.AVOID_STRUCTURES_ADJACENT.get();
         if (doAdjacent || Config.AVOID_VILLAGES.get() || Config.AVOID_SURFACE_STRUCTURES.get() || Config.hasAvoidedStructures()) {
             if (doAdjacent) {

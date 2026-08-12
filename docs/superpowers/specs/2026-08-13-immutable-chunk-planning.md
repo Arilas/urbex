@@ -46,8 +46,8 @@ The comment states the defect plainly: the answer is *whatever the region happen
 worlds with the same seed, generated in a different order, can disagree about whether a chunk is a
 city — and that disagreement is then written back into the shared cache by the block above.
 
-`avoidVillages` **defaults to true**, so this is not a corner configuration. Both digest runs exercise
-it today.
+`avoidVillages` **defaults to true**, so this is not a corner configuration — but see the digest
+section: default-on turned out not to mean the sampled windows contain a village, and they do not.
 
 ## What has to be decided before code
 
@@ -80,35 +80,49 @@ record ChunkPlan(...)       // settled occupancy, topology, transport, layout
 Published once, never written again. Structure suppression enters as an *input* to the candidate →
 plan step, not as a later edit of a published plan.
 
-## Digest expectations — the part to settle first
+## Digest expectations — measured, and not what this spec first assumed
 
-**Both goldens will almost certainly move**, and unlike every other change in phases 1 and 2 that is
-not a defect in the change:
+The first draft of this section predicted both goldens would move, reasoning that `avoidVillages`
+defaults to true so the digest worlds must exercise avoidance. **Measured, they do not.** The
+`avoidedChunks` counter added in 126a reports:
 
-- avoidance is on by default, so the digest worlds run it;
-- today's answer depends on region contents, so today's golden encodes *one particular load order*;
-- a deterministic mask gives one answer for every order, which is the point, and it will not always
-  be the answer the current golden happens to hold.
+```
+digestCheck          radius 3, offset 100   avoidedChunks=0
+digestCheckFeatures  radius 9, offset  83   avoidedChunks=0
+```
 
-That makes this the first change in the epic where "the golden moved" is the expected outcome rather
-than the alarm. It therefore needs, in order:
+Neither window contains a structure avoidance suppresses. So:
 
-1. the semantic decided and written down (above);
-2. the new digest configurations the acceptance criteria ask for — parallel and shuffled-order runs
-   covering villages, blacklisted structures, every `avoid*` mode, and railway collisions — added
-   **before** the behaviour changes, so the old behaviour is captured first;
-3. explicit approval of the golden change, with the before/after hashes and an explanation of which
-   chunks moved and why;
-4. regeneration the sanctioned way: delete the file, run twice, require agreement.
+- **Today's goldens do not cover this code path at all.** The config being on by default is not the
+  same as the sampled chunks containing a village.
+- **A shuffled-order run over the primary window agrees with the row-major one** — but that agreement
+  says nothing about #126, because the order-dependent branch never executes in it.
+- **126c will not move either golden**, which is the opposite of the risk this section was written
+  about. The real risk is the mirror image: the behaviour change ships with **no** digest coverage and
+  CI stays green through it.
 
-Step 2 is what makes step 3 reviewable. Landing the behaviour first would leave nothing to compare
-against.
+So the work 126a has to do is not "capture today's behaviour before changing it" — the primary and
+features windows already do that faithfully for everything except this. It is **to give avoidance a
+window at all**:
+
+1. probe for an offset/radius whose sample contains an avoided structure, the way the features window
+   was sited on a bridge and a slope;
+2. add it as a third configuration with a `requireAvoided` gate, so a window that stops containing one
+   fails rather than passes silently;
+3. capture its golden under today's behaviour;
+4. only then land 126b and 126c, and expect *that* golden to move while the other two hold.
+
+The shuffled-order run and the `avoidedChunks` counter are worth keeping regardless: the counter is
+what makes the coverage gap visible instead of assumed, and the shuffled run is the standing version
+of an experiment that had only ever been done by hand (see the note in `build.gradle` about
+15dba5f2).
 
 ## Suggested PR split
 
-**126a — order-independence made observable.** The shuffled-order and `avoid*` digest configurations,
-against today's behaviour. No production change; it should pass, and if it does not, that failure is
-the bug this issue exists to fix, captured before touching anything.
+**126a — order-independence and avoidance coverage made observable.** *Landed.* The shuffled-order
+run and the `avoidedChunks` counter, no production change. It passes — and the counter is what
+established that the reason it passes is that neither window contains an avoided structure. Siting a
+window that does is the remainder of 126a.
 
 **126b — immutable candidate/plan.** The record split and the removal of post-publication mutation,
 with suppression still computed the way it is now. Must not move a golden: it changes when values are

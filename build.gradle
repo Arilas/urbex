@@ -113,6 +113,28 @@ loom {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
             }
         }
+        // The same window as digestCheck, generated in a shuffled order and pinned to the same
+        // golden. Order-independence is asserted here rather than assumed: the primary check has
+        // always run one fixed order, so a decision that depends on which neighbours happen to be
+        // loaded produces a stable hash there and is invisible. Issue #126 is exactly that -
+        // hasBlacklistedStructure probes a 3x3 neighbourhood through level.hasChunk and treats
+        // absent chunks as clear - so this exists to make the current behaviour observable before
+        // it is changed, not after.
+        //
+        // It shares digestCheck's golden deliberately. A different value here would not mean
+        // anything; equality with the row-major run is the whole assertion.
+        digestCheckShuffled {
+            server()
+            setConfigName('Urbex Digest Check (shuffled order)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckshuffled')
+            vmArg '-Durbex.digestCheck=3,shuffled,100'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
         // The weighted-world-style-mix census. Not a golden check and not run by CI: mixing needs a
         // second datapack registering a second world style, and this repository ships only its own.
         // Point it at one or more with `-PurbexMixPack=<jar>[,<jar>...]` and run `./gradlew runMixCheck`;
@@ -162,12 +184,16 @@ motd=urbex digest check
 }
 registerPrepareDigestCheck('prepareDigestCheck', 'runs/digestcheck')
 registerPrepareDigestCheck('prepareDigestCheckFeatures', 'runs/digestcheckfeatures')
+registerPrepareDigestCheck('prepareDigestCheckShuffled', 'runs/digestcheckshuffled')
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
     dependsOn 'prepareDigestCheck'
 }
 tasks.matching { it.name == 'runDigestCheckFeatures' }.configureEach {
     dependsOn 'prepareDigestCheckFeatures'
+}
+tasks.matching { it.name == 'runDigestCheckShuffled' }.configureEach {
+    dependsOn 'prepareDigestCheckShuffled'
 }
 
 // The mix census needs a different world config from the digest runs - the experimental flag on,

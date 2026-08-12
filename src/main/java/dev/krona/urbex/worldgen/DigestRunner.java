@@ -55,13 +55,14 @@ public final class DigestRunner {
      *                     fails on it whenever asked to.
      */
     public record Result(long driverDigest, long fullDigest, long driverBlocks, int drivenChunks,
-                         int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks, long unsafeReads) {
+                         int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks, int avoidedChunks,
+                         long unsafeReads) {
 
         public String driverLine(String order, int offset) {
             return String.format(
-                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d unsafeReads=%d",
+                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d avoidedChunks=%d unsafeReads=%d",
                     driverDigest, driverBlocks, drivenChunks, chunkCount, order, offset, elapsedMs, bridgeChunks,
-                    slopeChunks, unsafeReads);
+                    slopeChunks, avoidedChunks, unsafeReads);
         }
 
         public String fullLine(String order, int offset) {
@@ -164,10 +165,11 @@ public final class DigestRunner {
 
         int bridgeChunks = countBridgeChunks(level, sorted);
         int slopeChunks = countSlopeChunks(level, sorted);
+        int avoidedChunks = countAvoidedChunks(level, sorted);
 
         long elapsed = System.currentTimeMillis() - start;
         return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed, bridgeChunks,
-                slopeChunks, unsafeReads);
+                slopeChunks, avoidedChunks, unsafeReads);
     }
 
     /**
@@ -176,6 +178,25 @@ public final class DigestRunner {
      * costs no extra draw and cannot perturb either digest. Zero whenever no Urbex profile is
      * configured for this dimension - the driver-writes check already fails that case loudly.
      */
+    /**
+     * How many of the sampled chunks structure avoidance suppresses.
+     * <p>
+     * The same coverage guard {@code bridgeChunks} and {@code slopeChunks} are: a window that stops
+     * containing an avoided structure stops testing avoidance, and passes while doing so. Counted
+     * after generation, when every chunk is loaded, so this reads the answer the neighbourhood probe
+     * <em>would</em> give with nothing missing - which is deliberately not the answer generation got,
+     * and the gap between them is issue #126.
+     */
+    private static int countAvoidedChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
+        int count = 0;
+        for (ChunkPos pos : chunkPositions) {
+            if (CityGenerator.hasBlacklistedStructure(level, pos.x(), pos.z()) != CityGenerator.AvoidChunk.NO) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     private static int countBridgeChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
         IDimensionInfo dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
