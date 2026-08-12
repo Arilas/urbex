@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **The README's usage instructions were describing 0.1.0.** They named a **More** tab and a
+  **Cities** button (it is a Cities tab now), the `dimensionsWithProfiles` config option (the key is
+  `dimensionsWithPresets`), and gave `minecraft:overworld=default` as the example — an unqualified
+  reference, which that option has rejected since references were made to name their namespace. Two
+  of the three would have failed for anyone following them. The same stale key was in the 0.2.0
+  entry that removed the `urbex:city` dimension - written before the preset rework renamed
+  `dimensionsWithProfiles` to `dimensionsWithPresets` - and is corrected there too.
+
 ## 0.2.0 — 2026-08-12 (beta)
 
 - **`urbex:rotatable` covers what the generator actually rotates.** The tag named
@@ -824,9 +834,9 @@
   `config/urbex/profiles/space.json`) will crash on startup with `Bad landscape type: space!`;
   there is no fallback. Delete or edit any such profile file before upgrading.
 - **Removed the `urbex:city` dimension.** It existed for historical reasons only (it was a plain
-  overworld clone). Cities are enabled by picking a profile on the world-creation Cities tab or
-  via the `dimensionsWithProfiles` config. The sleep-on-a-special-bed teleport and its
-  `specialBedBlock` config option are gone with it, and `dimensionsWithProfiles` now defaults to
+  overworld clone). Cities are enabled by picking a preset on the world-creation Cities tab or
+  via the `dimensionsWithPresets` config. The sleep-on-a-special-bed teleport and its
+  `specialBedBlock` config option are gone with it, and `dimensionsWithPresets` now defaults to
   empty. If an existing world has this dimension generated, leave it (return to the overworld)
   before upgrading — the dimension disappears and players still inside it will be relocated by
   vanilla.
