@@ -261,7 +261,7 @@ class WiringRequiredTest {
     private static WorldStyleRE worldStyle(String name, PartSelector.Decl parts) {
         return new WorldStyleRE(Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.ofNullable(parts),
-                Optional.of(new Mergeable<>(true, List.of())), Optional.empty())
+                Optional.of(new Mergeable<>(true, List.of())), Optional.empty(), Optional.empty())
                 .setRegistryName(Identifier.fromNamespaceAndPath("urbex", name));
     }
 }

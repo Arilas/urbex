@@ -178,6 +178,9 @@ public class NullDimensionInfo implements IDimensionInfo {
                                 noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
                                 noParts(), noParts(), noParts(), noParts())))),
                 Optional.of(new Mergeable<>(true, Collections.emptyList())),
+                Optional.empty(),
+                // No 'rotatable': the preview places no parts, so nothing is ever rotated, and
+                // naming a tag here would be a claim about a datapack this path has not loaded.
                 Optional.empty()
                 // Named, so the load error names this placeholder rather than 'null' if a field is
                 // ever added to the required set and not added here.
