@@ -326,7 +326,7 @@ public class ChunkDriver {
         BlockState state = cache.get(p);
         if (state == null) {
             state = region.getBlockState(p);
-            cache.put(p, state);
+            cache.remember(p, state);
         }
         return state;
     }
@@ -753,6 +753,25 @@ public class ChunkDriver {
                     fixHeightmapForAir(ystart, px, pz);
                 }
             }
+        }
+
+        /**
+         * Remembers what the world already holds at {@code pos}, without claiming this chunk wrote
+         * it.
+         *
+         * <p>This used to be {@link #put}, and {@code put} marks the section written - so a section
+         * Urbex only <em>read</em> from was flushed back in full at the end of the chunk, 4096 slots
+         * of terrain rewritten with the values they already had. Reading a block is not writing one
+         * (issue #52).</p>
+         *
+         * <p>The internal heightmap is deliberately not updated here. It is maintained by the write
+         * paths and read by nothing outside its own repair scan - which is its own finding, and its
+         * own change.</p>
+         */
+        private void remember(BlockPos pos, BlockState state) {
+            int sectionIdx = (pos.getY() - minY) / SECTION_HEIGHT;
+            int idx = ((pos.getX() & 0xf) << 8) + ((pos.getY() & 0xf) << 4) + (pos.getZ() & 0xf);
+            cache[sectionIdx].section[idx] = state;
         }
 
         private void put(BlockPos pos, BlockState state) {
