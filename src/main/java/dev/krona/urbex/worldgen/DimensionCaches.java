@@ -12,6 +12,7 @@ import dev.krona.urbex.worldgen.lost.ChunkCandidate;
 import dev.krona.urbex.worldgen.lost.MultiChunk;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
+import dev.krona.urbex.worldgen.lost.cityassets.PaletteCache;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -72,6 +73,13 @@ public final class DimensionCaches {
     /** Identifies one city-rarity field. All four components come from the profile. */
     public record RaritySettings(long seed, double scale, double offset, double innerScale) {}
 
+    /**
+     * The palettes this world has already compiled. Keyed on compiled assets rather than on
+     * coordinates, so it is bounded by what the datapacks declare (issue #53).
+     */
+    public final PaletteCache palettes = new PaletteCache();
+
+
     public CityRarityMap getCityRarityMap(long seed, double scale, double offset, double innerScale) {
         RaritySettings key = new RaritySettings(seed, scale, offset, innerScale);
         CityRarityMap existing = cityRarity.get(key);
@@ -97,5 +105,6 @@ public final class DimensionCaches {
         heightmap.clear();
         scatterAreaScan.clear();
         cityRarity.clear();
+        palettes.clear();
     }
 }
