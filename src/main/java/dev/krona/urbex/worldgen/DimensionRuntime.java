@@ -6,7 +6,10 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.plan.grid.GridRoadField;
+import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.setup.PresetChoice;
+import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
@@ -27,28 +30,29 @@ import javax.annotation.Nullable;
  * itself, which is how a worker could have the asset registries cleared underneath it and save an
  * undecorated chunk (issue #125).</p>
  *
- * <p>{@code dimension} is {@code null} for a level Urbex does not generate in. That is a cached
- * answer, not an absent one: the alternative is re-deriving "this dimension has no preset" from the
- * config on every chunk of every vanilla dimension.</p>
+ * <p>{@code planning} and {@code generator} are {@code null} together, for a level Urbex does not
+ * generate in. That is a cached answer, not an absent one: the alternative is re-deriving "this
+ * dimension has no preset" from the config on every chunk of every vanilla dimension.</p>
  *
- * <p>{@code dimension} is what is left of the phase-1 shape: it holds the {@link IDimensionInfo}
- * that pairs this level's {@link PlanningContext} with its {@link CityGenerator}, and goes when the
- * preview stops needing an implementation of that interface, leaving the two as real components.
- * {@link #planning()}, {@link #caches()} and {@link #generator()} read like the components they will
- * become while still delegating to the one object that owns them today - two record components
- * holding the same objects would be two owners of one thing, which is the mistake this whole epic
- * is about. {@code tasks} is a real component, because nothing else owns it.</p>
+ * <p>They are real components now. The phase-1 shape held one {@code IDimensionInfo} in the planning
+ * slot and delegated both to it, because the two could not be built independently - the generator's
+ * constructor took the dimension and the dimension's constructor built the generator. Splitting them
+ * is what #129 was for, and this is where the split lands: the runtime is the one place that pairs
+ * a {@link PlanningContext} with the {@link CityGenerator} built from it.</p>
  *
  * <p>{@code tagEpoch} is the server's, not this level's: it is the same instance in every loaded
  * level's runtime, because block tags come from the server's reloadable resources. It is a slot
  * rather than a {@link TagSnapshot} so that a {@code /reload} can swap the epoch without rebuilding
  * anything here - which is the whole of what a reload changes (issue #128).</p>
  */
-public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo dimension, LevelTaskQueue tasks,
+public record DimensionRuntime(ServerLevel level, @Nullable PlanningContext planning,
+                               @Nullable CityGenerator generator, LevelTaskQueue tasks,
                                @Nullable TagEpoch tagEpoch) {
 
-    public DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo dimension, @Nullable TagEpoch tagEpoch) {
-        this(level, dimension, new LevelTaskQueue(level.dimension().identifier().toString()), tagEpoch);
+    public DimensionRuntime(ServerLevel level, @Nullable PlanningContext planning,
+                            @Nullable CityGenerator generator, @Nullable TagEpoch tagEpoch) {
+        this(level, planning, generator, new LevelTaskQueue(level.dimension().identifier().toString()),
+                tagEpoch);
     }
 
     /**
@@ -57,26 +61,16 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo dimen
      * tag epoch, for the same reason it carries no planning context - nothing generates here.
      */
     public static DimensionRuntime disabled(ServerLevel level) {
-        return new DimensionRuntime(level, null, null);
+        return new DimensionRuntime(level, null, null, null);
     }
 
     public boolean isEnabled() {
-        return dimension != null;
-    }
-
-    /** Everything a chunk of this level is planned against. Never call on a disabled runtime. */
-    public PlanningContext planning() {
-        return dimension.planning();
+        return planning != null;
     }
 
     /** The per-level caches. Never call on a disabled runtime. */
     public DimensionCaches caches() {
-        return dimension.planning().caches();
-    }
-
-    /** The generator this level's chunks are driven by. Never call on a disabled runtime. */
-    public CityGenerator generator() {
-        return dimension.getFeature();
+        return planning.caches();
     }
 
     /**
@@ -136,8 +130,33 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo dimen
         // ignored and the un-overridden preset used, but a style that cannot resolve has no such
         // fallback - City.getCityStyle would simply hand null on to generation.
         requireCityStyle(assets, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
-        return new DimensionRuntime(level,
-                new DefaultDimensionInfo(level, assets, preset, choice.worldStyles()), tagEpoch);
+        PlanningContext planning = planningFor(level, assets, preset, choice.worldStyles());
+        return new DimensionRuntime(level, planning, new CityGenerator(planning, preset), tagEpoch);
+    }
+
+    /**
+     * Assembles this level's planning inputs.
+     *
+     * <p>Everything here is derived from the level, the compiled assets and the resolved preset, and
+     * nothing here reads a block. The {@link LevelShape} is resolved once, on the thread that loads
+     * the level: the dimension type fixes the two bounds and the chunk generator fixes the sea level,
+     * and neither can change while the level is loaded.</p>
+     */
+    private static PlanningContext planningFor(ServerLevel level, AssetSnapshot assets, Preset preset,
+                                               WorldStyleMix worldStyles) {
+        long seed = level.getSeed();
+        ResourceKey<Level> dimension = level.dimension();
+        DimensionCaches caches = new DimensionCaches(seed);
+        return new PlanningContext(
+                seed,
+                dimension,
+                preset,
+                assets,
+                WorldStyleField.resolve(assets, seed, worldStyles),
+                new GridRoadField(seed, dimension.identifier().toString(), GridSettings.fromPreset(preset)),
+                caches,
+                LevelShape.of(level),
+                new LevelTerrain(level, preset, caches));
     }
 
     /**

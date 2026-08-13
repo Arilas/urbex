@@ -72,8 +72,8 @@ public final class WorldStyleField {
     }
 
     /**
-     * Resolves every id in {@code mix} against the world style registry, once, at dimension
-     * construction - the same point {@code DefaultDimensionInfo} used to resolve its single style.
+     * Resolves every id in {@code mix} against the world style registry, once, while the level's
+     * {@link DimensionRuntime} is being built - the same point a single style used to be resolved at.
      */
     public static WorldStyleField resolve(AssetSnapshot assets, long seed, WorldStyleMix mix) {
         List<Weighted> resolved = new ArrayList<>(mix.entries().size());
