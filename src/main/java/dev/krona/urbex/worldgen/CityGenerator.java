@@ -52,7 +52,7 @@ public class CityGenerator {
     public static final int FLOORHEIGHT = 6;
 
     public final BlockState air;
-    private final BlockState hardAir;
+    public final BlockState hardAir;
 
     private final BlockState base;
     public final BlockState liquid;
@@ -65,26 +65,19 @@ public class CityGenerator {
     // everything the level plans with (issue #128); this one has nothing to reload.
     private final Set<BlockState> railStates;
 
-    private final NoiseGeneratorPerlin rubbleNoise;
-    private final NoiseGeneratorPerlin leavesNoise;
-    private final NoiseGeneratorPerlin ruinNoise;
     private final NoiseGeneratorPerlin bottomLayerNoise;    // Used in floating profile for the underside of buildings
 
 
     /** The random leaf and rubble tables, and the city-style characters that override them. */
     public final GroundCover groundCover = new GroundCover();
 
+    /** The rubble, ruin and vegetation passes, and the three noise fields they read. */
+    public final Decorations decorations;
+
     public final PlanningContext provider;
     public final Preset profile;
 
     private final Statistics statistics = new Statistics();
-    /**
-     * Which block entity type belongs to a block. Bounded by the block registry, so it needs no
-     * eviction policy beyond being dropped with the generator; {@link #NO_BLOCK_ENTITY} stands for
-     * "asked, and there is none" so a miss is remembered as well as a hit.
-     */
-    private final Map<Block, Optional<BlockEntityType>> typeCache = new ConcurrentHashMap<>();
-
     public CityGenerator(PlanningContext provider, Preset profile) {
         this.provider = provider;
         this.profile = profile;
@@ -92,9 +85,7 @@ public class CityGenerator {
         // Four independent noise fields, each seeded from the world seed alone. They describe the
         // whole dimension rather than one chunk, so they take a fixed coordinate and are built once.
         long seed = provider.seed();
-        this.rubbleNoise = new NoiseGeneratorPerlin(Rng.at(seed, 0, 0, Rng.Purpose.NOISE), 4);
-        this.leavesNoise = new NoiseGeneratorPerlin(Rng.at(seed, 1, 0, Rng.Purpose.NOISE), 4);
-        this.ruinNoise = new NoiseGeneratorPerlin(Rng.at(seed, 2, 0, Rng.Purpose.NOISE), 4);
+        this.decorations = new Decorations(seed);
         this.bottomLayerNoise = new NoiseGeneratorPerlin(Rng.at(seed, 3, 0, Rng.Purpose.NOISE), 4);
 
         air = Blocks.AIR.defaultBlockState();
@@ -250,7 +241,7 @@ public class CityGenerator {
         ctx.driver.actuallyGenerate(chunk);
         ChunkFixer.fix(ctx);
         // After the fixer, so the post-todos have placed their blocks and what we see is final
-        forgetOverwrittenBlockEntities(chunk);
+        Parts.forgetBlockEntities(chunk);
 
         long time = System.currentTimeMillis() - start;
         statistics.addTime(time);
@@ -383,7 +374,7 @@ public class CityGenerator {
     private void doNormalChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
 //        debugClearChunk(chunkX, chunkZ, primer);
         if ((avoidChunk != AvoidChunk.YES || !Config.avoidFlattening()) && profile.isDefault()) {
-            correctTerrainShape(ctx, info.coord, heightmap);
+            Terrain.correctTerrainShape(ctx, this, info.coord, heightmap);
 //            flattenChunkToCityBorder(chunkX, chunkZ);
         }
 
@@ -410,154 +401,6 @@ public class CityGenerator {
         }
     }
 
-    public void clearRange(ChunkGenContext ctx, ChunkPlan info, int x, int z, int height1, int height2, boolean dowater) {
-        ChunkDriver driver = ctx.driver;
-        if (dowater) {
-            // Special case for drowned city
-            driver.setBlockRange(x, height1, z, info.waterLevel, liquid);
-            driver.setBlockRangeToAir(x, info.waterLevel + 1, z, height2);
-        } else {
-            driver.setBlockRangeToAir(x, height1, z, height2);
-        }
-    }
-
-    public void clearRange(ChunkGenContext ctx, ChunkPlan info, int x, int z, int height1, int height2, boolean dowater, Predicate<BlockState> test) {
-        ChunkDriver driver = ctx.driver;
-        if (dowater) {
-            // Special case for drowned city
-            driver.setBlockRange(x, height1, z, info.waterLevel, liquid, test);
-            driver.setBlockRangeToAir(x, info.waterLevel + 1, z, height2, test);
-        } else {
-            driver.setBlockRangeToAir(x, height1, z, height2, test);
-        }
-    }
-
-    /**
-     * These three are asked about chunks other than the one being generated - a chunk interpolates
-     * its terrain fix against its eight neighbours - so they take the seed and the coordinate they
-     * are being asked about rather than a {@link ChunkGenContext}.
-     * <p>
-     * {@code getRandomizedOffset} takes its purpose from the caller because it is asked twice at
-     * one coordinate, for the lower and the upper bound of the same mesh. One purpose would tie
-     * them together, and neither may be shared with the street-type pick, which is drawn at the
-     * same address.
-     */
-    public static int getRandomizedOffset(long seed, int chunkX, int chunkZ, int min, int max, Rng.Purpose purpose) {
-        return Rng.at(seed, chunkX, chunkZ, purpose).nextInt(max - min + 1) + min;
-    }
-
-    public static int getHeightOffsetL1(long seed, int chunkX, int chunkZ) {
-        return Rng.at(seed, chunkX, chunkZ, Rng.Purpose.TERRAIN_L1).nextInt(5);
-    }
-
-    public static int getHeightOffsetL2(long seed, int chunkX, int chunkZ) {
-        return Rng.at(seed, chunkX, chunkZ, Rng.Purpose.TERRAIN_L2).nextInt(5);
-    }
-
-    /*
-     * This routine is used on a normal (non-city) chunk to make sure the landscape nicely fits
-     * with any possible adjacent city chunks. It works by creating two meshes that are overlayed
-     * on the terrain. Meshes are defined at chunk corners. Every chunk corner has a corresponding
-     * height on the two meshes.
-     *
-     * The upper mesh indicates the maximum height the terrain is allowed to go. If a certain chunk
-     * corner is not adjacent to any city chunk or is not adjacent to any normal chunk then there is
-     * no maximum height and in that case we set it to 100000. Otherwise (if the chunk corner
-     * is adjacent to mixed chunks) the maximum allowed height of the terrain is equal to the minimum
-     * height of all the city chunks (with minimum height we mean the lower city level or the height
-     * of the first floor).
-     *
-     * The lower mesh indicates the minimum height the terrain is allowed to go. Same as with the upper
-     * mesh there is no minimum in case the chunk corner is not a mixed type corner. Otherwise the
-     * minimum height is going to be some (configurable) offset below the minimum lower city level.
-     *
-     * Every normal chunk is made to fit between the lower and the upper mesh by moving down
-     * or up the top layer (6 thick) of the terrain. In a chunk these heights are interpolated
-     * (bilinear interpolation).
-     */
-    private void correctTerrainShape(ChunkGenContext ctx, ChunkCoord coord, ChunkHeightmap heightmap) {
-        ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
-        ChunkPlan.MinMax mm00 = info.getDesiredMaxHeightL2();
-        ChunkPlan.MinMax mm10 = info.getXmax().getDesiredMaxHeightL2();
-        ChunkPlan.MinMax mm01 = info.getZmax().getDesiredMaxHeightL2();
-        ChunkPlan.MinMax mm11 = info.getXmax().getZmax().getDesiredMaxHeightL2();
-
-        int min = provider.shape().minY();
-        int max = provider.shape().maxBuildHeight();
-        int heightmapH = Short.MIN_VALUE;
-
-        float min00 = mm00.min;
-        float min10 = mm10.min;
-        float min01 = mm01.min;
-        float min11 = mm11.min;
-        float max00 = mm00.max;
-        float max10 = mm10.max;
-        float max01 = mm01.max;
-        float max11 = mm11.max;
-        if (max00 < max || max10 < max || max01 < max || max11 < max ||
-                min00 < max || min10 < max || min01 < max || min11 < max) {
-            // We need to fit the terrain between the upper and lower mesh here
-            int maxHeightP = heightmap.getHeight() + 90;
-            int minHeightP = heightmap.getHeight() - 90;
-            if (max00 >= max) {
-                max00 = maxHeightP;
-            }
-            if (max10 >= max) {
-                max10 = maxHeightP;
-            }
-            if (max01 >= max) {
-                max01 = maxHeightP;
-            }
-            if (max11 >= max) {
-                max11 = maxHeightP;
-            }
-            if (min00 >= max) {
-                min00 = minHeightP;
-            }
-            if (min10 >= max) {
-                min10 = minHeightP;
-            }
-            if (min01 >= max) {
-                min01 = minHeightP;
-            }
-            if (min11 >= max) {
-                min11 = minHeightP;
-            }
-
-            for (int x = 0; x < 16; x++) {
-                // Bilinear interpolation
-                float factor = (15.0f - x) / 15.0f;
-                float maxh0 = max11 + (max01 - max11) * factor;
-                float maxh1 = max10 + (max00 - max10) * factor;
-                float minh0 = min11 + (min01 - min11) * factor;
-                float minh1 = min10 + (min00 - min10) * factor;
-                for (int z = 0; z < 16; z++) {
-                    float maxheight = maxh0 + (maxh1 - maxh0) * (15.0f - z) / 15.0f;
-                    if (maxheight > max) {
-                        maxheight = max;
-                    }
-                    int maxTouchedY = moveDown(ctx, x, z, (int) maxheight, max);
-
-                    if (maxTouchedY == Short.MIN_VALUE) {
-                        float minheight = minh0 + (minh1 - minh0) * (15.0f - z) / 15.0f;
-                        if (minheight < min) {
-                            minheight = min;
-                        }
-                        maxTouchedY = moveUp(ctx, x, z, (int) minheight, info.waterLevel > info.groundLevel);
-                    }
-                    if (maxTouchedY != Short.MIN_VALUE && x == 8 && z == 8) {
-                        // Only adjust heightmap for center value
-                        heightmapH = Math.max(heightmapH, maxTouchedY);
-                    }
-                }
-            }
-            if (heightmapH != Short.MIN_VALUE) {
-                heightmap.setHeight(heightmapH);
-            }
-        }
-    }
-
-    // Return true if state is air or liquid
     public static boolean isEmpty(BlockState state) {
         if (state.isAir()) {
             return true;
@@ -572,157 +415,6 @@ public class CityGenerator {
     }
 
     // Return true if state is Empty or Plant based - stops (most) funny tree/mushroom action on chunk borders
-    private static boolean isFoliageOrEmpty(TagSnapshot tags, BlockState state) {
-        if (isEmpty(state)) {
-            return true;
-        }
-        return tags.isFoliage(state);
-    }
-
-    /**
-     * Fill base blocks downwards from 'y' until solid ground (or the bedrock layer) is reached,
-     * so that whatever rests on top of it is not left hanging in the air. This is the same fill
-     * fillToBedrockStreetBlock() applies under streets.
-     */
-    private void fillSupportBelow(ChunkGenContext ctx, int x, int z, int y) {
-        ChunkDriver driver = ctx.driver;
-        int lowest = provider.shape().minY() + profile.bedrockLayer();
-        driver.current(x, y, z);
-        while (driver.getY() > lowest && isEmpty(driver.getBlock())) {
-            driver.block(base);
-            driver.decY();
-        }
-    }
-
-    // Return the new max height of the chunk in this column. Or Short.MIN_VALUE if nothing was done
-    private int moveUp(ChunkGenContext ctx, int x, int z, int height, boolean dowater) {
-        ChunkDriver driver = ctx.driver;
-        int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
-        // Find the first non-empty block starting at the given height
-        driver.current(x, height, z);
-        int minHeight = provider.shape().minY();
-        // We assume here we are not in a void chunk
-        while (isFoliageOrEmpty(ctx.tags, driver.getBlock()) && driver.getY() > minHeight) {
-            driver.decY();
-        }
-
-        if (driver.getY() >= height) {
-            return maxYTouched; // Nothing to do
-        }
-
-        int idx = driver.getY();    // Points to non-empty block below the empty block
-        driver.current(x, height, z);
-        while (idx > 0) {
-            BlockState blockToMove = driver.getBlock(x, idx, z);
-            if (blockToMove.isAir() || blockToMove.getBlock() == Blocks.BEDROCK) {
-                break;
-            }
-            if (maxYTouched == Short.MIN_VALUE) {
-                maxYTouched = idx;
-            }
-            driver.block(blockToMove);
-            driver.decY();
-            idx--;
-        }
-        return maxYTouched;
-    }
-
-    // Return the new max height of the chunk in this column. Or Short.MIN_VALUE if nothing was done
-    private int moveDown(ChunkGenContext ctx, int x, int z, int height, int maxBuildLimit) {
-        ChunkDriver driver = ctx.driver;
-        BlockState[] buffer = ctx.moveDownBuffer;
-        int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
-        int y = maxBuildLimit-1;
-        driver.current(x, y, z);
-        // We assume here we are not in a void chunk
-        while (isEmpty(driver.getBlock()) && driver.getY() > height) {
-            driver.decY();
-        }
-
-        if (driver.getY() <= height) {
-            return maxYTouched; // Nothing to do
-        }
-
-        // We arrived at our first non-air block
-        int bufferIdx = 0;
-        while (driver.getY() >= height) {
-            if (bufferIdx < buffer.length) {
-                buffer[bufferIdx++] = driver.getBlock();
-            }
-            driver.block(air);
-            driver.decY();
-        }
-
-        maxYTouched = driver.getY();
-        int idx = 0;
-        while (idx < bufferIdx && driver.getY() > 0) {
-            driver.block(buffer[idx++]);
-            driver.decY();
-        }
-
-        // The buffer only carried the top few blocks of whatever used to be here, and nothing
-        // above this point looked at what is underneath. Whenever the column we just moved that
-        // surface down onto is empty - an overhang or cliff shoulder over a carved cavern, or a
-        // sampled heightmap that disagrees with the local terrain - the relocated surface is
-        // left hanging in the air, and so is everything the city then builds on top of it.
-        fillSupportBelow(ctx, x, z, driver.getY());
-
-//
-//        if (dowater) {
-//            // Special case for drowned city
-//            driver.setBlockRange(x, height1, z, info.waterLevel, liquid);
-//            driver.setBlockRange(x, info.waterLevel+1, z, height2, air);
-//        } else {
-//            driver.setBlockRange(x, height1, z, height2, air);
-//        }
-        return maxYTouched;
-    }
-
-
-    public static boolean isWaterBiome(PlanningContext provider, ChunkCoord coord) {
-        BiomeInfo biomeInfo = BiomeInfo.getBiomeInfo(provider, coord);
-        Holder<Biome> mainBiome = biomeInfo.getMainBiome();
-        return isWaterBiome(mainBiome);
-    }
-
-    private static boolean isWaterBiome(Holder<Biome> biome) {
-        return biome.is(BiomeTags.IS_OCEAN) || biome.is(BiomeTags.IS_DEEP_OCEAN) || biome.is(BiomeTags.IS_BEACH) || biome.is(BiomeTags.IS_RIVER);
-    }
-
-    /**
-     * This function returns the height at a given point in this chunk
-     * If the point is at a border and the adjacent chunk at that point happens to be lower
-     * then this will return the minimum height
-     */
-    public int getMinHeightAt(ChunkPlan info, int x, int z, ChunkHeightmap heightmap) {
-        int height = heightmap.getHeight();
-        int adjacent;
-        if (x == 0) {
-            if (z == 0) {
-                adjacent = provider.heightmap(info.coord.northWest()).getHeight();
-            } else if (z == 15) {
-                adjacent = provider.heightmap(info.coord.southWest()).getHeight();
-            } else {
-                adjacent = provider.heightmap(info.coord.west()).getHeight();
-            }
-        } else if (x == 15) {
-            if (z == 0) {
-                adjacent = provider.heightmap(info.coord.northEast()).getHeight();
-            } else if (z == 15) {
-                adjacent = provider.heightmap(info.coord.southEast()).getHeight();
-            } else {
-                adjacent = provider.heightmap(info.coord.east()).getHeight();
-            }
-        } else if (z == 0) {
-            adjacent = provider.heightmap(info.coord.north()).getHeight();
-        } else if (z == 15) {
-            adjacent = provider.heightmap(info.coord.south()).getHeight();
-        } else {
-            return height;
-        }
-        return Math.min(height, adjacent);
-    }
-
     private void doCityChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, ChunkAccess chunk) {
         ChunkDriver driver = ctx.driver;
         boolean building = info.hasBuilding;
@@ -752,9 +444,9 @@ public class CityGenerator {
             int ground = info.getCityGroundLevel();
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
-                    int maxTouchedY = moveDown(ctx, x, z, ground + 1, provider.shape().maxBuildHeight());
+                    int maxTouchedY = Terrain.moveDown(ctx, this, x, z, ground + 1, provider.shape().maxBuildHeight());
                     if (maxTouchedY == Short.MIN_VALUE) {
-                        moveUp(ctx, x, z, ground, info.waterLevel > info.groundLevel);
+                        Terrain.moveUp(ctx, this, x, z, ground, info.waterLevel > info.groundLevel);
                     }
                 }
             }
@@ -763,11 +455,11 @@ public class CityGenerator {
         if (building) {
             generateBuilding(ctx, info, heightmap, chunk);
         } else {
-            generateStreet(ctx, info, heightmap);
+            Streets.generateStreet(ctx, this, info, heightmap);
         }
 
         if (info.profile.ruinChance() > 0.0) {
-            generateRuins(ctx, info);
+            decorations.ruins(ctx, this, info);
         }
 
         int levelX = info.getHighwayXLevel();
@@ -776,7 +468,7 @@ public class CityGenerator {
             Railway.RailChunkInfo railInfo = info.getRailInfo();
             if (levelX < 0 && levelZ < 0 && !railInfo.getType().isSurface()
                     && info.getStreetSlopeDirection() == null) {
-                generateStreetDecorations(ctx, info);
+                Streets.generateStreetDecorations(ctx, this, info);
             }
         }
         if (levelX >= 0 || levelZ >= 0) {
@@ -785,1142 +477,16 @@ public class CityGenerator {
 
         if (info.profile.rubbleLayer()) {
             if (!info.hasBuilding || info.ruinHeight >= 0) {
-                generateRubble(ctx, info);
+                decorations.rubble(ctx, this, info);
             }
         }
 
         Stuff.generateStuff(ctx, this, info);
     }
 
-    private void generateStreetDecorations(ChunkGenContext ctx, ChunkPlan info) {
-        Direction stairDirection = info.getActualStairDirection();
-        if (stairDirection != null) {
-            BuildingPart stairs = info.stairType;
-            if (stairs != null) {
-                Transform transform;
-                int oy = info.getCityGroundLevel() + 1;
-                transform = switch (stairDirection) {
-                    case XMIN -> Transform.ROTATE_NONE;
-                    case XMAX -> Transform.ROTATE_180;
-                    case ZMIN -> Transform.ROTATE_90;
-                    case ZMAX -> Transform.ROTATE_270;
-                };
-
-                generatePart(ctx, info, stairs, transform, 0, oy, 0, HardAirSetting.AIR);
-            }
-        }
-    }
-
-    private void generateRubble(ChunkGenContext ctx, ChunkPlan info) {
-        ChunkDriver driver = ctx.driver;
-        int chunkX = info.coord.chunkX();
-        int chunkZ = info.coord.chunkZ();
-        double[] rubbleBuffer = ctx.buffers.rubble = this.rubbleNoise.getRegion(ctx.buffers.rubble, (chunkX << 4), (chunkZ << 4), 16, 16, 1.0 / 16.0, 1.0 / 16.0, 1.0D);
-        double[] leavesBuffer = ctx.buffers.leaves = this.leavesNoise.getRegion(ctx.buffers.leaves, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
-
-        Set<BlockState> possibleRandomDirts = groundCover.possibleRubble(info, info.getCompiledPalette());
-        for (int x = 0; x < 16; ++x) {
-            for (int z = 0; z < 16; ++z) {
-                double vr = info.profile.rubbleDirtScale() < 0.01f ? 0 : rubbleBuffer[x + z * 16] / info.profile.rubbleDirtScale();
-                double vl = info.profile.rubbleLeaveScale() < 0.01f ? 0 : leavesBuffer[x + z * 16] / info.profile.rubbleLeaveScale();
-                if (vr > .5 || vl > .5) {
-                    int height = getInterpolatedHeight(info, x, z);
-                    driver.current(x, height, z);
-                    BlockState c = driver.getBlockDown();
-                    if (c != air && c != liquid) {
-                        for (int i = 0; i < vr; i++) {
-                            if (isEmpty(driver.getBlock())) {
-                                driver.add(groundCover.rubbleAt(ctx, info, info.getCompiledPalette()));
-                            } else {
-                                driver.incY();
-                            }
-                        }
-                    }
-                    //first round may not have generated this - stops crash on create world
-                    BlockState leafBaseState = driver.getBlockDown();
-                    if (leafBaseState == base || possibleRandomDirts.contains(leafBaseState)) {
-                        for (int i = 0; i < vl; i++) {
-                            if (isEmpty(driver.getBlock())) {
-                                driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
-                            } else {
-                                driver.incY();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private int getInterpolatedHeight(ChunkPlan info, int x, int z) {
-        if (x < 8 && z < 8) {
-            // First quadrant
-            float h00 = info.getXmin().getZmin().getCityGroundLevelOutsideLower();
-            float h10 = info.getZmin().getCityGroundLevelOutsideLower();
-            float h01 = info.getXmin().getCityGroundLevelOutsideLower();
-            float h11 = info.getCityGroundLevelOutsideLower();
-            return bipolate(h00, h10, h01, h11, x + 8, z + 8);
-        } else if (x >= 8 && z < 8) {
-            // Second quadrant
-            float h00 = info.getZmin().getCityGroundLevelOutsideLower();
-            float h10 = info.getXmax().getZmin().getCityGroundLevelOutsideLower();
-            float h01 = info.getCityGroundLevelOutsideLower();
-            float h11 = info.getXmax().getCityGroundLevelOutsideLower();
-            return bipolate(h00, h10, h01, h11, x - 8, z + 8);
-        } else if (x < 8 && z >= 8) {
-            // Third quadrant
-            float h00 = info.getXmin().getCityGroundLevelOutsideLower();
-            float h10 = info.getCityGroundLevelOutsideLower();
-            float h01 = info.getXmin().getZmax().getCityGroundLevelOutsideLower();
-            float h11 = info.getZmax().getCityGroundLevelOutsideLower();
-            return bipolate(h00, h10, h01, h11, x + 8, z - 8);
-        } else {
-            // Fourth quadrant
-            float h00 = info.getCityGroundLevelOutsideLower();
-            float h10 = info.getXmax().getCityGroundLevelOutsideLower();
-            float h01 = info.getZmax().getCityGroundLevelOutsideLower();
-            float h11 = info.getXmax().getZmax().getCityGroundLevelOutsideLower();
-            return bipolate(h00, h10, h01, h11, x - 8, z - 8);
-        }
-    }
-
-    private int bipolate(float h00, float h10, float h01, float h11, int dx, int dz) {
-        float factor = (15.0f - dx) / 15.0f;
-        float h0 = h00 + (h10 - h00) * factor;
-        float h1 = h01 + (h11 - h01) * factor;
-        float h = h0 + (h1 - h0) * (15.0f - dz) / 15.0f;
-        return (int) h;
-    }
-
-
-    /**
-     * A roll in {@code [0, 1)} for the block the driver is currently on. Addressed by that
-     * position, so a loop that walks two blocks further than it did last time changes those two
-     * blocks and nothing else.
-     */
-    private static float rollHere(ChunkGenContext ctx, ChunkDriver driver, Rng.Purpose purpose) {
-        return Rng.floatAtPos(ctx.seed, driver.getX(), driver.getY(), driver.getZ(), purpose);
-    }
-
-    private void generateRuins(ChunkGenContext ctx, ChunkPlan info) {
-        if (info.ruinHeight < 0) {
-            return;
-        }
-
-        ChunkDriver driver = ctx.driver;
-        int chunkX = info.coord.chunkX();
-        int chunkZ = info.coord.chunkZ();
-        double d0 = 0.03125D;
-        double[] ruinBuffer = ctx.buffers.ruin = this.ruinNoise.getRegion(ctx.buffers.ruin, (chunkX << 4), (chunkZ << 4), 16, 16, d0 * 2.0D, d0 * 2.0D, 1.0D);
-        double[] leavesBuffer = ctx.buffers.leaves;
-        boolean doLeaves = info.profile.rubbleLayer();
-        if (doLeaves) {
-            leavesBuffer = ctx.buffers.leaves = this.leavesNoise.getRegion(ctx.buffers.leaves, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
-        }
-
-        int baseheight = (int) (info.getCityGroundLevel() + 1 + (info.ruinHeight * info.getNumFloors() * FLOORHEIGHT));
-
-        CompiledPalette palette = info.getCompiledPalette();
-        BlockState ironbarsState = Blocks.IRON_BARS.defaultBlockState();
-        Character infobarsChar = info.getCityStyle().getIronbarsBlock();
-        Supplier<BlockState> ironbars = infobarsChar == null ? () -> ironbarsState : () -> ctx.paletteHere(palette, infobarsChar);
-        Set<BlockState> infoBarSet = infobarsChar == null ? Collections.singleton(ironbarsState) : palette.getAll(infobarsChar);
-        Predicate<BlockState> checkIronbars = infobarsChar == null ? s -> s == ironbarsState : infoBarSet::contains;
-        Character rubbleBlock = info.getBuilding().getRubbleBlock();
-
-        int maxBuildHeight = info.provider.shape().maxBuildHeight();
-        for (int x = 0; x < 16; ++x) {
-            for (int z = 0; z < 16; ++z) {
-                double v = ruinBuffer[x + z * 16];
-//                double v = ruinNoise.getValue(x, z) / 16.0;
-                int height = baseheight + (int) v;
-                driver.current(x, height, z);
-                height = info.getMaxHeight() + 10 - height;
-                if (height > maxBuildHeight - 2) {
-                    height = maxBuildHeight - 2;
-                }
-                int vl = 0;
-                if (doLeaves) {
-                    vl = (int) (info.profile.rubbleLeaveScale() < 0.01f ? 0 : leavesBuffer[x + z * 16] / info.profile.rubbleLeaveScale());
-//                    vl = (int) (info.profile.rubbleLeaveScale() < 0.01f ? 0 : leavesNoise.getValue(x / 64.0, z / 64.0) / 4.0 * info.profile.rubbleLeaveScale());
-                }
-                boolean doRubble = palette.isDefined(rubbleBlock);
-                while (height > 0) {
-                    BlockState damage = palette.canBeDamagedToIronBars(driver.getBlock());
-                    BlockState c = driver.getBlockDown();
-
-                    if (doRubble && !checkIronbars.test(c) && c != air && c != liquid && rollHere(ctx, driver, Rng.Purpose.RUINS) < .2f) {      // @todo hardcoded random
-                        doRubble = false;
-                        driver.add(ctx.paletteHere(palette, rubbleBlock));
-                    } else if ((damage != null || checkIronbars.test(c)) && c != air && c != liquid && rollHere(ctx, driver, Rng.Purpose.RUINS_BARS) < .2f) {    // @todo hardcoded random
-                        driver.add(ironbars.get());
-                    } else {
-                        if (vl > 0) {
-                            c = driver.getBlockDown();
-                            while (isEmpty(c)) {
-                                driver.decY();
-                                height++;   // Make sure we keep on filling with air a bit longer because we are lowering here
-                                c = driver.getBlockDown();
-                            }
-                            driver.add(groundCover.leafAt(ctx, info, palette));
-                            vl--;
-                        } else {
-                            driver.add(air);
-                        }
-                    }
-                    height--;
-                }
-            }
-        }
-    }
-
-    private void generateStreet(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap) {
-        ChunkDriver driver = ctx.driver;
-        boolean xRail = info.hasXCorridor();
-        boolean zRail = info.hasZCorridor();
-        if (xRail || zRail) {
-            Corridors.generateCorridors(ctx, this, info, xRail, zRail);
-        }
-
-        Railway.RailChunkInfo railInfo = info.getRailInfo();
-        boolean canDoStreetOrPark = info.getHighwayXLevel() != info.cityLevel && info.getHighwayZLevel() != info.cityLevel
-                && railInfo.getType() != RailChunkType.STATION_SURFACE
-                && (railInfo.getType() != RailChunkType.STATION_EXTENSION_SURFACE || railInfo.getLevel() < info.cityLevel);
-
-        if (canDoStreetOrPark) {
-            int height = info.getCityGroundLevel();
-            // In default landscape type we clear the landscape on top of the building
-//            if (profile.isDefault()) {
-//                clearToMax(info, heightmap, height);
-//            }
-
-            Direction streetSlopeDirection = info.getStreetSlopeDirection();
-            ChunkPlan.StreetType streetType = info.streetType;
-            boolean elevated = info.isElevatedParkSection();
-            if (elevated) {
-                Character elevationBlock = info.getCityStyle().getParkElevationBlock();
-                BlockState elevation = ctx.paletteAt(info.getCompiledPalette(), elevationBlock, 0, height, 0);
-                for (int x = 0; x < 16; ++x) {
-                    driver.current(x, height, 0);
-                    for (int z = 0; z < 16; ++z) {
-                        driver.block(elevation).incZ();
-                    }
-                }
-                boolean parkElevation = info.profile.parkElevation();
-                if (info.getCityStyle().getParkElevation() != null) {
-                    parkElevation = info.getCityStyle().getParkElevation();
-                }
-                if (parkElevation) {
-                    height++;
-                }
-            }
-
-            // No re-roll here any more. The content decision is authoritative: a planned road is
-            // NORMAL, an open lot is whatever its addressed park roll said, and re-rolling was what
-            // used to clobber the PARK decision neighbours read through isElevatedParkSection()
-            // (issue #36).
-            switch (streetType) {
-                case NORMAL -> {
-                    if (streetSlopeDirection == null) {
-                        generateNormalStreetSection(ctx, info, height);
-                    } else {
-                        generateStreetSlopeSection(ctx, info, height, streetSlopeDirection);
-                    }
-                }
-                case PARK -> generateParkSection(ctx, info, height, elevated);
-            }
-            height++;
-
-            // A sloped chunk is a ramp from end to end. Everything that would stand on the surface -
-            // a fountain, a park part, vegetation, a building front reaching out over the pavement -
-            // is suppressed, because on a ramp it would sit in mid-air or in the middle of the route.
-            if (streetSlopeDirection == null) {
-                if (streetType == ChunkPlan.StreetType.PARK || info.fountainType != null) {
-                    BuildingPart part;
-                    if (streetType == ChunkPlan.StreetType.PARK) {
-                        part = info.parkType;
-                    } else {
-                        part = info.fountainType;
-                    }
-                    if (part != null) {
-                        generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
-                    }
-                }
-
-                generateRandomVegetation(ctx, info, height);
-
-                generateFrontPart(ctx, info, height, info.getXmin(), Transform.ROTATE_NONE);
-                generateFrontPart(ctx, info, height, info.getZmin(), Transform.ROTATE_90);
-                generateFrontPart(ctx, info, height, info.getXmax(), Transform.ROTATE_180);
-                generateFrontPart(ctx, info, height, info.getZmax(), Transform.ROTATE_270);
-            }
-        }
-
-        generateBorders(ctx, info, canDoStreetOrPark, heightmap);
-    }
-
-    private void generateBorders(ChunkGenContext ctx, ChunkPlan info, boolean canDoParks, ChunkHeightmap heightmap) {
-        Character borderBlock = info.getCityStyle().getBorderBlock();
-
-        if (info.profile.isFloating()) {
-            fillMainStreetBlock(ctx, info, borderBlock, 3);
-        } else if (info.profile.isCavern()) {
-            fillMainStreetBlock(ctx, info, borderBlock, 2);
-        } else {
-            fillToBedrockStreetBlock(ctx, info);
-        }
-
-        if (doBorder(info, Direction.XMIN)) {
-            int x = 0;
-            for (int z = 0; z < 16; z++) {
-                generateBorder(ctx, info, canDoParks, x, z, Direction.XMIN.get(info), heightmap);
-            }
-        }
-        if (doBorder(info, Direction.XMAX)) {
-            int x = 15;
-            for (int z = 0; z < 16; z++) {
-                generateBorder(ctx, info, canDoParks, x, z, Direction.XMAX.get(info), heightmap);
-            }
-        }
-        if (doBorder(info, Direction.ZMIN)) {
-            int z = 0;
-            for (int x = 0; x < 16; x++) {
-                generateBorder(ctx, info, canDoParks, x, z, Direction.ZMIN.get(info), heightmap);
-            }
-        }
-        if (doBorder(info, Direction.ZMAX)) {
-            int z = 15;
-            for (int x = 0; x < 16; x++) {
-                generateBorder(ctx, info, canDoParks, x, z, Direction.ZMAX.get(info), heightmap);
-            }
-        }
-    }
-
-    /**
-     * Fill base blocks under streets to bedrock
-     */
-    private void fillToBedrockStreetBlock(ChunkGenContext ctx, ChunkPlan info) {
-        ChunkDriver driver = ctx.driver;
-        // Base blocks below streets
-        int minHeight = info.provider.shape().minY();
-        for (int x = 0; x < 16; ++x) {
-            for (int z = 0; z < 16; ++z) {
-                int y = info.getCityGroundLevel() - 1;
-                driver.current(x, y, z);
-                while (driver.getY() > (minHeight + info.profile.bedrockLayer()) && isEmpty(driver.getBlock())) {
-                    driver.block(base);
-                    driver.decY();
-                }
-//                driver.setBlockRange(x, info.profile.bedrockLayer(), z, info.getCityGroundLevel(), baseChar);
-            }
-        }
-    }
-
-    /**
-     * Fill a main street block with base blocks and border blocks at the bottom
-     */
-    private void fillMainStreetBlock(ChunkGenContext ctx, ChunkPlan info, Character borderBlock, int offset) {
-        ChunkDriver driver = ctx.driver;
-        BlockState border = ctx.paletteAt(info.getCompiledPalette(), borderBlock, 0, info.getCityGroundLevel() - offset, 0);
-        for (int x = 0; x < 16; ++x) {
-            for (int z = 0; z < 16; ++z) {
-                driver.setBlockRange(x, info.getCityGroundLevel() - (offset - 1), z, info.getCityGroundLevel(), base);
-                driver.current(x, info.getCityGroundLevel() - offset, z).block(border);
-            }
-        }
-    }
-
-    /**
-     * Generate a single border column for one side of a street block
-     */
-    private void generateBorder(ChunkGenContext ctx, ChunkPlan info, boolean canDoParks, int x, int z, ChunkPlan adjacent, ChunkHeightmap heightmap) {
-        ChunkDriver driver = ctx.driver;
-        Character borderBlock = info.getCityStyle().getBorderBlock();
-        Character wallBlock = info.getCityStyle().getWallBlock();
-        BlockState wall = ctx.paletteAt(info.getCompiledPalette(), wallBlock, x, info.getCityGroundLevel() + 1, z);
-
-        if (info.profile.isFloating()) {
-                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-                if (isCorner(x, z)) {
-                    generateBorderSupport(ctx, info, wall, x, z, 3, heightmap);
-                }
-        } else if (info.profile.isCavern()) {
-                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-                if (isCorner(x, z)) {
-                    generateBorderSupport(ctx, info, wall, x, z, 2, heightmap);
-                }
-        } else {
-            int y = getMinHeightAt(info, x, z, heightmap);
-            if (y < info.getCityGroundLevel() + 1) {
-                setBlocksFromPalette(ctx, x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-            } else {
-                setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
-            }
-        }
-        if (canDoParks) {
-            if (!borderNeedsConnectionToAdjacentChunk(info, x, z)) {
-                driver.current(x, info.getCityGroundLevel() + 1, z).block(wall);
-            } else {
-                driver.current(x, info.getCityGroundLevel() + 1, z).block(air);
-            }
-        }
-    }
-
-    /**
-     * Generate a column of wall blocks (and stone below that in water)
-     */
-    private void generateBorderSupport(ChunkGenContext ctx, ChunkPlan info, BlockState wall, int x, int z, int offset, ChunkHeightmap heightmap) {
-        ChunkDriver driver = ctx.driver;
-        int height = heightmap.getHeight();
-        if (height > 1) {
-            // None void
-            int y = info.getCityGroundLevel() - offset - 1;
-            driver.current(x, y, z);
-            while (y > 1 && driver.getBlock() == air) {
-                driver.block(wall).decY();
-                y--;
-            }
-            while (y > 1 && driver.getBlock() == liquid) {
-                driver.block(base).decY();
-                y--;
-            }
-        }
-    }
-
-    private int generateFrontPart(ChunkGenContext ctx, ChunkPlan info, int height, ChunkPlan adj, Transform rot) {
-        if (info.hasFrontPartFrom(adj)) {
-            return generatePart(ctx, adj, adj.frontType, rot, 0, height, 0, HardAirSetting.AIR);
-        }
-        return height;
-    }
-
-    private void generateRandomVegetation(ChunkGenContext ctx, ChunkPlan info, int height) {
-        ChunkDriver driver = ctx.driver;
-
-        if (info.getXmin().hasBuilding) {
-            for (int x = 0; x < info.profile.randomLeafBlockThickness(); x++) {
-                for (int z = 0; z < 16; z++) {
-                    driver.current(x, height, z);
-                    // @todo can be more optimal? Only go down to non air in case random succeeds?
-                    // It's ok to only go down to 0 as we are not expecting to go lower then that
-                    while (driver.getBlockDown() == air && driver.getY() > 0) {
-                        driver.decY();
-                    }
-                    float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (info.profile.randomLeafBlockThickness() + 1 - x));
-                    int cnt = 0;
-                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
-                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
-                        cnt++;
-                    }
-                }
-            }
-        }
-        if (info.getXmax().hasBuilding) {
-            for (int x = 15 - info.profile.randomLeafBlockThickness(); x < 15; x++) {
-                for (int z = 0; z < 16; z++) {
-                    driver.current(x, height, z);
-                    // @todo can be more optimal? Only go down to non air in case random succeeds?
-                    // It's ok to only go down to 0 as we are not expecting to go lower then that
-                    while (driver.getBlockDown() == air && driver.getY() > 0) {
-                        driver.decY();
-                    }
-                    float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (x - 14 + info.profile.randomLeafBlockThickness()));
-                    int cnt = 0;
-                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_XMAX) < v && cnt < 30) {
-                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
-                        cnt++;
-                    }
-                }
-            }
-        }
-        if (info.getZmin().hasBuilding) {
-            for (int z = 0; z < info.profile.randomLeafBlockThickness(); z++) {
-                for (int x = 0; x < 16; x++) {
-                    driver.current(x, height, z);
-                    // @todo can be more optimal? Only go down to non air in case random succeeds?
-                    // It's ok to only go down to 0 as we are not expecting to go lower then that
-                    while (driver.getBlockDown() == air && driver.getY() > 0) {
-                        driver.decY();
-                    }
-                    float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (info.profile.randomLeafBlockThickness() + 1 - z));
-                    int cnt = 0;
-                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMIN) < v && cnt < 30) {
-                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
-                        cnt++;
-                    }
-                }
-            }
-        }
-        if (info.getZmax().hasBuilding) {
-            for (int z = 15 - info.profile.randomLeafBlockThickness(); z < 15; z++) {
-                for (int x = 0; x < 16; x++) {
-                    driver.current(x, height, z);
-                    // @todo can be more optimal? Only go down to non air in case random succeeds?
-                    // It's ok to only go down to 0 as we are not expecting to go lower then that
-                    while (driver.getBlockDown() == air && driver.getY() > 0) {
-                        driver.decY();
-                    }
-                    float v = info.profile.randomLeafBlockChance() * (z - 14 + info.profile.randomLeafBlockThickness());
-                    int cnt = 0;
-                    while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMAX) < v && cnt < 30) {
-                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
-                        cnt++;
-                    }
-                }
-            }
-        }
-    }
-
-    private void generateParkSection(ChunkGenContext ctx, ChunkPlan info, int height, boolean elevated) {
-        ChunkDriver driver = ctx.driver;
-        char street = ctx.street;
-        BlockState b;
-        boolean el00 = info.getXmin().getZmin().isElevatedParkSection();
-        boolean el10 = info.getZmin().isElevatedParkSection();
-        boolean el20 = info.getXmax().getZmin().isElevatedParkSection();
-        boolean el01 = info.getXmin().isElevatedParkSection();
-        boolean el21 = info.getXmax().isElevatedParkSection();
-        boolean el02 = info.getXmin().getZmax().isElevatedParkSection();
-        boolean el12 = info.getZmax().isElevatedParkSection();
-        boolean el22 = info.getXmax().getZmax().isElevatedParkSection();
-        CompiledPalette compiledPalette = info.getCompiledPalette();
-
-        Character grassChar = info.getCityStyle().getGrassBlock();
-        BlockState grassBlock = Blocks.GRASS_BLOCK.defaultBlockState();
-        boolean parkBorder = info.getCityStyle().getParkBorder() != null ? info.getCityStyle().getParkBorder() : info.profile.parkBorder();
-        for (int x = 0; x < 16; ++x) {
-            for (int z = 0; z < 16; ++z) {
-                // Resolved per column, at the block it will be written to.
-                BlockState grass = (grassChar == null)
-                        ? grassBlock
-                        : ctx.paletteAt(compiledPalette, grassChar, x, height, z);
-                if (x == 0 || x == 15 || z == 0 || z == 15) {
-                    b = null;
-                    if (elevated) {
-                        if (x == 0 && z == 0) {
-                            if (el01 && el00 && el10) {
-                                b = grass;
-                            }
-                        } else if (x == 15 && z == 0) {
-                            if (el21 && el20 && el10) {
-                                b = grass;
-                            }
-                        } else if (x == 0 && z == 15) {
-                            if (el01 && el02 && el12) {
-                                b = grass;
-                            }
-                        } else if (x == 15 && z == 15) {
-                            if (el12 && el22 && el21) {
-                                b = grass;
-                            }
-                        } else if (x == 0) {
-                            if (el01) {
-                                b = grass;
-                            }
-                        } else if (x == 15) {
-                            if (el21) {
-                                b = grass;
-                            }
-                        } else if (z == 0) {
-                            if (el10) {
-                                b = grass;
-                            }
-                        } else if (z == 15) {
-                            if (el12) {
-                                b = grass;
-                            }
-                        }
-                        if (b == null) {
-                            b = parkBorder ? ctx.paletteAt(compiledPalette, street, x, height, z) : grass;
-                        }
-                    } else {
-                        b = parkBorder ? ctx.paletteAt(compiledPalette, street, x, height, z) : grass;
-                    }
-                } else {
-                    b = grass;
-                }
-                driver.current(x, height, z).block(b);
-            }
-        }
-    }
-
-    /**
-     * The part family a chunk's road class draws from. A style that defines no tertiary family falls
-     * back to its ordinary streets, which {@link dev.krona.urbex.worldgen.lost.cityassets.CityStyle}
-     * handles; a chunk with no planned road (an open lot rendered as paving) also uses the ordinary
-     * family, because that is the narrowest surface available.
-     */
-    private static StreetParts getStreetParts(ChunkPlan info) {
-        return switch (info.getEffectiveRoadType()) {
-            case PRIMARY -> info.getCityStyle().getLargeStreetParts();
-            case TERTIARY -> info.getCityStyle().getTertiaryStreetParts();
-            case SECONDARY, NONE -> info.getCityStyle().getStreetParts();
-        };
-    }
-
-    /**
-     * Whether the street part on {@code info} should reach the edge it shares with {@code adjacent}.
-     *
-     * <p>On a primary road only another primary counts as a road connection. A secondary or tertiary
-     * street still meets the primary's surface - that is what the connector overlay is for - but it
-     * must not turn the primary into a bend or a junction, which would aim its quartz centre line
-     * down a minor street.
-     *
-     * <p>A bridge still connects, primary or not: a bridge carries the road onward, so ignoring it
-     * would end the road in a kerb with the bridge starting a chunk later out of nothing.
-     */
-    private static boolean hasStreetPartConnection(ChunkPlan info, ChunkPlan adjacent, boolean bridgeConnection) {
-        boolean roadConnection = ChunkPlan.hasRoadConnection(info, adjacent);
-        if (info.isPrimaryRoad()) {
-            return (roadConnection && adjacent.isPrimaryRoad()) || bridgeConnection;
-        }
-        return roadConnection || bridgeConnection;
-    }
-
-    /**
-     * The whole chunk as one ramp. The stair part is authored rising towards {@code XMIN}, so the
-     * direction of the higher edge is exactly its rotation.
-     */
-    private void generateStreetSlopeSection(ChunkGenContext ctx, ChunkPlan info, int height, Direction slopeDirection) {
-        StreetParts parts = getStreetParts(info);
-        // A style with no stair part has opted out of slopes the same way an empty connector list
-        // opts out of connectors below: asset gaps degrade rather than crash. Without this guard,
-        // getRandomPart would call List.get on an empty list and throw.
-        if (parts.stair().isEmpty()) {
-            return;
-        }
-        BuildingPart part = provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.stair()));
-        if (part != null) {
-            generatePart(ctx, info, part, slopeDirection.getRotation(), 0, height, 0, HardAirSetting.VOID);
-        }
-    }
-
-    private void generateNormalStreetSection(ChunkGenContext ctx, ChunkPlan info, int height) {
-        StreetParts parts = getStreetParts(info);
-        boolean xmin = hasStreetPartConnection(info, info.getXmin(), info.getXmin().hasXBridge(provider) != null);
-        boolean xmax = hasStreetPartConnection(info, info.getXmax(), info.getXmax().hasXBridge(provider) != null);
-        boolean zmin = hasStreetPartConnection(info, info.getZmin(), info.getZmin().hasZBridge(provider) != null);
-        boolean zmax = hasStreetPartConnection(info, info.getZmax(), info.getZmax().hasZBridge(provider) != null);
-        int cnt = (xmin ? 1 : 0) + (xmax ? 1 : 0) + (zmin ? 1 : 0) + (zmax ? 1 : 0);
-        Transform transform = Transform.ROTATE_NONE;
-        // Each part-family list is checked for emptiness before getRandomPart touches it, the same
-        // way parts.stair() and parts.connector() are guarded elsewhere: an empty list is a style
-        // opting out of that part, and getRandomPart would otherwise call List.get on a nextInt(0)
-        // and throw. A null part here is already handled below (no render, no connectors).
-        BuildingPart part = switch (cnt) {
-            case 0 -> parts.none().isEmpty() ? null
-                    : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.none()));
-            case 1 -> {
-                if (xmin) {
-                } else if (xmax) {
-                    transform = Transform.ROTATE_180;
-                } else if (zmin) {
-                    transform = Transform.ROTATE_90;
-                } else {
-                    transform = Transform.ROTATE_270;
-                }
-                yield parts.end().isEmpty() ? null
-                        : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.end()));
-            }
-            case 2 -> {
-                if (xmin == xmax || zmin == zmax) {
-                    if (xmin) {
-                    } else if (xmax) {
-                        transform = Transform.ROTATE_180;
-                    } else if (zmin) {
-                        transform = Transform.ROTATE_90;
-                    } else {
-                        transform = Transform.ROTATE_270;
-                    }
-                    yield parts.straight().isEmpty() ? null
-                            : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.straight()));
-                } else {
-                    if (xmin && zmin) {
-                    } else if (xmin && zmax) {
-                        transform = Transform.ROTATE_270;
-                    } else if (xmax && zmin) {
-                        transform = Transform.ROTATE_90;
-                    } else {
-                        transform = Transform.ROTATE_180;
-                    }
-                    yield parts.bend().isEmpty() ? null
-                            : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.bend()));
-                }
-            }
-            case 3 -> {
-                if (!xmin) {
-                    transform = Transform.ROTATE_90;
-                } else if (!xmax) {
-                    transform = Transform.ROTATE_270;
-                } else if (!zmin) {
-                    transform = Transform.ROTATE_180;
-                }
-                yield parts.t().isEmpty() ? null
-                        : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.t()));
-            }
-            case 4 -> parts.all().isEmpty() ? null
-                    : provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.all()));
-            default -> throw new RuntimeException("Not possible!");
-        };
-        if (part != null) {
-            generatePart(ctx, info, part, transform, 0, height, 0, HardAirSetting.VOID);
-            generateMinorStreetConnectors(ctx, info, parts, height);
-        }
-    }
-
-    /**
-     * Where a minor street runs up against a primary road, overlay a connector on the primary so the
-     * two surfaces meet instead of ending in a kerb. Only primaries carry these - a minor street
-     * meeting another minor street is an ordinary junction the topology already covers. A style with
-     * an empty connector list has opted out; that is a choice, not a missing asset, so no warning.
-     */
-    private void generateMinorStreetConnectors(ChunkGenContext ctx, ChunkPlan info, StreetParts parts, int height) {
-        if (!info.isPrimaryRoad() || parts.connector().isEmpty()) {
-            return;
-        }
-        generateMinorStreetConnector(ctx, info, info.getXmin(), parts, height, Transform.ROTATE_NONE);
-        generateMinorStreetConnector(ctx, info, info.getXmax(), parts, height, Transform.ROTATE_180);
-        generateMinorStreetConnector(ctx, info, info.getZmin(), parts, height, Transform.ROTATE_90);
-        generateMinorStreetConnector(ctx, info, info.getZmax(), parts, height, Transform.ROTATE_270);
-    }
-
-    private void generateMinorStreetConnector(ChunkGenContext ctx, ChunkPlan info, ChunkPlan adjacent,
-                                              StreetParts parts, int height, Transform transform) {
-        if (ChunkPlan.hasRoadConnection(info, adjacent) && !adjacent.isPrimaryRoad()) {
-            BuildingPart connector = provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.connector()));
-            if (connector != null) {
-                generatePart(ctx, info, connector, transform, 0, height, 0, HardAirSetting.VOID);
-            }
-        }
-    }
-
-    private boolean borderNeedsConnectionToAdjacentChunk(ChunkPlan info, int x, int z) {
-        for (Direction direction : Direction.VALUES) {
-            if (direction.atSide(x, z)) {
-                ChunkPlan adjacent = direction.get(info);
-                // A lower neighbour sloping up towards this chunk needs the retaining wall opened,
-                // but only across the ramp itself: the stair part's z1/z2 band, rotated to this
-                // edge. The rest of the wall stays, or the level change would read as a gap.
-                if (adjacent.getStreetSlopeDirection() == direction.getOpposite()) {
-                    StreetParts slopeParts = getStreetParts(adjacent);
-                    if (!slopeParts.stair().isEmpty()) {
-                        BuildingPart slope = provider.assets().parts().getOrWarn(slopeParts.stair().get(0));
-                        if (slope != null) {
-                            Integer z1 = slope.getMetaInteger(BuildingPart.META_Z_1);
-                            Integer z2 = slope.getMetaInteger(BuildingPart.META_Z_2);
-                            if (z1 != null && z2 != null) {
-                                Transform transform = direction.getOpposite().getRotation();
-                                int xx1 = transform.rotateX(15, z1);
-                                int zz1 = transform.rotateZ(15, z1);
-                                int xx2 = transform.rotateX(15, z2);
-                                int zz2 = transform.rotateZ(15, z2);
-                                if (x >= Math.min(xx1, xx2) && x <= Math.max(xx1, xx2)
-                                        && z >= Math.min(zz1, zz2) && z <= Math.max(zz1, zz2)) {
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-                if (adjacent.getActualStairDirection() == direction.getOpposite()) {
-                    BuildingPart stairType = adjacent.stairType;
-                    if (stairType != null) {
-                        Integer z1 = stairType.getMetaInteger(BuildingPart.META_Z_1);
-                        Integer z2 = stairType.getMetaInteger(BuildingPart.META_Z_2);
-                        Transform transform = direction.getOpposite().getRotation();
-                        int xx1 = transform.rotateX(15, z1);
-                        int zz1 = transform.rotateZ(15, z1);
-                        int xx2 = transform.rotateX(15, z2);
-                        int zz2 = transform.rotateZ(15, z2);
-                        if (x >= Math.min(xx1, xx2) && x <= Math.max(xx1, xx2) && z >= Math.min(zz1, zz2) && z <= Math.max(zz1, zz2)) {
-                            return true;
-                        }
-                    }
-                }
-                if (adjacent.hasBridge(provider, direction.getOrientation()) != null) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     public enum HardAirSetting {
         AIR, WATERLEVEL, VOID
     }
-
-    /**
-     * Generate a part. If 'airWaterLevel' is true then 'hard air' blocks are replaced with water below the waterLevel.
-     * Otherwise they are replaced with air.
-     */
-    public int generatePart(ChunkGenContext ctx, ChunkPlan info, IBuildingPart part,
-                             Transform transform,
-                             int ox, int oy, int oz, HardAirSetting airWaterLevel) {
-        ChunkDriver driver = ctx.driver;
-        if (profile.editMode()) {
-            EditModeData.getData().addPartData(info.coord, oy, part.getName());
-        }
-        CompiledPalette compiledPalette = computePalette(info, part);
-
-        boolean nowater = part.getMetaBoolean(BuildingPart.META_NOWATER);
-
-        for (int x = 0; x < part.getXSize(); x++) {
-            for (int z = 0; z < part.getZSize(); z++) {
-                char[] vs = part.getVSlice(x, z);
-                if (vs != null) {
-                    int rx = ox + transform.rotateX(x, z);
-                    int rz = oz + transform.rotateZ(x, z);
-                    driver.current(rx, oy, rz);
-                    int len = vs.length;
-                    for (int y = 0; y < len; y++) {
-                        char c = vs[y];
-                        BlockState b = ctx.paletteAt(compiledPalette, c, rx, oy + y, rz);
-                        if (b == null) {
-                            throw new RuntimeException("Could not find entry '" + c + "' in the palette for part '" + part.getName() + "'!");
-                        }
-
-                        Palette.Info inf = compiledPalette.getInfo(c);
-
-                        if (transform != Transform.ROTATE_NONE) {
-                            b = transformBlockState(ctx.tags, info, transform, b);
-                        }
-
-                        // We don't replace the world where the part is empty (air)
-                        if (b != air) {
-                            if (b == liquid) {
-                                if (info.profile.avoidWater()) {
-                                    b = air;
-                                }
-                            } else if (b == hardAir) {
-                                switch (airWaterLevel) {
-                                    case AIR:
-                                        b = air;
-                                        break;
-                                    case WATERLEVEL:
-                                        if (!info.profile.avoidFoliage() && !nowater && oy + y < info.waterLevel) {
-                                            b = liquid;
-                                        } else {
-                                            b = air;
-                                        }
-                                        break;
-                                    case VOID:
-                                        // hardAir (STRUCTURE_VOID) is replaced by whatever was already there
-                                        break;
-                                }
-                            } else if (inf != null) {
-                                if (inf.light() != null || inf.isTorch()) {
-                                    b = handleLightMarker(ctx, inf, driver.getCurrentCopy());
-                                } else if (inf.loot() != null && !inf.loot().isEmpty()) {
-                                    handleLoot(ctx, info, part, b, inf);
-                                } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
-                                    // ctx.region, not provider.getWorld(): these write block entity
-                                    // NBT into a chunk, which only the generating region has.
-                                    b = handleSpawner(ctx, info, part, oy, ctx.region, rx, rz, y, b, inf);
-                                } else if (inf.tag() != null) {
-                                    b = handleBlockEntity(ctx, info, oy, ctx.region, rx, rz, y, b, inf);
-                                }
-                            } else if (ctx.tags.needsPoiUpdate(b)) {
-                                // If this block has POI data we need to delay setting it
-                                BlockState finalB = b;
-                                BlockPos p = driver.getCurrentCopy();
-                                ctx.addPostTodo(p, inWorld -> {
-                                    if (inWorld.getBlockState(p).getBlock() == Blocks.DIRT) {
-                                        inWorld.setBlock(p, finalB, Block.UPDATE_NONE);
-                                    }
-                                });
-                                b = Blocks.DIRT.defaultBlockState();
-                            } else if (ctx.tags.needsLightingUpdate(b)) {
-                                updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
-                            } else if (ctx.tags.needsTodo(b)) {
-                                b = handleTodo(ctx, info, oy, ctx.region, rx, rz, y, b);
-                            }
-                            driver.add(b);
-                        } else {
-                            driver.incY();
-                        }
-                    }
-                }
-            }
-        }
-        return oy + part.getSliceCount();
-    }
-
-    public BlockState handleLightMarker(ChunkGenContext ctx, Palette.Info marker, BlockPos pos) {
-        if (DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity())) {
-            ctx.addLightTodo(pos, marker.light());
-        }
-        return air;
-    }
-
-    /**
-     * The chunk's palette with this part's local palette merged over it.
-     * <p>
-     * This carried an upstream {@code // Cache the combined palette?} comment and answered it by
-     * building a fresh {@link CompiledPalette} - deep-copying three maps over a hundred-odd entries -
-     * for every part with a local palette in every chunk. The answer is yes, and it is keyed on the
-     * two compiled assets involved rather than on the chunk (issue #53).
-     */
-    public CompiledPalette computePalette(ChunkPlan info, IBuildingPart part) {
-        return provider.caches().palettes.with(info.getCompiledPalette(), part.getLocalPalette());
-    }
-
-    private BlockEntityType getTypeForBlock(BlockState state) {
-        // get / compute-outside / putIfAbsent, not computeIfAbsent: the registry walk used to
-        // run inside a ConcurrentHashMap bin lock, stalling every other worldgen thread whose
-        // block hashed into the same bin (issue #25). Racing threads compute the same answer.
-        Block block = state.getBlock();
-        Optional<BlockEntityType> existing = typeCache.get(block);
-        if (existing != null) {
-            return existing.orElse(null);
-        }
-        for (BlockEntityType<?> type : BuiltInRegistries.BLOCK_ENTITY_TYPE) {
-            if (type.isValid(state)) {
-                Optional<BlockEntityType> raced = typeCache.putIfAbsent(block, Optional.of(type));
-                return raced != null ? raced.orElse(null) : type;
-            }
-        }
-        // Remember the miss too. A palette entry carrying NBT for a block that is not a block
-        // entity is a datapack error, and the caller warns about it - but without this the registry
-        // walk ran again for every block placed from that entry, on a worldgen worker, for as long
-        // as the world was played. Optional rather than a sentinel type, because every real
-        // BlockEntityType is a value this map legitimately holds (issue #132).
-        typeCache.putIfAbsent(block, Optional.empty());
-        return null;
-    }
-
-    private BlockState handleBlockEntity(ChunkGenContext ctx, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
-        BlockPos pos = info.getRelativePos(rx, oy + y, rz);
-        BlockEntityType type = getTypeForBlock(b);
-        if (type == null) {
-            ModSetup.getLogger().warn("Error getting type for block: " + b.getBlock());
-            return b;
-        }
-        CompoundTag tag = inf.tag().copy();
-        tag.putInt("x", pos.getX());
-        tag.putInt("y", pos.getY());
-        tag.putInt("z", pos.getZ());
-        tag.putString("id", BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type).toString());
-        world.getChunk(pos).setBlockEntityNbt(tag);
-        if (b.getBlock() == Blocks.COMMAND_BLOCK) {
-            ctx.addPostTodo(pos, inWorld -> {
-                ((ServerChunkCache) inWorld.getLevel().getChunkSource()).blockChanged(pos);
-                inWorld.scheduleTick(pos, b.getBlock(), 1);
-            });
-        }
-        return b;
-    }
-
-    /**
-     * Forget queued block entity data for blocks that a later pass has overwritten.
-     *
-     * A spawner or a tagged block entity queues its NBT with setBlockEntityNbt the
-     * moment the part owning it is generated, but everything that runs afterwards —
-     * ruins above all, plus explosions, rubble, stuff and the post-todos — writes
-     * through the ChunkDriver or through setBlock, and neither of those touches that
-     * queue. ProtoChunk.setBlockState does not either; clearing it is ours to do.
-     *
-     * What is left is a spawner queued onto the air that replaced it. Minecraft
-     * discovers this when the chunk is saved or promoted, logs "Invalid block entity"
-     * with a full stack trace, and throws the data away anyway — so dropping it here
-     * changes nothing about the world and removes the noise from the log.
-     */
-    private static void forgetOverwrittenBlockEntities(ChunkAccess chunk) {
-        // getBlockEntitiesPos() hands back a copy, so removing while iterating is safe.
-        for (BlockPos pos : chunk.getBlockEntitiesPos()) {
-            CompoundTag tag = chunk.getBlockEntityNbt(pos);
-            if (tag == null) {
-                continue;   // a real block entity, already validated against its block
-            }
-            Identifier id = Identifier.tryParse(tag.getStringOr("id", ""));
-            BlockEntityType<?> type = id == null ? null : BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(id);
-            if (type == null || !type.isValid(chunk.getBlockState(pos))) {
-                chunk.removeBlockEntity(pos);
-            }
-        }
-    }
-
-    private BlockState handleSpawner(ChunkGenContext ctx, ChunkPlan info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
-        if (SpecialMarkerPolicy.generateSpawner(info.profile)) {
-            String mobid = inf.mobId();
-            BlockPos pos = info.getRelativePos(rx, oy + y, rz);
-            CompoundTag tag = new CompoundTag();
-            tag.putInt("x", pos.getX());
-            tag.putInt("y", pos.getY());
-            tag.putInt("z", pos.getZ());
-            tag.putString("id", "minecraft:mob_spawner");
-            // Keyed on the spawner's own position: which mob a spawner gets must not depend on
-            // how many spawners this chunk happened to place before it.
-            RandomSource spawnerRandom = Rng.atPos(provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SPAWNERS);
-            Identifier randomValue = getRandomSpawnerMob(world.getLevel(), spawnerRandom, provider, info,
-                    new ChunkPlan.ConditionTodo(mobid, part.getName(), info), pos);
-            CompoundTag sd = new CompoundTag();
-            sd.putString("id", randomValue.toString());
-            SpawnData data = new SpawnData(sd, Optional.empty(), Optional.empty());
-            tag.put("SpawnData", SpawnData.CODEC.encodeStart(NbtOps.INSTANCE, data).result().orElseThrow(() -> new IllegalStateException("Invalid SpawnData")));
-
-            world.getChunk(pos).setBlockEntityNbt(tag);
-        } else {
-            b = air;
-        }
-        return b;
-    }
-
-    private void handleLoot(ChunkGenContext ctx, ChunkPlan info, IBuildingPart part,
-                            BlockState block, Palette.Info marker) {
-        BlockPos pos = ctx.driver.getCurrentCopy();
-        if (!SpecialMarkerPolicy.populateLoot(provider.seed(), pos, info.profile)) {
-            return;
-        }
-        ctx.addPostTodo(pos, inWorld -> {
-            if (!inWorld.getBlockState(pos).isAir()) {
-                inWorld.setBlock(pos, block, Block.UPDATE_CLIENTS);
-                generateLoot(info, inWorld, pos,
-                        new ChunkPlan.ConditionTodo(marker.loot(), part.getName(), info));
-            }
-        });
-    }
-
-    private BlockState handleTodo(ChunkGenContext ctx, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
-        Block block = b.getBlock();
-        CityStyle cs = info.getCityStyle();
-        boolean avoidFoliage = info.profile.avoidFoliage();
-        if (cs.getAvoidFoliage() != null) {
-            avoidFoliage = cs.getAvoidFoliage();
-        }
-        if (block instanceof SaplingBlock || block instanceof FlowerBlock) {
-            if (avoidFoliage) {
-                b = air;
-            } else {
-                BlockPos pos = info.getRelativePos(rx, oy + y, rz);
-                if (block instanceof SaplingBlock saplingBlock) {
-                    BlockState finalB = b;
-                    if (Config.forceSaplingGrowth()) {
-                        // The todo runs later, on the server thread, long after this context is gone.
-                        // Key the tree it grows on the sapling's position so it is the same tree no
-                        // matter when the todo is drained.
-                        RandomSource growthRandom = Rng.atPos(provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.VEGETATION_GROWTH);
-                        ctx.addLevelTask(pos, level -> {
-                            // Not available yet is not the same as nothing to do. This used to
-                            // return either way and the queue counted it done, so a tree whose
-                            // chunk happened to be unloaded when the drain reached it simply never
-                            // grew (issue #127).
-                            if (!level.hasChunksAt(pos.offset(-1, -1, -1), pos.offset(1, 1, 1))) {
-                                return LevelTaskQueue.Outcome.RETRY;
-                            }
-                            if (level.getBlockState(pos).getBlock() instanceof SaplingBlock) {
-                                level.setBlock(pos, finalB, Block.UPDATE_CLIENTS);
-                                saplingBlock.advanceTree(level, pos, finalB, growthRandom);
-                            }
-                            // Either it grew, or something else stands there now and no sapling is
-                            // coming back to that position. Retrying would never end.
-                            return LevelTaskQueue.Outcome.DONE;
-                        });
-                    } else {
-                        ctx.addPostTodo(pos, inWorld -> {
-                            BlockState state = finalB.setValue(SaplingBlock.STAGE, 1);
-                            inWorld.setBlock(pos, state, Block.UPDATE_ALL_IMMEDIATE);
-                        });
-                    }
-                }
-            }
-        }
-        return b;
-    }
-
-    /**
-     * Applies a part's transform to one block state, using the {@code rotatable} tag of the world
-     * style governing this chunk.
-     * <p>
-     * The tag used to be resolved once and cached on the generator, because the world style could
-     * not change under a running generator. It can now: two cities in one world can come from
-     * different packs whose {@code rotatable} tags differ, so the tag has to follow the chunk.
-     * {@link ChunkPlan#worldStyle()} memoises it per chunk, so this stays a field read in the hot
-     * path rather than a neighbourhood walk. A world style that declares no {@code rotatable}
-     * resolves {@code urbex:rotatable}, as before.
-     * <p>
-     * Membership is answered by the chunk's own {@link TagSnapshot} rather than by a live registry
-     * read, so every block of every part in this chunk sees one tag epoch even if a {@code /reload}
-     * lands halfway through it (issue #128).
-     */
-    private BlockState transformBlockState(TagSnapshot tags, ChunkPlan info, Transform transform, BlockState b) {
-        if (tags.isRotatable(info.worldStyle().getRotatableTag(), b)) {
-            // Vanilla structure order: mirror first, then rotate. The mirror used to be
-            // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
-            // the wrong way (issue #45).
-            b = b.mirror(transform.getMcMirror()).rotate(transform.getMcRotation());
-        } else if (getRailStates().contains(b)) {
-            EnumProperty<RailShape> shapeProperty;
-            if (b.getBlock() == Blocks.RAIL) {
-                shapeProperty = RailBlock.SHAPE;
-            } else if (b.getBlock() == Blocks.POWERED_RAIL) {
-                shapeProperty = PoweredRailBlock.SHAPE;
-            } else {
-                throw new RuntimeException("Error with rail!");
-            }
-            RailShape shape = b.getValue(shapeProperty);
-            b = b.setValue(shapeProperty, transform.transform(shape));
-        }
-        return b;
-    }
-
-
-    public static Identifier getRandomSpawnerMob(Level world, RandomSource random, PlanningContext diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
-        String condition = todo.getCondition();
-        Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
-        int level = (pos.getY() - diminfo.preset().groundLevel()) / FLOORHEIGHT;
-        int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
-        String belowFloor = ConditionContext.NO_PART;
-        ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
-                todo.getPart(), belowFloor, todo.getBuilding(), info.coord) {
-            @Override
-            public Identifier getBiome() {
-                return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
-            }
-        };
-        String randomValue = cnd.getRandomValue(random, conditionContext);
-        if (randomValue == null) {
-            throw new RuntimeException("Condition '" + cnd.getName() + "' did not return a valid mob!");
-        }
-        return Identifier.parse(randomValue);
-    }
-
-
-    private void generateLoot(ChunkPlan info, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo condition) {
-        BlockEntity te = world.getBlockEntity(pos);
-        if (te instanceof RandomizableContainerBlockEntity) {
-            // Runs from a post-todo, after generation of this chunk has finished, so it cannot
-            // borrow the context's streams. The chest's own position addresses it instead.
-            RandomSource lootRandom = Rng.atPos(provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
-            createLoot(info, lootRandom, world, pos, condition, this.provider);
-        } else if (te == null) {
-            ModSetup.getLogger().error("Error setting loot at {},{},{}", pos.getX(), pos.getY(), pos.getZ());
-        }
-    }
-
-    public static void createLoot(ChunkPlan info, RandomSource random, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo todo, PlanningContext diminfo) {
-        BlockEntity tileentity = world.getBlockEntity(pos);
-        if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
-            if (todo != null) {
-                String lootTable = todo.getCondition();
-                int level = (pos.getY() - diminfo.preset().groundLevel()) / FLOORHEIGHT;
-                int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
-                ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
-                        todo.getPart(), ConditionContext.NO_PART, todo.getBuilding(), info.coord) {
-                    @Override
-                    public Identifier getBiome() {
-                        return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
-                    }
-                };
-                String randomValue = diminfo.assets().conditions().getOrThrow(lootTable).getRandomValue(random, conditionContext);
-//                ((LockableLootTileEntity) tileentity).setLootTable(Identifier.fromNamespaceAndPath(randomValue), random.nextLong());
-//                tileentity.markDirty();
-//                    Urbex.setup.getLogger().debug("createLootChest: loot=" + randomValue + " pos=" + pos.toString());
-//                }
-                rcbe.setLootTable(ResourceKey.create(Registries.LOOT_TABLE, Identifier.parse(randomValue)));
-            }
-        }
-    }
-
 
     private void generateDebris(ChunkGenContext ctx, ChunkPlan info) {
         // One stream for all eight neighbours: a fresh one per direction would scatter the debris
@@ -1992,43 +558,6 @@ public class CityGenerator {
         }
     }
 
-    private boolean doBorder(ChunkPlan info, Direction direction) {
-        ChunkPlan adjacent = direction.get(info);
-        if (isHigherThenNearbyStreetChunk(info, adjacent)) {
-            return true;
-        } else if (!adjacent.isCity) {
-            if (adjacent.cityLevel <= info.cityLevel) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isHigherThenNearbyStreetChunk(ChunkPlan info, ChunkPlan adjacent) {
-        if (!adjacent.isCity) {
-            return false;
-        }
-        if (adjacent.hasBuilding) {
-            return adjacent.cityLevel + adjacent.getNumFloors() < info.cityLevel;
-        } else {
-            return adjacent.cityLevel < info.cityLevel;
-        }
-    }
-
-    private void setBlocksFromPalette(ChunkGenContext ctx, int x, int y, int z, int y2, CompiledPalette palette, char character) {
-        ChunkDriver driver = ctx.driver;
-        if (palette.isSimple(character)) {
-            BlockState b = ctx.paletteAt(palette, character, x, y, z);
-            driver.setBlockRange(x, y, z, y2, b);
-        } else {
-            driver.current(x, y, z);
-            while (y < y2) {
-                driver.add(ctx.paletteHere(palette, character));
-                y++;
-            }
-        }
-    }
-
     private void generateBuilding(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, ChunkAccess chunk) {
         ChunkDriver driver = ctx.driver;
         int lowestLevel = info.getBuildingBottomHeight();
@@ -2052,7 +581,7 @@ public class CityGenerator {
             }
 
             BuildingPart part = info.getFloor(f);
-            generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
+            Parts.generatePart(ctx, this, info, part, Transform.ROTATE_NONE, 0, height, 0, HardAirSetting.AIR);
             part = info.getFloorPart2(f);
             if (part != null) {
                 part2Map.add(Pair.of(height, part));
@@ -2071,12 +600,12 @@ public class CityGenerator {
             // Underground we replace the glass with the filler
             for (int x = 0; x < 16; x++) {
                 // Use safe version because this may end up being lower
-                setBlocksFromPalette(ctx, x, lowestLevel, 0, Math.min(info.getCityGroundLevel(), info.getZmin().getCityGroundLevel()) + 1, palette, fillerBlock);
-                setBlocksFromPalette(ctx, x, lowestLevel, 15, Math.min(info.getCityGroundLevel(), info.getZmax().getCityGroundLevel()) + 1, palette, fillerBlock);
+                Parts.setBlocksFromPalette(ctx, this, x, lowestLevel, 0, Math.min(info.getCityGroundLevel(), info.getZmin().getCityGroundLevel()) + 1, palette, fillerBlock);
+                Parts.setBlocksFromPalette(ctx, this, x, lowestLevel, 15, Math.min(info.getCityGroundLevel(), info.getZmax().getCityGroundLevel()) + 1, palette, fillerBlock);
             }
             for (int z = 1; z < 15; z++) {
-                setBlocksFromPalette(ctx, 0, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmin().getCityGroundLevel()) + 1, palette, fillerBlock);
-                setBlocksFromPalette(ctx, 15, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmax().getCityGroundLevel()) + 1, palette, fillerBlock);
+                Parts.setBlocksFromPalette(ctx, this, 0, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmin().getCityGroundLevel()) + 1, palette, fillerBlock);
+                Parts.setBlocksFromPalette(ctx, this, 15, lowestLevel, z, Math.min(info.getCityGroundLevel(), info.getXmax().getCityGroundLevel()) + 1, palette, fillerBlock);
             }
         }
 
@@ -2092,7 +621,7 @@ public class CityGenerator {
             for (Pair<Integer, BuildingPart> entry : part2Map) {
                 int h = entry.getKey();
                 BuildingPart part = entry.getValue();
-                generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, h, 0, HardAirSetting.AIR);
+                Parts.generatePart(ctx, this, info, part, Transform.ROTATE_NONE, 0, h, 0, HardAirSetting.AIR);
             }
         }
     }
@@ -2127,7 +656,7 @@ public class CityGenerator {
                         driver.setBlockRange(x, height + 1, z, lowestLevel, base);
                     }
                     // Also clear the inside of buildings to avoid geometry that doesn't really belong there
-                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
+                    Terrain.clearRange(ctx, this, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
         } else if (info.profile.isCavern()) {
@@ -2135,7 +664,7 @@ public class CityGenerator {
             for (int x = 0; x < 16; ++x) {
                 for (int z = 0; z < 16; ++z) {
                     if (isSide(x, z)) {
-                        setBlocksFromPalette(ctx, x, lowestLevel - 10, z, lowestLevel, palette, borderBlock);
+                        Parts.setBlocksFromPalette(ctx, this, x, lowestLevel - 10, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
                         BlockState filler = ctx.paletteAt(palette, fillerBlock, x, lowestLevel, z);
@@ -2143,7 +672,7 @@ public class CityGenerator {
                     }
 
                     // Also clear the inside of buildings to avoid geometry that doesn't really belong there
-                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
+                    Terrain.clearRange(ctx, this, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
         } else {
@@ -2152,12 +681,12 @@ public class CityGenerator {
             for (int x = 0; x < 16; ++x) {
                 for (int z = 0; z < 16; ++z) {
                     if (isSide(x, z)) {
-                        int y = getMinHeightAt(info, x, z, heightmap);
+                        int y = Terrain.getMinHeightAt(this, info, x, z, heightmap);
                         if (y >= lowestLevel) {
                             // The building generates below heightmap height. So we generate a border of 3 only
                             y = lowestLevel - 3;
                         }
-                        setBlocksFromPalette(ctx, x, y, z, lowestLevel, palette, borderBlock);
+                        Parts.setBlocksFromPalette(ctx, this, x, y, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
                         BlockState filler = ctx.paletteAt(palette, fillerBlock, x, lowestLevel, z);
@@ -2165,21 +694,21 @@ public class CityGenerator {
                     }
                     // That single filler block is not enough when the bottom of the building ends
                     // up over a cave, a ravine or a terrain step: give it ground to stand on.
-                    fillSupportBelow(ctx, x, z, lowestLevel - 1);
+                    Terrain.fillSupportBelow(ctx, this, x, z, lowestLevel - 1);
 
                     // Also clear the inside of buildings to avoid geometry that doesn't really belong there
-                    clearRange(ctx, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
+                    Terrain.clearRange(ctx, this, info, x, z, lowestLevel, info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT, info.waterLevel > info.groundLevel);
                 }
             }
         }
     }
 
-    private void clearToMax(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, int height, int max) {
+    public void clearToMax(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, int height, int max) {
         int maximumHeight = Math.min(max, heightmap.getHeight() + 10);
         if (height < maximumHeight) {
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
-                    clearRange(ctx, info, x, z, height, maximumHeight, false);
+                    Terrain.clearRange(ctx, this, info, x, z, height, maximumHeight, false);
                 }
             }
         }
@@ -2189,16 +718,6 @@ public class CityGenerator {
         return x == 0 || x == 15 || z == 0 || z == 15;
     }
 
-    private static boolean isCorner(int x, int z) {
-        return (x == 0 || x == 15) && (z == 0 || z == 15);
-    }
-
-    /**
-     * Queue a place-twice refresh at {@code pos} on the context generating this chunk.
-     * <p>
-     * Takes the context rather than the chunk's {@code ChunkPlan}: the refresh belongs to one
-     * generation, and a cached planning value is not allowed to hold it (issue #127).
-     */
     public static void updateNeeded(ChunkGenContext ctx, BlockPos pos, int flags) {
         ctx.addPostTodo(pos, world -> {
             BlockState state = world.getBlockState(pos);

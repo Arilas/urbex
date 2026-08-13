@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.gen;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
+import dev.krona.urbex.worldgen.Parts;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.Transform;
@@ -50,31 +51,31 @@ public class Highways {
         if (info.isTunnel(level)) {
             // We know we need a tunnel
             part = info.provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, highwayParts.tunnel(bidirectional)));
-            feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
+            Parts.generatePart(ctx, feature, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
         } else {
             if (info.isCity && level <= adjacent1.cityLevel && level <= adjacent2.cityLevel && adjacent1.isCity && adjacent2.isCity) {
                 // Simple highway in the city
                 part = info.provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, highwayParts.open(bidirectional)));
-                int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
+                int height = Parts.generatePart(ctx, feature, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
                 // Clear a bit more above the highway
                 if (!info.profile.isCavern()) {
                     int clearheight = 15;
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
-                            feature.clearRange(ctx, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
+                            Terrain.clearRange(ctx, feature, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
                                     Highways::isClearableAboveHighway);
                         }
                     }
                 }
             } else {
                 part = info.provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, highwayParts.bridge(bidirectional)));
-                int height = feature.generatePart(ctx, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
+                int height = Parts.generatePart(ctx, feature, info, part, transform, 0, highwayGroundLevel, 0, CityGenerator.HardAirSetting.WATERLEVEL);
                 // Clear a bit more above the highway
                 if (!info.profile.isCavern()) {
                     int clearheight = 15;
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
-                            feature.clearRange(ctx, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
+                            Terrain.clearRange(ctx, feature, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
                                     Highways::isClearableAboveHighway);
                         }
                     }

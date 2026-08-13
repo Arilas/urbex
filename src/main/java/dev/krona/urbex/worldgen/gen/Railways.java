@@ -5,6 +5,7 @@ import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.CityGenerator;
+import dev.krona.urbex.worldgen.Parts;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
@@ -22,7 +23,7 @@ public class Railways {
         if (info.getZmin().getRailInfo().getType() == RailChunkType.HORIZONTAL ||
                 info.getZmax().getRailInfo().getType() == RailChunkType.HORIZONTAL) {
             int height = info.groundLevel + Railway.RAILWAY_LEVEL_OFFSET * CityGenerator.FLOORHEIGHT;
-            feature.generatePart(ctx, info, info.railDungeon, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+            Parts.generatePart(ctx, feature, info, info.railDungeon, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         }
     }
 
@@ -129,13 +130,13 @@ public class Railways {
                 part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.railsFlat()));
                 break;
         }
-        int h = feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+        int h = Parts.generatePart(ctx, feature, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         if (clearUpper) {
             int maxh = heightmap.getHeight() + 4;
             if (h < maxh) {
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
-                        feature.clearRange(ctx, info, x, z, h, maxh, false);
+                        Terrain.clearRange(ctx, feature, info, x, z, h, maxh, false);
                     }
                 }
             }
@@ -243,11 +244,11 @@ public class Railways {
             part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationStaircase()));
             for (int i = railInfo.getLevel() + 1; i < info.cityLevel; i++) {
                 height = info.groundLevel + i * CityGenerator.FLOORHEIGHT;
-                feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+                Parts.generatePart(ctx, feature, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
             }
             height = info.groundLevel + info.cityLevel * CityGenerator.FLOORHEIGHT;
             part = provider.assets().parts().getOrThrow(feature.getRandomPart(ctx, railwayParts.stationStaircaseSurface()));
-            feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+            Parts.generatePart(ctx, feature, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         }
     }
 }
