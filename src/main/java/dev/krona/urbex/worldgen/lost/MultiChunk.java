@@ -8,7 +8,7 @@ import dev.krona.urbex.varia.Counter;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.cityassets.Building;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.cityassets.MultiBuilding;
@@ -51,7 +51,7 @@ public class MultiChunk {
      * Not synchronized, and getOrCompute rather than computeIfAbsent: calculateBuildings() reaches
      * back into the city caches, which reach back here.
      */
-    public static MultiChunk getOrCreate(IDimensionInfo provider, ChunkCoord coord) {
+    public static MultiChunk getOrCreate(PlanningContext provider, ChunkCoord coord) {
         // primary(), unlike the rest of multisettings below: areasize defines the grid getMultiCoord
         // divides by, so it cannot be read from an area that grid has not identified yet.
         int areasize = provider.worldStyles().primary().getMultiSettings().areasize();
@@ -69,8 +69,8 @@ public class MultiChunk {
                 Math.floorDiv(coord.chunkZ(), areasize));
     }
 
-    private MultiChunk calculateBuildings(IDimensionInfo provider) {
-        RandomSource rand = Rng.at(provider.getSeed(), mc.chunkX(), mc.chunkZ(), Rng.Purpose.MULTI);
+    private MultiChunk calculateBuildings(PlanningContext provider) {
+        RandomSource rand = Rng.at(provider.seed(), mc.chunkX(), mc.chunkZ(), Rng.Purpose.MULTI);
 
         // Determine how many multibuildings we want to place in this multichunk
         // Drawn at this area's own anchor rather than world-wide: how many multi-buildings an area
@@ -115,7 +115,7 @@ public class MultiChunk {
         Counter<CityStyle> cityStyleCounter = new Counter<>();
         for (int x = 0 ; x < areasize ; x++) {
             for (int z = 0 ; z < areasize ; z++) {
-                CityStyle cityStyle = City.getCityStyle(topleft.offset(x, z), provider, provider.getProfile());
+                CityStyle cityStyle = City.getCityStyle(topleft.offset(x, z), provider, provider.preset());
                 if (cityStyle == null) {
                     throw new RuntimeException("Cannot find city style for chunk: " + topleft.offset(x, z));
                 }
@@ -171,7 +171,7 @@ public class MultiChunk {
             for (int att = 0 ; att < attempts ; att++) {
                 int x = rand.nextInt(areasize - dimX + 1);
                 int z = rand.nextInt(areasize - dimZ + 1);
-                if (canPlaceBuilding(topleft, provider, provider.getProfile(), ch.style(), mb, cityLevel, maxCellars, x, z)) {
+                if (canPlaceBuilding(topleft, provider, provider.preset(), ch.style(), mb, cityLevel, maxCellars, x, z)) {
                     placeBuilding(mb, x, z);
                     break;
                 }
@@ -206,7 +206,7 @@ public class MultiChunk {
         }
     }
 
-    private boolean canPlaceBuilding(ChunkCoord topleft, IDimensionInfo provider, Preset profile, CityStyle buildingCityStyle, MultiBuilding building,
+    private boolean canPlaceBuilding(ChunkCoord topleft, PlanningContext provider, Preset profile, CityStyle buildingCityStyle, MultiBuilding building,
                                      int cityLevel, int maxCellars, int x, int z) {
         int partlevel = provider.worldStyles().primary().getWorldSettings().railPartHeight6();
         int correctStyle = 0;

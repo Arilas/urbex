@@ -74,19 +74,19 @@ public class CityGenerator {
     private final BlockState[] randomDirt;
     private final Set<BlockState> randomDirtSet;
 
-    public final IDimensionInfo provider;
+    public final PlanningContext provider;
     public final Preset profile;
 
     private final Statistics statistics = new Statistics();
     private final Map<Block, BlockEntityType> typeCache = new ConcurrentHashMap<>();
 
-    public CityGenerator(IDimensionInfo provider, Preset profile) {
+    public CityGenerator(PlanningContext provider, Preset profile) {
         this.provider = provider;
         this.profile = profile;
 //        int waterLevel = provider.getWorld() == null ? 65 : Tools.getSeaLevel(provider.getWorld());// profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
         // Four independent noise fields, each seeded from the world seed alone. They describe the
         // whole dimension rather than one chunk, so they take a fixed coordinate and are built once.
-        long seed = provider.getSeed();
+        long seed = provider.seed();
         this.rubbleNoise = new NoiseGeneratorPerlin(Rng.at(seed, 0, 0, Rng.Purpose.NOISE), 4);
         this.leavesNoise = new NoiseGeneratorPerlin(Rng.at(seed, 1, 0, Rng.Purpose.NOISE), 4);
         this.ruinNoise = new NoiseGeneratorPerlin(Rng.at(seed, 2, 0, Rng.Purpose.NOISE), 4);
@@ -222,7 +222,7 @@ public class CityGenerator {
         int chunkX = chunk.getPos().x();
         int chunkZ = chunk.getPos().z();
 
-        ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
+        ChunkCoord coord = new ChunkCoord(provider.dimension(), chunkX, chunkZ);
 
         // A copy, because correctTerrainShape() below writes the corrected surface back into it.
         // The instance in caches().heightmap is shared with every other thread generating a chunk
@@ -231,7 +231,7 @@ public class CityGenerator {
         // value whose presence depends on whether this chunk ran before or after its neighbour
         // read it - the neighbour's border height, and so the terrain, would depend on generation
         // order. See Arilas/urbex#24.
-        ChunkHeightmap heightmap = new ChunkHeightmap(provider.getHeightmap(coord));
+        ChunkHeightmap heightmap = new ChunkHeightmap(provider.heightmap(coord));
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
         // runtime.tags() is read here and nowhere else in this generation: one call, at the start,
         // so a /reload landing mid-chunk cannot be observed halfway through a building (issue #128).
@@ -263,7 +263,7 @@ public class CityGenerator {
         // If this chunk has a building or street but we're in a floating profile and
         // we happen to have a void chunk we detect that here and go back to normal chunk generation
         // anyway
-        if (doCity && provider.getProfile().CITY_AVOID_VOID && provider.getProfile().isFloating()) {
+        if (doCity && provider.preset().CITY_AVOID_VOID && provider.preset().isFloating()) {
             boolean v = isVoid(ctx, 2, 2) || isVoid(ctx, 2, 14) || isVoid(ctx, 14, 2) || isVoid(ctx, 14, 14) || isVoid(ctx, 8, 8);
             doCity = !v;
         }
@@ -802,7 +802,7 @@ public class CityGenerator {
     }
 
 
-    public static boolean isWaterBiome(IDimensionInfo provider, ChunkCoord coord) {
+    public static boolean isWaterBiome(PlanningContext provider, ChunkCoord coord) {
         BiomeInfo biomeInfo = BiomeInfo.getBiomeInfo(provider, coord);
         Holder<Biome> mainBiome = biomeInfo.getMainBiome();
         return isWaterBiome(mainBiome);
@@ -822,24 +822,24 @@ public class CityGenerator {
         int adjacent;
         if (x == 0) {
             if (z == 0) {
-                adjacent = provider.getHeightmap(info.coord.northWest()).getHeight();
+                adjacent = provider.heightmap(info.coord.northWest()).getHeight();
             } else if (z == 15) {
-                adjacent = provider.getHeightmap(info.coord.southWest()).getHeight();
+                adjacent = provider.heightmap(info.coord.southWest()).getHeight();
             } else {
-                adjacent = provider.getHeightmap(info.coord.west()).getHeight();
+                adjacent = provider.heightmap(info.coord.west()).getHeight();
             }
         } else if (x == 15) {
             if (z == 0) {
-                adjacent = provider.getHeightmap(info.coord.northEast()).getHeight();
+                adjacent = provider.heightmap(info.coord.northEast()).getHeight();
             } else if (z == 15) {
-                adjacent = provider.getHeightmap(info.coord.southEast()).getHeight();
+                adjacent = provider.heightmap(info.coord.southEast()).getHeight();
             } else {
-                adjacent = provider.getHeightmap(info.coord.east()).getHeight();
+                adjacent = provider.heightmap(info.coord.east()).getHeight();
             }
         } else if (z == 0) {
-            adjacent = provider.getHeightmap(info.coord.north()).getHeight();
+            adjacent = provider.heightmap(info.coord.north()).getHeight();
         } else if (z == 15) {
-            adjacent = provider.getHeightmap(info.coord.south()).getHeight();
+            adjacent = provider.heightmap(info.coord.south()).getHeight();
         } else {
             return height;
         }
@@ -1921,7 +1921,7 @@ public class CityGenerator {
             tag.putString("id", "minecraft:mob_spawner");
             // Keyed on the spawner's own position: which mob a spawner gets must not depend on
             // how many spawners this chunk happened to place before it.
-            RandomSource spawnerRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SPAWNERS);
+            RandomSource spawnerRandom = Rng.atPos(provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SPAWNERS);
             Identifier randomValue = getRandomSpawnerMob(world.getLevel(), spawnerRandom, provider, info,
                     new ChunkPlan.ConditionTodo(mobid, part.getName(), info), pos);
             CompoundTag sd = new CompoundTag();
@@ -1939,7 +1939,7 @@ public class CityGenerator {
     private void handleLoot(ChunkGenContext ctx, ChunkPlan info, IBuildingPart part,
                             BlockState block, Palette.Info marker) {
         BlockPos pos = ctx.driver.getCurrentCopy();
-        if (!SpecialMarkerPolicy.populateLoot(provider.getSeed(), pos, info.profile)) {
+        if (!SpecialMarkerPolicy.populateLoot(provider.seed(), pos, info.profile)) {
             return;
         }
         ctx.addPostTodo(pos, inWorld -> {
@@ -1969,7 +1969,7 @@ public class CityGenerator {
                         // The todo runs later, on the server thread, long after this context is gone.
                         // Key the tree it grows on the sapling's position so it is the same tree no
                         // matter when the todo is drained.
-                        RandomSource growthRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.VEGETATION_GROWTH);
+                        RandomSource growthRandom = Rng.atPos(provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.VEGETATION_GROWTH);
                         ctx.addLevelTask(pos, level -> {
                             // Not available yet is not the same as nothing to do. This used to
                             // return either way and the queue counted it done, so a tree whose
@@ -2035,10 +2035,10 @@ public class CityGenerator {
     }
 
 
-    public static Identifier getRandomSpawnerMob(Level world, RandomSource random, IDimensionInfo diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
+    public static Identifier getRandomSpawnerMob(Level world, RandomSource random, PlanningContext diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();
         Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
-        int level = (pos.getY() - diminfo.getProfile().GROUNDLEVEL) / FLOORHEIGHT;
+        int level = (pos.getY() - diminfo.preset().GROUNDLEVEL) / FLOORHEIGHT;
         int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
         String belowFloor = ConditionContext.NO_PART;
         ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
@@ -2061,19 +2061,19 @@ public class CityGenerator {
         if (te instanceof RandomizableContainerBlockEntity) {
             // Runs from a post-todo, after generation of this chunk has finished, so it cannot
             // borrow the context's streams. The chest's own position addresses it instead.
-            RandomSource lootRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
+            RandomSource lootRandom = Rng.atPos(provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
             createLoot(info, lootRandom, world, pos, condition, this.provider);
         } else if (te == null) {
             ModSetup.getLogger().error("Error setting loot at {},{},{}", pos.getX(), pos.getY(), pos.getZ());
         }
     }
 
-    public static void createLoot(ChunkPlan info, RandomSource random, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo todo, IDimensionInfo diminfo) {
+    public static void createLoot(ChunkPlan info, RandomSource random, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo todo, PlanningContext diminfo) {
         BlockEntity tileentity = world.getBlockEntity(pos);
         if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
             if (todo != null) {
                 String lootTable = todo.getCondition();
-                int level = (pos.getY() - diminfo.getProfile().GROUNDLEVEL) / FLOORHEIGHT;
+                int level = (pos.getY() - diminfo.preset().GROUNDLEVEL) / FLOORHEIGHT;
                 int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
                 ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
                         todo.getPart(), ConditionContext.NO_PART, todo.getBuilding(), info.coord) {

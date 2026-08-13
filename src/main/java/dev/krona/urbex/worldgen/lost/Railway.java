@@ -4,7 +4,7 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.util.RandomSource;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 
@@ -93,12 +93,12 @@ public class Railway {
     /**
      * The station grid repeats every 9 chunks. There is never a station at every 18/18 multiple chunk
      */
-    private static RailChunkInfo getRailChunkTypeInternal(ChunkCoord key, IDimensionInfo provider) {
+    private static RailChunkInfo getRailChunkTypeInternal(ChunkCoord key, PlanningContext provider) {
         int chunkX = key.chunkX();
         int chunkZ = key.chunkZ();
-        RandomSource randomRailChunkType = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.RAILWAY);
+        RandomSource randomRailChunkType = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.RAILWAY);
 
-        Preset profile = provider.getProfile();
+        Preset profile = provider.preset();
         RailwayParts railwayParts = provider.worldStyles().primary().getPartSelector().railwayParts();
 
         // @todo make all settings based on rand below configurable
@@ -287,7 +287,7 @@ public class Railway {
         return RailChunkInfo.NOTHING;
     }
 
-    private static RailChunkInfo getStationType(ChunkCoord coord, IDimensionInfo provider, Preset profile, float r, int rails, List<String> part) {
+    private static RailChunkInfo getStationType(ChunkCoord coord, PlanningContext provider, Preset profile, float r, int rails, List<String> part) {
         int cityLevel = ChunkPlan.getCityLevel(coord, provider);
         if (cityLevel > 2 || !profile.RAILWAY_SURFACE_STATIONS_ENABLED) {
             // We are too high here. We need an underground station
@@ -315,7 +315,7 @@ public class Railway {
         return r < .5f ? new RailChunkInfo(STATION_SURFACE, BI, cityLevel, rails, part) : new RailChunkInfo(STATION_UNDERGROUND, BI, RAILWAY_LEVEL_OFFSET, rails);
     }
 
-    public static RailChunkInfo getRailChunkType(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    public static RailChunkInfo getRailChunkType(ChunkCoord coord, PlanningContext provider, Preset profile) {
         Map<ChunkCoord, RailChunkInfo> cache = provider.caches().railInfo;
         RailChunkInfo known = cache.get(coord);
         if (known != null) {
@@ -357,13 +357,13 @@ public class Railway {
      * railway when the world style is <em>not</em> {@code BLOCK_RAILWAY}, so under the one policy
      * that consults this the building's depth owes the railway nothing.</p>
      */
-    public static boolean buildingBlocksRail(ChunkCoord coord, IDimensionInfo provider) {
+    public static boolean buildingBlocksRail(ChunkCoord coord, PlanningContext provider) {
         WorldSettings.RailwayAvoidance avoidance =
                 provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
         if (avoidance != WorldSettings.RailwayAvoidance.BLOCK_RAILWAY) {
             return false;
         }
-        RailChunkInfo railInfo = getRailChunkType(coord, provider, provider.getProfile());
+        RailChunkInfo railInfo = getRailChunkType(coord, provider, provider.preset());
         if (railInfo == RailChunkInfo.NOTHING) {
             return false;
         }
@@ -376,7 +376,7 @@ public class Railway {
         return lowestLevel <= railInfo.getLevel() + partlevel - 1;
     }
 
-    private static RailChunkInfo testAdjacentRailChunk(float r, RailChunkInfo adjacent, RailDirection direction, ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    private static RailChunkInfo testAdjacentRailChunk(float r, RailChunkInfo adjacent, RailDirection direction, ChunkCoord coord, PlanningContext provider, Preset profile) {
         switch (adjacent.getType()) {
             case NONE:
                 return RailChunkInfo.NOTHING;

@@ -8,7 +8,7 @@ import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.*;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
@@ -33,7 +33,7 @@ import static dev.krona.urbex.worldgen.CityGenerator.FLOORHEIGHT;
 public class ChunkPlan {
 
     public final ChunkCoord coord;
-    public final IDimensionInfo provider;
+    public final PlanningContext provider;
     public final Preset profile;
     public final int groundLevel;
     public final int waterLevel;
@@ -298,25 +298,25 @@ public class ChunkPlan {
     }
 
     // Version for usage inside the gui
-    public static boolean hasBuildingGui(int chunkX, int chunkZ, IDimensionInfo provider, ChunkCandidate candidate) {
-//        Random rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
+    public static boolean hasBuildingGui(int chunkX, int chunkZ, PlanningContext provider, ChunkCandidate candidate) {
+//        Random rand = getBuildingRandom(chunkX, chunkZ, provider.seed());
 //        rand.nextFloat();       // Compatibility?
 
         return candidate.couldHaveBuilding();
     }
 
-    public static ChunkCandidate getChunkCandidateGui(ChunkCoord key, IDimensionInfo provider) {
+    public static ChunkCandidate getChunkCandidateGui(ChunkCoord key, PlanningContext provider) {
 //        ChunkCandidate cached = CITY_INFO_MAP.get(key);
 //        if (cached != null) {
 //            return cached;
 //        }
         int chunkX = key.chunkX();
         int chunkZ = key.chunkZ();
-        Preset profile = provider.getProfile();
+        Preset profile = provider.preset();
 
         boolean isCity = isCityRaw(key, provider, profile);
         int cityLevel = getCityLevelGui(key, provider);
-        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
+        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.seed(), Rng.Purpose.BUILDING);
         boolean couldHaveBuilding = isCity && rand.nextFloat() < profile.BUILDING_CHANCE;
         // The preview resolves neither a multi-building section nor a style, exactly as before -
         // those three stay null here rather than being computed for a screen that does not use them.
@@ -329,14 +329,14 @@ public class ChunkPlan {
      * them simply loses the putIfAbsent below. Locking here would be a deadlock waiting to happen -
      * this method reaches its neighbours' city styles, which reach back here.
      */
-    public static ChunkCandidate getChunkCandidate(ChunkCoord coord, IDimensionInfo provider) {
+    public static ChunkCandidate getChunkCandidate(ChunkCoord coord, PlanningContext provider) {
         ChunkCandidate cached = provider.caches().candidate.get(coord);
         if (cached != null) {
             return cached;
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        Preset profile = provider.getProfile();
+        Preset profile = provider.preset();
 
         // Computed into locals and constructed once at the end. This used to assemble a mutable
         // object field by field and hand the half-built thing to its own helpers; the record cannot
@@ -354,7 +354,7 @@ public class ChunkPlan {
             cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(multiPos, coord, provider)
                     : getAverageCityLevel(multiPos, coord, provider);
         }
-        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
+        RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.seed(), Rng.Purpose.BUILDING);
         boolean couldHaveBuilding = ChunkContentResolver.couldHaveBuilding(profile,
                 isCity, multiPos, cityLevel, rand,
                 chunkFacts(coord, provider, profile));
@@ -424,7 +424,7 @@ public class ChunkPlan {
     /**
      * Don't use the cache as we're busy building the cache.
      */
-    public static boolean isCityRaw(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    public static boolean isCityRaw(ChunkCoord coord, PlanningContext provider, Preset profile) {
         if (isVoidChunk(coord, provider)) {
             // If we have a void chunk then no city here
             return false;
@@ -434,7 +434,7 @@ public class ChunkPlan {
         return cityFactor > profile.CITY_THRESHOLD;
     }
 
-    public static boolean isCity(ChunkCoord coord, IDimensionInfo provider) {
+    public static boolean isCity(ChunkCoord coord, PlanningContext provider) {
         return getChunkCandidate(coord, provider).isCity();
     }
 
@@ -448,7 +448,7 @@ public class ChunkPlan {
      * still being computed, so it may not read anything that depends on a building decision - its
      * own or a neighbour's - or the decision graph stops being acyclic.
      */
-    public static RoadType effectiveRoadType(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    public static RoadType effectiveRoadType(ChunkCoord coord, PlanningContext provider, Preset profile) {
         // The city test comes first, and it is not a matter of taste. Every chunk in the world builds
         // a ChunkPlan, and the great majority of them are wilderness; asking the road field first
         // would build the block layout five times over - once for this chunk and once per neighbour
@@ -479,7 +479,7 @@ public class ChunkPlan {
      * {@link Railway} for a chunk whose building roll already failed would be new work, and
      * {@code Railway}'s chunk types are mutable state.
      */
-    private static ChunkContentResolver.ChunkFacts chunkFacts(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    private static ChunkContentResolver.ChunkFacts chunkFacts(ChunkCoord coord, PlanningContext provider, Preset profile) {
         return new ChunkContentResolver.ChunkFacts(
                 () -> City.getPredefinedBuildingAtTopLeft(provider, coord) != null,
                 () -> City.getPredefinedStreetAt(provider, coord) != null,
@@ -502,7 +502,7 @@ public class ChunkPlan {
         static final MultiSection NONE = new MultiSection(MultiPos.SINGLE, null);
     }
 
-    private static MultiSection multiBuildingSection(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    private static MultiSection multiBuildingSection(ChunkCoord coord, PlanningContext provider, Preset profile) {
         // If a chunk is occupied according to City then there is a predefined building or street here.
         // Try to look for it
         if (City.isChunkOccupied(provider, coord)) {
@@ -536,7 +536,7 @@ public class ChunkPlan {
         return getChunkPlan(key, provider);
     }
 
-    private static int getAverageCityLevel(MultiPos mp, ChunkCoord coord, IDimensionInfo provider) {
+    private static int getAverageCityLevel(MultiPos mp, ChunkCoord coord, PlanningContext provider) {
         int level = 0;
         int topX = coord.chunkX() - mp.x();
         int topZ = coord.chunkZ() - mp.z();
@@ -549,7 +549,7 @@ public class ChunkPlan {
         return level / (mp.w() * mp.h());
     }
 
-    private static int getTopLeftCityLevel(MultiPos mp, ChunkCoord coord, IDimensionInfo provider) {
+    private static int getTopLeftCityLevel(MultiPos mp, ChunkCoord coord, PlanningContext provider) {
         int topX = coord.chunkX() - mp.x();
         int topZ = coord.chunkZ() - mp.z();
         ChunkCoord key = new ChunkCoord(provider.dimension(), topX, topZ);
@@ -561,20 +561,20 @@ public class ChunkPlan {
      * that needs the top-left's building type, and only when {@code mp} is not itself the top left -
      * the caller has no half-built object to hand back for that case any more, and does not need one.
      */
-    private static ChunkCandidate getTopLeftCityInfo(MultiPos mp, ChunkCoord coord, IDimensionInfo provider) {
+    private static ChunkCandidate getTopLeftCityInfo(MultiPos mp, ChunkCoord coord, PlanningContext provider) {
         ChunkCoord key = coord.offset(-mp.x(), -mp.z());
         return getChunkCandidate(key, provider);
     }
 
-    public static boolean hasHighway(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    public static boolean hasHighway(ChunkCoord coord, PlanningContext provider, Preset profile) {
         return Highway.getXHighwayLevel(coord, provider, profile) >= 0 || Highway.getZHighwayLevel(coord, provider, profile) >= 0;
     }
 
-    public static boolean hasRailway(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    public static boolean hasRailway(ChunkCoord coord, PlanningContext provider, Preset profile) {
         return Railway.getRailChunkType(coord, provider, profile).getType() != RailChunkType.NONE;
     }
 
-    public static boolean hasRailwayAtSurface(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    public static boolean hasRailwayAtSurface(ChunkCoord coord, PlanningContext provider, Preset profile) {
         RailChunkType type = Railway.getRailChunkType(coord, provider, profile).getType();
         return type.isSurface() || type.isStation();
     }
@@ -591,7 +591,7 @@ public class ChunkPlan {
         }
 
         // Get the (possbily cached) heightmap for this chunk
-        ChunkHeightmap heightmap = provider.getHeightmap(coord);
+        ChunkHeightmap heightmap = provider.heightmap(coord);
         // The height at which the highway would be + a threshold of 3
         int highwayHeight = groundLevel + level * FLOORHEIGHT + 3;
         // If there are many places in the chunk above this height we will need a tunnel
@@ -603,7 +603,7 @@ public class ChunkPlan {
      * neighbours', so populating inside the map's bin lock deadlocks. Racing threads both build one
      * and one of them is thrown away - identical, because it is a pure function of seed + coord.
      */
-    public static ChunkPlan getChunkPlan(ChunkCoord key, IDimensionInfo provider) {
+    public static ChunkPlan getChunkPlan(ChunkCoord key, PlanningContext provider) {
         ChunkPlan info = provider.caches().chunkPlan.get(key);
         if (info != null) {
             return info;
@@ -637,16 +637,16 @@ public class ChunkPlan {
      * of that shape would have picked here. Nothing reads back what the command draws, so the change
      * is only visible as which parts the preview stacks.
      */
-    public static ChunkPlan detachedForEditing(ChunkCoord key, IDimensionInfo provider,
+    public static ChunkPlan detachedForEditing(ChunkCoord key, PlanningContext provider,
                                                   BuildingOverride override) {
         return new ChunkPlan(key, provider, override);
     }
 
-    private ChunkPlan(ChunkCoord key, IDimensionInfo provider, @Nullable BuildingOverride override) {
+    private ChunkPlan(ChunkCoord key, PlanningContext provider, @Nullable BuildingOverride override) {
         this.provider = provider;
         this.coord = key;
 
-        profile = provider.getProfile();
+        profile = provider.preset();
 
         ChunkCandidate candidate = getChunkCandidate(key, provider);
 
@@ -658,14 +658,14 @@ public class ChunkPlan {
         multiBuilding = candidate.multiBuilding();
         multiBuildingPos = candidate.multiPos();
 
-        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_LAYOUT);
+        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.seed(), Rng.Purpose.BUILDING_LAYOUT);
 
         CityStyle cs = candidate.cityStyle();
 
         isCity = candidate.isCity();
         effectiveRoad = effectiveRoadType(key, provider, profile);
 
-        ChunkContent content = ChunkContentResolver.resolve(profile, provider.getSeed(), rand,
+        ChunkContent content = ChunkContentResolver.resolve(profile, provider.seed(), rand,
                 isCity, candidate.couldHaveBuilding(), effectiveRoad, multiBuildingPos, coord,
                 neighbour -> getChunkCandidate(neighbour, provider).buildingType().getPrefersLonely(),
                 candidate.buildingType().getName());
@@ -801,12 +801,12 @@ public class ChunkPlan {
 
                 @Override
                 public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly, where the old
+                    // provider.biome() asks the biome source directly, where the old
                     // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
                     // offset - so the two can disagree right at a quart boundary. Forced: a cached
                     // ChunkPlan is reached from its neighbours' generation and has no region to
                     // ask, and the dimension's own level would go looking for unloaded chunks.
-                    Holder<Biome> biome = provider.getBiome(getCenter(0));
+                    Holder<Biome> biome = provider.biome(getCenter(0));
                     return biome.unwrap().map(ResourceKey::identifier, b -> provider.registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
@@ -947,9 +947,9 @@ public class ChunkPlan {
      * Return true if this is a void chunk (only for floating island worldtype). This does
      * not use the cache so it is safe to use when the cache is building
      */
-    public static boolean isVoidChunk(ChunkCoord coord, IDimensionInfo provider) {
-        if (provider.getProfile().isFloating()) {
-            return provider.getHeightmap(coord).getHeight() <= 0;
+    public static boolean isVoidChunk(ChunkCoord coord, PlanningContext provider) {
+        if (provider.preset().isFloating()) {
+            return provider.heightmap(coord).getHeight() <= 0;
         } else {
             return false;
         }
@@ -960,7 +960,7 @@ public class ChunkPlan {
      * This function does not use the cache. So safe to use when the cache is building
      * This function uses its own cache.
      */
-    public static int getCityLevel(ChunkCoord key, IDimensionInfo provider) {
+    public static int getCityLevel(ChunkCoord key, PlanningContext provider) {
         // Unconditional. This used to be gated on provider.getWorld() != null, "In LC preview we
         // don't want to use the cache as the config isn't loaded yet" - a guard from when the
         // preview shared the dimension's caches. It has held its own DimensionCaches, built from
@@ -971,12 +971,12 @@ public class ChunkPlan {
             return cached;
         }
         int result;
-        if (provider.getProfile().isFloating()) {
+        if (provider.preset().isFloating()) {
             result = getCityLevelFloating(key, provider);
-        } else if (provider.getProfile().isCavern()) {
+        } else if (provider.preset().isCavern()) {
             result =  getCityLevelCavern(key, provider);
         } else {
-            result = getCityLevelNormal(key, provider, provider.getProfile());
+            result = getCityLevelNormal(key, provider, provider.preset());
         }
         Integer raced = provider.caches().cityLevel.putIfAbsent(key, result);
         if (raced != null) {
@@ -985,26 +985,26 @@ public class ChunkPlan {
         return result;
     }
 
-    public static int getCityLevelGui(ChunkCoord key, IDimensionInfo provider) {
+    public static int getCityLevelGui(ChunkCoord key, PlanningContext provider) {
         int result;
-        if (provider.getProfile().isFloating()) {
+        if (provider.preset().isFloating()) {
             result = getCityLevelFloating(key, provider);
-        } else if (provider.getProfile().isCavern()) {
+        } else if (provider.preset().isCavern()) {
             result =  getCityLevelCavern(key, provider);
         } else {
-            result = getCityLevelNormal(key, provider, provider.getProfile());
+            result = getCityLevelNormal(key, provider, provider.preset());
         }
         return result;
     }
 
-    private static int getCityLevelCavern(ChunkCoord coord, IDimensionInfo provider) {
+    private static int getCityLevelCavern(ChunkCoord coord, PlanningContext provider) {
         // @todo for now
         return getCityLevelFloating(coord, provider);
     }
 
 
-    private static int getCityLevelNormal(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
-        ChunkHeightmap heightmap = provider.getHeightmap(coord);
+    private static int getCityLevelNormal(ChunkCoord coord, PlanningContext provider, Preset profile) {
+        ChunkHeightmap heightmap = provider.heightmap(coord);
         int height = heightmap.getHeight();
         if (profile.USE_AVG_HEIGHTMAP && Config.HEIGHT_SAMPLE_SIZE.get() > 2) {
             int sampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
@@ -1023,19 +1023,19 @@ public class ChunkPlan {
             int avgHeightmap = height;
             int counter = 1;
             if (isCityRaw(left, provider, profile)) {
-                avgHeightmap += provider.getHeightmap(left).getHeight();
+                avgHeightmap += provider.heightmap(left).getHeight();
                 counter++;
             }
             if (isCityRaw(right, provider, profile)) {
-                avgHeightmap += provider.getHeightmap(right).getHeight();
+                avgHeightmap += provider.heightmap(right).getHeight();
                 counter++;
             }
             if (isCityRaw(up, provider, profile)) {
-                avgHeightmap += provider.getHeightmap(up).getHeight();
+                avgHeightmap += provider.heightmap(up).getHeight();
                 counter++;
             }
             if (isCityRaw(down, provider, profile)) {
-                avgHeightmap += provider.getHeightmap(down).getHeight();
+                avgHeightmap += provider.heightmap(down).getHeight();
                 counter++;
             }
             avgHeightmap /= counter;
@@ -1044,9 +1044,9 @@ public class ChunkPlan {
         return getLevelBasedOnHeight(height, profile);
     }
 
-    private static int getCityLevelFloating(ChunkCoord coord, IDimensionInfo provider) {
-        int h = provider.getHeightmap(coord).getHeight();
-        return getLevelBasedOnHeight(h, provider.getProfile());
+    private static int getCityLevelFloating(ChunkCoord coord, PlanningContext provider) {
+        int h = provider.heightmap(coord).getHeight();
+        return getLevelBasedOnHeight(h, provider.preset());
     }
 
     private static int getLevelBasedOnHeight(int height, Preset profile) {
@@ -1263,14 +1263,14 @@ public class ChunkPlan {
         return result;
     }
 
-    public BuildingPart hasBridge(IDimensionInfo provider, Orientation orientation) {
+    public BuildingPart hasBridge(PlanningContext provider, Orientation orientation) {
         return switch (orientation) {
             case X -> hasXBridge(provider);
             case Z -> hasZBridge(provider);
         };
     }
 
-    public boolean hasBridge(IDimensionInfo provider) {
+    public boolean hasBridge(PlanningContext provider) {
         if (hasXBridge(provider) != null) {
             return true;
         }
@@ -1281,7 +1281,7 @@ public class ChunkPlan {
     }
 
     // To prevent adjacent bridges of the same direction we give the bridges at even chunk Z coordinates higher priority
-    public BuildingPart hasXBridge(IDimensionInfo provider) {
+    public BuildingPart hasXBridge(PlanningContext provider) {
         if (xBridgeTypeCalculated) {
             return xBridgeType;
         }
@@ -1293,7 +1293,7 @@ public class ChunkPlan {
         return result;
     }
 
-    private BuildingPart computeXBridge(IDimensionInfo provider) {
+    private BuildingPart computeXBridge(PlanningContext provider) {
         PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
         if (planned != null) {
             // A planned span settles this chunk for both orientations. Falling through to the
@@ -1351,7 +1351,7 @@ public class ChunkPlan {
     }
 
     // To prevent adjacent bridges of the same direction we give the bridges at even chunk X coordinates higher priority
-    public BuildingPart hasZBridge(IDimensionInfo provider) {
+    public BuildingPart hasZBridge(PlanningContext provider) {
         if (zBridgeTypeCalculated) {
             return zBridgeType;
         }
@@ -1361,7 +1361,7 @@ public class ChunkPlan {
         return result;
     }
 
-    private BuildingPart computeZBridge(IDimensionInfo provider) {
+    private BuildingPart computeZBridge(PlanningContext provider) {
         PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
         if (planned != null) {
             return planned.orientation() == Orientation.Z
@@ -1437,7 +1437,7 @@ public class ChunkPlan {
     }
 
 
-    private boolean isSuitableForBridge(IDimensionInfo provider, ChunkPlan i) {
+    private boolean isSuitableForBridge(PlanningContext provider, ChunkPlan i) {
         if (i.getPlannedBridge() != null) {
             // A planned span owns this chunk. An opportunistic bridge must not run through it -
             // it would stamp its own part over the planned deck on its way past.
@@ -1785,23 +1785,23 @@ public class ChunkPlan {
             if (h < provider.shape().maxBuildHeight()) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
-                        h + CityGenerator.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
-                        h + CityGenerator.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_UPPER));
+                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
+                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_UPPER));
                 return desiredMaxHeight1;
             }
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx, cz - 1));
-            getZmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx, cz + 1));
+            getZmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx, cz - 1));
+            getZmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.getSeed(), cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx + 1, cz + 1));
 
             desiredMaxHeight1 = minMax;
         }
@@ -1847,16 +1847,16 @@ public class ChunkPlan {
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx, cz - 1));
-            getZmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx, cz + 1));
+            getZmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx, cz - 1));
+            getZmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.getSeed(), cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx + 1, cz + 1));
             desiredTerrainCorrectionHeights = minMax;
         }
         return desiredTerrainCorrectionHeights;

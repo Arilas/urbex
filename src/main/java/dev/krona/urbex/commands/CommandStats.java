@@ -6,7 +6,7 @@ import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.varia.Statistics;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.DimensionRuntime;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -27,9 +27,9 @@ public class CommandStats implements Command<CommandSourceStack> {
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         // The source's own level, not the player's: this has to work from the server console too,
         // which is where the generation timings are actually read from during a headless run.
-        IDimensionInfo dimInfo = GenerationSession.planningFor(context.getSource().getLevel());
-        if (dimInfo != null) {
-            Statistics statistics = dimInfo.getFeature().getStatistics();
+        DimensionRuntime runtime = GenerationSession.runtimeFor(context.getSource().getLevel());
+        if (runtime != null && runtime.isEnabled()) {
+            Statistics statistics = runtime.generator().getStatistics();
             float averageTime = statistics.getAverageTime();
             long minTime = statistics.getMinTime();
             long maxTime = statistics.getMaxTime();

@@ -27,13 +27,14 @@ import javax.annotation.Nullable;
  * itself, which is how a worker could have the asset registries cleared underneath it and save an
  * undecorated chunk (issue #125).</p>
  *
- * <p>{@code planning} is {@code null} for a level Urbex does not generate in. That is a cached
+ * <p>{@code dimension} is {@code null} for a level Urbex does not generate in. That is a cached
  * answer, not an absent one: the alternative is re-deriving "this dimension has no preset" from the
  * config on every chunk of every vanilla dimension.</p>
  *
- * <p>The record is the phase-1 shape from the milestone plan, deliberately not the final one:
- * {@code planning} holds today's {@link IDimensionInfo} until #129 replaces it with an explicit
- * planning context. {@link #caches()} and {@link #generator()} read like the components they will
+ * <p>{@code dimension} is what is left of the phase-1 shape: it holds the {@link IDimensionInfo}
+ * that pairs this level's {@link PlanningContext} with its {@link CityGenerator}, and goes when the
+ * preview stops needing an implementation of that interface, leaving the two as real components.
+ * {@link #planning()}, {@link #caches()} and {@link #generator()} read like the components they will
  * become while still delegating to the one object that owns them today - two record components
  * holding the same objects would be two owners of one thing, which is the mistake this whole epic
  * is about. {@code tasks} is a real component, because nothing else owns it.</p>
@@ -43,11 +44,11 @@ import javax.annotation.Nullable;
  * rather than a {@link TagSnapshot} so that a {@code /reload} can swap the epoch without rebuilding
  * anything here - which is the whole of what a reload changes (issue #128).</p>
  */
-public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning, LevelTaskQueue tasks,
+public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo dimension, LevelTaskQueue tasks,
                                @Nullable TagEpoch tagEpoch) {
 
-    public DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo planning, @Nullable TagEpoch tagEpoch) {
-        this(level, planning, new LevelTaskQueue(level.dimension().identifier().toString()), tagEpoch);
+    public DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo dimension, @Nullable TagEpoch tagEpoch) {
+        this(level, dimension, new LevelTaskQueue(level.dimension().identifier().toString()), tagEpoch);
     }
 
     /**
@@ -60,17 +61,22 @@ public record DimensionRuntime(ServerLevel level, @Nullable IDimensionInfo plann
     }
 
     public boolean isEnabled() {
-        return planning != null;
+        return dimension != null;
+    }
+
+    /** Everything a chunk of this level is planned against. Never call on a disabled runtime. */
+    public PlanningContext planning() {
+        return dimension.planning();
     }
 
     /** The per-level caches. Never call on a disabled runtime. */
     public DimensionCaches caches() {
-        return planning.caches();
+        return dimension.planning().caches();
     }
 
     /** The generator this level's chunks are driven by. Never call on a disabled runtime. */
     public CityGenerator generator() {
-        return planning.getFeature();
+        return dimension.getFeature();
     }
 
     /**

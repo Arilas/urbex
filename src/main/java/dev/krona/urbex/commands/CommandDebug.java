@@ -9,7 +9,7 @@ import dev.krona.urbex.plan.RoadCell;
 import dev.krona.urbex.plan.TertiarySegment;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
 import dev.krona.urbex.worldgen.lost.Railway;
@@ -52,12 +52,12 @@ public class CommandDebug implements Command<CommandSourceStack> {
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         BlockPos position = player.blockPosition();
-        IDimensionInfo dimInfo = GenerationSession.planningFor((WorldGenLevel) player.level());
+        PlanningContext dimInfo = GenerationSession.planningFor((WorldGenLevel) player.level());
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
-        ChunkCoord coord = new ChunkCoord(dimInfo.getType(), position.getX() >> 4, position.getZ() >> 4);
+        ChunkCoord coord = new ChunkCoord(dimInfo.dimension(), position.getX() >> 4, position.getZ() >> 4);
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimInfo);
         line(context, "profile = " + info.profile.getId());
         line(context, "buildingType = " + info.buildingType.getName());
@@ -88,12 +88,12 @@ public class CommandDebug implements Command<CommandSourceStack> {
         int explosions = info.getExplosions().size();
         line(context, "explosions = " + explosions);
 
-        ChunkHeightmap heightmap = dimInfo.getHeightmap(info.coord);
+        ChunkHeightmap heightmap = dimInfo.heightmap(info.coord);
         line(context, "Chunk height (heightmap): " + heightmap.getHeight());
 
-        line(context, "dimInfo.getProfile().BUILDING_MINFLOORS = " + dimInfo.getProfile().BUILDING_MINFLOORS);
-        line(context, "dimInfo.getProfile().BUILDING_MAXFLOORS = " + dimInfo.getProfile().BUILDING_MAXFLOORS);
-        line(context, "dimInfo.getProfile().CITY_CHANCE = " + dimInfo.getProfile().CITY_CHANCE);
+        line(context, "dimInfo.preset().BUILDING_MINFLOORS = " + dimInfo.preset().BUILDING_MINFLOORS);
+        line(context, "dimInfo.preset().BUILDING_MAXFLOORS = " + dimInfo.preset().BUILDING_MAXFLOORS);
+        line(context, "dimInfo.preset().CITY_CHANCE = " + dimInfo.preset().CITY_CHANCE);
         line(context, "info.isOcean() = " + info.isOcean());
 
         printRoadDebug(context, info, dimInfo);
@@ -108,7 +108,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
      * containing multi-building). Printed only on command - never during ordinary generation - and
      * grouped under three headers so the three kinds of information don't run together.
      */
-    private static void printRoadDebug(CommandContext<CommandSourceStack> context, ChunkPlan info, IDimensionInfo dimInfo) {
+    private static void printRoadDebug(CommandContext<CommandSourceStack> context, ChunkPlan info, PlanningContext dimInfo) {
         RoadCell road = dimInfo.roadField().at(info.coord.chunkX(), info.coord.chunkZ());
 
         line(context, "-- roads: raw vs effective --");
@@ -141,7 +141,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
             line(context, "road.bridgeSpan = " + span.orientation()
                     + " (" + span.fromX() + ", " + span.fromZ() + ") -> (" + span.toX() + ", " + span.toZ() + ")");
         }
-        line(context, "road.conflictPolicy = " + dimInfo.getProfile().MULTI_BUILDING_STREET_CONFLICT);
+        line(context, "road.conflictPolicy = " + dimInfo.preset().MULTI_BUILDING_STREET_CONFLICT);
         if (info.multiBuildingPos.isMulti() && info.multiBuilding != null) {
             line(context, "road.multiBuilding = " + info.multiBuilding.getName());
         } else {

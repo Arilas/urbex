@@ -7,7 +7,7 @@ import dev.krona.urbex.plan.grid.GridPurpose;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.CityGenerator;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import net.minecraft.util.RandomSource;
@@ -77,10 +77,10 @@ public final class PrimaryBridgePlanner {
      * The span claiming {@code coord}, if any. Empty for every chunk that is not open water on a
      * primary line, which is nearly all of them, and the first test is the cheap one.
      */
-    public static Optional<BridgeSpan> spanAt(ChunkCoord coord, IDimensionInfo provider) {
+    public static Optional<BridgeSpan> spanAt(ChunkCoord coord, PlanningContext provider) {
         // Dimension-wide, not per-chunk: a span's length limit and acceptance chance must be the
         // same number for every chunk in it.
-        Preset profile = provider.getProfile();
+        Preset profile = provider.preset();
         float chance = profile.PLANNED_PRIMARY_BRIDGE_CHANCE;
         int maxGapLength = profile.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
         if (chance <= 0.0f) {
@@ -90,7 +90,7 @@ public final class PrimaryBridgePlanner {
         if (!isGap(coord, facts)) {
             return Optional.empty();
         }
-        long seed = provider.getSeed();
+        long seed = provider.seed();
         BridgeSpan horizontal = acceptedSpan(coord, Orientation.X, facts, seed, maxGapLength, chance);
         BridgeSpan vertical = acceptedSpan(coord, Orientation.Z, facts, seed, maxGapLength, chance);
         // At most one of these can survive: each one's own chunk is a crossing the other contests,
@@ -111,10 +111,10 @@ public final class PrimaryBridgePlanner {
      * shift what any other decision sees.
      */
     @Nullable
-    public static BuildingPart deckPart(BridgeSpan span, ChunkCoord anyChunkInSpan, IDimensionInfo provider) {
+    public static BuildingPart deckPart(BridgeSpan span, ChunkCoord anyChunkInSpan, PlanningContext provider) {
         ChunkCoord anchor = new ChunkCoord(anyChunkInSpan.dimension(), span.fromX(), span.fromZ());
-        CityStyle style = City.getCityStyle(anchor, provider, provider.getProfile());
-        RandomSource rand = Rng.at(provider.getSeed(), anchor.chunkX(), anchor.chunkZ(), Rng.Purpose.LARGE_BRIDGE);
+        CityStyle style = City.getCityStyle(anchor, provider, provider.preset());
+        RandomSource rand = Rng.at(provider.seed(), anchor.chunkX(), anchor.chunkZ(), Rng.Purpose.LARGE_BRIDGE);
         String name = style.getRandomLargeBridge(rand, anchor);
         return name == null ? null : provider.assets().parts().getOrWarn(name);
     }
@@ -281,7 +281,7 @@ public final class PrimaryBridgePlanner {
         return true;
     }
 
-    private static ChunkFacts worldFacts(IDimensionInfo provider) {
+    private static ChunkFacts worldFacts(PlanningContext provider) {
         return new ChunkFacts() {
             @Override
             public boolean isRawPrimary(ChunkCoord coord) {
@@ -290,12 +290,12 @@ public final class PrimaryBridgePlanner {
 
             @Override
             public boolean isCity(ChunkCoord coord) {
-                return ChunkPlan.isCityRaw(coord, provider, provider.getProfile());
+                return ChunkPlan.isCityRaw(coord, provider, provider.preset());
             }
 
             @Override
             public boolean isEffectivePrimary(ChunkCoord coord) {
-                Preset profile = provider.getProfile();
+                Preset profile = provider.preset();
                 return ChunkPlan.effectiveRoadType(coord, provider, profile) == RoadType.PRIMARY;
             }
 
@@ -311,9 +311,9 @@ public final class PrimaryBridgePlanner {
                 if (CityGenerator.isWaterBiome(provider, coord)) {
                     return true;
                 }
-                int sealevel = provider.getProfile().SEALEVEL;
+                int sealevel = provider.preset().SEALEVEL;
                 int waterLevel = sealevel == -1 ? provider.shape().seaLevel() : sealevel;
-                return provider.getHeightmap(coord).getHeight() < waterLevel;
+                return provider.heightmap(coord).getHeight() < waterLevel;
             }
         };
     }

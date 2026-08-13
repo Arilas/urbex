@@ -12,7 +12,7 @@ import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.editor.EditorInfo;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
@@ -60,7 +60,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         BlockPos start = editorInfo.getBottomLocation();
         ServerLevel level = (ServerLevel) player.level();
         // The provider first: the part is looked up in this level's compiled assets (issue #128).
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("Urbex does not generate in this dimension!").withStyle(ChatFormatting.RED));
             return 0;
@@ -73,7 +73,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
             return 0;
         }
 
-        ChunkCoord coord = new ChunkCoord(dimInfo.getType(), start.getX() >> 4, start.getZ() >> 4);
+        ChunkCoord coord = new ChunkCoord(dimInfo.dimension(), start.getX() >> 4, start.getZ() >> 4);
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimInfo);
         CompiledPalette palette = info.getCompiledPalette();
         Palette partPalette = part.getLocalPalette();

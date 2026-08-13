@@ -128,7 +128,7 @@ public final class DigestRunner {
             for (ChunkPos pos : chunks) {
                 level.getChunk(pos.x(), pos.z(), ChunkStatus.FULL, true);
                 if (expireEvery > 0 && ++driven % expireEvery == 0) {
-                    IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+                    PlanningContext dimInfo = GenerationSession.planningFor(level);
                     if (dimInfo != null) {
                         dimInfo.caches().clear();
                     }
@@ -196,7 +196,7 @@ public final class DigestRunner {
 
     /**
      * How many of the sampled chunks carry a planned primary bridge deck. Read-only: queries the
-     * same {@link IDimensionInfo} real generation used for these chunks, after generation, so it
+     * same {@link PlanningContext} real generation used for these chunks, after generation, so it
      * costs no extra draw and cannot perturb either digest. Zero whenever no Urbex profile is
      * configured for this dimension - the driver-writes check already fails that case loudly.
      */
@@ -246,7 +246,7 @@ public final class DigestRunner {
      * stayed order-dependent unobserved (issue #126).
      */
     private static int countRailCollisionChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             return 0;
         }
@@ -266,7 +266,7 @@ public final class DigestRunner {
     }
 
     private static int countBridgeChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             return 0;
         }
@@ -282,12 +282,12 @@ public final class DigestRunner {
 
     /**
      * How many of the sampled chunks carry a sloped minor road. Read-only: queries the same
-     * {@link IDimensionInfo} real generation used for these chunks, after generation, so it costs
+     * {@link PlanningContext} real generation used for these chunks, after generation, so it costs
      * no extra draw and cannot perturb either digest. Zero whenever no Urbex profile is configured
      * for this dimension - the driver-writes check already fails that case loudly.
      */
     private static int countSlopeChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             return 0;
         }

@@ -5,7 +5,7 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
@@ -29,28 +29,28 @@ public class City {
      * "ready" over an empty map (issue #67) - plus a {@code cleanPredefinedCache()} three unrelated
      * call sites had to remember, one of them the preview, clearing maps live worldgen was reading.
      */
-    private static PredefinedIndex predefined(IDimensionInfo provider) {
+    private static PredefinedIndex predefined(PlanningContext provider) {
         return provider.assets().predefined();
     }
 
-    public static PredefinedCity getPredefinedCity(IDimensionInfo provider, ChunkCoord coord) {
+    public static PredefinedCity getPredefinedCity(PlanningContext provider, ChunkCoord coord) {
         return predefined(provider).cityAt(coord);
     }
 
-    public static PredefinedBuilding getPredefinedBuildingAtTopLeft(IDimensionInfo provider, ChunkCoord coord) {
+    public static PredefinedBuilding getPredefinedBuildingAtTopLeft(PlanningContext provider, ChunkCoord coord) {
         return predefined(provider).buildingAt(coord);
     }
 
-    public static PredefinedIndex.BuildingAt getPredefinedBuilding(IDimensionInfo provider, ChunkCoord coord) {
+    public static PredefinedIndex.BuildingAt getPredefinedBuilding(PlanningContext provider, ChunkCoord coord) {
         return predefined(provider).buildingCovering(coord);
     }
 
-    public static PredefinedStreet getPredefinedStreet(IDimensionInfo provider, ChunkCoord coord) {
+    public static PredefinedStreet getPredefinedStreet(PlanningContext provider, ChunkCoord coord) {
         return predefined(provider).streetCovering(coord);
     }
 
     // Return true if a chunk is occupied (by a predefined building or street)
-    public static boolean isChunkOccupied(IDimensionInfo provider, ChunkCoord coord) {
+    public static boolean isChunkOccupied(PlanningContext provider, ChunkCoord coord) {
         return predefined(provider).isOccupied(coord);
     }
 
@@ -60,34 +60,34 @@ public class City {
      * Separate from {@link #getPredefinedStreet}: this one answers about the chunk the street was
      * declared on, that one about any chunk the street covers.
      */
-    public static PredefinedStreet getPredefinedStreetAt(IDimensionInfo provider, ChunkCoord coord) {
+    public static PredefinedStreet getPredefinedStreetAt(PlanningContext provider, ChunkCoord coord) {
         return predefined(provider).streetAt(coord);
     }
 
 
-    public static boolean isCityCenter(ChunkCoord coord, IDimensionInfo provider) {
+    public static boolean isCityCenter(ChunkCoord coord, PlanningContext provider) {
         PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             return true;
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        RandomSource cityCenterRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_CENTER);
-        return cityCenterRandom.nextDouble() < provider.getProfile().CITY_CHANCE;
+        RandomSource cityCenterRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_CENTER);
+        return cityCenterRandom.nextDouble() < provider.preset().CITY_CHANCE;
     }
 
     /**
      * Return the radius of the city with the given center
      */
-    public static float getCityRadius(ChunkCoord coord, IDimensionInfo provider) {
+    public static float getCityRadius(ChunkCoord coord, PlanningContext provider) {
         PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             return city.getRadius();
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        RandomSource cityRadiusRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_RADIUS);
-        Preset profile = provider.getProfile();
+        RandomSource cityRadiusRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_RADIUS);
+        Preset profile = provider.preset();
         int cityRange = profile.CITY_MAXRADIUS - profile.CITY_MINRADIUS;
         if (cityRange < 1) {
             cityRange = 1;
@@ -96,7 +96,7 @@ public class City {
     }
 
     // Call this on a city center to get the style of that city
-    public static String getCityStyleForCityCenter(ChunkCoord coord, IDimensionInfo provider) {
+    public static String getCityStyleForCityCenter(ChunkCoord coord, PlanningContext provider) {
         PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             if (city.getCityStyle() != null) {
@@ -106,7 +106,7 @@ public class City {
         }
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        RandomSource cityStyleForCenterRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
+        RandomSource cityStyleForCenterRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
         // The centre's own world style, drawn at the centre: this is what makes one city internally
         // coherent when a world mixes several datapacks, since every chunk of that city asks here.
         return provider.worldStyles().atCityCenter(coord)
@@ -114,23 +114,23 @@ public class City {
     }
 
     // Calculate the citystyle based on all surrounding cities
-    public static CityStyle getCityStyle(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    public static CityStyle getCityStyle(ChunkCoord coord, PlanningContext provider, Preset profile) {
         // getOrCompute, not computeIfAbsent: this is reached from ChunkPlan
         // .getChunkCandidate, which calls it in a 3x3 loop over the neighbours, and computing
         // inside a ConcurrentHashMap bin lock deadlocks on that.
         return provider.caches().cityStyle.getOrCompute(coord, k -> getCityStyleInt(coord, provider, profile));
     }
 
-    private static CityStyle getCityStyleInt(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    private static CityStyle getCityStyleInt(ChunkCoord coord, PlanningContext provider, Preset profile) {
         List<Pair<Float, String>> styles = new ArrayList<>();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         // Not CITY_STYLE: getCityStyleForCityCenter draws from that address for this same chunk,
         // and this method calls it, so one purpose would make the blend agree with the centre.
-        RandomSource cityStyleRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE_LOCAL);
+        RandomSource cityStyleRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE_LOCAL);
 
         if (profile.CITY_CHANCE < 0) {
-            CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.getSeed(),
+            CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
                     profile.CITY_PERLIN_SCALE, profile.CITY_PERLIN_OFFSET, profile.CITY_PERLIN_INNERSCALE);
             float factor = rarityMap.getCityFactor(chunkX, chunkZ);
             if (factor < profile.CITY_STYLE_THRESHOLD) {
@@ -142,7 +142,7 @@ public class City {
             int offset = (profile.CITY_MAXRADIUS + 15) / 16;
             for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
                 for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
-                    ChunkCoord c = new ChunkCoord(provider.getType(), cx, cz);
+                    ChunkCoord c = new ChunkCoord(provider.dimension(), cx, cz);
                     if (isCityCenter(c, provider)) {
                         float radius = getCityRadius(c, provider);
                         float sqdist = (cx * 16 - (chunkX << 4)) * (cx * 16 - (chunkX << 4)) + (cz * 16 - (chunkZ << 4)) * (cz * 16 - (chunkZ << 4));
@@ -178,8 +178,8 @@ public class City {
         return provider.assets().cityStyles().get(cityStyleName);
     }
 
-    public static float getCityFactor(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
-        ResourceKey<Level> type = provider.getType();
+    public static float getCityFactor(ChunkCoord coord, PlanningContext provider, Preset profile) {
+        ResourceKey<Level> type = provider.dimension();
         // If we have a predefined building here we force a high city factor
 
         PredefinedBuilding predefinedBuilding = getPredefinedBuildingAtTopLeft(provider, coord);
@@ -208,7 +208,7 @@ public class City {
         int chunkZ = coord.chunkZ();
         float factor = 0;
         if (profile.CITY_CHANCE < 0) {
-            CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.getSeed(),
+            CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
                     profile.CITY_PERLIN_SCALE, profile.CITY_PERLIN_OFFSET, profile.CITY_PERLIN_INNERSCALE);
             factor = rarityMap.getCityFactor(chunkX, chunkZ);
         } else {
@@ -233,7 +233,7 @@ public class City {
             // rather than a real WorldGenLevel so the world-creation preview (registry access
             // present, world null) applies this too - real worldgen always has both, so this is
             // unchanged there.
-            ChunkHeightmap heightmap = provider.getHeightmap(coord);
+            ChunkHeightmap heightmap = provider.heightmap(coord);
             if (heightmap == null) {
                 return 0;
             }

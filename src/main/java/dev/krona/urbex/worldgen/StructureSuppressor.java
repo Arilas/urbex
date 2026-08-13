@@ -27,15 +27,15 @@ public class StructureSuppressor {
         if (!Config.STRUCTURES_YIELD_TO_CITIES.get()) {
             return false;
         }
-        IDimensionInfo diminfo = GenerationSession.planningFor(level);
+        PlanningContext diminfo = GenerationSession.planningFor(level);
         if (diminfo == null) {
             return false;   // No Urbex profile for this dimension, or the level is not loaded
         }
 
-        // No lock and no setWorld: the city caches are concurrent now, and IDimensionInfo's level
+        // No lock and no setWorld: the city caches are concurrent now, and PlanningContext's level
         // is final. Structure placement runs on the worker pool too, so this used to be one of the
         // threads contending for the per-dimension monitor.
-        ChunkCoord coord = new ChunkCoord(diminfo.getType(), chunkPos.x(), chunkPos.z());
+        ChunkCoord coord = new ChunkCoord(diminfo.dimension(), chunkPos.x(), chunkPos.z());
         if (!ChunkPlan.isCity(coord, diminfo)) {
             return false;
         }

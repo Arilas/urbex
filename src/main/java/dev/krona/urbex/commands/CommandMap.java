@@ -6,7 +6,7 @@ import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -35,7 +35,7 @@ public class CommandMap implements Command<CommandSourceStack> {
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         ServerPlayer player = context.getSource().getPlayerOrException();
         BlockPos position = player.blockPosition();
-        IDimensionInfo dimInfo = GenerationSession.planningFor((WorldGenLevel) player.level());
+        PlanningContext dimInfo = GenerationSession.planningFor((WorldGenLevel) player.level());
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
@@ -45,7 +45,7 @@ public class CommandMap implements Command<CommandSourceStack> {
             for (int z = pos.z() - 20 ; z <= pos.z() + 20 ; z++) {
                 StringBuilder buf = new StringBuilder();
                 for (int x = pos.x() - 20 ; x <= pos.x() + 20 ; x++) {
-                    ChunkCoord coord = new ChunkCoord(dimInfo.getType(), x, z);
+                    ChunkCoord coord = new ChunkCoord(dimInfo.dimension(), x, z);
                     ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimInfo);
                     if (info.isCity && info.hasBuilding) {
                         buf.append("B");

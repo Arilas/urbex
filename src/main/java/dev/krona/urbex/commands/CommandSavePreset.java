@@ -9,7 +9,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.config.Preset;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
@@ -37,12 +37,12 @@ public class CommandSavePreset implements Command<CommandSourceStack> {
     @Override
     public int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         // The source's own level, not the player's: this has to work from the server console too.
-        IDimensionInfo dimInfo = GenerationSession.planningFor(context.getSource().getLevel());
+        PlanningContext dimInfo = GenerationSession.planningFor(context.getSource().getLevel());
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("No dimension info found!").withStyle(ChatFormatting.RED));
             return 0;
         }
-        Preset preset = dimInfo.getProfile();
+        Preset preset = dimInfo.preset();
         JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, preset.toDefinition()).getOrThrow();
         Path out = FabricLoader.getInstance().getGameDir().resolve("urbex-export");
         Path target = out.resolve(preset.getId().getPath() + ".json");

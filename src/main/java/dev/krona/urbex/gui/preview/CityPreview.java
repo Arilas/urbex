@@ -8,6 +8,7 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.gui.NullDimensionInfo;
 import dev.krona.urbex.plan.RoadType;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.ChunkCandidate;
@@ -49,7 +50,7 @@ import java.util.Random;
  *       chunk generates.</li>
  * </ul>
  * "Honest" relative to the old editor's preview map renderer: that preview always ran
- * with {@code IDimensionInfo.getWorld() == null}, which silently skipped the worldstyle
+ * with {@code PlanningContext.getWorld() == null}, which silently skipped the worldstyle
  * city-chance multiplier and the CITY_MINHEIGHT/MAXHEIGHT gate in {@code City.getCityFactor} (both
  * guarded on {@code getWorld() != null}). This preview is built with real registry access, so those
  * guards - now keyed on {@code registryAccess() != null} - evaluate the same rules a real dimension
@@ -294,10 +295,11 @@ public class CityPreview implements AutoCloseable {
             case '*', 'd' -> 0xffcccc55;
             default -> 0xff005500;
         };
-        ChunkCoord coord = new ChunkCoord(diminfo.dimension(), x, z);
-        ChunkCandidate candidate = ChunkPlan.getChunkCandidateGui(coord, diminfo);
+        PlanningContext planning = diminfo.planning();
+        ChunkCoord coord = planning.coord(x, z);
+        ChunkCandidate candidate = ChunkPlan.getChunkCandidateGui(coord, planning);
         if (candidate.isCity()) {
-            return ChunkPlan.hasBuildingGui(x, z, diminfo, candidate) ? BUILDING_COLOR : CITY_COLOR;
+            return ChunkPlan.hasBuildingGui(x, z, planning, candidate) ? BUILDING_COLOR : CITY_COLOR;
         }
         return terrainColor;
     }
@@ -310,14 +312,15 @@ public class CityPreview implements AutoCloseable {
      * chunks blended over. Highway-over-rail is a distinct grey so an interchange is visible.
      */
     private void renderTransport(NullDimensionInfo diminfo, Preset profile) {
+        PlanningContext planning = diminfo.planning();
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));
-                ChunkCoord c = new ChunkCoord(diminfo.dimension(), x, z);
-                boolean hasRail = Railway.getRailChunkType(c, diminfo, profile).getType() != RailChunkType.NONE;
+                ChunkCoord c = planning.coord(x, z);
+                boolean hasRail = Railway.getRailChunkType(c, planning, profile).getType() != RailChunkType.NONE;
                 int overlay = hasRail ? RAIL_OVERLAY : 0;
-                int levelX = Highway.getXHighwayLevel(c, diminfo, profile);
-                int levelZ = Highway.getZHighwayLevel(c, diminfo, profile);
+                int levelX = Highway.getXHighwayLevel(c, planning, profile);
+                int levelZ = Highway.getZHighwayLevel(c, planning, profile);
                 if (levelX >= 0 || levelZ >= 0) {
                     overlay = hasRail ? HIGHWAY_OVER_RAIL_OVERLAY : HIGHWAY_OVERLAY;
                 }
@@ -359,11 +362,12 @@ public class CityPreview implements AutoCloseable {
      * as a guarantee.
      */
     private void renderRoads(NullDimensionInfo diminfo, Preset profile) {
+        PlanningContext planning = diminfo.planning();
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));
-                ChunkCoord c = new ChunkCoord(diminfo.dimension(), x, z);
-                RoadType type = ChunkPlan.effectiveRoadType(c, diminfo, profile);
+                ChunkCoord c = planning.coord(x, z);
+                RoadType type = ChunkPlan.effectiveRoadType(c, planning, profile);
                 colors[z * WIDTH + x] = blend(base, roadColour(type));
             }
         }

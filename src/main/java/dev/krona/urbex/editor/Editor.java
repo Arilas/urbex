@@ -1,7 +1,7 @@
 package dev.krona.urbex.editor;
 
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
@@ -16,8 +16,8 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class Editor {
 
-    public static void startEditing(BuildingPart part, ServerPlayer player, BlockPos start, ServerLevel level, IDimensionInfo dimInfo, boolean clear) {
-        ChunkCoord coord = new ChunkCoord(dimInfo.getType(), start.getX() >> 4, start.getZ() >> 4);
+    public static void startEditing(BuildingPart part, ServerPlayer player, BlockPos start, ServerLevel level, PlanningContext dimInfo, boolean clear) {
+        ChunkCoord coord = new ChunkCoord(dimInfo.dimension(), start.getX() >> 4, start.getZ() >> 4);
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimInfo);
         CompiledPalette palette = info.getCompiledPalette();
         Palette partPalette = part.getLocalPalette();
