@@ -3,7 +3,6 @@ package dev.krona.urbex.config;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.ModSetup;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings;
@@ -165,11 +164,6 @@ public class Preset {
     public int SPAWN_CHECK_RADIUS = 200;
     public int SPAWN_RADIUS_INCREASE = 100;
     public int SPAWN_CHECK_ATTEMPTS = 20000;
-    public float HORIZON = -1f;
-    public float FOG_RED = -1.0f;
-    public float FOG_GREEN = -1.0f;
-    public float FOG_BLUE = -1.0f;
-    public float FOG_DENSITY = -1.0f;
     public boolean EDITMODE = false;
     public boolean GENERATE_NETHER = false;
 
@@ -421,11 +415,6 @@ public class Preset {
         p.SPAWN_CHECK_RADIUS = SPAWN_CHECK_RADIUS;
         p.SPAWN_RADIUS_INCREASE = SPAWN_RADIUS_INCREASE;
         p.SPAWN_CHECK_ATTEMPTS = SPAWN_CHECK_ATTEMPTS;
-        p.HORIZON = HORIZON;
-        p.FOG_RED = FOG_RED;
-        p.FOG_GREEN = FOG_GREEN;
-        p.FOG_BLUE = FOG_BLUE;
-        p.FOG_DENSITY = FOG_DENSITY;
         p.EDITMODE = EDITMODE;
         p.GENERATE_NETHER = GENERATE_NETHER;
         return p;
@@ -571,13 +560,6 @@ public class Preset {
                 Optional.of(SPAWN_CHECK_RADIUS),
                 Optional.of(SPAWN_RADIUS_INCREASE),
                 Optional.of(SPAWN_CHECK_ATTEMPTS));
-        AtmosphereSettings atmosphere =
-                new AtmosphereSettings(
-                Optional.of(HORIZON),
-                Optional.of(FOG_RED),
-                Optional.of(FOG_GREEN),
-                Optional.of(FOG_BLUE),
-                Optional.of(FOG_DENSITY));
         MiscSettings misc =
                 new MiscSettings(
                 Optional.of(EDITMODE),
@@ -599,7 +581,6 @@ public class Preset {
                 Optional.of(destruction),
                 Optional.of(decoration),
                 Optional.of(spawn),
-                Optional.of(atmosphere),
                 Optional.of(misc));
     }
 }

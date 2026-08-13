@@ -461,7 +461,7 @@ public final class Settings {
                 p -> (double) p.SPAWN_CHECK_ATTEMPTS, (p, v) -> p.SPAWN_CHECK_ATTEMPTS = (int) Math.round((Double) v));
 
         // ==== ADVANCED =======================================================
-        // Identifier/list TEXT fields, low-level generation switches, and client fog/horizon tuning.
+        // Identifier/list TEXT fields and low-level generation switches.
         r.section("identifiers");
         r.text("CITY_STYLE_ALTERNATIVE", SettingCategory.ADVANCED,
                 p -> p.CITY_STYLE_ALTERNATIVE, (p, v) -> p.CITY_STYLE_ALTERNATIVE = (String) v);
@@ -482,18 +482,6 @@ public final class Settings {
                 p -> p.MULTI_USE_CORNER, (p, v) -> p.MULTI_USE_CORNER = (Boolean) v);
         r.toggle("USE_AVG_HEIGHTMAP", SettingCategory.ADVANCED,
                 p -> p.USE_AVG_HEIGHTMAP, (p, v) -> p.USE_AVG_HEIGHTMAP = (Boolean) v);
-
-        r.section("visuals");
-        r.slider("HORIZON", SettingCategory.ADVANCED, -1, 256, 1,
-                p -> (double) p.HORIZON, (p, v) -> p.HORIZON = ((Double) v).floatValue());
-        r.slider("FOG_RED", SettingCategory.ADVANCED, -1.0, 1.0, 0.01,
-                p -> (double) p.FOG_RED, (p, v) -> p.FOG_RED = ((Double) v).floatValue());
-        r.slider("FOG_GREEN", SettingCategory.ADVANCED, -1.0, 1.0, 0.01,
-                p -> (double) p.FOG_GREEN, (p, v) -> p.FOG_GREEN = ((Double) v).floatValue());
-        r.slider("FOG_BLUE", SettingCategory.ADVANCED, -1.0, 1.0, 0.01,
-                p -> (double) p.FOG_BLUE, (p, v) -> p.FOG_BLUE = ((Double) v).floatValue());
-        r.slider("FOG_DENSITY", SettingCategory.ADVANCED, -1.0, 1.0, 0.01,
-                p -> (double) p.FOG_DENSITY, (p, v) -> p.FOG_DENSITY = ((Double) v).floatValue());
 
         return List.copyOf(r.all);
     }

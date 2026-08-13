@@ -10,13 +10,6 @@
     "groundLevel": 40,
     "seaLevel": 32
   },
-  "atmosphere": {
-    "horizon": 128,
-    "fogRed": 0,
-    "fogGreen": 0,
-    "fogBlue": 0,
-    "fogDensity": 0.02
-  },
   "destruction": {
     "explosionChance": 0,
     "miniExplosionChance": 0

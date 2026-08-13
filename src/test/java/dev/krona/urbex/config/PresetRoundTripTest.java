@@ -4,7 +4,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings;
@@ -47,7 +46,6 @@ class PresetRoundTripTest {
         EXPECTED_SECTION_KEYS.put("destruction", DestructionSettings.KEYS);
         EXPECTED_SECTION_KEYS.put("decoration", DecorationSettings.KEYS);
         EXPECTED_SECTION_KEYS.put("spawn", SpawnSettings.KEYS);
-        EXPECTED_SECTION_KEYS.put("atmosphere", AtmosphereSettings.KEYS);
         EXPECTED_SECTION_KEYS.put("misc", MiscSettings.KEYS);
     }
 
@@ -79,7 +77,6 @@ class PresetRoundTripTest {
         p.RUIN_CHANCE = 0.77f;
         p.LIGHTING_DENSITY = 0.9f;
         p.SPAWN_CHECK_RADIUS = 500;
-        p.HORIZON = 100f;
         p.EDITMODE = true;
 
         PresetDefinition re = p.toDefinition();
@@ -97,7 +94,6 @@ class PresetRoundTripTest {
         assertEquals(0.77f, resolved.RUIN_CHANCE);
         assertEquals(0.9f, resolved.LIGHTING_DENSITY);
         assertEquals(500, resolved.SPAWN_CHECK_RADIUS);
-        assertEquals(100f, resolved.HORIZON);
         assertTrue(resolved.EDITMODE);
     }
 }

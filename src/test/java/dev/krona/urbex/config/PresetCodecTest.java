@@ -10,6 +10,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -49,8 +50,39 @@ class PresetCodecTest {
         assertTrue(re.destruction().isEmpty());
         assertTrue(re.decoration().isEmpty());
         assertTrue(re.spawn().isEmpty());
-        assertTrue(re.atmosphere().isEmpty());
         assertTrue(re.misc().isEmpty());
+    }
+
+    /**
+     * All six metadata keys are top-level keys of the preset object, and round-trip through the
+     * codec in both directions. Decoding binds positionally through the constructor, so a
+     * transposed {@code forGetter} in the flat {@code RecordCodecBuilder.group} in
+     * {@code PresetDefinition} would still decode correctly - only the encode direction, which the
+     * getters actually drive, would catch it. That is why this test checks both directions rather
+     * than decode alone.
+     */
+    @Test
+    void everyMetadataKeyRoundTrips() {
+        PresetDefinition re = decode("{\"extends\":\"urbex:default\",\"name\":\"Tall Buildings\","
+                + "\"description\":\"d\",\"extraDescription\":\"e\",\"warning\":\"w\","
+                + "\"icon\":\"i.png\",\"cities\":{\"cityChance\":0.25}}");
+
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), re.getExtends().orElseThrow());
+        assertEquals("Tall Buildings", re.displayName().orElseThrow());
+        assertEquals("d", re.description().orElseThrow());
+        assertEquals("e", re.extraDescription().orElseThrow());
+        assertEquals("w", re.warning().orElseThrow());
+        assertEquals("i.png", re.icon().orElseThrow());
+        assertEquals(0.25, re.cities().orElseThrow().cityChance().orElseThrow());
+
+        JsonElement encoded = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+        JsonObject json = encoded.getAsJsonObject();
+        assertEquals("urbex:default", json.get("extends").getAsString());
+        assertEquals("Tall Buildings", json.get("name").getAsString());
+        assertEquals("d", json.get("description").getAsString());
+        assertEquals("e", json.get("extraDescription").getAsString());
+        assertEquals("w", json.get("warning").getAsString());
+        assertEquals("i.png", json.get("icon").getAsString());
     }
 
     @Test
@@ -62,6 +94,23 @@ class PresetCodecTest {
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         Dynamic<JsonElement> dyn = new Dynamic<>(JsonOps.INSTANCE, root);
         assertEquals(List.of("citiez"), UnknownKeys.check(dyn, PresetDefinition.KEYS));
+    }
+
+    /**
+     * The removed {@code atmosphere} section is not a hard error. It never had a reader (issue #73),
+     * so a pack that still declares it generates exactly what it did before - it is reported through
+     * the ordinary unknown-key WARN, and the file still loads.
+     */
+    @Test
+    void removedAtmosphereSectionParsesButWarns() {
+        String json = "{\"description\":\"x\",\"atmosphere\":{\"horizon\":128,\"fogDensity\":0.02}}";
+
+        PresetDefinition re = assertDoesNotThrow(() -> decode(json));
+        assertEquals("x", re.description().orElseThrow());
+
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        Dynamic<JsonElement> dyn = new Dynamic<>(JsonOps.INSTANCE, root);
+        assertEquals(List.of("atmosphere"), UnknownKeys.check(dyn, PresetDefinition.KEYS));
     }
 
     @Test

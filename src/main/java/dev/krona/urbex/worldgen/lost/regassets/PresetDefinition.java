@@ -1,10 +1,8 @@
 package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
-import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.config.Preset;
-import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings;
@@ -18,7 +16,6 @@ import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.Set;
@@ -32,38 +29,16 @@ public class PresetDefinition implements Extendable {
 
     public static final Set<String> KEYS = Set.of("extends", "name", "description", "extraDescription", "warning",
             "icon", "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
-            "spawn", "atmosphere", "misc");
-
-    /**
-     * The six non-section keys, as one {@link MapCodec} inlined into the preset's own JSON object -
-     * {@code "name"} and its five neighbours stay top-level keys, exactly where they were authored.
-     * <p>
-     * Not a shape anyone asked for: {@code RecordCodecBuilder.group} tops out at sixteen fields, and
-     * adding {@code name} made seventeen. Bundling the metadata behind a {@code MapCodec} is the one
-     * way to buy a field back without moving a key or nesting one, so this record exists purely to
-     * be flattened again and never appears in the format.
-     */
-    private record Meta(Optional<Identifier> extendsId,
-                        Optional<String> name,
-                        Optional<String> description,
-                        Optional<String> extraDescription,
-                        Optional<String> warning,
-                        Optional<String> icon) {
-    }
-
-    private static final MapCodec<Meta> META = RecordCodecBuilder.mapCodec(instance ->
-            instance.group(
-                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(Meta::extendsId),
-                    Codec.STRING.optionalFieldOf("name").forGetter(Meta::name),
-                    Codec.STRING.optionalFieldOf("description").forGetter(Meta::description),
-                    Codec.STRING.optionalFieldOf("extraDescription").forGetter(Meta::extraDescription),
-                    Codec.STRING.optionalFieldOf("warning").forGetter(Meta::warning),
-                    Codec.STRING.optionalFieldOf("icon").forGetter(Meta::icon)
-            ).apply(instance, Meta::new));
+            "spawn", "misc");
 
     private static final Codec<PresetDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
-                    META.forGetter(PresetDefinition::meta),
+                    DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(PresetDefinition::getExtends),
+                    Codec.STRING.optionalFieldOf("name").forGetter(PresetDefinition::displayName),
+                    Codec.STRING.optionalFieldOf("description").forGetter(PresetDefinition::description),
+                    Codec.STRING.optionalFieldOf("extraDescription").forGetter(PresetDefinition::extraDescription),
+                    Codec.STRING.optionalFieldOf("warning").forGetter(PresetDefinition::warning),
+                    Codec.STRING.optionalFieldOf("icon").forGetter(PresetDefinition::icon),
                     TerrainSettings.CODEC.optionalFieldOf("terrain").forGetter(PresetDefinition::terrain),
                     CitySettings.CODEC.optionalFieldOf("cities").forGetter(PresetDefinition::cities),
                     BuildingSettings.CODEC.optionalFieldOf("buildings").forGetter(PresetDefinition::buildings),
@@ -73,7 +48,6 @@ public class PresetDefinition implements Extendable {
                     DestructionSettings.CODEC.optionalFieldOf("destruction").forGetter(PresetDefinition::destruction),
                     DecorationSettings.CODEC.optionalFieldOf("decoration").forGetter(PresetDefinition::decoration),
                     SpawnSettings.CODEC.optionalFieldOf("spawn").forGetter(PresetDefinition::spawn),
-                    AtmosphereSettings.CODEC.optionalFieldOf("atmosphere").forGetter(PresetDefinition::atmosphere),
                     MiscSettings.CODEC.optionalFieldOf("misc").forGetter(PresetDefinition::misc)
             ).apply(instance, PresetDefinition::new));
 
@@ -103,7 +77,6 @@ public class PresetDefinition implements Extendable {
     private final Optional<DestructionSettings> destruction;
     private final Optional<DecorationSettings> decoration;
     private final Optional<SpawnSettings> spawn;
-    private final Optional<AtmosphereSettings> atmosphere;
     private final Optional<MiscSettings> misc;
 
     public PresetDefinition(Optional<Identifier> extendsId,
@@ -121,32 +94,13 @@ public class PresetDefinition implements Extendable {
                      Optional<DestructionSettings> destruction,
                      Optional<DecorationSettings> decoration,
                      Optional<SpawnSettings> spawn,
-                     Optional<AtmosphereSettings> atmosphere,
                      Optional<MiscSettings> misc) {
-        this(new Meta(extendsId, displayName, description, extraDescription, warning, icon),
-                terrain, cities, buildings, roads, highways, railways, destruction, decoration,
-                spawn, atmosphere, misc);
-    }
-
-    /** The codec's own constructor; see {@link Meta} for why the metadata arrives bundled. */
-    private PresetDefinition(Meta meta,
-                     Optional<TerrainSettings> terrain,
-                     Optional<CitySettings> cities,
-                     Optional<BuildingSettings> buildings,
-                     Optional<RoadSettings> roads,
-                     Optional<HighwaySettings> highways,
-                     Optional<RailwaySettings> railways,
-                     Optional<DestructionSettings> destruction,
-                     Optional<DecorationSettings> decoration,
-                     Optional<SpawnSettings> spawn,
-                     Optional<AtmosphereSettings> atmosphere,
-                     Optional<MiscSettings> misc) {
-        this.extendsId = meta.extendsId();
-        this.displayName = meta.name();
-        this.description = meta.description();
-        this.extraDescription = meta.extraDescription();
-        this.warning = meta.warning();
-        this.icon = meta.icon();
+        this.extendsId = extendsId;
+        this.displayName = displayName;
+        this.description = description;
+        this.extraDescription = extraDescription;
+        this.warning = warning;
+        this.icon = icon;
         this.terrain = terrain;
         this.cities = cities;
         this.buildings = buildings;
@@ -156,17 +110,12 @@ public class PresetDefinition implements Extendable {
         this.destruction = destruction;
         this.decoration = decoration;
         this.spawn = spawn;
-        this.atmosphere = atmosphere;
         this.misc = misc;
     }
 
     @Override
     public Optional<Identifier> getExtends() {
         return extendsId;
-    }
-
-    private Meta meta() {
-        return new Meta(extendsId, displayName, description, extraDescription, warning, icon);
     }
 
     /**
@@ -230,10 +179,6 @@ public class PresetDefinition implements Extendable {
         return spawn;
     }
 
-    public Optional<AtmosphereSettings> atmosphere() {
-        return atmosphere;
-    }
-
     public Optional<MiscSettings> misc() {
         return misc;
     }
@@ -254,7 +199,6 @@ public class PresetDefinition implements Extendable {
         destruction.ifPresent(s -> s.apply(p));
         decoration.ifPresent(s -> s.apply(p));
         spawn.ifPresent(s -> s.apply(p));
-        atmosphere.ifPresent(s -> s.apply(p));
         misc.ifPresent(s -> s.apply(p));
     }
 

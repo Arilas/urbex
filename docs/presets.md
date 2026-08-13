@@ -26,14 +26,14 @@ Its registry id is `<namespace>:<name>` (for example `urbex:default`, or `mypack
 preset at either id is unsupported — the UI's built-in rows shadow it and it will never be shown
 or selectable.
 
-Every field in the file is **optional**. A preset only needs to state what it changes; anything
-left out falls through to what it `extends` (see [Resolution rules](#resolution-rules) below). The
-top-level object has six plain metadata fields (`extends`, `name`, `description`, `extraDescription`,
-`warning`, `icon`) plus eleven **sections**, each grouping related settings: `terrain`, `cities`,
-`buildings`, `roads`, `highways`, `railways`, `destruction`, `decoration`, `spawn`, `atmosphere`,
-`misc`. A section is only applied if it's present in the file, and within a present section only
-the fields you actually write are overridden — you never have to restate a whole section to change
-one number in it.
+Every field in the file is **optional**. A preset only needs to state what it changes;
+anything left out falls through to what it `extends` (see [Resolution rules](#resolution-rules)
+below). The top-level object has six plain metadata fields (`extends`, `name`, `description`,
+`extraDescription`, `warning`, `icon`) plus ten **sections**, each grouping related settings:
+`terrain`, `cities`, `buildings`, `roads`, `highways`, `railways`, `destruction`, `decoration`,
+`spawn`, `misc`. A section is only applied if it's present in the file, and within a present
+section only the fields you actually write are overridden — you never have to restate a
+whole section to change one number in it.
 
 `name` is what the Cities tab puts on the row: a plain human label like `Tall Buildings`, not an id
 and not a translation key. Leave it out and the list falls back to showing the fully-qualified id,

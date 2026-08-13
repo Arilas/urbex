@@ -7,7 +7,6 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings;
@@ -59,7 +58,6 @@ class PresetSchemaTest {
         EXPECTED_SECTION_KEYS.put("destruction", DestructionSettings.KEYS);
         EXPECTED_SECTION_KEYS.put("decoration", DecorationSettings.KEYS);
         EXPECTED_SECTION_KEYS.put("spawn", SpawnSettings.KEYS);
-        EXPECTED_SECTION_KEYS.put("atmosphere", AtmosphereSettings.KEYS);
         EXPECTED_SECTION_KEYS.put("misc", MiscSettings.KEYS);
     }
 
