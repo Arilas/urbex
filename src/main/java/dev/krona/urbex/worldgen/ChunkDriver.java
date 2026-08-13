@@ -653,7 +653,6 @@ public class ChunkDriver {
         private final int cx;
         private final int cz;
         private final S[] cache;
-        private final int[][] heightmap = new int[16][16];
 
         private SectionCache(ChunkDriver owner, LevelAccessor level, int cx, int cz) {
             this.owner = owner;
@@ -670,18 +669,14 @@ public class ChunkDriver {
             if (state == null || state.getBlock() instanceof StructureVoidBlock) {
                 return;
             }
-            int ystart = y1;
             int px = x & 0xf;
             int pz = z & 0xf;
-            boolean isAir = state.isAir();
-            boolean dirty = false;
             boolean record = recordingWrites;    // read the flag once, not once per block
             while (y1 <= y2) {
                 int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
                 int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
 
                 if (cache[sectionIdx].section[idx] != state) {
-                    dirty = true;
                     cache[sectionIdx].section[idx] = state;
                     cache[sectionIdx].touched = true;
                 }
@@ -690,18 +685,6 @@ public class ChunkDriver {
                 }
                 y1++;
             }
-
-            // Now update the heightmap
-            if (dirty) {
-                if (!isAir) {
-                    if (heightmap[px][pz] < y2) {
-                        heightmap[px][pz] = y2;
-                    }
-                } else {
-                    // If state is air we need to recalculate the heightmap
-                    fixHeightmapForAir(ystart, px, pz);
-                }
-            }
         }
 
         // Puts a range of blockstates starting at pos and ending at y2 (inclusive)
@@ -709,11 +692,8 @@ public class ChunkDriver {
             if (state == null || state.getBlock() instanceof StructureVoidBlock) {
                 return;
             }
-            int ystart = y1;
             int px = x & 0xf;
             int pz = z & 0xf;
-            boolean isAir = state.isAir();
-            boolean dirty = false;
             boolean record = recordingWrites;    // read the flag once, not once per block
             BlockPos.MutableBlockPos worldPos = null;
             while (y1 <= y2) {
@@ -732,7 +712,6 @@ public class ChunkDriver {
                     st = owner.region.getBlockState(worldPos.set(cx + px, y1, cz + pz));
                 }
                 if (st != state && test.test(st)) {
-                    dirty = true;
                     cache[sectionIdx].section[idx] = state;
                     cache[sectionIdx].touched = true;
                     if (record) {
@@ -740,18 +719,6 @@ public class ChunkDriver {
                     }
                 }
                 y1++;
-            }
-
-            // Now update the heightmap
-            if (dirty) {
-                if (!isAir) {
-                    if (heightmap[px][pz] < y2) {
-                        heightmap[px][pz] = y2;
-                    }
-                } else {
-                    // If state is air we need to recalculate the heightmap
-                    fixHeightmapForAir(ystart, px, pz);
-                }
             }
         }
 
@@ -763,10 +730,6 @@ public class ChunkDriver {
          * Urbex only <em>read</em> from was flushed back in full at the end of the chunk, 4096 slots
          * of terrain rewritten with the values they already had. Reading a block is not writing one
          * (issue #52).</p>
-         *
-         * <p>The internal heightmap is deliberately not updated here. It is maintained by the write
-         * paths and read by nothing outside its own repair scan - which is its own finding, and its
-         * own change.</p>
          */
         private void remember(BlockPos pos, BlockState state) {
             int sectionIdx = (pos.getY() - minY) / SECTION_HEIGHT;
@@ -784,31 +747,6 @@ public class ChunkDriver {
             }
             cache[sectionIdx].section[idx] = state;
             cache[sectionIdx].touched = true;
-            if (!state.isAir()) {
-                if (heightmap[px][pz] < pos.getY()) {
-                    heightmap[px][pz] = pos.getY();
-                }
-            } else {
-                // If state is air we need to recalculate the heightmap
-                fixHeightmapForAir(pos.getY(), px, pz);
-            }
-        }
-
-        private void fixHeightmapForAir(int y1, int px, int pz) {
-            if (heightmap[px][pz] >= y1) {
-                int y = Math.max(heightmap[px][pz], y1);
-                while (y >= minY) {
-                    int si = (y - minY) / SECTION_HEIGHT;
-                    int i = (px << 8) + ((y & 0xf) << 4) + pz;
-                    BlockState st = cache[si].section[i];
-                    if (st != null && !st.isAir()) {
-                        heightmap[px][pz] = y;
-                        return;
-                    }
-                    y--;
-                }
-                heightmap[px][pz] = Integer.MIN_VALUE;
-            }
         }
 
         @Nullable
@@ -845,11 +783,6 @@ public class ChunkDriver {
         private void clear() {
             for (int si = 0 ; si < (maxY - minY) / SECTION_HEIGHT ; si++) {
                 cache[si] = new S();
-            }
-            for (int x = 0 ; x < 16 ; x++) {
-                for (int z = 0 ; z < 16 ; z++) {
-                    heightmap[x][z] = Integer.MIN_VALUE;
-                }
             }
         }
     }
