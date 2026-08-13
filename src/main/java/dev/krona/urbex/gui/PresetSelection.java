@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.WorldSelection;
@@ -43,7 +44,7 @@ public final class PresetSelection {
      * One selectable row. {@code preset} is {@code null} only for the Disabled row; every other
      * entry (built-in or the transient customized one) always carries the resolved {@link Preset} it
      * would generate with. {@code Preset.getId()} on the customized entry's preset is the base
-     * preset it was customized from (an unchanged, immutable field that survives {@link Preset#copy()}),
+     * preset it was customized from (an unchanged, immutable field that survives {@link Preset#toDraft()}),
      * which is what {@link #publish()} reports as the preset id underneath the overrides.
      */
     public record Entry(Identifier id, Component name, @Nullable Preset preset) {
@@ -197,9 +198,14 @@ public final class PresetSelection {
         return selected;
     }
 
-    /** Supplies a hand-edited preset copy from the Customize editor and selects it. */
-    public void applyCustomized(Preset copy) {
-        this.customized = copy;
+    /**
+     * Supplies the Customize editor's draft and selects it.
+     * <p>
+     * Settled on the way in, so what the entry carries is a resolved preset like every other entry's
+     * - the editor's draft goes on being editable and this does not (issue #10).
+     */
+    public void applyCustomized(PresetDraft draft) {
+        this.customized = draft.resolve();
         select(CUSTOMIZED_ID);
     }
 
@@ -305,7 +311,7 @@ public final class PresetSelection {
         Entry base = findEntry(pending.presetId());
         if (base == null) {
             // Not found yet (or genuinely unknown - the server-side check will report that once a
-            // chunk generates). Keep waiting; the raw Config fields are already correct either way.
+            // chunk generates). Keep waiting; what was published is already correct either way.
             return;
         }
         pendingRestore = null;
@@ -315,7 +321,7 @@ public final class PresetSelection {
         }
         try {
             PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(pending.overridesJson())).getOrThrow();
-            applyCustomized(Presets.applyOverrides(base.preset(), re));
+            applyCustomized(Presets.applyOverrides(base.preset(), re).toDraft());
         } catch (Exception e) {
             Urbex.getLogger().warn("Could not rebuild the restored customized preset '{}'; showing it plain.",
                     pending.presetId(), e);

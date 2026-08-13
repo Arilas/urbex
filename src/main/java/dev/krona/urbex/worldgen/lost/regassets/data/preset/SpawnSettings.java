@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import java.util.List;
 
 import java.util.Optional;
@@ -35,7 +35,7 @@ public record SpawnSettings(
             ).apply(i, SpawnSettings::new));
     public static final Codec<SpawnSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "spawn");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         spawnBiome.ifPresent(v -> p.SPAWN_BIOME = v);
         spawnCity.ifPresent(v -> p.SPAWN_CITY = v);
         spawnNotInBuilding.ifPresent(v -> p.SPAWN_NOT_IN_BUILDING = v);

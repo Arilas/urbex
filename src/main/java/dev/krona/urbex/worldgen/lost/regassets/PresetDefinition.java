@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings;
@@ -184,7 +184,7 @@ public class PresetDefinition implements Extendable {
     }
 
     /** Applies metadata (if present) then each present section's {@code apply}, onto {@code p}. */
-    public void applyTo(Preset p) {
+    public void applyTo(PresetDraft p) {
         displayName.ifPresent(p::setName);
         description.ifPresent(p::setDescription);
         extraDescription.ifPresent(p::setExtraDescription);

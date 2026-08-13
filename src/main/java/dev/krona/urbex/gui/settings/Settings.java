@@ -2,7 +2,7 @@ package dev.krona.urbex.gui.settings;
 
 import dev.krona.urbex.config.LandscapeType;
 import dev.krona.urbex.config.MultiBuildingStreetConflict;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.ArrayList;
@@ -52,7 +52,7 @@ public final class Settings {
 
         private void add(String key, SettingCategory cat, ControlKind kind, double min, double max, double step,
                          boolean logScale, boolean integerOnly,
-                         Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                         Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             if (section == null) {
                 throw new IllegalStateException("descriptor " + key + " added before any section() was opened");
             }
@@ -60,13 +60,13 @@ public final class Settings {
         }
 
         private void slider(String key, SettingCategory cat, double min, double max, double step,
-                            Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                            Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             add(key, cat, ControlKind.SLIDER, min, max, step, false, false, getter, setter);
         }
 
         /** A logarithmic slider (min &gt; 0) for the chance knobs where 0.0001 and 0.001 must be distinguishable. */
         private void logSlider(String key, SettingCategory cat, double min, double max, double step,
-                               Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                               Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             add(key, cat, ControlKind.SLIDER, min, max, step, true, false, getter, setter);
         }
 
@@ -82,7 +82,7 @@ public final class Settings {
          * {@code int} field, an overflowing) value.</p>
          */
         private void number(String key, SettingCategory cat, double min, double max, boolean integerOnly,
-                            Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                            Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             add(key, cat, ControlKind.NUMBER, min, max, 0, false, integerOnly, getter, setter);
         }
 
@@ -92,22 +92,22 @@ public final class Settings {
          * field access; the widget coordinates the sentinel against the single field.
          */
         private void chancePerlin(String key, SettingCategory cat, double min, double max, double step,
-                                  Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                                  Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             add(key, cat, ControlKind.CHANCE_PERLIN, min, max, step, true, false, getter, setter);
         }
 
         private void toggle(String key, SettingCategory cat,
-                            Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                            Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             add(key, cat, ControlKind.TOGGLE, 0, 0, 0, false, false, getter, setter);
         }
 
         private void cycle(String key, SettingCategory cat,
-                           Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                           Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             add(key, cat, ControlKind.CYCLE, 0, 0, 0, false, false, getter, setter);
         }
 
         private void text(String key, SettingCategory cat,
-                          Function<Preset, Object> getter, BiConsumer<Preset, Object> setter) {
+                          Function<PresetDraft, Object> getter, BiConsumer<PresetDraft, Object> setter) {
             add(key, cat, ControlKind.TEXT, 0, 0, 0, false, false, getter, setter);
         }
     }

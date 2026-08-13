@@ -20,67 +20,67 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class PresetRoadGridTest {
 
-    private static Preset profile() {
-        return new Preset(Identifier.fromNamespaceAndPath("urbex", "test"));
+    private static PresetDraft profile() {
+        return new PresetDraft(Identifier.fromNamespaceAndPath("urbex", "test"));
     }
 
     @Test
     void aFreshProfileProducesUpstreamsDefaults() {
-        assertEquals(GridSettings.defaults(), PresetRoadGrid.of(profile()));
+        assertEquals(GridSettings.defaults(), PresetRoadGrid.of(profile().resolve()));
     }
 
     @Test
     void primarySpacingXOutOfRangeIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.PRIMARY_ROAD_SPACING_X = 200;
         assertNamesTheField(p, "primaryRoadSpacingX");
     }
 
     @Test
     void primarySpacingZOutOfRangeIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.PRIMARY_ROAD_SPACING_Z = 200;
         assertNamesTheField(p, "primaryRoadSpacingZ");
     }
 
     @Test
     void primaryOptionalChanceOutOfRangeIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.PRIMARY_ROAD_OPTIONAL_CHANCE = 1.5f;
         assertNamesTheField(p, "primaryRoadOptionalChance");
     }
 
     @Test
     void primaryForceEveryOutOfRangeIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.PRIMARY_ROAD_FORCE_EVERY = 0;
         assertNamesTheField(p, "primaryRoadForceEvery");
     }
 
     @Test
     void minimumRoadSeparationOutOfRangeIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.MINIMUM_ROAD_SEPARATION = 1;
         assertNamesTheField(p, "minimumRoadSeparation");
     }
 
     @Test
     void minimumEdgeDistanceOutOfRangeIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.MINIMUM_ROAD_EDGE_DISTANCE = 1;
         assertNamesTheField(p, "minimumRoadEdgeDistance");
     }
 
     @Test
     void tertiaryChanceOutOfRangeIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.TERTIARY_ROAD_CHANCE = -0.1f;
         assertNamesTheField(p, "tertiaryRoadChance");
     }
 
     @Test
     void anInvertedSecondaryCountOnXIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.SECONDARY_ROAD_MIN_COUNT_X = 5;
         p.SECONDARY_ROAD_MAX_COUNT_X = 2;
         assertNamesTheField(p, "secondaryRoadMinCountX");
@@ -88,7 +88,7 @@ class PresetRoadGridTest {
 
     @Test
     void anInvertedSecondaryCountOnZIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.SECONDARY_ROAD_MIN_COUNT_Z = 7;
         p.SECONDARY_ROAD_MAX_COUNT_Z = 0;
         assertNamesTheField(p, "secondaryRoadMinCountZ");
@@ -96,7 +96,7 @@ class PresetRoadGridTest {
 
     @Test
     void anInvertedTertiaryLengthIsRejectedByName() {
-        Preset p = profile();
+        PresetDraft p = profile();
         p.TERTIARY_ROAD_MIN_LENGTH = 9;
         p.TERTIARY_ROAD_MAX_LENGTH = 2;
         assertNamesTheField(p, "tertiaryRoadMinLength");
@@ -108,9 +108,9 @@ class PresetRoadGridTest {
      * have on the value. The offending values are included too, so the report is actionable without
      * opening the file.
      */
-    private static void assertNamesTheField(Preset p, String configKey) {
+    private static void assertNamesTheField(PresetDraft p, String configKey) {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> PresetRoadGrid.of(p));
+                () -> PresetRoadGrid.of(p.resolve()));
         assertTrue(e.getMessage().contains(configKey),
                 "message must name the offending profile setting '" + configKey + "', was: " + e.getMessage());
     }

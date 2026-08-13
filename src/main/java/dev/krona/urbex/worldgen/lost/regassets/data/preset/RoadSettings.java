@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Optional;
 import java.util.Set;
@@ -124,7 +124,7 @@ public record RoadSettings(
     ).codec();
     public static final Codec<RoadSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "roads");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         primaryRoadSpacingX.ifPresent(v -> p.PRIMARY_ROAD_SPACING_X = v);
         primaryRoadSpacingZ.ifPresent(v -> p.PRIMARY_ROAD_SPACING_Z = v);
         primaryRoadOptionalChance.ifPresent(v -> p.PRIMARY_ROAD_OPTIONAL_CHANCE = v);

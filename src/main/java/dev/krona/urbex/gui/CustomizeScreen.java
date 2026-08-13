@@ -1,6 +1,7 @@
 package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.gui.preview.CityPreview;
 import dev.krona.urbex.gui.settings.SettingCategory;
 import dev.krona.urbex.gui.settings.SettingControls;
@@ -34,8 +35,8 @@ import java.util.List;
 
 /**
  * The Phase 2 "Customize this preset…" editor: the metadata-driven successor to the old
- * world-creation config screen. Since Task 4 it works entirely on a private {@link Preset} copy of
- * the preset it was opened on ({@code Preset.copy()}), so nothing global is touched until the player
+ * world-creation config screen. Since Task 4 it works entirely on a private {@link PresetDraft} of
+ * the preset it was opened on ({@code Preset.toDraft()}), so nothing global is touched until the player
  * presses Done - which is exactly what makes Cancel/ESC a clean discard (issue #65). Layout is a
  * category list on the left, a scrollable column of setting controls in the middle (with a search box
  * on top that filters across categories), and a live {@link CityPreview} on the right; the bottom bar
@@ -78,7 +79,7 @@ public class CustomizeScreen extends Screen {
     /** Display name only ({@code base.getDisplayName()}) - not the editor's own state. */
     private final String baseName;
     private final Preset base;
-    private Preset copy;
+    private PresetDraft copy;
     private CityPreview preview;
     /** True once {@link #removed()} has closed the preview, so the next {@link #init()} rebuilds it. */
     private boolean previewClosed;
@@ -109,7 +110,7 @@ public class CustomizeScreen extends Screen {
         this.createWorldScreen = parent instanceof CreateWorldScreen cws ? cws : null;
         this.base = base;
         this.baseName = base.getDisplayName();
-        this.copy = base.copy();
+        this.copy = base.toDraft();
         this.preview = new CityPreview(previewRegistries(createWorldScreen));
         this.previewSeedFallback = random.nextLong();
     }
@@ -278,7 +279,7 @@ public class CustomizeScreen extends Screen {
         previewDirty = false;
         // worldStyles are orthogonal to the preset (spec 1a) - a Preset carries no field for them any
         // more, so the live value always comes from PresetSelection, not from the copy being edited.
-        preview.update(copy, PresetSelection.CLIENT.effectiveWorldStyles(), currentSeed(), modeForCategory(selectedCategory));
+        preview.update(copy.resolve(), PresetSelection.CLIENT.effectiveWorldStyles(), currentSeed(), modeForCategory(selectedCategory));
     }
 
     /**
@@ -317,7 +318,7 @@ public class CustomizeScreen extends Screen {
      * Publishes the edited copy as a world-saved-data overrides overlay (spec §9) - not a file:
      * {@link PresetSelection#applyCustomized} keeps it purely in memory, and {@link PresetSelection#publish()}
      * encodes it as a {@code PresetDefinition} overlay over its base preset id ({@code copy.getId()}, unchanged
-     * by {@link Preset#copy()}).
+     * by {@link Preset#toDraft()}).
      */
     private void done() {
         PresetSelection.CLIENT.applyCustomized(copy);
@@ -331,7 +332,7 @@ public class CustomizeScreen extends Screen {
     }
 
     private void reset() {
-        copy = base.copy();
+        copy = base.toDraft();
         dirty = false;
         rebuildControls();
         schedulePreview();

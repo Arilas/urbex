@@ -67,19 +67,19 @@ class PresetRoundTripTest {
 
     @Test
     void roundTripPreservesValues() {
-        Preset p = new Preset(ID);
-        p.GROUNDLEVEL = 80;
-        p.CITY_CHANCE = 0.55;
-        p.BUILDING_CHANCE = 0.66f;
-        p.PRIMARY_ROAD_SPACING_X = 20;
-        p.HIGHWAY_DISTANCE_MASK = 15;
-        p.RAILWAY_DUNGEON_CHANCE = 0.5f;
-        p.RUIN_CHANCE = 0.77f;
-        p.LIGHTING_DENSITY = 0.9f;
-        p.SPAWN_CHECK_RADIUS = 500;
-        p.EDITMODE = true;
+        PresetDraft draft = new PresetDraft(ID);
+        draft.GROUNDLEVEL = 80;
+        draft.CITY_CHANCE = 0.55;
+        draft.BUILDING_CHANCE = 0.66f;
+        draft.PRIMARY_ROAD_SPACING_X = 20;
+        draft.HIGHWAY_DISTANCE_MASK = 15;
+        draft.RAILWAY_DUNGEON_CHANCE = 0.5f;
+        draft.RUIN_CHANCE = 0.77f;
+        draft.LIGHTING_DENSITY = 0.9f;
+        draft.SPAWN_CHECK_RADIUS = 500;
+        draft.EDITMODE = true;
 
-        PresetDefinition re = p.toDefinition();
+        PresetDefinition re = draft.resolve().toDefinition();
         JsonElement encoded = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
         PresetDefinition decoded = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, encoded).getOrThrow();
 

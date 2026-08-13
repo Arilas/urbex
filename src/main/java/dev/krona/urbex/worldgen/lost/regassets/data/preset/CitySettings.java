@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Optional;
 import java.util.Set;
@@ -132,7 +132,7 @@ public record CitySettings(
     ).codec();
     public static final Codec<CitySettings> CODEC = UnknownKeys.warning(RAW, KEYS, "cities");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         cityChance.ifPresent(v -> p.CITY_CHANCE = v);
         cityMinRadius.ifPresent(v -> p.CITY_MINRADIUS = v);
         cityMaxRadius.ifPresent(v -> p.CITY_MAXRADIUS = v);
