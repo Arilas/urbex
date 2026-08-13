@@ -1006,8 +1006,8 @@ public class ChunkPlan {
     private static int getCityLevelNormal(ChunkCoord coord, PlanningContext provider, Preset profile) {
         ChunkHeightmap heightmap = provider.heightmap(coord);
         int height = heightmap.getHeight();
-        if (profile.USE_AVG_HEIGHTMAP && Config.HEIGHT_SAMPLE_SIZE.get() > 2) {
-            int sampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
+        if (profile.USE_AVG_HEIGHTMAP && Config.heightSampleSize() > 2) {
+            int sampleSize = Config.heightSampleSize();
             int constX = coord.chunkX() < 0 ? -1 : 1;
             int constZ = coord.chunkZ() < 0 ? -1 : 1;
             int chunkBaseX =  (coord.chunkX() / sampleSize) * sampleSize + (sampleSize / 2 * constX);

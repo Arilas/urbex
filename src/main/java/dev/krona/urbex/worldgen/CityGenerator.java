@@ -379,7 +379,7 @@ public class CityGenerator {
      * on the generation path (issue #126).
      */
     static AvoidChunk hasBlacklistedStructure(WorldGenLevel level, int chunkX, int chunkZ) {
-        if (!Config.AVOID_VILLAGES.get() && !Config.AVOID_SURFACE_STRUCTURES.get()
+        if (!Config.avoidVillages() && !Config.avoidSurfaceStructures()
                 && !Config.hasAvoidedStructures()) {
             return AvoidChunk.NO;
         }
@@ -403,12 +403,12 @@ public class CityGenerator {
                 if (!entry.getValue().isEmpty()) {
                     Structure structure = entry.getKey();
                     Optional<ResourceKey<Structure>> key = structures.getResourceKey(structure);
-                    if (Config.AVOID_VILLAGES.get()
+                    if (Config.avoidVillages()
                             && key.map(k -> structures.getOrThrow(k).is(StructureTags.VILLAGE)).orElse(false)) {
                         return true;
                     }
                     // Catch-all for structure mods: everything that builds at the surface step
-                    if (Config.AVOID_SURFACE_STRUCTURES.get()
+                    if (Config.avoidSurfaceStructures()
                             && structure.step() == GenerationStep.Decoration.SURFACE_STRUCTURES) {
                         return true;
                     }
@@ -458,7 +458,7 @@ public class CityGenerator {
 
     private void doNormalChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
 //        debugClearChunk(chunkX, chunkZ, primer);
-        if ((avoidChunk != AvoidChunk.YES || !Config.AVOID_FLATTENING.get()) && profile.isDefault()) {
+        if ((avoidChunk != AvoidChunk.YES || !Config.avoidFlattening()) && profile.isDefault()) {
             correctTerrainShape(ctx, info.coord, heightmap);
 //            flattenChunkToCityBorder(chunkX, chunkZ);
         }
@@ -2000,7 +2000,7 @@ public class CityGenerator {
                 BlockPos pos = info.getRelativePos(rx, oy + y, rz);
                 if (block instanceof SaplingBlock saplingBlock) {
                     BlockState finalB = b;
-                    if (Config.FORCE_SAPLING_GROWTH.get()) {
+                    if (Config.forceSaplingGrowth()) {
                         // The todo runs later, on the server thread, long after this context is gone.
                         // Key the tree it grows on the sapling's position so it is the same tree no
                         // matter when the todo is drained.

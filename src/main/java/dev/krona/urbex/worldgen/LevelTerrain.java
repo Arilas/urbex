@@ -46,7 +46,7 @@ public final class LevelTerrain implements TerrainSampler {
 
     @Override
     public ChunkHeightmap heightmap(ChunkCoord chunk) {
-        int heightSampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
+        int heightSampleSize = Config.heightSampleSize();
         // The block this chunk shares a sampled height with, and the coordinate that height is taken
         // at. Both come from HeightSampleGrid so that the tiling is a partition and the sampled
         // coordinate is a function of the block rather than of whichever chunk asked first - see the

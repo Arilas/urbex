@@ -117,7 +117,7 @@ public final class LevelTaskQueue {
         // At most what was queued when the pass started: a task that retries goes to the back, and
         // without this limit a queue of nothing but retries would be walked over and over until the
         // count budget ran out, retrying each task several times in one tick.
-        int budget = Math.min(Config.TODO_QUEUE_SIZE.get(), queued);
+        int budget = Math.min(Config.todoQueueSize(), queued);
         long deadline = System.nanoTime() + TIME_BUDGET_NANOS;
         for (int done = 0; done < budget; done++) {
             Entry entry = pending.poll();
