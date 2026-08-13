@@ -73,7 +73,7 @@ public class City {
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         RandomSource cityCenterRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_CENTER);
-        return cityCenterRandom.nextDouble() < provider.preset().CITY_CHANCE;
+        return cityCenterRandom.nextDouble() < provider.preset().cityChance();
     }
 
     /**
@@ -88,11 +88,11 @@ public class City {
         int chunkZ = coord.chunkZ();
         RandomSource cityRadiusRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_RADIUS);
         Preset profile = provider.preset();
-        int cityRange = profile.CITY_MAXRADIUS - profile.CITY_MINRADIUS;
+        int cityRange = profile.cityMaxRadius() - profile.cityMinRadius();
         if (cityRange < 1) {
             cityRange = 1;
         }
-        return profile.CITY_MINRADIUS + cityRadiusRandom.nextInt(cityRange);
+        return profile.cityMinRadius() + cityRadiusRandom.nextInt(cityRange);
     }
 
     // Call this on a city center to get the style of that city
@@ -129,17 +129,17 @@ public class City {
         // and this method calls it, so one purpose would make the blend agree with the centre.
         RandomSource cityStyleRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE_LOCAL);
 
-        if (profile.CITY_CHANCE < 0) {
+        if (profile.cityChance() < 0) {
             CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
-                    profile.CITY_PERLIN_SCALE, profile.CITY_PERLIN_OFFSET, profile.CITY_PERLIN_INNERSCALE);
+                    profile.cityPerlinScale(), profile.cityPerlinOffset(), profile.cityPerlinInnerScale());
             float factor = rarityMap.getCityFactor(chunkX, chunkZ);
-            if (factor < profile.CITY_STYLE_THRESHOLD) {
-                styles.add(Pair.of(factor, profile.CITY_STYLE_ALTERNATIVE));
+            if (factor < profile.cityStyleThreshold()) {
+                styles.add(Pair.of(factor, profile.cityStyleAlternative()));
             } else {
                 styles.add(Pair.of(factor, getCityStyleForCityCenter(coord, provider)));
             }
         } else {
-            int offset = (profile.CITY_MAXRADIUS + 15) / 16;
+            int offset = (profile.cityMaxRadius() + 15) / 16;
             for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
                 for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
                     ChunkCoord c = new ChunkCoord(provider.dimension(), cx, cz);
@@ -149,8 +149,8 @@ public class City {
                         if (sqdist < radius * radius) {
                             float dist = (float) Math.sqrt(sqdist);
                             float factor = (radius - dist) / radius;
-                            if (factor < profile.CITY_STYLE_THRESHOLD) {
-                                styles.add(Pair.of(factor, profile.CITY_STYLE_ALTERNATIVE));
+                            if (factor < profile.cityStyleThreshold()) {
+                                styles.add(Pair.of(factor, profile.cityStyleAlternative()));
                             } else {
                                 // The centre's style, not the observing chunk's: asking at
                                 // `coord` gave every chunk of one city its own roll, so a
@@ -207,12 +207,12 @@ public class City {
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         float factor = 0;
-        if (profile.CITY_CHANCE < 0) {
+        if (profile.cityChance() < 0) {
             CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
-                    profile.CITY_PERLIN_SCALE, profile.CITY_PERLIN_OFFSET, profile.CITY_PERLIN_INNERSCALE);
+                    profile.cityPerlinScale(), profile.cityPerlinOffset(), profile.cityPerlinInnerScale());
             factor = rarityMap.getCityFactor(chunkX, chunkZ);
         } else {
-            int offset = (profile.CITY_MAXRADIUS + 15) / 16;
+            int offset = (profile.cityMaxRadius() + 15) / 16;
             for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
                 for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
                     ChunkCoord c = new ChunkCoord(type, cx, cz);
@@ -237,10 +237,10 @@ public class City {
             if (heightmap == null) {
                 return 0;
             }
-            if (heightmap.getHeight() < profile.CITY_MINHEIGHT) {
+            if (heightmap.getHeight() < profile.cityMinHeight()) {
                 return 0;
             }
-            if (heightmap.getHeight() > profile.CITY_MAXHEIGHT) {
+            if (heightmap.getHeight() > profile.cityMaxHeight()) {
                 return 0;
             }
         }
@@ -256,16 +256,16 @@ public class City {
             factor *= multiplier;
         }
 
-        if (profile.CITY_SPAWN_DISTANCE2 > 0) {
+        if (profile.citySpawnDistance2() > 0) {
             float dist = (float) Math.sqrt((chunkX << 4) * (chunkX << 4) + (chunkZ << 4) * (chunkZ << 4));
             double factorDist;
-            if (dist <= profile.CITY_SPAWN_DISTANCE1) {
-                factorDist = profile.CITY_SPAWN_MULTIPLIER1;
-            } else if (dist >= profile.CITY_SPAWN_DISTANCE2) {
-                factorDist = profile.CITY_SPAWN_MULTIPLIER2;
+            if (dist <= profile.citySpawnDistance1()) {
+                factorDist = profile.citySpawnMultiplier1();
+            } else if (dist >= profile.citySpawnDistance2()) {
+                factorDist = profile.citySpawnMultiplier2();
             } else {
-                float f = (dist - profile.CITY_SPAWN_DISTANCE1) / (profile.CITY_SPAWN_DISTANCE2 - profile.CITY_SPAWN_DISTANCE1);
-                factorDist = profile.CITY_SPAWN_MULTIPLIER1 + f * (profile.CITY_SPAWN_MULTIPLIER2 - profile.CITY_SPAWN_MULTIPLIER1);
+                float f = (dist - profile.citySpawnDistance1()) / (profile.citySpawnDistance2() - profile.citySpawnDistance1());
+                factorDist = profile.citySpawnMultiplier1() + f * (profile.citySpawnMultiplier2() - profile.citySpawnMultiplier1());
             }
             factor *= (float) factorDist;
         }

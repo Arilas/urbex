@@ -129,7 +129,7 @@ public record DimensionRuntime(ServerLevel level, @Nullable PlanningContext plan
         // deliberately not fail-soft like the overrides parse above: a malformed payload can be
         // ignored and the un-overridden preset used, but a style that cannot resolve has no such
         // fallback - City.getCityStyle would simply hand null on to generation.
-        requireCityStyle(assets, preset.CITY_STYLE_ALTERNATIVE, type.identifier());
+        requireCityStyle(assets, preset.cityStyleAlternative(), type.identifier());
         PlanningContext planning = planningFor(level, assets, preset, choice.worldStyles());
         return new DimensionRuntime(level, planning, new CityGenerator(planning, preset), tagEpoch);
     }

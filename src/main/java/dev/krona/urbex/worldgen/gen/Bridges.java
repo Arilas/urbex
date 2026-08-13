@@ -36,8 +36,8 @@ public class Bridges {
         // slung over a gap. A planned primary bridge is the road itself carried onward, so its deck
         // sits at the street surface and its markings line up with the road at either end.
         int bridgeLevel = info.getPlannedBridge() != null
-                ? info.profile.GROUNDLEVEL
-                : info.profile.GROUNDLEVEL + 1;
+                ? info.profile.groundLevel()
+                : info.profile.groundLevel() + 1;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 driver.current(x, bridgeLevel, z);
@@ -58,7 +58,7 @@ public class Bridges {
         }
 
         Character support = bt.getMetaChar(BuildingPart.META_SUPPORT);
-        if (info.profile.BRIDGE_SUPPORTS && support != null) {
+        if (info.profile.bridgeSupports() && support != null) {
             BlockState sup = ctx.paletteAt(compiledPalette, support, 7, info.groundLevel, 7);
             // Everything below the deck is measured from the deck, not from the ground: the pillar
             // and the two side lips belong one block under whichever level the deck landed on. Read

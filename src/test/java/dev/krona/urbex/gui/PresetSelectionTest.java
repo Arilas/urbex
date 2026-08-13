@@ -305,7 +305,7 @@ class PresetSelectionTest {
         selection.setAvailablePresets(List.of(entry("default")));
 
         assertEquals(PresetSelection.CUSTOMIZED_ID, selection.selected().id());
-        assertEquals(0.9, selection.selected().preset().CITY_CHANCE, 1e-9);
+        assertEquals(0.9, selection.selected().preset().cityChance(), 1e-9);
     }
 
     @Test

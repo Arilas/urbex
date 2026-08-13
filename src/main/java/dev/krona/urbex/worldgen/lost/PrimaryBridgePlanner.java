@@ -81,8 +81,8 @@ public final class PrimaryBridgePlanner {
         // Dimension-wide, not per-chunk: a span's length limit and acceptance chance must be the
         // same number for every chunk in it.
         Preset profile = provider.preset();
-        float chance = profile.PLANNED_PRIMARY_BRIDGE_CHANCE;
-        int maxGapLength = profile.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
+        float chance = profile.plannedPrimaryBridgeChance();
+        int maxGapLength = profile.plannedPrimaryBridgeMaxLength();
         if (chance <= 0.0f) {
             return Optional.empty();
         }
@@ -311,7 +311,7 @@ public final class PrimaryBridgePlanner {
                 if (CityGenerator.isWaterBiome(provider, coord)) {
                     return true;
                 }
-                int sealevel = provider.preset().SEALEVEL;
+                int sealevel = provider.preset().seaLevel();
                 int waterLevel = sealevel == -1 ? provider.shape().seaLevel() : sealevel;
                 return provider.heightmap(coord).getHeight() < waterLevel;
             }

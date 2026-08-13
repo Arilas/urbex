@@ -42,11 +42,11 @@ public class DamageArea {
         this.minSectionY = provider.shape().minSection();
         this.maxSectionY = provider.shape().maxSection();
 
-        int offset = (Math.max(info.profile.EXPLOSION_MAXRADIUS, info.profile.MINI_EXPLOSION_MAXRADIUS)+15) / 16;
+        int offset = (Math.max(info.profile.explosionMaxRadius(), info.profile.miniExplosionMaxRadius())+15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
             for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
                 ChunkCoord coord = new ChunkCoord(provider.dimension(), cx, cz);
-                if ((!info.profile.EXPLOSIONS_IN_CITIES_ONLY) || ChunkPlan.isCity(coord, provider)) {
+                if ((!info.profile.explosionsInCitiesOnly()) || ChunkPlan.isCity(coord, provider)) {
                     Explosion explosion = getExplosionAt(coord, provider);
                     if (explosion != null) {
                         if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
@@ -108,7 +108,7 @@ public class DamageArea {
         }
         if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {
             BlockState damaged = palette.canBeDamagedToIronBars(b);
-            int waterlevel = provider.shape().seaLevel();//profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
+            int waterlevel = provider.shape().seaLevel();//profile.groundLevel() - profile.WATERLEVEL_OFFSET;
             if (damage < BLOCK_DAMAGE_CHANCE && damaged != null) {
                 if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
                     b = damaged;
@@ -129,10 +129,10 @@ public class DamageArea {
 
     private Explosion getExplosionAt(ChunkCoord coord, PlanningContext provider) {
         RandomSource randomExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION);
-        if (randomExplosion.nextFloat() < profile.EXPLOSION_CHANCE) {
-            return new Explosion(Tools.randomBetween(randomExplosion, profile.EXPLOSION_MINRADIUS, profile.EXPLOSION_MAXRADIUS),
+        if (randomExplosion.nextFloat() < profile.explosionChance()) {
+            return new Explosion(Tools.randomBetween(randomExplosion, profile.explosionMinRadius(), profile.explosionMaxRadius()),
                     new BlockPos((coord.chunkX() << 4) + randomExplosion.nextInt(16),
-                            ChunkPlan.getChunkPlan(coord, provider).cityLevel * 6 + Tools.randomBetween(randomExplosion, profile.EXPLOSION_MINHEIGHT, profile.EXPLOSION_MAXHEIGHT),
+                            ChunkPlan.getChunkPlan(coord, provider).cityLevel * 6 + Tools.randomBetween(randomExplosion, profile.explosionMinHeight(), profile.explosionMaxHeight()),
                             (coord.chunkZ() << 4) + randomExplosion.nextInt(16)));
         }
         return null;
@@ -140,10 +140,10 @@ public class DamageArea {
 
     private Explosion getMiniExplosionAt(ChunkCoord coord, PlanningContext provider) {
         RandomSource randomMiniExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION_MINI);
-        if (randomMiniExplosion.nextFloat() < profile.MINI_EXPLOSION_CHANCE) {
-            return new Explosion(Tools.randomBetween(randomMiniExplosion, profile.MINI_EXPLOSION_MINRADIUS, profile.MINI_EXPLOSION_MAXRADIUS),
+        if (randomMiniExplosion.nextFloat() < profile.miniExplosionChance()) {
+            return new Explosion(Tools.randomBetween(randomMiniExplosion, profile.miniExplosionMinRadius(), profile.miniExplosionMaxRadius()),
                     new BlockPos((coord.chunkX() << 4) + randomMiniExplosion.nextInt(16),
-                            ChunkPlan.getChunkPlan(coord, provider).cityLevel * 6 + Tools.randomBetween(randomMiniExplosion, profile.MINI_EXPLOSION_MINHEIGHT, profile.MINI_EXPLOSION_MAXHEIGHT),
+                            ChunkPlan.getChunkPlan(coord, provider).cityLevel * 6 + Tools.randomBetween(randomMiniExplosion, profile.miniExplosionMinHeight(), profile.miniExplosionMaxHeight()),
                             (coord.chunkZ() << 4) + randomMiniExplosion.nextInt(16)));
         }
         return null;

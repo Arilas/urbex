@@ -155,12 +155,12 @@ public final class WorldStyleField {
         Preset profile = provider.preset();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        if (profile.CITY_CHANCE < 0) {
+        if (profile.cityChance() < 0) {
             return draw(Math.floorDiv(chunkX, PERLIN_REGION_CHUNKS), Math.floorDiv(chunkZ, PERLIN_REGION_CHUNKS));
         }
         ChunkCoord best = null;
         float bestFactor = 0;
-        int offset = (profile.CITY_MAXRADIUS + 15) / 16;
+        int offset = (profile.cityMaxRadius() + 15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
             for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
                 ChunkCoord c = new ChunkCoord(provider.dimension(), cx, cz);

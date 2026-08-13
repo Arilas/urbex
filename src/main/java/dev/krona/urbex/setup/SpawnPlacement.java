@@ -84,18 +84,18 @@ public class SpawnPlacement {
             Predicate<BlockPos> isSuitable = pos -> true;
             boolean needsCheck = false;
 
-            if (!profile.SPAWN_BIOME.isEmpty()) {
-                final Biome spawnBiome = serverLevel.registryAccess().lookupOrThrow(Registries.BIOME).getValue(Identifier.parse(profile.SPAWN_BIOME));
+            if (!profile.spawnBiome().isEmpty()) {
+                final Biome spawnBiome = serverLevel.registryAccess().lookupOrThrow(Registries.BIOME).getValue(Identifier.parse(profile.spawnBiome()));
                 if (spawnBiome == null) {
-                    ModSetup.getLogger().error("Cannot find biome '{}' for the player to spawn in !", profile.SPAWN_BIOME);
+                    ModSetup.getLogger().error("Cannot find biome '{}' for the player to spawn in !", profile.spawnBiome());
                 } else {
                     isSuitable = blockPos -> world.getBiome(blockPos).value() == spawnBiome;
                     needsCheck = true;
                 }
-            } else if (!profile.SPAWN_CITY.isEmpty()) {
-                final PredefinedCity city = dimensionInfo.assets().predefinedCities().get(profile.SPAWN_CITY);
+            } else if (!profile.spawnCity().isEmpty()) {
+                final PredefinedCity city = dimensionInfo.assets().predefinedCities().get(profile.spawnCity());
                 if (city == null) {
-                    ModSetup.getLogger().error("Cannot find city '{}' for the player to spawn in !", profile.SPAWN_CITY);
+                    ModSetup.getLogger().error("Cannot find city '{}' for the player to spawn in !", profile.spawnCity());
                 } else {
                     float sqradius = getSqRadius(city.getRadius(), 0.8f);
                     isSuitable = blockPos -> city.getDimension() == serverLevel.dimension() &&
@@ -104,12 +104,12 @@ public class SpawnPlacement {
                 }
             }
 
-            if (profile.SPAWN_NOT_IN_BUILDING) {
+            if (profile.spawnNotInBuilding()) {
                 isSuitable = isSuitable.and(blockPos -> isOutsideBuilding(dimensionInfo, blockPos));
                 needsCheck = true;
-            } else if (!profile.FORCE_SPAWN_BUILDINGS.isEmpty() || !profile.FORCE_SPAWN_PARTS.isEmpty()) {
-                Set<String> buildings = Set.copyOf(profile.FORCE_SPAWN_BUILDINGS);
-                Set<String> parts = Set.copyOf(profile.FORCE_SPAWN_PARTS);
+            } else if (!profile.forceSpawnBuildings().isEmpty() || !profile.forceSpawnParts().isEmpty()) {
+                Set<String> buildings = Set.copyOf(profile.forceSpawnBuildings());
+                Set<String> parts = Set.copyOf(profile.forceSpawnParts());
                 isSuitable = isSuitable.and(blockPos -> {
                     ChunkCoord coord = new ChunkCoord(dimensionInfo.dimension(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
                     ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimensionInfo);
@@ -136,7 +136,7 @@ public class SpawnPlacement {
                     return false;
                 });
                 needsCheck = true;
-            } else if (profile.FORCE_SPAWN_IN_BUILDING) {
+            } else if (profile.forceSpawnInBuilding()) {
                 isSuitable = isSuitable.and(blockPos -> !isOutsideBuilding(dimensionInfo, blockPos));
                 needsCheck = true;
             }
@@ -185,7 +185,7 @@ public class SpawnPlacement {
     private static BlockPos findSafeSpawnPoint(Level world, PlanningContext provider, @Nonnull Predicate<BlockPos> isSuitable,
                                     @Nonnull ServerLevelData serverLevelData) {
         Random rand = new Random(provider.seed());
-        int radius = provider.preset().SPAWN_CHECK_RADIUS;
+        int radius = provider.preset().spawnCheckRadius();
         int attempts = 0;
 //        int bottom = world.getWorldType().getMinimumSpawnHeight(world);
         while (true) {
@@ -201,7 +201,7 @@ public class SpawnPlacement {
                 ChunkCoord coord = new ChunkCoord(provider.dimension(), x >> 4, z >> 4);
                 Preset profile = provider.preset();
 
-                for (int y = profile.GROUNDLEVEL-5 ; y < 125 ; y++) {
+                for (int y = profile.groundLevel()-5 ; y < 125 ; y++) {
                     BlockPos pos = new BlockPos(x, y, z);
                     if (isValidStandingPosition(world, pos)) {
 //                        serverLevelData.setSpawn(pos.above(), 0.0f);
@@ -209,8 +209,8 @@ public class SpawnPlacement {
                     }
                 }
             }
-            radius += provider.preset().SPAWN_RADIUS_INCREASE;
-            if (attempts > provider.preset().SPAWN_CHECK_ATTEMPTS) {
+            radius += provider.preset().spawnRadiusIncrease();
+            if (attempts > provider.preset().spawnCheckAttempts()) {
                 Urbex.setup.getLogger().error("Can't find a valid spawn position!");
                 throw new RuntimeException("Can't find a valid spawn position!");
             }

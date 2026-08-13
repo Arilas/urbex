@@ -81,7 +81,7 @@ class ShippedPresetsTest {
         for (var entry : presets.entrySet()) {
             Identifier id = entry.getKey();
             Preset resolved = Presets.resolve(id, presets::get);
-            assertTrue(resolved.USE_AVG_HEIGHTMAP,
+            assertTrue(resolved.useAvgHeightmap(),
                     "Preset " + id + " does not have USE_AVG_HEIGHTMAP=true after resolution");
         }
     }

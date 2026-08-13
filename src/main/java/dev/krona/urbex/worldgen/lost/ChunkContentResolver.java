@@ -144,7 +144,7 @@ public final class ChunkContentResolver {
         }
 
         CityStyle style = facts.cityStyle().get();
-        float buildingChance = profile.BUILDING_CHANCE;
+        float buildingChance = profile.buildingChance();
         if (style.getBuildingChance() != null) {
             buildingChance = style.getBuildingChance();
         }
@@ -222,7 +222,7 @@ public final class ChunkContentResolver {
         // Every open lot is grass, unconditionally - that is the point of the whole road field. A lot
         // is what is left over between the planned roads, and rendering some of them as street parts
         // would scatter road fragments through the middle of city blocks, which is the artefact the
-        // hierarchical roads exist to remove. OPEN_LOT_PARK_CHANCE decides only whether the lot is
+        // hierarchical roads exist to remove. openLotParkChance() decides only whether the lot is
         // furnished with a park part; it never reaches the surface underneath.
         //
         // The roll has its own GridPurpose key rather than sharing an address with a neighbouring
@@ -230,7 +230,7 @@ public final class ChunkContentResolver {
         // decision.
         boolean parkPart = openLot
                 && Hash.unit(Hash.at(seed, coord.chunkX(), coord.chunkZ(), GridPurpose.OPEN_LOT_PARK.key()))
-                        < profile.OPEN_LOT_PARK_CHANCE;
+                        < profile.openLotParkChance();
 
         // Settled whether or not a building claimed the chunk: see the draw discipline note above.
         // A non-top-left multi-building chunk copies the top-left's street type instead.

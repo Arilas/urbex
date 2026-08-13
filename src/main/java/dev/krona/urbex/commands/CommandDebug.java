@@ -91,9 +91,9 @@ public class CommandDebug implements Command<CommandSourceStack> {
         ChunkHeightmap heightmap = dimInfo.heightmap(info.coord);
         line(context, "Chunk height (heightmap): " + heightmap.getHeight());
 
-        line(context, "dimInfo.preset().BUILDING_MINFLOORS = " + dimInfo.preset().BUILDING_MINFLOORS);
-        line(context, "dimInfo.preset().BUILDING_MAXFLOORS = " + dimInfo.preset().BUILDING_MAXFLOORS);
-        line(context, "dimInfo.preset().CITY_CHANCE = " + dimInfo.preset().CITY_CHANCE);
+        line(context, "buildingMinFloors = " + dimInfo.preset().buildingMinFloors());
+        line(context, "buildingMaxFloors = " + dimInfo.preset().buildingMaxFloors());
+        line(context, "cityChance = " + dimInfo.preset().cityChance());
         line(context, "info.isOcean() = " + info.isOcean());
 
         printRoadDebug(context, info, dimInfo);
@@ -141,7 +141,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
             line(context, "road.bridgeSpan = " + span.orientation()
                     + " (" + span.fromX() + ", " + span.fromZ() + ") -> (" + span.toX() + ", " + span.toZ() + ")");
         }
-        line(context, "road.conflictPolicy = " + dimInfo.preset().MULTI_BUILDING_STREET_CONFLICT);
+        line(context, "road.conflictPolicy = " + dimInfo.preset().multiBuildingStreetConflict());
         if (info.multiBuildingPos.isMulti() && info.multiBuilding != null) {
             line(context, "road.multiBuilding = " + info.multiBuilding.getName());
         } else {

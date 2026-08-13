@@ -11,10 +11,10 @@ final class SpecialMarkerPolicy {
     }
 
     static boolean populateLoot(long seed, BlockPos marker, Preset profile) {
-        return DensitySelector.loot(seed, marker, profile.LOOT_DENSITY);
+        return DensitySelector.loot(seed, marker, profile.lootDensity());
     }
 
     static boolean generateSpawner(Preset profile) {
-        return profile.GENERATE_SPAWNERS;
+        return profile.generateSpawners();
     }
 }

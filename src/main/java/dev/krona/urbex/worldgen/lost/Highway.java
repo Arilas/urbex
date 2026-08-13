@@ -62,7 +62,7 @@ public class Highway {
         }
 
         // Highways can only occur at chunkZ that is a multiple of 8
-        int mask = profile.HIGHWAY_DISTANCE_MASK;
+        int mask = profile.highwayDistanceMask();
         if (mask <= 0) {
             cache.put(cp, -1);
             return -1;
@@ -95,14 +95,14 @@ public class Highway {
             int level = -1;
             if (higher.getCoord(orientation)-lower.getCoord(orientation) >= 5) {
                 boolean valid;
-                if (profile.HIGHWAY_REQUIRES_TWO_CITIES) {
+                if (profile.highwayRequiresTwoCities()) {
                     valid = ChunkPlan.isCityRaw(lower, provider, profile) && ChunkPlan.isCityRaw(higher, provider, profile);
                 } else {
                     valid = ChunkPlan.isCityRaw(lower, provider, profile) || ChunkPlan.isCityRaw(higher, provider, profile);
                 }
                 if (valid) {
                     // We have at least one city. Valid highway:
-                    level = switch (profile.HIGHWAY_LEVEL_FROM_CITIES_MODE) {
+                    level = switch (profile.highwayLevelFromCities()) {
                         case 0 -> ChunkPlan.getCityLevel(lower, provider);
                         case 1 -> Math.min(ChunkPlan.getCityLevel(lower, provider),
                                 ChunkPlan.getCityLevel(higher, provider));
@@ -152,13 +152,13 @@ public class Highway {
     }
 
     private static boolean hasXHighway(PlanningContext provider, ChunkCoord cp, Preset profile) {
-        return provider.caches().highwayPerlinX.getValue(cp.chunkX() / profile.HIGHWAY_MAINPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_SECONDARYPERLIN_SCALE)
-                > profile.HIGHWAY_PERLIN_FACTOR;
+        return provider.caches().highwayPerlinX.getValue(cp.chunkX() / profile.highwayMainPerlinScale(), cp.chunkZ() / profile.highwaySecondaryPerlinScale())
+                > profile.highwayPerlinFactor();
     }
 
     private static boolean hasZHighway(PlanningContext provider, ChunkCoord cp, Preset profile) {
-        return provider.caches().highwayPerlinZ.getValue(cp.chunkX() / profile.HIGHWAY_SECONDARYPERLIN_SCALE, cp.chunkZ() / profile.HIGHWAY_MAINPERLIN_SCALE)
-                > profile.HIGHWAY_PERLIN_FACTOR;
+        return provider.caches().highwayPerlinZ.getValue(cp.chunkX() / profile.highwaySecondaryPerlinScale(), cp.chunkZ() / profile.highwayMainPerlinScale())
+                > profile.highwayPerlinFactor();
     }
 
 }

@@ -54,7 +54,7 @@ public class CommandLocatePart implements Command<CommandSourceStack> {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
-        if (!dimInfo.preset().EDITMODE) {
+        if (!dimInfo.preset().editMode()) {
             context.getSource().sendFailure(Component.literal("This world was not created with edit mode enabled. This command is not possible!"));
             return 0;
         }
