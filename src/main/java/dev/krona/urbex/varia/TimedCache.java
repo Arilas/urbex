@@ -8,13 +8,35 @@ import java.util.function.Function;
 import java.util.function.IntSupplier;
 
 /**
- * A map whose entries expire once they have not been touched for a while.
+ * A map whose entries expire once they have not been touched for a while, and which never grows past
+ * a stated size.
  * <p>
  * Backed by a {@link ConcurrentHashMap}: worldgen runs on the vanilla worker pool, so every one of
  * these caches is read and written from several threads at once. There is deliberately no
  * {@code computeIfAbsent} - see {@link #getOrCompute}.
+ *
+ * <h2>Why the size bound exists</h2>
+ *
+ * <p>Every value in these caches is a pure function of the world seed and a chunk coordinate, so
+ * dropping one is only ever a recomputation - never a change in what gets generated. That is
+ * asserted rather than assumed: {@code runDigestCheckAvoidExpire} clears every cache every 25 chunks
+ * and reproduces the same golden. What was missing was a ceiling. A player walking in one direction
+ * visits new coordinates indefinitely, and a TTL only reclaims what nothing touches - so the maps
+ * grew with distance travelled and were bounded by nothing at all (issue #132).</p>
  */
 public class TimedCache<K, V> {
+
+    /**
+     * How many entries to look at when making room, and how many of those to drop.
+     *
+     * <p>Sampled rather than exhaustive, so an insert that finds the cache full does a fixed amount
+     * of work instead of scanning it. The sample is taken from {@link ConcurrentHashMap}'s iteration
+     * order, which is by hash bucket and so unrelated to both insertion order and coordinate - it is
+     * effectively a random draw, and the oldest of a random 32 is old enough. What matters here is
+     * the ceiling, not which particular entry pays for it.</p>
+     */
+    private static final int EVICTION_SAMPLE = 32;
+    private static final int EVICTION_TAKE = 8;
 
     /**
      * Where this cache's counters go, or null when metrics are off - which is every run that is not
@@ -37,6 +59,7 @@ public class TimedCache<K, V> {
 
     private final Map<K, Entry<V>> cache = new ConcurrentHashMap<>();
     private final IntSupplier ttlSecondsSupplier;
+    private final IntSupplier maxEntriesSupplier;
     private final AtomicLong nextCleanupAt;
 
     public TimedCache(IntSupplier ttlSecondsSupplier) {
@@ -48,10 +71,27 @@ public class TimedCache<K, V> {
      *             not reported, which is how a cache created inside a test stays out of the numbers.
      */
     public TimedCache(IntSupplier ttlSecondsSupplier, String name) {
+        this(ttlSecondsSupplier, dev.krona.urbex.setup.Config::cacheMaxEntries, name);
+    }
+
+    public TimedCache(IntSupplier ttlSecondsSupplier, IntSupplier maxEntriesSupplier, String name) {
         this.ttlSecondsSupplier = ttlSecondsSupplier;
-        this.nextCleanupAt = new AtomicLong(System.currentTimeMillis());
+        this.maxEntriesSupplier = maxEntriesSupplier;
+        this.nextCleanupAt = new AtomicLong(now());
         this.stats = GenerationMetrics.enabled() && name != null
                 ? GenerationMetrics.cache(name, cache::size) : null;
+    }
+
+    /**
+     * Milliseconds on a clock that only moves forward.
+     *
+     * <p>{@link System#currentTimeMillis()} is wall-clock: an NTP correction or a manual change
+     * steps it, and every entry in every cache then looks either freshly touched or long dead
+     * depending on which way it moved. Expiry is a duration, so it should be measured with the clock
+     * that measures durations. The absolute value is meaningless and only ever subtracted.</p>
+     */
+    private static long now() {
+        return System.nanoTime() / 1_000_000L;
     }
 
     public void clear() {
@@ -64,7 +104,7 @@ public class TimedCache<K, V> {
     }
 
     public V get(K key) {
-        long now = System.currentTimeMillis();
+        long now = now();
         Entry<V> entry = cache.get(key);
         if (entry == null) {
             if (stats != null) {
@@ -91,7 +131,8 @@ public class TimedCache<K, V> {
     }
 
     public void put(K key, V value) {
-        long now = System.currentTimeMillis();
+        long now = now();
+        makeRoom();
         cache.put(key, new Entry<>(value, now));
         maybeCleanup(now);
     }
@@ -127,10 +168,58 @@ public class TimedCache<K, V> {
      * it was already occupied, or null if this call is the one that stored.
      */
     public V putIfAbsent(K key, V value) {
-        long now = System.currentTimeMillis();
+        long now = now();
+        makeRoom();
         Entry<V> raced = cache.putIfAbsent(key, new Entry<>(value, now));
         maybeCleanup(now);
         return raced == null ? null : raced.value;
+    }
+
+    /**
+     * Drops a few entries if the cache is at its ceiling, so the insert about to happen does not
+     * push it past.
+     *
+     * <p>Bounded work, unconditionally: at most {@link #EVICTION_SAMPLE} entries are examined and at
+     * most {@link #EVICTION_TAKE} removed, however far over the limit the map is. A cache that is
+     * over its ceiling therefore converges towards it over the following inserts rather than paying
+     * for the whole correction on whichever worldgen worker happened to notice - which is the
+     * "full sweeps do not stall generation workers" half of issue #132.</p>
+     */
+    private void makeRoom() {
+        int max = maxEntriesSupplier.getAsInt();
+        if (max <= 0 || cache.size() < max) {
+            return;
+        }
+        // The oldest few of a sample, rather than the oldest overall: finding the true oldest means
+        // reading every entry, which is the scan this is here to avoid.
+        Object[] oldestKeys = new Object[EVICTION_TAKE];
+        long[] oldestTimes = new long[EVICTION_TAKE];
+        java.util.Arrays.fill(oldestTimes, Long.MAX_VALUE);
+        int seen = 0;
+        for (Map.Entry<K, Entry<V>> entry : cache.entrySet()) {
+            long age = entry.getValue().lastAccess;
+            for (int i = 0; i < EVICTION_TAKE; i++) {
+                if (age < oldestTimes[i]) {
+                    System.arraycopy(oldestTimes, i, oldestTimes, i + 1, EVICTION_TAKE - i - 1);
+                    System.arraycopy(oldestKeys, i, oldestKeys, i + 1, EVICTION_TAKE - i - 1);
+                    oldestTimes[i] = age;
+                    oldestKeys[i] = entry.getKey();
+                    break;
+                }
+            }
+            if (++seen >= EVICTION_SAMPLE) {
+                break;
+            }
+        }
+        long removed = 0;
+        for (Object key : oldestKeys) {
+            if (key != null && cache.remove(key) != null) {
+                removed++;
+            }
+        }
+        if (stats != null && removed > 0) {
+            stats.evicted(removed);
+        }
     }
 
     private boolean isExpired(Entry<V> entry, long now) {
@@ -149,6 +238,12 @@ public class TimedCache<K, V> {
         cleanup(now);
     }
 
+    /**
+     * The TTL sweep. Still a full pass, and that is now a bounded statement rather than an open one:
+     * {@link #makeRoom} keeps the map at or below the configured ceiling, so this walks at most that
+     * many entries - a number an operator chose - instead of however many coordinates a player
+     * happened to visit.
+     */
     private void cleanup(long now) {
         long started = stats == null ? 0 : System.nanoTime();
         long removed = 0;
@@ -167,8 +262,6 @@ public class TimedCache<K, V> {
             }
         }
         if (stats != null) {
-            // The sweep is O(n) on whichever worldgen worker won the CAS above, which is the
-            // specific thing #132 asks to measure before anything is done about it.
             stats.evicted(removed);
             stats.swept(System.nanoTime() - started, cache.size());
         }
