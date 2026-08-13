@@ -55,7 +55,7 @@ public class ChunkPlan {
     public final BuildingPart bridgeType;
     public final BuildingPart stairType;
     public final BuildingPart frontType;
-    private final float stairPriority;      // A random number that indicates if this chunk should get a stair if there are competing stairs around it. The highest wins
+    final float stairPriority;      // A random number that indicates if this chunk should get a stair if there are competing stairs around it. The highest wins
     public final BuildingPart railDungeon;    // Dungeon next to rails. Will only generate if there are actually rails next to it
     public final StreetType streetType;
     private final RoadType effectiveRoad;   // The planned road this chunk renders, NONE for most chunks
@@ -103,13 +103,8 @@ public class ChunkPlan {
     /** This chunk's bridge decisions and the state memoising them; see {@link BridgeDecisions}. */
     final BridgeDecisions bridges = new BridgeDecisions(this);
 
-    private volatile boolean streetSlopeCalculated = false;
-    private volatile Direction streetSlopeDirection;
-
-    private volatile boolean stairsCalculated = false;
-    private volatile Direction stairDirection;
-    private volatile boolean actualStairsCalculated = false;
-    private volatile Direction actualStairDirection;
+    /** Which way this chunk's street slopes and where its stairs face; see {@link SlopeDecisions}. */
+    final SlopeDecisions slopes = new SlopeDecisions(this);
 
     private volatile MinMax desiredTerrainCorrectionHeights = null;
     private volatile MinMax desiredMaxHeight1 = null;
@@ -958,12 +953,12 @@ public class ChunkPlan {
     }
 
     /** A chunk that renders a planned road of some class, rather than a lot, a park or a building. */
-    private boolean isPlannedRoadSection() {
+    boolean isPlannedRoadSection() {
         return isCity && !hasBuilding && effectiveRoad != RoadType.NONE;
     }
 
     /** A planned road below primary: the only roads allowed to slope. */
-    private boolean isMinorRoadSection() {
+    boolean isMinorRoadSection() {
         return isPlannedRoadSection() && effectiveRoad != RoadType.PRIMARY;
     }
 
@@ -984,59 +979,11 @@ public class ChunkPlan {
      */
     @Nullable
     public Direction getStreetSlopeDirection() {
-        if (streetSlopeCalculated) {
-            return streetSlopeDirection;
-        }
-        Direction direction = computeStreetSlopeDirection();
-        // Value first, then the flag: a reader that sees the flag set must see the value.
-        streetSlopeDirection = direction;
-        streetSlopeCalculated = true;
-        return direction;
+        return slopes.streetSlope();
     }
 
-    @Nullable
-    private Direction computeStreetSlopeDirection() {
-        if (!isMinorRoadSection()) {
-            return null;
-        }
-        Direction slopeDirection = null;
-        for (Direction direction : Direction.VALUES) {
-            ChunkPlan adjacent = direction.get(this);
-            if (adjacent.isMinorRoadSection() && adjacent.cityLevel == cityLevel + 1) {
-                if (slopeDirection != null) {
-                    // Two ways up out of one chunk: which one the ramp should face is not decided.
-                    return null;
-                }
-                slopeDirection = direction;
-            }
-        }
-        if (slopeDirection == null) {
-            return null;
-        }
-
-        ChunkPlan upper = slopeDirection.get(this);
-        ChunkPlan approach = slopeDirection.getOpposite().get(this);
-        if (!approach.isMinorRoadSection() || approach.cityLevel != cityLevel) {
-            return null;
-        }
-        ChunkPlan departure = slopeDirection.get(upper);
-        if (!departure.isMinorRoadSection() || departure.cityLevel != upper.cityLevel) {
-            return null;
-        }
-
-        for (Direction direction : Direction.VALUES) {
-            if (direction != slopeDirection && direction != slopeDirection.getOpposite()) {
-                ChunkPlan side = direction.get(this);
-                if (side.isPlannedRoadSection() && side.cityLevel == cityLevel) {
-                    return null;
-                }
-                ChunkPlan upperSide = direction.get(upper);
-                if (upperSide.isPlannedRoadSection() && upperSide.cityLevel == upper.cityLevel) {
-                    return null;
-                }
-            }
-        }
-        return slopeDirection;
+    public Direction getActualStairDirection() {
+        return slopes.actualStair();
     }
 
     public boolean isElevatedParkSection() {
@@ -1055,57 +1002,6 @@ public class ChunkPlan {
         counter += getXmax().getZmax().isStreetOrParkSection() ? 1 : 0;
         return counter >= threshold;
     }
-
-    private Direction getStairDirection() {
-        if (stairsCalculated) {
-            return stairDirection;
-        }
-        Direction direction = null;
-        // A sloped chunk already carries the whole level change across its full width. The narrow
-        // stair decoration on top of it would be a second, contradictory way up.
-        if (getStreetSlopeDirection() == null && streetType != StreetType.PARK && !hasBuilding && isCity) {
-            if (cityLevel == getXmin().cityLevel - 1 && !getXmin().hasBuilding && getXmin().isCity) {
-                direction = Direction.XMIN;
-            } else if (cityLevel == getXmax().cityLevel - 1 && !getXmax().hasBuilding && getXmax().isCity) {
-                direction = Direction.XMAX;
-            } else if (cityLevel == getZmin().cityLevel - 1 && !getZmin().hasBuilding && getZmin().isCity) {
-                direction = Direction.ZMIN;
-            } else if (cityLevel == getZmax().cityLevel - 1 && !getZmax().hasBuilding && getZmax().isCity) {
-                direction = Direction.ZMAX;
-            }
-        }
-        // Value first, then the flag: a reader that sees the flag set must see the value.
-        stairDirection = direction;
-        stairsCalculated = true;
-        return direction;
-    }
-
-    // This returns the actual stair direction. It keeps track if there are stair chunks around
-    // it those have higher stair priority
-    public Direction getActualStairDirection() {
-        if (actualStairsCalculated) {
-            return actualStairDirection;
-        }
-        Direction direction = getStairDirection();
-        if (direction != null) {
-            for (int cx = -1; cx <= 1; cx++) {
-                for (int cz = -1; cz <= 1; cz++) {
-                    if (cx != 0 || cz != 0) {
-                        ChunkCoord key = coord.offset(cx, cz);
-                        ChunkPlan adjacent = getChunkPlan(key, provider);
-                        if (adjacent.getStairDirection() != null && adjacent.stairPriority > stairPriority) {
-                            direction = null;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        actualStairDirection = direction;
-        actualStairsCalculated = true;
-        return direction;
-    }
-
 
     /**
      * The planned primary bridge claiming this chunk, or {@code null}. Memoized because the border
