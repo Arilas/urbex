@@ -11,6 +11,9 @@
   - *An existing pack that still writes the section keeps loading.* It is reported by the ordinary
     unknown-key WARN and generates exactly what it generated before, because nothing ever consumed
     the values. The JSON Schema flags it while you type.
+  - *An existing world with a Customize preset keeps its saved settings unchanged too.* Its saved
+    overrides still include the old `atmosphere` block, so it logs the same unknown-key WARN once
+    per level load — harmless, and nothing to re-customize over.
   - *No worldgen change*: every digest golden is unchanged.
 
 - **A palette character that resolves to nothing, and a road part that does not fit its chunk, are

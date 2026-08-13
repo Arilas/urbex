@@ -54,13 +54,15 @@ class PresetCodecTest {
     }
 
     /**
-     * All six metadata keys are top-level keys of the preset object, decoded alongside the sections.
-     * Pinned because they have been routed through the codec two different ways - see the flat
-     * {@code RecordCodecBuilder.group} in {@code PresetDefinition}, which they were briefly lifted
-     * out of to buy back a field slot.
+     * All six metadata keys are top-level keys of the preset object, and round-trip through the
+     * codec in both directions. Decoding binds positionally through the constructor, so a
+     * transposed {@code forGetter} in the flat {@code RecordCodecBuilder.group} in
+     * {@code PresetDefinition} would still decode correctly - only the encode direction, which the
+     * getters actually drive, would catch it. That is why this test checks both directions rather
+     * than decode alone.
      */
     @Test
-    void everyMetadataKeyDecodes() {
+    void everyMetadataKeyRoundTrips() {
         PresetDefinition re = decode("{\"extends\":\"urbex:default\",\"name\":\"Tall Buildings\","
                 + "\"description\":\"d\",\"extraDescription\":\"e\",\"warning\":\"w\","
                 + "\"icon\":\"i.png\",\"cities\":{\"cityChance\":0.25}}");
@@ -72,6 +74,15 @@ class PresetCodecTest {
         assertEquals("w", re.warning().orElseThrow());
         assertEquals("i.png", re.icon().orElseThrow());
         assertEquals(0.25, re.cities().orElseThrow().cityChance().orElseThrow());
+
+        JsonElement encoded = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
+        JsonObject json = encoded.getAsJsonObject();
+        assertEquals("urbex:default", json.get("extends").getAsString());
+        assertEquals("Tall Buildings", json.get("name").getAsString());
+        assertEquals("d", json.get("description").getAsString());
+        assertEquals("e", json.get("extraDescription").getAsString());
+        assertEquals("w", json.get("warning").getAsString());
+        assertEquals("i.png", json.get("icon").getAsString());
     }
 
     @Test

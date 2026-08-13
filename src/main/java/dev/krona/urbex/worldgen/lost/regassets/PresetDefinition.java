@@ -16,7 +16,6 @@ import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 import net.minecraft.resources.Identifier;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.Set;

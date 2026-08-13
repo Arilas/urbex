@@ -127,10 +127,9 @@ class DisplayNameTest {
 
         assertTrue(json.getAsJsonObject().has("name"), "toDefinition() must carry the name");
         assertEquals("Example", json.getAsJsonObject().get("name").getAsString());
-        // The metadata block is a MapCodec purely to buy a seventeenth field back from
-        // RecordCodecBuilder's sixteen-field limit; it must stay flattened into the file's own
-        // object, or every existing preset's 'description' and 'icon' would need renesting.
+        // The six metadata keys are top-level keys of the preset object, not a nested block -
+        // renesting them would break every existing preset file.
         assertTrue(json.getAsJsonObject().has("description"),
-                "the metadata MapCodec must inline its keys, not nest them");
+                "the metadata keys must stay top-level, not nested");
     }
 }
