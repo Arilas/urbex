@@ -1,11 +1,9 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.logging.log4j.Level;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -18,15 +16,63 @@ public class CompiledPalette {
     /** Keys the world seed by a palette character. Odd, so distinct characters give distinct keys. */
     private static final long CHARACTER_KEY = 0x9E3779B97F4A7C15L;
 
-    private final Map<Character, Object> palette = new HashMap<>();
+    /**
+     * What a palette character resolves to.
+     *
+     * <p>Two cases, and they were an {@code Object} recovered by {@code instanceof} at twelve
+     * lookups. That is exactly how {@code isSimple} rotted: it tested {@code instanceof Character},
+     * which matched neither case, so the bulk-fill fast path behind it was dead for as long as
+     * anyone had been reading the code (issue #33). A sealed type cannot be wrong about which cases
+     * exist, and the compiler checks each site instead of a reader doing it (issue #53).</p>
+     */
+    public sealed interface Entry {
+
+        /** One state, whatever the position. */
+        record Simple(BlockState state) implements Entry {}
+
+        /**
+         * A weighted choice, expanded to exactly {@link #SLOTS} slots at compile time so a lookup is
+         * an array index rather than a walk over weights. Which slot is a pure function of the
+         * position - see {@link CompiledPalette#getAt}.
+         */
+        record Weighted(BlockState[] slots) implements Entry {}
+    }
+
+    /** How many slots a weighted entry expands to. A palette weight is a count out of this. */
+    public static final int SLOTS = 128;
+
+    private final Map<Character, Entry> palette = new HashMap<>();
+    /**
+     * The same entries indexed by character, for the characters that fit.
+     * <p>
+     * A palette character is datapack-defined and so is any {@code char}, but every one anybody has
+     * ever written is ASCII. This is the lookup {@code generatePart} does once per block of every
+     * part it renders, and an array index beats hashing a boxed {@link Character}; the map stays the
+     * source of truth for the rest.
+     */
+    private final Entry[] ascii = new Entry[128];
     private final Map<BlockState, BlockState> damagedToBlock = new HashMap<>();
     private final Map<Character, Palette.Info> information = new HashMap<>();
 
     public CompiledPalette(CompiledPalette other, Palette... palettes) {
-        this.palette.putAll(other.palette);
+        other.palette.forEach(this::define);
         this.damagedToBlock.putAll(other.damagedToBlock);
         this.information.putAll(other.information);
         addPalettes(palettes);
+    }
+
+    /** Records {@code entry} for {@code c} in both the map and the ASCII index. */
+    private void define(char c, Entry entry) {
+        palette.put(c, entry);
+        if (c < ascii.length) {
+            ascii[c] = entry;
+        }
+    }
+
+    /** What {@code c} resolves to, or null. */
+    @Nullable
+    private Entry entry(char c) {
+        return c < ascii.length ? ascii[c] : palette.get(c);
     }
 
     public CompiledPalette(Palette... palettes) {
@@ -119,8 +165,8 @@ public class CompiledPalette {
             if (p != null) {
                 for (Map.Entry<Character, Palette.PE> entry : p.getPalette().entrySet()) {
                     Palette.PE pe = entry.getValue();
-                    if (pe.blocks() instanceof BlockState) {
-                        palette.put(entry.getKey(), pe.blocks());
+                    if (pe.blocks() instanceof BlockState state) {
+                        define(entry.getKey(), new Entry.Simple(state));
                     } else if (pe.blocks() instanceof Pair[]) {
                         Pair<Integer, BlockState>[] r = (Pair<Integer, BlockState>[]) pe.blocks();
                         int[] weights = new int[r.length];
@@ -129,23 +175,28 @@ public class CompiledPalette {
                         }
                         int[] slots;
                         try {
-                            slots = distributeSlots(weights, 128);
+                            slots = distributeSlots(weights, SLOTS);
                         } catch (IllegalArgumentException e) {
                             throw new RuntimeException("Invalid palette entry for '" + entry.getKey() + "': " + e.getMessage());
                         }
-                        BlockState[] randomBlocks = new BlockState[128];
+                        BlockState[] randomBlocks = new BlockState[SLOTS];
                         int idx = 0;
                         for (int i = 0; i < r.length; i++) {
                             for (int j = 0; j < slots[i]; j++) {
                                 randomBlocks[idx++] = r[i].getRight();
                             }
                         }
-                        palette.put(entry.getKey(), randomBlocks);
+                        define(entry.getKey(), new Entry.Weighted(randomBlocks));
+                    } else if (pe.blocks() == null) {
+                        throw new RuntimeException("Invalid palette entry for '" + entry.getKey() + "'!");
                     } else if (!(pe.blocks() instanceof String)) {
-                        if (pe.blocks() == null) {
-                            throw new RuntimeException("Invalid palette entry for '" + entry.getKey() + "'!");
-                        }
-                        palette.put(entry.getKey(), pe.blocks());
+                        // Unreachable: Palette only ever builds a PE from a BlockState, a Pair[] or
+                        // a String. It used to store whatever this was and let the cast fail later,
+                        // from a worldgen worker mid-part; the sealed Entry has nowhere to put it,
+                        // which is the point.
+                        throw new RuntimeException("Palette entry for '" + entry.getKey()
+                                + "' is a " + pe.blocks().getClass().getName()
+                                + ", which is not a block, a weighted list or a character reference");
                     }
                     // Remove information for this character here. If we need it again we will add it below
                     information.remove(entry.getKey());
@@ -164,8 +215,9 @@ public class CompiledPalette {
                         Palette.PE pe = entry.getValue();
                         if (pe.blocks() instanceof String blocks) {
                             char c = blocks.charAt(0);
-                            if (palette.containsKey(c) && !palette.containsKey(entry.getKey())) {
-                                palette.put(entry.getKey(), palette.get(c));
+                            Entry referenced = palette.get(c);
+                            if (referenced != null && !palette.containsKey(entry.getKey())) {
+                                define(entry.getKey(), referenced);
                                 information.remove(entry.getKey());
                                 dirty = true;
                             }
@@ -199,18 +251,20 @@ public class CompiledPalette {
      * Return true if this palette entry exists
      */
     public boolean isDefined(Character c) {
-        return c != null && palette.containsKey(c);
+        return c != null && entry(c) != null;
     }
 
     /**
      * Return true if this is a simple character that can have only one value in the palette.
-     * The palette map only ever holds {@code BlockState} (simple) or {@code BlockState[]}
-     * (weighted); the old {@code instanceof Character} test matched neither, so the bulk-fill
-     * fast path behind this check was dead (issue #33).
+     * <p>
+     * The check that rotted, and the reason for the sealed type. It used to read
+     * {@code palette.get(c) instanceof Character} against a map holding {@code BlockState} or
+     * {@code BlockState[]} - matching neither, so the bulk-fill fast path behind it was dead and
+     * nothing said so (issue #33). {@code instanceof Entry.Simple} cannot be wrong about a case
+     * that does not exist.
      */
     public boolean isSimple(char c) {
-        Object o = palette.get(c);
-        return o instanceof BlockState;
+        return entry(c) instanceof Entry.Simple;
     }
 
     /**
@@ -219,23 +273,17 @@ public class CompiledPalette {
      * There is deliberately no no-argument {@code get(char)}: it used to draw from a static LCG
      * shared by every chunk and every thread, which is exactly what made generation depend on the
      * order chunks were built in. Callers pass the stream they are responsible for.
+     * <p>
+     * There is no longer a {@code catch} here either. It existed to log and return null when the
+     * unchecked cast to {@code BlockState[]} failed - a defence against the untyped map, on the path
+     * that resolves every block of every part.
      */
     public BlockState get(char c, RandomSource rand) {
-        try {
-            Object o = palette.get(c);
-            if (o instanceof BlockState state) {
-                return state;
-            } else if (o == null) {
-                return null;
-            } else {
-                BlockState[] randomBlocks = (BlockState[]) o;
-                return randomBlocks[rand.nextInt(128)];
-            }
-        } catch (Exception e) {
-            Urbex.LOGGER.log(Level.ERROR, e);
-            return null;
-        }
-
+        return switch (entry(c)) {
+            case null -> null;
+            case Entry.Simple simple -> simple.state();
+            case Entry.Weighted weighted -> weighted.slots()[rand.nextInt(SLOTS)];
+        };
     }
 
     /**
@@ -255,15 +303,12 @@ public class CompiledPalette {
      * {@link Rng.Purpose} cannot carry it because palette characters are datapack-defined.
      */
     public BlockState getAt(char c, long seed, int x, int y, int z) {
-        Object o = palette.get(c);
-        if (o instanceof BlockState state) {
-            return state;
-        } else if (o == null) {
-            return null;
-        } else {
-            BlockState[] randomBlocks = (BlockState[]) o;
-            return randomBlocks[Rng.indexAtPos(characterSeed(seed, c), x, y, z, Rng.Purpose.PALETTE, randomBlocks.length)];
-        }
+        return switch (entry(c)) {
+            case null -> null;
+            case Entry.Simple simple -> simple.state();
+            case Entry.Weighted weighted -> weighted.slots()[Rng.indexAtPos(
+                    characterSeed(seed, c), x, y, z, Rng.Purpose.PALETTE, weighted.slots().length)];
+        };
     }
 
     /**
@@ -281,32 +326,21 @@ public class CompiledPalette {
      * rubble rather than one repeated block.
      */
     public BlockState getRepresentative(char c) {
-        Object o = palette.get(c);
-        if (o instanceof BlockState state) {
-            return state;
-        } else if (o == null) {
-            return null;
-        } else {
-            return ((BlockState[]) o)[0];
-        }
+        return switch (entry(c)) {
+            case null -> null;
+            case Entry.Simple simple -> simple.state();
+            case Entry.Weighted weighted -> weighted.slots()[0];
+        };
     }
 
     public Set<BlockState> getAll(char c) {
-        try {
-            Object o = palette.get(c);
-            if (o instanceof BlockState state) {
-                return Collections.singleton(state);
-            } else if (o == null) {
-                return Collections.emptySet();
-            } else {
-                BlockState[] randomBlocks = (BlockState[]) o;
-                // Set.copyOf, not Set.of: a weighted array always repeats states, and the
-                // varargs form throws on duplicates (issue #44)
-                return Set.copyOf(Arrays.asList(randomBlocks));
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return switch (entry(c)) {
+            case null -> Collections.emptySet();
+            case Entry.Simple simple -> Collections.singleton(simple.state());
+            // Set.copyOf, not Set.of: a weighted array always repeats states, and the varargs form
+            // throws on duplicates (issue #44)
+            case Entry.Weighted weighted -> Set.copyOf(Arrays.asList(weighted.slots()));
+        };
     }
 
     public BlockState canBeDamagedToIronBars(BlockState b) {
@@ -320,19 +354,13 @@ public class CompiledPalette {
      */
     @Nullable
     public Character find(BlockState state) {
-        for (Map.Entry<Character, Object> entry : palette.entrySet()) {
-            Object o = entry.getValue();
-            if (o instanceof BlockState s) {
-                if (s == state) {
-                    return entry.getKey();
-                }
-            } else {
-                BlockState[] randomBlocks = (BlockState[]) o;
-                for (BlockState randomBlock : randomBlocks) {
-                    if (randomBlock == state) {
-                        return entry.getKey();
-                    }
-                }
+        for (Map.Entry<Character, Entry> mapping : palette.entrySet()) {
+            boolean found = switch (mapping.getValue()) {
+                case Entry.Simple simple -> simple.state() == state;
+                case Entry.Weighted weighted -> Arrays.asList(weighted.slots()).contains(state);
+            };
+            if (found) {
+                return mapping.getKey();
             }
         }
         return null;
@@ -342,17 +370,18 @@ public class CompiledPalette {
      * For editor. See if a state matches with a character
      */
     public boolean isMatch(char c, BlockState state) {
-        Object o = palette.get(c);
-        if (o instanceof BlockState s) {
-            return s.getBlock() == state.getBlock();
-        } else {
-            BlockState[] randomBlocks = (BlockState[]) o;
-            for (BlockState randomBlock : randomBlocks) {
-                if (randomBlock.getBlock() == state.getBlock()) {
-                    return true;
+        return switch (entry(c)) {
+            // Was a NullPointerException: the old code cast a missing character to BlockState[].
+            case null -> false;
+            case Entry.Simple simple -> simple.state().getBlock() == state.getBlock();
+            case Entry.Weighted weighted -> {
+                for (BlockState slot : weighted.slots()) {
+                    if (slot.getBlock() == state.getBlock()) {
+                        yield true;
+                    }
                 }
+                yield false;
             }
-        }
-        return false;
+        };
     }
 }
