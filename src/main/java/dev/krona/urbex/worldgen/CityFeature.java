@@ -8,6 +8,7 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.feature.Feature;
 import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
@@ -52,12 +53,20 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
     /**
      * Generates the city content for {@code chunk}. Called from the carver-stage hook.
      * <p>
+     * Static, because it needs nothing from the registered feature instance - it holds no state, and
+     * everything this reads comes from the level's published {@link DimensionRuntime}. The carver
+     * hook used to reach it through {@code Registration.cityFeature()}, a process-global slot holding
+     * whichever {@code CityFeature} the last {@code Registration.init()} made; that is the last of
+     * the "ask a static for the thing that generates" lookups #129 is about, and a lookup that can
+     * answer {@code null} (before registration, or in a test) for something the mixin then skips
+     * silently.
+     * <p>
      * The runtime is read once, at the top, and everything below uses that one reference. A
      * {@code /reload} or an unload landing mid-chunk republishes the level's runtime for the
      * <em>next</em> chunk and leaves this one generating against the epoch it captured - which is
      * the whole point of the ownership move, and the opposite of what the dirty counter did.
      */
-    public boolean generateFromPipeline(WorldGenRegion region, net.minecraft.world.level.chunk.ChunkAccess chunk) {
+    public static boolean generateFromPipeline(WorldGenRegion region, ChunkAccess chunk) {
         DimensionRuntime runtime = GenerationSession.runtimeFor(region);
         if (runtime == null) {
             reportMissingRuntime(region.getLevel(), chunk.getPos());

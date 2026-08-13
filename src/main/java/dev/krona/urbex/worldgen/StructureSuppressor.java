@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.setup.Config;
-import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import net.minecraft.world.level.ChunkPos;
