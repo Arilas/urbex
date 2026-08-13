@@ -4,25 +4,11 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
-import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.setup.WorldStyleMix;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.BiomeSource;
-import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.biome.Climate;
-import net.minecraft.world.level.chunk.ChunkGenerator;
-import net.minecraft.world.level.chunk.ChunkSource;
 import org.jetbrains.annotations.Nullable;
 
 public class DefaultDimensionInfo implements IDimensionInfo {
@@ -37,7 +23,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     private final WorldStyleField styles;
     private final DimensionCaches caches;
 
-    private final Registry<Biome> biomeRegistry;
+    private final LevelTerrain terrain;
     private final CityGenerator feature;
     private final RoadField roadField;
 
@@ -52,8 +38,11 @@ public class DefaultDimensionInfo implements IDimensionInfo {
         this.profile = preset;
         this.caches = new DimensionCaches(this.world.getSeed());
         styles = WorldStyleField.resolve(assets, this.world.getSeed(), worldStyles);
+        // Before the generator, and no longer on it: sampling the ground height is not generation,
+        // and having the generator own it is half of why the generator and this class have to
+        // construct each other (issue #129).
+        terrain = new LevelTerrain(this.world, preset, caches);
         feature = new CityGenerator(this, preset);
-        biomeRegistry = this.world.registryAccess().lookupOrThrow(Registries.BIOME);
         roadField = new GridRoadField(this.world.getSeed(), getType().identifier().toString(),
                 GridSettings.fromPreset(preset));
     }
@@ -66,11 +55,6 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     @Override
     public AssetSnapshot assets() {
         return assets;
-    }
-
-    @Override
-    public WorldGenLevel getWorld() {
-        return world;
     }
 
     @Override
@@ -109,35 +93,8 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public ChunkHeightmap getHeightmap(int chunkX, int chunkZ) {
-        ChunkCoord coord = new ChunkCoord(getType(), chunkX, chunkZ);
-        return feature.getHeightmap(coord, getWorld());
-    }
-
-    @Override
-    public ChunkHeightmap getHeightmap(ChunkCoord coord) {
-        return feature.getHeightmap(coord, getWorld());
-    }
-
-    //    @Override
-//    public Biome[] getBiomes(int chunkX, int chunkZ) {
-//        AbstractChunkProvider chunkProvider = getWorld().getChunkProvider();
-//        if (chunkProvider instanceof ServerChunkProvider) {
-//            BiomeProvider biomeProvider = ((ServerChunkProvider) chunkProvider).getChunkGenerator().getBiomeProvider();
-//            return biomeProvider.getBiomes((chunkX - 1) * 4 - 2, chunkZ * 4 - 2, 10, 10, false);
-//        }
-//    }
-//
-    @Override
-    public Holder<Biome> getBiome(BlockPos pos) {
-        ChunkSource chunkProvider = getWorld().getChunkSource();
-        if (chunkProvider instanceof ServerChunkCache) {
-            ChunkGenerator generator = ((ServerChunkCache) chunkProvider).getGenerator();
-            BiomeSource biomeProvider = generator.getBiomeSource();
-            Climate.Sampler sampler = ((ServerChunkCache) chunkProvider).randomState().sampler();
-            return biomeProvider.getNoiseBiome(pos.getX() >> 2, pos.getY() >> 2, pos.getZ() >> 2, sampler);
-        }
-        return biomeRegistry.getOrThrow(Biomes.PLAINS);
+    public TerrainSampler terrain() {
+        return terrain;
     }
 
     @Nullable

@@ -9,47 +9,49 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 
 import javax.annotation.Nullable;
 
+/**
+ * What one dimension plans and generates with.
+ *
+ * <p>It no longer hands out a {@code WorldGenLevel}. Everything the planning path asked one for is
+ * a narrower question now - {@link LevelShape} for the height bounds and the water line,
+ * {@link TerrainSampler} for the ground height, the biome and the registries - and none of those has
+ * an answer only a server can give. That is what made {@code getWorld() != null} a planning
+ * condition: five call sites branched on it, meaning "am I the world-creation preview?" (issue
+ * #129).</p>
+ *
+ * <p>Block access during generation goes through the region on the {@link ChunkGenContext}, as it
+ * already did; the dimension's own level is held by its {@link DimensionRuntime}.</p>
+ */
 public interface IDimensionInfo {
 
     long getSeed();
 
     /**
-     * The dimension's own level. Stable for the life of the dimension and safe to hold: this is
-     * <em>not</em> the WorldGenRegion of whatever chunk happens to be generating, which is what it
-     * used to be (via a setWorld() that a per-dimension lock had to guard).
-     * <p>
-     * Use it for level-wide questions - registry access, min/max build height, sea level, the seed.
-     * Reading or writing blocks during generation must go through the region on the
-     * {@link ChunkGenContext} instead; a region only has the chunks around the one being built,
-     * and the level would go looking for the rest.
-     */
-    WorldGenLevel getWorld();
-
-    /**
      * How deep this dimension goes, how high it goes, and where its water sits.
      * <p>
-     * Resolved once, when the dimension's runtime is built. Planning and generation ask this rather
-     * than {@link #getWorld()} for the same three numbers, so the code that needs a bound does not
-     * have to hold a level to get one - and so the preview can answer (issue #129).
+     * Resolved once, when the dimension's runtime is built.
      */
     LevelShape shape();
 
     /**
-     * Registry access for this dimension, or {@code null} if none is available. Real dimensions
-     * always have one (it comes straight off {@link #getWorld()}); {@code NullDimensionInfo} is the
-     * one implementor that can have registry access - and so be able to evaluate registry-backed
-     * worldgen rules - while still having no {@link WorldGenLevel} to hand out, which is what makes
-     * this a separate question from "is {@link #getWorld()} null".
+     * How high the ground is, what biome is where, and which registries to resolve one against.
+     * See {@link TerrainSampler}.
+     */
+    TerrainSampler terrain();
+
+    /**
+     * Registry access for this dimension, or {@code null} if none is available.
+     * <p>
+     * A real dimension's comes straight off its level; the preview has registry access without
+     * having a level at all, which is why this is a question of its own.
      */
     @Nullable
     default RegistryAccess registryAccess() {
-        WorldGenLevel world = getWorld();
-        return world != null ? world.registryAccess() : null;
+        return terrain().registryAccess();
     }
 
     /**
@@ -88,13 +90,20 @@ public interface IDimensionInfo {
 
     CityGenerator getFeature();
 
-    ChunkHeightmap getHeightmap(int chunkX, int chunkZ);
+    default ChunkHeightmap getHeightmap(int chunkX, int chunkZ) {
+        return terrain().heightmap(new ChunkCoord(getType(), chunkX, chunkZ));
+    }
 
-    ChunkHeightmap getHeightmap(ChunkCoord coord);
+    default ChunkHeightmap getHeightmap(ChunkCoord coord) {
+        return terrain().heightmap(coord);
+    }
 
 //    Biome[] getBiomes(int chunkX, int chunkZ);
 
-    Holder<Biome> getBiome(BlockPos pos);
+    @Nullable
+    default Holder<Biome> getBiome(BlockPos pos) {
+        return terrain().biome(pos);
+    }
 
     @Nullable
     ResourceKey<Level> dimension();

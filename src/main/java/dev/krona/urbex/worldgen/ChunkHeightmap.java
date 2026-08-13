@@ -1,11 +1,6 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.config.LandscapeType;
-import net.minecraft.server.level.ServerChunkCache;
-import net.minecraft.world.level.WorldGenLevel;
-import net.minecraft.world.level.chunk.ChunkGenerator;
-import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.RandomState;
 
 /**
  * A heightmap for a chunk
@@ -64,17 +59,18 @@ public class ChunkHeightmap {
         this.height = height;
     }
 
-    public void calculateAccurateHeight(WorldGenLevel region, int chunkX, int chunkZ) {
-        ServerChunkCache chunkProvider = region.getLevel().getChunkSource();
-        ChunkGenerator generator = chunkProvider.getGenerator();
-        int cx = chunkX << 4;
-        int cz = chunkZ << 4;
-        RandomState randomState = chunkProvider.randomState();
-        // Average of height and 4 other points
-        int height0 = generator.getBaseHeight(cx + 2, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        int height1 = generator.getBaseHeight(cx + 2, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        int height2 = generator.getBaseHeight(cx + 14, cz + 2, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        int height3 = generator.getBaseHeight(cx + 14, cz + 14, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
+    /**
+     * Folds four extra sampled heights into this map's min/max, alongside its own.
+     * <p>
+     * Used to be {@code calculateAccurateHeight(WorldGenLevel, chunkX, chunkZ)}, which took a level
+     * only to reach the chunk generator and sample those four points itself. Where the samples come
+     * from is {@link TerrainSampler#sampleAccurateHeight}'s business - a preview has no generator to
+     * ask - and folding them in is this class's (issue #129).
+     * <p>
+     * Reads the raw {@link #height} field rather than {@link #getHeight()}, unchanged: an unsampled
+     * map contributes {@link Short#MIN_VALUE} to the minimum, not its ground level.
+     */
+    public void accurateHeights(int height0, int height1, int height2, int height3) {
         minHeight = Math.min(height, Math.min(height0, Math.min(height1, Math.min(height2, height3))));
         maxHeight = Math.max(height, Math.max(height0, Math.max(height1, Math.max(height2, height3))));
     }

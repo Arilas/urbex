@@ -20,7 +20,6 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.BiomeTags;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -808,7 +807,7 @@ public class ChunkPlan {
                     // ChunkPlan is reached from its neighbours' generation and has no region to
                     // ask, and the dimension's own level would go looking for unloaded chunks.
                     Holder<Biome> biome = provider.getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
+                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
                 }
             };
             String part = building.getRandomPart(rand, conditionContext);
@@ -962,11 +961,14 @@ public class ChunkPlan {
      * This function uses its own cache.
      */
     public static int getCityLevel(ChunkCoord key, IDimensionInfo provider) {
-        if (provider.getWorld() != null) {  // In LC preview we don't want to use the cache as the config isn't loaded yet
-            Integer cached = provider.caches().cityLevel.get(key);
-            if (cached != null) {
-                return cached;
-            }
+        // Unconditional. This used to be gated on provider.getWorld() != null, "In LC preview we
+        // don't want to use the cache as the config isn't loaded yet" - a guard from when the
+        // preview shared the dimension's caches. It has held its own DimensionCaches, built from
+        // its own seed and dropped with it, since #125; and the value cached here is a pure function
+        // of the seed and the preset, both of which are fixed for one preview.
+        Integer cached = provider.caches().cityLevel.get(key);
+        if (cached != null) {
+            return cached;
         }
         int result;
         if (provider.getProfile().isFloating()) {
@@ -976,11 +978,9 @@ public class ChunkPlan {
         } else {
             result = getCityLevelNormal(key, provider, provider.getProfile());
         }
-        if (provider.getWorld() != null) {
-            Integer raced = provider.caches().cityLevel.putIfAbsent(key, result);
-            if (raced != null) {
-                return raced;
-            }
+        Integer raced = provider.caches().cityLevel.putIfAbsent(key, result);
+        if (raced != null) {
+            return raced;
         }
         return result;
     }

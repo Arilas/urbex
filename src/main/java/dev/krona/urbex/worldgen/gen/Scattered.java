@@ -240,9 +240,9 @@ public class Scattered {
                 }
                 // A copy: calculateAccurateHeight writes minHeight/maxHeight, and the cached
                 // instance is shared with every thread generating near this chunk. See #24.
-                ChunkHeightmap hm = new ChunkHeightmap(feature.getHeightmap(coord, provider.getWorld()));
+                ChunkHeightmap hm = new ChunkHeightmap(provider.getHeightmap(coord));
                 int height = hm.getHeight();
-                hm.calculateAccurateHeight(provider.getWorld(), x, z);   // generator-only, no block access
+                provider.terrain().sampleAccurateHeight(hm, x, z);   // generator-only, no block access
                 if (!reference.isAllowVoid()) {
                     if (!(feature.profile.isDefault() || feature.profile.isCavern())) {
                         // We are in a world that can have void chunks. Check if this chunk is a void chunk
@@ -302,7 +302,7 @@ public class Scattered {
                     // goes through BiomeManager, which applies a seeded sub-quart fuzzy offset. The
                     // two disagree near quart boundaries, so swapping them would move output.
                     Holder<Biome> biome = ctx.region.getBiome(info.getCenter(0));
-                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
+                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.registryAccess().lookupOrThrow(Registries.BIOME).getKey(b));
                 }
             };
             ChunkDriver driver = ctx.driver;
