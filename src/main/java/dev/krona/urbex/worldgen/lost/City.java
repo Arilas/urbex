@@ -246,9 +246,9 @@ public class City {
         }
 
         if (factor > 0.0001 && provider.registryAccess() != null) {
-            // The compiled styles are already on the dimension info (DefaultDimensionInfo /
-            // NullDimensionInfo resolve them once at construction) - Preset itself carries no
-            // worldStyle any more, so there is nothing left to re-resolve here.
+            // The compiled styles are already on the planning context, resolved once when it was
+            // built - Preset itself carries no worldStyle any more, so there is nothing left to
+            // re-resolve here.
             //
             // primary(), not the chunk's style: this decides whether a city exists at all, so
             // attributing it to a nearby city would be circular.

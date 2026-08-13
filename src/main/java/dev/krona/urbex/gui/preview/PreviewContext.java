@@ -1,17 +1,14 @@
-package dev.krona.urbex.gui;
+package dev.krona.urbex.gui.preview;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
-import dev.krona.urbex.gui.preview.PreviewTerrain;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
-import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.setup.WorldStyleMix;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.worldgen.LevelShape;
 import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.WorldStyleField;
-import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetDiagnostics;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
@@ -30,9 +27,24 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
-public class NullDimensionInfo implements IDimensionInfo {
+/**
+ * What the world-creation preview plans against: a {@link PlanningContext} and the bitmap terrain it
+ * reads.
+ *
+ * <p>This replaces {@code NullDimensionInfo}, which reached the production planner by impersonating a
+ * server dimension - answering {@code null} to "what level are you?" and, to be constructible at all,
+ * building a {@link dev.krona.urbex.worldgen.CityGenerator} nothing drove. Nothing here impersonates
+ * anything: the preview holds the same value a loaded level's runtime holds, built from what the
+ * world-creation screen actually knows (issue #129).</p>
+ *
+ * <p>The generator is gone entirely. The preview samples city placement, road classes and rail and
+ * highway chunk <em>types</em>; it renders none of them as blocks, so it never had a use for one.</p>
+ *
+ * @param terrain also reachable as {@code planning().terrain()}; named here because the renderer
+ *                colours its map straight from the bitmap, which is not a planning question.
+ */
+public record PreviewContext(PlanningContext planning, PreviewTerrain terrain) {
 
     /** What the placeholder world style calls itself, so a load error can name it. */
     private static final Identifier PLACEHOLDER_ID =
@@ -40,21 +52,21 @@ public class NullDimensionInfo implements IDimensionInfo {
     /** A style the bundled pack actually ships, and qualified; see {@link #placeholderStyle()}. */
     private static final String PLACEHOLDER_OUTSIDE_STYLE = Urbex.MODID + ":standard";
 
-    private final Random random;
-    private final PreviewTerrain terrain;
-    private final PlanningContext planning;
-    private final CityGenerator feature;
-
     /**
-     * The preview's dimension info. Takes the whole {@link WorldStyleMix} the player chose, so a
+     * Builds the preview's context. Takes the whole {@link WorldStyleMix} the player chose, so a
      * mixed selection previews as a mix rather than as its primary alone - judging a balance before
      * committing to the world is the point of the control.
      * <p>
      * Every id resolves independently: one style the datapacks no longer ship falls back to the
      * placeholder for that entry alone, rather than taking the whole preview with it.
+     *
+     * @throws IllegalArgumentException if the preset's road settings are self-contradictory
+     *                                  ({@link GridSettings#fromPreset})
+     * @throws IllegalStateException    if the placeholder world style stops declaring a field that
+     *                                  becomes required after resolution
      */
-    public NullDimensionInfo(Preset profile, WorldStyleMix worldStyles, long seed, @Nullable RegistryAccess registryAccess) {
-        DimensionCaches caches = new DimensionCaches(seed);
+    public static PreviewContext create(Preset preset, WorldStyleMix worldStyles, long seed,
+                                        @Nullable RegistryAccess registryAccess) {
         // The preview compiles its own snapshot and owns it, rather than reaching for the server's.
         // It has no session - it runs on the client, on the world-creation screen, before any server
         // exists - and must not acquire one. Diagnostics are discarded on purpose: a broken pack is
@@ -79,27 +91,24 @@ public class NullDimensionInfo implements IDimensionInfo {
             resolvedEntries.add(new WorldStyleField.Weighted(entry.weight(),
                     resolved != null ? resolved : new WorldStyle(PLACEHOLDER_ID, List.of(placeholderStyle()))));
         }
-        random = new Random(seed);
-        terrain = new PreviewTerrain(profile, registryAccess);
-        planning = new PlanningContext(
+        PreviewTerrain terrain = new PreviewTerrain(preset, registryAccess);
+        return new PreviewContext(new PlanningContext(
                 seed,
                 // The overworld, which is what the preview draws.
                 Level.OVERWORLD,
-                profile,
+                preset,
                 assets,
                 new WorldStyleField(seed, resolvedEntries),
-                // The preview's own seed and dimension, so the roads it draws are the roads the
-                // world will have. Same construction as DefaultDimensionInfo; there is no server to
-                // ask.
+                // The preview's own seed and dimension, so the roads it draws are the roads the world
+                // will have. Same construction as a loaded level's; there is no server to ask.
                 new GridRoadField(seed, Level.OVERWORLD.identifier().toString(),
-                        GridSettings.fromPreset(profile)),
-                caches,
+                        GridSettings.fromPreset(preset)),
+                new DimensionCaches(seed),
                 // The vanilla overworld's shape: a preview runs before any level exists, so there is
-                // nothing to ask, and every planning rule that reads a height bound or the water
-                // line gets a real answer rather than an NPE off a null level (issue #129).
+                // nothing to ask, and every planning rule that reads a height bound or the water line
+                // gets a real answer rather than an NPE off a null level.
                 LevelShape.VANILLA_OVERWORLD,
-                terrain);
-        feature = new CityGenerator(planning, profile);
+                terrain), terrain);
     }
 
     /**
@@ -110,8 +119,9 @@ public class NullDimensionInfo implements IDimensionInfo {
      * {@code outsidestyle}, {@code citystyles} and the whole of {@code parts}, down to each of the
      * twenty-two wiring components {@code PartSelector.requireComplete} checks. Anything left absent
      * is an {@link IllegalStateException} out of the constructor rather than a decode failure, and
-     * this is the one place in {@code src/main} that builds a {@code WorldStyleDefinition} by hand instead
-     * of decoding one, so no datapack test covers it; {@code NullDimensionInfoPlaceholderTest} does.
+     * this is the one place in {@code src/main} that builds a {@code WorldStyleDefinition} by hand
+     * instead of decoding one, so no datapack test covers it; {@code PreviewPlaceholderStyleTest}
+     * does.
      * <p>
      * The lists are declared and empty rather than absent because the preview draws no parts: it
      * samples biomes, city placement, road classes and rail/highway chunk <em>types</em>, none of
@@ -153,25 +163,4 @@ public class NullDimensionInfo implements IDimensionInfo {
     private static Optional<Mergeable<String>> noParts() {
         return Optional.of(new Mergeable<>(true, Collections.emptyList()));
     }
-
-    /** The config preview renderer's own source. Nothing here places generated blocks. */
-    public Random getRandom() {
-        return random;
-    }
-
-    @Override
-    public PlanningContext planning() {
-        return planning;
-    }
-
-    @Override
-    public CityGenerator getFeature() {
-        return feature;
-    }
-
-    /** The bitmap character at a chunk, for the renderer that colours the preview map from it. */
-    public char getBiomeChar(int chunkX, int chunkZ) {
-        return terrain.biomeChar(chunkX, chunkZ);
-    }
-
 }

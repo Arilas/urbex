@@ -1,4 +1,4 @@
-package dev.krona.urbex.gui;
+package dev.krona.urbex.gui.preview;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.WorldStyleMix;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The world-creation preview's placeholder world style must satisfy the same post-resolution rules
  * every datapack world style does.
  * <p>
- * {@link NullDimensionInfo} builds it whenever it cannot resolve the chosen one - either because it
+ * {@link PreviewContext} builds it whenever it cannot resolve the chosen one - either because it
  * was handed no {@code RegistryAccess} at all (the Cities tab and the Customize screen both pass
  * null deliberately when the biome registry or the parent screen is absent) or because the lookup
  * failed, which is what a stale GUI world style no longer shipped by any datapack looks like. The
@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * is driven from the render pass. This test is the guard: every field {@code WorldStyle} requires
  * after resolution has to be declared here, and every asset name has to name its namespace.
  */
-class NullDimensionInfoPlaceholderTest {
+class PreviewPlaceholderStyleTest {
 
     @BeforeAll
     static void bootstrap() {
@@ -45,17 +45,17 @@ class NullDimensionInfoPlaceholderTest {
         Bootstrap.bootStrap();
     }
 
-    private static NullDimensionInfo placeholderPreview() {
+    private static PreviewContext placeholderPreview() {
         Preset preset = new Preset(Identifier.fromNamespaceAndPath("urbex", "test-placeholder"));
         // Null registry access is the GUI's own fallback, and it is also the only way to reach the
         // placeholder without a loaded registry to fail a lookup against.
-        return new NullDimensionInfo(preset, WorldStyleMix.of(Identifier.fromNamespaceAndPath("urbex", "standard")),
+        return PreviewContext.create(preset, WorldStyleMix.of(Identifier.fromNamespaceAndPath("urbex", "standard")),
                 1234L, null);
     }
 
     @Test
     void thePreviewBuildsWithoutRegistryAccess() {
-        NullDimensionInfo diminfo = assertDoesNotThrow(NullDimensionInfoPlaceholderTest::placeholderPreview,
+        PreviewContext diminfo = assertDoesNotThrow(PreviewPlaceholderStyleTest::placeholderPreview,
                 "the preview must fall back to the placeholder world style, not throw");
         assertNotNull(diminfo.planning().worldStyles().primary(), "the placeholder world style must be built");
     }

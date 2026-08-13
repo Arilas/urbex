@@ -498,7 +498,7 @@ public class CitiesTab extends GridLayoutTab {
      * The registries the preview should sample biomes from: the ones loaded for the world being
      * created, so datapack biomes and world-type choices are reflected. Degrades to {@code null}
      * (the pre-preview "registry-gated rules skipped" behaviour) rather than letting
-     * {@code NullDimensionInfo}'s {@code lookupOrThrow(BIOME)} take the screen down if a
+     * {@code PreviewTerrain}'s {@code lookupOrThrow(BIOME)} take the screen down if a
      * half-loaded context ever lacks the biome registry.
      */
     @Nullable
