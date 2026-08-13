@@ -327,7 +327,7 @@ public class Scattered {
                     case CLEAR -> {
                         for (int x = 0; x < 16; x++) {
                             for (int z = 0; z < 16; z++) {
-                                feature.clearRange(ctx, info, x, z, lowestLevel, lowestLevel + 50, false);
+                                Terrain.clearRange(ctx, feature, info, x, z, lowestLevel, lowestLevel + 50, false);
                             }
                         }
                     }

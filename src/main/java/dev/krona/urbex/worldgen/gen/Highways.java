@@ -62,7 +62,7 @@ public class Highways {
                     int clearheight = 15;
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
-                            feature.clearRange(ctx, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
+                            Terrain.clearRange(ctx, feature, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
                                     Highways::isClearableAboveHighway);
                         }
                     }
@@ -75,7 +75,7 @@ public class Highways {
                     int clearheight = 15;
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
-                            feature.clearRange(ctx, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
+                            Terrain.clearRange(ctx, feature, info, x, z, height, height + clearheight, info.waterLevel > info.groundLevel,
                                     Highways::isClearableAboveHighway);
                         }
                     }

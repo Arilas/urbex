@@ -136,7 +136,7 @@ public class Railways {
             if (h < maxh) {
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
-                        feature.clearRange(ctx, info, x, z, h, maxh, false);
+                        Terrain.clearRange(ctx, feature, info, x, z, h, maxh, false);
                     }
                 }
             }

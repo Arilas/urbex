@@ -231,7 +231,7 @@ public class Streets {
                     generateBorderSupport(ctx, feature, info, wall, x, z, 2, heightmap);
                 }
         } else {
-            int y = feature.getMinHeightAt(info, x, z, heightmap);
+            int y = Terrain.getMinHeightAt(feature, info, x, z, heightmap);
             if (y < info.getCityGroundLevel() + 1) {
                 Parts.setBlocksFromPalette(ctx, feature, x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
             } else {

@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
+import dev.krona.urbex.worldgen.gen.Terrain;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.EffectiveRoad;
 import dev.krona.urbex.plan.RoadCell;
@@ -1446,7 +1447,7 @@ public class ChunkPlan {
             // it would stamp its own part over the planned deck on its way past.
             return false;
         }
-        return i.cityLevel < cityLevel || CityGenerator.isWaterBiome(provider, i.coord);
+        return i.cityLevel < cityLevel || Terrain.isWaterBiome(provider, i.coord);
     }
 
 
@@ -1788,23 +1789,23 @@ public class ChunkPlan {
             if (h < provider.shape().maxBuildHeight()) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
-                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixLowerMinOffset(), profile.terrainFixLowerMaxOffset(), Rng.Purpose.TERRAIN_FIX_LOWER),
-                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixUpperMinOffset(), profile.terrainFixUpperMaxOffset(), Rng.Purpose.TERRAIN_FIX_UPPER));
+                        h + Terrain.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixLowerMinOffset(), profile.terrainFixLowerMaxOffset(), Rng.Purpose.TERRAIN_FIX_LOWER),
+                        h + Terrain.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixUpperMinOffset(), profile.terrainFixUpperMaxOffset(), Rng.Purpose.TERRAIN_FIX_UPPER));
                 return desiredMaxHeight1;
             }
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx, cz - 1));
-            getZmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx, cz + 1));
+            getZmin().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx, cz - 1));
+            getZmax().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL1(minMax, 20 + CityGenerator.getHeightOffsetL1(provider.seed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL1(minMax, 25 + CityGenerator.getHeightOffsetL1(provider.seed(), cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx + 1, cz + 1));
 
             desiredMaxHeight1 = minMax;
         }
@@ -1850,16 +1851,16 @@ public class ChunkPlan {
 
             MinMax minMax = new MinMax();
 
-            getXmin().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx - 1, cz + 1));
+            getXmin().getZmin().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx - 1, cz - 1));
+            getXmin().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx - 1, cz));
+            getXmin().getZmax().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx - 1, cz + 1));
 
-            getZmin().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx, cz - 1));
-            getZmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx, cz + 1));
+            getZmin().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx, cz - 1));
+            getZmax().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx, cz + 1));
 
-            getXmax().getZmin().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL2(minMax, 20 + CityGenerator.getHeightOffsetL2(provider.seed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL2(minMax, 25 + CityGenerator.getHeightOffsetL2(provider.seed(), cx + 1, cz + 1));
+            getXmax().getZmin().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx + 1, cz - 1));
+            getXmax().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx + 1, cz));
+            getXmax().getZmax().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx + 1, cz + 1));
             desiredTerrainCorrectionHeights = minMax;
         }
         return desiredTerrainCorrectionHeights;

@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
+import dev.krona.urbex.worldgen.gen.Terrain;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.plan.Hash;
 import dev.krona.urbex.plan.RoadType;
@@ -308,7 +309,7 @@ public final class PrimaryBridgePlanner {
             public boolean isWaterLike(ChunkCoord coord) {
                 // The biome tags catch oceans, rivers and beaches; the deterministic terrain height
                 // also catches an inland lake whose biome is still plains or forest.
-                if (CityGenerator.isWaterBiome(provider, coord)) {
+                if (Terrain.isWaterBiome(provider, coord)) {
                     return true;
                 }
                 int sealevel = provider.preset().seaLevel();
