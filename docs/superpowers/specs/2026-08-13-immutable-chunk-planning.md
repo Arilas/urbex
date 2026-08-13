@@ -197,6 +197,60 @@ chunks are *asked for* leave the pool free to resolve races the same way every t
 by whichever worker arrives first produces one stable answer per pool size and looks reproducible
 until the pool size changes - which is not something a single machine rerunning a check will ever do.
 
+## Conflict precedence, as landed
+
+Three conflicts, one rule: **the losing side is cancelled where it is drawn, and no published plan is
+edited.** Neighbours keep planning as though the loser were there. That is the cost, it is the same
+cost in all three, and it is what makes the answer a function of the seed and the coordinate rather
+than of which chunk generated first.
+
+| Conflict | Winner | Config | Where |
+|---|---|---|---|
+| Structure vs city | structure; the city is not drawn in that chunk | `avoidVillages`, `avoidStructures`, `avoidSurfaceStructures` (avoidance on) | `CityGenerator.hasBlacklistedStructure` → `doCity = false` |
+| City vs structure | city; the structure start is cancelled | `structuresYieldToCities` | `StructureSuppressor` + `StructureStartMixin` |
+| Building vs railway | building; the rails are not drawn in that chunk | `railwayavoidance: block_railway` | `Railway.buildingBlocksRail`, asked from `CityGenerator.generate` |
+
+The first two are mutually exclusive policies for one conflict and the defaults pick *city yields*
+(`avoidVillages=true`, `structuresYieldToCities=false`).
+
+The third is the one this issue changed. It used to be resolved by `BuildingInfo`'s constructor
+calling `Railway.removeRailChunkType`, which wrote `NOTHING` over the published `railInfo` entry -
+a planner constructor editing another planning cache, which criterion 3 names directly. Rail
+planning reads its neighbours' entries and `MultiChunk` reads them when accepting a multi-building,
+so what either saw depended on whether that chunk's `BuildingInfo` had been constructed yet.
+
+**Measured, the two agree.** In the one window that generates the collision at all - 110 rail chunks,
+6 of them cancelled by a building - the old resolution and the new one produce
+`3fff027c14eea4a9` alike, at one, two and three worker threads and under forced cache expiry. So this
+is a structural fix, not a bug fix with an observed symptom: the mutation was a real order-dependence
+hazard and a real criterion-3 violation, and it is now demonstrably not one, but nobody was looking
+at a world it visibly damaged.
+
+## Coverage, measured rather than assumed
+
+`railwayavoidance` ships as `ignore` in the only world style this mod has, so **no check in the
+repository had ever generated the railway collision**. `digestCheckRail` brings its own datapack -
+a world style that extends the shipped one with that single setting changed - which is the only
+configuration here under which the conflict exists.
+
+The avoid* modes needed the same treatment. Measured on the avoidance window: all 108 suppressed
+chunks come from the village *tag* branch, and turning `avoidVillages` off drops the count to zero,
+so the named-blacklist branch and the surface-step catch-all matched nothing. `digestCheckAvoidModes`
+turns the tag off, names the village in `avoidStructures` instead - the same 108 chunks, reached
+through the blacklist branch - and turns on `avoidSurfaceStructures`, which suppresses exactly one
+more.
+
+| Mode | Covered by | Chunks |
+|---|---|---|
+| `avoidVillages` (tag) | `digestCheckAvoid` | 108 |
+| `avoidStructures` (named list) | `digestCheckAvoidModes` | 108 |
+| `avoidSurfaceStructures` | `digestCheckAvoidModes` | +1 |
+| `avoidFlattening` | both, since it is what a suppressed chunk does with its terrain | 108 / 109 |
+| railway collision | `digestCheckRail`, `digestCheckRailShuffled` | 6 |
+
+Suppression demonstrably changes the world rather than only a counter: with `avoidVillages` off the
+avoidance window drives 658 chunks and 5942711 blocks against 580 and 5359701 with it on.
+
 ## Suggested PR split
 
 **126a — order-independence and avoidance coverage made observable.** *Landed.* The shuffled-order

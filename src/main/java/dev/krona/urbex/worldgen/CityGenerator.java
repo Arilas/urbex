@@ -279,7 +279,13 @@ public class CityGenerator {
             doNormalChunk(ctx, info, heightmap, avoidChunk);
         }
 
-        Railway.RailChunkInfo railInfo = info.getRailInfo();
+        // Suppressed here rather than removed from the plan, the same way a village suppresses this
+        // chunk's city above: a building deep enough to hit the line cancels the rails where they
+        // would be drawn, and the neighbouring chunks keep planning and rendering the line as though
+        // it ran through (issue #126, and see Railway.buildingBlocksRail for the precedence).
+        Railway.RailChunkInfo railInfo = Railway.buildingBlocksRail(coord, provider)
+                ? Railway.RailChunkInfo.NOTHING
+                : info.getRailInfo();
         if (railInfo.getType() != RailChunkType.NONE) {
             Railways.generateRailways(ctx, this, info, railInfo, heightmap);
         }

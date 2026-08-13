@@ -4,6 +4,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.BuildingInfo;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
+import dev.krona.urbex.worldgen.lost.Railway;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -63,13 +64,13 @@ public final class DigestRunner {
      */
     public record Result(long driverDigest, long fullDigest, long driverBlocks, int drivenChunks,
                          int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks, int avoidedChunks,
-                         long unsafeReads) {
+                         int railCollisionChunks, long unsafeReads) {
 
         public String driverLine(String order, int offset) {
             return String.format(
-                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d avoidedChunks=%d unsafeReads=%d",
+                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d avoidedChunks=%d railCollisionChunks=%d unsafeReads=%d",
                     driverDigest, driverBlocks, drivenChunks, chunkCount, order, offset, elapsedMs, bridgeChunks,
-                    slopeChunks, avoidedChunks, unsafeReads);
+                    slopeChunks, avoidedChunks, railCollisionChunks, unsafeReads);
         }
 
         public String fullLine(String order, int offset) {
@@ -186,10 +187,11 @@ public final class DigestRunner {
         int bridgeChunks = countBridgeChunks(level, sorted);
         int slopeChunks = countSlopeChunks(level, sorted);
         int avoidedChunks = countAvoidedChunks(level, sorted);
+        int railCollisionChunks = countRailCollisionChunks(level, sorted);
 
         long elapsed = System.currentTimeMillis() - start;
         return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed, bridgeChunks,
-                slopeChunks, avoidedChunks, unsafeReads);
+                slopeChunks, avoidedChunks, railCollisionChunks, unsafeReads);
     }
 
     /**
@@ -232,6 +234,33 @@ public final class DigestRunner {
         // the same job the comments over digestCheckFeatures do by hand for the bridge and the slope.
         if (count > 0) {
             Urbex.getLogger().info("AVOIDEDCHUNKS{}", where);
+        }
+        return count;
+    }
+
+    /**
+     * How many of the sampled chunks have a building deep enough to cancel the railway planned
+     * there. The same coverage guard {@code avoidedChunks} is: the collision only exists under a
+     * world style that sets {@code railwayavoidance: block_railway}, and the one this mod ships sets
+     * {@code ignore}, so every window is blind to it unless a datapack turns it on - which is how it
+     * stayed order-dependent unobserved (issue #126).
+     */
+    private static int countRailCollisionChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
+        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        if (dimInfo == null) {
+            return 0;
+        }
+        int count = 0;
+        StringBuilder where = new StringBuilder();
+        for (ChunkPos pos : chunkPositions) {
+            ChunkCoord coord = new ChunkCoord(level.dimension(), pos.x(), pos.z());
+            if (Railway.buildingBlocksRail(coord, dimInfo)) {
+                count++;
+                where.append(' ').append(pos.x()).append(',').append(pos.z());
+            }
+        }
+        if (count > 0) {
+            Urbex.getLogger().info("RAILCOLLISIONS{}", where);
         }
         return count;
     }

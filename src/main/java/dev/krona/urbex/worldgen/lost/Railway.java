@@ -6,6 +6,7 @@ import dev.krona.urbex.varia.Rng;
 import net.minecraft.util.RandomSource;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
+import dev.krona.urbex.worldgen.lost.regassets.data.WorldSettings;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -334,8 +335,45 @@ public class Railway {
         return raced != null ? raced : info;
     }
 
-    public static void removeRailChunkType(IDimensionInfo provider, ChunkCoord coord) {
-        provider.caches().railInfo.put(coord, RailChunkInfo.NOTHING);
+    /**
+     * Whether a building at {@code coord} reaches down far enough to collide with the railway
+     * planned there, under a world style that resolves the clash in the building's favour
+     * ({@link WorldSettings.RailwayAvoidance#BLOCK_RAILWAY}).
+     *
+     * <p><b>Precedence, and it is deliberate.</b> The building wins, and it wins <em>locally</em>:
+     * the rail's plan is not rewritten, so this chunk renders no rails while its neighbours keep
+     * planning and rendering theirs as though the line ran through. That is the same shape structure
+     * avoidance uses against cities and {@code StructureSuppressor} uses against structures - the
+     * losing side is cancelled where it is drawn, never edited out of a published plan.</p>
+     *
+     * <p>It used to be the other way round: {@code BuildingInfo}'s constructor called a
+     * {@code removeRailChunkType} that wrote {@code NOTHING} over the published {@code railInfo}
+     * entry. Rail planning reads its neighbours' entries and {@code MultiChunk} reads them when
+     * accepting a multi-building, so what they saw depended on whether this chunk's BuildingInfo had
+     * been constructed yet - and after a timed eviction rebuilt one but not the other, on which of
+     * them came back first (issue #126).</p>
+     *
+     * <p>Pure, and free of the cycle that shape suggests: cellars are only clamped against the
+     * railway when the world style is <em>not</em> {@code BLOCK_RAILWAY}, so under the one policy
+     * that consults this the building's depth owes the railway nothing.</p>
+     */
+    public static boolean buildingBlocksRail(ChunkCoord coord, IDimensionInfo provider) {
+        WorldSettings.RailwayAvoidance avoidance =
+                provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
+        if (avoidance != WorldSettings.RailwayAvoidance.BLOCK_RAILWAY) {
+            return false;
+        }
+        RailChunkInfo railInfo = getRailChunkType(coord, provider, provider.getProfile());
+        if (railInfo == RailChunkInfo.NOTHING) {
+            return false;
+        }
+        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
+        if (!info.hasBuilding) {
+            return false;
+        }
+        int lowestLevel = info.cityLevel - info.cellars;
+        int partlevel = provider.worldStyles().primary().getWorldSettings().railPartHeight6();
+        return lowestLevel <= railInfo.getLevel() + partlevel - 1;
     }
 
     private static RailChunkInfo testAdjacentRailChunk(float r, RailChunkInfo adjacent, RailDirection direction, ChunkCoord coord, IDimensionInfo provider, Preset profile) {

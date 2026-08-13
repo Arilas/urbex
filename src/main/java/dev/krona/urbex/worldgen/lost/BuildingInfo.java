@@ -822,18 +822,13 @@ public class BuildingInfo {
             }
         }
 
-        // Check railway/building collision
-        if (avoidance == WorldSettings.RailwayAvoidance.BLOCK_RAILWAY && hasBuilding) {
-            Railway.RailChunkInfo railInfo = getRailInfo();
-            if (railInfo != Railway.RailChunkInfo.NOTHING) {
-                int lowestLevel = cityLevel - cellars;
-                int partlevel = provider.worldStyles().primary().getWorldSettings().railPartHeight6();
-                if (lowestLevel <= railInfo.getLevel() + partlevel - 1) {
-                    // There is a collision
-                    Railway.removeRailChunkType(provider, coord);
-                }
-            }
-        }
+        // The railway/building collision used to be resolved here, by writing NOTHING over the
+        // published railInfo entry for this chunk. That is a planner constructor editing another
+        // planning cache: rail planning reads its neighbours' entries and MultiChunk reads them when
+        // accepting a multi-building, so what they saw depended on whether this chunk's BuildingInfo
+        // had been built yet (issue #126). It is a pure query now - Railway.buildingBlocksRail -
+        // asked at generation time, and the rail is suppressed where it is drawn instead of being
+        // deleted from the plan. See that method for the precedence and what it costs.
 
         floorTypes = new BuildingPart[floors + cellars + 1];
         floorTypes2 = new BuildingPart[floors + cellars + 1];
