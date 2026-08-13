@@ -13,29 +13,19 @@ import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.level.block.state.properties.WallSide;
 import net.minecraft.world.level.chunk.BulkSectionAccess;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.LevelChunkSection;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
 
-import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
-// Section constants (formerly on LevelChunkSection, removed in 26.2)
-
-
 public class ChunkDriver {
-
-    private static final int SECTION_WIDTH = 16;
-    private static final int SECTION_HEIGHT = 16;
-    private static final int SECTION_SIZE = SECTION_WIDTH * SECTION_WIDTH * SECTION_HEIGHT;
 
     // ---------------------------------------------------------------------------------------
     // Write recording. Off in normal play; /urbex digest switches it on around a generation run
@@ -223,8 +213,8 @@ public class ChunkDriver {
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
     /** Reused across every shape update: thread-confined, reseeded per position via Rng.posSeed. */
     private final XoroshiroRandomSource shapeRandom = new XoroshiroRandomSource(0);
-//    private final Long2ObjectOpenHashMap<BlockState> cache = new Long2ObjectOpenHashMap<>();
-    private SectionCache cache;
+    /** Where writes accumulate until {@link #flushToChunk}. */
+    private ChunkBuffer buffer;
     private int cx;
     private int cz;
 
@@ -233,7 +223,9 @@ public class ChunkDriver {
         this.seed = region instanceof WorldGenLevel level ? level.getSeed() : 0L;
         this.primer = primer;
         if (primer != null) {
-            cache = new SectionCache(this, region, primer.getPos().x() << 4, primer.getPos().z() << 4);
+            buffer = new ChunkBuffer(this::wrote, region::getBlockState,
+                    region.getMinY(), region.getMaxY() + 1,
+                    primer.getPos().x() << 4, primer.getPos().z() << 4);
             this.cx = primer.getPos().x();
             this.cz = primer.getPos().z();
         }
@@ -272,9 +264,9 @@ public class ChunkDriver {
     public void flushToChunk(ChunkAccess chunk) {
         commitState = CommitState.COMMITTING;
         BulkSectionAccess bulk = new BulkSectionAccess(region);
-        cache.generate(bulk);
+        buffer.flush(bulk);
         bulk.close();
-        cache.clear();
+        buffer.clear();
         commitState = CommitState.COMMITTED;
     }
 
@@ -314,16 +306,7 @@ public class ChunkDriver {
     }
 
     private void setBlock(BlockPos p, BlockState state) {
-        if (state != null) {
-            if (state.getBlock() instanceof StructureVoidBlock) {
-                // Alpha channel: structure void keeps whatever is already there. Filtered at the
-                // write, so every path honours it - the old per-write correct() only caught the
-                // cursor path, and bulk fills placed literal structure_void blocks.
-                return;
-            }
-            cache.put(p, state);
-            wrote(p.getX(), p.getY(), p.getZ(), state);
-        }
+        buffer.set(p.getX(), p.getY(), p.getZ(), state);
     }
 
     // This version of getBlock() is less optimal but it will work for different chunks
@@ -350,10 +333,10 @@ public class ChunkDriver {
     }
 
     private BlockState getBlock(BlockPos p) {
-        BlockState state = cache.get(p);
+        BlockState state = buffer.get(p.getX(), p.getY(), p.getZ());
         if (state == null) {
             state = region.getBlockState(p);
-            cache.remember(p, state);
+            buffer.remember(p.getX(), p.getY(), p.getZ(), state);
         }
         return state;
     }
@@ -418,19 +401,27 @@ public class ChunkDriver {
     }
 
     public void setBlockRange(int x, int y, int z, int y2, BlockState state) {
-        cache.putRange(x + (primer.getPos().x() << 4), z + (primer.getPos().z() << 4), y, y2-1, state);
+        buffer.fill(worldX(x), worldZ(z), y, y2 - 1, state);
     }
 
     public void setBlockRange(int x, int y, int z, int y2, BlockState state, Predicate<BlockState> test) {
-        cache.putRange(x + (primer.getPos().x() << 4), z + (primer.getPos().z() << 4), y, y2-1, state, test);
+        buffer.fillWhere(worldX(x), worldZ(z), y, y2 - 1, state, test);
     }
 
     public void setBlockRangeToAir(int x, int y, int z, int y2) {
-        cache.putRange(x + (primer.getPos().x() << 4), z + (primer.getPos().z() << 4), y, y2-1, Blocks.AIR.defaultBlockState());
+        buffer.fill(worldX(x), worldZ(z), y, y2 - 1, Blocks.AIR.defaultBlockState());
     }
 
     public void setBlockRangeToAir(int x, int y, int z, int y2, Predicate<BlockState> test) {
-        cache.putRange(x + (primer.getPos().x() << 4), z + (primer.getPos().z() << 4), y, y2-1, Blocks.AIR.defaultBlockState(), test);
+        buffer.fillWhere(worldX(x), worldZ(z), y, y2 - 1, Blocks.AIR.defaultBlockState(), test);
+    }
+
+    private int worldX(int x) {
+        return x + (primer.getPos().x() << 4);
+    }
+
+    private int worldZ(int z) {
+        return z + (primer.getPos().z() << 4);
     }
 
     private boolean isThisChunk(BlockPos pos) {
@@ -665,146 +656,5 @@ public class ChunkDriver {
 
     public BlockState getBlock(int x, int y, int z) {
         return getBlock(pos.set(x + (primer.getPos().x() << 4), y, z + (primer.getPos().z() << 4)));
-    }
-
-    private static class S {
-        private final BlockState[] section = new BlockState[SECTION_SIZE];
-        // AIR is still a write: it may need to erase terrain already present in the chunk.
-        private boolean touched = false;
-    }
-
-    private static class SectionCache {
-        private final ChunkDriver owner;
-        private final int minY;
-        private final int maxY;
-        private final int cx;
-        private final int cz;
-        private final S[] cache;
-
-        private SectionCache(ChunkDriver owner, LevelAccessor level, int cx, int cz) {
-            this.owner = owner;
-            minY = level.getMinY();
-            maxY = level.getMaxY() + 1;
-            this.cx = cx;
-            this.cz = cz;
-            cache = new S[(maxY - minY) / SECTION_HEIGHT];
-            clear();
-        }
-
-        // Puts a range of blockstates starting at pos and ending at y2 (inclusive)
-        private void putRange(int x, int z, int y1, int y2, BlockState state) {
-            if (state == null || state.getBlock() instanceof StructureVoidBlock) {
-                return;
-            }
-            int px = x & 0xf;
-            int pz = z & 0xf;
-            while (y1 <= y2) {
-                int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
-                int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
-
-                if (cache[sectionIdx].section[idx] != state) {
-                    cache[sectionIdx].section[idx] = state;
-                    cache[sectionIdx].touched = true;
-                }
-                owner.wrote(x, y1, z, state);
-                y1++;
-            }
-        }
-
-        // Puts a range of blockstates starting at pos and ending at y2 (inclusive)
-        private void putRange(int x, int z, int y1, int y2, BlockState state, Predicate<BlockState> test) {
-            if (state == null || state.getBlock() instanceof StructureVoidBlock) {
-                return;
-            }
-            int px = x & 0xf;
-            int pz = z & 0xf;
-            BlockPos.MutableBlockPos worldPos = null;
-            while (y1 <= y2) {
-                int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
-                int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
-
-                BlockState st = cache[sectionIdx].section[idx];
-                if (st == null) {
-                    // Fall back to the world for positions this chunk never touched. Skipping
-                    // them made the predicate form a no-op on virgin terrain: the highway
-                    // clear-above passes target vanilla blocks that are never in the cache,
-                    // so highways were not cleared of terrain at all (issue #35).
-                    if (worldPos == null) {
-                        worldPos = new BlockPos.MutableBlockPos();
-                    }
-                    st = owner.region.getBlockState(worldPos.set(cx + px, y1, cz + pz));
-                }
-                if (st != state && test.test(st)) {
-                    cache[sectionIdx].section[idx] = state;
-                    cache[sectionIdx].touched = true;
-                    owner.wrote(x, y1, z, state);
-                }
-                y1++;
-            }
-        }
-
-        /**
-         * Remembers what the world already holds at {@code pos}, without claiming this chunk wrote
-         * it.
-         *
-         * <p>This used to be {@link #put}, and {@code put} marks the section written - so a section
-         * Urbex only <em>read</em> from was flushed back in full at the end of the chunk, 4096 slots
-         * of terrain rewritten with the values they already had. Reading a block is not writing one
-         * (issue #52).</p>
-         */
-        private void remember(BlockPos pos, BlockState state) {
-            int sectionIdx = (pos.getY() - minY) / SECTION_HEIGHT;
-            int idx = ((pos.getX() & 0xf) << 8) + ((pos.getY() & 0xf) << 4) + (pos.getZ() & 0xf);
-            cache[sectionIdx].section[idx] = state;
-        }
-
-        private void put(BlockPos pos, BlockState state) {
-            int sectionIdx = (pos.getY() - minY) / SECTION_HEIGHT;
-            int px = pos.getX() & 0xf;
-            int pz = pos.getZ() & 0xf;
-            int idx = (px << 8) + ((pos.getY() & 0xf) << 4) + pz;
-            if (cache[sectionIdx].section[idx] == state) {
-                return;
-            }
-            cache[sectionIdx].section[idx] = state;
-            cache[sectionIdx].touched = true;
-        }
-
-        @Nullable
-        private BlockState get(BlockPos pos) {
-            int sectionIdx = (pos.getY() - minY) / SECTION_HEIGHT;
-            int idx = ((pos.getX() & 0xf) << 8) + ((pos.getY() & 0xf) << 4) + ((pos.getZ() & 0xf));
-            return cache[sectionIdx].section[idx];
-        }
-
-        private void generate(BulkSectionAccess bulk) {
-            for (int si = 0 ; si < (maxY - minY) / SECTION_HEIGHT ; si++) {
-                S c = cache[si];
-                if (c.touched) {
-                    int cy = si * SECTION_HEIGHT + minY;
-                    LevelChunkSection section = bulk.getSection(new BlockPos(cx, cy, cz));
-                    if (section == null) {
-                        throw new RuntimeException("This cannot happen: " + si);
-                    }
-                    int i = 0;
-                    for (int x = 0 ; x < SECTION_WIDTH ; x++) {
-                        for (int y = 0 ; y < SECTION_HEIGHT ; y++) {
-                            for (int z = 0 ; z < SECTION_WIDTH ; z++) {
-                                BlockState state = c.section[i++];
-                                if (state != null) {
-                                    section.setBlockState(x, y, z, state, false);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        private void clear() {
-            for (int si = 0 ; si < (maxY - minY) / SECTION_HEIGHT ; si++) {
-                cache[si] = new S();
-            }
-        }
     }
 }
