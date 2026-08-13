@@ -66,6 +66,15 @@ final class ChunkBuffer {
     private final int sections;
     private final int originX;
     private final int originZ;
+    /**
+     * One slot per section, filled on first write to that section.
+     *
+     * <p>Lazily, and that is the point: a chunk touches a handful of the level's 24 sections, but
+     * this used to allocate every one of them up front - 24 {@code BlockState[4096]} per chunk,
+     * about 800 KiB, most of it never read. {@link #clear} allocated them all again, including the
+     * call at the end of {@code actuallyGenerate} where the buffer is about to be discarded
+     * (issue #132).</p>
+     */
     private final Section[] cache;
 
     /** Reused by {@link #fillWhere}'s fallback read; created on first use, never escapes. */
@@ -79,7 +88,17 @@ final class ChunkBuffer {
         this.originX = originX;
         this.originZ = originZ;
         this.cache = new Section[sections];
-        clear();
+    }
+
+    /** The section holding {@code y}, created if this is the first write to it. */
+    private Section sectionFor(int y) {
+        int index = (y - minY) / SECTION_HEIGHT;
+        Section section = cache[index];
+        if (section == null) {
+            section = new Section();
+            cache[index] = section;
+        }
+        return section;
     }
 
     /**
@@ -94,9 +113,8 @@ final class ChunkBuffer {
         if (isTransparent(state)) {
             return;
         }
-        int sectionIdx = (y - minY) / SECTION_HEIGHT;
         int idx = index(x, y, z);
-        Section section = cache[sectionIdx];
+        Section section = sectionFor(y);
         if (section.blocks[idx] != state) {
             section.blocks[idx] = state;
             section.written = true;
@@ -110,9 +128,8 @@ final class ChunkBuffer {
             return;
         }
         for (int y = y1; y <= y2; y++) {
-            int sectionIdx = (y - minY) / SECTION_HEIGHT;
             int idx = index(x, y, z);
-            Section section = cache[sectionIdx];
+            Section section = sectionFor(y);
             if (section.blocks[idx] != state) {
                 section.blocks[idx] = state;
                 section.written = true;
@@ -133,9 +150,8 @@ final class ChunkBuffer {
             return;
         }
         for (int y = y1; y <= y2; y++) {
-            int sectionIdx = (y - minY) / SECTION_HEIGHT;
             int idx = index(x, y, z);
-            Section section = cache[sectionIdx];
+            Section section = sectionFor(y);
             BlockState existing = section.blocks[idx];
             if (existing == null) {
                 if (scratch == null) {
@@ -154,7 +170,8 @@ final class ChunkBuffer {
     /** What this buffer holds at a position, or null if it has never seen it. */
     @Nullable
     BlockState get(int x, int y, int z) {
-        return cache[(y - minY) / SECTION_HEIGHT].blocks[index(x, y, z)];
+        Section section = cache[(y - minY) / SECTION_HEIGHT];
+        return section == null ? null : section.blocks[index(x, y, z)];
     }
 
     /**
@@ -165,14 +182,14 @@ final class ChunkBuffer {
      * chunk - 4096 slots of terrain rewritten with the values they already had (issue #52).</p>
      */
     void remember(int x, int y, int z, BlockState state) {
-        cache[(y - minY) / SECTION_HEIGHT].blocks[index(x, y, z)] = state;
+        sectionFor(y).blocks[index(x, y, z)] = state;
     }
 
     /** Copies every written section into the world. */
     void flush(BulkSectionAccess bulk) {
         for (int si = 0; si < sections; si++) {
             Section section = cache[si];
-            if (!section.written) {
+            if (section == null || !section.written) {
                 continue;
             }
             int cy = si * SECTION_HEIGHT + minY;
@@ -194,10 +211,15 @@ final class ChunkBuffer {
         }
     }
 
+    /**
+     * Forgets everything, for the mid-generation flush a part2 floor needs (issue #48).
+     *
+     * <p>Nulls the slots rather than replacing them with empty sections: a buffer that is cleared
+     * and then discarded should cost nothing, and one that is cleared and reused allocates again
+     * only for the sections it touches the second time round.</p>
+     */
     void clear() {
-        for (int si = 0; si < sections; si++) {
-            cache[si] = new Section();
-        }
+        java.util.Arrays.fill(cache, null);
     }
 
     /** Null and structure void both mean "leave whatever is already there". */
