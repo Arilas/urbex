@@ -108,6 +108,8 @@ public class ChunkPlan {
 
     /** How high this chunk's city sits and what terrain correction it asks for; see {@link HeightDecisions}. */
     final HeightDecisions heights = new HeightDecisions(this);
+    /** What this chunk joins on to; see {@link ConnectionGraph}. */
+    final ConnectionGraph graph = new ConnectionGraph(this);
 
     // No per-generation runtime state here, and specifically no post-generation callbacks: those
     // belong to the ChunkGenContext that queued them (see PostTodoQueue). A ChunkPlan is a
@@ -1034,113 +1036,33 @@ public class ChunkPlan {
     }
 
     public boolean hasXCorridor() {
-        if (!xRailCorridor) {
-            return false;
-        }
-        ChunkPlan i = getXmin();
-        while (i.canRailGoThrough() && i.xRailCorridor) {
-            i = i.getXmin();
-        }
-        if ((!i.hasBuilding) || i.cellars == 0) {
-            return false;
-        }
-        i = getXmax();
-        while (i.canRailGoThrough() && i.xRailCorridor) {
-            i = i.getXmax();
-        }
-        return !((!i.hasBuilding) || i.cellars == 0);
+        return graph.xCorridor();
     }
 
     public boolean hasZCorridor() {
-        if (!zRailCorridor) {
-            return false;
-        }
-        ChunkPlan i = getZmin();
-        while (i.canRailGoThrough() && i.zRailCorridor) {
-            i = i.getZmin();
-        }
-        if ((!i.hasBuilding) || i.cellars == 0) {
-            return false;
-        }
-        i = getZmax();
-        while (i.canRailGoThrough() && i.zRailCorridor) {
-            i = i.getZmax();
-        }
-        return !((!i.hasBuilding) || i.cellars == 0);
+        return graph.zCorridor();
     }
 
-    // Return true if it is possible for a rail section to go through here
     public boolean canRailGoThrough() {
-        if (!isCity) {
-            // There is no city here so no passing possible
-            return false;
-        }
-        if (!hasBuilding) {
-            // There is no building here but we have a city so we can pass
-            return true;
-        }
-        // Otherwise we can only pass if this building has no floors below ground
-        return cellars == 0;
+        return graph.canRailGoThrough();
     }
 
-    // Return true if it is possible for a water corridor to go through here
     public boolean canWaterCorridorGoThrough() {
-        if (!isCity) {
-            // There is no city here so no passing possible
-            return false;
-        }
-        if (!hasBuilding) {
-            // There is no building here but we have a city so we can pass
-            return true;
-        }
-        // Otherwise we can only pass if this building has at most one floor below ground
-        return cellars <= 1;
+        return graph.canWaterCorridorGoThrough();
     }
 
-    // Return true if the road from a neighbouring chunk can extend into this chunk
     public boolean doesRoadExtendTo() {
-        boolean b = isCity && !hasBuilding;
-        if (b) {
-            return !isElevatedParkSection();
-        }
-        return false;
+        return graph.roadExtendsOut();
     }
 
-    // Return true if there can be a road connection between the two given chunks
     public static boolean hasRoadConnection(ChunkPlan i1, ChunkPlan i2) {
-        if (!i1.doesRoadExtendTo()) {
-            return false;
-        }
-        if (!i2.doesRoadExtendTo()) {
-            return false;
-        }
-        if (i1.cityLevel == i2.cityLevel) {
-            return true;
-        }
-        // A one-level difference only connects where a slope actually bridges it. Reading the slope
-        // rather than merely allowing a difference of one is what keeps the upper road drawing
-        // through to its edge exactly over the ramp, and ending in a kerb everywhere else.
-        Direction slope1 = i1.getStreetSlopeDirection();
-        if (slope1 != null && slope1.get(i1).coord.equals(i2.coord)) {
-            return true;
-        }
-        Direction slope2 = i2.getStreetSlopeDirection();
-        return slope2 != null && slope2.get(i2).coord.equals(i1.coord);
+        return ConnectionGraph.hasRoadConnection(i1, i2);
     }
 
-    /**
-     * A stream for one of the per-chunk building decisions.
-     * <p>
-     * The purpose is the caller's because three independent decisions are made at this one
-     * coordinate - whether a building is here at all, which parts its floors use, and whether a
-     * lonely neighbour suppresses it - and each of them reads draw 1. Sharing a purpose made the
-     * building chance and the loneliness roll literally the same number.
-     */
     public static RandomSource getBuildingRandom(int chunkX, int chunkZ, long seed, Rng.Purpose purpose) {
         return Rng.at(seed, chunkX, chunkZ, purpose);
     }
 
-    // Convert a local building level to a global one (where cityLevel == 0)
     public int localToGlobal(int l) {
         return l + cityLevel;
     }
@@ -1150,116 +1072,27 @@ public class ChunkPlan {
     }
 
     public boolean hasConnectionAt(int level, Orientation orientation) {
-        return switch (orientation) {
-            case X -> hasConnectionAtX(level);
-            case Z -> hasConnectionAtZ(level);
-        };
+        return graph.at(level, orientation);
     }
 
-    // Call this from the street reference with the (potential building) as 'adj'
-    // 'streetLevel' is the cityLevel at the position of the street
     public boolean hasFrontPartFrom(ChunkPlan adj) {
-        ChunkPlan.StreetType st = streetType;
-        boolean elevated = isElevatedParkSection();
-        if (elevated) {
-            st = ChunkPlan.StreetType.PARK;
-        }
-
-        if (adj.hasBuilding && adj.frontType != null && st == ChunkPlan.StreetType.NORMAL && cityLevel < adj.cityLevel + adj.getNumFloors()) {
-            RailChunkType type = getRailInfo().getType();
-            if (type == RailChunkType.STATION_UNDERGROUND) {
-                return false;
-            }
-            if (type == RailChunkType.GOING_DOWN_ONE_FROM_SURFACE) {
-                return false;
-            }
-            if (getMaxHighwayLevel() >= 0) {
-                return false;
-            }
-
-            int local = adj.globalToLocal(cityLevel);
-            if (adj.isValidFloor(local) && adj.getFloor(local).getMetaBoolean(BuildingPart.META_DONTCONNECT)) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-        return true;
+        return graph.frontPartFrom(adj);
     }
 
-
-    // This checks if there can be a connection at minX
     public boolean hasConnectionAtX(int level) {
-        if (!isCity) {
-            return false;
-        }
-        if (multiBuildingPos.isRightSide()) {
-            return false;
-        }
-        if (level < 0 || level >= connectionAtX.length) {
-            return false;
-        }
-        if (level < floorTypes.length && floorTypes[level].getMetaBoolean(BuildingPart.META_DONTCONNECT)) {
-            return false;       // No connection supported
-        }
-        if (getXmin().hasFrontPartFrom(this)) {
-            return true;
-        }
-        return connectionAtX[level];
+        return graph.atX(level);
     }
 
-    // This checks if there can be a connection at minX
     public boolean hasConnectionAtXFromStreet(int level) {
-        if (!isCity) {
-            return false;
-        }
-        if (multiBuildingPos.isRightSide()) {
-            return false;
-        }
-        if (level < 0 || level >= connectionAtX.length) {
-            return false;
-        }
-        if (hasFrontPartFrom(getXmin())) {
-            return true;
-        }
-        return connectionAtX[level];
+        return graph.atXFromStreet(level);
     }
 
-    // This checks if there can be a connection at minZ
     public boolean hasConnectionAtZ(int level) {
-        if (!isCity) {
-            return false;
-        }
-        if (multiBuildingPos.isBottomSide()) {
-            return false;
-        }
-        if (level < 0 || level >= connectionAtZ.length) {
-            return false;
-        }
-        if (level < floorTypes.length && floorTypes[level].getMetaBoolean(BuildingPart.META_DONTCONNECT)) {
-            return false;       // No connection supported
-        }
-        if (getZmin().hasFrontPartFrom(this)) {
-            return true;
-        }
-        return connectionAtZ[level];
+        return graph.atZ(level);
     }
 
-    // This checks if there can be a connection at minZ
     public boolean hasConnectionAtZFromStreet(int level) {
-        if (!isCity) {
-            return false;
-        }
-        if (multiBuildingPos.isBottomSide()) {
-            return false;
-        }
-        if (level < 0 || level >= connectionAtZ.length) {
-            return false;
-        }
-        if (hasFrontPartFrom(getZmin())) {
-            return true;
-        }
-        return connectionAtZ[level];
+        return graph.atZFromStreet(level);
     }
 
     /**
