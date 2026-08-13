@@ -20,6 +20,9 @@ import java.util.SortedMap;
  *
  * @param stuffByTag each stuff tag's objects, sorted by id. Derived rather than looked up, because
  *                   the sort order is an RNG address - see {@link #stuffFor}.
+ * @param predefined where the predefined cities, buildings and streets sit, by chunk. Also derived:
+ *                   it is a pure function of {@code predefinedCities} and {@code multiBuildings},
+ *                   and used to be five lazily-latched static maps on {@code City} (issue #129).
  */
 public record AssetSnapshot(
         AssetIndex<Variant> variants,
@@ -34,7 +37,8 @@ public record AssetSnapshot(
         AssetIndex<CityStyle> cityStyles,
         AssetIndex<PredefinedCity> predefinedCities,
         AssetIndex<StuffObject> stuff,
-        SortedMap<String, List<StuffObject>> stuffByTag
+        SortedMap<String, List<StuffObject>> stuffByTag,
+        PredefinedIndex predefined
 ) {
 
     /**
@@ -71,6 +75,7 @@ public record AssetSnapshot(
                 AssetIndex.empty("urbex:citystyles"),
                 AssetIndex.empty("urbex:predefinedcities"),
                 AssetIndex.empty("urbex:stuff"),
-                java.util.Collections.emptySortedMap());
+                java.util.Collections.emptySortedMap(),
+                PredefinedIndex.empty());
     }
 }

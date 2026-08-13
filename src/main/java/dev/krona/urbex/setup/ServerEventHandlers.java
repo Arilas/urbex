@@ -3,7 +3,6 @@ package dev.krona.urbex.setup;
 import dev.krona.urbex.commands.ModCommands;
 import dev.krona.urbex.worldgen.GenerationSession;
 import dev.krona.urbex.worldgen.DimensionRuntime;
-import dev.krona.urbex.worldgen.lost.City;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLevelEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -121,10 +120,10 @@ public class ServerEventHandlers {
 
     public static void cleanUp() {
         Config.resetPresetCache();
-        // Everything that used to be cleared here now lives on DimensionCaches, and goes away with
+        // Everything that used to be cleared here now lives on DimensionCaches and goes away with
         // the DimensionRuntime that owns it (GenerationSession retires those on unload and at
-        // server stop). Only the datapack-derived predefined maps are still global.
-        City.cleanPredefinedCache();
+        // server stop), or on the AssetSnapshot and goes away with the session that compiled it -
+        // which is what removed the last datapack-derived static map from here (issue #129).
         // Pending spawn corrections must not leak into the next world of this JVM session
         SpawnPlacement.reset();
     }
