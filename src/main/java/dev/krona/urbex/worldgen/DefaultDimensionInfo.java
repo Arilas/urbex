@@ -31,6 +31,7 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     // cannot be swapped out from under a worker thread, which is what the per-dimension lock in
     // CityFeature.place used to be protecting.
     private final WorldGenLevel world;
+    private final LevelShape shape;
     private final AssetSnapshot assets;
     private final Preset profile;
     private final WorldStyleField styles;
@@ -43,6 +44,10 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     public DefaultDimensionInfo(WorldGenLevel world, AssetSnapshot assets, Preset preset,
                                 WorldStyleMix worldStyles) {
         this.world = world.getLevel();
+        // Resolved here, on the thread that loads the level, rather than per call from generation:
+        // the dimension type fixes the two bounds and the chunk generator fixes the sea level, and
+        // neither can change while the level is loaded.
+        this.shape = LevelShape.of(this.world);
         this.assets = assets;
         this.profile = preset;
         this.caches = new DimensionCaches(this.world.getSeed());
@@ -66,6 +71,11 @@ public class DefaultDimensionInfo implements IDimensionInfo {
     @Override
     public WorldGenLevel getWorld() {
         return world;
+    }
+
+    @Override
+    public LevelShape shape() {
+        return shape;
     }
 
     @Override

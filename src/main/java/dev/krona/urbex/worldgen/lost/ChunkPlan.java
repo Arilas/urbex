@@ -674,7 +674,7 @@ public class ChunkPlan {
 
         groundLevel = override != null ? override.groundLevel() : profile.GROUNDLEVEL;
         int wl = profile.SEALEVEL;
-        waterLevel = wl == -1 ? Tools.getSeaLevel(provider.getWorld()) : wl;
+        waterLevel = wl == -1 ? provider.shape().seaLevel() : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
 
         // In a multi building we copy all information from the top-left chunk
@@ -725,7 +725,7 @@ public class ChunkPlan {
                 f = minfloors;
             }
 
-            int max = provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
+            int max = provider.shape().maxY() - 1 - FLOORHEIGHT;
             while (getCityGroundLevel() + f * FLOORHEIGHT >= max) {
                 f--;
             }
@@ -1681,8 +1681,8 @@ public class ChunkPlan {
      * Return Integer.MIN_VALUE if the building is degenerate (no floors, no cellars).
      */
     public int getBuildingBottomHeight() {
-        int min = provider.getWorld().getMinY() + 2;
-        int max = provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
+        int min = provider.shape().minY() + 2;
+        int max = provider.shape().maxY() - 1 - FLOORHEIGHT;
 
         // Locals. This used to decrement the published cellars and floors as it walked, so the answer
         // depended on how many times it had been asked: the first call shrank the building and every
@@ -1782,7 +1782,7 @@ public class ChunkPlan {
             int cz = coord.chunkZ();
 
             // @todo build limit
-            if (h < provider.getWorld().getMaxY() + 1) {
+            if (h < provider.shape().maxBuildHeight()) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
                         h + CityGenerator.getRandomizedOffset(provider.getSeed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
@@ -1836,7 +1836,7 @@ public class ChunkPlan {
         if (desiredTerrainCorrectionHeights == null) {
             MinMax mm = getDesiredMaxHeightL1();
             // @todo build limit
-            if (mm.min < provider.getWorld().getMaxY() + 1) {
+            if (mm.min < provider.shape().maxBuildHeight()) {
                 // The L1 height at this corner is fixed so we return that
                 desiredTerrainCorrectionHeights = new MinMax(mm);
                 return desiredTerrainCorrectionHeights;

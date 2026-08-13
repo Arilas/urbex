@@ -16,7 +16,6 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
@@ -159,7 +158,7 @@ public class Scattered {
                 if (profile.isCavern()) {
                     lowestLevel = profile.GROUNDLEVEL;
                 } else {
-                    lowestLevel = provider.getWorld().getMinY() + 2;  // @todo is this right?
+                    lowestLevel = provider.shape().minY() + 2;  // @todo is this right?
                 }
             }
             generateScatteredBuilding(ctx, feature, info, building, scatteredRandom, lowestLevel, scattered.getTerrainfix());
@@ -247,7 +246,7 @@ public class Scattered {
                 if (!reference.isAllowVoid()) {
                     if (!(feature.profile.isDefault() || feature.profile.isCavern())) {
                         // We are in a world that can have void chunks. Check if this chunk is a void chunk
-                        if (height <= provider.getWorld().getMinY() + 3) {
+                        if (height <= provider.shape().minY() + 3) {
                             return AreaScan.INVALID;
                         }
                     }
@@ -360,7 +359,7 @@ public class Scattered {
     }
 
     private static int scatteredLevel(CityGenerator feature, ScatteredBuilding scattered, int minimum, int maximum, int average) {
-        int seaLevel = ((ServerChunkCache) feature.provider.getWorld().getChunkSource()).getGenerator().getSeaLevel();
+        int seaLevel = feature.provider.shape().seaLevel();
         return pickLevel(scattered.getTerrainheight(), minimum, maximum, average, seaLevel) + scattered.getHeightoffset();
     }
 

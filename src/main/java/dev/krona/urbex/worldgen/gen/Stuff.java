@@ -84,7 +84,7 @@ public class Stuff {
      * world that no longer existed.
      */
     private static boolean seesSky(ChunkDriver driver, CityGenerator feature, int x, int y, int z) {
-        int maxY = feature.provider.getWorld().getMaxY();
+        int maxY = feature.provider.shape().maxY();
         for (int yy = y; yy <= maxY; yy++) {
             if (!driver.getBlock(x, yy, z).isAir()) {
                 return false;
