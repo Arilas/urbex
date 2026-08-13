@@ -6,7 +6,6 @@ import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.plan.grid.GridPurpose;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
-import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
@@ -313,7 +312,7 @@ public final class PrimaryBridgePlanner {
                     return true;
                 }
                 int sealevel = provider.getProfile().SEALEVEL;
-                int waterLevel = sealevel == -1 ? Tools.getSeaLevel(provider.getWorld()) : sealevel;
+                int waterLevel = sealevel == -1 ? provider.shape().seaLevel() : sealevel;
                 return provider.getHeightmap(coord).getHeight() < waterLevel;
             }
         };

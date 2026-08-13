@@ -38,9 +38,9 @@ public class DamageArea {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
         this.air = Blocks.AIR.defaultBlockState();
-        chunkBox = new AABB(chunkX << 4, provider.getWorld().getMinY(), chunkZ << 4, (chunkX << 4) + 15, provider.getWorld().getMaxY() + 1, (chunkZ << 4) + 15);
-        this.minSectionY = provider.getWorld().getMinY() >> 4;
-        this.maxSectionY = provider.getWorld().getMaxY() >> 4;
+        chunkBox = new AABB(chunkX << 4, provider.shape().minY(), chunkZ << 4, (chunkX << 4) + 15, provider.shape().maxBuildHeight(), (chunkZ << 4) + 15);
+        this.minSectionY = provider.shape().minSection();
+        this.maxSectionY = provider.shape().maxSection();
 
         int offset = (Math.max(info.profile.EXPLOSION_MAXRADIUS, info.profile.MINI_EXPLOSION_MAXRADIUS)+15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
@@ -108,7 +108,7 @@ public class DamageArea {
         }
         if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {
             BlockState damaged = palette.canBeDamagedToIronBars(b);
-            int waterlevel = Tools.getSeaLevel(provider.getWorld());//profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
+            int waterlevel = provider.shape().seaLevel();//profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
             if (damage < BLOCK_DAMAGE_CHANCE && damaged != null) {
                 if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
                     b = damaged;

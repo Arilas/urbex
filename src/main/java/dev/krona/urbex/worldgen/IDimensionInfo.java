@@ -31,6 +31,15 @@ public interface IDimensionInfo {
     WorldGenLevel getWorld();
 
     /**
+     * How deep this dimension goes, how high it goes, and where its water sits.
+     * <p>
+     * Resolved once, when the dimension's runtime is built. Planning and generation ask this rather
+     * than {@link #getWorld()} for the same three numbers, so the code that needs a bound does not
+     * have to hold a level to get one - and so the preview can answer (issue #129).
+     */
+    LevelShape shape();
+
+    /**
      * Registry access for this dimension, or {@code null} if none is available. Real dimensions
      * always have one (it comes straight off {@link #getWorld()}); {@code NullDimensionInfo} is the
      * one implementor that can have registry access - and so be able to evaluate registry-backed

@@ -10,6 +10,7 @@ import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.LevelShape;
 import dev.krona.urbex.worldgen.WorldStyleField;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler;
@@ -233,6 +234,16 @@ public class NullDimensionInfo implements IDimensionInfo {
     @Override
     public WorldGenLevel getWorld() {
         return null;
+    }
+
+    /**
+     * The vanilla overworld's, because a preview runs before any level exists and the overworld is
+     * what it draws. Every planning rule that reads a height bound or the water line now gets a real
+     * answer here rather than an NPE off the null level above (issue #129).
+     */
+    @Override
+    public LevelShape shape() {
+        return LevelShape.VANILLA_OVERWORLD;
     }
 
     @Nullable

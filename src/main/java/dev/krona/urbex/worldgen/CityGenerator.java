@@ -206,8 +206,8 @@ public class CityGenerator {
 
     private boolean isVoid(ChunkGenContext ctx, int x, int z) {
         ChunkDriver driver = ctx.driver;
-        driver.current(x, provider.getWorld().getMaxY(), z);
-        int minHeight = provider.getWorld().getMinY();
+        driver.current(x, provider.shape().maxY(), z);
+        int minHeight = provider.shape().minY();
         while (driver.getBlock() == air && driver.getY() > minHeight) {
             driver.decY();
         }
@@ -459,8 +459,8 @@ public class CityGenerator {
         boolean hasCollectedDamage = false;
         float[][] collectedDamage = new float[16][16];
 
-        int minSection = provider.getWorld().getMinY() >> 4;
-        int maxSection = provider.getWorld().getMaxY() >> 4;
+        int minSection = provider.shape().minSection();
+        int maxSection = provider.shape().maxSection();
         for (int yy = minSection; yy <= maxSection; yy++) {
             java.util.List<dev.krona.urbex.worldgen.lost.Explosion> sectionExplosions = damageArea.explosionsIntersecting(yy);
             boolean hasExplosions = !sectionExplosions.isEmpty();
@@ -713,7 +713,7 @@ public class CityGenerator {
      */
     private void fillSupportBelow(ChunkGenContext ctx, int x, int z, int y) {
         ChunkDriver driver = ctx.driver;
-        int lowest = provider.getWorld().getMinY() + profile.BEDROCK_LAYER;
+        int lowest = provider.shape().minY() + profile.BEDROCK_LAYER;
         driver.current(x, y, z);
         while (driver.getY() > lowest && isEmpty(driver.getBlock())) {
             driver.block(base);
@@ -727,7 +727,7 @@ public class CityGenerator {
         int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
         // Find the first non-empty block starting at the given height
         driver.current(x, height, z);
-        int minHeight = provider.getWorld().getMinY();
+        int minHeight = provider.shape().minY();
         // We assume here we are not in a void chunk
         while (isFoliageOrEmpty(ctx.tags, driver.getBlock()) && driver.getY() > minHeight) {
             driver.decY();
@@ -907,7 +907,7 @@ public class CityGenerator {
         boolean building = info.hasBuilding;
 
         if (info.profile.isDefault()) {
-            int minHeight = info.provider.getWorld().getMinY();
+            int minHeight = info.provider.shape().minY();
             BlockState bedrock = Blocks.BEDROCK.defaultBlockState();
             for (int x = 0; x < 16; ++x) {
                 for (int z = 0; z < 16; ++z) {
@@ -931,7 +931,7 @@ public class CityGenerator {
             int ground = info.getCityGroundLevel();
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
-                    int maxTouchedY = moveDown(ctx, x, z, ground + 1, provider.getWorld().getMaxY() + 1);
+                    int maxTouchedY = moveDown(ctx, x, z, ground + 1, provider.shape().maxBuildHeight());
                     if (maxTouchedY == Short.MIN_VALUE) {
                         moveUp(ctx, x, z, ground, info.waterLevel > info.groundLevel);
                     }
@@ -1037,7 +1037,7 @@ public class CityGenerator {
                 } else {
                     for (int x = 0; x < 16; x++) {
                         for (int z = 0; z < 16; z++) {
-                            driver.setBlockRangeToAir(x, y + 1, z, provider.getWorld().getMaxY() + 1);
+                            driver.setBlockRangeToAir(x, y + 1, z, provider.shape().maxBuildHeight());
                         }
                     }
                 }
@@ -1163,7 +1163,7 @@ public class CityGenerator {
         Predicate<BlockState> checkIronbars = infobarsChar == null ? s -> s == ironbarsState : infoBarSet::contains;
         Character rubbleBlock = info.getBuilding().getRubbleBlock();
 
-        int maxBuildHeight = info.provider.getWorld().getMaxY() + 1;
+        int maxBuildHeight = info.provider.shape().maxBuildHeight();
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 double v = ruinBuffer[x + z * 16];
@@ -1337,7 +1337,7 @@ public class CityGenerator {
     private void fillToBedrockStreetBlock(ChunkGenContext ctx, ChunkPlan info) {
         ChunkDriver driver = ctx.driver;
         // Base blocks below streets
-        int minHeight = info.provider.getWorld().getMinY();
+        int minHeight = info.provider.shape().minY();
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 int y = info.getCityGroundLevel() - 1;
@@ -2180,8 +2180,8 @@ public class CityGenerator {
                 // How many go this direction (approx, based on cardinal directions from building as well as number that simply fall down)
                 destroyedBlocks /= info.profile.DEBRIS_TO_NEARBYCHUNK_FACTOR;
                 int startHeight = adjacentInfo.getMaxHeight() + 10;
-                int maxBuildHeight = info.provider.getWorld().getMaxY() + 1;
-                int minBuildHeight = info.provider.getWorld().getMinY();
+                int maxBuildHeight = info.provider.shape().maxBuildHeight();
+                int minBuildHeight = info.provider.shape().minY();
                 if (startHeight > maxBuildHeight - 1) {
                     // Clamp to the top of the world: the old code clamped an out-of-range start
                     // to minBuildHeight - 1, dropping debris at bedrock and reading below minY
@@ -2261,7 +2261,7 @@ public class CityGenerator {
         int lowestLevel = info.getBuildingBottomHeight();
         int cellars = info.cellars;
         int floors = info.getNumFloors();
-        int max = info.provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
+        int max = info.provider.shape().maxY() - 1 - FLOORHEIGHT;
 
         CompiledPalette palette = info.getCompiledPalette();
         makeRoomForBuilding(ctx, info, lowestLevel, heightmap, palette);
@@ -2337,8 +2337,8 @@ public class CityGenerator {
             // We also remove all blocks from the inside because we generate buildings on top of
             // generated chunks as opposed to blank chunks with non-floating worlds
             double[] bottomLayerBuffer = ctx.buffers.bottomLayer = this.bottomLayerNoise.getRegion(ctx.buffers.bottomLayer, (info.coord.chunkX() << 4), (info.coord.chunkZ() << 4), 16, 16, 8.0 / 16.0, 8.0 / 16.0, 1.0D);
-            int minBuildHeight = info.provider.getWorld().getMinY();
-            int maxBuildHeight = info.provider.getWorld().getMaxY() + 1;
+            int minBuildHeight = info.provider.shape().minY();
+            int maxBuildHeight = info.provider.shape().maxBuildHeight();
             for (int x = 0; x < 16; ++x) {
                 for (int z = 0; z < 16; ++z) {
                     double vr = bottomLayerBuffer[x + z * 16] / 4.0f;
