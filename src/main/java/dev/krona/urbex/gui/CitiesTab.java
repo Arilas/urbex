@@ -331,7 +331,7 @@ public class CitiesTab extends GridLayoutTab {
         List<String> choices = PresetSelection.CLIENT.styleChoices();
         Minecraft.getInstance().gui.setScreen(new WorldStyleDialog(screen, choices, worldStyleNames,
                 PresetSelection.CLIENT.effectiveWorldStyles(),
-                Config.EXPERIMENTAL_MULTI_WORLD_STYLES.get(),
+                Config.experimentalMultiWorldStyles(),
                 this::onWorldStylesChanged));
     }
 

@@ -23,7 +23,7 @@ public class StructureSuppressor {
      * edge of a city keeps the pieces that fall outside it.
      */
     public static boolean suppressedByCity(WorldGenLevel level, ChunkPos chunkPos, BoundingBox structureBox) {
-        if (!Config.STRUCTURES_YIELD_TO_CITIES.get()) {
+        if (!Config.structuresYieldToCities()) {
             return false;
         }
         PlanningContext diminfo = GenerationSession.planningFor(level);

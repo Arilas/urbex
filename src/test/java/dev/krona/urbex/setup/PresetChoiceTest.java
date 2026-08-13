@@ -9,7 +9,6 @@ import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,6 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * {@code dimensionsWithPresets} entries are {@code dimension=preset[@worldstylespec]}. The parser
  * is a small static method so it is testable headless, with no server or registry.
+ * <p>
+ * It takes the {@code experimentalMultiWorldStyles} flag as an argument rather than reading the
+ * published config, which is what lets these cases run without publishing anything: the entries are
+ * parsed when a config is translated, and the flag is in the same file they came from (issue #130).
  */
 class PresetChoiceTest {
 
@@ -33,36 +36,37 @@ class PresetChoiceTest {
 
     @Test
     void parsesDimensionPresetEntry() {
-        Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> parsed =
-                Config.parseDimensionPresetEntry("minecraft:overworld=urbex:rarecities");
+        Optional<GlobalConfig.DimensionRule> parsed = parse("minecraft:overworld=urbex:rarecities");
         assertTrue(parsed.isPresent());
-        assertEquals(dimension("minecraft:overworld"), parsed.get().getKey());
-        assertEquals(Identifier.fromNamespaceAndPath("urbex", "rarecities"), parsed.get().getValue().preset());
-        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, parsed.get().getValue().worldStyles());
-        assertTrue(parsed.get().getValue().overridesJson().isEmpty());
+        assertEquals(dimension("minecraft:overworld"), parsed.get().dimension());
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "rarecities"), parsed.get().choice().preset());
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, parsed.get().choice().worldStyles());
+        assertTrue(parsed.get().choice().overridesJson().isEmpty());
 
-        Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> explicitStyle =
-                Config.parseDimensionPresetEntry("minecraft:the_nether=urbex:cavern@urbex:standard");
+        Optional<GlobalConfig.DimensionRule> explicitStyle =
+                parse("minecraft:the_nether=urbex:cavern@urbex:standard");
         assertTrue(explicitStyle.isPresent());
-        assertEquals(dimension("minecraft:the_nether"), explicitStyle.get().getKey());
-        assertEquals(Identifier.fromNamespaceAndPath("urbex", "cavern"), explicitStyle.get().getValue().preset());
+        assertEquals(dimension("minecraft:the_nether"), explicitStyle.get().dimension());
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "cavern"), explicitStyle.get().choice().preset());
         assertEquals(WorldStyleMix.of(Identifier.fromNamespaceAndPath("urbex", "standard")),
-                explicitStyle.get().getValue().worldStyles());
+                explicitStyle.get().choice().worldStyles());
 
         // A bare (unqualified) name is rejected, not defaulted to the urbex namespace: the entry
         // is logged and dropped, same as any other malformed entry.
-        assertTrue(Config.parseDimensionPresetEntry("minecraft:overworld=default").isEmpty());
+        assertTrue(parse("minecraft:overworld=default").isEmpty());
     }
 
     @Test
     void malformedEntryIsRejectedWithError() {
-        assertTrue(Config.parseDimensionPresetEntry("junk").isEmpty());
-        assertTrue(Config.parseDimensionPresetEntry("a=b=c=d").isEmpty());
+        assertTrue(parse("junk").isEmpty());
+        assertTrue(parse("a=b=c=d").isEmpty());
         // A malformed style spec takes the whole entry down rather than falling back to the default
         // style: generating with the wrong style would hide a typo for the life of the world.
-        assertTrue(Config.parseDimensionPresetEntry(
-                "minecraft:overworld=urbex:default@urbex:standard*0").isEmpty());
-        assertTrue(Config.parseDimensionPresetEntry(
-                "minecraft:overworld=urbex:default@standard*0.5+urbex:cavern").isEmpty());
+        assertTrue(parse("minecraft:overworld=urbex:default@urbex:standard*0").isEmpty());
+        assertTrue(parse("minecraft:overworld=urbex:default@standard*0.5+urbex:cavern").isEmpty());
+    }
+
+    private static Optional<GlobalConfig.DimensionRule> parse(String entry) {
+        return GlobalConfig.parseDimensionEntry(entry, true);
     }
 }

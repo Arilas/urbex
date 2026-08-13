@@ -5,7 +5,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
-import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,18 +53,19 @@ class ExperimentalMixGateTest {
     }
 
     private static PresetChoice parse(String entry) {
-        Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> parsed = Config.parseDimensionPresetEntry(entry);
+        Optional<GlobalConfig.DimensionRule> parsed =
+                GlobalConfig.parseDimensionEntry(entry, Config.experimentalMultiWorldStyles());
         assertTrue(parsed.isPresent(), "entry should parse: " + entry);
         assertEquals(ResourceKey.create(Registries.DIMENSION, Identifier.parse("minecraft:overworld")),
-                parsed.get().getKey());
-        return parsed.get().getValue();
+                parsed.get().dimension());
+        return parsed.get().choice();
     }
 
     @Test
     void withTheFlagOffAMixedEntryKeepsOnlyItsHeaviestStyle(@TempDir Path dir) throws IOException {
         writeConfig(dir, false);
         Config.loadGlobal(dir);
-        assertFalse(Config.EXPERIMENTAL_MULTI_WORLD_STYLES.get());
+        assertFalse(Config.experimentalMultiWorldStyles());
 
         WorldStyleMix styles = parse(MIXED_ENTRY).worldStyles();
         assertTrue(styles.isSingle());
@@ -77,7 +76,7 @@ class ExperimentalMixGateTest {
     void withTheFlagOnTheWholeMixSurvives(@TempDir Path dir) throws IOException {
         writeConfig(dir, true);
         Config.loadGlobal(dir);
-        assertTrue(Config.EXPERIMENTAL_MULTI_WORLD_STYLES.get());
+        assertTrue(Config.experimentalMultiWorldStyles());
 
         WorldStyleMix styles = parse(MIXED_ENTRY).worldStyles();
         assertFalse(styles.isSingle());

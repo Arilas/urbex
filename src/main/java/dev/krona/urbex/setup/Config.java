@@ -6,13 +6,10 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.config.ConfigRepository;
-import dev.krona.urbex.config.UrbexConfig;
 import dev.krona.urbex.data.UrbexData;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
@@ -26,13 +23,16 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
 /**
- * Configuration access. Values come from the codec-backed {@link UrbexConfig}: the global
- * {@code config/urbex/urbex.json}, optionally overridden per world by
- * {@code <world>/serverconfig/urbex.json}. Legacy Forge Config API Port TOML files are read
- * once and migrated (issue #75).
+ * Which configuration is in effect, and the decisions taken from it.
  * <p>
- * The public surface is kept supplier-shaped ({@code Config.X.get()}) so the many call sites
- * did not have to change when the ModConfigSpec backing was removed.
+ * Reading and writing the files is {@link ConfigRepository}'s job; turning what they say into
+ * identifiers and dimension rules is {@link GlobalConfig}'s. What is left here is publication - one
+ * slot for the global config and one for the running world's - plus the per-dimension preset choice
+ * derived from it (issue #130).
+ * <p>
+ * The accessors are plain methods. They were {@code Supplier} constants so that call sites written
+ * against the NeoForge {@code ModConfigSpec} did not have to change when it was removed (#75); the
+ * spec has been gone for two releases and the shape was only ever a migration aid.
  */
 public class Config {
 
@@ -45,21 +45,50 @@ public class Config {
     public static final WorldStyleMix DEFAULT_WORLD_STYLE_MIX = WorldStyleMix.of(DEFAULT_WORLD_STYLE);
 
     /** The currently active config: global, with the running world's overrides applied. */
-    private static volatile UrbexConfig active = UrbexConfig.DEFAULT;
+    private static volatile GlobalConfig active = GlobalConfig.DEFAULT;
     /** The global config alone, restored when a world's overrides are dropped. */
-    private static volatile UrbexConfig global = UrbexConfig.DEFAULT;
+    private static volatile GlobalConfig global = GlobalConfig.DEFAULT;
 
-    public static final Supplier<String> SELECTED_PRESET = () -> active.selectedPreset();
-    public static final Supplier<String> SELECTED_WORLD_STYLE = () -> active.selectedWorldStyle();
-    public static final Supplier<Integer> TODO_QUEUE_SIZE = () -> active.todoQueueSize();
-    public static final Supplier<Boolean> FORCE_SAPLING_GROWTH = () -> active.forceSaplingGrowth();
-    public static final Supplier<Integer> CACHE_CLEANUP_SECONDS = () -> active.cacheCleanupSeconds();
-    public static final Supplier<Integer> HEIGHT_SAMPLE_SIZE = () -> active.heightSampleSize();
-    public static final Supplier<Boolean> AVOID_SURFACE_STRUCTURES = () -> active.avoidSurfaceStructures();
-    public static final Supplier<Boolean> STRUCTURES_YIELD_TO_CITIES = () -> active.structuresYieldToCities();
-    public static final Supplier<Boolean> AVOID_VILLAGES = () -> active.avoidVillages();
-    public static final Supplier<Boolean> AVOID_FLATTENING = () -> active.avoidFlattening();
-    public static final Supplier<Boolean> EXPERIMENTAL_MULTI_WORLD_STYLES = () -> active.experimentalMultiWorldStyles();
+    /** Everything in effect right now, typed. */
+    public static GlobalConfig active() {
+        return active;
+    }
+
+    public static int todoQueueSize() {
+        return active.file().todoQueueSize();
+    }
+
+    public static boolean forceSaplingGrowth() {
+        return active.file().forceSaplingGrowth();
+    }
+
+    public static int cacheCleanupSeconds() {
+        return active.file().cacheCleanupSeconds();
+    }
+
+    public static int heightSampleSize() {
+        return active.file().heightSampleSize();
+    }
+
+    public static boolean avoidSurfaceStructures() {
+        return active.file().avoidSurfaceStructures();
+    }
+
+    public static boolean structuresYieldToCities() {
+        return active.file().structuresYieldToCities();
+    }
+
+    public static boolean avoidVillages() {
+        return active.file().avoidVillages();
+    }
+
+    public static boolean avoidFlattening() {
+        return active.file().avoidFlattening();
+    }
+
+    public static boolean experimentalMultiWorldStyles() {
+        return active.file().experimentalMultiWorldStyles();
+    }
 
     /**
      * Applies the {@code experimentalMultiWorldStyles} opt-in to a mix that arrived from anywhere -
@@ -70,7 +99,17 @@ public class Config {
      * carry a mix must not quietly get one on an install that never opted in.
      */
     public static WorldStyleMix gateMix(WorldStyleMix mix, String context) {
-        if (mix.isSingle() || EXPERIMENTAL_MULTI_WORLD_STYLES.get()) {
+        return gateMix(mix, experimentalMultiWorldStyles(), context);
+    }
+
+    /**
+     * @see #gateMix(WorldStyleMix, String)
+     *
+     * <p>Takes the flag rather than reading it, for the one caller that has to gate a mix while the
+     * config carrying the flag is still being built - see {@link GlobalConfig#of}.</p>
+     */
+    static WorldStyleMix gateMix(WorldStyleMix mix, boolean allowMixes, String context) {
+        if (mix.isSingle() || allowMixes) {
             return mix;
         }
         WorldStyleMix reduced = mix.reducedToPrimary();
@@ -86,7 +125,7 @@ public class Config {
      * business; what happens here is publication - the two slots every other path reads (issue #130).
      */
     public static void loadGlobal(Path configDir) {
-        global = ConfigRepository.loadGlobal(configDir);
+        global = GlobalConfig.of(ConfigRepository.loadGlobal(configDir));
         active = global;
     }
 
@@ -95,8 +134,8 @@ public class Config {
      * any worldgen.
      */
     public static void applyWorldOverrides(MinecraftServer server) {
-        active = ConfigRepository.applyWorldOverrides(global, server.getWorldPath(LevelResource.ROOT));
-        AVOID_STRUCTURES_SET = null;
+        active = GlobalConfig.of(ConfigRepository.applyWorldOverrides(
+                global.file(), server.getWorldPath(LevelResource.ROOT)));
         resetPresetCache();
     }
 
@@ -116,16 +155,11 @@ public class Config {
     public static WorldStyleMix worldStyleMixFromClient = null;
     public static String overridesFromClient = null;
 
-    // Lazily filled from avoidStructures by cacheAvoidedStructures(). Must start out null:
-    // that method only fills the set when it is still null.
-    private static Set<Identifier> AVOID_STRUCTURES_SET = null;
-
     public static void reset() {
         presetFromClient = null;
         worldStyleMixFromClient = null;
         overridesFromClient = null;
         dimensionPresetCache = null;
-        AVOID_STRUCTURES_SET = null;
         active = global;
     }
 
@@ -141,63 +175,6 @@ public class Config {
             dimensionPresetCache = cache;
         }
         return cache.get(type);
-    }
-
-    /**
-     * Parses one {@code dimensionsWithPresets} entry: {@code dimension=preset[@worldstyle]}. The
-     * preset and worldstyle names must name their namespace: {@link DataTools#fromName} rejects a
-     * bare one rather than defaulting it, so {@code minecraft:overworld=default} is refused and
-     * {@code minecraft:overworld=urbex:default} is not. (The dimension id on the left is parsed by
-     * {@link Identifier#parse} and does still default, to {@code minecraft} - it is a vanilla id,
-     * not a datapack cross-reference.) Malformed entries - wrong arity on either side of {@code =},
-     * or an id that fails to parse - are logged and rejected rather than thrown, so one bad line in
-     * the config doesn't take the whole list down.
-     * <p>
-     * The rejection messages below carry {@code e.getMessage()} through, because for the two
-     * {@code fromName} calls that is the only place the "add a namespace, e.g. urbex:default" hint
-     * exists - and a config written before namespaces were mandatory is exactly the case that hits
-     * it, so it is the one message that user will see.
-     */
-    public static Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> parseDimensionPresetEntry(String entry) {
-        String[] split = entry.split("=");
-        if (split.length != 2) {
-            Urbex.getLogger().error("Bad format for config value: '{}'! Expected 'dimension=preset[@worldstyle]'.", entry);
-            return Optional.empty();
-        }
-        ResourceKey<Level> dimensionType;
-        try {
-            dimensionType = ResourceKey.create(Registries.DIMENSION, Identifier.parse(split[0]));
-        } catch (Exception e) {
-            Urbex.getLogger().error("Bad dimension id in config value: '{}'!", entry);
-            return Optional.empty();
-        }
-
-        String presetPart = split[1];
-        String presetName = presetPart;
-        WorldStyleMix worldStyles = DEFAULT_WORLD_STYLE_MIX;
-        int at = presetPart.indexOf('@');
-        if (at >= 0) {
-            presetName = presetPart.substring(0, at);
-            String stylePart = presetPart.substring(at + 1);
-            try {
-                // The whole tail, not one id: a single qualified id is just a one-entry mix, so the
-                // pre-mixing form parses unchanged.
-                worldStyles = gateMix(WorldStyleMix.parse(stylePart), "dimensionsWithPresets entry '" + entry + "'");
-            } catch (Exception e) {
-                Urbex.getLogger().error("Bad worldstyle spec in config value: '{}'! {}", entry, e.getMessage());
-                return Optional.empty();
-            }
-        }
-
-        Identifier presetId;
-        try {
-            presetId = DataTools.fromName(presetName);
-        } catch (Exception e) {
-            Urbex.getLogger().error("Bad preset id in config value: '{}'! {}", entry, e.getMessage());
-            return Optional.empty();
-        }
-
-        return Optional.of(Map.entry(dimensionType, new PresetChoice(presetId, worldStyles, Optional.empty())));
     }
 
     /**
@@ -221,8 +198,11 @@ public class Config {
      */
     private static Map<ResourceKey<Level>, PresetChoice> buildPresetCache(ServerLevel level) {
         Map<ResourceKey<Level>, PresetChoice> cache = new ConcurrentHashMap<>();
-        for (String dp : active.dimensionsWithPresets()) {
-            parseDimensionPresetEntry(dp).ifPresent(e -> cache.put(e.getKey(), e.getValue()));
+        // Parsed once, when the config was published, rather than per cache build. The messages a
+        // malformed entry produces therefore reach the log at load time, where a player can act on
+        // them, instead of from whichever worldgen worker first needed the cache.
+        for (GlobalConfig.DimensionRule rule : active.dimensionRules()) {
+            cache.put(rule.dimension(), rule.choice());
         }
 
         UrbexData data = UrbexData.getData(level);
@@ -263,16 +243,12 @@ public class Config {
                     selectedOverrides = savedOverrides.isEmpty() ? null : savedOverrides;
                 }
             } else if (level.dimension() == Level.OVERWORLD) {
-                String globalPreset = Config.SELECTED_PRESET.get();
-                if (globalPreset != null && !globalPreset.isEmpty()) {
-                    selectedPreset = DataTools.fromName(globalPreset);
-                    // The global config's own selection stays a single id: it is the overworld-only
-                    // default for installs that never open the Cities tab, and a mix there would add
-                    // a third place to look for one setting without adding any reach.
-                    String globalStyle = Config.SELECTED_WORLD_STYLE.get();
-                    selectedWorldStyles = globalStyle == null || globalStyle.isEmpty()
-                            ? DEFAULT_WORLD_STYLE_MIX : WorldStyleMix.of(DataTools.fromName(globalStyle));
-                }
+                // Parsed when the config was published. The global config's own selection stays a
+                // single id: it is the overworld-only default for installs that never open the
+                // Cities tab, and a mix there would add a third place to look for one setting
+                // without adding any reach.
+                selectedPreset = active.selectedPreset();
+                selectedWorldStyles = active.selectedWorldStyles();
             }
         }
 
@@ -348,24 +324,22 @@ public class Config {
         Registry<dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition> worldStyles =
                 server.registryAccess().lookupOrThrow(CustomRegistries.WORLDSTYLES_REGISTRY_KEY);
 
-        String selected = SELECTED_PRESET.get();
-        if (selected != null && !selected.isEmpty()) {
-            requirePreset(presets, DataTools.fromName(selected), "config selectedPreset '" + selected + "'");
+        Identifier selected = active.selectedPreset();
+        if (selected != null) {
+            requirePreset(presets, selected, "config selectedPreset '" + selected + "'");
         }
-        String selectedStyle = SELECTED_WORLD_STYLE.get();
-        if (selectedStyle != null && !selectedStyle.isEmpty()) {
-            requireWorldStyle(worldStyles, DataTools.fromName(selectedStyle), "config selectedWorldStyle '" + selectedStyle + "'");
+        for (Identifier style : active.selectedWorldStyles().styles()) {
+            requireWorldStyle(worldStyles, style, "config selectedWorldStyle '" + style + "'");
         }
 
-        for (String dp : active.dimensionsWithPresets()) {
-            Optional<Map.Entry<ResourceKey<Level>, PresetChoice>> parsed = parseDimensionPresetEntry(dp);
-            // Malformed entries are reported by parseDimensionPresetEntry itself; not this method's concern.
-            parsed.ifPresent(e -> {
-                requirePreset(presets, e.getValue().preset(), "dimensionsWithPresets entry '" + dp + "'");
-                for (Identifier style : e.getValue().worldStyles().styles()) {
-                    requireWorldStyle(worldStyles, style, "dimensionsWithPresets entry '" + dp + "'");
-                }
-            });
+        // Over the parsed rules: a malformed entry was reported when the config was published and is
+        // not in this list, which is what stops it being reported a second time here.
+        for (GlobalConfig.DimensionRule rule : active.dimensionRules()) {
+            String where = "dimensionsWithPresets entry for '" + rule.dimension().identifier() + "'";
+            requirePreset(presets, rule.choice().preset(), where);
+            for (Identifier style : rule.choice().worldStyles().styles()) {
+                requireWorldStyle(worldStyles, style, where);
+            }
         }
     }
 
@@ -392,22 +366,10 @@ public class Config {
     }
 
     public static boolean isAvoidedStructure(Identifier id) {
-        cacheAvoidedStructures();
-        return AVOID_STRUCTURES_SET.contains(id);
+        return active.avoidStructures().contains(id);
     }
 
     public static boolean hasAvoidedStructures() {
-        cacheAvoidedStructures();
-        return !AVOID_STRUCTURES_SET.isEmpty();
-    }
-
-    private static void cacheAvoidedStructures() {
-        if (AVOID_STRUCTURES_SET == null) {
-            Set<Identifier> set = new HashSet<>();
-            for (String s : active.avoidStructures()) {
-                set.add(Identifier.parse(s));
-            }
-            AVOID_STRUCTURES_SET = set;
-        }
+        return !active.avoidStructures().isEmpty();
     }
 }
