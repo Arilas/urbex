@@ -122,52 +122,79 @@ public class ChunkDriver {
         RECORDED_WRITES.clear();
     }
 
-    /** Thread-confined: only ever touched by the single thread driving this chunk. */
-    private Long2ObjectOpenHashMap<BlockState> recorded;
+    /**
+     * Every position this driver wrote and the state it last put there. Thread-confined: only ever
+     * touched by the single thread driving this chunk.
+     *
+     * <p>Filled on every write, whether or not anything is recording, and that is the fix rather
+     * than an implementation detail. {@code putRange} used to consult {@link #recordingWrites}
+     * before noting a position at all - and {@link #correctionsPass} walks this same log - so a
+     * bulk-filled wall got its connection properties during {@code /urbex digest} and did not
+     * during normal play. The corrections pass is generation; the recorder is a harness, and a
+     * harness must not be load-bearing (issue #52).</p>
+     *
+     * <p>No golden moved when this was fixed, and none moves if it is broken again: every suite
+     * hashes the same chunks under either rule. The guard is
+     * {@code ChunkDriverCorrectionsTest}, not the digests - which is worth knowing before trusting
+     * a green digest run to cover a change to <em>which</em> positions get corrected.</p>
+     */
+    private Long2ObjectOpenHashMap<BlockState> written;
+
     private boolean published;
     private boolean loggedLateWrite;
 
-    private void recordWrite(int x, int y, int z, BlockState state) {
+    /** This driver put {@code state} at the given position. */
+    private void wrote(int x, int y, int z, BlockState state) {
         if (published) {
-            if (!recordingWrites) {
-                return;
-            }
-            // publishRecordedWrites() has already run for this driver, so the accumulator is gone
-            // and this position would simply vanish. Nothing reaches here today - updateAdjacent is
-            // the only writer that could outlive the placement pass, and it is only ever called
-            // from correct(). But Task 6 verifies itself with this harness, and a harness that
-            // silently discards writes is the worst possible thing to debug. So: say so, loudly,
-            // and record it anyway rather than quietly reporting a wrong digest.
-            if (!loggedLateWrite) {
-                loggedLateWrite = true;
-                Urbex.getLogger().error(
-                        "ChunkDriver write recorder: block written at {},{},{} after this driver "
-                                + "published its writes. The /urbex digest harness would have "
-                                + "dropped it; recording it separately. This is a bug - some pass "
-                                + "now runs after actuallyGenerate().", x, y, z);
-            }
-            Long2ObjectOpenHashMap<BlockState> late = new Long2ObjectOpenHashMap<>();
-            late.put(BlockPos.asLong(x, y, z), state);
-            mergeIntoRecordedWrites(late);
+            recordLateWrite(x, y, z, state);
             return;
         }
-        if (recorded == null) {
-            recorded = new Long2ObjectOpenHashMap<>();
+        if (written == null) {
+            written = new Long2ObjectOpenHashMap<>();
         }
         // put, not putIfAbsent: within one driver, the last write to a position wins - the same
         // property the old read-the-final-world approach had for driver-internal overwrites
-        recorded.put(BlockPos.asLong(x, y, z), state);
+        written.put(BlockPos.asLong(x, y, z), state);
+    }
+
+    private void recordLateWrite(int x, int y, int z, BlockState state) {
+        if (!recordingWrites) {
+            return;
+        }
+        // publishRecordedWrites() has already run for this driver, so the accumulator is gone
+        // and this position would simply vanish. Nothing reaches here today - updateAdjacent is
+        // the only writer that could outlive the placement pass, and it is only ever called
+        // from correct(). But Task 6 verifies itself with this harness, and a harness that
+        // silently discards writes is the worst possible thing to debug. So: say so, loudly,
+        // and record it anyway rather than quietly reporting a wrong digest.
+        if (!loggedLateWrite) {
+            loggedLateWrite = true;
+            Urbex.getLogger().error(
+                    "ChunkDriver write recorder: block written at {},{},{} after this driver "
+                            + "published its writes. The /urbex digest harness would have "
+                            + "dropped it; recording it separately. This is a bug - some pass "
+                            + "now runs after actuallyGenerate().", x, y, z);
+        }
+        Long2ObjectOpenHashMap<BlockState> late = new Long2ObjectOpenHashMap<>();
+        late.put(BlockPos.asLong(x, y, z), state);
+        mergeIntoRecordedWrites(late);
     }
 
     /**
-     * Hand this chunk's recorded positions over to the shared map. Called once, at the end of
-     * generation, from the thread that did the driving.
+     * Hand this chunk's write log over to the shared map, if anyone asked for it. Called once, at
+     * the end of generation, from the thread that did the driving.
+     *
+     * <p>The {@code recordingWrites} check is the whole point of the method. {@link #RECORDED_WRITES}
+     * is a static that only {@code /urbex digest} ever clears, and this published into it
+     * unconditionally - so a server that never ran the command still kept every position and
+     * {@code BlockState} of every chunk it had ever generated, for the life of the process, and
+     * paid a full copy of the accumulated map per chunk to put them there (issue #52).</p>
      */
     private void publishRecordedWrites() {
-        Long2ObjectOpenHashMap<BlockState> local = recorded;
-        recorded = null;
+        Long2ObjectOpenHashMap<BlockState> local = written;
+        written = null;
         published = true;
-        if (local == null || local.isEmpty()) {
+        if (!recordingWrites || local == null || local.isEmpty()) {
             return;
         }
         mergeIntoRecordedWrites(local);
@@ -271,10 +298,10 @@ public class ChunkDriver {
      * result cannot depend on write order.
      */
     private void correctionsPass() {
-        if (recorded == null || recorded.isEmpty()) {
+        if (written == null || written.isEmpty()) {
             return;
         }
-        long[] positions = recorded.keySet().toLongArray();
+        long[] positions = written.keySet().toLongArray();
         Arrays.sort(positions);
         for (long packed : positions) {
             current.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
@@ -295,7 +322,7 @@ public class ChunkDriver {
                 return;
             }
             cache.put(p, state);
-            recordWrite(p.getX(), p.getY(), p.getZ(), state);
+            wrote(p.getX(), p.getY(), p.getZ(), state);
         }
     }
 
@@ -671,7 +698,6 @@ public class ChunkDriver {
             }
             int px = x & 0xf;
             int pz = z & 0xf;
-            boolean record = recordingWrites;    // read the flag once, not once per block
             while (y1 <= y2) {
                 int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
                 int idx = (px << 8) + ((y1 & 0xf) << 4) + pz;
@@ -680,9 +706,7 @@ public class ChunkDriver {
                     cache[sectionIdx].section[idx] = state;
                     cache[sectionIdx].touched = true;
                 }
-                if (record) {
-                    owner.recordWrite(x, y1, z, state);
-                }
+                owner.wrote(x, y1, z, state);
                 y1++;
             }
         }
@@ -694,7 +718,6 @@ public class ChunkDriver {
             }
             int px = x & 0xf;
             int pz = z & 0xf;
-            boolean record = recordingWrites;    // read the flag once, not once per block
             BlockPos.MutableBlockPos worldPos = null;
             while (y1 <= y2) {
                 int sectionIdx = (y1 - minY) / SECTION_HEIGHT;
@@ -714,9 +737,7 @@ public class ChunkDriver {
                 if (st != state && test.test(st)) {
                     cache[sectionIdx].section[idx] = state;
                     cache[sectionIdx].touched = true;
-                    if (record) {
-                        owner.recordWrite(x, y1, z, state);
-                    }
+                    owner.wrote(x, y1, z, state);
                 }
                 y1++;
             }

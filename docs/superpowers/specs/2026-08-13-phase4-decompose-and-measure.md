@@ -94,6 +94,22 @@ Four things this says that inspection did not, and that #132b now has to answer:
 `generated` exceeds `chunks` because the pipeline pulls in neighbours to satisfy the requested
 square; it is the honest denominator for a per-chunk figure.
 
+## A blind spot the baseline found
+
+`ChunkDriver` used one field as both the end-of-chunk corrections worklist and the `/urbex digest`
+write log, and `putRange` only filled it when the recorder was on. So which positions received
+connection properties and neighbour shape updates depended on whether a digest was running.
+
+The interesting part is what happened when it was fixed: **nothing**. All six suites hash the same
+chunks whether corrections run over every written position or only over cursor-written ones — about
+26M recorded block writes, five worlds, no difference. The measurement is what made the change
+decidable at all: correcting bulk fills costs ~6.5% of mean chunk time (3864µs against 4117–4206µs
+on `runDigestCheckAvoid`) and no measurable wall clock, since the extra work parallelizes.
+
+So the digests do not cover this class of defect, and a green six-suite run is not evidence about
+it. Anything that changes *which* positions the corrections pass visits needs a unit test;
+`ChunkDriverCorrectionsTest` is that test.
+
 ## What this PR does not do
 
 It sets no cache limits and removes no allocation. Those are #132b, and doing them here would be
