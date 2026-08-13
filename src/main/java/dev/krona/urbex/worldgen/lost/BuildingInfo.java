@@ -35,14 +35,8 @@ public class BuildingInfo {
 
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
-    /**
-     * True only for an instance built by {@link #detachedForEditing} and never published to the
-     * cache, which is the only kind {@link #setBuildingType} will touch. Everything reachable from
-     * {@code caches().buildingInfo} is immutable planning (issue #126).
-     */
-    private final boolean detached;
     public final Preset profile;
-    public int groundLevel;
+    public final int groundLevel;
     public final int waterLevel;
 
     // Final, and no longer volatile: CityGenerator.generate() used to clear this when it found a
@@ -51,10 +45,10 @@ public class BuildingInfo {
     // so what is published here is what the seed and the coordinate say and nothing rewrites it
     // (issue #126).
     public final boolean isCity;
-    public boolean hasBuilding;
+    public final boolean hasBuilding;
     public final MultiPos multiBuildingPos;
     public final MultiBuilding multiBuilding;
-    public Building buildingType;
+    public final Building buildingType;
 
     public final BuildingPart fountainType;
     public final BuildingPart parkType;
@@ -66,10 +60,10 @@ public class BuildingInfo {
     public final StreetType streetType;
     private final RoadType effectiveRoad;   // The planned road this chunk renders, NONE for most chunks
 
-    private int floors;
-    public int cellars;
-    public BuildingPart[] floorTypes;
-    public BuildingPart[] floorTypes2;
+    private final int floors;
+    public final int cellars;
+    public final BuildingPart[] floorTypes;
+    public final BuildingPart[] floorTypes2;
 
     public final boolean[] connectionAtX;
     public final boolean[] connectionAtZ;
@@ -301,7 +295,7 @@ public class BuildingInfo {
     }
 
     public CityStyle getCityStyle() {
-        return getChunkCharacteristics(coord, provider).cityStyle;
+        return getChunkCharacteristics(coord, provider).cityStyle();
     }
 
     // Version for usage inside the gui
@@ -309,7 +303,7 @@ public class BuildingInfo {
 //        Random rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed());
 //        rand.nextFloat();       // Compatibility?
 
-        return characteristics.couldHaveBuilding;
+        return characteristics.couldHaveBuilding();
     }
 
     public static ChunkCharacteristics getChunkCharacteristicsGui(ChunkCoord key, IDimensionInfo provider) {
@@ -320,14 +314,14 @@ public class BuildingInfo {
         int chunkX = key.chunkX();
         int chunkZ = key.chunkZ();
         Preset profile = provider.getProfile();
-        ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
-        characteristics.isCity = isCityRaw(key, provider, profile);
-        characteristics.cityLevel = getCityLevelGui(key, provider);
+        boolean isCity = isCityRaw(key, provider, profile);
+        int cityLevel = getCityLevelGui(key, provider);
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
-        characteristics.couldHaveBuilding = characteristics.isCity && rand.nextFloat() < profile.BUILDING_CHANCE;
-//        CITY_INFO_MAP.put(key, characteristics);
-        return characteristics;
+        boolean couldHaveBuilding = isCity && rand.nextFloat() < profile.BUILDING_CHANCE;
+        // The preview resolves neither a multi-building section nor a style, exactly as before -
+        // those three stay null here rather than being computed for a screen that does not use them.
+        return new ChunkCharacteristics(isCity, couldHaveBuilding, null, cityLevel, null, null, null);
     }
 
     /**
@@ -344,33 +338,33 @@ public class BuildingInfo {
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         Preset profile = provider.getProfile();
-        ChunkCharacteristics characteristics = new ChunkCharacteristics();
 
-        WorldGenLevel world = provider.getWorld();
-        characteristics.isCity = isCityRaw(coord, provider, profile);
+        // Computed into locals and constructed once at the end. This used to assemble a mutable
+        // object field by field and hand the half-built thing to its own helpers; the record cannot
+        // be published half-built, which is the point (issue #126).
+        boolean isCity = isCityRaw(coord, provider, profile);
 
-        if (!characteristics.isCity) {
-            characteristics.multiPos = MultiPos.SINGLE;
-            characteristics.multiBuilding = null;
+        MultiSection section = isCity ? multiBuildingSection(coord, provider, profile) : MultiSection.NONE;
+        MultiPos multiPos = section.pos();
+        MultiBuilding multiBuilding = section.building();
+
+        int cityLevel;
+        if (multiPos.isSingle()) {
+            cityLevel = getCityLevel(coord, provider);
         } else {
-            initMultiBuildingSection(characteristics, coord, provider, profile);
-        }
-
-        if (characteristics.multiPos.isSingle()) {
-            characteristics.cityLevel = getCityLevel(coord, provider);
-        } else {
-            characteristics.cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(characteristics, coord, provider) : getAverageCityLevel(characteristics, coord, provider);
+            cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(multiPos, coord, provider)
+                    : getAverageCityLevel(multiPos, coord, provider);
         }
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.getSeed(), Rng.Purpose.BUILDING);
-        characteristics.couldHaveBuilding = ChunkContentResolver.couldHaveBuilding(profile,
-                characteristics.isCity, characteristics.multiPos, characteristics.cityLevel, rand,
+        boolean couldHaveBuilding = ChunkContentResolver.couldHaveBuilding(profile,
+                isCity, multiPos, cityLevel, rand,
                 chunkFacts(coord, provider, profile));
 
         CityStyle cityStyle;
         // If this is a street we find other chunks connected to this and pick the cityStyle
         // that represents the majority. This is to prevent streets from switching style randomly if two
         // different styled cities mix
-        if (characteristics.isCity && !characteristics.couldHaveBuilding) {
+        if (isCity && !couldHaveBuilding) {
             // Counted by Identifier, not by the id's String form. A tie is the ordinary case at a
             // style boundary (ten votes: 3x3 neighbours plus the centre twice), and
             // Counter.getMostOccuring() breaks ties on a stated rule rather than HashMap bucket
@@ -393,33 +387,24 @@ public class BuildingInfo {
         } else {
             cityStyle = City.getCityStyle(coord, provider, profile);
         }
-        characteristics.cityStyle = cityStyle;
-
-        if (characteristics.multiPos.isMulti() && !characteristics.multiPos.isTopLeft()) {
-            ChunkCharacteristics topleft = getTopLeftCityInfo(characteristics, coord, provider);
-//                characteristics.multiBuilding = topleft.multiBuilding;
-            if (characteristics.multiBuilding != null) {
-                String b = characteristics.multiBuilding.getBuilding(characteristics.multiPos.x(), characteristics.multiPos.z());
-                characteristics.buildingType = provider.assets().buildings().getOrThrow(b);
+        Building buildingType;
+        if (multiPos.isMulti() && !multiPos.isTopLeft()) {
+            if (multiBuilding != null) {
+                String b = multiBuilding.getBuilding(multiPos.x(), multiPos.z());
+                buildingType = provider.assets().buildings().getOrThrow(b);
             } else {
                 // @todo is this even possible?
-                characteristics.buildingType = topleft.buildingType;
-                if (characteristics.buildingType == null) {
+                buildingType = getTopLeftCityInfo(multiPos, coord, provider).buildingType();
+                if (buildingType == null) {
                     throw new RuntimeException("Topleft building type is not set!");
                 }
             }
         } else {
             PredefinedBuilding predefinedBuilding = City.getPredefinedBuildingAtTopLeft(provider, coord);
-            if (characteristics.multiPos.isTopLeft()) {
-//                    String name = cityStyle.getRandomMultiBuilding(rand);
-//                    if (predefinedBuilding != null) {
-//                        name = predefinedBuilding.building();
-//                    }
-//                    characteristics.multiBuilding = AssetRegistries.MULTI_BUILDINGS.get(world, name);
-                String b = characteristics.multiBuilding.getBuilding(0, 0);
-                characteristics.buildingType = provider.assets().buildings().getOrThrow(b);
+            if (multiPos.isTopLeft()) {
+                String b = multiBuilding.getBuilding(0, 0);
+                buildingType = provider.assets().buildings().getOrThrow(b);
             } else {
-//                    characteristics.multiBuilding = null;
                 String name = cityStyle.getRandomBuilding(rand, coord);
                 if (predefinedBuilding != null) {
                     name = predefinedBuilding.building();
@@ -427,10 +412,12 @@ public class BuildingInfo {
                 if (name == null) {
                     throw new RuntimeException("Invalid building for multibuilding!");
                 }
-                characteristics.buildingType = provider.assets().buildings().getOrThrow(name);
+                buildingType = provider.assets().buildings().getOrThrow(name);
             }
         }
 
+        ChunkCharacteristics characteristics = new ChunkCharacteristics(isCity, couldHaveBuilding,
+                multiPos, cityLevel, cityStyle, multiBuilding, buildingType);
         ChunkCharacteristics raced = provider.caches().characteristics.putIfAbsent(coord, characteristics);
         return raced != null ? raced : characteristics;
     }
@@ -449,7 +436,7 @@ public class BuildingInfo {
     }
 
     public static boolean isCity(ChunkCoord coord, IDimensionInfo provider) {
-        return getChunkCharacteristics(coord, provider).isCity;
+        return getChunkCharacteristics(coord, provider).isCity();
     }
 
     /**
@@ -506,9 +493,17 @@ public class BuildingInfo {
     }
 
     /**
-     * Initialize the chunk characteristics with the multi building information
+     * Which multi-building section a chunk belongs to, if any. Returned rather than written into a
+     * half-built {@link ChunkCharacteristics} - see that type for why (issue #126).
+     *
+     * @param pos      {@link MultiPos#SINGLE} when this chunk is not part of a multi-building
+     * @param building null whenever {@code pos} is {@code SINGLE}
      */
-    private static void initMultiBuildingSection(ChunkCharacteristics characteristics, ChunkCoord coord, IDimensionInfo provider, Preset profile) {
+    private record MultiSection(MultiPos pos, MultiBuilding building) {
+        static final MultiSection NONE = new MultiSection(MultiPos.SINGLE, null);
+    }
+
+    private static MultiSection multiBuildingSection(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
         // If a chunk is occupied according to City then there is a predefined building or street here.
         // Try to look for it
         if (City.isChunkOccupied(provider, coord)) {
@@ -516,27 +511,22 @@ public class BuildingInfo {
             if (predefinedBuilding != null) {
                 if (predefinedBuilding.building().multi()) {
                     MultiBuilding building = provider.assets().multiBuildings().getOrThrow(predefinedBuilding.building().building());
-                    characteristics.multiPos = new MultiPos(predefinedBuilding.offsetX(), predefinedBuilding.offsetZ(), building.getDimX(), building.getDimZ());
-                    characteristics.multiBuilding = building;
-                    return;
+                    return new MultiSection(new MultiPos(predefinedBuilding.offsetX(), predefinedBuilding.offsetZ(),
+                            building.getDimX(), building.getDimZ()), building);
                 }
             }
-            characteristics.multiPos = MultiPos.SINGLE;
-            characteristics.multiBuilding = null;
-            return;
+            return MultiSection.NONE;
         }
 
         MultiChunk multiChunk = MultiChunk.getOrCreate(provider, coord);
         MultiChunk.MB multiBuilding = multiChunk.getMultiBuilding(coord);
         if (multiBuilding == null) {
-            characteristics.multiPos = MultiPos.SINGLE;
-            characteristics.multiBuilding = null;
-            return;
+            return MultiSection.NONE;
         }
 
         MultiBuilding building = provider.assets().multiBuildings().getOrThrow(multiBuilding.name());
-        characteristics.multiPos = new MultiPos(multiBuilding.offsetX(), multiBuilding.offsetZ(), building.getDimX(), building.getDimZ());
-        characteristics.multiBuilding = building;
+        return new MultiSection(new MultiPos(multiBuilding.offsetX(), multiBuilding.offsetZ(),
+                building.getDimX(), building.getDimZ()), building);
     }
 
     private BuildingInfo calculateTopLeft() {
@@ -547,9 +537,8 @@ public class BuildingInfo {
         return getBuildingInfo(key, provider);
     }
 
-    private static int getAverageCityLevel(ChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
+    private static int getAverageCityLevel(MultiPos mp, ChunkCoord coord, IDimensionInfo provider) {
         int level = 0;
-        MultiPos mp = thisone.multiPos;
         int topX = coord.chunkX() - mp.x();
         int topZ = coord.chunkZ() - mp.z();
         for (int x = 0; x < mp.w(); x++) {
@@ -561,19 +550,20 @@ public class BuildingInfo {
         return level / (mp.w() * mp.h());
     }
 
-    private static int getTopLeftCityLevel(ChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
-        MultiPos mp = thisone.multiPos;
+    private static int getTopLeftCityLevel(MultiPos mp, ChunkCoord coord, IDimensionInfo provider) {
         int topX = coord.chunkX() - mp.x();
         int topZ = coord.chunkZ() - mp.z();
         ChunkCoord key = new ChunkCoord(provider.dimension(), topX, topZ);
         return getCityLevel(key, provider);
     }
 
-    private static ChunkCharacteristics getTopLeftCityInfo(ChunkCharacteristics thisone, ChunkCoord coord, IDimensionInfo provider) {
-        if (thisone.multiPos.isTopLeft()) {
-            return thisone;
-        }
-        ChunkCoord key = coord.offset(-thisone.multiPos.x(), -thisone.multiPos.z());
+    /**
+     * The characteristics of this multi-building's top-left chunk. Only reached from the one branch
+     * that needs the top-left's building type, and only when {@code mp} is not itself the top left -
+     * the caller has no half-built object to hand back for that case any more, and does not need one.
+     */
+    private static ChunkCharacteristics getTopLeftCityInfo(MultiPos mp, ChunkCoord coord, IDimensionInfo provider) {
+        ChunkCoord key = coord.offset(-mp.x(), -mp.z());
         return getChunkCharacteristics(key, provider);
     }
 
@@ -619,109 +609,70 @@ public class BuildingInfo {
         if (info != null) {
             return info;
         }
-        info = new BuildingInfo(key, provider, false);
+        info = new BuildingInfo(key, provider, null);
         BuildingInfo raced = provider.caches().buildingInfo.putIfAbsent(key, info);
         return raced != null ? raced : info;
     }
 
     /**
-     * A BuildingInfo for {@code key} that is deliberately never published to the cache, for the
-     * editing commands to overwrite with {@link #setBuildingType}.
-     * <p>
-     * {@code /urbex createbuilding} used to take the cached one and rewrite it in place, which left
-     * the shared plan for that chunk describing a building the seed never chose - for every later
-     * generation and every neighbour that read it, until the entry happened to be evicted. The
-     * values here are identical to the cached instance's, because the constructor is a pure function
-     * of seed and coordinate; the difference is only that nobody else can see this one (issue #126).
+     * The building an editing command asked for, in place of the one the seed chose. Applied by the
+     * constructor rather than written over a finished object, which is what lets every field it
+     * touches be {@code final}.
      */
-    public static BuildingInfo detachedForEditing(ChunkCoord key, IDimensionInfo provider) {
-        return new BuildingInfo(key, provider, true);
-    }
+    public record BuildingOverride(Building building, int cellars, int floors, int groundLevel) {}
 
     /**
-     * Overwrites this chunk's building with an arbitrary one, for the editing commands to draw.
-     *
-     * @throws IllegalStateException if called on a cached instance. Published planning is immutable
-     *         - see {@link #detachedForEditing}, which is the only legal receiver.
+     * A BuildingInfo for {@code key} carrying {@code override}'s building instead of the one the seed
+     * chose, and deliberately never published to the cache.
+     * <p>
+     * {@code /urbex createbuilding} used to take the cached instance and rewrite its building,
+     * floors, cellars and ground level in place through a {@code setBuildingType} method. That left
+     * the shared plan for the chunk describing a building the seed never chose - for every later
+     * generation and every neighbour that read it, until the entry happened to be evicted - and it
+     * was the last writer of a published plan, so seven fields had to stay non-final for it. The
+     * override is a constructor argument now: nothing outside this class can reach a published
+     * BuildingInfo and change it, and the compiler is what says so (issue #126).
+     * <p>
+     * The floors it builds are drawn from this chunk's ordinary layout stream rather than the
+     * separate one {@code setBuildingType} used, so a hand-placed building picks the parts a building
+     * of that shape would have picked here. Nothing reads back what the command draws, so the change
+     * is only visible as which parts the preview stacks.
      */
-    public void setBuildingType(Building building, int cellars, int floors, int groundLevel) {
-        if (!detached) {
-            throw new IllegalStateException(
-                    "setBuildingType on a published BuildingInfo at " + coord + ". Cached planning is "
-                            + "immutable; use BuildingInfo.detachedForEditing() (issue #126).");
-        }
-        buildingType = building;
-        hasBuilding = true;
-        this.floors = floors;
-        this.cellars = cellars;
-        this.groundLevel = groundLevel;
-
-        floorTypes = new BuildingPart[floors + cellars + 1];
-        floorTypes2 = new BuildingPart[floors + cellars + 1];
-
-        RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_FLOORS);
-
-        String belowPart = ConditionContext.NO_PART;
-        for (int i = 0; i <= floors + cellars; i++) {
-            // NO_PART, not the previous floor's part: this context is what selects parts[i], so
-            // there is no current part yet - see the constructor's copy of this loop.
-            ConditionContext conditionContext = new ConditionContext(cityLevel + i - cellars, i - cellars, cellars, floors, ConditionContext.NO_PART, belowPart, building.getName(), coord) {
-                @Override
-                public boolean isBuilding() {
-                    return true;
-                }
-
-                @Override
-                public Identifier getBiome() {
-                    // provider.getBiome() asks the biome source directly, where the old
-                    // getWorld().getBiome() went via BiomeManager and its seeded sub-quart fuzzy
-                    // offset - so the two can disagree right at a quart boundary. Forced: a cached
-                    // BuildingInfo is reached from its neighbours' generation and has no region to
-                    // ask, and the dimension's own level would go looking for unloaded chunks.
-                    Holder<Biome> biome = provider.getBiome(getCenter(0));
-                    return biome.unwrap().map(ResourceKey::identifier, b -> provider.getWorld().registryAccess().lookup(Registries.BIOME).orElseThrow().getKey(b));
-                }
-            };
-            String part = building.getRandomPart(rand, conditionContext);
-            floorTypes[i] = provider.assets().parts().getOrThrow(part);
-            // getRandomPart2 derives the parts2 context from this one, so it sees this floor's
-            // parts[] pick as the current part and the floor below as the part below - see the
-            // constructor's copy of this loop.
-            String part2 = building.getRandomPart2(rand, conditionContext, part);
-            floorTypes2[i] = provider.assets().parts().get(part2);    // null is legal
-            // Last in the body: the next iteration's parts[] context is what reads this.
-            belowPart = part;
-        }
+    public static BuildingInfo detachedForEditing(ChunkCoord key, IDimensionInfo provider,
+                                                  BuildingOverride override) {
+        return new BuildingInfo(key, provider, override);
     }
 
-    private BuildingInfo(ChunkCoord key, IDimensionInfo provider, boolean detached) {
+    private BuildingInfo(ChunkCoord key, IDimensionInfo provider, @Nullable BuildingOverride override) {
         this.provider = provider;
         this.coord = key;
-        this.detached = detached;
 
         profile = provider.getProfile();
 
         ChunkCharacteristics characteristics = getChunkCharacteristics(key, provider);
 
-        cityLevel = characteristics.cityLevel;
-        buildingType = characteristics.buildingType;
-        multiBuilding = characteristics.multiBuilding;
-        multiBuildingPos = characteristics.multiPos;
+        cityLevel = characteristics.cityLevel();
+        // Every override use below is a ternary whose null branch is exactly what this constructor
+        // did before, so the ordinary path draws from `rand` in the same order and the same number of
+        // times. Only an instance from detachedForEditing carries one (issue #126).
+        buildingType = override != null ? override.building() : characteristics.buildingType();
+        multiBuilding = characteristics.multiBuilding();
+        multiBuildingPos = characteristics.multiPos();
 
         RandomSource rand = getBuildingRandom(coord.chunkX(), coord.chunkZ(), provider.getSeed(), Rng.Purpose.BUILDING_LAYOUT);
 
-        CityStyle cs = characteristics.cityStyle;
+        CityStyle cs = characteristics.cityStyle();
 
-        isCity = characteristics.isCity;
+        isCity = characteristics.isCity();
         effectiveRoad = effectiveRoadType(key, provider, profile);
 
         ChunkContent content = ChunkContentResolver.resolve(profile, provider.getSeed(), rand,
-                isCity, characteristics.couldHaveBuilding, effectiveRoad, multiBuildingPos, coord,
-                neighbour -> getChunkCharacteristics(neighbour, provider).buildingType.getPrefersLonely(),
-                characteristics.buildingType.getName());
-        hasBuilding = content.hasBuilding();
+                isCity, characteristics.couldHaveBuilding(), effectiveRoad, multiBuildingPos, coord,
+                neighbour -> getChunkCharacteristics(neighbour, provider).buildingType().getPrefersLonely(),
+                characteristics.buildingType().getName());
+        hasBuilding = override != null || content.hasBuilding();
 
-        groundLevel = profile.GROUNDLEVEL;
+        groundLevel = override != null ? override.groundLevel() : profile.GROUNDLEVEL;
         int wl = profile.SEALEVEL;
         waterLevel = wl == -1 ? Tools.getSeaLevel(provider.getWorld()) : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
@@ -734,8 +685,8 @@ public class BuildingInfo {
             streetType = topleft.streetType;
             fountainType = topleft.fountainType;
             parkType = topleft.parkType;
-            floors = topleft.floors;
-            cellars = topleft.cellars;
+            floors = override != null ? override.floors() : topleft.floors;
+            cellars = override != null ? override.cellars() : topleft.cellars;
             doorBlock = topleft.doorBlock;
             bridgeType = topleft.bridgeType;
             stairType = topleft.stairType;
@@ -778,7 +729,7 @@ public class BuildingInfo {
             while (getCityGroundLevel() + f * FLOORHEIGHT >= max) {
                 f--;
             }
-            floors = f;
+            floors = override != null ? override.floors() : f;
 
             int maxcellars = getMaxcellars(cs);
             int mincellars = Math.max(profile.BUILDING_MINCELLARS, buildingType.getMinCellars());
@@ -805,7 +756,7 @@ public class BuildingInfo {
             if (fb > maxcellars) {
                 fb = maxcellars;
             }
-            cellars = fb;
+            cellars = override != null ? override.cellars() : fb;
 
             doorBlock = getRandomDoor(rand);
             bridgeType = provider.assets().parts().getOrThrow(cs.getRandomBridge(rand, this.coord));
@@ -1733,20 +1684,29 @@ public class BuildingInfo {
         int min = provider.getWorld().getMinY() + 2;
         int max = provider.getWorld().getMaxY() - 1 - FLOORHEIGHT;
 
-        int lowestLevel = getCityGroundLevel() - cellars * FLOORHEIGHT;
+        // Locals. This used to decrement the published cellars and floors as it walked, so the answer
+        // depended on how many times it had been asked: the first call shrank the building and every
+        // later one measured the shrunken version, and a TimedCache eviction reset the count by
+        // rebuilding the object. It is the "building queries such as bottom-height calculation mutate
+        // floors/cellars during consumption" defect in issue #126, and the only reason the fields it
+        // touched could not be final.
+        int remainingCellars = cellars;
+        int lowestLevel = getCityGroundLevel() - remainingCellars * FLOORHEIGHT;
 
         // Fix lowest level so it goes above minimum build height
         while (lowestLevel <= min) {
             lowestLevel += FLOORHEIGHT;
-            cellars--;
-            if (cellars < 0) {
+            remainingCellars--;
+            if (remainingCellars < 0) {
                 return Integer.MIN_VALUE;     // Bail out, this is a degenerate case
             }
         }
 
-        while (getCityGroundLevel() + floors * FLOORHEIGHT >= max) {
-            floors--;
-            if (floors < 0) {
+        // Contributes nothing but the degenerate bail-out: the height returned is the cellar walk's.
+        int remainingFloors = floors;
+        while (getCityGroundLevel() + remainingFloors * FLOORHEIGHT >= max) {
+            remainingFloors--;
+            if (remainingFloors < 0) {
                 return Integer.MIN_VALUE;     // Bail out, this is a degenerate case
             }
         }

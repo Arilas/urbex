@@ -69,8 +69,8 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         // Detached, not the cached plan: this command draws an arbitrary building on request, and
         // rewriting the published BuildingInfo left the shared plan for the chunk describing a
         // building the seed never chose (issue #126).
-        BuildingInfo info = BuildingInfo.detachedForEditing(coord, dimInfo);
-        info.setBuildingType(building, cellars, floors, bottom.getY());
+        BuildingInfo info = BuildingInfo.detachedForEditing(coord, dimInfo,
+                new BuildingInfo.BuildingOverride(building, cellars, floors, bottom.getY()));
 
         ChunkPos cp = ChunkPos.containing(bottom);
 

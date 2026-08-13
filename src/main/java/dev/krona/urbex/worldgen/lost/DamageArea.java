@@ -51,7 +51,7 @@ public class DamageArea {
                     if (explosion != null) {
                         if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
 //                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
-                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
+                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle().getExplosionChance();
                             if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_ACCEPT)) {
                                 explosions.add(explosion);
                             }
@@ -61,7 +61,7 @@ public class DamageArea {
                     if (explosion != null) {
                         if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
 //                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
-                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
+                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle().getExplosionChance();
                             if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_MINI_ACCEPT)) {
                                 explosions.add(explosion);
                             }

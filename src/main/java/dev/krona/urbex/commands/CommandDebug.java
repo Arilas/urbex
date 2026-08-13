@@ -68,7 +68,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
         line(context, "isCity = " + info.isCity);
         line(context, "chunkX = " + info.coord.chunkX());
         line(context, "chunkZ = " + info.coord.chunkZ());
-        CityStyle cityStyle = BuildingInfo.getChunkCharacteristics(info.coord, info.provider).cityStyle;
+        CityStyle cityStyle = BuildingInfo.getChunkCharacteristics(info.coord, info.provider).cityStyle();
         // Name first, id after: the id is what you edit, the name is what the world-style picker
         // showed you, and a debug dump is the one place both are worth having side by side.
         line(context, "getCityStyle() = " + cityStyle.getDisplayName() + " (" + cityStyle.getName() + ")");

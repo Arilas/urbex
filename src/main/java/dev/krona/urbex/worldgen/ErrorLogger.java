@@ -53,12 +53,12 @@ public class ErrorLogger {
             ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
             logger.info("IsCity: " + BuildingInfo.isCityRaw(coord, provider, provider.getProfile()));
             ChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristics(coord, provider);
-            logger.info("    Level: " + characteristics.cityLevel);
-            if (characteristics.multiBuilding != null) {
-                logger.info("    Multibuilding: " + characteristics.multiBuilding.getName());
+            logger.info("    Level: " + characteristics.cityLevel());
+            if (characteristics.multiBuilding() != null) {
+                logger.info("    Multibuilding: " + characteristics.multiBuilding().getName());
             }
-            if (characteristics.buildingType != null) {
-                logger.info("    Building: " + characteristics.buildingType.getName());
+            if (characteristics.buildingType() != null) {
+                logger.info("    Building: " + characteristics.buildingType().getName());
             }
             BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
             if (info.hasBuilding) {

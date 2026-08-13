@@ -297,7 +297,7 @@ public class CityPreview implements AutoCloseable {
         };
         ChunkCoord coord = new ChunkCoord(diminfo.dimension(), x, z);
         ChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristicsGui(coord, diminfo);
-        if (characteristics.isCity) {
+        if (characteristics.isCity()) {
             return BuildingInfo.hasBuildingGui(x, z, diminfo, characteristics) ? BUILDING_COLOR : CITY_COLOR;
         }
         return terrainColor;
