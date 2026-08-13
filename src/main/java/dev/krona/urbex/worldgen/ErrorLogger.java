@@ -8,13 +8,9 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
-import dev.krona.urbex.varia.ServerAccess;
 import org.apache.logging.log4j.Logger;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import javax.annotation.Nullable;
 
 public class ErrorLogger {
 
@@ -23,22 +19,26 @@ public class ErrorLogger {
     /**
      * Tells whoever is playing that a chunk went wrong, at most once every ten seconds.
      * <p>
+     * The server arrives as an argument, from the level whose runtime this generation belongs to,
+     * rather than being read from a process-global slot. That slot was the last thing on any
+     * worldgen or error-reporting path reaching {@code ServerAccess}, and reading it here meant a
+     * chunk failing during a different server's lifetime reported to that server (issue #131).
+     * <p>
      * The null guard is not defensive tidiness. This is called from the handler around chunk
      * generation, and the window it most wants to survive is shutdown - a worker finishing a chunk
-     * after {@code SERVER_STOPPED} has cleared the static server reference. Without it the error
-     * <em>handler</em> threw a {@link NullPointerException} of its own, turning a reported chunk
-     * failure into a dead worldgen worker and losing the message that was being reported (issue
-     * #56). The log line below is not a fallback for the chat message; it is where the report has
-     * always actually belonged, and now happens whether or not anyone is listening.
+     * after the server has stopped. Without it the error <em>handler</em> threw a
+     * {@link NullPointerException} of its own, turning a reported chunk failure into a dead worldgen
+     * worker and losing the message that was being reported (issue #56). The log line below is not a
+     * fallback for the chat message; it is where the report has always actually belonged, and now
+     * happens whether or not anyone is listening.
      */
-    public static void report(String message) {
+    public static void report(@Nullable MinecraftServer server, String message) {
         long time = System.currentTimeMillis();
         if (lastReportTime != -1 && lastReportTime >= (time - 10000)) {
             return;
         }
         lastReportTime = time;
         Urbex.getLogger().error(message);
-        MinecraftServer server = ServerAccess.getServer();
         if (server == null) {
             return;
         }
