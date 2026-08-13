@@ -74,6 +74,8 @@ public class CommandDigest implements Command<CommandSourceStack> {
         context.getSource().sendSuccess(() -> Component.literal(driverLine).withStyle(ChatFormatting.GREEN), true);
         context.getSource().sendSuccess(() -> Component.literal(line).withStyle(ChatFormatting.YELLOW), true);
         System.out.println(driverLine);     // so headless runs can grep stdout
+        context.getSource().sendSuccess(() -> Component.literal(result.perfLine()).withStyle(ChatFormatting.GRAY), false);
+        System.out.println(result.perfLine());
         System.out.println(line);
         return 1;
     }

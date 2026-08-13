@@ -100,6 +100,8 @@ public final class DigestCheck {
                 String driverLine = result.driverLine(spec.order(), spec.offset());
                 Urbex.getLogger().info(driverLine);
                 System.out.println(driverLine);
+                Urbex.getLogger().info(result.perfLine());
+                System.out.println(result.perfLine());
 
                 String actual = String.format("%016x", result.driverDigest());
                 if (result.driverBlocks() == 0) {
