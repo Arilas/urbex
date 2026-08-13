@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.Preset;
-import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
@@ -131,8 +130,7 @@ public class City {
         RandomSource cityStyleRandom = Rng.at(provider.getSeed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE_LOCAL);
 
         if (profile.CITY_CHANCE < 0) {
-            WorldGenLevel world = provider.getWorld();
-            CityRarityMap rarityMap = provider.caches().getCityRarityMap(world.getSeed(),
+            CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.getSeed(),
                     profile.CITY_PERLIN_SCALE, profile.CITY_PERLIN_OFFSET, profile.CITY_PERLIN_INNERSCALE);
             float factor = rarityMap.getCityFactor(chunkX, chunkZ);
             if (factor < profile.CITY_STYLE_THRESHOLD) {

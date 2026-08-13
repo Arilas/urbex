@@ -69,8 +69,8 @@ public class CityPreview implements AutoCloseable {
         ROADS
     }
 
-    public static final int WIDTH = NullDimensionInfo.PREVIEW_WIDTH;
-    public static final int HEIGHT = NullDimensionInfo.PREVIEW_HEIGHT;
+    public static final int WIDTH = PreviewTerrain.WIDTH;
+    public static final int HEIGHT = PreviewTerrain.HEIGHT;
 
     /** The fixed-height legend strip {@link #render} draws below the map; public so callers that
      *  size a host widget can budget for it (the map itself keeps the {@link #WIDTH}:{@link #HEIGHT}

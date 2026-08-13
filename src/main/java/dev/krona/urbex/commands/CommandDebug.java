@@ -88,7 +88,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
         int explosions = info.getExplosions().size();
         line(context, "explosions = " + explosions);
 
-        ChunkHeightmap heightmap = dimInfo.getFeature().getHeightmap(info.coord, (WorldGenLevel) player.level());
+        ChunkHeightmap heightmap = dimInfo.getHeightmap(info.coord);
         line(context, "Chunk height (heightmap): " + heightmap.getHeight());
 
         line(context, "dimInfo.getProfile().BUILDING_MINFLOORS = " + dimInfo.getProfile().BUILDING_MINFLOORS);

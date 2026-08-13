@@ -2,11 +2,10 @@ package dev.krona.urbex.gui;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.gui.preview.PreviewTerrain;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
-import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.IDimensionInfo;
@@ -22,19 +21,10 @@ import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.WorldGenLevel;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Biomes;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
@@ -45,85 +35,19 @@ import java.util.Random;
 
 public class NullDimensionInfo implements IDimensionInfo {
 
-    public static final int PREVIEW_WIDTH = 62;
-    public static final int PREVIEW_HEIGHT = 58;
-
     /** What the placeholder world style calls itself, so a load error can name it. */
     private static final Identifier PLACEHOLDER_ID =
             Identifier.fromNamespaceAndPath(Urbex.MODID, "preview_placeholder");
     /** A style the bundled pack actually ships, and qualified; see {@link #placeholderStyle()}. */
     private static final String PLACEHOLDER_OUTSIDE_STYLE = Urbex.MODID + ":standard";
 
-    private final String[] biomeMap = new String[] {
-            "ddddddddddddddddddddddppppppppppppppp==ppppppppppppppppppppppp",
-            "ddddddddddddddddddddpppppppppppppppp==pppppppppppppppppppppppp",
-            "ddddddddddddddddddddpppppppppppppp===ppppppppppppppppppppppppp",
-            "pddddddddddddddddpppppppppppppppppp==ppppppppppppppppppppppppp",
-            "pppdddddddppppppppppppppppppppppppp==ppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppp==pppppppppp----------pppp",
-            "ppppppppppppppppppppppppppppppppppppp==ppppppp--------------pp",
-            "pppppppppppppppppppppppppppppppppppppp==ppppp-----------------",
-            "pppppppppppppppppppppppppppppppppppppp===pppp-----------------",
-            "ppppppppppppppppppppppppppppppppppppppp===ppppp---------------",
-            "pppppppppppppppppppppppppppppppppppppppp==--pp----------------",
-            "pppppppppppppppppppppppppppppppppppppppp*---------------------",
-            "pppppppppppppppppppppppppppppppppppppp****--------------------",
-            "ppppppppppppppppppppppppppppppppppppp***----------------------",
-            "pppppppppppppppppppppppppppppppppppp**------------------------",
-            "ppppppppppppppppppppppppppppppppppppp**-----------------------",
-            "ppppppppppppppppppppppppppppppppppppppp*----------------------",
-            "pppppppppppppppppppppppppppppppppppppp**----------------------",
-            "ppppp###pppppppppppppppppppppppppppppp**----------------------",
-            "ppppp####ppppppp#####pppppppppppppppppp*----------------------",
-            "pppppp#####pp##+++#####ppppppppppppp*****---------------------",
-            "pppppppp#####++++####pppppppppppppp**------pp----p------------",
-            "ppppppppp##++++++###pppppppppppppppp***---pppp--ppp-----------",
-            "ppppppppp###+++++++#####ppppppppppppp---pppppppppppp---------p",
-            "pppppppp##p##+++++++###ppppppppppppppppppppppppppppp---------p",
-            "pppppppppp#####++++####ppppppppppppppppppppppppppppppppp----pp",
-            "pppppppppppp###+++++###ppppppppppppppppppppppppppppppppppppppp",
-            "ppppppppppppp####++++####ppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppp####++######pppppppppppppppppppppppppppppppppppp",
-            "ppppppppppppppp#+++####ppppppppppppppppppppppppppppppppppppppp",
-            "ppppppppppppp####pp#####pppppppppppppppppppppppppppppppppppppp",
-            "pppppppppp#####ppppppppppppppppppppppppppppppppppppppppppppppp",
-            "ppppppppppp###pppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp"
-    };
-
     private final Preset profile;
     private final WorldStyleField styles;
     private final Random random;
     private final long seed;
 
-    private final RegistryAccess registryAccess;
     private final AssetSnapshot assets;
-    @Nullable
-    private final Registry<Biome> biomeRegistry;
+    private final PreviewTerrain terrain;
     private final CityGenerator feature;
     private final DimensionCaches caches;
     private final RoadField roadField;
@@ -166,9 +90,8 @@ public class NullDimensionInfo implements IDimensionInfo {
         styles = new WorldStyleField(seed, resolvedEntries);
         this.seed = seed;
         random = new Random(seed);
+        terrain = new PreviewTerrain(profile, registryAccess);
         feature = new CityGenerator(this, profile);
-        this.registryAccess = registryAccess;
-        biomeRegistry = registryAccess != null ? registryAccess.lookupOrThrow(Registries.BIOME) : null;
         // The preview's own seed and dimension, so the roads it draws are the roads the world will
         // have. Same construction as DefaultDimensionInfo; there is no server to ask.
         roadField = new GridRoadField(seed, getType().identifier().toString(), GridSettings.fromPreset(profile));
@@ -231,11 +154,6 @@ public class NullDimensionInfo implements IDimensionInfo {
         return seed;
     }
 
-    @Override
-    public WorldGenLevel getWorld() {
-        return null;
-    }
-
     /**
      * The vanilla overworld's, because a preview runs before any level exists and the overworld is
      * what it draws. Every planning rule that reads a height bound or the water line now gets a real
@@ -253,8 +171,8 @@ public class NullDimensionInfo implements IDimensionInfo {
     }
 
     @Override
-    public RegistryAccess registryAccess() {
-        return registryAccess;
+    public PreviewTerrain terrain() {
+        return terrain;
     }
 
     @Override
@@ -292,92 +210,9 @@ public class NullDimensionInfo implements IDimensionInfo {
         return feature;
     }
 
-    @Override
-    public ChunkHeightmap getHeightmap(ChunkCoord coord) {
-        int chunkX = coord.chunkX();
-        int chunkZ = coord.chunkZ();
-        ChunkHeightmap heightmap = new ChunkHeightmap(profile.LANDSCAPE_TYPE, profile.GROUNDLEVEL);
-        char b = getBiomeChar(chunkX, chunkZ);
-        int y = switch (b) {
-            case 'p' -> 65;
-            case '-' -> 60;
-            case '=' -> 65;
-            case '#' -> 95;
-            case '+' -> 125;
-            case '*' -> 65;
-            case 'd' -> 65;
-            default -> 65;
-        };
-        heightmap.update(y);
-        return heightmap;
-    }
-
-    @Override
-    public ChunkHeightmap getHeightmap(int chunkX, int chunkZ) {
-        ChunkCoord coord = new ChunkCoord(getType(), chunkX, chunkZ);
-        return getHeightmap(coord);
-    }
-
+    /** The bitmap character at a chunk, for the renderer that colours the preview map from it. */
     public char getBiomeChar(int chunkX, int chunkZ) {
-        if (chunkX >= 0 && chunkX < PREVIEW_WIDTH && chunkZ >= 0 && chunkZ < PREVIEW_HEIGHT) {
-            return biomeMap[chunkZ].charAt(chunkX);
-        } else {
-            return 'p';
-        }
-    }
-
-//    @Override
-//    public Biome[] getBiomes(int chunkX, int chunkZ) {
-//        Biome[] biomes = new Biome[10*10];
-//        Biome biome = Biomes.PLAINS;
-//        char b = getBiomeChar(chunkX, chunkZ);
-//        switch (b) {
-//            case 'p': biome = Biomes.PLAINS; break;
-//            case '-': biome = Biomes.OCEAN; break;
-//            case '=': biome = Biomes.RIVER; break;
-//            case '#': biome = Biomes.MOUNTAIN_EDGE; break;
-//            case '+': biome = Biomes.MOUNTAINS; break;
-//            case '*': biome = Biomes.BEACH; break;
-//            case 'd': biome = Biomes.DESERT; break;
-//        }
-//        for (int i = 0 ; i < biomes.length ; i++) {
-//            biomes[i] = biome;
-//        }
-//        return biomes;
-//    }
-
-    @Nullable
-    @Override
-    public Holder<Biome> getBiome(BlockPos pos) {
-        if (biomeRegistry == null) {
-            // #67: no registry access means there's no registry to resolve even a plains fallback
-            // from - dereferencing it unconditionally is what used to NPE here. This is not a
-            // legacy shim: there is one constructor, and the GUI passes null to it deliberately
-            // whenever the world-creation context has no biome registry yet, or (in the Customize
-            // screen) no parent screen at all - see CitiesTab.previewRegistries and
-            // CustomizeScreen.previewRegistries. Every caller currently reachable without registry
-            // access (ChunkPlan.getChunkCandidateGui and friends) never dereferences this
-            // result: the registryAccess()-gated rules in City that do read biomes only run when
-            // we're not in this branch.
-            Urbex.LOGGER.warn("NullDimensionInfo.getBiome() called without registry access; returning null.");
-            return null;
-        }
-        ChunkPos cp = ChunkPos.containing(pos);
-        char b = getBiomeChar(cp.x(), cp.z());
-        ResourceKey<Biome> biome = switch (b) {
-            case 'p' -> Biomes.PLAINS;
-            case '-' -> Biomes.OCEAN;
-            case '=' -> Biomes.RIVER;
-            case '#' -> Biomes.STONY_PEAKS;
-            // @todo 1.18
-            case '+' -> Biomes.JAGGED_PEAKS;
-            // @todo 1.18
-            case '*' -> Biomes.BEACH;
-            case 'd' -> Biomes.DESERT;
-            // Plains fallback for anything unmapped, same as the old default branch.
-            default -> Biomes.PLAINS;
-        };
-        return biomeRegistry.getOrThrow(biome);
+        return terrain.biomeChar(chunkX, chunkZ);
     }
 
     @Override

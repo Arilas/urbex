@@ -34,17 +34,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.block.state.properties.RailShape;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.GenerationStep;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
-import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import org.apache.commons.lang3.tuple.Pair;
 
-import javax.annotation.Nonnull;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
@@ -235,7 +231,7 @@ public class CityGenerator {
         // value whose presence depends on whether this chunk ran before or after its neighbour
         // read it - the neighbour's border height, and so the terrain, would depend on generation
         // order. See Arilas/urbex#24.
-        ChunkHeightmap heightmap = new ChunkHeightmap(getHeightmap(coord, provider.getWorld()));
+        ChunkHeightmap heightmap = new ChunkHeightmap(provider.getHeightmap(coord));
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
         // runtime.tags() is read here and nowhere else in this generation: one call, at the start,
         // so a /reload landing mid-chunk cannot be observed halfway through a building (issue #128).
@@ -428,7 +424,7 @@ public class CityGenerator {
     private void doNormalChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
 //        debugClearChunk(chunkX, chunkZ, primer);
         if ((avoidChunk != AvoidChunk.YES || !Config.AVOID_FLATTENING.get()) && profile.isDefault()) {
-            correctTerrainShape(ctx, provider.getWorld(), info.coord, heightmap);
+            correctTerrainShape(ctx, info.coord, heightmap);
 //            flattenChunkToCityBorder(chunkX, chunkZ);
         }
 
@@ -602,15 +598,15 @@ public class CityGenerator {
      * or up the top layer (6 thick) of the terrain. In a chunk these heights are interpolated
      * (bilinear interpolation).
      */
-    private void correctTerrainShape(ChunkGenContext ctx, WorldGenLevel level, ChunkCoord coord, ChunkHeightmap heightmap) {
+    private void correctTerrainShape(ChunkGenContext ctx, ChunkCoord coord, ChunkHeightmap heightmap) {
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
         ChunkPlan.MinMax mm00 = info.getDesiredMaxHeightL2();
         ChunkPlan.MinMax mm10 = info.getXmax().getDesiredMaxHeightL2();
         ChunkPlan.MinMax mm01 = info.getZmax().getDesiredMaxHeightL2();
         ChunkPlan.MinMax mm11 = info.getXmax().getZmax().getDesiredMaxHeightL2();
 
-        int min = level.getMinY();
-        int max = level.getMaxY() + 1;
+        int min = provider.shape().minY();
+        int max = provider.shape().maxBuildHeight();
         int heightmapH = Short.MIN_VALUE;
 
         float min00 = mm00.min;
@@ -823,83 +819,31 @@ public class CityGenerator {
      */
     public int getMinHeightAt(ChunkPlan info, int x, int z, ChunkHeightmap heightmap) {
         int height = heightmap.getHeight();
-        WorldGenLevel world = info.provider.getWorld();
         int adjacent;
         if (x == 0) {
             if (z == 0) {
-                adjacent = getHeightmap(info.coord.northWest(), world).getHeight();
+                adjacent = provider.getHeightmap(info.coord.northWest()).getHeight();
             } else if (z == 15) {
-                adjacent = getHeightmap(info.coord.southWest(), world).getHeight();
+                adjacent = provider.getHeightmap(info.coord.southWest()).getHeight();
             } else {
-                adjacent = getHeightmap(info.coord.west(), world).getHeight();
+                adjacent = provider.getHeightmap(info.coord.west()).getHeight();
             }
         } else if (x == 15) {
             if (z == 0) {
-                adjacent = getHeightmap(info.coord.northEast(), world).getHeight();
+                adjacent = provider.getHeightmap(info.coord.northEast()).getHeight();
             } else if (z == 15) {
-                adjacent = getHeightmap(info.coord.southEast(), world).getHeight();
+                adjacent = provider.getHeightmap(info.coord.southEast()).getHeight();
             } else {
-                adjacent = getHeightmap(info.coord.east(), world).getHeight();
+                adjacent = provider.getHeightmap(info.coord.east()).getHeight();
             }
         } else if (z == 0) {
-            adjacent = getHeightmap(info.coord.north(), world).getHeight();
+            adjacent = provider.getHeightmap(info.coord.north()).getHeight();
         } else if (z == 15) {
-            adjacent = getHeightmap(info.coord.south(), world).getHeight();
+            adjacent = provider.getHeightmap(info.coord.south()).getHeight();
         } else {
             return height;
         }
         return Math.min(height, adjacent);
-    }
-
-    public ChunkHeightmap getHeightmap(ChunkCoord chunk, @Nonnull WorldGenLevel world) {
-        int heightSampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
-        // The block this chunk shares a sampled height with, and the coordinate that height is taken
-        // at. Both come from HeightSampleGrid so that the tiling is a partition and the sampled
-        // coordinate is a function of the block rather than of whichever chunk asked first - see the
-        // note there for what the old arithmetic did at the origin, and issue #126.
-        int top = HeightSampleGrid.anchor(chunk.chunkX(), heightSampleSize);
-        int left = HeightSampleGrid.anchor(chunk.chunkZ(), heightSampleSize);
-        ChunkCoord sampler = new ChunkCoord(chunk.dimension(),
-                HeightSampleGrid.sampler(top, heightSampleSize),
-                HeightSampleGrid.sampler(left, heightSampleSize));
-        // No lock. The heightmap is a pure function of the generator and the coordinate, so two
-        // threads that race on the same chunk build two equal heightmaps and one of them is thrown
-        // away; a third thread reading the cache sees whichever was published, and they agree.
-        //
-        // That holds only as long as nobody writes to what this returns. The instance is shared,
-        // so a caller that needs to mutate one - correctTerrainShape's setHeight,
-        // calculateAccurateHeight - must take a copy first (the copy constructor exists for this).
-        // Mutating the published instance would be a data race on a plain int field and, worse,
-        // would make what a neighbouring chunk reads depend on generation order.
-        TimedCache<ChunkCoord, ChunkHeightmap> cachedHeightmaps = provider.caches().heightmap;
-        ChunkHeightmap cached = cachedHeightmaps.get(chunk);
-        if (cached != null) {
-            return cached;
-        }
-        ChunkHeightmap heightmap = new ChunkHeightmap(profile.LANDSCAPE_TYPE, profile.GROUNDLEVEL);
-        generateHeightmap(sampler.chunkX(), sampler.chunkZ(), world, heightmap);
-        if (heightSampleSize > 1) {
-            for (int i = 0; i < heightSampleSize; i++) {
-                for (int j = 0; j < heightSampleSize; j++) {
-                    ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + i, left + j);
-                    cachedHeightmaps.putIfAbsent(sampleKey, new ChunkHeightmap(heightmap));
-                }
-            }
-        } else {
-            cachedHeightmaps.putIfAbsent(chunk, heightmap);
-        }
-        return heightmap;
-    }
-
-    private void generateHeightmap(int chunkX, int chunkZ, WorldGenLevel region, ChunkHeightmap heightmap) {
-        ServerChunkCache chunkProvider = region.getLevel().getChunkSource();
-        ChunkGenerator generator = chunkProvider.getGenerator();
-        int cx = chunkX << 4;
-        int cz = chunkZ << 4;
-        RandomState randomState = chunkProvider.randomState();
-
-        int height = generator.getBaseHeight(cx + 8, cz + 8, Heightmap.Types.OCEAN_FLOOR_WG, region, randomState);
-        heightmap.update(height);
     }
 
     private void doCityChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, ChunkAccess chunk) {
