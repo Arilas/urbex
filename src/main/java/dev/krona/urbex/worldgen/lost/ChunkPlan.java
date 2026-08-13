@@ -168,12 +168,15 @@ public class ChunkPlan {
         }
         // Built into a local and published in one write: the half-built palette (without the
         // building's own entries merged in) must never be visible to another chunk's thread.
-        CompiledPalette built = new CompiledPalette(palette);
+        //
+        // Both steps go through the world's PaletteCache now. This field stays as the per-chunk
+        // memo in front of it - a field read beats two map lookups on a path every part of every
+        // building takes - but a chunk that is the first to want this combination no longer
+        // deep-copies three maps to get it (issue #53).
+        PaletteCache cache = provider.caches().palettes;
+        CompiledPalette built = cache.of(palette);
         if (hasBuilding) {
-            Palette buildingPalette = buildingType.getLocalPalette();
-            if (buildingPalette != null) {
-                built = new CompiledPalette(built, buildingPalette);
-            }
+            built = cache.with(built, buildingType.getLocalPalette());
         }
         compiledPalette = built;
         return built;

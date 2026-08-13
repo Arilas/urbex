@@ -1871,14 +1871,16 @@ public class CityGenerator {
         return air;
     }
 
+    /**
+     * The chunk's palette with this part's local palette merged over it.
+     * <p>
+     * This carried an upstream {@code // Cache the combined palette?} comment and answered it by
+     * building a fresh {@link CompiledPalette} - deep-copying three maps over a hundred-odd entries -
+     * for every part with a local palette in every chunk. The answer is yes, and it is keyed on the
+     * two compiled assets involved rather than on the chunk (issue #53).
+     */
     public CompiledPalette computePalette(ChunkPlan info, IBuildingPart part) {
-        CompiledPalette compiledPalette = info.getCompiledPalette();
-        // Cache the combined palette?
-        Palette partPalette = part.getLocalPalette();
-        if (partPalette != null) {
-            compiledPalette = new CompiledPalette(compiledPalette, partPalette);
-        }
-        return compiledPalette;
+        return provider.caches().palettes.with(info.getCompiledPalette(), part.getLocalPalette());
     }
 
     private BlockEntityType getTypeForBlock(BlockState state) {
