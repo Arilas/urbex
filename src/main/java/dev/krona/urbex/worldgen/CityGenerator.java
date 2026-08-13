@@ -70,9 +70,9 @@ public class CityGenerator {
     private final NoiseGeneratorPerlin ruinNoise;
     private final NoiseGeneratorPerlin bottomLayerNoise;    // Used in floating profile for the underside of buildings
 
-    private final BlockState[] randomLeafs;
-    private final BlockState[] randomDirt;
-    private final Set<BlockState> randomDirtSet;
+
+    /** The random leaf and rubble tables, and the city-style characters that override them. */
+    public final GroundCover groundCover = new GroundCover();
 
     public final PlanningContext provider;
     public final Preset profile;
@@ -101,95 +101,9 @@ public class CityGenerator {
         addStates(Blocks.RAIL, railStates);
         addStates(Blocks.POWERED_RAIL, railStates);
 
-        randomLeafs = buildRandomLeafs();
-        randomDirt = buildRandomDirt();
-        randomDirtSet = Set.of(Blocks.MOSSY_STONE_BRICKS.defaultBlockState(),
-                Blocks.MOSSY_COBBLESTONE.defaultBlockState(),
-                Blocks.MOSS_BLOCK.defaultBlockState());
-
 //        islandTerrainGenerator.setup(provider.getWorld().getWorld(), provider);
 //        cavernTerrainGenerator.setup(provider.getWorld().getWorld(), provider);
 //        spaceTerrainGenerator.setup(provider.getWorld().getWorld(), provider);
-    }
-
-    private static BlockState[] buildRandomLeafs() {
-        BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-        BlockState leaves2 = Blocks.JUNGLE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-        BlockState leaves3 = Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-
-        BlockState[] result = new BlockState[128];
-        int i = 0;
-        while (i < 20) {
-            result[i] = leaves2;
-            i++;
-        }
-        while (i < 40) {
-            result[i] = leaves3;
-            i++;
-        }
-        while (i < result.length) {
-            result[i] = leaves;
-            i++;
-        }
-        return result;
-    }
-
-    private static BlockState[] buildRandomDirt() {
-        BlockState mBricks = Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
-        BlockState mCobble = Blocks.MOSSY_COBBLESTONE.defaultBlockState();
-        BlockState moss = Blocks.MOSS_BLOCK.defaultBlockState();
-
-        BlockState[] result = new BlockState[128];
-        int i = 0;
-        while (i < 20) {
-            result[i] = mBricks;
-            i++;
-        }
-        while (i < 60) {
-            result[i] = mCobble;
-            i++;
-        }
-        while (i < result.length) {
-            result[i] = moss;
-            i++;
-        }
-        return result;
-    }
-
-    /**
-     * One leaf state for the block the driver is about to write. Addressed by that position, so
-     * how many leaves this chunk placed first cannot change which one this is.
-     */
-    private BlockState getRandomLeaf(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
-        Character leavesBlock = info.getCityStyle().getLeavesBlock();
-        if (leavesBlock != null) {
-            return ctx.paletteHere(compiledPalette, leavesBlock);
-        }
-        return randomLeafs[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
-                Rng.Purpose.LEAVES, randomLeafs.length)];
-    }
-
-    private Set<BlockState> getPossibleRandomDirts(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
-        Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
-        if (rubbleDirtBlock != null) {
-            return compiledPalette.getAll(rubbleDirtBlock);
-        } else {
-            return randomDirtSet;
-        }
-    }
-
-    /**
-     * One rubble state for the block the driver is about to write. Addressed by that position, for
-     * the same reason as {@link #getRandomLeaf}. Nothing is regenerated here: {@code randomDirt} is
-     * a final array built once in the constructor and never empty.
-     */
-    private BlockState getRandomDirt(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
-        Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
-        if (rubbleDirtBlock != null) {
-            return ctx.paletteHere(compiledPalette, rubbleDirtBlock);
-        }
-        return randomDirt[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
-                Rng.Purpose.RUBBLE, randomDirt.length)];
     }
 
     public Set<BlockState> getRailStates() {
@@ -899,7 +813,7 @@ public class CityGenerator {
         double[] rubbleBuffer = ctx.buffers.rubble = this.rubbleNoise.getRegion(ctx.buffers.rubble, (chunkX << 4), (chunkZ << 4), 16, 16, 1.0 / 16.0, 1.0 / 16.0, 1.0D);
         double[] leavesBuffer = ctx.buffers.leaves = this.leavesNoise.getRegion(ctx.buffers.leaves, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
 
-        Set<BlockState> possibleRandomDirts = getPossibleRandomDirts(ctx, info, info.getCompiledPalette());
+        Set<BlockState> possibleRandomDirts = groundCover.possibleRubble(info, info.getCompiledPalette());
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 double vr = info.profile.rubbleDirtScale() < 0.01f ? 0 : rubbleBuffer[x + z * 16] / info.profile.rubbleDirtScale();
@@ -911,7 +825,7 @@ public class CityGenerator {
                     if (c != air && c != liquid) {
                         for (int i = 0; i < vr; i++) {
                             if (isEmpty(driver.getBlock())) {
-                                driver.add(getRandomDirt(ctx, info, info.getCompiledPalette()));
+                                driver.add(groundCover.rubbleAt(ctx, info, info.getCompiledPalette()));
                             } else {
                                 driver.incY();
                             }
@@ -922,7 +836,7 @@ public class CityGenerator {
                     if (leafBaseState == base || possibleRandomDirts.contains(leafBaseState)) {
                         for (int i = 0; i < vl; i++) {
                             if (isEmpty(driver.getBlock())) {
-                                driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
+                                driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
                             } else {
                                 driver.incY();
                             }
@@ -1043,7 +957,7 @@ public class CityGenerator {
                                 height++;   // Make sure we keep on filling with air a bit longer because we are lowering here
                                 c = driver.getBlockDown();
                             }
-                            driver.add(getRandomLeaf(ctx, info, palette));
+                            driver.add(groundCover.leafAt(ctx, info, palette));
                             vl--;
                         } else {
                             driver.add(air);
@@ -1290,7 +1204,7 @@ public class CityGenerator {
                     float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (info.profile.randomLeafBlockThickness() + 1 - x));
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
+                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1308,7 +1222,7 @@ public class CityGenerator {
                     float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (x - 14 + info.profile.randomLeafBlockThickness()));
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_XMAX) < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
+                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1326,7 +1240,7 @@ public class CityGenerator {
                     float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (info.profile.randomLeafBlockThickness() + 1 - z));
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMIN) < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
+                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
@@ -1344,7 +1258,7 @@ public class CityGenerator {
                     float v = info.profile.randomLeafBlockChance() * (z - 14 + info.profile.randomLeafBlockThickness());
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMAX) < v && cnt < 30) {
-                        driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
+                        driver.add(groundCover.leafAt(ctx, info, info.getCompiledPalette()));
                         cnt++;
                     }
                 }
