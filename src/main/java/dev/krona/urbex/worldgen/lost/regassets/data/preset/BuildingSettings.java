@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.config.MultiBuildingStreetConflict;
 
 import java.util.Optional;
@@ -51,7 +51,7 @@ public record BuildingSettings(
             ).apply(i, BuildingSettings::new));
     public static final Codec<BuildingSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "buildings");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         buildingChance.ifPresent(v -> p.BUILDING_CHANCE = v);
         buildingMinFloors.ifPresent(v -> p.BUILDING_MINFLOORS = v);
         buildingMaxFloors.ifPresent(v -> p.BUILDING_MAXFLOORS = v);

@@ -1,6 +1,7 @@
 package dev.krona.urbex.gui.settings;
 
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Locale;
 import java.util.function.BiConsumer;
@@ -58,8 +59,8 @@ public record SettingDescriptor(
         double step,
         boolean logScale,
         boolean integerOnly,
-        Function<Preset, Object> getter,
-        BiConsumer<Preset, Object> setter
+        Function<PresetDraft, Object> getter,
+        BiConsumer<PresetDraft, Object> setter
 ) {
     /** Lang key for this setting's display name. */
     public String nameKey() {

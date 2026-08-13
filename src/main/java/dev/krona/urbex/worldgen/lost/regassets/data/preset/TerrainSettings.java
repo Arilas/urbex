@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.config.LandscapeType;
 
 import java.util.Optional;
@@ -52,7 +52,7 @@ public record TerrainSettings(
             ).apply(i, TerrainSettings::new));
     public static final Codec<TerrainSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "terrain");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         landscapeType.ifPresent(v -> p.LANDSCAPE_TYPE = v);
         groundLevel.ifPresent(v -> p.GROUNDLEVEL = v);
         seaLevel.ifPresent(v -> p.SEALEVEL = v);

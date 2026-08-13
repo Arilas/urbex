@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
@@ -23,10 +24,15 @@ final class TestProfiles {
 
     /** A profile that always wants a building and never nominates a park. */
     static Preset dense() {
-        Preset profile = new Preset(Identifier.fromNamespaceAndPath("urbex", "test-dense"));
-        profile.BUILDING_CHANCE = 1.0f;
-        profile.OPEN_LOT_PARK_CHANCE = 0.0f;
-        return profile;
+        return denseDraft().resolve();
+    }
+
+    /** As {@link #dense()}, unsettled, for a test that varies one more field. */
+    static PresetDraft denseDraft() {
+        PresetDraft draft = new PresetDraft(Identifier.fromNamespaceAndPath("urbex", "test-dense"));
+        draft.BUILDING_CHANCE = 1.0f;
+        draft.OPEN_LOT_PARK_CHANCE = 0.0f;
+        return draft;
     }
 
     /**

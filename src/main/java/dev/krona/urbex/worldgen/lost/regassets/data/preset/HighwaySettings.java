@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Optional;
 import java.util.Set;
@@ -30,7 +30,7 @@ public record HighwaySettings(
             ).apply(i, HighwaySettings::new));
     public static final Codec<HighwaySettings> CODEC = UnknownKeys.warning(RAW, KEYS, "highways");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         highwayRequiresTwoCities.ifPresent(v -> p.HIGHWAY_REQUIRES_TWO_CITIES = v);
         highwayLevelFromCities.ifPresent(v -> p.HIGHWAY_LEVEL_FROM_CITIES_MODE = v);
         highwayDistanceMask.ifPresent(v -> p.HIGHWAY_DISTANCE_MASK = v);

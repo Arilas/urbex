@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Optional;
 import java.util.Set;
@@ -26,7 +26,7 @@ public record RailwaySettings(
             ).apply(i, RailwaySettings::new));
     public static final Codec<RailwaySettings> CODEC = UnknownKeys.warning(RAW, KEYS, "railways");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         railwaysEnabled.ifPresent(v -> p.RAILWAYS_ENABLED = v);
         railwayStationsEnabled.ifPresent(v -> p.RAILWAY_STATIONS_ENABLED = v);
         railwaySurfaceStationsEnabled.ifPresent(v -> p.RAILWAY_SURFACE_STATIONS_ENABLED = v);

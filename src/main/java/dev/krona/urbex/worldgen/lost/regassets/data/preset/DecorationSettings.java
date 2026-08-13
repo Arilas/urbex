@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Optional;
 import java.util.Set;
@@ -26,7 +26,7 @@ public record DecorationSettings(
             ).apply(i, DecorationSettings::new));
     public static final Codec<DecorationSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "decoration");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         randomLeafBlockChance.ifPresent(v -> p.CHANCE_OF_RANDOM_LEAFBLOCKS = v);
         randomLeafBlockThickness.ifPresent(v -> p.THICKNESS_OF_RANDOM_LEAFBLOCKS = v);
         avoidFoliage.ifPresent(v -> p.AVOID_FOLIAGE = v);

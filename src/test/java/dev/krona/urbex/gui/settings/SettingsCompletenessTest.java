@@ -3,6 +3,7 @@ package dev.krona.urbex.gui.settings;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
@@ -45,7 +46,7 @@ class SettingsCompletenessTest {
 
     private static List<Field> editableFields() {
         List<Field> fields = new ArrayList<>();
-        for (Field f : Preset.class.getFields()) { // getFields() = public members only
+        for (Field f : PresetDraft.class.getFields()) { // getFields() = public members only
             if (Modifier.isStatic(f.getModifiers())) {
                 continue; // category-id constants etc.
             }
@@ -103,7 +104,7 @@ class SettingsCompletenessTest {
             editable.add(f.getName());
         }
         Set<String> allFieldNames = new HashSet<>();
-        for (Field f : Preset.class.getFields()) {
+        for (Field f : PresetDraft.class.getFields()) {
             if (!Modifier.isStatic(f.getModifiers())) {
                 allFieldNames.add(f.getName());
             }
@@ -118,7 +119,7 @@ class SettingsCompletenessTest {
                 pointsAtExcluded.add(d.key());
             }
         }
-        assertTrue(unknown.isEmpty(), "Descriptor keys that are not public Preset fields: " + unknown);
+        assertTrue(unknown.isEmpty(), "Descriptor keys that are not public PresetDraft fields: " + unknown);
         assertTrue(pointsAtExcluded.isEmpty(), "Descriptor keys that point at an EXCLUDED field: " + pointsAtExcluded);
     }
 
@@ -161,7 +162,7 @@ class SettingsCompletenessTest {
      */
     @Test
     void logScaleSlidersRoundTripTheirDefaultValueThroughLogValueMapper() {
-        Preset preset = fresh();
+        PresetDraft preset = fresh();
         for (SettingDescriptor d : Settings.ALL) {
             if (isSliderLike(d.kind()) && d.logScale()) {
                 LogValueMapper mapper = new LogValueMapper(d.min(), d.max());
@@ -186,7 +187,7 @@ class SettingsCompletenessTest {
      */
     @Test
     void cycleDescriptorsHaveAtLeastTwoEnumConstants() {
-        Preset preset = fresh();
+        PresetDraft preset = fresh();
         for (SettingDescriptor d : Settings.ALL) {
             if (d.kind() == ControlKind.CYCLE) {
                 Object value = d.getter().apply(preset);
@@ -210,7 +211,7 @@ class SettingsCompletenessTest {
     @Test
     void cycleDescriptorEnumConstantsHaveLangLabels() {
         JsonObject lang = loadLang();
-        Preset preset = fresh();
+        PresetDraft preset = fresh();
         Set<String> missing = new TreeSet<>();
         for (SettingDescriptor d : Settings.ALL) {
             if (d.kind() == ControlKind.CYCLE) {
@@ -306,7 +307,7 @@ class SettingsCompletenessTest {
     @Test
     void getterAndSetterObserveTheKeyedField() throws Exception {
         for (SettingDescriptor d : Settings.ALL) {
-            Field f = Preset.class.getField(d.key());
+            Field f = PresetDraft.class.getField(d.key());
             f.setAccessible(true);
             Class<?> t = f.getType();
             String where = d.key();
@@ -343,13 +344,13 @@ class SettingsCompletenessTest {
 
     /** Two-probe check for numeric fields, honoring the Double-boxed slider convention. */
     private static void checkNumeric(SettingDescriptor d, Field f, String where, double s1, double s2) throws Exception {
-        Preset getP = fresh();
+        PresetDraft getP = fresh();
         f.set(getP, coerce(f.getType(), s1));
         assertEquals(s1, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4, "getter does not read field " + where);
         f.set(getP, coerce(f.getType(), s2));
         assertEquals(s2, ((Number) d.getter().apply(getP)).doubleValue(), 1e-4, "getter does not read field " + where);
 
-        Preset setP = fresh();
+        PresetDraft setP = fresh();
         d.setter().accept(setP, s1);
         assertEquals(s1, ((Number) f.get(setP)).doubleValue(), 1e-4, "setter does not write field " + where);
         d.setter().accept(setP, s2);
@@ -368,13 +369,13 @@ class SettingsCompletenessTest {
 
     /** Two-probe check for reference-valued fields compared with {@link Object#equals}. */
     private static void checkObject(SettingDescriptor d, Field f, String where, Object s1, Object s2) throws Exception {
-        Preset getP = fresh();
+        PresetDraft getP = fresh();
         f.set(getP, s1);
         assertEquals(s1, d.getter().apply(getP), "getter does not read field " + where);
         f.set(getP, s2);
         assertEquals(s2, d.getter().apply(getP), "getter does not read field " + where);
 
-        Preset setP = fresh();
+        PresetDraft setP = fresh();
         d.setter().accept(setP, s1);
         assertEquals(s1, f.get(setP), "setter does not write field " + where);
         d.setter().accept(setP, s2);
@@ -383,21 +384,21 @@ class SettingsCompletenessTest {
 
     /** Two-probe check for {@code List<String>} fields, boxed as {@code String[]} across the descriptor. */
     private static void checkList(SettingDescriptor d, Field f, String where, String[] s1, String[] s2) throws Exception {
-        Preset getP = fresh();
+        PresetDraft getP = fresh();
         f.set(getP, List.of(s1));
         assertArrayEquals(s1, (String[]) d.getter().apply(getP), "getter does not read field " + where);
         f.set(getP, List.of(s2));
         assertArrayEquals(s2, (String[]) d.getter().apply(getP), "getter does not read field " + where);
 
-        Preset setP = fresh();
+        PresetDraft setP = fresh();
         d.setter().accept(setP, s1);
         assertEquals(List.of(s1), f.get(setP), "setter does not write field " + where);
         d.setter().accept(setP, s2);
         assertEquals(List.of(s2), f.get(setP), "setter does not write field " + where);
     }
 
-    private static Preset fresh() {
-        return new Preset(Identifier.fromNamespaceAndPath("urbex", "test"));
+    private static PresetDraft fresh() {
+        return new PresetDraft(Identifier.fromNamespaceAndPath("urbex", "test"));
     }
 
     private static JsonObject loadLang() {

@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.LandscapeType;
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
@@ -49,8 +50,9 @@ class ChunkPlanTest {
 
     @Test
     void effectiveRoadTypeIsNoneForANonCityChunkWithoutConsultingTheRoadField() {
-        Preset preset = new Preset(Identifier.fromNamespaceAndPath("urbex", "test-void"));
-        preset.LANDSCAPE_TYPE = LandscapeType.FLOATING;
+        PresetDraft draft = new PresetDraft(Identifier.fromNamespaceAndPath("urbex", "test-void"));
+        draft.LANDSCAPE_TYPE = LandscapeType.FLOATING;
+        Preset preset = draft.resolve();
         ChunkCoord coord = new ChunkCoord(Level.OVERWORLD, 3, 4);
 
         PlanningContext planning = new PlanningContext(

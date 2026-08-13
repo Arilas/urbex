@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Optional;
 import java.util.Set;
@@ -20,7 +20,7 @@ public record MiscSettings(
             ).apply(i, MiscSettings::new));
     public static final Codec<MiscSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "misc");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         editMode.ifPresent(v -> p.EDITMODE = v);
         generateNether.ifPresent(v -> p.GENERATE_NETHER = v);
     }

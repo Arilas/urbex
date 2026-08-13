@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.lost.regassets.data.preset;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 
 import java.util.Optional;
 import java.util.Set;
@@ -104,7 +104,7 @@ public record DestructionSettings(
     ).codec();
     public static final Codec<DestructionSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "destruction");
 
-    public void apply(Preset p) {
+    public void apply(PresetDraft p) {
         ruinChance.ifPresent(v -> p.RUIN_CHANCE = v);
         ruinMinlevelPercent.ifPresent(v -> p.RUIN_MINLEVEL_PERCENT = v);
         ruinMaxlevelPercent.ifPresent(v -> p.RUIN_MAXLEVEL_PERCENT = v);

@@ -1,6 +1,7 @@
 package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.TextColor;
@@ -35,11 +36,11 @@ class CitiesTabTest {
     }
 
     private static Preset preset(String description, String extra, String warning) {
-        Preset preset = new Preset(Identifier.fromNamespaceAndPath("urbex", "test"));
+        PresetDraft preset = new PresetDraft(Identifier.fromNamespaceAndPath("urbex", "test"));
         preset.setDescription(description);
         preset.setExtraDescription(extra);
         preset.setWarning(warning);
-        return preset;
+        return preset.resolve();
     }
 
     @Test

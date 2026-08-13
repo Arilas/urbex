@@ -102,7 +102,7 @@ class DisplayNameTest {
         Map<Identifier, PresetDefinition> lookup = Map.of(presetId, decode("{\"name\": \"Wasteland\"}"));
         Preset resolved = Presets.resolve(presetId, lookup::get);
 
-        assertEquals("Wasteland", resolved.copy().getDisplayName());
+        assertEquals("Wasteland", resolved.toDraft().resolve().getDisplayName());
 
         Preset rebuilt = Presets.applyOverrides(new Preset(presetId), resolved.toDefinition());
         assertEquals("Wasteland", rebuilt.getDisplayName());
@@ -120,10 +120,10 @@ class DisplayNameTest {
 
     @Test
     void nameIsEncodedUnderItsOwnKeyAndNowhereElse() {
-        Preset p = new Preset(id("x"));
+        PresetDraft p = new PresetDraft(id("x"));
         p.setName("Example");
 
-        JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, p.toDefinition()).getOrThrow();
+        JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, p.resolve().toDefinition()).getOrThrow();
 
         assertTrue(json.getAsJsonObject().has("name"), "toDefinition() must carry the name");
         assertEquals("Example", json.getAsJsonObject().get("name").getAsString());

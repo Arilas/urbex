@@ -46,11 +46,13 @@ public class Presets {
      */
     public static Preset resolve(Identifier id, Function<Identifier, PresetDefinition> lookup) {
         List<PresetDefinition> chain = ExtendsChain.resolve(id, lookup, PresetDefinition::getExtends);
-        Preset p = new Preset(id);
+        PresetDraft draft = new PresetDraft(id);
         for (PresetDefinition re : chain) {
-            re.applyTo(p);
+            re.applyTo(draft);
         }
-        return p;
+        // Settled here, and nowhere else: what leaves this method is what worldgen reads, and it is
+        // not writable (issue #10).
+        return draft.resolve();
     }
 
     /** Registry-backed wrapper around {@link #resolve(Identifier, Function)}, cached per id. */
@@ -65,11 +67,11 @@ public class Presets {
         return raced != null ? raced : resolved;
     }
 
-    /** Clones {@code base} and applies {@code overrides}'s present sections on top of the clone. */
+    /** Applies {@code overrides}'s present sections to a draft of {@code base}, and settles it. */
     public static Preset applyOverrides(Preset base, PresetDefinition overrides) {
-        Preset p = base.copy();
-        overrides.applyTo(p);
-        return p;
+        PresetDraft draft = base.toDraft();
+        overrides.applyTo(draft);
+        return draft.resolve();
     }
 
     /**

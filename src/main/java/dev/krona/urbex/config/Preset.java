@@ -24,151 +24,436 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A fully-resolved preset: the runtime settings used by worldgen, produced by walking a
- * {@link PresetDefinition}'s extends chain onto these code defaults (see {@code Presets.resolve}).
- * <p>
- * Public field names match the runtime-generated profile format this class replaced (same names,
- * same types) so that the worldgen consumers migrated by a pure type rename. Exceptions: there is
- * no {@code worldStyle} field (world style selection is now a separate first-class value), no
- * {@code isPublic}, and no config-file binding of any kind. {@link #USE_AVG_HEIGHTMAP} defaults
- * to {@code true} here, unlike the old default of {@code false}.
+ * A fully-resolved preset: the runtime settings worldgen generates from, settled from a
+ * {@link PresetDraft} once its {@code extends} chain and any customization patch have been applied
+ * (see {@code Presets.resolve}).
+ *
+ * <p><strong>Immutable.</strong> Every value is {@code final} and there is no setter, so nothing
+ * generation is handed can be written to. That used to be a convention: 119 public mutable fields,
+ * a {@code copy()} the editor called because it needed a scratch copy, and a comment asking everyone
+ * else not to. What replaced the convention is the type - editing happens on a
+ * {@link PresetDraft}, and the two are not interchangeable (issue #10). It is the same move issue
+ * #126 made for chunk plans, where an audit that searched for assignments still missed a field being
+ * decremented on every call.</p>
+ *
+ * <p>Field names match the runtime-generated profile format this class replaced (same names, same
+ * types), and each is read through the accessor named for the JSON key its codec reads it from.
+ * Exceptions: there is no {@code worldStyle} field (world style selection is a separate first-class
+ * value), no {@code isPublic}, and no config-file binding of any kind. {@link #useAvgHeightmap()}
+ * defaults to {@code true} here, unlike the old default of {@code false}.</p>
  */
 public class Preset {
 
     private final Identifier id;
 
-    private String name = "";
-    private String description = "Default generation, common cities, explosions";
-    private String extraDescription = "";
-    private String warning = "";
-    private String iconFile = "";
+    private final String name;
+    private final String description;
+    private final String extraDescription;
+    private final String warning;
+    private final String iconFile;
+    /*
+     * The three memoized derivations, and the only fields here that are not final. They are not
+     * state: each is a pure function of a final field above (the icon file name, the liquid and base
+     * block ids), computed on first ask because resolving a block needs a registry this class is not
+     * handed. Nothing can observe a difference between one that has been computed and one that has
+     * not, which is what makes writing them compatible with the rest being immutable (issue #10).
+     */
     private Identifier icon;
-
     private BlockState liquidBlock;
     private BlockState baseBlock;
 
-    public LandscapeType LANDSCAPE_TYPE = LandscapeType.DEFAULT;
-    public int GROUNDLEVEL = 71;
-    public int SEALEVEL = -1;
-    public String LIQUID_BLOCK = "minecraft:water";
-    public String BASE_BLOCK = "minecraft:stone";
-    public int BEDROCK_LAYER = 1;
-    public int TERRAIN_FIX_LOWER_MIN_OFFSET = -4;
-    public int TERRAIN_FIX_LOWER_MAX_OFFSET = -3;
-    public int TERRAIN_FIX_UPPER_MIN_OFFSET = -1;
-    public int TERRAIN_FIX_UPPER_MAX_OFFSET = 1;
-    public int OCEAN_CORRECTION_BORDER = 4;
-    public boolean AVOID_WATER = false;
-    public boolean USE_AVG_HEIGHTMAP = true;
-    public double CITY_CHANCE = .01;
-    public int CITY_MINRADIUS = 50;
-    public int CITY_MAXRADIUS = 128;
-    public double CITY_PERLIN_SCALE = 3;
-    public double CITY_PERLIN_OFFSET = .1;
-    public double CITY_PERLIN_INNERSCALE = .1;
-    public float CITY_THRESHOLD = .2f;
-    public int CITY_SPAWN_DISTANCE1 = 0;
-    public int CITY_SPAWN_DISTANCE2 = 0;
-    public double CITY_SPAWN_MULTIPLIER1 = 1.0;
-    public double CITY_SPAWN_MULTIPLIER2 = 1.0;
-    public float CITY_STYLE_THRESHOLD = -1f;
-    public String CITY_STYLE_ALTERNATIVE = "";
-    public boolean CITY_AVOID_VOID = true;
-    public int CITY_LEVEL0_HEIGHT = 75;
-    public int CITY_LEVEL1_HEIGHT = 83;
-    public int CITY_LEVEL2_HEIGHT = 91;
-    public int CITY_LEVEL3_HEIGHT = 99;
-    public int CITY_LEVEL4_HEIGHT = 107;
-    public int CITY_LEVEL5_HEIGHT = 115;
-    public int CITY_LEVEL6_HEIGHT = 123;
-    public int CITY_LEVEL7_HEIGHT = 131;
-    public int CITY_MINHEIGHT = 50;
-    public int CITY_MAXHEIGHT = 150;
-    public float SCATTERED_CHANCE_MULTIPLIER = 1.0f;
-    public float BUILDING_CHANCE = .3f;
-    public int BUILDING_MINFLOORS = 0;
-    public int BUILDING_MAXFLOORS = 8;
-    public int BUILDING_MINFLOORS_CHANCE = 4;
-    public int BUILDING_MAXFLOORS_CHANCE = 6;
-    public int BUILDING_MINCELLARS = 0;
-    public int BUILDING_MAXCELLARS = 3;
-    public float BUILDING_DOORWAYCHANCE = .6f;
-    public float BUILDING_FRONTCHANCE = .2f;
-    public boolean MULTI_USE_CORNER = false;
-    public MultiBuildingStreetConflict MULTI_BUILDING_STREET_CONFLICT = MultiBuildingStreetConflict.OVERRIDE_MINOR;
-    public boolean GENERATE_SPAWNERS = true;
-    public int PRIMARY_ROAD_SPACING_X = 8;
-    public int PRIMARY_ROAD_SPACING_Z = 8;
-    public float PRIMARY_ROAD_OPTIONAL_CHANCE = .45f;
-    public int PRIMARY_ROAD_FORCE_EVERY = 4;
-    public int SECONDARY_ROAD_MIN_COUNT_X = 0;
-    public int SECONDARY_ROAD_MAX_COUNT_X = 2;
-    public int SECONDARY_ROAD_MIN_COUNT_Z = 0;
-    public int SECONDARY_ROAD_MAX_COUNT_Z = 2;
-    public int MINIMUM_ROAD_SEPARATION = 4;
-    public int MINIMUM_ROAD_EDGE_DISTANCE = 3;
-    public float TERTIARY_ROAD_CHANCE = .40f;
-    public int TERTIARY_ROAD_MIN_LENGTH = 2;
-    public int TERTIARY_ROAD_MAX_LENGTH = 5;
-    public float PLANNED_PRIMARY_BRIDGE_CHANCE = 1.0f;
-    public int PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = 12;
-    public float OPEN_LOT_PARK_CHANCE = .8f;
-    public boolean PARK_ELEVATION = true;
-    public boolean PARK_BORDER = true;
-    public int PARK_STREET_THRESHOLD = 3;
-    public float FOUNTAIN_CHANCE = .05f;
-    public float CORRIDOR_CHANCE = .7f;
-    public float BRIDGE_CHANCE = .7f;
-    public boolean BRIDGE_SUPPORTS = true;
-    public boolean HIGHWAY_REQUIRES_TWO_CITIES = true;
-    public int HIGHWAY_LEVEL_FROM_CITIES_MODE = 0;
-    public int HIGHWAY_DISTANCE_MASK = 7;
-    public float HIGHWAY_MAINPERLIN_SCALE = 50.0f;
-    public float HIGHWAY_SECONDARYPERLIN_SCALE = 10.0f;
-    public float HIGHWAY_PERLIN_FACTOR = 2.0f;
-    public boolean HIGHWAY_SUPPORTS = true;
-    public boolean RAILWAYS_ENABLED = true;
-    public boolean RAILWAY_STATIONS_ENABLED = true;
-    public boolean RAILWAY_SURFACE_STATIONS_ENABLED = true;
-    public boolean RAILWAYS_CAN_END = false;
-    public float RAILWAY_DUNGEON_CHANCE = .01f;
-    public float RUIN_CHANCE = 0.05f;
-    public float RUIN_MINLEVEL_PERCENT = 0.8f;
-    public float RUIN_MAXLEVEL_PERCENT = 1.0f;
-    public boolean RUBBLELAYER = true;
-    public float RUBBLE_DIRT_SCALE = 3.0f;
-    public float RUBBLE_LEAVE_SCALE = 6.0f;
-    public float EXPLOSION_CHANCE = .002f;
-    public int EXPLOSION_MINRADIUS = 15;
-    public int EXPLOSION_MAXRADIUS = 35;
-    public int EXPLOSION_MINHEIGHT = 75;
-    public int EXPLOSION_MAXHEIGHT = 90;
-    public float MINI_EXPLOSION_CHANCE = .03f;
-    public int MINI_EXPLOSION_MINRADIUS = 5;
-    public int MINI_EXPLOSION_MAXRADIUS = 12;
-    public int MINI_EXPLOSION_MINHEIGHT = 60;
-    public int MINI_EXPLOSION_MAXHEIGHT = 100;
-    public boolean EXPLOSIONS_IN_CITIES_ONLY = true;
-    public int DEBRIS_TO_NEARBYCHUNK_FACTOR = 200;
-    public float CHANCE_OF_RANDOM_LEAFBLOCKS = .1f;
-    public int THICKNESS_OF_RANDOM_LEAFBLOCKS = 2;
-    public boolean AVOID_FOLIAGE = false;
-    public float LIGHTING_DENSITY = 0.15f;
-    public float LOOT_DENSITY = 0.65f;
-    public String SPAWN_BIOME = "";
-    public String SPAWN_CITY = "";
-    public boolean SPAWN_NOT_IN_BUILDING = false;
-    public boolean FORCE_SPAWN_IN_BUILDING = false;
-    public List<String> FORCE_SPAWN_BUILDINGS = List.of();
-    public List<String> FORCE_SPAWN_PARTS = List.of();
-    public int SPAWN_CHECK_RADIUS = 200;
-    public int SPAWN_RADIUS_INCREASE = 100;
-    public int SPAWN_CHECK_ATTEMPTS = 20000;
-    public boolean EDITMODE = false;
-    public boolean GENERATE_NETHER = false;
+    private final LandscapeType LANDSCAPE_TYPE;
+    private final int GROUNDLEVEL;
+    private final int SEALEVEL;
+    private final String LIQUID_BLOCK;
+    private final String BASE_BLOCK;
+    private final int BEDROCK_LAYER;
+    private final int TERRAIN_FIX_LOWER_MIN_OFFSET;
+    private final int TERRAIN_FIX_LOWER_MAX_OFFSET;
+    private final int TERRAIN_FIX_UPPER_MIN_OFFSET;
+    private final int TERRAIN_FIX_UPPER_MAX_OFFSET;
+    private final int OCEAN_CORRECTION_BORDER;
+    private final boolean AVOID_WATER;
+    private final boolean USE_AVG_HEIGHTMAP;
+    private final double CITY_CHANCE;
+    private final int CITY_MINRADIUS;
+    private final int CITY_MAXRADIUS;
+    private final double CITY_PERLIN_SCALE;
+    private final double CITY_PERLIN_OFFSET;
+    private final double CITY_PERLIN_INNERSCALE;
+    private final float CITY_THRESHOLD;
+    private final int CITY_SPAWN_DISTANCE1;
+    private final int CITY_SPAWN_DISTANCE2;
+    private final double CITY_SPAWN_MULTIPLIER1;
+    private final double CITY_SPAWN_MULTIPLIER2;
+    private final float CITY_STYLE_THRESHOLD;
+    private final String CITY_STYLE_ALTERNATIVE;
+    private final boolean CITY_AVOID_VOID;
+    private final int CITY_LEVEL0_HEIGHT;
+    private final int CITY_LEVEL1_HEIGHT;
+    private final int CITY_LEVEL2_HEIGHT;
+    private final int CITY_LEVEL3_HEIGHT;
+    private final int CITY_LEVEL4_HEIGHT;
+    private final int CITY_LEVEL5_HEIGHT;
+    private final int CITY_LEVEL6_HEIGHT;
+    private final int CITY_LEVEL7_HEIGHT;
+    private final int CITY_MINHEIGHT;
+    private final int CITY_MAXHEIGHT;
+    private final float SCATTERED_CHANCE_MULTIPLIER;
+    private final float BUILDING_CHANCE;
+    private final int BUILDING_MINFLOORS;
+    private final int BUILDING_MAXFLOORS;
+    private final int BUILDING_MINFLOORS_CHANCE;
+    private final int BUILDING_MAXFLOORS_CHANCE;
+    private final int BUILDING_MINCELLARS;
+    private final int BUILDING_MAXCELLARS;
+    private final float BUILDING_DOORWAYCHANCE;
+    private final float BUILDING_FRONTCHANCE;
+    private final boolean MULTI_USE_CORNER;
+    private final MultiBuildingStreetConflict MULTI_BUILDING_STREET_CONFLICT;
+    private final boolean GENERATE_SPAWNERS;
+    private final int PRIMARY_ROAD_SPACING_X;
+    private final int PRIMARY_ROAD_SPACING_Z;
+    private final float PRIMARY_ROAD_OPTIONAL_CHANCE;
+    private final int PRIMARY_ROAD_FORCE_EVERY;
+    private final int SECONDARY_ROAD_MIN_COUNT_X;
+    private final int SECONDARY_ROAD_MAX_COUNT_X;
+    private final int SECONDARY_ROAD_MIN_COUNT_Z;
+    private final int SECONDARY_ROAD_MAX_COUNT_Z;
+    private final int MINIMUM_ROAD_SEPARATION;
+    private final int MINIMUM_ROAD_EDGE_DISTANCE;
+    private final float TERTIARY_ROAD_CHANCE;
+    private final int TERTIARY_ROAD_MIN_LENGTH;
+    private final int TERTIARY_ROAD_MAX_LENGTH;
+    private final float PLANNED_PRIMARY_BRIDGE_CHANCE;
+    private final int PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
+    private final float OPEN_LOT_PARK_CHANCE;
+    private final boolean PARK_ELEVATION;
+    private final boolean PARK_BORDER;
+    private final int PARK_STREET_THRESHOLD;
+    private final float FOUNTAIN_CHANCE;
+    private final float CORRIDOR_CHANCE;
+    private final float BRIDGE_CHANCE;
+    private final boolean BRIDGE_SUPPORTS;
+    private final boolean HIGHWAY_REQUIRES_TWO_CITIES;
+    private final int HIGHWAY_LEVEL_FROM_CITIES_MODE;
+    private final int HIGHWAY_DISTANCE_MASK;
+    private final float HIGHWAY_MAINPERLIN_SCALE;
+    private final float HIGHWAY_SECONDARYPERLIN_SCALE;
+    private final float HIGHWAY_PERLIN_FACTOR;
+    private final boolean HIGHWAY_SUPPORTS;
+    private final boolean RAILWAYS_ENABLED;
+    private final boolean RAILWAY_STATIONS_ENABLED;
+    private final boolean RAILWAY_SURFACE_STATIONS_ENABLED;
+    private final boolean RAILWAYS_CAN_END;
+    private final float RAILWAY_DUNGEON_CHANCE;
+    private final float RUIN_CHANCE;
+    private final float RUIN_MINLEVEL_PERCENT;
+    private final float RUIN_MAXLEVEL_PERCENT;
+    private final boolean RUBBLELAYER;
+    private final float RUBBLE_DIRT_SCALE;
+    private final float RUBBLE_LEAVE_SCALE;
+    private final float EXPLOSION_CHANCE;
+    private final int EXPLOSION_MINRADIUS;
+    private final int EXPLOSION_MAXRADIUS;
+    private final int EXPLOSION_MINHEIGHT;
+    private final int EXPLOSION_MAXHEIGHT;
+    private final float MINI_EXPLOSION_CHANCE;
+    private final int MINI_EXPLOSION_MINRADIUS;
+    private final int MINI_EXPLOSION_MAXRADIUS;
+    private final int MINI_EXPLOSION_MINHEIGHT;
+    private final int MINI_EXPLOSION_MAXHEIGHT;
+    private final boolean EXPLOSIONS_IN_CITIES_ONLY;
+    private final int DEBRIS_TO_NEARBYCHUNK_FACTOR;
+    private final float CHANCE_OF_RANDOM_LEAFBLOCKS;
+    private final int THICKNESS_OF_RANDOM_LEAFBLOCKS;
+    private final boolean AVOID_FOLIAGE;
+    private final float LIGHTING_DENSITY;
+    private final float LOOT_DENSITY;
+    private final String SPAWN_BIOME;
+    private final String SPAWN_CITY;
+    private final boolean SPAWN_NOT_IN_BUILDING;
+    private final boolean FORCE_SPAWN_IN_BUILDING;
+    private final List<String> FORCE_SPAWN_BUILDINGS;
+    private final List<String> FORCE_SPAWN_PARTS;
+    private final int SPAWN_CHECK_RADIUS;
+    private final int SPAWN_RADIUS_INCREASE;
+    private final int SPAWN_CHECK_ATTEMPTS;
+    private final boolean EDITMODE;
+    private final boolean GENERATE_NETHER;
 
+    /** The code defaults, unmodified. */
     public Preset(Identifier id) {
-        this.id = id;
+        this(new PresetDraft(id));
+    }
+
+    /** Settles {@code draft}. Every value is copied; nothing is shared with it afterwards. */
+    public Preset(PresetDraft draft) {
+        this.id = draft.getId();
+        this.name = draft.getName();
+        this.description = draft.getDescription();
+        this.extraDescription = draft.getExtraDescription();
+        this.warning = draft.getWarning();
+        this.iconFile = draft.getIconFile();
+        this.LANDSCAPE_TYPE = draft.LANDSCAPE_TYPE;
+        this.GROUNDLEVEL = draft.GROUNDLEVEL;
+        this.SEALEVEL = draft.SEALEVEL;
+        this.LIQUID_BLOCK = draft.LIQUID_BLOCK;
+        this.BASE_BLOCK = draft.BASE_BLOCK;
+        this.BEDROCK_LAYER = draft.BEDROCK_LAYER;
+        this.TERRAIN_FIX_LOWER_MIN_OFFSET = draft.TERRAIN_FIX_LOWER_MIN_OFFSET;
+        this.TERRAIN_FIX_LOWER_MAX_OFFSET = draft.TERRAIN_FIX_LOWER_MAX_OFFSET;
+        this.TERRAIN_FIX_UPPER_MIN_OFFSET = draft.TERRAIN_FIX_UPPER_MIN_OFFSET;
+        this.TERRAIN_FIX_UPPER_MAX_OFFSET = draft.TERRAIN_FIX_UPPER_MAX_OFFSET;
+        this.OCEAN_CORRECTION_BORDER = draft.OCEAN_CORRECTION_BORDER;
+        this.AVOID_WATER = draft.AVOID_WATER;
+        this.USE_AVG_HEIGHTMAP = draft.USE_AVG_HEIGHTMAP;
+        this.CITY_CHANCE = draft.CITY_CHANCE;
+        this.CITY_MINRADIUS = draft.CITY_MINRADIUS;
+        this.CITY_MAXRADIUS = draft.CITY_MAXRADIUS;
+        this.CITY_PERLIN_SCALE = draft.CITY_PERLIN_SCALE;
+        this.CITY_PERLIN_OFFSET = draft.CITY_PERLIN_OFFSET;
+        this.CITY_PERLIN_INNERSCALE = draft.CITY_PERLIN_INNERSCALE;
+        this.CITY_THRESHOLD = draft.CITY_THRESHOLD;
+        this.CITY_SPAWN_DISTANCE1 = draft.CITY_SPAWN_DISTANCE1;
+        this.CITY_SPAWN_DISTANCE2 = draft.CITY_SPAWN_DISTANCE2;
+        this.CITY_SPAWN_MULTIPLIER1 = draft.CITY_SPAWN_MULTIPLIER1;
+        this.CITY_SPAWN_MULTIPLIER2 = draft.CITY_SPAWN_MULTIPLIER2;
+        this.CITY_STYLE_THRESHOLD = draft.CITY_STYLE_THRESHOLD;
+        this.CITY_STYLE_ALTERNATIVE = draft.CITY_STYLE_ALTERNATIVE;
+        this.CITY_AVOID_VOID = draft.CITY_AVOID_VOID;
+        this.CITY_LEVEL0_HEIGHT = draft.CITY_LEVEL0_HEIGHT;
+        this.CITY_LEVEL1_HEIGHT = draft.CITY_LEVEL1_HEIGHT;
+        this.CITY_LEVEL2_HEIGHT = draft.CITY_LEVEL2_HEIGHT;
+        this.CITY_LEVEL3_HEIGHT = draft.CITY_LEVEL3_HEIGHT;
+        this.CITY_LEVEL4_HEIGHT = draft.CITY_LEVEL4_HEIGHT;
+        this.CITY_LEVEL5_HEIGHT = draft.CITY_LEVEL5_HEIGHT;
+        this.CITY_LEVEL6_HEIGHT = draft.CITY_LEVEL6_HEIGHT;
+        this.CITY_LEVEL7_HEIGHT = draft.CITY_LEVEL7_HEIGHT;
+        this.CITY_MINHEIGHT = draft.CITY_MINHEIGHT;
+        this.CITY_MAXHEIGHT = draft.CITY_MAXHEIGHT;
+        this.SCATTERED_CHANCE_MULTIPLIER = draft.SCATTERED_CHANCE_MULTIPLIER;
+        this.BUILDING_CHANCE = draft.BUILDING_CHANCE;
+        this.BUILDING_MINFLOORS = draft.BUILDING_MINFLOORS;
+        this.BUILDING_MAXFLOORS = draft.BUILDING_MAXFLOORS;
+        this.BUILDING_MINFLOORS_CHANCE = draft.BUILDING_MINFLOORS_CHANCE;
+        this.BUILDING_MAXFLOORS_CHANCE = draft.BUILDING_MAXFLOORS_CHANCE;
+        this.BUILDING_MINCELLARS = draft.BUILDING_MINCELLARS;
+        this.BUILDING_MAXCELLARS = draft.BUILDING_MAXCELLARS;
+        this.BUILDING_DOORWAYCHANCE = draft.BUILDING_DOORWAYCHANCE;
+        this.BUILDING_FRONTCHANCE = draft.BUILDING_FRONTCHANCE;
+        this.MULTI_USE_CORNER = draft.MULTI_USE_CORNER;
+        this.MULTI_BUILDING_STREET_CONFLICT = draft.MULTI_BUILDING_STREET_CONFLICT;
+        this.GENERATE_SPAWNERS = draft.GENERATE_SPAWNERS;
+        this.PRIMARY_ROAD_SPACING_X = draft.PRIMARY_ROAD_SPACING_X;
+        this.PRIMARY_ROAD_SPACING_Z = draft.PRIMARY_ROAD_SPACING_Z;
+        this.PRIMARY_ROAD_OPTIONAL_CHANCE = draft.PRIMARY_ROAD_OPTIONAL_CHANCE;
+        this.PRIMARY_ROAD_FORCE_EVERY = draft.PRIMARY_ROAD_FORCE_EVERY;
+        this.SECONDARY_ROAD_MIN_COUNT_X = draft.SECONDARY_ROAD_MIN_COUNT_X;
+        this.SECONDARY_ROAD_MAX_COUNT_X = draft.SECONDARY_ROAD_MAX_COUNT_X;
+        this.SECONDARY_ROAD_MIN_COUNT_Z = draft.SECONDARY_ROAD_MIN_COUNT_Z;
+        this.SECONDARY_ROAD_MAX_COUNT_Z = draft.SECONDARY_ROAD_MAX_COUNT_Z;
+        this.MINIMUM_ROAD_SEPARATION = draft.MINIMUM_ROAD_SEPARATION;
+        this.MINIMUM_ROAD_EDGE_DISTANCE = draft.MINIMUM_ROAD_EDGE_DISTANCE;
+        this.TERTIARY_ROAD_CHANCE = draft.TERTIARY_ROAD_CHANCE;
+        this.TERTIARY_ROAD_MIN_LENGTH = draft.TERTIARY_ROAD_MIN_LENGTH;
+        this.TERTIARY_ROAD_MAX_LENGTH = draft.TERTIARY_ROAD_MAX_LENGTH;
+        this.PLANNED_PRIMARY_BRIDGE_CHANCE = draft.PLANNED_PRIMARY_BRIDGE_CHANCE;
+        this.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = draft.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
+        this.OPEN_LOT_PARK_CHANCE = draft.OPEN_LOT_PARK_CHANCE;
+        this.PARK_ELEVATION = draft.PARK_ELEVATION;
+        this.PARK_BORDER = draft.PARK_BORDER;
+        this.PARK_STREET_THRESHOLD = draft.PARK_STREET_THRESHOLD;
+        this.FOUNTAIN_CHANCE = draft.FOUNTAIN_CHANCE;
+        this.CORRIDOR_CHANCE = draft.CORRIDOR_CHANCE;
+        this.BRIDGE_CHANCE = draft.BRIDGE_CHANCE;
+        this.BRIDGE_SUPPORTS = draft.BRIDGE_SUPPORTS;
+        this.HIGHWAY_REQUIRES_TWO_CITIES = draft.HIGHWAY_REQUIRES_TWO_CITIES;
+        this.HIGHWAY_LEVEL_FROM_CITIES_MODE = draft.HIGHWAY_LEVEL_FROM_CITIES_MODE;
+        this.HIGHWAY_DISTANCE_MASK = draft.HIGHWAY_DISTANCE_MASK;
+        this.HIGHWAY_MAINPERLIN_SCALE = draft.HIGHWAY_MAINPERLIN_SCALE;
+        this.HIGHWAY_SECONDARYPERLIN_SCALE = draft.HIGHWAY_SECONDARYPERLIN_SCALE;
+        this.HIGHWAY_PERLIN_FACTOR = draft.HIGHWAY_PERLIN_FACTOR;
+        this.HIGHWAY_SUPPORTS = draft.HIGHWAY_SUPPORTS;
+        this.RAILWAYS_ENABLED = draft.RAILWAYS_ENABLED;
+        this.RAILWAY_STATIONS_ENABLED = draft.RAILWAY_STATIONS_ENABLED;
+        this.RAILWAY_SURFACE_STATIONS_ENABLED = draft.RAILWAY_SURFACE_STATIONS_ENABLED;
+        this.RAILWAYS_CAN_END = draft.RAILWAYS_CAN_END;
+        this.RAILWAY_DUNGEON_CHANCE = draft.RAILWAY_DUNGEON_CHANCE;
+        this.RUIN_CHANCE = draft.RUIN_CHANCE;
+        this.RUIN_MINLEVEL_PERCENT = draft.RUIN_MINLEVEL_PERCENT;
+        this.RUIN_MAXLEVEL_PERCENT = draft.RUIN_MAXLEVEL_PERCENT;
+        this.RUBBLELAYER = draft.RUBBLELAYER;
+        this.RUBBLE_DIRT_SCALE = draft.RUBBLE_DIRT_SCALE;
+        this.RUBBLE_LEAVE_SCALE = draft.RUBBLE_LEAVE_SCALE;
+        this.EXPLOSION_CHANCE = draft.EXPLOSION_CHANCE;
+        this.EXPLOSION_MINRADIUS = draft.EXPLOSION_MINRADIUS;
+        this.EXPLOSION_MAXRADIUS = draft.EXPLOSION_MAXRADIUS;
+        this.EXPLOSION_MINHEIGHT = draft.EXPLOSION_MINHEIGHT;
+        this.EXPLOSION_MAXHEIGHT = draft.EXPLOSION_MAXHEIGHT;
+        this.MINI_EXPLOSION_CHANCE = draft.MINI_EXPLOSION_CHANCE;
+        this.MINI_EXPLOSION_MINRADIUS = draft.MINI_EXPLOSION_MINRADIUS;
+        this.MINI_EXPLOSION_MAXRADIUS = draft.MINI_EXPLOSION_MAXRADIUS;
+        this.MINI_EXPLOSION_MINHEIGHT = draft.MINI_EXPLOSION_MINHEIGHT;
+        this.MINI_EXPLOSION_MAXHEIGHT = draft.MINI_EXPLOSION_MAXHEIGHT;
+        this.EXPLOSIONS_IN_CITIES_ONLY = draft.EXPLOSIONS_IN_CITIES_ONLY;
+        this.DEBRIS_TO_NEARBYCHUNK_FACTOR = draft.DEBRIS_TO_NEARBYCHUNK_FACTOR;
+        this.CHANCE_OF_RANDOM_LEAFBLOCKS = draft.CHANCE_OF_RANDOM_LEAFBLOCKS;
+        this.THICKNESS_OF_RANDOM_LEAFBLOCKS = draft.THICKNESS_OF_RANDOM_LEAFBLOCKS;
+        this.AVOID_FOLIAGE = draft.AVOID_FOLIAGE;
+        this.LIGHTING_DENSITY = draft.LIGHTING_DENSITY;
+        this.LOOT_DENSITY = draft.LOOT_DENSITY;
+        this.SPAWN_BIOME = draft.SPAWN_BIOME;
+        this.SPAWN_CITY = draft.SPAWN_CITY;
+        this.SPAWN_NOT_IN_BUILDING = draft.SPAWN_NOT_IN_BUILDING;
+        this.FORCE_SPAWN_IN_BUILDING = draft.FORCE_SPAWN_IN_BUILDING;
+        this.FORCE_SPAWN_BUILDINGS = draft.FORCE_SPAWN_BUILDINGS;
+        this.FORCE_SPAWN_PARTS = draft.FORCE_SPAWN_PARTS;
+        this.SPAWN_CHECK_RADIUS = draft.SPAWN_CHECK_RADIUS;
+        this.SPAWN_RADIUS_INCREASE = draft.SPAWN_RADIUS_INCREASE;
+        this.SPAWN_CHECK_ATTEMPTS = draft.SPAWN_CHECK_ATTEMPTS;
+        this.EDITMODE = draft.EDITMODE;
+        this.GENERATE_NETHER = draft.GENERATE_NETHER;
+    }
+
+    /**
+     * A draft of these values, for an editor to change.
+     * <p>
+     * What {@code copy()} was, with the difference that the result is a different type: a copy of a
+     * preset used to be a preset, so nothing distinguished "the resolved value worldgen reads" from
+     * "the scratch copy the customization screen is editing" (issue #10).
+     * <p>
+     * The resolved liquid/base {@link BlockState} cache deliberately does not carry over. Those are
+     * memoized from the {@code LIQUID_BLOCK}/{@code BASE_BLOCK} strings, which a draft can change,
+     * and a copied cache would keep answering with the pre-edit block.
+     */
+    public PresetDraft toDraft() {
+        PresetDraft draft = new PresetDraft(id);
+        draft.setName(name);
+        draft.setDescription(description);
+        draft.setExtraDescription(extraDescription);
+        draft.setWarning(warning);
+        draft.setIconFile(iconFile);
+        draft.LANDSCAPE_TYPE = LANDSCAPE_TYPE;
+        draft.GROUNDLEVEL = GROUNDLEVEL;
+        draft.SEALEVEL = SEALEVEL;
+        draft.LIQUID_BLOCK = LIQUID_BLOCK;
+        draft.BASE_BLOCK = BASE_BLOCK;
+        draft.BEDROCK_LAYER = BEDROCK_LAYER;
+        draft.TERRAIN_FIX_LOWER_MIN_OFFSET = TERRAIN_FIX_LOWER_MIN_OFFSET;
+        draft.TERRAIN_FIX_LOWER_MAX_OFFSET = TERRAIN_FIX_LOWER_MAX_OFFSET;
+        draft.TERRAIN_FIX_UPPER_MIN_OFFSET = TERRAIN_FIX_UPPER_MIN_OFFSET;
+        draft.TERRAIN_FIX_UPPER_MAX_OFFSET = TERRAIN_FIX_UPPER_MAX_OFFSET;
+        draft.OCEAN_CORRECTION_BORDER = OCEAN_CORRECTION_BORDER;
+        draft.AVOID_WATER = AVOID_WATER;
+        draft.USE_AVG_HEIGHTMAP = USE_AVG_HEIGHTMAP;
+        draft.CITY_CHANCE = CITY_CHANCE;
+        draft.CITY_MINRADIUS = CITY_MINRADIUS;
+        draft.CITY_MAXRADIUS = CITY_MAXRADIUS;
+        draft.CITY_PERLIN_SCALE = CITY_PERLIN_SCALE;
+        draft.CITY_PERLIN_OFFSET = CITY_PERLIN_OFFSET;
+        draft.CITY_PERLIN_INNERSCALE = CITY_PERLIN_INNERSCALE;
+        draft.CITY_THRESHOLD = CITY_THRESHOLD;
+        draft.CITY_SPAWN_DISTANCE1 = CITY_SPAWN_DISTANCE1;
+        draft.CITY_SPAWN_DISTANCE2 = CITY_SPAWN_DISTANCE2;
+        draft.CITY_SPAWN_MULTIPLIER1 = CITY_SPAWN_MULTIPLIER1;
+        draft.CITY_SPAWN_MULTIPLIER2 = CITY_SPAWN_MULTIPLIER2;
+        draft.CITY_STYLE_THRESHOLD = CITY_STYLE_THRESHOLD;
+        draft.CITY_STYLE_ALTERNATIVE = CITY_STYLE_ALTERNATIVE;
+        draft.CITY_AVOID_VOID = CITY_AVOID_VOID;
+        draft.CITY_LEVEL0_HEIGHT = CITY_LEVEL0_HEIGHT;
+        draft.CITY_LEVEL1_HEIGHT = CITY_LEVEL1_HEIGHT;
+        draft.CITY_LEVEL2_HEIGHT = CITY_LEVEL2_HEIGHT;
+        draft.CITY_LEVEL3_HEIGHT = CITY_LEVEL3_HEIGHT;
+        draft.CITY_LEVEL4_HEIGHT = CITY_LEVEL4_HEIGHT;
+        draft.CITY_LEVEL5_HEIGHT = CITY_LEVEL5_HEIGHT;
+        draft.CITY_LEVEL6_HEIGHT = CITY_LEVEL6_HEIGHT;
+        draft.CITY_LEVEL7_HEIGHT = CITY_LEVEL7_HEIGHT;
+        draft.CITY_MINHEIGHT = CITY_MINHEIGHT;
+        draft.CITY_MAXHEIGHT = CITY_MAXHEIGHT;
+        draft.SCATTERED_CHANCE_MULTIPLIER = SCATTERED_CHANCE_MULTIPLIER;
+        draft.BUILDING_CHANCE = BUILDING_CHANCE;
+        draft.BUILDING_MINFLOORS = BUILDING_MINFLOORS;
+        draft.BUILDING_MAXFLOORS = BUILDING_MAXFLOORS;
+        draft.BUILDING_MINFLOORS_CHANCE = BUILDING_MINFLOORS_CHANCE;
+        draft.BUILDING_MAXFLOORS_CHANCE = BUILDING_MAXFLOORS_CHANCE;
+        draft.BUILDING_MINCELLARS = BUILDING_MINCELLARS;
+        draft.BUILDING_MAXCELLARS = BUILDING_MAXCELLARS;
+        draft.BUILDING_DOORWAYCHANCE = BUILDING_DOORWAYCHANCE;
+        draft.BUILDING_FRONTCHANCE = BUILDING_FRONTCHANCE;
+        draft.MULTI_USE_CORNER = MULTI_USE_CORNER;
+        draft.MULTI_BUILDING_STREET_CONFLICT = MULTI_BUILDING_STREET_CONFLICT;
+        draft.GENERATE_SPAWNERS = GENERATE_SPAWNERS;
+        draft.PRIMARY_ROAD_SPACING_X = PRIMARY_ROAD_SPACING_X;
+        draft.PRIMARY_ROAD_SPACING_Z = PRIMARY_ROAD_SPACING_Z;
+        draft.PRIMARY_ROAD_OPTIONAL_CHANCE = PRIMARY_ROAD_OPTIONAL_CHANCE;
+        draft.PRIMARY_ROAD_FORCE_EVERY = PRIMARY_ROAD_FORCE_EVERY;
+        draft.SECONDARY_ROAD_MIN_COUNT_X = SECONDARY_ROAD_MIN_COUNT_X;
+        draft.SECONDARY_ROAD_MAX_COUNT_X = SECONDARY_ROAD_MAX_COUNT_X;
+        draft.SECONDARY_ROAD_MIN_COUNT_Z = SECONDARY_ROAD_MIN_COUNT_Z;
+        draft.SECONDARY_ROAD_MAX_COUNT_Z = SECONDARY_ROAD_MAX_COUNT_Z;
+        draft.MINIMUM_ROAD_SEPARATION = MINIMUM_ROAD_SEPARATION;
+        draft.MINIMUM_ROAD_EDGE_DISTANCE = MINIMUM_ROAD_EDGE_DISTANCE;
+        draft.TERTIARY_ROAD_CHANCE = TERTIARY_ROAD_CHANCE;
+        draft.TERTIARY_ROAD_MIN_LENGTH = TERTIARY_ROAD_MIN_LENGTH;
+        draft.TERTIARY_ROAD_MAX_LENGTH = TERTIARY_ROAD_MAX_LENGTH;
+        draft.PLANNED_PRIMARY_BRIDGE_CHANCE = PLANNED_PRIMARY_BRIDGE_CHANCE;
+        draft.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
+        draft.OPEN_LOT_PARK_CHANCE = OPEN_LOT_PARK_CHANCE;
+        draft.PARK_ELEVATION = PARK_ELEVATION;
+        draft.PARK_BORDER = PARK_BORDER;
+        draft.PARK_STREET_THRESHOLD = PARK_STREET_THRESHOLD;
+        draft.FOUNTAIN_CHANCE = FOUNTAIN_CHANCE;
+        draft.CORRIDOR_CHANCE = CORRIDOR_CHANCE;
+        draft.BRIDGE_CHANCE = BRIDGE_CHANCE;
+        draft.BRIDGE_SUPPORTS = BRIDGE_SUPPORTS;
+        draft.HIGHWAY_REQUIRES_TWO_CITIES = HIGHWAY_REQUIRES_TWO_CITIES;
+        draft.HIGHWAY_LEVEL_FROM_CITIES_MODE = HIGHWAY_LEVEL_FROM_CITIES_MODE;
+        draft.HIGHWAY_DISTANCE_MASK = HIGHWAY_DISTANCE_MASK;
+        draft.HIGHWAY_MAINPERLIN_SCALE = HIGHWAY_MAINPERLIN_SCALE;
+        draft.HIGHWAY_SECONDARYPERLIN_SCALE = HIGHWAY_SECONDARYPERLIN_SCALE;
+        draft.HIGHWAY_PERLIN_FACTOR = HIGHWAY_PERLIN_FACTOR;
+        draft.HIGHWAY_SUPPORTS = HIGHWAY_SUPPORTS;
+        draft.RAILWAYS_ENABLED = RAILWAYS_ENABLED;
+        draft.RAILWAY_STATIONS_ENABLED = RAILWAY_STATIONS_ENABLED;
+        draft.RAILWAY_SURFACE_STATIONS_ENABLED = RAILWAY_SURFACE_STATIONS_ENABLED;
+        draft.RAILWAYS_CAN_END = RAILWAYS_CAN_END;
+        draft.RAILWAY_DUNGEON_CHANCE = RAILWAY_DUNGEON_CHANCE;
+        draft.RUIN_CHANCE = RUIN_CHANCE;
+        draft.RUIN_MINLEVEL_PERCENT = RUIN_MINLEVEL_PERCENT;
+        draft.RUIN_MAXLEVEL_PERCENT = RUIN_MAXLEVEL_PERCENT;
+        draft.RUBBLELAYER = RUBBLELAYER;
+        draft.RUBBLE_DIRT_SCALE = RUBBLE_DIRT_SCALE;
+        draft.RUBBLE_LEAVE_SCALE = RUBBLE_LEAVE_SCALE;
+        draft.EXPLOSION_CHANCE = EXPLOSION_CHANCE;
+        draft.EXPLOSION_MINRADIUS = EXPLOSION_MINRADIUS;
+        draft.EXPLOSION_MAXRADIUS = EXPLOSION_MAXRADIUS;
+        draft.EXPLOSION_MINHEIGHT = EXPLOSION_MINHEIGHT;
+        draft.EXPLOSION_MAXHEIGHT = EXPLOSION_MAXHEIGHT;
+        draft.MINI_EXPLOSION_CHANCE = MINI_EXPLOSION_CHANCE;
+        draft.MINI_EXPLOSION_MINRADIUS = MINI_EXPLOSION_MINRADIUS;
+        draft.MINI_EXPLOSION_MAXRADIUS = MINI_EXPLOSION_MAXRADIUS;
+        draft.MINI_EXPLOSION_MINHEIGHT = MINI_EXPLOSION_MINHEIGHT;
+        draft.MINI_EXPLOSION_MAXHEIGHT = MINI_EXPLOSION_MAXHEIGHT;
+        draft.EXPLOSIONS_IN_CITIES_ONLY = EXPLOSIONS_IN_CITIES_ONLY;
+        draft.DEBRIS_TO_NEARBYCHUNK_FACTOR = DEBRIS_TO_NEARBYCHUNK_FACTOR;
+        draft.CHANCE_OF_RANDOM_LEAFBLOCKS = CHANCE_OF_RANDOM_LEAFBLOCKS;
+        draft.THICKNESS_OF_RANDOM_LEAFBLOCKS = THICKNESS_OF_RANDOM_LEAFBLOCKS;
+        draft.AVOID_FOLIAGE = AVOID_FOLIAGE;
+        draft.LIGHTING_DENSITY = LIGHTING_DENSITY;
+        draft.LOOT_DENSITY = LOOT_DENSITY;
+        draft.SPAWN_BIOME = SPAWN_BIOME;
+        draft.SPAWN_CITY = SPAWN_CITY;
+        draft.SPAWN_NOT_IN_BUILDING = SPAWN_NOT_IN_BUILDING;
+        draft.FORCE_SPAWN_IN_BUILDING = FORCE_SPAWN_IN_BUILDING;
+        draft.FORCE_SPAWN_BUILDINGS = FORCE_SPAWN_BUILDINGS;
+        draft.FORCE_SPAWN_PARTS = FORCE_SPAWN_PARTS;
+        draft.SPAWN_CHECK_RADIUS = SPAWN_CHECK_RADIUS;
+        draft.SPAWN_RADIUS_INCREASE = SPAWN_RADIUS_INCREASE;
+        draft.SPAWN_CHECK_ATTEMPTS = SPAWN_CHECK_ATTEMPTS;
+        draft.EDITMODE = EDITMODE;
+        draft.GENERATE_NETHER = GENERATE_NETHER;
+        return draft;
     }
 
     public Identifier getId() {
@@ -185,9 +470,6 @@ public class Preset {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
 
     /**
      * What a UI should label this preset: the authored {@code name}, falling back to the
@@ -202,30 +484,17 @@ public class Preset {
         return description;
     }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
 
     public String getExtraDescription() {
         return extraDescription;
     }
 
-    public void setExtraDescription(String extraDescription) {
-        this.extraDescription = extraDescription;
-    }
 
     public String getWarning() {
         return warning;
     }
 
-    public void setWarning(String warning) {
-        this.warning = warning;
-    }
 
-    public void setIconFile(String iconFile) {
-        this.iconFile = iconFile;
-        this.icon = null;
-    }
 
     public String getIconFile() {
         return iconFile;
@@ -280,150 +549,6 @@ public class Preset {
         return baseBlock;
     }
 
-    /** Field-by-field clone, used by the GUI editor to stage changes without mutating the original. */
-    public Preset copy() {
-        Preset p = new Preset(id);
-        p.name = name;
-        p.description = description;
-        p.extraDescription = extraDescription;
-        p.warning = warning;
-        p.iconFile = iconFile;
-        p.icon = icon;
-        // liquidBlock/baseBlock (the resolved BlockState cache) deliberately do NOT carry over:
-        // TerrainSettings.apply() writes LIQUID_BLOCK/BASE_BLOCK (the string fields) directly, with
-        // no setter to invalidate a cache. Presets.applyOverrides() is copy() followed by an
-        // apply() of the override's sections; if the base's cache was already warmed (getLiquidBlock()
-        // called before the override) and the override changes the block string, a copied cache
-        // would make getLiquidBlock()/getBaseBlock() keep returning the pre-override block. Leaving
-        // them null here forces a fresh lazy resolve against whatever LIQUID_BLOCK/BASE_BLOCK ends
-        // up being on the copy.
-
-        p.LANDSCAPE_TYPE = LANDSCAPE_TYPE;
-        p.GROUNDLEVEL = GROUNDLEVEL;
-        p.SEALEVEL = SEALEVEL;
-        p.LIQUID_BLOCK = LIQUID_BLOCK;
-        p.BASE_BLOCK = BASE_BLOCK;
-        p.BEDROCK_LAYER = BEDROCK_LAYER;
-        p.TERRAIN_FIX_LOWER_MIN_OFFSET = TERRAIN_FIX_LOWER_MIN_OFFSET;
-        p.TERRAIN_FIX_LOWER_MAX_OFFSET = TERRAIN_FIX_LOWER_MAX_OFFSET;
-        p.TERRAIN_FIX_UPPER_MIN_OFFSET = TERRAIN_FIX_UPPER_MIN_OFFSET;
-        p.TERRAIN_FIX_UPPER_MAX_OFFSET = TERRAIN_FIX_UPPER_MAX_OFFSET;
-        p.OCEAN_CORRECTION_BORDER = OCEAN_CORRECTION_BORDER;
-        p.AVOID_WATER = AVOID_WATER;
-        p.USE_AVG_HEIGHTMAP = USE_AVG_HEIGHTMAP;
-        p.CITY_CHANCE = CITY_CHANCE;
-        p.CITY_MINRADIUS = CITY_MINRADIUS;
-        p.CITY_MAXRADIUS = CITY_MAXRADIUS;
-        p.CITY_PERLIN_SCALE = CITY_PERLIN_SCALE;
-        p.CITY_PERLIN_OFFSET = CITY_PERLIN_OFFSET;
-        p.CITY_PERLIN_INNERSCALE = CITY_PERLIN_INNERSCALE;
-        p.CITY_THRESHOLD = CITY_THRESHOLD;
-        p.CITY_SPAWN_DISTANCE1 = CITY_SPAWN_DISTANCE1;
-        p.CITY_SPAWN_DISTANCE2 = CITY_SPAWN_DISTANCE2;
-        p.CITY_SPAWN_MULTIPLIER1 = CITY_SPAWN_MULTIPLIER1;
-        p.CITY_SPAWN_MULTIPLIER2 = CITY_SPAWN_MULTIPLIER2;
-        p.CITY_STYLE_THRESHOLD = CITY_STYLE_THRESHOLD;
-        p.CITY_STYLE_ALTERNATIVE = CITY_STYLE_ALTERNATIVE;
-        p.CITY_AVOID_VOID = CITY_AVOID_VOID;
-        p.CITY_LEVEL0_HEIGHT = CITY_LEVEL0_HEIGHT;
-        p.CITY_LEVEL1_HEIGHT = CITY_LEVEL1_HEIGHT;
-        p.CITY_LEVEL2_HEIGHT = CITY_LEVEL2_HEIGHT;
-        p.CITY_LEVEL3_HEIGHT = CITY_LEVEL3_HEIGHT;
-        p.CITY_LEVEL4_HEIGHT = CITY_LEVEL4_HEIGHT;
-        p.CITY_LEVEL5_HEIGHT = CITY_LEVEL5_HEIGHT;
-        p.CITY_LEVEL6_HEIGHT = CITY_LEVEL6_HEIGHT;
-        p.CITY_LEVEL7_HEIGHT = CITY_LEVEL7_HEIGHT;
-        p.CITY_MINHEIGHT = CITY_MINHEIGHT;
-        p.CITY_MAXHEIGHT = CITY_MAXHEIGHT;
-        p.SCATTERED_CHANCE_MULTIPLIER = SCATTERED_CHANCE_MULTIPLIER;
-        p.BUILDING_CHANCE = BUILDING_CHANCE;
-        p.BUILDING_MINFLOORS = BUILDING_MINFLOORS;
-        p.BUILDING_MAXFLOORS = BUILDING_MAXFLOORS;
-        p.BUILDING_MINFLOORS_CHANCE = BUILDING_MINFLOORS_CHANCE;
-        p.BUILDING_MAXFLOORS_CHANCE = BUILDING_MAXFLOORS_CHANCE;
-        p.BUILDING_MINCELLARS = BUILDING_MINCELLARS;
-        p.BUILDING_MAXCELLARS = BUILDING_MAXCELLARS;
-        p.BUILDING_DOORWAYCHANCE = BUILDING_DOORWAYCHANCE;
-        p.BUILDING_FRONTCHANCE = BUILDING_FRONTCHANCE;
-        p.MULTI_USE_CORNER = MULTI_USE_CORNER;
-        p.MULTI_BUILDING_STREET_CONFLICT = MULTI_BUILDING_STREET_CONFLICT;
-        p.GENERATE_SPAWNERS = GENERATE_SPAWNERS;
-        p.PRIMARY_ROAD_SPACING_X = PRIMARY_ROAD_SPACING_X;
-        p.PRIMARY_ROAD_SPACING_Z = PRIMARY_ROAD_SPACING_Z;
-        p.PRIMARY_ROAD_OPTIONAL_CHANCE = PRIMARY_ROAD_OPTIONAL_CHANCE;
-        p.PRIMARY_ROAD_FORCE_EVERY = PRIMARY_ROAD_FORCE_EVERY;
-        p.SECONDARY_ROAD_MIN_COUNT_X = SECONDARY_ROAD_MIN_COUNT_X;
-        p.SECONDARY_ROAD_MAX_COUNT_X = SECONDARY_ROAD_MAX_COUNT_X;
-        p.SECONDARY_ROAD_MIN_COUNT_Z = SECONDARY_ROAD_MIN_COUNT_Z;
-        p.SECONDARY_ROAD_MAX_COUNT_Z = SECONDARY_ROAD_MAX_COUNT_Z;
-        p.MINIMUM_ROAD_SEPARATION = MINIMUM_ROAD_SEPARATION;
-        p.MINIMUM_ROAD_EDGE_DISTANCE = MINIMUM_ROAD_EDGE_DISTANCE;
-        p.TERTIARY_ROAD_CHANCE = TERTIARY_ROAD_CHANCE;
-        p.TERTIARY_ROAD_MIN_LENGTH = TERTIARY_ROAD_MIN_LENGTH;
-        p.TERTIARY_ROAD_MAX_LENGTH = TERTIARY_ROAD_MAX_LENGTH;
-        p.PLANNED_PRIMARY_BRIDGE_CHANCE = PLANNED_PRIMARY_BRIDGE_CHANCE;
-        p.PLANNED_PRIMARY_BRIDGE_MAX_LENGTH = PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
-        p.OPEN_LOT_PARK_CHANCE = OPEN_LOT_PARK_CHANCE;
-        p.PARK_ELEVATION = PARK_ELEVATION;
-        p.PARK_BORDER = PARK_BORDER;
-        p.PARK_STREET_THRESHOLD = PARK_STREET_THRESHOLD;
-        p.FOUNTAIN_CHANCE = FOUNTAIN_CHANCE;
-        p.CORRIDOR_CHANCE = CORRIDOR_CHANCE;
-        p.BRIDGE_CHANCE = BRIDGE_CHANCE;
-        p.BRIDGE_SUPPORTS = BRIDGE_SUPPORTS;
-        p.HIGHWAY_REQUIRES_TWO_CITIES = HIGHWAY_REQUIRES_TWO_CITIES;
-        p.HIGHWAY_LEVEL_FROM_CITIES_MODE = HIGHWAY_LEVEL_FROM_CITIES_MODE;
-        p.HIGHWAY_DISTANCE_MASK = HIGHWAY_DISTANCE_MASK;
-        p.HIGHWAY_MAINPERLIN_SCALE = HIGHWAY_MAINPERLIN_SCALE;
-        p.HIGHWAY_SECONDARYPERLIN_SCALE = HIGHWAY_SECONDARYPERLIN_SCALE;
-        p.HIGHWAY_PERLIN_FACTOR = HIGHWAY_PERLIN_FACTOR;
-        p.HIGHWAY_SUPPORTS = HIGHWAY_SUPPORTS;
-        p.RAILWAYS_ENABLED = RAILWAYS_ENABLED;
-        p.RAILWAY_STATIONS_ENABLED = RAILWAY_STATIONS_ENABLED;
-        p.RAILWAY_SURFACE_STATIONS_ENABLED = RAILWAY_SURFACE_STATIONS_ENABLED;
-        p.RAILWAYS_CAN_END = RAILWAYS_CAN_END;
-        p.RAILWAY_DUNGEON_CHANCE = RAILWAY_DUNGEON_CHANCE;
-        p.RUIN_CHANCE = RUIN_CHANCE;
-        p.RUIN_MINLEVEL_PERCENT = RUIN_MINLEVEL_PERCENT;
-        p.RUIN_MAXLEVEL_PERCENT = RUIN_MAXLEVEL_PERCENT;
-        p.RUBBLELAYER = RUBBLELAYER;
-        p.RUBBLE_DIRT_SCALE = RUBBLE_DIRT_SCALE;
-        p.RUBBLE_LEAVE_SCALE = RUBBLE_LEAVE_SCALE;
-        p.EXPLOSION_CHANCE = EXPLOSION_CHANCE;
-        p.EXPLOSION_MINRADIUS = EXPLOSION_MINRADIUS;
-        p.EXPLOSION_MAXRADIUS = EXPLOSION_MAXRADIUS;
-        p.EXPLOSION_MINHEIGHT = EXPLOSION_MINHEIGHT;
-        p.EXPLOSION_MAXHEIGHT = EXPLOSION_MAXHEIGHT;
-        p.MINI_EXPLOSION_CHANCE = MINI_EXPLOSION_CHANCE;
-        p.MINI_EXPLOSION_MINRADIUS = MINI_EXPLOSION_MINRADIUS;
-        p.MINI_EXPLOSION_MAXRADIUS = MINI_EXPLOSION_MAXRADIUS;
-        p.MINI_EXPLOSION_MINHEIGHT = MINI_EXPLOSION_MINHEIGHT;
-        p.MINI_EXPLOSION_MAXHEIGHT = MINI_EXPLOSION_MAXHEIGHT;
-        p.EXPLOSIONS_IN_CITIES_ONLY = EXPLOSIONS_IN_CITIES_ONLY;
-        p.DEBRIS_TO_NEARBYCHUNK_FACTOR = DEBRIS_TO_NEARBYCHUNK_FACTOR;
-        p.CHANCE_OF_RANDOM_LEAFBLOCKS = CHANCE_OF_RANDOM_LEAFBLOCKS;
-        p.THICKNESS_OF_RANDOM_LEAFBLOCKS = THICKNESS_OF_RANDOM_LEAFBLOCKS;
-        p.AVOID_FOLIAGE = AVOID_FOLIAGE;
-        p.LIGHTING_DENSITY = LIGHTING_DENSITY;
-        p.LOOT_DENSITY = LOOT_DENSITY;
-        p.SPAWN_BIOME = SPAWN_BIOME;
-        p.SPAWN_CITY = SPAWN_CITY;
-        p.SPAWN_NOT_IN_BUILDING = SPAWN_NOT_IN_BUILDING;
-        p.FORCE_SPAWN_IN_BUILDING = FORCE_SPAWN_IN_BUILDING;
-        p.FORCE_SPAWN_BUILDINGS = List.copyOf(FORCE_SPAWN_BUILDINGS);
-        p.FORCE_SPAWN_PARTS = List.copyOf(FORCE_SPAWN_PARTS);
-        p.SPAWN_CHECK_RADIUS = SPAWN_CHECK_RADIUS;
-        p.SPAWN_RADIUS_INCREASE = SPAWN_RADIUS_INCREASE;
-        p.SPAWN_CHECK_ATTEMPTS = SPAWN_CHECK_ATTEMPTS;
-        p.EDITMODE = EDITMODE;
-        p.GENERATE_NETHER = GENERATE_NETHER;
-        return p;
-    }
-
-    /**
-     * Encodes this preset as a {@link PresetDefinition} with every field present (fully-populated
-     * sections). Used for round-trip tests, saved-data overrides, and the export command.
-     */
     public PresetDefinition toDefinition() {
         TerrainSettings terrain =
                 new TerrainSettings(

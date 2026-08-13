@@ -1,6 +1,7 @@
 package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.WorldSelectionHandoff;
 import dev.krona.urbex.setup.WorldStyleMix;
@@ -56,6 +57,11 @@ class PresetSelectionTest {
         return new Preset(id(path));
     }
 
+    /** What the Customize editor hands back: a draft of the preset it was opened on. */
+    private static PresetDraft draft(String path) {
+        return new PresetDraft(id(path));
+    }
+
     private static PresetSelection.Entry entry(String path) {
         return new PresetSelection.Entry(id(path), Component.literal(path), preset(path));
     }
@@ -106,7 +112,7 @@ class PresetSelectionTest {
     void customizedEntrySortsLastAndCarriesTheSentinelId() {
         PresetSelection selection = new PresetSelection();
         selection.setAvailablePresets(List.of(entry("default")));
-        selection.applyCustomized(preset("default"));
+        selection.applyCustomized(draft("default"));
 
         List<Identifier> ids = selection.entries().stream().map(PresetSelection.Entry::id).toList();
 
@@ -116,7 +122,7 @@ class PresetSelectionTest {
     @Test
     void customizedEntryNameIsGenericNotTiedToAnyBaseId() {
         PresetSelection selection = new PresetSelection();
-        selection.applyCustomized(preset("default"));
+        selection.applyCustomized(draft("default"));
 
         assertEquals("urbex.preset.custom", keyOf(selection.selected().name()));
     }
@@ -182,7 +188,7 @@ class PresetSelectionTest {
         selection.setAvailablePresets(List.of(entry("default")));
         selection.select(id("default"));
 
-        Preset copy = preset("default");
+        PresetDraft copy = draft("default");
         copy.CITY_CHANCE = 0.5;
         selection.applyCustomized(copy);
         selection.publish();
@@ -206,7 +212,7 @@ class PresetSelectionTest {
         selection.select(id("default"));
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
         selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
-        selection.applyCustomized(preset("default"));
+        selection.applyCustomized(draft("default"));
 
         selection.publish();
 

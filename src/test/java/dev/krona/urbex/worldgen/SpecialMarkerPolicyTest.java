@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
@@ -12,19 +12,19 @@ class SpecialMarkerPolicyTest {
 
     @Test
     void lootAdmissionUsesDensityWhileSpawnerAdmissionDoesNot() {
-        Preset profile = new Preset(Identifier.fromNamespaceAndPath("urbex", "marker-policy"));
+        PresetDraft draft = new PresetDraft(Identifier.fromNamespaceAndPath("urbex", "marker-policy"));
         BlockPos marker = new BlockPos(12, 70, -4);
-        profile.GENERATE_SPAWNERS = true;
+        draft.GENERATE_SPAWNERS = true;
 
-        profile.LOOT_DENSITY = 0.0f;
-        assertFalse(SpecialMarkerPolicy.populateLoot(41L, marker, profile));
-        assertTrue(SpecialMarkerPolicy.generateSpawner(profile));
+        draft.LOOT_DENSITY = 0.0f;
+        assertFalse(SpecialMarkerPolicy.populateLoot(41L, marker, draft.resolve()));
+        assertTrue(SpecialMarkerPolicy.generateSpawner(draft.resolve()));
 
-        profile.LOOT_DENSITY = 1.0f;
-        assertTrue(SpecialMarkerPolicy.populateLoot(41L, marker, profile));
-        assertTrue(SpecialMarkerPolicy.generateSpawner(profile));
+        draft.LOOT_DENSITY = 1.0f;
+        assertTrue(SpecialMarkerPolicy.populateLoot(41L, marker, draft.resolve()));
+        assertTrue(SpecialMarkerPolicy.generateSpawner(draft.resolve()));
 
-        profile.GENERATE_SPAWNERS = false;
-        assertFalse(SpecialMarkerPolicy.generateSpawner(profile));
+        draft.GENERATE_SPAWNERS = false;
+        assertFalse(SpecialMarkerPolicy.generateSpawner(draft.resolve()));
     }
 }
