@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.UrbexTags;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
@@ -189,7 +189,7 @@ public class WorldStyle {
         return worldSettings;
     }
 
-    public float getCityChanceMultiplier(IDimensionInfo provider, ChunkCoord coord) {
+    public float getCityChanceMultiplier(PlanningContext provider, ChunkCoord coord) {
         Holder<Biome> biome = BiomeInfo.getBiomeInfo(provider, coord).getMainBiome();
         for (Pair<Predicate<Holder<Biome>>, Float> pair : cityBiomeMultiplier) {
             if (pair.getLeft().test(biome)) {
@@ -199,7 +199,7 @@ public class WorldStyle {
         return 1.0f;
     }
 
-    public String getRandomCityStyle(IDimensionInfo provider, ChunkCoord coord, RandomSource random) {
+    public String getRandomCityStyle(PlanningContext provider, ChunkCoord coord, RandomSource random) {
         Holder<Biome> biome = BiomeInfo.getBiomeInfo(provider, coord).getMainBiome();
         List<Pair<Float, String>> ct = new ArrayList<>();
         for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> pair : cityStyleSelector) {

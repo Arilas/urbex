@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.gen;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
@@ -27,7 +27,7 @@ public class Railways {
     }
 
     public static void generateRailways(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, Railway.RailChunkInfo railInfo, ChunkHeightmap heightmap) {
-        IDimensionInfo provider = feature.provider;
+        PlanningContext provider = feature.provider;
         ChunkDriver driver = ctx.driver;
         BlockState liquid = feature.liquid;
         BlockState air = Blocks.AIR.defaultBlockState();

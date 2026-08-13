@@ -67,7 +67,7 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
             // Urbex does not generate in this dimension. A published decision, not a missing one.
             return false;
         }
-        IDimensionInfo diminfo = runtime.planning();
+        PlanningContext diminfo = runtime.planning();
         ChunkPos center = chunk.getPos();
         Holder<Biome> biome = region.getBiome(center.getMiddleBlockPosition(60));
         if (biome.is(UrbexTags.IS_VOID)) {
@@ -79,14 +79,14 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
         // No lock. The terrain feature holds no per-chunk state any more (that is on the
         // ChunkGenContext built inside generate()), the caches it reaches are concurrent,
         // and the region arrives as an argument instead of being written onto the shared
-        // IDimensionInfo. So Urbex generation runs on the worker pool in parallel with the
+        // PlanningContext. So Urbex generation runs on the worker pool in parallel with the
         // rest of worldgen again, as it did before the driver became shared.
         CityGenerator feature = runtime.generator();
         try {
             feature.generate(runtime, region, chunk);
         } catch (Exception e) {
             Urbex.getLogger().error("Error generating chunk {},{} (preset={}, dimension={})",
-                    chunkX, chunkZ, diminfo.getProfile().getId(), diminfo.getType().identifier(), e);
+                    chunkX, chunkZ, diminfo.preset().getId(), diminfo.dimension().identifier(), e);
             ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
             ErrorLogger.report("There was an error generating a chunk. See log for details!");
         }

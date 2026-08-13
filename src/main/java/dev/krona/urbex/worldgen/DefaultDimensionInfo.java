@@ -1,105 +1,58 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.config.Preset;
-import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
-import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import dev.krona.urbex.setup.WorldStyleMix;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
+import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import net.minecraft.world.level.WorldGenLevel;
-import org.jetbrains.annotations.Nullable;
 
+/**
+ * Builds one loaded level's planning inputs and its generator.
+ *
+ * <p>What is left of a class that used to be the planning inputs. Every field it held is a component
+ * of the {@link PlanningContext} it assembles now, and the assembly is the whole of its body - which
+ * is what breaks the cycle it was the other half of: {@code new CityGenerator(this, preset)} handed a
+ * half-constructed object to a collaborator that read a level back out of it, so neither type could
+ * be built without the other (issue #129).</p>
+ */
 public class DefaultDimensionInfo implements IDimensionInfo {
 
-    // The dimension's ServerLevel, not the region of whichever chunk is generating. Final, so it
-    // cannot be swapped out from under a worker thread, which is what the per-dimension lock in
-    // CityFeature.place used to be protecting.
-    private final WorldGenLevel world;
-    private final LevelShape shape;
-    private final AssetSnapshot assets;
-    private final Preset profile;
-    private final WorldStyleField styles;
-    private final DimensionCaches caches;
-
-    private final LevelTerrain terrain;
+    private final PlanningContext planning;
     private final CityGenerator feature;
-    private final RoadField roadField;
 
     public DefaultDimensionInfo(WorldGenLevel world, AssetSnapshot assets, Preset preset,
                                 WorldStyleMix worldStyles) {
-        this.world = world.getLevel();
-        // Resolved here, on the thread that loads the level, rather than per call from generation:
-        // the dimension type fixes the two bounds and the chunk generator fixes the sea level, and
-        // neither can change while the level is loaded.
-        this.shape = LevelShape.of(this.world);
-        this.assets = assets;
-        this.profile = preset;
-        this.caches = new DimensionCaches(this.world.getSeed());
-        styles = WorldStyleField.resolve(assets, this.world.getSeed(), worldStyles);
-        // Before the generator, and no longer on it: sampling the ground height is not generation,
-        // and having the generator own it is half of why the generator and this class have to
-        // construct each other (issue #129).
-        terrain = new LevelTerrain(this.world, preset, caches);
-        feature = new CityGenerator(this, preset);
-        roadField = new GridRoadField(this.world.getSeed(), getType().identifier().toString(),
-                GridSettings.fromPreset(preset));
+        // The dimension's ServerLevel, not the region of whichever chunk is generating. Final, so it
+        // cannot be swapped out from under a worker thread, which is what the per-dimension lock in
+        // CityFeature.place used to be protecting.
+        WorldGenLevel level = world.getLevel();
+        long seed = level.getSeed();
+        DimensionCaches caches = new DimensionCaches(seed);
+        planning = new PlanningContext(
+                seed,
+                level.getLevel().dimension(),
+                preset,
+                assets,
+                WorldStyleField.resolve(assets, seed, worldStyles),
+                new GridRoadField(seed, level.getLevel().dimension().identifier().toString(),
+                        GridSettings.fromPreset(preset)),
+                caches,
+                // Resolved here, on the thread that loads the level, rather than per call from
+                // generation: the dimension type fixes the two bounds and the chunk generator fixes
+                // the sea level, and neither can change while the level is loaded.
+                LevelShape.of(level),
+                new LevelTerrain(level, preset, caches));
+        feature = new CityGenerator(planning, preset);
     }
 
     @Override
-    public long getSeed() {
-        return world.getSeed();
-    }
-
-    @Override
-    public AssetSnapshot assets() {
-        return assets;
-    }
-
-    @Override
-    public LevelShape shape() {
-        return shape;
-    }
-
-    @Override
-    public DimensionCaches caches() {
-        return caches;
-    }
-
-    @Override
-    public RoadField roadField() {
-        return roadField;
-    }
-
-    @Override
-    public ResourceKey<Level> getType() {
-        return world.getLevel().dimension();
-    }
-
-    @Override
-    public Preset getProfile() {
-        return profile;
-    }
-
-    @Override
-    public WorldStyleField worldStyles() {
-        return styles;
+    public PlanningContext planning() {
+        return planning;
     }
 
     @Override
     public CityGenerator getFeature() {
         return feature;
-    }
-
-    @Override
-    public TerrainSampler terrain() {
-        return terrain;
-    }
-
-    @Nullable
-    @Override
-    public ResourceKey<Level> dimension() {
-        return world.getLevel().dimension();
     }
 }

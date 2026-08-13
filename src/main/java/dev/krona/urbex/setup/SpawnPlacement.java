@@ -4,7 +4,7 @@ import dev.krona.urbex.worldgen.GenerationSession;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity;
@@ -75,11 +75,11 @@ public class SpawnPlacement {
     public static boolean onCreateSpawnPoint(ServerLevel serverLevel, ServerLevelData settings) {
         LevelAccessor world = serverLevel;
         {
-            IDimensionInfo dimensionInfo = GenerationSession.planningFor(serverLevel);
+            PlanningContext dimensionInfo = GenerationSession.planningFor(serverLevel);
             if (dimensionInfo == null) {
                 return false;
             }
-            Preset profile = dimensionInfo.getProfile();
+            Preset profile = dimensionInfo.preset();
 
             Predicate<BlockPos> isSuitable = pos -> true;
             boolean needsCheck = false;
@@ -111,7 +111,7 @@ public class SpawnPlacement {
                 Set<String> buildings = Set.copyOf(profile.FORCE_SPAWN_BUILDINGS);
                 Set<String> parts = Set.copyOf(profile.FORCE_SPAWN_PARTS);
                 isSuitable = isSuitable.and(blockPos -> {
-                    ChunkCoord coord = new ChunkCoord(dimensionInfo.getType(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
+                    ChunkCoord coord = new ChunkCoord(dimensionInfo.dimension(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
                     ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimensionInfo);
                     if (info == null) {
                         return false;
@@ -166,8 +166,8 @@ public class SpawnPlacement {
         return false;
     }
 
-    private static boolean isOutsideBuilding(IDimensionInfo provider, BlockPos pos) {
-        ChunkCoord coord = new ChunkCoord(provider.getType(), pos.getX() >> 4, pos.getZ() >> 4);
+    private static boolean isOutsideBuilding(PlanningContext provider, BlockPos pos) {
+        ChunkCoord coord = new ChunkCoord(provider.dimension(), pos.getX() >> 4, pos.getZ() >> 4);
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
         return !(info.isCity() && info.hasBuilding);
     }
@@ -182,10 +182,10 @@ public class SpawnPlacement {
         return dx * dx + dz * dz;
     }
 
-    private static BlockPos findSafeSpawnPoint(Level world, IDimensionInfo provider, @Nonnull Predicate<BlockPos> isSuitable,
+    private static BlockPos findSafeSpawnPoint(Level world, PlanningContext provider, @Nonnull Predicate<BlockPos> isSuitable,
                                     @Nonnull ServerLevelData serverLevelData) {
-        Random rand = new Random(provider.getSeed());
-        int radius = provider.getProfile().SPAWN_CHECK_RADIUS;
+        Random rand = new Random(provider.seed());
+        int radius = provider.preset().SPAWN_CHECK_RADIUS;
         int attempts = 0;
 //        int bottom = world.getWorldType().getMinimumSpawnHeight(world);
         while (true) {
@@ -198,8 +198,8 @@ public class SpawnPlacement {
                     continue;
                 }
 
-                ChunkCoord coord = new ChunkCoord(provider.getType(), x >> 4, z >> 4);
-                Preset profile = provider.getProfile();
+                ChunkCoord coord = new ChunkCoord(provider.dimension(), x >> 4, z >> 4);
+                Preset profile = provider.preset();
 
                 for (int y = profile.GROUNDLEVEL-5 ; y < 125 ; y++) {
                     BlockPos pos = new BlockPos(x, y, z);
@@ -209,8 +209,8 @@ public class SpawnPlacement {
                     }
                 }
             }
-            radius += provider.getProfile().SPAWN_RADIUS_INCREASE;
-            if (attempts > provider.getProfile().SPAWN_CHECK_ATTEMPTS) {
+            radius += provider.preset().SPAWN_RADIUS_INCREASE;
+            if (attempts > provider.preset().SPAWN_CHECK_ATTEMPTS) {
                 Urbex.setup.getLogger().error("Can't find a valid spawn position!");
                 throw new RuntimeException("Can't find a valid spawn position!");
             }

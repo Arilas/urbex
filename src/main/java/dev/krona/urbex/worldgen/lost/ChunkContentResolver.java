@@ -95,7 +95,7 @@ public final class ChunkContentResolver {
      * short-circuits: a chunk whose building-chance roll fails never asks whether it sits on a
      * highway. Evaluating these eagerly would consult {@link Highway} and {@link Railway} for chunks
      * that never do so today - {@code Railway}'s chunk types are mutable state, and the highway
-     * extent scan is expensive. It also keeps the resolver free of {@code IDimensionInfo}: the
+     * extent scan is expensive. It also keeps the resolver free of {@code PlanningContext}: the
      * decision is a pure function of these values, so a test can supply them directly.
      *
      * @param hasPredefinedBuilding        a predefined building starts at this chunk's top-left

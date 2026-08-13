@@ -7,7 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.editor.EditModeData;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -35,12 +35,12 @@ public class CommandListParts implements Command<CommandSourceStack> {
         BlockPos start = player.blockPosition();
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;
         }
-        if (!dimInfo.getProfile().EDITMODE) {
+        if (!dimInfo.preset().EDITMODE) {
             context.getSource().sendFailure(Component.literal("This world was not created with edit mode enabled. This command is not possible!"));
             return 0;
         }

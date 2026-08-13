@@ -29,7 +29,7 @@ public final class ChunkGenContext {
     public final WorldGenRegion region;
     public final ChunkAccess chunk;
     public final ChunkCoord coord;
-    public final IDimensionInfo provider;
+    public final PlanningContext provider;
     public final Preset profile;
     public final ChunkPlan info;
     public final CompiledPalette palette;
@@ -67,7 +67,7 @@ public final class ChunkGenContext {
     public final long seed;
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
-                           IDimensionInfo provider, Preset profile, ChunkPlan info,
+                           PlanningContext provider, Preset profile, ChunkPlan info,
                            LevelTaskQueue levelTasks, TagSnapshot tags) {
         this.levelTasks = levelTasks;
         this.tags = tags;
@@ -82,7 +82,7 @@ public final class ChunkGenContext {
         this.driver = new ChunkDriver();
         this.driver.setPrimer(region, chunk);
         this.buffers = new NoiseBuffers();
-        this.seed = provider.getSeed();
+        this.seed = provider.seed();
         this.lightTodo = new LightTodoQueue(coord.chunkX(), coord.chunkZ());
     }
 

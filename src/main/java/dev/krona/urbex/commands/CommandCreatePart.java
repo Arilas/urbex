@@ -6,7 +6,7 @@ import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.editor.Editor;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -40,7 +40,7 @@ public class CommandCreatePart implements Command<CommandSourceStack> {
         ServerLevel level = (ServerLevel) player.level();
         // The provider first: the part is looked up in this level's compiled assets, so there is
         // nothing to look it up in until the level has one (issue #128).
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("Urbex does not generate in this dimension!").withStyle(ChatFormatting.RED));
             return 0;

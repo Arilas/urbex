@@ -25,7 +25,7 @@ public class Style {
      * @param palettes the compiled palettes this style's {@code randompalettes} name. Resolved here
      *                 rather than on the first chunk that needs one: the lookup used to happen inside
      *                 {@link #getRandomPalette}, from a worldgen worker, which is why that method took
-     *                 an {@code IDimensionInfo} it otherwise had no use for (issue #128).
+     *                 a {@code PlanningContext} it otherwise had no use for (issue #128).
      */
     public Style(Identifier id, AssetIndex<Palette> palettes, List<StyleDefinition> chainRootFirst) {
         name = id;

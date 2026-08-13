@@ -7,7 +7,7 @@ import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -58,7 +58,7 @@ public class CommandLocate implements Command<CommandSourceStack> {
         BlockPos start = player.blockPosition();
 
         ServerLevel level = (ServerLevel) player.level();
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("This dimension doesn't support Urbex!"));
             return 0;

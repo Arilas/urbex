@@ -47,11 +47,11 @@ public class ErrorLogger {
         }
     }
 
-    public static void logChunkInfo(int chunkX, int chunkZ, IDimensionInfo provider) {
+    public static void logChunkInfo(int chunkX, int chunkZ, PlanningContext provider) {
         Logger logger = Urbex.getLogger();
         try {
-            ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
-            logger.info("IsCity: " + ChunkPlan.isCityRaw(coord, provider, provider.getProfile()));
+            ChunkCoord coord = new ChunkCoord(provider.dimension(), chunkX, chunkZ);
+            logger.info("IsCity: " + ChunkPlan.isCityRaw(coord, provider, provider.preset()));
             ChunkCandidate candidate = ChunkPlan.getChunkCandidate(coord, provider);
             logger.info("    Level: " + candidate.cityLevel());
             if (candidate.multiBuilding() != null) {

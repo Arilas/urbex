@@ -2,21 +2,13 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
-import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
-import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
-import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import net.minecraft.SharedConstants;
-import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -42,53 +34,19 @@ class WorldStyleFieldTest {
         Bootstrap.bootStrap();
     }
 
-    /**
-     * A minimal resolvable world style, built by hand rather than from a registry - the same shape
-     * {@code NullDimensionInfo}'s preview placeholder uses, which is the only other place in the
-     * tree that constructs a {@code WorldStyleDefinition} directly. Declares everything
-     * {@code WorldStyle} requires after resolution and nothing else.
-     */
-    private static WorldStyle style(String path) {
-        WorldStyleDefinition re = new WorldStyleDefinition(
-                Optional.empty(),
-                // No display name: these exist to be told apart by id, and getName() is what the
-                // field's primary tie-break and this test's assertions read.
-                Optional.empty(),
-                Optional.of("urbex:standard"),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.of(new PartSelector.Decl(
-                        Optional.of(new HighwayParts.Decl(
-                                noParts(), noParts(), noParts(), noParts(), noParts(), noParts())),
-                        Optional.of(new RailwayParts.Decl(
-                                noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
-                                noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
-                                noParts(), noParts(), noParts(), noParts())))),
-                Optional.of(new Mergeable<>(true, Collections.emptyList())),
-                Optional.empty(),
-                Optional.empty()
-        );
-        return new WorldStyle(Identifier.fromNamespaceAndPath("urbextest", path), List.of(re));
-    }
-
-    private static Optional<Mergeable<String>> noParts() {
-        return Optional.of(new Mergeable<>(true, Collections.emptyList()));
-    }
-
     private static ChunkCoord coord(int x, int z) {
         return new ChunkCoord(Level.OVERWORLD, x, z);
     }
 
     private static WorldStyleField mixed() {
         return new WorldStyleField(SEED, List.of(
-                new WorldStyleField.Weighted(0.1f, style("light")),
-                new WorldStyleField.Weighted(0.9f, style("heavy"))));
+                new WorldStyleField.Weighted(0.1f, TestWorldStyles.minimal("light")),
+                new WorldStyleField.Weighted(0.9f, TestWorldStyles.minimal("heavy"))));
     }
 
     @Test
     void oneStyleAlwaysAnswersItselfWithoutDrawing() {
-        WorldStyle only = style("light");
+        WorldStyle only = TestWorldStyles.minimal("light");
         WorldStyleField field = WorldStyleField.single(SEED, only);
         assertTrue(field.isSingle());
         assertSame(only, field.primary());
@@ -118,8 +76,8 @@ class WorldStyleFieldTest {
     void differentSeedsDrawDifferently() {
         WorldStyleField a = mixed();
         WorldStyleField b = new WorldStyleField(SEED + 1, List.of(
-                new WorldStyleField.Weighted(0.1f, style("light")),
-                new WorldStyleField.Weighted(0.9f, style("heavy"))));
+                new WorldStyleField.Weighted(0.1f, TestWorldStyles.minimal("light")),
+                new WorldStyleField.Weighted(0.9f, TestWorldStyles.minimal("heavy"))));
         int differences = 0;
         for (int x = -30; x <= 30; x++) {
             for (int z = -30; z <= 30; z++) {
@@ -159,8 +117,8 @@ class WorldStyleFieldTest {
     void equalWeightsBreakTheTieOnTheIdNotOnListOrder() {
         // Mirrors WorldStyleMix.primary: the field is built from a list that can arrive in registry
         // iteration order, so a positional tie-break would depend on file names.
-        WorldStyle light = style("light");
-        WorldStyle heavy = style("heavy");
+        WorldStyle light = TestWorldStyles.minimal("light");
+        WorldStyle heavy = TestWorldStyles.minimal("heavy");
         assertEquals("urbextest:heavy", new WorldStyleField(SEED, List.of(
                 new WorldStyleField.Weighted(1.0f, light),
                 new WorldStyleField.Weighted(1.0f, heavy))).primary().getName());

@@ -3,7 +3,7 @@ package dev.krona.urbex.setup;
 import dev.krona.urbex.worldgen.GenerationSession;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.gen.Scattered;
 import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
@@ -75,7 +75,7 @@ public final class MixCheck {
     }
 
     private static void census(ServerLevel level, int radius, int offset, boolean requireAll) {
-        IDimensionInfo provider = GenerationSession.planningFor(level);
+        PlanningContext provider = GenerationSession.planningFor(level);
         if (provider == null) {
             report(FAIL + " (no Urbex preset configured for the overworld)");
             return;
@@ -99,7 +99,7 @@ public final class MixCheck {
 
         for (int cx = offset - radius; cx <= offset + radius; cx++) {
             for (int cz = offset - radius; cz <= offset + radius; cz++) {
-                ChunkCoord coord = new ChunkCoord(provider.getType(), cx, cz);
+                ChunkCoord coord = new ChunkCoord(provider.dimension(), cx, cz);
 
                 chunkStyles.merge(provider.worldStyles().atChunk(provider, coord).getName(), 1, Integer::sum);
 

@@ -5,7 +5,7 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.GeometryTools;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.TagSnapshot;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.core.BlockPos;
@@ -32,8 +32,8 @@ public class DamageArea {
 
     private final BlockState air;
 
-    public DamageArea(int chunkX, int chunkZ, IDimensionInfo provider, ChunkPlan info) {
-        this.seed = provider.getSeed();
+    public DamageArea(int chunkX, int chunkZ, PlanningContext provider, ChunkPlan info) {
+        this.seed = provider.seed();
         this.profile = info.profile;
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
@@ -45,7 +45,7 @@ public class DamageArea {
         int offset = (Math.max(info.profile.EXPLOSION_MAXRADIUS, info.profile.MINI_EXPLOSION_MAXRADIUS)+15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
             for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
-                ChunkCoord coord = new ChunkCoord(provider.getType(), cx, cz);
+                ChunkCoord coord = new ChunkCoord(provider.dimension(), cx, cz);
                 if ((!info.profile.EXPLOSIONS_IN_CITIES_ONLY) || ChunkPlan.isCity(coord, provider)) {
                     Explosion explosion = getExplosionAt(coord, provider);
                     if (explosion != null) {
@@ -98,7 +98,7 @@ public class DamageArea {
      * the chunk's {@link ChunkPlan} and outlives any one generation, so a tag epoch stored here
      * would be the wrong one for every chunk after the next {@code /reload} (issue #128).
      */
-    public BlockState damageBlock(BlockState b, IDimensionInfo provider, TagSnapshot tags, int x, int y, int z, float damage, CompiledPalette palette, BlockState liquidChar) {
+    public BlockState damageBlock(BlockState b, PlanningContext provider, TagSnapshot tags, int x, int y, int z, float damage, CompiledPalette palette, BlockState liquidChar) {
         if (tags.isNotBreakable(b)) {
             return b;
         }
@@ -127,7 +127,7 @@ public class DamageArea {
         return dmin <= radius * radius;
     }
 
-    private Explosion getExplosionAt(ChunkCoord coord, IDimensionInfo provider) {
+    private Explosion getExplosionAt(ChunkCoord coord, PlanningContext provider) {
         RandomSource randomExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION);
         if (randomExplosion.nextFloat() < profile.EXPLOSION_CHANCE) {
             return new Explosion(Tools.randomBetween(randomExplosion, profile.EXPLOSION_MINRADIUS, profile.EXPLOSION_MAXRADIUS),
@@ -138,7 +138,7 @@ public class DamageArea {
         return null;
     }
 
-    private Explosion getMiniExplosionAt(ChunkCoord coord, IDimensionInfo provider) {
+    private Explosion getMiniExplosionAt(ChunkCoord coord, PlanningContext provider) {
         RandomSource randomMiniExplosion = Rng.at(seed, coord.chunkX(), coord.chunkZ(), Rng.Purpose.EXPLOSION_MINI);
         if (randomMiniExplosion.nextFloat() < profile.MINI_EXPLOSION_CHANCE) {
             return new Explosion(Tools.randomBetween(randomMiniExplosion, profile.MINI_EXPLOSION_MINRADIUS, profile.MINI_EXPLOSION_MAXRADIUS),

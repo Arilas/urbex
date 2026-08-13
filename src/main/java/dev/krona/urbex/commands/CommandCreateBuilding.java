@@ -7,7 +7,7 @@ import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import net.minecraft.commands.CommandSourceStack;
@@ -52,7 +52,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         ServerPlayer player = context.getSource().getPlayerOrException();
         ServerLevel level = (ServerLevel) player.level();
         // The provider first: the building is looked up in this level's compiled assets (issue #128).
-        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        PlanningContext dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
             context.getSource().sendFailure(Component.literal("Urbex does not generate in this dimension!"));
             return 0;

@@ -7,7 +7,7 @@ import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.worldgen.GenerationSession;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.cityassets.Building;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import net.minecraft.commands.CommandSourceStack;
@@ -61,7 +61,7 @@ public class ModCommands {
     @Nonnull
     static SuggestionProvider<CommandSourceStack> getPartSuggestionProvider() {
         return (context, builder) -> {
-            IDimensionInfo provider = GenerationSession.planningFor(context.getSource().getLevel());
+            PlanningContext provider = GenerationSession.planningFor(context.getSource().getLevel());
             if (provider == null) {
                 return builder.buildFuture();
             }
@@ -73,7 +73,7 @@ public class ModCommands {
     @Nonnull
     static SuggestionProvider<CommandSourceStack> getBuildingSuggestionProvider() {
         return (context, builder) -> {
-            IDimensionInfo provider = GenerationSession.planningFor(context.getSource().getLevel());
+            PlanningContext provider = GenerationSession.planningFor(context.getSource().getLevel());
             if (provider == null) {
                 return builder.buildFuture();
             }

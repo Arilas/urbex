@@ -169,9 +169,9 @@ public final class GenerationSession {
      * contract and none of its side effects: it builds nothing, loads nothing and resets nothing.</p>
      */
     @Nullable
-    public static IDimensionInfo planningFor(ServerLevelAccessor level) {
+    public static PlanningContext planningFor(ServerLevelAccessor level) {
         DimensionRuntime runtime = runtimeFor(level);
-        return runtime == null ? null : runtime.planning();
+        return runtime == null || !runtime.isEnabled() ? null : runtime.planning();
     }
 
     /**

@@ -6,7 +6,7 @@ import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
-import dev.krona.urbex.worldgen.IDimensionInfo;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
@@ -47,7 +47,7 @@ public class Scattered {
      * {@code 1} when the primary style declares no {@code scattered} block at all, so the anchor
      * maths stays well defined; the caller checks for null settings before generating anything.
      */
-    private static int primaryAreasize(IDimensionInfo provider) {
+    private static int primaryAreasize(PlanningContext provider) {
         ScatteredSettings settings = provider.worldStyles().primary().getScatteredSettings();
         return settings == null ? 1 : settings.getAreasize();
     }
@@ -58,26 +58,26 @@ public class Scattered {
      * Public because the caller has to know which area a chunk is in <em>before</em> it can ask
      * which world style governs that area, and every chunk of one area has to get the same answer.
      */
-    public static ChunkCoord areaAnchor(IDimensionInfo provider, ChunkCoord coord) {
+    public static ChunkCoord areaAnchor(PlanningContext provider, ChunkCoord coord) {
         int areasize = primaryAreasize(provider);
         // Add a large amount so the division is over positive coordinates.
         int ax = (coord.chunkX() + 2000000) / areasize;
         int az = (coord.chunkZ() + 2000000) / areasize;
-        return new ChunkCoord(provider.getType(), ax * areasize - 2000000, az * areasize - 2000000);
+        return new ChunkCoord(provider.dimension(), ax * areasize - 2000000, az * areasize - 2000000);
     }
 
     public static void generateScattered(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, ScatteredSettings scatteredSettings) {
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
-        IDimensionInfo provider = feature.provider;
+        PlanningContext provider = feature.provider;
 
         // First normalize the coordinates to scatter area sized coordinates. Add a large amount to make sure the coordinates are positive
         int ax = (chunkX + 2000000) / scatteredSettings.getAreasize();
         int az = (chunkZ + 2000000) / scatteredSettings.getAreasize();
 
-        RandomSource scatteredRandom = Rng.at(provider.getSeed(), ax, az, Rng.Purpose.SCATTERED);
+        RandomSource scatteredRandom = Rng.at(provider.seed(), ax, az, Rng.Purpose.SCATTERED);
 
-        if (scatteredRandom.nextFloat() >= (scatteredSettings.getChance() * provider.getProfile().SCATTERED_CHANCE_MULTIPLIER)) {
+        if (scatteredRandom.nextFloat() >= (scatteredSettings.getChance() * provider.preset().SCATTERED_CHANCE_MULTIPLIER)) {
             // No scattered structure in this area
             return;
         }
@@ -86,7 +86,7 @@ public class Scattered {
         // on the area's anchor chunk, never the chunk that happens to be generating: every
         // chunk of the area must compute the same filtered list and draw the same reference,
         // or a multi-chunk building disagrees with itself about where it stands (issue #38).
-        ChunkCoord areaAnchor = new ChunkCoord(provider.getType(),
+        ChunkCoord areaAnchor = new ChunkCoord(provider.dimension(),
                 ax * scatteredSettings.getAreasize() - 2000000,
                 az * scatteredSettings.getAreasize() - 2000000);
         ScatteredReference reference = selectRandomScattered(feature, areaAnchor, scatteredSettings, scatteredRandom);
@@ -154,7 +154,7 @@ public class Scattered {
             Building building = provider.assets().buildings().getOrThrow(buildingName);
             int lowestLevel = scatteredLevel(feature, scattered, minheight, maxheight, avgheight);
             if (lowestLevel < -4000) {
-                Preset profile = feature.provider.getProfile();
+                Preset profile = feature.provider.preset();
                 if (profile.isCavern()) {
                     lowestLevel = profile.GROUNDLEVEL;
                 } else {
@@ -216,13 +216,13 @@ public class Scattered {
      * caching it per area sound.
      */
     private static AreaScan scanArea(CityGenerator feature, ScatteredReference reference, int tlChunkX, int tlChunkZ, int w, int h) {
-        IDimensionInfo provider = feature.provider;
+        PlanningContext provider = feature.provider;
         int minheight = Integer.MAX_VALUE;
         int maxheight = Integer.MIN_VALUE;
         int avgheight = 0;
         for (int x = tlChunkX; x < tlChunkX + w; x++) {
             for (int z = tlChunkZ; z < tlChunkZ + h; z++) {
-                ChunkCoord coord = new ChunkCoord(provider.getType(), x, z);
+                ChunkCoord coord = new ChunkCoord(provider.dimension(), x, z);
                 if (!isValidScatterBiome(feature, reference, coord)) {
                     return AreaScan.INVALID;
                 }
@@ -240,7 +240,7 @@ public class Scattered {
                 }
                 // A copy: calculateAccurateHeight writes minHeight/maxHeight, and the cached
                 // instance is shared with every thread generating near this chunk. See #24.
-                ChunkHeightmap hm = new ChunkHeightmap(provider.getHeightmap(coord));
+                ChunkHeightmap hm = new ChunkHeightmap(provider.heightmap(coord));
                 int height = hm.getHeight();
                 provider.terrain().sampleAccurateHeight(hm, x, z);   // generator-only, no block access
                 if (!reference.isAllowVoid()) {
@@ -268,7 +268,7 @@ public class Scattered {
     }
 
     private static void generateScatteredBuilding(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, Building building, RandomSource rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
-        IDimensionInfo provider = feature.provider;
+        PlanningContext provider = feature.provider;
 
         int height = lowestLevel;
         int floors;
@@ -297,7 +297,7 @@ public class Scattered {
                 @Override
                 public Identifier getBiome() {
                     // ctx.region, not provider.getWorld(): the region is what this used to be, back
-                    // when IDimensionInfo held a mutable world reference. Not provider.getBiome()
+                    // when PlanningContext held a mutable world reference. Not provider.biome()
                     // either - that asks the biome source directly, while WorldGenLevel.getBiome
                     // goes through BiomeManager, which applies a seeded sub-quart fuzzy offset. The
                     // two disagree near quart boundaries, so swapping them would move output.

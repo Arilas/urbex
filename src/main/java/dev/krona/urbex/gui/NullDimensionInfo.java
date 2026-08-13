@@ -3,13 +3,13 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.gui.preview.PreviewTerrain;
-import dev.krona.urbex.plan.RoadField;
 import dev.krona.urbex.plan.grid.GridRoadField;
 import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.LevelShape;
+import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.WorldStyleField;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetCompiler;
@@ -23,7 +23,6 @@ import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
 
 import javax.annotation.Nullable;
@@ -41,16 +40,10 @@ public class NullDimensionInfo implements IDimensionInfo {
     /** A style the bundled pack actually ships, and qualified; see {@link #placeholderStyle()}. */
     private static final String PLACEHOLDER_OUTSIDE_STYLE = Urbex.MODID + ":standard";
 
-    private final Preset profile;
-    private final WorldStyleField styles;
     private final Random random;
-    private final long seed;
-
-    private final AssetSnapshot assets;
     private final PreviewTerrain terrain;
+    private final PlanningContext planning;
     private final CityGenerator feature;
-    private final DimensionCaches caches;
-    private final RoadField roadField;
 
     /**
      * The preview's dimension info. Takes the whole {@link WorldStyleMix} the player chose, so a
@@ -61,14 +54,13 @@ public class NullDimensionInfo implements IDimensionInfo {
      * placeholder for that entry alone, rather than taking the whole preview with it.
      */
     public NullDimensionInfo(Preset profile, WorldStyleMix worldStyles, long seed, @Nullable RegistryAccess registryAccess) {
-        this.profile = profile;
-        this.caches = new DimensionCaches(seed);
+        DimensionCaches caches = new DimensionCaches(seed);
         // The preview compiles its own snapshot and owns it, rather than reaching for the server's.
         // It has no session - it runs on the client, on the world-creation screen, before any server
         // exists - and must not acquire one. Diagnostics are discarded on purpose: a broken pack is
         // the world load's business to refuse, and a preview that threw would leave the player unable
         // to see why. Individual ids still fall back to the placeholder below.
-        this.assets = registryAccess == null
+        AssetSnapshot assets = registryAccess == null
                 ? AssetSnapshot.empty()
                 : AssetCompiler.compile(registryAccess, new AssetDiagnostics());
         List<WorldStyleField.Weighted> resolvedEntries = new ArrayList<>(worldStyles.entries().size());
@@ -87,14 +79,27 @@ public class NullDimensionInfo implements IDimensionInfo {
             resolvedEntries.add(new WorldStyleField.Weighted(entry.weight(),
                     resolved != null ? resolved : new WorldStyle(PLACEHOLDER_ID, List.of(placeholderStyle()))));
         }
-        styles = new WorldStyleField(seed, resolvedEntries);
-        this.seed = seed;
         random = new Random(seed);
         terrain = new PreviewTerrain(profile, registryAccess);
-        feature = new CityGenerator(this, profile);
-        // The preview's own seed and dimension, so the roads it draws are the roads the world will
-        // have. Same construction as DefaultDimensionInfo; there is no server to ask.
-        roadField = new GridRoadField(seed, getType().identifier().toString(), GridSettings.fromPreset(profile));
+        planning = new PlanningContext(
+                seed,
+                // The overworld, which is what the preview draws.
+                Level.OVERWORLD,
+                profile,
+                assets,
+                new WorldStyleField(seed, resolvedEntries),
+                // The preview's own seed and dimension, so the roads it draws are the roads the
+                // world will have. Same construction as DefaultDimensionInfo; there is no server to
+                // ask.
+                new GridRoadField(seed, Level.OVERWORLD.identifier().toString(),
+                        GridSettings.fromPreset(profile)),
+                caches,
+                // The vanilla overworld's shape: a preview runs before any level exists, so there is
+                // nothing to ask, and every planning rule that reads a height bound or the water
+                // line gets a real answer rather than an NPE off a null level (issue #129).
+                LevelShape.VANILLA_OVERWORLD,
+                terrain);
+        feature = new CityGenerator(planning, profile);
     }
 
     /**
@@ -149,60 +154,14 @@ public class NullDimensionInfo implements IDimensionInfo {
         return Optional.of(new Mergeable<>(true, Collections.emptyList()));
     }
 
-    @Override
-    public long getSeed() {
-        return seed;
-    }
-
-    /**
-     * The vanilla overworld's, because a preview runs before any level exists and the overworld is
-     * what it draws. Every planning rule that reads a height bound or the water line now gets a real
-     * answer here rather than an NPE off the null level above (issue #129).
-     */
-    @Override
-    public LevelShape shape() {
-        return LevelShape.VANILLA_OVERWORLD;
-    }
-
-    @Nullable
-    @Override
-    public AssetSnapshot assets() {
-        return assets;
-    }
-
-    @Override
-    public PreviewTerrain terrain() {
-        return terrain;
-    }
-
-    @Override
-    public DimensionCaches caches() {
-        return caches;
-    }
-
-    @Override
-    public RoadField roadField() {
-        return roadField;
-    }
-
-    @Override
-    public ResourceKey<Level> getType() {
-        return Level.OVERWORLD;
-    }
-
-    @Override
-    public Preset getProfile() {
-        return profile;
-    }
-
-    @Override
-    public WorldStyleField worldStyles() {
-        return styles;
-    }
-
     /** The config preview renderer's own source. Nothing here places generated blocks. */
     public Random getRandom() {
         return random;
+    }
+
+    @Override
+    public PlanningContext planning() {
+        return planning;
     }
 
     @Override
@@ -215,10 +174,4 @@ public class NullDimensionInfo implements IDimensionInfo {
         return terrain.biomeChar(chunkX, chunkZ);
     }
 
-    @Override
-    public ResourceKey<Level> dimension() {
-        // Agrees with getType(): both name the overworld. dimension() used to return null here,
-        // which disagreed with getType() and tripped up anything that assumed the two matched (#67).
-        return Level.OVERWORLD;
-    }
 }

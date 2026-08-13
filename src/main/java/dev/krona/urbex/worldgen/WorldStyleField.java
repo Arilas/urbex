@@ -21,7 +21,7 @@ import java.util.List;
  * A world style is not one scope. Its {@code citystyles} and {@code outsidestyle} describe a city;
  * its highway and railway {@code parts} describe a network that runs between cities for hundreds of
  * chunks. Mixing forces that distinction to become explicit, so this class offers one accessor per
- * scope and {@link IDimensionInfo} hands out the field rather than a single style - a call site has
+ * scope and {@link PlanningContext} hands out the field rather than a single style - a call site has
  * to say which scope it means, and the compiler makes it.
  * <p>
  * <b>The single-style fast path is the point.</b> With one entry every accessor returns that style
@@ -141,7 +141,7 @@ public final class WorldStyleField {
      * {@link #PERLIN_REGION_CHUNKS}.
      */
     @Nonnull
-    public WorldStyle atChunk(IDimensionInfo provider, ChunkCoord coord) {
+    public WorldStyle atChunk(PlanningContext provider, ChunkCoord coord) {
         if (single) {
             return primary;
         }
@@ -151,8 +151,8 @@ public final class WorldStyleField {
         return provider.caches().worldStyle.getOrCompute(coord, k -> atChunkInt(provider, coord));
     }
 
-    private WorldStyle atChunkInt(IDimensionInfo provider, ChunkCoord coord) {
-        Preset profile = provider.getProfile();
+    private WorldStyle atChunkInt(PlanningContext provider, ChunkCoord coord) {
+        Preset profile = provider.preset();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         if (profile.CITY_CHANCE < 0) {
@@ -163,7 +163,7 @@ public final class WorldStyleField {
         int offset = (profile.CITY_MAXRADIUS + 15) / 16;
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
             for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
-                ChunkCoord c = new ChunkCoord(provider.getType(), cx, cz);
+                ChunkCoord c = new ChunkCoord(provider.dimension(), cx, cz);
                 if (!City.isCityCenter(c, provider)) {
                     continue;
                 }
