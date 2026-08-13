@@ -293,7 +293,7 @@ class SettingsCompletenessTest {
 
     /**
      * A key naming the right field is not enough: a copy-paste slip like
-     * {@code slider("CITY_CHANCE", ..., p -> p.CITY_MINRADIUS, ...)} would pass every other test while silently
+     * {@code slider("CITY_CHANCE", ..., p -> p.cityMinRadius(), ...)} would pass every other test while silently
      * orphaning one field and double-exposing another.
      *
      * <p>A single sentinel is also not enough: comparing one flipped value against the field's own default lets a

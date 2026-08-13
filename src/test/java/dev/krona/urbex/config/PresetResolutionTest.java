@@ -41,9 +41,9 @@ class PresetResolutionTest {
 
         Preset p = Presets.resolve(presetId, lookup::get);
 
-        assertTrue(p.USE_AVG_HEIGHTMAP);
-        assertEquals(0.15f, p.LIGHTING_DENSITY);
-        assertEquals(71, p.GROUNDLEVEL);
+        assertTrue(p.useAvgHeightmap());
+        assertEquals(0.15f, p.lightingDensity());
+        assertEquals(71, p.groundLevel());
     }
 
     @Test
@@ -57,11 +57,11 @@ class PresetResolutionTest {
 
         Preset p = Presets.resolve(childId, lookup::get);
 
-        assertEquals(0.5, p.CITY_CHANCE);
-        assertEquals(0.9f, p.RUIN_CHANCE);
+        assertEquals(0.5, p.cityChance());
+        assertEquals(0.9f, p.ruinChance());
         // untouched fields keep their code defaults
-        assertEquals(0.3f, p.BUILDING_CHANCE);
-        assertEquals(0.8f, p.RUIN_MINLEVEL_PERCENT);
+        assertEquals(0.3f, p.buildingChance());
+        assertEquals(0.8f, p.ruinMinlevelPercent());
     }
 
     @Test
@@ -78,8 +78,8 @@ class PresetResolutionTest {
 
         Preset p = Presets.resolve(leafId, lookup::get);
 
-        assertEquals(0.2, p.CITY_CHANCE);       // middle overrides root; leaf doesn't touch it
-        assertEquals(0.4f, p.BUILDING_CHANCE);  // leaf wins over middle
+        assertEquals(0.2, p.cityChance());       // middle overrides root; leaf doesn't touch it
+        assertEquals(0.4f, p.buildingChance());  // leaf wins over middle
     }
 
     @Test
@@ -138,13 +138,13 @@ class PresetResolutionTest {
         lookup.put(presetId, decode("{\"cities\":{\"cityChance\":0.1}}"));
 
         Preset first = Presets.resolve(presetId, lookup::get);
-        assertEquals(0.1, first.CITY_CHANCE);
+        assertEquals(0.1, first.cityChance());
 
         // Simulates a datapack toggle / new registry context redefining the same id - nothing about
         // the pure core remembers the first call.
         lookup.put(presetId, decode("{\"cities\":{\"cityChance\":0.9}}"));
         Preset second = Presets.resolve(presetId, lookup::get);
 
-        assertEquals(0.9, second.CITY_CHANCE);
+        assertEquals(0.9, second.cityChance());
     }
 }

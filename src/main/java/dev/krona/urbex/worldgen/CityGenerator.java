@@ -83,7 +83,7 @@ public class CityGenerator {
     public CityGenerator(PlanningContext provider, Preset profile) {
         this.provider = provider;
         this.profile = profile;
-//        int waterLevel = provider.getWorld() == null ? 65 : Tools.getSeaLevel(provider.getWorld());// profile.GROUNDLEVEL - profile.WATERLEVEL_OFFSET;
+//        int waterLevel = provider.getWorld() == null ? 65 : Tools.getSeaLevel(provider.getWorld());// profile.groundLevel() - profile.WATERLEVEL_OFFSET;
         // Four independent noise fields, each seeded from the world seed alone. They describe the
         // whole dimension rather than one chunk, so they take a fixed coordinate and are built once.
         long seed = provider.seed();
@@ -295,7 +295,7 @@ public class CityGenerator {
         // If this chunk has a building or street but we're in a floating profile and
         // we happen to have a void chunk we detect that here and go back to normal chunk generation
         // anyway
-        if (doCity && provider.preset().CITY_AVOID_VOID && provider.preset().isFloating()) {
+        if (doCity && provider.preset().cityAvoidVoid() && provider.preset().isFloating()) {
             boolean v = isVoid(ctx, 2, 2) || isVoid(ctx, 2, 14) || isVoid(ctx, 14, 2) || isVoid(ctx, 14, 14) || isVoid(ctx, 8, 8);
             doCity = !v;
         }
@@ -744,7 +744,7 @@ public class CityGenerator {
      */
     private void fillSupportBelow(ChunkGenContext ctx, int x, int z, int y) {
         ChunkDriver driver = ctx.driver;
-        int lowest = provider.shape().minY() + profile.BEDROCK_LAYER;
+        int lowest = provider.shape().minY() + profile.bedrockLayer();
         driver.current(x, y, z);
         while (driver.getY() > lowest && isEmpty(driver.getBlock())) {
             driver.block(base);
@@ -890,7 +890,7 @@ public class CityGenerator {
             BlockState bedrock = Blocks.BEDROCK.defaultBlockState();
             for (int x = 0; x < 16; ++x) {
                 for (int z = 0; z < 16; ++z) {
-                    driver.setBlockRange(x, minHeight, z, minHeight + info.profile.BEDROCK_LAYER, bedrock);
+                    driver.setBlockRange(x, minHeight, z, minHeight + info.profile.bedrockLayer(), bedrock);
                 }
             }
 
@@ -924,7 +924,7 @@ public class CityGenerator {
             generateStreet(ctx, info, heightmap);
         }
 
-        if (info.profile.RUIN_CHANCE > 0.0) {
+        if (info.profile.ruinChance() > 0.0) {
             generateRuins(ctx, info);
         }
 
@@ -941,7 +941,7 @@ public class CityGenerator {
             Highways.generateHighways(ctx, this, info);
         }
 
-        if (info.profile.RUBBLELAYER) {
+        if (info.profile.rubbleLayer()) {
             if (!info.hasBuilding || info.ruinHeight >= 0) {
                 generateRubble(ctx, info);
             }
@@ -1035,8 +1035,8 @@ public class CityGenerator {
         Set<BlockState> possibleRandomDirts = getPossibleRandomDirts(ctx, info, info.getCompiledPalette());
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
-                double vr = info.profile.RUBBLE_DIRT_SCALE < 0.01f ? 0 : rubbleBuffer[x + z * 16] / info.profile.RUBBLE_DIRT_SCALE;
-                double vl = info.profile.RUBBLE_LEAVE_SCALE < 0.01f ? 0 : leavesBuffer[x + z * 16] / info.profile.RUBBLE_LEAVE_SCALE;
+                double vr = info.profile.rubbleDirtScale() < 0.01f ? 0 : rubbleBuffer[x + z * 16] / info.profile.rubbleDirtScale();
+                double vl = info.profile.rubbleLeaveScale() < 0.01f ? 0 : leavesBuffer[x + z * 16] / info.profile.rubbleLeaveScale();
                 if (vr > .5 || vl > .5) {
                     int height = getInterpolatedHeight(info, x, z);
                     driver.current(x, height, z);
@@ -1127,7 +1127,7 @@ public class CityGenerator {
         double d0 = 0.03125D;
         double[] ruinBuffer = ctx.buffers.ruin = this.ruinNoise.getRegion(ctx.buffers.ruin, (chunkX << 4), (chunkZ << 4), 16, 16, d0 * 2.0D, d0 * 2.0D, 1.0D);
         double[] leavesBuffer = ctx.buffers.leaves;
-        boolean doLeaves = info.profile.RUBBLELAYER;
+        boolean doLeaves = info.profile.rubbleLayer();
         if (doLeaves) {
             leavesBuffer = ctx.buffers.leaves = this.leavesNoise.getRegion(ctx.buffers.leaves, (chunkX << 6), (chunkZ << 6), 16, 16, 1.0 / 64.0, 1.0 / 64.0, 4.0D);
         }
@@ -1155,8 +1155,8 @@ public class CityGenerator {
                 }
                 int vl = 0;
                 if (doLeaves) {
-                    vl = (int) (info.profile.RUBBLE_LEAVE_SCALE < 0.01f ? 0 : leavesBuffer[x + z * 16] / info.profile.RUBBLE_LEAVE_SCALE);
-//                    vl = (int) (info.profile.RUBBLE_LEAVE_SCALE < 0.01f ? 0 : leavesNoise.getValue(x / 64.0, z / 64.0) / 4.0 * info.profile.RUBBLE_LEAVE_SCALE);
+                    vl = (int) (info.profile.rubbleLeaveScale() < 0.01f ? 0 : leavesBuffer[x + z * 16] / info.profile.rubbleLeaveScale());
+//                    vl = (int) (info.profile.rubbleLeaveScale() < 0.01f ? 0 : leavesNoise.getValue(x / 64.0, z / 64.0) / 4.0 * info.profile.rubbleLeaveScale());
                 }
                 boolean doRubble = palette.isDefined(rubbleBlock);
                 while (height > 0) {
@@ -1220,7 +1220,7 @@ public class CityGenerator {
                         driver.block(elevation).incZ();
                     }
                 }
-                boolean parkElevation = info.profile.PARK_ELEVATION;
+                boolean parkElevation = info.profile.parkElevation();
                 if (info.getCityStyle().getParkElevation() != null) {
                     parkElevation = info.getCityStyle().getParkElevation();
                 }
@@ -1321,11 +1321,11 @@ public class CityGenerator {
             for (int z = 0; z < 16; ++z) {
                 int y = info.getCityGroundLevel() - 1;
                 driver.current(x, y, z);
-                while (driver.getY() > (minHeight + info.profile.BEDROCK_LAYER) && isEmpty(driver.getBlock())) {
+                while (driver.getY() > (minHeight + info.profile.bedrockLayer()) && isEmpty(driver.getBlock())) {
                     driver.block(base);
                     driver.decY();
                 }
-//                driver.setBlockRange(x, info.profile.BEDROCK_LAYER, z, info.getCityGroundLevel(), baseChar);
+//                driver.setBlockRange(x, info.profile.bedrockLayer(), z, info.getCityGroundLevel(), baseChar);
             }
         }
     }
@@ -1412,7 +1412,7 @@ public class CityGenerator {
         ChunkDriver driver = ctx.driver;
 
         if (info.getXmin().hasBuilding) {
-            for (int x = 0; x < info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS; x++) {
+            for (int x = 0; x < info.profile.randomLeafBlockThickness(); x++) {
                 for (int z = 0; z < 16; z++) {
                     driver.current(x, height, z);
                     // @todo can be more optimal? Only go down to non air in case random succeeds?
@@ -1420,7 +1420,7 @@ public class CityGenerator {
                     while (driver.getBlockDown() == air && driver.getY() > 0) {
                         driver.decY();
                     }
-                    float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS + 1 - x));
+                    float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (info.profile.randomLeafBlockThickness() + 1 - x));
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION) < v && cnt < 30) {
                         driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
@@ -1430,7 +1430,7 @@ public class CityGenerator {
             }
         }
         if (info.getXmax().hasBuilding) {
-            for (int x = 15 - info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS; x < 15; x++) {
+            for (int x = 15 - info.profile.randomLeafBlockThickness(); x < 15; x++) {
                 for (int z = 0; z < 16; z++) {
                     driver.current(x, height, z);
                     // @todo can be more optimal? Only go down to non air in case random succeeds?
@@ -1438,7 +1438,7 @@ public class CityGenerator {
                     while (driver.getBlockDown() == air && driver.getY() > 0) {
                         driver.decY();
                     }
-                    float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (x - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS));
+                    float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (x - 14 + info.profile.randomLeafBlockThickness()));
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_XMAX) < v && cnt < 30) {
                         driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
@@ -1448,7 +1448,7 @@ public class CityGenerator {
             }
         }
         if (info.getZmin().hasBuilding) {
-            for (int z = 0; z < info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS; z++) {
+            for (int z = 0; z < info.profile.randomLeafBlockThickness(); z++) {
                 for (int x = 0; x < 16; x++) {
                     driver.current(x, height, z);
                     // @todo can be more optimal? Only go down to non air in case random succeeds?
@@ -1456,7 +1456,7 @@ public class CityGenerator {
                     while (driver.getBlockDown() == air && driver.getY() > 0) {
                         driver.decY();
                     }
-                    float v = Math.min(.8f, info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS + 1 - z));
+                    float v = Math.min(.8f, info.profile.randomLeafBlockChance() * (info.profile.randomLeafBlockThickness() + 1 - z));
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMIN) < v && cnt < 30) {
                         driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
@@ -1466,7 +1466,7 @@ public class CityGenerator {
             }
         }
         if (info.getZmax().hasBuilding) {
-            for (int z = 15 - info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS; z < 15; z++) {
+            for (int z = 15 - info.profile.randomLeafBlockThickness(); z < 15; z++) {
                 for (int x = 0; x < 16; x++) {
                     driver.current(x, height, z);
                     // @todo can be more optimal? Only go down to non air in case random succeeds?
@@ -1474,7 +1474,7 @@ public class CityGenerator {
                     while (driver.getBlockDown() == air && driver.getY() > 0) {
                         driver.decY();
                     }
-                    float v = info.profile.CHANCE_OF_RANDOM_LEAFBLOCKS * (z - 14 + info.profile.THICKNESS_OF_RANDOM_LEAFBLOCKS);
+                    float v = info.profile.randomLeafBlockChance() * (z - 14 + info.profile.randomLeafBlockThickness());
                     int cnt = 0;
                     while (rollHere(ctx, driver, Rng.Purpose.VEGETATION_ZMAX) < v && cnt < 30) {
                         driver.add(getRandomLeaf(ctx, info, info.getCompiledPalette()));
@@ -1501,7 +1501,7 @@ public class CityGenerator {
 
         Character grassChar = info.getCityStyle().getGrassBlock();
         BlockState grassBlock = Blocks.GRASS_BLOCK.defaultBlockState();
-        boolean parkBorder = info.getCityStyle().getParkBorder() != null ? info.getCityStyle().getParkBorder() : info.profile.PARK_BORDER;
+        boolean parkBorder = info.getCityStyle().getParkBorder() != null ? info.getCityStyle().getParkBorder() : info.profile.parkBorder();
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 // Resolved per column, at the block it will be written to.
@@ -1771,7 +1771,7 @@ public class CityGenerator {
                              Transform transform,
                              int ox, int oy, int oz, HardAirSetting airWaterLevel) {
         ChunkDriver driver = ctx.driver;
-        if (profile.EDITMODE) {
+        if (profile.editMode()) {
             EditModeData.getData().addPartData(info.coord, oy, part.getName());
         }
         CompiledPalette compiledPalette = computePalette(info, part);
@@ -1802,7 +1802,7 @@ public class CityGenerator {
                         // We don't replace the world where the part is empty (air)
                         if (b != air) {
                             if (b == liquid) {
-                                if (info.profile.AVOID_WATER) {
+                                if (info.profile.avoidWater()) {
                                     b = air;
                                 }
                             } else if (b == hardAir) {
@@ -1811,7 +1811,7 @@ public class CityGenerator {
                                         b = air;
                                         break;
                                     case WATERLEVEL:
-                                        if (!info.profile.AVOID_FOLIAGE && !nowater && oy + y < info.waterLevel) {
+                                        if (!info.profile.avoidFoliage() && !nowater && oy + y < info.waterLevel) {
                                             b = liquid;
                                         } else {
                                             b = air;
@@ -1860,7 +1860,7 @@ public class CityGenerator {
     }
 
     public BlockState handleLightMarker(ChunkGenContext ctx, Palette.Info marker, BlockPos pos) {
-        if (DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.LIGHTING_DENSITY)) {
+        if (DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity())) {
             ctx.addLightTodo(pos, marker.light());
         }
         return air;
@@ -1989,7 +1989,7 @@ public class CityGenerator {
     private BlockState handleTodo(ChunkGenContext ctx, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
         Block block = b.getBlock();
         CityStyle cs = info.getCityStyle();
-        boolean avoidFoliage = info.profile.AVOID_FOLIAGE;
+        boolean avoidFoliage = info.profile.avoidFoliage();
         if (cs.getAvoidFoliage() != null) {
             avoidFoliage = cs.getAvoidFoliage();
         }
@@ -2073,7 +2073,7 @@ public class CityGenerator {
     public static Identifier getRandomSpawnerMob(Level world, RandomSource random, PlanningContext diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();
         Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
-        int level = (pos.getY() - diminfo.preset().GROUNDLEVEL) / FLOORHEIGHT;
+        int level = (pos.getY() - diminfo.preset().groundLevel()) / FLOORHEIGHT;
         int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
         String belowFloor = ConditionContext.NO_PART;
         ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
@@ -2108,7 +2108,7 @@ public class CityGenerator {
         if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
             if (todo != null) {
                 String lootTable = todo.getCondition();
-                int level = (pos.getY() - diminfo.preset().GROUNDLEVEL) / FLOORHEIGHT;
+                int level = (pos.getY() - diminfo.preset().groundLevel()) / FLOORHEIGHT;
                 int floor = (pos.getY() - info.getCityGroundLevel()) / FLOORHEIGHT;
                 ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
                         todo.getPart(), ConditionContext.NO_PART, todo.getBuilding(), info.coord) {
@@ -2157,7 +2157,7 @@ public class CityGenerator {
                 float damage = Math.max(1.0f, damageFactor * DamageArea.BLOCK_DAMAGE_CHANCE);
                 int destroyedBlocks = (int) (blocks * damage);
                 // How many go this direction (approx, based on cardinal directions from building as well as number that simply fall down)
-                destroyedBlocks /= info.profile.DEBRIS_TO_NEARBYCHUNK_FACTOR;
+                destroyedBlocks /= info.profile.debrisToNearbyChunkFactor();
                 int startHeight = adjacentInfo.getMaxHeight() + 10;
                 int maxBuildHeight = info.provider.shape().maxBuildHeight();
                 int minBuildHeight = info.provider.shape().minY();

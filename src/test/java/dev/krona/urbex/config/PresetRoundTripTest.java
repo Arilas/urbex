@@ -85,15 +85,15 @@ class PresetRoundTripTest {
 
         Preset resolved = Presets.resolve(ID, i -> i.equals(ID) ? decoded : null);
 
-        assertEquals(80, resolved.GROUNDLEVEL);
-        assertEquals(0.55, resolved.CITY_CHANCE);
-        assertEquals(0.66f, resolved.BUILDING_CHANCE);
-        assertEquals(20, resolved.PRIMARY_ROAD_SPACING_X);
-        assertEquals(15, resolved.HIGHWAY_DISTANCE_MASK);
-        assertEquals(0.5f, resolved.RAILWAY_DUNGEON_CHANCE);
-        assertEquals(0.77f, resolved.RUIN_CHANCE);
-        assertEquals(0.9f, resolved.LIGHTING_DENSITY);
-        assertEquals(500, resolved.SPAWN_CHECK_RADIUS);
-        assertTrue(resolved.EDITMODE);
+        assertEquals(80, resolved.groundLevel());
+        assertEquals(0.55, resolved.cityChance());
+        assertEquals(0.66f, resolved.buildingChance());
+        assertEquals(20, resolved.primaryRoadSpacingX());
+        assertEquals(15, resolved.highwayDistanceMask());
+        assertEquals(0.5f, resolved.railwayDungeonChance());
+        assertEquals(0.77f, resolved.ruinChance());
+        assertEquals(0.9f, resolved.lightingDensity());
+        assertEquals(500, resolved.spawnCheckRadius());
+        assertTrue(resolved.editMode());
     }
 }

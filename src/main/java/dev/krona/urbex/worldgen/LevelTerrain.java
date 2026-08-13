@@ -65,7 +65,7 @@ public final class LevelTerrain implements TerrainSampler {
         if (cached != null) {
             return cached;
         }
-        ChunkHeightmap heightmap = new ChunkHeightmap(preset.LANDSCAPE_TYPE, preset.GROUNDLEVEL);
+        ChunkHeightmap heightmap = new ChunkHeightmap(preset.landscapeType(), preset.groundLevel());
         heightmap.update(baseHeight((sampler.chunkX() << 4) + 8, (sampler.chunkZ() << 4) + 8));
         if (heightSampleSize > 1) {
             for (int i = 0; i < heightSampleSize; i++) {

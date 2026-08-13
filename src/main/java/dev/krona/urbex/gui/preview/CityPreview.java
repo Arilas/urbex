@@ -417,18 +417,18 @@ public class CityPreview implements AutoCloseable {
                 factor = (radius - dist) / radius;
             }
             if (factor > 0 && x > 0) {
-                int maxfloors = profile.BUILDING_MAXFLOORS;
-                int randdist = (int) (profile.BUILDING_MINFLOORS_CHANCE
-                        + (factor + .1f) * (profile.BUILDING_MAXFLOORS_CHANCE - profile.BUILDING_MINFLOORS_CHANCE));
+                int maxfloors = profile.buildingMaxFloors();
+                int randdist = (int) (profile.buildingMinFloorsChance()
+                        + (factor + .1f) * (profile.buildingMaxFloorsChance() - profile.buildingMinFloorsChance()));
                 if (randdist < 1) {
                     randdist = 1;
                 }
-                int f = profile.BUILDING_MINFLOORS + rand.nextInt(randdist);
+                int f = profile.buildingMinFloors() + rand.nextInt(randdist);
                 f++;
                 if (f > maxfloors + 1) {
                     f = maxfloors + 1;
                 }
-                int minfloors = profile.BUILDING_MINFLOORS + 1;
+                int minfloors = profile.buildingMinFloors() + 1;
                 if (f < minfloors) {
                     f = minfloors;
                 }
@@ -437,8 +437,8 @@ public class CityPreview implements AutoCloseable {
                             dimHor * x + dimHor - 1, base - i * dimVer + dimVer - 1 - dimVer, FLOOR_COLOR);
                 }
 
-                int maxcellars = profile.BUILDING_MAXCELLARS;
-                int fb = profile.BUILDING_MINCELLARS + ((maxcellars <= 0) ? 0 : rand.nextInt(maxcellars + 1));
+                int maxcellars = profile.buildingMaxCellars();
+                int fb = profile.buildingMinCellars() + ((maxcellars <= 0) ? 0 : rand.nextInt(maxcellars + 1));
                 for (int i = 0; i < fb; i++) {
                     fillRect(dimHor * x, base + i * dimVer,
                             dimHor * x + dimHor - 1, base + i * dimVer + dimVer - 1, CELLAR_COLOR);
@@ -453,9 +453,9 @@ public class CityPreview implements AutoCloseable {
         Random rnd = new Random(333);
         // Old centres were leftRender+75 and leftRender+35 within a 150-wide canvas (0.5 and ~0.233).
         drawExplosion(base, horFactor, verFactor, Math.round(WIDTH * 0.5f),
-                profile.EXPLOSION_MINHEIGHT, profile.EXPLOSION_MAXRADIUS, rnd);
+                profile.explosionMinHeight(), profile.explosionMaxRadius(), rnd);
         drawExplosion(base, horFactor, verFactor, Math.round(WIDTH * 0.233f),
-                profile.MINI_EXPLOSION_MINHEIGHT, profile.MINI_EXPLOSION_MAXRADIUS, rnd);
+                profile.miniExplosionMinHeight(), profile.miniExplosionMaxRadius(), rnd);
     }
 
     private void drawExplosion(int base, float horFactor, float verFactor, int cx,

@@ -77,7 +77,7 @@ public class Scattered {
 
         RandomSource scatteredRandom = Rng.at(provider.seed(), ax, az, Rng.Purpose.SCATTERED);
 
-        if (scatteredRandom.nextFloat() >= (scatteredSettings.getChance() * provider.preset().SCATTERED_CHANCE_MULTIPLIER)) {
+        if (scatteredRandom.nextFloat() >= (scatteredSettings.getChance() * provider.preset().scatteredChanceMultiplier())) {
             // No scattered structure in this area
             return;
         }
@@ -156,7 +156,7 @@ public class Scattered {
             if (lowestLevel < -4000) {
                 Preset profile = feature.provider.preset();
                 if (profile.isCavern()) {
-                    lowestLevel = profile.GROUNDLEVEL;
+                    lowestLevel = profile.groundLevel();
                 } else {
                     lowestLevel = provider.shape().minY() + 2;  // @todo is this right?
                 }

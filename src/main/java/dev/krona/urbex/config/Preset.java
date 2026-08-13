@@ -583,4 +583,488 @@ public class Preset {
                 Optional.of(spawn),
                 Optional.of(misc));
     }
+
+    // ------------------------------------------------------------------------ accessors
+
+    /*
+     * One per field, named for the JSON key its codec reads it from - the name a datapack author
+     * already uses for it. Step 1 of issue #10: the fields are still public here, so nothing changes
+     * except that no caller depends on them being. Making them private is the next commit, and that
+     * is the one where the compiler enumerates every writer.
+     */
+    public LandscapeType landscapeType() {
+        return LANDSCAPE_TYPE;
+    }
+
+    public int groundLevel() {
+        return GROUNDLEVEL;
+    }
+
+    public int seaLevel() {
+        return SEALEVEL;
+    }
+
+    public String liquidBlock() {
+        return LIQUID_BLOCK;
+    }
+
+    public String baseBlock() {
+        return BASE_BLOCK;
+    }
+
+    public int bedrockLayer() {
+        return BEDROCK_LAYER;
+    }
+
+    public int terrainFixLowerMinOffset() {
+        return TERRAIN_FIX_LOWER_MIN_OFFSET;
+    }
+
+    public int terrainFixLowerMaxOffset() {
+        return TERRAIN_FIX_LOWER_MAX_OFFSET;
+    }
+
+    public int terrainFixUpperMinOffset() {
+        return TERRAIN_FIX_UPPER_MIN_OFFSET;
+    }
+
+    public int terrainFixUpperMaxOffset() {
+        return TERRAIN_FIX_UPPER_MAX_OFFSET;
+    }
+
+    public int oceanCorrectionBorder() {
+        return OCEAN_CORRECTION_BORDER;
+    }
+
+    public boolean avoidWater() {
+        return AVOID_WATER;
+    }
+
+    public boolean useAvgHeightmap() {
+        return USE_AVG_HEIGHTMAP;
+    }
+
+    public double cityChance() {
+        return CITY_CHANCE;
+    }
+
+    public int cityMinRadius() {
+        return CITY_MINRADIUS;
+    }
+
+    public int cityMaxRadius() {
+        return CITY_MAXRADIUS;
+    }
+
+    public double cityPerlinScale() {
+        return CITY_PERLIN_SCALE;
+    }
+
+    public double cityPerlinOffset() {
+        return CITY_PERLIN_OFFSET;
+    }
+
+    public double cityPerlinInnerScale() {
+        return CITY_PERLIN_INNERSCALE;
+    }
+
+    public float cityThreshold() {
+        return CITY_THRESHOLD;
+    }
+
+    public int citySpawnDistance1() {
+        return CITY_SPAWN_DISTANCE1;
+    }
+
+    public int citySpawnDistance2() {
+        return CITY_SPAWN_DISTANCE2;
+    }
+
+    public double citySpawnMultiplier1() {
+        return CITY_SPAWN_MULTIPLIER1;
+    }
+
+    public double citySpawnMultiplier2() {
+        return CITY_SPAWN_MULTIPLIER2;
+    }
+
+    public float cityStyleThreshold() {
+        return CITY_STYLE_THRESHOLD;
+    }
+
+    public String cityStyleAlternative() {
+        return CITY_STYLE_ALTERNATIVE;
+    }
+
+    public boolean cityAvoidVoid() {
+        return CITY_AVOID_VOID;
+    }
+
+    public int cityLevel0Height() {
+        return CITY_LEVEL0_HEIGHT;
+    }
+
+    public int cityLevel1Height() {
+        return CITY_LEVEL1_HEIGHT;
+    }
+
+    public int cityLevel2Height() {
+        return CITY_LEVEL2_HEIGHT;
+    }
+
+    public int cityLevel3Height() {
+        return CITY_LEVEL3_HEIGHT;
+    }
+
+    public int cityLevel4Height() {
+        return CITY_LEVEL4_HEIGHT;
+    }
+
+    public int cityLevel5Height() {
+        return CITY_LEVEL5_HEIGHT;
+    }
+
+    public int cityLevel6Height() {
+        return CITY_LEVEL6_HEIGHT;
+    }
+
+    public int cityLevel7Height() {
+        return CITY_LEVEL7_HEIGHT;
+    }
+
+    public int cityMinHeight() {
+        return CITY_MINHEIGHT;
+    }
+
+    public int cityMaxHeight() {
+        return CITY_MAXHEIGHT;
+    }
+
+    public float scatteredChanceMultiplier() {
+        return SCATTERED_CHANCE_MULTIPLIER;
+    }
+
+    public float buildingChance() {
+        return BUILDING_CHANCE;
+    }
+
+    public int buildingMinFloors() {
+        return BUILDING_MINFLOORS;
+    }
+
+    public int buildingMaxFloors() {
+        return BUILDING_MAXFLOORS;
+    }
+
+    public int buildingMinFloorsChance() {
+        return BUILDING_MINFLOORS_CHANCE;
+    }
+
+    public int buildingMaxFloorsChance() {
+        return BUILDING_MAXFLOORS_CHANCE;
+    }
+
+    public int buildingMinCellars() {
+        return BUILDING_MINCELLARS;
+    }
+
+    public int buildingMaxCellars() {
+        return BUILDING_MAXCELLARS;
+    }
+
+    public float buildingDoorwayChance() {
+        return BUILDING_DOORWAYCHANCE;
+    }
+
+    public float buildingFrontChance() {
+        return BUILDING_FRONTCHANCE;
+    }
+
+    public boolean multiUseCorner() {
+        return MULTI_USE_CORNER;
+    }
+
+    public MultiBuildingStreetConflict multiBuildingStreetConflict() {
+        return MULTI_BUILDING_STREET_CONFLICT;
+    }
+
+    public boolean generateSpawners() {
+        return GENERATE_SPAWNERS;
+    }
+
+    public int primaryRoadSpacingX() {
+        return PRIMARY_ROAD_SPACING_X;
+    }
+
+    public int primaryRoadSpacingZ() {
+        return PRIMARY_ROAD_SPACING_Z;
+    }
+
+    public float primaryRoadOptionalChance() {
+        return PRIMARY_ROAD_OPTIONAL_CHANCE;
+    }
+
+    public int primaryRoadForceEvery() {
+        return PRIMARY_ROAD_FORCE_EVERY;
+    }
+
+    public int secondaryRoadMinCountX() {
+        return SECONDARY_ROAD_MIN_COUNT_X;
+    }
+
+    public int secondaryRoadMaxCountX() {
+        return SECONDARY_ROAD_MAX_COUNT_X;
+    }
+
+    public int secondaryRoadMinCountZ() {
+        return SECONDARY_ROAD_MIN_COUNT_Z;
+    }
+
+    public int secondaryRoadMaxCountZ() {
+        return SECONDARY_ROAD_MAX_COUNT_Z;
+    }
+
+    public int minimumRoadSeparation() {
+        return MINIMUM_ROAD_SEPARATION;
+    }
+
+    public int minimumRoadEdgeDistance() {
+        return MINIMUM_ROAD_EDGE_DISTANCE;
+    }
+
+    public float tertiaryRoadChance() {
+        return TERTIARY_ROAD_CHANCE;
+    }
+
+    public int tertiaryRoadMinLength() {
+        return TERTIARY_ROAD_MIN_LENGTH;
+    }
+
+    public int tertiaryRoadMaxLength() {
+        return TERTIARY_ROAD_MAX_LENGTH;
+    }
+
+    public float plannedPrimaryBridgeChance() {
+        return PLANNED_PRIMARY_BRIDGE_CHANCE;
+    }
+
+    public int plannedPrimaryBridgeMaxLength() {
+        return PLANNED_PRIMARY_BRIDGE_MAX_LENGTH;
+    }
+
+    public float openLotParkChance() {
+        return OPEN_LOT_PARK_CHANCE;
+    }
+
+    public boolean parkElevation() {
+        return PARK_ELEVATION;
+    }
+
+    public boolean parkBorder() {
+        return PARK_BORDER;
+    }
+
+    public int parkStreetThreshold() {
+        return PARK_STREET_THRESHOLD;
+    }
+
+    public float fountainChance() {
+        return FOUNTAIN_CHANCE;
+    }
+
+    public float corridorChance() {
+        return CORRIDOR_CHANCE;
+    }
+
+    public float bridgeChance() {
+        return BRIDGE_CHANCE;
+    }
+
+    public boolean bridgeSupports() {
+        return BRIDGE_SUPPORTS;
+    }
+
+    public boolean highwayRequiresTwoCities() {
+        return HIGHWAY_REQUIRES_TWO_CITIES;
+    }
+
+    public int highwayLevelFromCities() {
+        return HIGHWAY_LEVEL_FROM_CITIES_MODE;
+    }
+
+    public int highwayDistanceMask() {
+        return HIGHWAY_DISTANCE_MASK;
+    }
+
+    public float highwayMainPerlinScale() {
+        return HIGHWAY_MAINPERLIN_SCALE;
+    }
+
+    public float highwaySecondaryPerlinScale() {
+        return HIGHWAY_SECONDARYPERLIN_SCALE;
+    }
+
+    public float highwayPerlinFactor() {
+        return HIGHWAY_PERLIN_FACTOR;
+    }
+
+    public boolean highwaySupports() {
+        return HIGHWAY_SUPPORTS;
+    }
+
+    public boolean railwaysEnabled() {
+        return RAILWAYS_ENABLED;
+    }
+
+    public boolean railwayStationsEnabled() {
+        return RAILWAY_STATIONS_ENABLED;
+    }
+
+    public boolean railwaySurfaceStationsEnabled() {
+        return RAILWAY_SURFACE_STATIONS_ENABLED;
+    }
+
+    public boolean railwaysCanEnd() {
+        return RAILWAYS_CAN_END;
+    }
+
+    public float railwayDungeonChance() {
+        return RAILWAY_DUNGEON_CHANCE;
+    }
+
+    public float ruinChance() {
+        return RUIN_CHANCE;
+    }
+
+    public float ruinMinlevelPercent() {
+        return RUIN_MINLEVEL_PERCENT;
+    }
+
+    public float ruinMaxlevelPercent() {
+        return RUIN_MAXLEVEL_PERCENT;
+    }
+
+    public boolean rubbleLayer() {
+        return RUBBLELAYER;
+    }
+
+    public float rubbleDirtScale() {
+        return RUBBLE_DIRT_SCALE;
+    }
+
+    public float rubbleLeaveScale() {
+        return RUBBLE_LEAVE_SCALE;
+    }
+
+    public float explosionChance() {
+        return EXPLOSION_CHANCE;
+    }
+
+    public int explosionMinRadius() {
+        return EXPLOSION_MINRADIUS;
+    }
+
+    public int explosionMaxRadius() {
+        return EXPLOSION_MAXRADIUS;
+    }
+
+    public int explosionMinHeight() {
+        return EXPLOSION_MINHEIGHT;
+    }
+
+    public int explosionMaxHeight() {
+        return EXPLOSION_MAXHEIGHT;
+    }
+
+    public float miniExplosionChance() {
+        return MINI_EXPLOSION_CHANCE;
+    }
+
+    public int miniExplosionMinRadius() {
+        return MINI_EXPLOSION_MINRADIUS;
+    }
+
+    public int miniExplosionMaxRadius() {
+        return MINI_EXPLOSION_MAXRADIUS;
+    }
+
+    public int miniExplosionMinHeight() {
+        return MINI_EXPLOSION_MINHEIGHT;
+    }
+
+    public int miniExplosionMaxHeight() {
+        return MINI_EXPLOSION_MAXHEIGHT;
+    }
+
+    public boolean explosionsInCitiesOnly() {
+        return EXPLOSIONS_IN_CITIES_ONLY;
+    }
+
+    public int debrisToNearbyChunkFactor() {
+        return DEBRIS_TO_NEARBYCHUNK_FACTOR;
+    }
+
+    public float randomLeafBlockChance() {
+        return CHANCE_OF_RANDOM_LEAFBLOCKS;
+    }
+
+    public int randomLeafBlockThickness() {
+        return THICKNESS_OF_RANDOM_LEAFBLOCKS;
+    }
+
+    public boolean avoidFoliage() {
+        return AVOID_FOLIAGE;
+    }
+
+    public float lightingDensity() {
+        return LIGHTING_DENSITY;
+    }
+
+    public float lootDensity() {
+        return LOOT_DENSITY;
+    }
+
+    public String spawnBiome() {
+        return SPAWN_BIOME;
+    }
+
+    public String spawnCity() {
+        return SPAWN_CITY;
+    }
+
+    public boolean spawnNotInBuilding() {
+        return SPAWN_NOT_IN_BUILDING;
+    }
+
+    public boolean forceSpawnInBuilding() {
+        return FORCE_SPAWN_IN_BUILDING;
+    }
+
+    public List<String> forceSpawnBuildings() {
+        return FORCE_SPAWN_BUILDINGS;
+    }
+
+    public List<String> forceSpawnParts() {
+        return FORCE_SPAWN_PARTS;
+    }
+
+    public int spawnCheckRadius() {
+        return SPAWN_CHECK_RADIUS;
+    }
+
+    public int spawnRadiusIncrease() {
+        return SPAWN_RADIUS_INCREASE;
+    }
+
+    public int spawnCheckAttempts() {
+        return SPAWN_CHECK_ATTEMPTS;
+    }
+
+    public boolean editMode() {
+        return EDITMODE;
+    }
+
+    public boolean generateNether() {
+        return GENERATE_NETHER;
+    }
 }

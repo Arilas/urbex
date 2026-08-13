@@ -29,18 +29,18 @@ public final class PresetRoadGrid {
      */
     public static GridSettings of(Preset preset) {
         return new GridSettings(
-                preset.PRIMARY_ROAD_SPACING_X,
-                preset.PRIMARY_ROAD_SPACING_Z,
-                preset.PRIMARY_ROAD_OPTIONAL_CHANCE,
-                preset.PRIMARY_ROAD_FORCE_EVERY,
-                preset.SECONDARY_ROAD_MIN_COUNT_X,
-                preset.SECONDARY_ROAD_MAX_COUNT_X,
-                preset.SECONDARY_ROAD_MIN_COUNT_Z,
-                preset.SECONDARY_ROAD_MAX_COUNT_Z,
-                preset.MINIMUM_ROAD_SEPARATION,
-                preset.MINIMUM_ROAD_EDGE_DISTANCE,
-                preset.TERTIARY_ROAD_CHANCE,
-                preset.TERTIARY_ROAD_MIN_LENGTH,
-                preset.TERTIARY_ROAD_MAX_LENGTH);
+                preset.primaryRoadSpacingX(),
+                preset.primaryRoadSpacingZ(),
+                preset.primaryRoadOptionalChance(),
+                preset.primaryRoadForceEvery(),
+                preset.secondaryRoadMinCountX(),
+                preset.secondaryRoadMaxCountX(),
+                preset.secondaryRoadMinCountZ(),
+                preset.secondaryRoadMaxCountZ(),
+                preset.minimumRoadSeparation(),
+                preset.minimumRoadEdgeDistance(),
+                preset.tertiaryRoadChance(),
+                preset.tertiaryRoadMinLength(),
+                preset.tertiaryRoadMaxLength());
     }
 }

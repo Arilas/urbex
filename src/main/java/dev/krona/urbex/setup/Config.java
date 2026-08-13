@@ -268,7 +268,7 @@ public class Config {
                             "the GENERATE_NETHER probe will see the un-overridden preset.", e);
                 }
             }
-            if (overworldPreset.GENERATE_NETHER) {
+            if (overworldPreset.generateNether()) {
                 cache.put(Level.NETHER, new PresetChoice(
                         Identifier.fromNamespaceAndPath("urbex", "cavern"), DEFAULT_WORLD_STYLE_MIX, Optional.empty()));
             }

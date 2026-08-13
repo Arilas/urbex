@@ -472,7 +472,7 @@ class ChunkContentResolverTest {
         @Test
         void multiBuildingAcceptanceWouldDifferIfItReadTheEffectiveRoadInsteadOfTheRawOne() {
             GridRoadField roadField = new GridRoadField(1337L, "urbex:test", GridSettings.defaults());
-            MultiBuildingStreetConflict conflict = profileWithBuildingChance(0.5f).MULTI_BUILDING_STREET_CONFLICT;
+            MultiBuildingStreetConflict conflict = profileWithBuildingChance(0.5f).multiBuildingStreetConflict();
 
             int divergences = 0;
             for (int x = -40; x < 40; x++) {

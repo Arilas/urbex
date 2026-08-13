@@ -224,7 +224,7 @@ public class MultiChunk {
                 // multi-building acceptance depend on ChunkPlan, which depends on multi-building
                 // acceptance. Predefined multi-buildings never reach here at all.
                 RoadType rawRoad = provider.roadField().typeAt(coord.chunkX(), coord.chunkZ());
-                if (profile.MULTI_BUILDING_STREET_CONFLICT.roadBlocks(rawRoad)) {
+                if (profile.multiBuildingStreetConflict().roadBlocks(rawRoad)) {
                     return false;
                 }
 

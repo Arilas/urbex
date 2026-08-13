@@ -317,7 +317,7 @@ public class ChunkPlan {
         boolean isCity = isCityRaw(key, provider, profile);
         int cityLevel = getCityLevelGui(key, provider);
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.seed(), Rng.Purpose.BUILDING);
-        boolean couldHaveBuilding = isCity && rand.nextFloat() < profile.BUILDING_CHANCE;
+        boolean couldHaveBuilding = isCity && rand.nextFloat() < profile.buildingChance();
         // The preview resolves neither a multi-building section nor a style, exactly as before -
         // those three stay null here rather than being computed for a screen that does not use them.
         return new ChunkCandidate(isCity, couldHaveBuilding, null, cityLevel, null, null, null);
@@ -351,7 +351,7 @@ public class ChunkPlan {
         if (multiPos.isSingle()) {
             cityLevel = getCityLevel(coord, provider);
         } else {
-            cityLevel = profile.MULTI_USE_CORNER ? getTopLeftCityLevel(multiPos, coord, provider)
+            cityLevel = profile.multiUseCorner() ? getTopLeftCityLevel(multiPos, coord, provider)
                     : getAverageCityLevel(multiPos, coord, provider);
         }
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.seed(), Rng.Purpose.BUILDING);
@@ -431,7 +431,7 @@ public class ChunkPlan {
         }
 
         float cityFactor = City.getCityFactor(coord, provider, profile);
-        return cityFactor > profile.CITY_THRESHOLD;
+        return cityFactor > profile.cityThreshold();
     }
 
     public static boolean isCity(ChunkCoord coord, PlanningContext provider) {
@@ -671,8 +671,8 @@ public class ChunkPlan {
                 candidate.buildingType().getName());
         hasBuilding = override != null || content.hasBuilding();
 
-        groundLevel = override != null ? override.groundLevel() : profile.GROUNDLEVEL;
-        int wl = profile.SEALEVEL;
+        groundLevel = override != null ? override.groundLevel() : profile.groundLevel();
+        int wl = profile.seaLevel();
         waterLevel = wl == -1 ? provider.shape().seaLevel() : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
 
@@ -699,7 +699,7 @@ public class ChunkPlan {
             highwayZLevel = Highway.getZHighwayLevel(key, provider, profile);
 
             streetType = content.streetType();
-            float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.FOUNTAIN_CHANCE;
+            float fountainChance = cs.getFountainChance() != null ? cs.getFountainChance() : profile.fountainChance();
             if (rand.nextFloat() < fountainChance) {
                 fountainType = provider.assets().parts().getOrWarn(cs.getRandomFountain(rand, this.coord));
             } else {
@@ -714,7 +714,7 @@ public class ChunkPlan {
             float cityFactor = City.getCityFactor(coord, provider, profile);
 
             int maxfloors = getMaxfloors(cs);
-            int f = profile.BUILDING_MINFLOORS + rand.nextInt((int) (profile.BUILDING_MINFLOORS_CHANCE + (cityFactor + .1f) * (profile.BUILDING_MAXFLOORS_CHANCE - profile.BUILDING_MINFLOORS_CHANCE)));
+            int f = profile.buildingMinFloors() + rand.nextInt((int) (profile.buildingMinFloorsChance() + (cityFactor + .1f) * (profile.buildingMaxFloorsChance() - profile.buildingMinFloorsChance())));
             f++;
             if (f > maxfloors) {
                 f = maxfloors;
@@ -731,7 +731,7 @@ public class ChunkPlan {
             floors = override != null ? override.floors() : f;
 
             int maxcellars = getMaxcellars(cs);
-            int mincellars = Math.max(profile.BUILDING_MINCELLARS, buildingType.getMinCellars());
+            int mincellars = Math.max(profile.buildingMinCellars(), buildingType.getMinCellars());
             int fb = mincellars + ((maxcellars <= 0) ? 0 : rand.nextInt(maxcellars + 1));
             boolean checkHighway = getMaxHighwayLevel() >= 0;
             boolean checkRailway = avoidance != WorldSettings.RailwayAvoidance.BLOCK_RAILWAY && getRailInfo() != Railway.RailChunkInfo.NOTHING;
@@ -765,8 +765,8 @@ public class ChunkPlan {
             // Preserve the legacy building stream slot formerly used by buildingWithoutLootChance.
             rand.nextFloat();
             float r = rand.nextFloat();
-            if (rand.nextFloat() < profile.RUIN_CHANCE && (predefinedBuilding == null || !predefinedBuilding.preventRuins())) {
-                ruinHeight = profile.RUIN_MINLEVEL_PERCENT + (profile.RUIN_MAXLEVEL_PERCENT - profile.RUIN_MINLEVEL_PERCENT) * r;
+            if (rand.nextFloat() < profile.ruinChance() && (predefinedBuilding == null || !predefinedBuilding.preventRuins())) {
+                ruinHeight = profile.ruinMinlevelPercent() + (profile.ruinMaxlevelPercent() - profile.ruinMinlevelPercent()) * r;
             } else {
                 ruinHeight = -1;
             }
@@ -826,11 +826,11 @@ public class ChunkPlan {
             // Last in the body: what still reads this local is the *next* iteration's parts[]
             // context, at the top of the loop, which must see the floor below rather than this one.
             belowPart = part;
-            connectionAtX[i] = isCity(coord.west(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
-            connectionAtZ[i] = isCity(coord.north(), provider) && (rand.nextFloat() < profile.BUILDING_DOORWAYCHANCE);
+            connectionAtX[i] = isCity(coord.west(), provider) && (rand.nextFloat() < profile.buildingDoorwayChance());
+            connectionAtZ[i] = isCity(coord.north(), provider) && (rand.nextFloat() < profile.buildingDoorwayChance());
         }
 
-        float corridorChance = cs.getCorridorChance() != null ? cs.getCorridorChance() : profile.CORRIDOR_CHANCE;
+        float corridorChance = cs.getCorridorChance() != null ? cs.getCorridorChance() : profile.corridorChance();
         if (hasBuilding && cellars > 0) {
             xRailCorridor = false;
             zRailCorridor = false;
@@ -843,11 +843,11 @@ public class ChunkPlan {
             xBridge = false;
             zBridge = false;
         } else {
-            xBridge = rand.nextFloat() < profile.BRIDGE_CHANCE;
-            zBridge = rand.nextFloat() < profile.BRIDGE_CHANCE;
+            xBridge = rand.nextFloat() < profile.bridgeChance();
+            zBridge = rand.nextFloat() < profile.bridgeChance();
         }
 
-        if (rand.nextFloat() < profile.RAILWAY_DUNGEON_CHANCE) {
+        if (rand.nextFloat() < profile.railwayDungeonChance()) {
             if (!hasBuilding || (Railway.RAILWAY_LEVEL_OFFSET < (cityLevel - cellars))) {
                 railDungeon = provider.assets().parts().getOrWarn(getCityStyle().getRandomRailDungeon(rand, this.coord));
             } else {
@@ -857,7 +857,7 @@ public class ChunkPlan {
             railDungeon = null;
         }
 
-        float frontChance = cs.getFrontChance() != null ? cs.getFrontChance() : profile.BUILDING_FRONTCHANCE;
+        float frontChance = cs.getFrontChance() != null ? cs.getFrontChance() : profile.buildingFrontChance();
         if (rand.nextFloat() < frontChance) {
             frontType = provider.assets().parts().getOrWarn(getCityStyle().getRandomFront(rand, this.coord));
         } else {
@@ -866,7 +866,7 @@ public class ChunkPlan {
     }
 
     private int getMaxcellars(CityStyle cs) {
-        int maxcellars = profile.BUILDING_MAXCELLARS + cityLevel;
+        int maxcellars = profile.buildingMaxCellars() + cityLevel;
         if (buildingType.getMaxCellars() != -1 && buildingType.getOverrideFloors()) {
             maxcellars = buildingType.getMaxCellars();
             return maxcellars;
@@ -891,7 +891,7 @@ public class ChunkPlan {
     }
 
     private int getMinfloors(CityStyle cs) {
-        int minfloors = profile.BUILDING_MINFLOORS + 1;    // +1 because this doesn't count the top
+        int minfloors = profile.buildingMinFloors() + 1;    // +1 because this doesn't count the top
         if (buildingType.getMinFloors() != -1 && buildingType.getOverrideFloors()) {
             minfloors = buildingType.getMinFloors();
             return minfloors;
@@ -906,7 +906,7 @@ public class ChunkPlan {
     }
 
     private int getMaxfloors(CityStyle cs) {
-        int maxfloors = profile.BUILDING_MAXFLOORS;
+        int maxfloors = profile.buildingMaxFloors();
         if (buildingType.getMaxFloors() != -1 && buildingType.getOverrideFloors()) {
             maxfloors = buildingType.getMaxFloors();
             return maxfloors;
@@ -1006,7 +1006,7 @@ public class ChunkPlan {
     private static int getCityLevelNormal(ChunkCoord coord, PlanningContext provider, Preset profile) {
         ChunkHeightmap heightmap = provider.heightmap(coord);
         int height = heightmap.getHeight();
-        if (profile.USE_AVG_HEIGHTMAP && Config.heightSampleSize() > 2) {
+        if (profile.useAvgHeightmap() && Config.heightSampleSize() > 2) {
             int sampleSize = Config.heightSampleSize();
             int constX = coord.chunkX() < 0 ? -1 : 1;
             int constZ = coord.chunkZ() < 0 ? -1 : 1;
@@ -1050,21 +1050,21 @@ public class ChunkPlan {
     }
 
     private static int getLevelBasedOnHeight(int height, Preset profile) {
-        if (height < profile.CITY_LEVEL0_HEIGHT) {
+        if (height < profile.cityLevel0Height()) {
             return 0;
-        } else if (height < profile.CITY_LEVEL1_HEIGHT) {
+        } else if (height < profile.cityLevel1Height()) {
             return 1;
-        } else if (height < profile.CITY_LEVEL2_HEIGHT) {
+        } else if (height < profile.cityLevel2Height()) {
             return 2;
-        } else if (height < profile.CITY_LEVEL3_HEIGHT) {
+        } else if (height < profile.cityLevel3Height()) {
             return 3;
-        } else if (height < profile.CITY_LEVEL4_HEIGHT) {
+        } else if (height < profile.cityLevel4Height()) {
             return 4;
-        } else if (height < profile.CITY_LEVEL5_HEIGHT) {
+        } else if (height < profile.cityLevel5Height()) {
             return 5;
-        } else if (height < profile.CITY_LEVEL6_HEIGHT) {
+        } else if (height < profile.cityLevel6Height()) {
             return 6;
-        } else if (height < profile.CITY_LEVEL7_HEIGHT) {
+        } else if (height < profile.cityLevel7Height()) {
             return 7;
         } else {
             return 8;
@@ -1182,7 +1182,7 @@ public class ChunkPlan {
         if (!isStreetOrParkSection() || (streetType != StreetType.PARK)) {
             return false;
         }
-        int threshold = getCityStyle().getParkStreetThreshold() != null ? getCityStyle().getParkStreetThreshold() : profile.PARK_STREET_THRESHOLD;
+        int threshold = getCityStyle().getParkStreetThreshold() != null ? getCityStyle().getParkStreetThreshold() : profile.parkStreetThreshold();
         int counter = 0;
         counter += getXmin().isStreetOrParkSection() ? 1 : 0;
         counter += getXmax().isStreetOrParkSection() ? 1 : 0;
@@ -1762,7 +1762,7 @@ public class ChunkPlan {
             return getCityGroundLevel();
         } else {
             if (isOcean()) {
-                return groundLevel - profile.OCEAN_CORRECTION_BORDER;
+                return groundLevel - profile.oceanCorrectionBorder();
             } else {
                 return 100000;
             }
@@ -1785,8 +1785,8 @@ public class ChunkPlan {
             if (h < provider.shape().maxBuildHeight()) {
                 // The L0 height at this corner is fixed so we return that
                 desiredMaxHeight1 = new MinMax(
-                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.TERRAIN_FIX_LOWER_MIN_OFFSET, profile.TERRAIN_FIX_LOWER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_LOWER),
-                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.TERRAIN_FIX_UPPER_MIN_OFFSET, profile.TERRAIN_FIX_UPPER_MAX_OFFSET, Rng.Purpose.TERRAIN_FIX_UPPER));
+                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixLowerMinOffset(), profile.terrainFixLowerMaxOffset(), Rng.Purpose.TERRAIN_FIX_LOWER),
+                        h + CityGenerator.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixUpperMinOffset(), profile.terrainFixUpperMaxOffset(), Rng.Purpose.TERRAIN_FIX_UPPER));
                 return desiredMaxHeight1;
             }
 

@@ -118,7 +118,7 @@ public final class PreviewTerrain implements TerrainSampler {
 
     @Override
     public ChunkHeightmap heightmap(ChunkCoord coord) {
-        ChunkHeightmap heightmap = new ChunkHeightmap(preset.LANDSCAPE_TYPE, preset.GROUNDLEVEL);
+        ChunkHeightmap heightmap = new ChunkHeightmap(preset.landscapeType(), preset.groundLevel());
         heightmap.update(groundAt(coord.chunkX(), coord.chunkZ()));
         return heightmap;
     }
