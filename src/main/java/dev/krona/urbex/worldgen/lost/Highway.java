@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.TimedCache;
 
 import dev.krona.urbex.worldgen.PlanningContext;
 
@@ -55,7 +56,7 @@ public class Highway {
                 cp -> hasZHighway(provider, cp, profile), Orientation.Z, coord);
     }
 
-    private static int getHighwayLevel(PlanningContext provider, Preset profile, Map<ChunkCoord, Integer> cache, Function<ChunkCoord, Boolean> hasHighway, Orientation orientation, ChunkCoord cp) {
+    private static int getHighwayLevel(PlanningContext provider, Preset profile, TimedCache<ChunkCoord, Integer> cache, Function<ChunkCoord, Boolean> hasHighway, Orientation orientation, ChunkCoord cp) {
         Integer known = cache.get(cp);
         if (known != null) {
             return known;

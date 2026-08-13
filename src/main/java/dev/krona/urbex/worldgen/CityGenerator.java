@@ -78,7 +78,12 @@ public class CityGenerator {
     public final Preset profile;
 
     private final Statistics statistics = new Statistics();
-    private final Map<Block, BlockEntityType> typeCache = new ConcurrentHashMap<>();
+    /**
+     * Which block entity type belongs to a block. Bounded by the block registry, so it needs no
+     * eviction policy beyond being dropped with the generator; {@link #NO_BLOCK_ENTITY} stands for
+     * "asked, and there is none" so a miss is remembered as well as a hit.
+     */
+    private final Map<Block, Optional<BlockEntityType>> typeCache = new ConcurrentHashMap<>();
 
     public CityGenerator(PlanningContext provider, Preset profile) {
         this.provider = provider;
@@ -1664,16 +1669,22 @@ public class CityGenerator {
         // run inside a ConcurrentHashMap bin lock, stalling every other worldgen thread whose
         // block hashed into the same bin (issue #25). Racing threads compute the same answer.
         Block block = state.getBlock();
-        BlockEntityType existing = typeCache.get(block);
+        Optional<BlockEntityType> existing = typeCache.get(block);
         if (existing != null) {
-            return existing;
+            return existing.orElse(null);
         }
         for (BlockEntityType<?> type : BuiltInRegistries.BLOCK_ENTITY_TYPE) {
             if (type.isValid(state)) {
-                BlockEntityType raced = typeCache.putIfAbsent(block, type);
-                return raced != null ? raced : type;
+                Optional<BlockEntityType> raced = typeCache.putIfAbsent(block, Optional.of(type));
+                return raced != null ? raced.orElse(null) : type;
             }
         }
+        // Remember the miss too. A palette entry carrying NBT for a block that is not a block
+        // entity is a datapack error, and the caller warns about it - but without this the registry
+        // walk ran again for every block placed from that entry, on a worldgen worker, for as long
+        // as the world was played. Optional rather than a sentinel type, because every real
+        // BlockEntityType is a value this map legitimately holds (issue #132).
+        typeCache.putIfAbsent(block, Optional.empty());
         return null;
     }
 

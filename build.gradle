@@ -265,6 +265,26 @@ loom {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
             }
         }
+        // A long-distance exploration soak, for the cache-lifecycle half of #132. Not a golden
+        // check - it is deliberately far larger than any window whose output we pin, and its point
+        // is the PERF= line rather than the digest: how big the planning caches get as a function of
+        // how far a player has travelled, and whether the ceiling in Config.cacheMaxEntries is ever
+        // reached in ordinary play. Radius 40 is 6561 requested chunks, about ten times the windows
+        // above.
+        //
+        // The radius is a property rather than a constant because the useful soak is whatever size
+        // reaches the ceiling on the machine running it: -PurbexSoakRadius=64 for a longer one.
+        digestSoak {
+            server()
+            setConfigName('Urbex Digest Soak (long-distance exploration)')
+            ideConfigGenerated(false)
+            runDir('runs/digestsoak')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            def radius = project.hasProperty('urbexSoakRadius') ? project.property('urbexSoakRadius') : '40'
+            vmArg "-Durbex.digestCheck=${radius},rowmajor,0"
+        }
         // The two structure-avoidance branches the window above does not reach. Measured on that
         // window: all 108 of its suppressed chunks come from the village *tag* test, and turning
         // avoidVillages off drops the count to zero - so the named-blacklist branch
@@ -441,6 +461,8 @@ registerPrepareDigestCheck('prepareDigestCheckAvoidThreads', 'runs/digestcheckav
         '135132278163449878')
 registerPrepareDigestCheck('prepareDigestCheckAvoidExpire', 'runs/digestcheckavoidexpire', '',
         '135132278163449878')
+registerPrepareDigestCheck('prepareDigestSoak', 'runs/digestsoak', '',
+        '135132278163449878')
 // The railway-collision window: the same seed and square as the avoidance ones, with the world
 // style swapped for the datapack one above so railwayavoidance is block_railway. Nothing the mod
 // ships selects that policy, so this is the only configuration in the repository under which a
@@ -477,6 +499,9 @@ tasks.matching { it.name == 'runDigestCheckAvoidShuffled' }.configureEach {
 }
 tasks.matching { it.name == 'runDigestCheckAvoidThreads' }.configureEach {
     dependsOn 'prepareDigestCheckAvoidThreads'
+}
+tasks.matching { it.name == 'runDigestSoak' }.configureEach {
+    dependsOn 'prepareDigestSoak'
 }
 tasks.matching { it.name == 'runDigestCheckAvoidExpire' }.configureEach {
     dependsOn 'prepareDigestCheckAvoidExpire'

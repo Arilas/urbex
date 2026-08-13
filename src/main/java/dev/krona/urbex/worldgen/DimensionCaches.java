@@ -44,9 +44,18 @@ public final class DimensionCaches {
     public final TimedCache<ChunkCoord, WorldStyle> worldStyle = new TimedCache<>(Config::cacheCleanupSeconds, "worldStyle");
     public final TimedCache<ChunkCoord, MultiChunk> multiChunk = new TimedCache<>(Config::cacheCleanupSeconds, "multiChunk");
     public final TimedCache<ChunkCoord, BiomeInfo> biomeInfo = new TimedCache<>(Config::cacheCleanupSeconds, "biomeInfo");
-    public final ConcurrentHashMap<ChunkCoord, Railway.RailChunkInfo> railInfo = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<ChunkCoord, Integer> xHighwayLevel = new ConcurrentHashMap<>();
-    public final ConcurrentHashMap<ChunkCoord, Integer> zHighwayLevel = new ConcurrentHashMap<>();
+    /**
+     * The railway and highway coordinate maps.
+     *
+     * <p>Plain {@link ConcurrentHashMap}s until issue #132: no TTL, no ceiling, no lifecycle beyond
+     * the dimension being unloaded. Every other planning answer here expires; these three grew with
+     * the distance a player travelled and were bounded by nothing. They hold the same kind of value
+     * as their neighbours - a pure function of seed and coordinate - so they belong in the same kind
+     * of cache.</p>
+     */
+    public final TimedCache<ChunkCoord, Railway.RailChunkInfo> railInfo = new TimedCache<>(Config::cacheCleanupSeconds, "railInfo");
+    public final TimedCache<ChunkCoord, Integer> xHighwayLevel = new TimedCache<>(Config::cacheCleanupSeconds, "xHighwayLevel");
+    public final TimedCache<ChunkCoord, Integer> zHighwayLevel = new TimedCache<>(Config::cacheCleanupSeconds, "zHighwayLevel");
     public final TimedCache<ChunkCoord, ChunkHeightmap> heightmap = new TimedCache<>(Config::cacheCleanupSeconds, "heightmap");
     /** Keyed on the scatter area's anchor chunk, not a real chunk coordinate. */
     public final TimedCache<ChunkCoord, Scattered.AreaScan> scatterAreaScan = new TimedCache<>(Config::cacheCleanupSeconds, "scatterAreaScan");

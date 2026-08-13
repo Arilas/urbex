@@ -68,6 +68,17 @@ public class Config {
         return active.file().cacheCleanupSeconds();
     }
 
+    /**
+     * How many entries one planning cache may hold before it starts evicting.
+     *
+     * <p>Per cache, not in total. The default of 16384 is roughly a 128x128-chunk region's worth of
+     * one kind of answer - far more than a player generates in a session, so it costs nothing in
+     * normal play and bounds what a long exploration run can accumulate (issue #132).</p>
+     */
+    public static int cacheMaxEntries() {
+        return active.file().cacheMaxEntries();
+    }
+
     public static int heightSampleSize() {
         return active.file().heightSampleSize();
     }

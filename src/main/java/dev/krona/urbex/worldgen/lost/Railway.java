@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.util.RandomSource;
 import dev.krona.urbex.worldgen.PlanningContext;
@@ -316,7 +317,7 @@ public class Railway {
     }
 
     public static RailChunkInfo getRailChunkType(ChunkCoord coord, PlanningContext provider, Preset profile) {
-        Map<ChunkCoord, RailChunkInfo> cache = provider.caches().railInfo;
+        TimedCache<ChunkCoord, RailChunkInfo> cache = provider.caches().railInfo;
         RailChunkInfo known = cache.get(coord);
         if (known != null) {
             return known;
