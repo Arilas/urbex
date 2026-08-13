@@ -218,11 +218,37 @@ public class ChunkDriver {
      * recorder keeps accumulating across it, so nothing lands on the late-write path any more
      * (issue #48).
      */
+    /**
+     * Where this driver is relative to writing its buffered blocks into the world.
+     *
+     * <p>Everything before {@link #flushToChunk} is buffered in this driver's own section cache, so
+     * a generation that fails before it has touched nothing. What a failure costs depends on which
+     * side of that line it lands on, and a report that cannot say which side is a report nobody can
+     * act on (issue #131).</p>
+     */
+    public enum CommitState {
+        /** Nothing has been written to the world. The chunk is still pure vanilla terrain. */
+        BUFFERED,
+        /** Partway through writing. Some of this chunk's city is in the world and some is not. */
+        COMMITTING,
+        /** Every buffered block is in the world. Anything after this is post-processing. */
+        COMMITTED
+    }
+
+    private CommitState commitState = CommitState.BUFFERED;
+
+    /** @see CommitState */
+    public CommitState commitState() {
+        return commitState;
+    }
+
     public void flushToChunk(ChunkAccess chunk) {
+        commitState = CommitState.COMMITTING;
         BulkSectionAccess bulk = new BulkSectionAccess(region);
         cache.generate(bulk);
         bulk.close();
         cache.clear();
+        commitState = CommitState.COMMITTED;
     }
 
     public void actuallyGenerate(ChunkAccess chunk) {

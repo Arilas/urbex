@@ -217,12 +217,43 @@ public class CityGenerator {
      *                redirect this generation's work to a different epoch (issue #125).
      */
     public void generate(DimensionRuntime runtime, WorldGenRegion region, ChunkAccess chunk) {
+        ChunkCoord coord = new ChunkCoord(provider.dimension(), chunk.getPos().x(), chunk.getPos().z());
+        try {
+            generateOrThrow(runtime, region, chunk, coord);
+        } catch (Throwable t) {
+            // One category, one outcome: the chunk is not generated, so it must not continue through
+            // the pipeline and be saved as though it were (issue #131). What used to happen here was
+            // a log line and a return of success.
+            //
+            // generateOrThrow attaches the commit state, because only it can see the driver. Anything
+            // that arrives here unattached failed before the driver existed, which is the same thing
+            // as having written nothing.
+            ChunkGenerationFailure failure = t instanceof ChunkGenerationFailure attached
+                    ? attached
+                    : new ChunkGenerationFailure(coord, ChunkDriver.CommitState.BUFFERED, t);
+            Urbex.getLogger().error(failure.getMessage(), failure.getCause());
+            ErrorLogger.logChunkInfo(coord.chunkX(), coord.chunkZ(), provider);
+            // A non-fatal diagnostic in its own right: the chunk fails whether or not anyone is
+            // listening, and this only tells whoever is playing to go and read the log.
+            ErrorLogger.report(runtime.level().getServer(),
+                    "There was an error generating a chunk. See log for details!");
+            throw failure;
+        }
+    }
+
+    /**
+     * The generation itself, with the commit state attached to whatever it throws.
+     * <p>
+     * Only this method can see the driver, and the driver is the only thing that knows whether a
+     * failure landed before, during or after the buffered blocks were written to the world - see
+     * {@link ChunkDriver.CommitState}.
+     */
+    private void generateOrThrow(DimensionRuntime runtime, WorldGenRegion region,
+                                 ChunkAccess chunk, ChunkCoord coord) {
         long start = System.currentTimeMillis();
 
-        int chunkX = chunk.getPos().x();
-        int chunkZ = chunk.getPos().z();
-
-        ChunkCoord coord = new ChunkCoord(provider.dimension(), chunkX, chunkZ);
+        int chunkX = coord.chunkX();
+        int chunkZ = coord.chunkZ();
 
         // A copy, because correctTerrainShape() below writes the corrected surface back into it.
         // The instance in caches().heightmap is shared with every other thread generating a chunk
@@ -237,6 +268,7 @@ public class CityGenerator {
         // so a /reload landing mid-chunk cannot be observed halfway through a building (issue #128).
         ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info,
                 runtime.tasks(), runtime.tags());
+        try {
 
         boolean doCity = info.isCity;
 
@@ -302,6 +334,9 @@ public class CityGenerator {
 
         long time = System.currentTimeMillis() - start;
         statistics.addTime(time);
+        } catch (Throwable t) {
+            throw new ChunkGenerationFailure(coord, ctx.driver.commitState(), t);
+        }
     }
 
     public Statistics getStatistics() {

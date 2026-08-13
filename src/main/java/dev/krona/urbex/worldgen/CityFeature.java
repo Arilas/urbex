@@ -106,29 +106,26 @@ public class CityFeature extends Feature<NoneFeatureConfiguration> {
             // Urbex does not generate in this dimension. A published decision, not a missing one.
             return false;
         }
-        PlanningContext diminfo = runtime.planning();
         ChunkPos center = chunk.getPos();
         Holder<Biome> biome = region.getBiome(center.getMiddleBlockPosition(60));
         if (biome.is(UrbexTags.IS_VOID)) {
             return false;
         }
 
-        int chunkX = center.x();
-        int chunkZ = center.z();
         // No lock. The terrain feature holds no per-chunk state any more (that is on the
         // ChunkGenContext built inside generate()), the caches it reaches are concurrent,
         // and the region arrives as an argument instead of being written onto the shared
         // PlanningContext. So Urbex generation runs on the worker pool in parallel with the
         // rest of worldgen again, as it did before the driver became shared.
-        CityGenerator feature = runtime.generator();
-        try {
-            feature.generate(runtime, region, chunk);
-        } catch (Exception e) {
-            Urbex.getLogger().error("Error generating chunk {},{} (preset={}, dimension={})",
-                    chunkX, chunkZ, diminfo.preset().getId(), diminfo.dimension().identifier(), e);
-            ErrorLogger.logChunkInfo(chunkX, chunkZ, diminfo);
-            ErrorLogger.report("There was an error generating a chunk. See log for details!");
-        }
+        //
+        // No catch either, which is the point. This used to wrap generate() in catch (Exception),
+        // log, and return true - so a chunk that threw halfway through writing a building continued
+        // through the pipeline and was saved: vanilla terrain with half a city in it, next to
+        // neighbours that got theirs, distinguished from a correct chunk only by a log line nobody
+        // reads. A ChunkGenerationFailure leaves here and fails the chunk task instead, having
+        // already reported itself (issue #131). Returning true is therefore a statement about what
+        // happened rather than about what was attempted.
+        runtime.generator().generate(runtime, region, chunk);
         return true;
     }
 
