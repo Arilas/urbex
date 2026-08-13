@@ -4,7 +4,6 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
-import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
@@ -13,165 +12,57 @@ import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.CommonLevelAccessor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.WorldGenLevel;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class City {
 
-    record PreDefBuildingOffset(PredefinedBuilding building, int offsetX, int offsetZ) {}
-
-    // These five are datapack-derived: identical for every dimension, and their contents already
-    // carry the dimension they belong to. So they stay static - but they are built lazily from
-    // several worker threads at once, so each one is a concurrent map published through its own
-    // volatile guard. The guard is written last, so a thread that sees it set sees a full map.
-    private static final Map<ChunkCoord, PredefinedCity> PREDEFINED_CITY_MAP = new ConcurrentHashMap<>();
-    private static final Map<ChunkCoord, PredefinedBuilding> PREDEFINED_BUILDING_MAP = new ConcurrentHashMap<>();
-    private static final Map<ChunkCoord, PredefinedStreet> PREDEFINED_STREET_MAP = new ConcurrentHashMap<>();
-    private static final Map<ChunkCoord, PreDefBuildingOffset> OCCUPIED_CHUNKS_BUILDING = new ConcurrentHashMap<>();
-    private static final Map<ChunkCoord, PredefinedStreet> OCCUPIED_CHUNKS_STREET = new ConcurrentHashMap<>();
-
-    // All five are filled by walking provider.assets().predefinedCities().all(), which is a
-    // ConcurrentHashMap's values - Identifier hash-bucket order. Two predefined cities that claim
-    // the same chunk therefore resolve last-writer-wins by hash, and renaming either file could
-    // flip which one that is. Left as is deliberately: unlike the stuff ordinal, this is not a
-    // silent reordering of a working configuration but a conflict - two files claiming one chunk is
-    // already a pack authoring error, and the loser is unreachable whichever way it is broken. Any
-    // future rule here (first-wins, or a load error naming both) is a datapack-validation decision,
-    // not a determinism fix.
-    private static volatile boolean predefinedCityMapReady = false;
-    private static volatile boolean predefinedBuildingMapReady = false;
-    private static volatile boolean predefinedStreetMapReady = false;
-    private static volatile boolean occupiedBuildingReady = false;
-    private static volatile boolean occupiedStreetReady = false;
-
     /**
-     * Drop the datapack-derived maps. Only the per-dimension caches used to need this; these
-     * survive a dimension but not a datapack reload.
+     * Where the predefined content of the world {@code provider} generates is.
+     * <p>
+     * Compiled with the rest of the assets and finished before any chunk can ask (issue #129).
+     * What this replaces is five {@code static} maps on this class, each filled lazily from
+     * whichever worker thread arrived first, latched by its own {@code volatile boolean}, and
+     * guarded on {@code provider.getWorld() != null} so a world-creation preview could not latch
+     * "ready" over an empty map (issue #67) - plus a {@code cleanPredefinedCache()} three unrelated
+     * call sites had to remember, one of them the preview, clearing maps live worldgen was reading.
      */
-    public static void cleanPredefinedCache() {
-        predefinedCityMapReady = false;
-        predefinedBuildingMapReady = false;
-        predefinedStreetMapReady = false;
-        occupiedBuildingReady = false;
-        occupiedStreetReady = false;
-        PREDEFINED_CITY_MAP.clear();
-        PREDEFINED_BUILDING_MAP.clear();
-        PREDEFINED_STREET_MAP.clear();
-        OCCUPIED_CHUNKS_BUILDING.clear();
-        OCCUPIED_CHUNKS_STREET.clear();
+    private static PredefinedIndex predefined(IDimensionInfo provider) {
+        return provider.assets().predefined();
     }
 
     public static PredefinedCity getPredefinedCity(IDimensionInfo provider, ChunkCoord coord) {
-        // Guarded on a real level (#67): the preview's NullDimensionInfo has none, and its snapshot
-        // may be empty, so latching "ready" over it would permanently stop a later real level from
-        // populating this map.
-        if (!predefinedCityMapReady && provider.getWorld() != null) {
-            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
-                PREDEFINED_CITY_MAP.put(new ChunkCoord(city.getDimension(), city.getChunkX(), city.getChunkZ()), city);
-            }
-            predefinedCityMapReady = true;
-        }
-        if (PREDEFINED_CITY_MAP.isEmpty()) {
-            return null;
-        }
-        return PREDEFINED_CITY_MAP.get(coord);
+        return predefined(provider).cityAt(coord);
     }
 
     public static PredefinedBuilding getPredefinedBuildingAtTopLeft(IDimensionInfo provider, ChunkCoord coord) {
-        calculateMap(provider);
-        return PREDEFINED_BUILDING_MAP.get(coord);
+        return predefined(provider).buildingAt(coord);
     }
 
-    public static PreDefBuildingOffset getPredefinedBuilding(IDimensionInfo provider, ChunkCoord coord) {
-        calculateOccupied(provider);
-        return OCCUPIED_CHUNKS_BUILDING.get(coord);
+    public static PredefinedIndex.BuildingAt getPredefinedBuilding(IDimensionInfo provider, ChunkCoord coord) {
+        return predefined(provider).buildingCovering(coord);
     }
 
     public static PredefinedStreet getPredefinedStreet(IDimensionInfo provider, ChunkCoord coord) {
-        calculateOccupied(provider);
-        return OCCUPIED_CHUNKS_STREET.get(coord);
+        return predefined(provider).streetCovering(coord);
     }
 
     // Return true if a chunk is occupied (by a predefined building or street)
     public static boolean isChunkOccupied(IDimensionInfo provider, ChunkCoord coord) {
-        calculateOccupied(provider);
-        return OCCUPIED_CHUNKS_BUILDING.containsKey(coord) || OCCUPIED_CHUNKS_STREET.containsKey(coord);
-    }
-
-    private static void calculateOccupied(IDimensionInfo provider) {
-        WorldGenLevel world = provider.getWorld();
-        // Same level != null guard as getPredefinedCity above, and for the same reason: with a
-        // null world (the preview) these bodies run on whatever's currently in the datapack-derived
-        // maps - usually nothing yet - and must not latch "ready" over that.
-        if (!occupiedBuildingReady && world != null) {
-            calculateMap(provider);
-            for (Map.Entry<ChunkCoord, PredefinedBuilding> entry : PREDEFINED_BUILDING_MAP.entrySet()) {
-                PredefinedBuilding pb = entry.getValue();
-                ChunkCoord root = entry.getKey();
-                if (pb.multi()) {
-                    MultiBuilding building = provider.assets().multiBuildings().getOrThrow(pb.building());
-                    // Add all occupied chunkcoords for the building to the occupied set
-                    for (int x = 0 ; x < building.getDimX() ; x++) {
-                        for (int z = 0 ; z < building.getDimZ() ; z++) {
-                            OCCUPIED_CHUNKS_BUILDING.put(root.offset(x, z), new PreDefBuildingOffset(pb, x, z));
-                        }
-                    }
-                } else {
-                    OCCUPIED_CHUNKS_BUILDING.put(root, new PreDefBuildingOffset(pb, 0, 0));
-                }
-            }
-            occupiedBuildingReady = true;
-        }
-        if (!occupiedStreetReady && world != null) {
-            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
-                for (PredefinedStreet street : city.getPredefinedStreets()) {
-                    OCCUPIED_CHUNKS_STREET.put(new ChunkCoord(city.getDimension(),
-                            city.getChunkX() + street.relChunkX(), city.getChunkZ() + street.relChunkZ()), street);
-                }
-            }
-            occupiedStreetReady = true;
-        }
-    }
-
-    private static void calculateMap(IDimensionInfo provider) {
-        if (!predefinedBuildingMapReady && provider.getWorld() != null) {
-            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
-                for (PredefinedBuilding building : city.getPredefinedBuildings()) {
-                    PREDEFINED_BUILDING_MAP.put(new ChunkCoord(city.getDimension(),
-                            city.getChunkX() + building.relChunkX(), city.getChunkZ() + building.relChunkZ()), building);
-                }
-            }
-            predefinedBuildingMapReady = true;
-        }
+        return predefined(provider).isOccupied(coord);
     }
 
     /**
      * The predefined street declared <em>at</em> {@code coord}, or null.
      * <p>
-     * Renamed out of an overload collision: this and {@link #getPredefinedStreet} were both called
-     * {@code getPredefinedStreet}, separated only by whether the caller passed a level or a provider,
-     * and they answer different questions - this one reads the street map, that one reads the
-     * occupancy map. Two names, because the argument type is no longer the distinction.
+     * Separate from {@link #getPredefinedStreet}: this one answers about the chunk the street was
+     * declared on, that one about any chunk the street covers.
      */
     public static PredefinedStreet getPredefinedStreetAt(IDimensionInfo provider, ChunkCoord coord) {
-        if (!predefinedStreetMapReady && provider.getWorld() != null) {
-            for (PredefinedCity city : provider.assets().predefinedCities().all()) {
-                for (PredefinedStreet street : city.getPredefinedStreets()) {
-                    PREDEFINED_STREET_MAP.put(new ChunkCoord(city.getDimension(),
-                            city.getChunkX() + street.relChunkX(), city.getChunkZ() + street.relChunkZ()), street);
-                }
-            }
-            predefinedStreetMapReady = true;
-        }
-        if (PREDEFINED_STREET_MAP.isEmpty()) {
-            return null;
-        }
-        return PREDEFINED_STREET_MAP.get(coord);
+        return predefined(provider).streetAt(coord);
     }
 
 

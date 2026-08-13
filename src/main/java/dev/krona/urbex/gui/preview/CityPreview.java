@@ -11,7 +11,6 @@ import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.ChunkCandidate;
-import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
@@ -223,12 +222,12 @@ public class CityPreview implements AutoCloseable {
     }
 
     private void recompute(Preset preset, WorldStyleMix worldStyles, long seed, Mode mode) {
-        // The datapack-derived predefined-city/street maps are static (shared with real worldgen)
-        // and keyed only by chunk coord, not by preset - drop them so a new preset/seed combo
-        // doesn't see another preset's predefined content. Mirrors the old editor's preview
-        // refresh.
-        City.cleanPredefinedCache();
-
+        // Nothing to drop before recomputing any more. The predefined-city/street maps this used to
+        // clear were static and shared with live worldgen - the preview cleared them so a new
+        // preset/seed combo would not see the previous one's content, and in doing so cleared them
+        // out from under whatever else was reading them. They are part of the snapshot the preview
+        // compiles for itself now, so a new preview simply has its own (issue #129).
+        //
         // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
         // the preset, so it does not pay to build one there - nor to resolve the world styles, which
         // is why that sits inside this branch and inside the guard rather than above it.

@@ -507,7 +507,7 @@ public class ChunkPlan {
         // If a chunk is occupied according to City then there is a predefined building or street here.
         // Try to look for it
         if (City.isChunkOccupied(provider, coord)) {
-            City.PreDefBuildingOffset predefinedBuilding = City.getPredefinedBuilding(provider, coord);
+            PredefinedIndex.BuildingAt predefinedBuilding = City.getPredefinedBuilding(provider, coord);
             if (predefinedBuilding != null) {
                 if (predefinedBuilding.building().multi()) {
                     MultiBuilding building = provider.assets().multiBuildings().getOrThrow(predefinedBuilding.building().building());

@@ -424,7 +424,8 @@ class AssetGraphTest {
                     new AssetIndex<>("urbex:buildings", buildings),
                     new AssetIndex<>("urbex:multibuildings", multiBuildings), empty.scattered(),
                     empty.worldStyles(), empty.cityStyles(),
-                    new AssetIndex<>("urbex:predefinedcities", cities), empty.stuff(), empty.stuffByTag());
+                    new AssetIndex<>("urbex:predefinedcities", cities), empty.stuff(), empty.stuffByTag(),
+                    empty.predefined());
         }
     }
 }

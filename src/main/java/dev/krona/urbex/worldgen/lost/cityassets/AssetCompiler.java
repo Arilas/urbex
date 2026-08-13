@@ -110,7 +110,8 @@ public final class AssetCompiler {
 
         AssetSnapshot snapshot = new AssetSnapshot(variants, palettes, conditions, styles, parts,
                 buildings, multiBuildings, scattered, worldStyles, cityStyles, predefinedCities,
-                stuff, groupStuffByTag(stuff.all()));
+                stuff, groupStuffByTag(stuff.all()),
+                PredefinedIndex.build(predefinedCities, multiBuildings));
         // Last, on the finished snapshot: the cross-asset references are names, and resolving them
         // needs every index built. Generation resolves them one at a time on whichever chunk first
         // needs one, which is the whole of what issue #56's second half is about.
