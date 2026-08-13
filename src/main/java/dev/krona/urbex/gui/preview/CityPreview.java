@@ -232,7 +232,7 @@ public class CityPreview implements AutoCloseable {
         // which is why that sits inside this branch and inside the guard rather than above it.
         //
         // Two things under the guard can throw, and both must leave the screen standing:
-        //   - GridSettings.fromPreset validates the road settings, and a preset can be momentarily
+        //   - PresetRoadGrid.of validates the road settings, and a preset can be momentarily
         //     self-contradictory. The road settings come in min/max pairs held by two independent
         //     sliders, so dragging a minimum up necessarily passes through states where it exceeds
         //     its maximum. GridSettings refuses those, correctly - a world must never be generated

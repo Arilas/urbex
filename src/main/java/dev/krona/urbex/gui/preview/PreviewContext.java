@@ -2,8 +2,8 @@ package dev.krona.urbex.gui.preview;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetRoadGrid;
 import dev.krona.urbex.plan.grid.GridRoadField;
-import dev.krona.urbex.plan.grid.GridSettings;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.DimensionCaches;
 import dev.krona.urbex.worldgen.LevelShape;
@@ -61,7 +61,7 @@ public record PreviewContext(PlanningContext planning, PreviewTerrain terrain) {
      * placeholder for that entry alone, rather than taking the whole preview with it.
      *
      * @throws IllegalArgumentException if the preset's road settings are self-contradictory
-     *                                  ({@link GridSettings#fromPreset})
+     *                                  ({@link PresetRoadGrid#of})
      * @throws IllegalStateException    if the placeholder world style stops declaring a field that
      *                                  becomes required after resolution
      */
@@ -102,7 +102,7 @@ public record PreviewContext(PlanningContext planning, PreviewTerrain terrain) {
                 // The preview's own seed and dimension, so the roads it draws are the roads the world
                 // will have. Same construction as a loaded level's; there is no server to ask.
                 new GridRoadField(seed, Level.OVERWORLD.identifier().toString(),
-                        GridSettings.fromPreset(preset)),
+                        PresetRoadGrid.of(preset)),
                 new DimensionCaches(seed),
                 // The vanilla overworld's shape: a preview runs before any level exists, so there is
                 // nothing to ask, and every planning rule that reads a height bound or the water line
