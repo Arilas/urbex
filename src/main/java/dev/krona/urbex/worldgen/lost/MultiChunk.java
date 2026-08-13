@@ -85,7 +85,7 @@ public class MultiChunk {
         }
 
         ChunkCoord topleft = new ChunkCoord(mc.dimension(), mc.chunkX() * areasize, mc.chunkZ() * areasize);
-        int cityLevel = ChunkPlan.getCityLevel(topleft, provider);
+        int cityLevel = CityField.getCityLevel(topleft, provider);
 
         // Find all city styles in this multichunk and count them.
         //
@@ -232,7 +232,7 @@ public class MultiChunk {
                 RailChunkType type = railChunkInfo.getType();
                 boolean atSurface = type.isSurface() || type.isStation();
 
-                if (atSurface || !ChunkPlan.isCityRaw(coord, provider, profile) || ChunkPlan.hasHighway(coord, provider, profile)) {
+                if (atSurface || !CityField.isCityRaw(coord, provider, profile) || ChunkPlan.hasHighway(coord, provider, profile)) {
                     return false;
                 }
                 WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();

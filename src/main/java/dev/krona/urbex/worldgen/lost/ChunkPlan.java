@@ -318,8 +318,8 @@ public class ChunkPlan {
         int chunkZ = key.chunkZ();
         Preset profile = provider.preset();
 
-        boolean isCity = isCityRaw(key, provider, profile);
-        int cityLevel = getCityLevelGui(key, provider);
+        boolean isCity = CityField.isCityRaw(key, provider, profile);
+        int cityLevel = CityField.cityLevelUncached(key, provider);
         RandomSource rand = getBuildingRandom(chunkX, chunkZ, provider.seed(), Rng.Purpose.BUILDING);
         boolean couldHaveBuilding = isCity && rand.nextFloat() < profile.buildingChance();
         // The preview resolves neither a multi-building section nor a style, exactly as before -
@@ -345,7 +345,7 @@ public class ChunkPlan {
         // Computed into locals and constructed once at the end. This used to assemble a mutable
         // object field by field and hand the half-built thing to its own helpers; the record cannot
         // be published half-built, which is the point (issue #126).
-        boolean isCity = isCityRaw(coord, provider, profile);
+        boolean isCity = CityField.isCityRaw(coord, provider, profile);
 
         MultiSection section = isCity ? multiBuildingSection(coord, provider, profile) : MultiSection.NONE;
         MultiPos multiPos = section.pos();
@@ -353,7 +353,7 @@ public class ChunkPlan {
 
         int cityLevel;
         if (multiPos.isSingle()) {
-            cityLevel = getCityLevel(coord, provider);
+            cityLevel = CityField.getCityLevel(coord, provider);
         } else {
             cityLevel = profile.multiUseCorner() ? getTopLeftCityLevel(multiPos, coord, provider)
                     : getAverageCityLevel(multiPos, coord, provider);
@@ -425,19 +425,6 @@ public class ChunkPlan {
         return raced != null ? raced : candidate;
     }
 
-    /**
-     * Don't use the cache as we're busy building the cache.
-     */
-    public static boolean isCityRaw(ChunkCoord coord, PlanningContext provider, Preset profile) {
-        if (isVoidChunk(coord, provider)) {
-            // If we have a void chunk then no city here
-            return false;
-        }
-
-        float cityFactor = City.getCityFactor(coord, provider, profile);
-        return cityFactor > profile.cityThreshold();
-    }
-
     public static boolean isCity(ChunkCoord coord, PlanningContext provider) {
         return getChunkCandidate(coord, provider).isCity();
     }
@@ -459,7 +446,7 @@ public class ChunkPlan {
         // probe, each one sorting a candidate list with a comparator that hashes twice per comparison
         // - only for the clip below to throw the answer away. EffectiveRoad.resolve returns NONE for
         // a non-city chunk whatever the field said, so hoisting the test cannot change the answer.
-        if (!isCityRaw(coord, provider, profile)) {
+        if (!CityField.isCityRaw(coord, provider, profile)) {
             return RoadType.NONE;
         }
         RoadCell cell = provider.roadField().at(coord.chunkX(), coord.chunkZ());
@@ -467,7 +454,7 @@ public class ChunkPlan {
         for (RoadDirection direction : RoadDirection.values()) {
             if (cell.connects(direction)) {
                 ChunkCoord adjacent = coord.offset(direction.stepX(), direction.stepZ());
-                if (isCityRaw(adjacent, provider, profile)) {
+                if (CityField.isCityRaw(adjacent, provider, profile)) {
                     connectedCityNeighbour = true;
                     break;
                 }
@@ -547,7 +534,7 @@ public class ChunkPlan {
         for (int x = 0; x < mp.w(); x++) {
             for (int z = 0; z < mp.h(); z++) {
                 ChunkCoord key = new ChunkCoord(provider.dimension(), topX + x, topZ + z);
-                level += getCityLevel(key, provider);
+                level += CityField.getCityLevel(key, provider);
             }
         }
         return level / (mp.w() * mp.h());
@@ -557,7 +544,7 @@ public class ChunkPlan {
         int topX = coord.chunkX() - mp.x();
         int topZ = coord.chunkZ() - mp.z();
         ChunkCoord key = new ChunkCoord(provider.dimension(), topX, topZ);
-        return getCityLevel(key, provider);
+        return CityField.getCityLevel(key, provider);
     }
 
     /**
@@ -951,130 +938,6 @@ public class ChunkPlan {
      * Return true if this is a void chunk (only for floating island worldtype). This does
      * not use the cache so it is safe to use when the cache is building
      */
-    public static boolean isVoidChunk(ChunkCoord coord, PlanningContext provider) {
-        if (provider.preset().isFloating()) {
-            return provider.heightmap(coord).getHeight() <= 0;
-        } else {
-            return false;
-        }
-    }
-
-
-    /**
-     * This function does not use the cache. So safe to use when the cache is building
-     * This function uses its own cache.
-     */
-    public static int getCityLevel(ChunkCoord key, PlanningContext provider) {
-        // Unconditional. This used to be gated on provider.getWorld() != null, "In LC preview we
-        // don't want to use the cache as the config isn't loaded yet" - a guard from when the
-        // preview shared the dimension's caches. It has held its own DimensionCaches, built from
-        // its own seed and dropped with it, since #125; and the value cached here is a pure function
-        // of the seed and the preset, both of which are fixed for one preview.
-        Integer cached = provider.caches().cityLevel.get(key);
-        if (cached != null) {
-            return cached;
-        }
-        int result;
-        if (provider.preset().isFloating()) {
-            result = getCityLevelFloating(key, provider);
-        } else if (provider.preset().isCavern()) {
-            result =  getCityLevelCavern(key, provider);
-        } else {
-            result = getCityLevelNormal(key, provider, provider.preset());
-        }
-        Integer raced = provider.caches().cityLevel.putIfAbsent(key, result);
-        if (raced != null) {
-            return raced;
-        }
-        return result;
-    }
-
-    public static int getCityLevelGui(ChunkCoord key, PlanningContext provider) {
-        int result;
-        if (provider.preset().isFloating()) {
-            result = getCityLevelFloating(key, provider);
-        } else if (provider.preset().isCavern()) {
-            result =  getCityLevelCavern(key, provider);
-        } else {
-            result = getCityLevelNormal(key, provider, provider.preset());
-        }
-        return result;
-    }
-
-    private static int getCityLevelCavern(ChunkCoord coord, PlanningContext provider) {
-        // @todo for now
-        return getCityLevelFloating(coord, provider);
-    }
-
-
-    private static int getCityLevelNormal(ChunkCoord coord, PlanningContext provider, Preset profile) {
-        ChunkHeightmap heightmap = provider.heightmap(coord);
-        int height = heightmap.getHeight();
-        if (profile.useAvgHeightmap() && Config.heightSampleSize() > 2) {
-            int sampleSize = Config.heightSampleSize();
-            int constX = coord.chunkX() < 0 ? -1 : 1;
-            int constZ = coord.chunkZ() < 0 ? -1 : 1;
-            int chunkBaseX =  (coord.chunkX() / sampleSize) * sampleSize + (sampleSize / 2 * constX);
-            int chunkBaseZ =  (coord.chunkZ() / sampleSize) * sampleSize + (sampleSize / 2 * constZ);
-            int chunkLeft = ((coord.chunkX() / sampleSize) - 1) * sampleSize + (sampleSize / 2 * constX);
-            int chunkRight = ((coord.chunkX() / sampleSize) + 1) * sampleSize + (sampleSize / 2 * constX);
-            int chunkUp = ((coord.chunkZ() / sampleSize) - 1) * sampleSize + (sampleSize / 2 * constZ);
-            int chunkDown = ((coord.chunkZ() / sampleSize) + 1) * sampleSize + (sampleSize / 2 * constZ);
-            ChunkCoord left = new ChunkCoord(provider.dimension(), chunkLeft, chunkBaseZ);
-            ChunkCoord right = new ChunkCoord(provider.dimension(), chunkRight, chunkBaseZ);
-            ChunkCoord up = new ChunkCoord(provider.dimension(), chunkBaseX, chunkUp);
-            ChunkCoord down = new ChunkCoord(provider.dimension(), chunkBaseX, chunkDown);
-            int avgHeightmap = height;
-            int counter = 1;
-            if (isCityRaw(left, provider, profile)) {
-                avgHeightmap += provider.heightmap(left).getHeight();
-                counter++;
-            }
-            if (isCityRaw(right, provider, profile)) {
-                avgHeightmap += provider.heightmap(right).getHeight();
-                counter++;
-            }
-            if (isCityRaw(up, provider, profile)) {
-                avgHeightmap += provider.heightmap(up).getHeight();
-                counter++;
-            }
-            if (isCityRaw(down, provider, profile)) {
-                avgHeightmap += provider.heightmap(down).getHeight();
-                counter++;
-            }
-            avgHeightmap /= counter;
-            return getLevelBasedOnHeight(avgHeightmap, profile);
-        }
-        return getLevelBasedOnHeight(height, profile);
-    }
-
-    private static int getCityLevelFloating(ChunkCoord coord, PlanningContext provider) {
-        int h = provider.heightmap(coord).getHeight();
-        return getLevelBasedOnHeight(h, provider.preset());
-    }
-
-    private static int getLevelBasedOnHeight(int height, Preset profile) {
-        if (height < profile.cityLevel0Height()) {
-            return 0;
-        } else if (height < profile.cityLevel1Height()) {
-            return 1;
-        } else if (height < profile.cityLevel2Height()) {
-            return 2;
-        } else if (height < profile.cityLevel3Height()) {
-            return 3;
-        } else if (height < profile.cityLevel4Height()) {
-            return 4;
-        } else if (height < profile.cityLevel5Height()) {
-            return 5;
-        } else if (height < profile.cityLevel6Height()) {
-            return 6;
-        } else if (height < profile.cityLevel7Height()) {
-            return 7;
-        } else {
-            return 8;
-        }
-    }
-
     private Block getRandomDoor(RandomSource rand) {
         return switch (rand.nextInt(7)) {
             case 0 -> Blocks.BIRCH_DOOR;

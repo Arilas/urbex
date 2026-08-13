@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
+import dev.krona.urbex.worldgen.lost.CityField;
 import dev.krona.urbex.worldgen.lost.ChunkCandidate;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -51,7 +52,7 @@ public class ErrorLogger {
         Logger logger = Urbex.getLogger();
         try {
             ChunkCoord coord = new ChunkCoord(provider.dimension(), chunkX, chunkZ);
-            logger.info("IsCity: " + ChunkPlan.isCityRaw(coord, provider, provider.preset()));
+            logger.info("IsCity: " + CityField.isCityRaw(coord, provider, provider.preset()));
             ChunkCandidate candidate = ChunkPlan.getChunkCandidate(coord, provider);
             logger.info("    Level: " + candidate.cityLevel());
             if (candidate.multiBuilding() != null) {

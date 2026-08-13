@@ -291,7 +291,7 @@ public final class PrimaryBridgePlanner {
 
             @Override
             public boolean isCity(ChunkCoord coord) {
-                return ChunkPlan.isCityRaw(coord, provider, provider.preset());
+                return CityField.isCityRaw(coord, provider, provider.preset());
             }
 
             @Override
@@ -302,7 +302,7 @@ public final class PrimaryBridgePlanner {
 
             @Override
             public int cityLevel(ChunkCoord coord) {
-                return ChunkPlan.getCityLevel(coord, provider);
+                return CityField.getCityLevel(coord, provider);
             }
 
             @Override
