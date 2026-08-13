@@ -4,7 +4,7 @@ import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.Orientation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -22,7 +22,7 @@ public class Doors
                 .setValue(DoorBlock.FACING, facing);
     }
 
-    public static void generateDoors(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, int height, int f) {
+    public static void generateDoors(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int height, int f) {
         BlockState air = Blocks.AIR.defaultBlockState();
         BlockState filler = ctx.paletteAt(info.getCompiledPalette(), info.getBuilding().getFillerBlock(), 0, height, 0);
         ChunkDriver driver = ctx.driver;
@@ -120,7 +120,7 @@ public class Doors
         }
     }
 
-    private static boolean hasConnectionWithBuildingMax(int localLevel, BuildingInfo info, BuildingInfo info2, Orientation x) {
+    private static boolean hasConnectionWithBuildingMax(int localLevel, ChunkPlan info, ChunkPlan info2, Orientation x) {
         if (info.isValidFloor(localLevel) && info.getFloor(localLevel).getMetaBoolean(BuildingPart.META_DONTCONNECT)) {
             return false;
         }
@@ -133,7 +133,7 @@ public class Doors
         return info2.hasBuilding && ((localAdjacent >= 0 && localAdjacent < info2.getNumFloors()) || (localAdjacent < 0 && (-localAdjacent) <= info2.cellars)) && info2.hasConnectionAt(level, x);
     }
 
-    private static boolean hasConnectionToTopOrOutside(int localLevel, BuildingInfo info, BuildingInfo info2) {
+    private static boolean hasConnectionToTopOrOutside(int localLevel, ChunkPlan info, ChunkPlan info2) {
         int globalLevel = info.localToGlobal(localLevel);
         int localAdjacent = info2.globalToLocal(globalLevel);
         if (info.getFloor(localLevel).getMetaBoolean(BuildingPart.META_DONTCONNECT)) {
@@ -143,7 +143,7 @@ public class Doors
 //        return (!info2.hasBuilding && localLevel == localAdjacent) || (info2.hasBuilding && localAdjacent == info2.getNumFloors());
     }
 
-    private static boolean hasConnectionWithBuilding(int localLevel, BuildingInfo info, BuildingInfo info2) {
+    private static boolean hasConnectionWithBuilding(int localLevel, ChunkPlan info, ChunkPlan info2) {
         int globalLevel = info.localToGlobal(localLevel);
         int localAdjacent = info2.globalToLocal(globalLevel);
         return info2.hasBuilding && ((localAdjacent >= 0 && localAdjacent < info2.getNumFloors()) || (localAdjacent < 0 && (-localAdjacent) <= info2.cellars));

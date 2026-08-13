@@ -1,8 +1,10 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
+import dev.krona.urbex.worldgen.lost.Railway;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -30,6 +32,12 @@ public final class DigestRunner {
     private static final long FNV_OFFSET = 0xCBF29CE484222325L;
     private static final long FNV_PRIME = 0x100000001B3L;
 
+    /**
+     * Clear every planning cache after each {@code N} chunks driven, simulating the timed eviction
+     * a long-running world does by itself. Absent or zero leaves the caches alone.
+     */
+    public static final String EXPIRE_EVERY_PROPERTY = "urbex.digestCheck.expireEvery";
+
     private DigestRunner() {
     }
 
@@ -43,7 +51,7 @@ public final class DigestRunner {
      *                     all - announces itself instead of moving silently; see
      *                     {@code digestCheckFeatures} in {@code build.gradle}.
      * @param slopeChunks  how many sampled chunks carry a sloped minor road (see
-     *                     {@link BuildingInfo#getStreetSlopeDirection}). Printed for the same
+     *                     {@link ChunkPlan#getStreetSlopeDirection}). Printed for the same
      *                     reason as {@code bridgeChunks}: a sample window that stops containing a
      *                     slope - the only mechanical proof the full-chunk {@code street_stair}
      *                     part renders at all - announces itself instead of moving silently; see
@@ -55,13 +63,14 @@ public final class DigestRunner {
      *                     fails on it whenever asked to.
      */
     public record Result(long driverDigest, long fullDigest, long driverBlocks, int drivenChunks,
-                         int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks, long unsafeReads) {
+                         int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks, int avoidedChunks,
+                         int railCollisionChunks, long unsafeReads) {
 
         public String driverLine(String order, int offset) {
             return String.format(
-                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d unsafeReads=%d",
+                    "DRIVERDIGEST=%016x blocks=%d drivenChunks=%d chunks=%d order=%s offset=%d ms=%d bridgeChunks=%d slopeChunks=%d avoidedChunks=%d railCollisionChunks=%d unsafeReads=%d",
                     driverDigest, driverBlocks, drivenChunks, chunkCount, order, offset, elapsedMs, bridgeChunks,
-                    slopeChunks, unsafeReads);
+                    slopeChunks, avoidedChunks, railCollisionChunks, unsafeReads);
         }
 
         public String fullLine(String order, int offset) {
@@ -107,10 +116,23 @@ public final class DigestRunner {
         UnsafeReadCounter.reset();
         long start = System.currentTimeMillis();
         int recordedChunks;
+        // Forced cache expiry, off unless asked for. Planning caches are TimedCaches that can drop
+        // an entry at any moment in a real world, and a plan rebuilt from a different starting point
+        // than its neighbours saw is one of the two defects issue #126 was opened for. Clearing them
+        // mid-drive is the standing version of "wait for the eviction to happen by itself": if any
+        // planning value is not a pure function of the seed and the coordinate, the digest moves.
+        int expireEvery = Integer.getInteger(EXPIRE_EVERY_PROPERTY, 0);
+        int driven = 0;
         ChunkDriver.startRecordingWrites();
         try {
             for (ChunkPos pos : chunks) {
                 level.getChunk(pos.x(), pos.z(), ChunkStatus.FULL, true);
+                if (expireEvery > 0 && ++driven % expireEvery == 0) {
+                    IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+                    if (dimInfo != null) {
+                        dimInfo.caches().clear();
+                    }
+                }
             }
         } finally {
             ChunkDriver.stopRecordingWrites();
@@ -164,10 +186,12 @@ public final class DigestRunner {
 
         int bridgeChunks = countBridgeChunks(level, sorted);
         int slopeChunks = countSlopeChunks(level, sorted);
+        int avoidedChunks = countAvoidedChunks(level, sorted);
+        int railCollisionChunks = countRailCollisionChunks(level, sorted);
 
         long elapsed = System.currentTimeMillis() - start;
         return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed, bridgeChunks,
-                slopeChunks, unsafeReads);
+                slopeChunks, avoidedChunks, railCollisionChunks, unsafeReads);
     }
 
     /**
@@ -176,6 +200,71 @@ public final class DigestRunner {
      * costs no extra draw and cannot perturb either digest. Zero whenever no Urbex profile is
      * configured for this dimension - the driver-writes check already fails that case loudly.
      */
+    /**
+     * How many of the sampled chunks structure avoidance suppresses.
+     * <p>
+     * The same coverage guard {@code bridgeChunks} and {@code slopeChunks} are: a window that stops
+     * containing an avoided structure stops testing avoidance, and passes while doing so. Counted
+     * after generation, when every chunk is loaded, so this reads the answer the neighbourhood probe
+     * <em>would</em> give with nothing missing - which is deliberately not the answer generation got,
+     * and the gap between them is issue #126.
+     */
+    private static int countAvoidedChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
+        int count = 0;
+        StringBuilder where = new StringBuilder();
+        for (ChunkPos pos : chunkPositions) {
+            // Loaded first, then asked through the production method. Not a reimplementation of the
+            // matching - that stays in one place - but the residency guard inside it answers "no"
+            // for a chunk the level does not hold, and after generation some of the sample is not
+            // resident. A coverage counter that inherited that would report "nothing to cover" for a
+            // window full of structures, which is the opposite of its job.
+            level.getChunk(pos.x(), pos.z(), ChunkStatus.STRUCTURE_REFERENCES, true);
+            CityGenerator.AvoidChunk avoid = CityGenerator.hasBlacklistedStructure(level, pos.x(), pos.z());
+            if (avoid != CityGenerator.AvoidChunk.NO) {
+                count++;
+                where.append(' ').append(pos.x()).append(',').append(pos.z()).append('=').append(avoid);
+            }
+        }
+        // The production method, not a reimplementation of it. It answers "skip" for a chunk the
+        // region does not hold, which is exactly the order-dependence issue #126 is about - so a
+        // count taken through it is the honest one: it says what avoidance would actually have done,
+        // not what a perfectly-loaded world would say. If those two ever disagree, that disagreement
+        // is the bug, and hiding it behind a second loop here would be the wrong place to find out.
+        // Logged when it fires, so a window that loses its structure says where it used to be -
+        // the same job the comments over digestCheckFeatures do by hand for the bridge and the slope.
+        if (count > 0) {
+            Urbex.getLogger().info("AVOIDEDCHUNKS{}", where);
+        }
+        return count;
+    }
+
+    /**
+     * How many of the sampled chunks have a building deep enough to cancel the railway planned
+     * there. The same coverage guard {@code avoidedChunks} is: the collision only exists under a
+     * world style that sets {@code railwayavoidance: block_railway}, and the one this mod ships sets
+     * {@code ignore}, so every window is blind to it unless a datapack turns it on - which is how it
+     * stayed order-dependent unobserved (issue #126).
+     */
+    private static int countRailCollisionChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
+        IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+        if (dimInfo == null) {
+            return 0;
+        }
+        int count = 0;
+        StringBuilder where = new StringBuilder();
+        for (ChunkPos pos : chunkPositions) {
+            ChunkCoord coord = new ChunkCoord(level.dimension(), pos.x(), pos.z());
+            if (Railway.buildingBlocksRail(coord, dimInfo)) {
+                count++;
+                where.append(' ').append(pos.x()).append(',').append(pos.z());
+            }
+        }
+        if (count > 0) {
+            Urbex.getLogger().info("RAILCOLLISIONS{}", where);
+        }
+        return count;
+    }
+
     private static int countBridgeChunks(ServerLevel level, List<ChunkPos> chunkPositions) {
         IDimensionInfo dimInfo = GenerationSession.planningFor(level);
         if (dimInfo == null) {
@@ -205,7 +294,7 @@ public final class DigestRunner {
         int count = 0;
         for (ChunkPos pos : chunkPositions) {
             ChunkCoord coord = new ChunkCoord(level.dimension(), pos.x(), pos.z());
-            if (BuildingInfo.getBuildingInfo(coord, dimInfo).getStreetSlopeDirection() != null) {
+            if (ChunkPlan.getChunkPlan(coord, dimInfo).getStreetSlopeDirection() != null) {
                 count++;
             }
         }

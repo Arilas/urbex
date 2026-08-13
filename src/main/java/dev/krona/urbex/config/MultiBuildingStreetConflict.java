@@ -11,7 +11,7 @@ public enum MultiBuildingStreetConflict {
     /**
      * Only a primary road rejects. A secondary or tertiary road under an accepted complex's
      * footprint is cut, not suppressed: the chunk holds the building instead of the road, but
-     * {@link dev.krona.urbex.worldgen.lost.BuildingInfo#getEffectiveRoadType()} still reports that
+     * {@link dev.krona.urbex.worldgen.lost.ChunkPlan#getEffectiveRoadType()} still reports that
      * road class there, because it is resolved from the raw road field before the building decision
      * is known.
      */

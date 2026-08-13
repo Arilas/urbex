@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The three ways the old arrangement could lose or misdirect a post-generation callback, and why a
  * queue owned by the {@link ChunkGenContext} closes all three (issue #127).
  * <p>
- * Post-todos used to be stored on the cached {@code BuildingInfo} for the chunk, which
+ * Post-todos used to be stored on the cached {@code ChunkPlan} for the chunk, which
  * {@code ChunkFixer} re-fetched through {@code DimensionCaches} in order to drain. That cache entry
  * outlives the generation that wrote to it and is shared by every generation that reads the chunk,
  * so the work could be evicted before the drain, inherited by a second generation, or cleared out
@@ -70,7 +70,7 @@ class PostTodoQueueTest {
     /**
      * Duplicate generation of one chunk. Both generations address the same position - the same
      * building part, driven twice - and each must see only what it queued itself. Sharing one map
-     * on the cached {@code BuildingInfo} meant the first drain took the second generation's
+     * on the cached {@code ChunkPlan} meant the first drain took the second generation's
      * callback with it and applied it to the wrong region.
      */
     @Test
@@ -92,7 +92,7 @@ class PostTodoQueueTest {
     /**
      * Forced eviction of everything the dimension caches hold, in the window between queueing the
      * work and draining it. That window used to be fatal: the callbacks lived in the evicted
-     * {@code BuildingInfo}, and the drain re-fetched the cache and found a fresh, empty one.
+     * {@code ChunkPlan}, and the drain re-fetched the cache and found a fresh, empty one.
      */
     @Test
     void forcedCacheEvictionBetweenQueueingAndDrainingCannotLoseWork() {
@@ -108,7 +108,7 @@ class PostTodoQueueTest {
         assertEquals(List.of(pos), ran);
     }
 
-    /** Last write wins per position, which is what the map on {@code BuildingInfo} did. */
+    /** Last write wins per position, which is what the map on {@code ChunkPlan} did. */
     @Test
     void aSecondTodoAtOnePositionReplacesTheFirst() {
         PostTodoQueue queue = new PostTodoQueue();

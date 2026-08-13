@@ -12,14 +12,14 @@ import java.util.function.Consumer;
  * Deferred block writes owned by one chunk-generation context, drained at the end of that same
  * generation.
  *
- * <p>These used to live on the cached {@code BuildingInfo} for the chunk, and {@code ChunkFixer}
+ * <p>These used to live on the cached {@code ChunkPlan} for the chunk, and {@code ChunkFixer}
  * re-fetched that cache entry to drain them. Three things could go wrong with that, and the queue
  * being per-context is what removes all three (issue #127): the cache entry could be evicted between
  * the write and the drain, taking the callbacks with it; a second generation of the same chunk found
  * the first generation's callbacks still queued and ran them against its own region; and a callback
  * added on a worker thread while another thread cleared the map was simply lost.</p>
  *
- * <p>Keyed by position and last-write-wins, which is what the map on {@code BuildingInfo} did:
+ * <p>Keyed by position and last-write-wins, which is what the map on {@code ChunkPlan} did:
  * a position written twice in one generation gets the later callback only. Iteration order is
  * deliberately the {@link ConcurrentHashMap} one rather than insertion order - the drain applies
  * these to the world in that order, and preserving it keeps this change a pure ownership move. The

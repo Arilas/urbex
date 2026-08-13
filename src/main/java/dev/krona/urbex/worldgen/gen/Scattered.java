@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Scattered {
-    public static boolean avoidScattered(CityGenerator feature, BuildingInfo info) {
+    public static boolean avoidScattered(CityGenerator feature, ChunkPlan info) {
         if (info.isCity) {
             return true;
         }
@@ -67,7 +67,7 @@ public class Scattered {
         return new ChunkCoord(provider.getType(), ax * areasize - 2000000, az * areasize - 2000000);
     }
 
-    public static void generateScattered(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, ScatteredSettings scatteredSettings) {
+    public static void generateScattered(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, ScatteredSettings scatteredSettings) {
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
         IDimensionInfo provider = feature.provider;
@@ -227,7 +227,7 @@ public class Scattered {
                 if (!isValidScatterBiome(feature, reference, coord)) {
                     return AreaScan.INVALID;
                 }
-                BuildingInfo tinfo = BuildingInfo.getBuildingInfo(coord, provider);
+                ChunkPlan tinfo = ChunkPlan.getChunkPlan(coord, provider);
                 if (avoidScattered(feature, tinfo)) {
                     return AreaScan.INVALID;
                 }
@@ -268,7 +268,7 @@ public class Scattered {
         return true;
     }
 
-    private static void generateScatteredBuilding(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, Building building, RandomSource rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
+    private static void generateScatteredBuilding(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, Building building, RandomSource rand, int lowestLevel, ScatteredBuilding.TerrainFix terrainFix) {
         IDimensionInfo provider = feature.provider;
 
         int height = lowestLevel;

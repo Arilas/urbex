@@ -15,7 +15,7 @@ import java.util.function.Supplier;
 
 /**
  * Owns the order in which candidate content claims a city chunk. Stated once, here, rather than
- * being implicit in {@link BuildingInfo}'s control flow.
+ * being implicit in {@link ChunkPlan}'s control flow.
  *
  * <h2>The order</h2>
  * {@link #couldHaveBuilding} walks a chain of full stops. The first one that matches decides, and
@@ -50,12 +50,12 @@ import java.util.function.Supplier;
  * The order cannot be evaluated in one go, and the split is not cosmetic:
  * <ul>
  *   <li>{@link #couldHaveBuilding} is the <em>candidate</em> verdict. It runs during the
- *       {@link ChunkCharacteristics} pass, on the {@link dev.krona.urbex.varia.Rng.Purpose#BUILDING}
+ *       {@link ChunkCandidate} pass, on the {@link dev.krona.urbex.varia.Rng.Purpose#BUILDING}
  *       stream, because its answer is cached per chunk and read by the neighbours (the street
  *       city-style majority vote, and the preview).</li>
- *   <li>{@link #resolve} is the <em>final</em> verdict. It runs while a {@link BuildingInfo} is
+ *   <li>{@link #resolve} is the <em>final</em> verdict. It runs while a {@link ChunkPlan} is
  *       being constructed, on the {@link dev.krona.urbex.varia.Rng.Purpose#BUILDING_LAYOUT} stream,
- *       because the lonely-building veto reads the four neighbours' {@link ChunkCharacteristics} -
+ *       because the lonely-building veto reads the four neighbours' {@link ChunkCandidate} -
  *       so it cannot itself live in the pass those neighbours are computed by without recursing
  *       forever.</li>
  * </ul>
@@ -80,7 +80,7 @@ public final class ChunkContentResolver {
 
     /**
      * How strongly a neighbouring chunk's building type prefers to stand alone. Narrow on purpose:
-     * the real implementation reaches into the neighbours' {@link ChunkCharacteristics}, and this
+     * the real implementation reaches into the neighbours' {@link ChunkCandidate}, and this
      * keeps {@link #resolve} a pure function of values a test can supply.
      */
     @FunctionalInterface
@@ -122,7 +122,7 @@ public final class ChunkContentResolver {
     }
 
     /**
-     * Pass one: can this chunk hold a building at all? Cached in {@link ChunkCharacteristics} and
+     * Pass one: can this chunk hold a building at all? Cached in {@link ChunkCandidate} and
      * read by neighbouring chunks, so it must not depend on any neighbour's own verdict.
      *
      * <p>Note the short-circuit on {@code isCity}: a chunk outside a city takes no draw at all.
@@ -235,9 +235,9 @@ public final class ChunkContentResolver {
         // Settled whether or not a building claimed the chunk: see the draw discipline note above.
         // A non-top-left multi-building chunk copies the top-left's street type instead.
         boolean inheritsFromTopLeft = section.isMulti() && !section.isTopLeft();
-        BuildingInfo.StreetType streetType = null;
+        ChunkPlan.StreetType streetType = null;
         if (!inheritsFromTopLeft) {
-            streetType = openLot ? BuildingInfo.StreetType.PARK : BuildingInfo.StreetType.NORMAL;
+            streetType = openLot ? ChunkPlan.StreetType.PARK : ChunkPlan.StreetType.NORMAL;
         }
 
         return new ChunkContent(b, streetType, b ? candidateBuildingName : null, openLot, parkPart);

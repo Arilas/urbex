@@ -32,7 +32,7 @@ public class DamageArea {
 
     private final BlockState air;
 
-    public DamageArea(int chunkX, int chunkZ, IDimensionInfo provider, BuildingInfo info) {
+    public DamageArea(int chunkX, int chunkZ, IDimensionInfo provider, ChunkPlan info) {
         this.seed = provider.getSeed();
         this.profile = info.profile;
         this.chunkX = chunkX;
@@ -46,12 +46,12 @@ public class DamageArea {
         for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
             for (int cz = chunkZ - offset; cz <= chunkZ + offset; cz++) {
                 ChunkCoord coord = new ChunkCoord(provider.getType(), cx, cz);
-                if ((!info.profile.EXPLOSIONS_IN_CITIES_ONLY) || BuildingInfo.isCity(coord, provider)) {
+                if ((!info.profile.EXPLOSIONS_IN_CITIES_ONLY) || ChunkPlan.isCity(coord, provider)) {
                     Explosion explosion = getExplosionAt(coord, provider);
                     if (explosion != null) {
                         if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
-//                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
-                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
+//                            Float chance = ChunkPlan.getChunkPlan(cx, cz, provider).getChunkCandidate(cx, cz, provider).cityStyle.getExplosionChance();
+                            Float chance = ChunkPlan.getChunkCandidate(coord, provider).cityStyle().getExplosionChance();
                             if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_ACCEPT)) {
                                 explosions.add(explosion);
                             }
@@ -60,8 +60,8 @@ public class DamageArea {
                     explosion = getMiniExplosionAt(coord, provider);
                     if (explosion != null) {
                         if (intersectsWith(explosion.getCenter(), explosion.getRadius())) {
-//                            Float chance = BuildingInfo.getBuildingInfo(cx, cz, provider).getChunkCharacteristics(cx, cz, provider).cityStyle.getExplosionChance();
-                            Float chance = BuildingInfo.getChunkCharacteristics(coord, provider).cityStyle.getExplosionChance();
+//                            Float chance = ChunkPlan.getChunkPlan(cx, cz, provider).getChunkCandidate(cx, cz, provider).cityStyle.getExplosionChance();
+                            Float chance = ChunkPlan.getChunkCandidate(coord, provider).cityStyle().getExplosionChance();
                             if (isAccepted(coord, chance, Rng.Purpose.EXPLOSION_MINI_ACCEPT)) {
                                 explosions.add(explosion);
                             }
@@ -95,7 +95,7 @@ public class DamageArea {
      * damaged before it depends on what was already in the world.
      * <p>
      * {@code tags} is passed in rather than held on this object: a {@code DamageArea} is cached on
-     * the chunk's {@link BuildingInfo} and outlives any one generation, so a tag epoch stored here
+     * the chunk's {@link ChunkPlan} and outlives any one generation, so a tag epoch stored here
      * would be the wrong one for every chunk after the next {@code /reload} (issue #128).
      */
     public BlockState damageBlock(BlockState b, IDimensionInfo provider, TagSnapshot tags, int x, int y, int z, float damage, CompiledPalette palette, BlockState liquidChar) {
@@ -132,7 +132,7 @@ public class DamageArea {
         if (randomExplosion.nextFloat() < profile.EXPLOSION_CHANCE) {
             return new Explosion(Tools.randomBetween(randomExplosion, profile.EXPLOSION_MINRADIUS, profile.EXPLOSION_MAXRADIUS),
                     new BlockPos((coord.chunkX() << 4) + randomExplosion.nextInt(16),
-                            BuildingInfo.getBuildingInfo(coord, provider).cityLevel * 6 + Tools.randomBetween(randomExplosion, profile.EXPLOSION_MINHEIGHT, profile.EXPLOSION_MAXHEIGHT),
+                            ChunkPlan.getChunkPlan(coord, provider).cityLevel * 6 + Tools.randomBetween(randomExplosion, profile.EXPLOSION_MINHEIGHT, profile.EXPLOSION_MAXHEIGHT),
                             (coord.chunkZ() << 4) + randomExplosion.nextInt(16)));
         }
         return null;
@@ -143,7 +143,7 @@ public class DamageArea {
         if (randomMiniExplosion.nextFloat() < profile.MINI_EXPLOSION_CHANCE) {
             return new Explosion(Tools.randomBetween(randomMiniExplosion, profile.MINI_EXPLOSION_MINRADIUS, profile.MINI_EXPLOSION_MAXRADIUS),
                     new BlockPos((coord.chunkX() << 4) + randomMiniExplosion.nextInt(16),
-                            BuildingInfo.getBuildingInfo(coord, provider).cityLevel * 6 + Tools.randomBetween(randomMiniExplosion, profile.MINI_EXPLOSION_MINHEIGHT, profile.MINI_EXPLOSION_MAXHEIGHT),
+                            ChunkPlan.getChunkPlan(coord, provider).cityLevel * 6 + Tools.randomBetween(randomMiniExplosion, profile.MINI_EXPLOSION_MINHEIGHT, profile.MINI_EXPLOSION_MAXHEIGHT),
                             (coord.chunkZ() << 4) + randomMiniExplosion.nextInt(16)));
         }
         return null;

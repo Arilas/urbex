@@ -7,7 +7,7 @@ import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
@@ -28,7 +28,7 @@ public class Stuff {
     // palettes. Report each such combination once instead of on every city chunk.
     private static final Set<String> REPORTED_UNRESOLVED = ConcurrentHashMap.newKeySet();
 
-    public static void generateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
+    public static void generateStuff(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info) {
         // No unloaded-registries guard here any more, and none is possible: the stuff index is a
         // component of the AssetSnapshot this chunk's provider was built with, and a snapshot cannot
         // be cleared, half-built or swapped underneath a generation (issue #128). The guard that
@@ -128,7 +128,7 @@ public class Stuff {
         return true;
     }
 
-    private static void actuallyGenerateStuff(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, StuffObject stuff, CompiledPalette palette, int stuffOrdinal, boolean inBuilding) {
+    private static void actuallyGenerateStuff(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, StuffObject stuff, CompiledPalette palette, int stuffOrdinal, boolean inBuilding) {
         StuffSettingsDefinition settings = stuff.getSettings();
         String blocks = settings.getColumn();
         if (!columnResolves(stuff, blocks, palette)) {

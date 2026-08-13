@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * {@code getMostOccuring()} used to break ties on {@code HashMap} iteration order, which depends
  * on each key's hash bucket - so renaming a key (nothing about its vote count) could silently flip
- * which tied entry won. {@code BuildingInfo}'s 3x3-neighbour cityStyle vote is the one call site,
+ * which tied entry won. {@code ChunkPlan}'s 3x3-neighbour cityStyle vote is the one call site,
  * and an even split is the ordinary case at a style boundary, so this pins the tie-break to a
  * stated rule (the lowest key under the caller's comparator) instead.
  * <p>
@@ -65,7 +65,7 @@ class CounterTest {
     }
 
     /**
-     * The reason the parameter is a comparator. {@code BuildingInfo} counts {@code Identifier}s and
+     * The reason the parameter is a comparator. {@code ChunkPlan} counts {@code Identifier}s and
      * breaks ties on {@code Identifier}'s natural order, which compares the path before the
      * namespace - the same order {@code MultiChunk} sorts city styles by. Tie-breaking on
      * {@code toString()} would compare the namespace first and pick the other one here, so the two

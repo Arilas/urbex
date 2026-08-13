@@ -85,7 +85,7 @@ public class MultiChunk {
         }
 
         ChunkCoord topleft = new ChunkCoord(mc.dimension(), mc.chunkX() * areasize, mc.chunkZ() * areasize);
-        int cityLevel = BuildingInfo.getCityLevel(topleft, provider);
+        int cityLevel = ChunkPlan.getCityLevel(topleft, provider);
 
         // Find all city styles in this multichunk and count them.
         //
@@ -133,7 +133,7 @@ public class MultiChunk {
         // keySet, and Tools.getRandomFromList below walks the list subtracting weights, so the
         // order decides which style (and therefore which multibuilding) gets picked. getId()
         // never changes meaning under a future accessor rename the way getName() just did.
-        // Identifier's own order - path, then namespace - is also what BuildingInfo's city-style
+        // Identifier's own order - path, then namespace - is also what ChunkPlan's city-style
         // vote breaks ties on, so this asset kind has one order, not two.
         styleList.sort(Comparator.comparing(CityStyle::getId));
         for (int i = 0 ; i < cnt ; i++) {
@@ -219,9 +219,9 @@ public class MultiChunk {
                 if (City.isChunkOccupied(provider, coord)) {
                     return false;
                 }
-                // The RAW road, never BuildingInfo.getEffectiveRoadType(). Effective roads depend on
-                // city membership, which is fine, but routing this through BuildingInfo would make
-                // multi-building acceptance depend on BuildingInfo, which depends on multi-building
+                // The RAW road, never ChunkPlan.getEffectiveRoadType(). Effective roads depend on
+                // city membership, which is fine, but routing this through ChunkPlan would make
+                // multi-building acceptance depend on ChunkPlan, which depends on multi-building
                 // acceptance. Predefined multi-buildings never reach here at all.
                 RoadType rawRoad = provider.roadField().typeAt(coord.chunkX(), coord.chunkZ());
                 if (profile.MULTI_BUILDING_STREET_CONFLICT.roadBlocks(rawRoad)) {
@@ -232,7 +232,7 @@ public class MultiChunk {
                 RailChunkType type = railChunkInfo.getType();
                 boolean atSurface = type.isSurface() || type.isStation();
 
-                if (atSurface || !BuildingInfo.isCityRaw(coord, provider, profile) || BuildingInfo.hasHighway(coord, provider, profile)) {
+                if (atSurface || !ChunkPlan.isCityRaw(coord, provider, profile) || ChunkPlan.hasHighway(coord, provider, profile)) {
                     return false;
                 }
                 WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
@@ -259,7 +259,7 @@ public class MultiChunk {
 
     private void placeBuilding(MultiBuilding building, int x, int z) {
         // getName() is the fully-qualified id: MB.name is fed straight back into
-        // AssetRegistries.MULTI_BUILDINGS.getOrThrow(String) in BuildingInfo.initMultiBuildingSection.
+        // AssetRegistries.MULTI_BUILDINGS.getOrThrow(String) in ChunkPlan.initMultiBuildingSection.
         for (int xx = 0 ; xx < building.getDimX() ; xx++) {
             for (int zz = 0 ; zz < building.getDimZ() ; zz++) {
                 buildingGrid[x+xx][z+zz] = new MB(building.getName(), xx, zz);

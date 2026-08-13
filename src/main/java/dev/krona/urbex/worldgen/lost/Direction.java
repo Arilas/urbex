@@ -34,7 +34,7 @@ public enum Direction {
     }
 
     @Nonnull
-    public BuildingInfo get(BuildingInfo info) {
+    public ChunkPlan get(ChunkPlan info) {
         return switch (this) {
             case XMIN -> info.getXmin();
             case XMAX -> info.getXmax();

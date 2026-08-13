@@ -225,8 +225,8 @@ public class City {
 
     // Calculate the citystyle based on all surrounding cities
     public static CityStyle getCityStyle(ChunkCoord coord, IDimensionInfo provider, Preset profile) {
-        // getOrCompute, not computeIfAbsent: this is reached from BuildingInfo
-        // .getChunkCharacteristics, which calls it in a 3x3 loop over the neighbours, and computing
+        // getOrCompute, not computeIfAbsent: this is reached from ChunkPlan
+        // .getChunkCandidate, which calls it in a 3x3 loop over the neighbours, and computing
         // inside a ConcurrentHashMap bin lock deadlocks on that.
         return provider.caches().cityStyle.getOrCompute(coord, k -> getCityStyleInt(coord, provider, profile));
     }

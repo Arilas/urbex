@@ -77,7 +77,7 @@ public class BelowPartConditionTest {
     //
     // Everything above is the reading side: given a context, does parseTest ask it the right
     // question. That was issue #58's fix. The same defect survived on the writing side - all three
-    // floor loops (BuildingInfo's two copies and Scattered) advanced their belowPart local to the
+    // floor loops (ChunkPlan's two copies and Scattered) advanced their belowPart local to the
     // part just chosen *before* building the context that selects parts2[], so parts2[] saw
     // getBelowPart() == getPart() and its "belowpart" was an exact duplicate of its "inpart".
     // Scattered had the third variant: it reused the parts[] context outright, so parts2[]'s

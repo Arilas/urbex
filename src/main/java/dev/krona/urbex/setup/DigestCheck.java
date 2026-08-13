@@ -43,6 +43,14 @@ public final class DigestCheck {
      * the digest run configurations set it; see {@code UnsafeReadGateMixin} for why it is opt-in.
      */
     public static final String PROP_FAIL_ON_UNSAFE_READ = "urbex.digestCheck.failOnUnsafeRead";
+    /** Fails a window that no longer contains a structure avoidance suppresses. */
+    public static final String PROP_REQUIRE_AVOIDED = "urbex.digestCheck.requireAvoided";
+    /**
+     * Fails a window that no longer contains a building deep enough to cancel a railway. Only
+     * meaningful under a world style setting {@code railwayavoidance: block_railway} - the one this
+     * mod ships sets {@code ignore}, so the window that sets this brings its own datapack.
+     */
+    public static final String PROP_REQUIRE_RAIL_COLLISION = "urbex.digestCheck.requireRailCollision";
     public static final String OK = "URBEX-DIGEST-CHECK: OK";
     public static final String FAIL = "URBEX-DIGEST-CHECK: FAIL";
 
@@ -82,6 +90,8 @@ public final class DigestCheck {
         boolean requireBridge = System.getProperty(PROP_REQUIRE_BRIDGE) != null;
         boolean requireSlope = System.getProperty(PROP_REQUIRE_SLOPE) != null;
         boolean failOnUnsafeRead = System.getProperty(PROP_FAIL_ON_UNSAFE_READ) != null;
+        boolean requireAvoided = System.getProperty(PROP_REQUIRE_AVOIDED) != null;
+        boolean requireRailCollision = System.getProperty(PROP_REQUIRE_RAIL_COLLISION) != null;
 
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             try {
@@ -98,6 +108,14 @@ public final class DigestCheck {
                     verdict(FAIL + " (sample window contains zero planned-bridge chunks - it no longer covers "
                             + "the bridge this check exists to guard; relocate the window rather than accepting "
                             + "a new golden here)");
+                } else if (requireAvoided && result.avoidedChunks() == 0) {
+                    verdict(FAIL + " (sample window contains zero chunks suppressed by structure "
+                            + "avoidance - it no longer covers the suppression this check exists to "
+                            + "guard; relocate the window rather than accepting a new golden here)");
+                } else if (requireRailCollision && result.railCollisionChunks() == 0) {
+                    verdict(FAIL + " (sample window contains zero chunks where a building cancels a "
+                            + "railway - it no longer covers the collision this check exists to guard; "
+                            + "relocate the window rather than accepting a new golden here)");
                 } else if (requireSlope && result.slopeChunks() == 0) {
                     verdict(FAIL + " (sample window contains zero sloped-road chunks - it no longer covers "
                             + "the slope this check exists to guard; relocate the window rather than accepting "

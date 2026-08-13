@@ -5,10 +5,10 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.PerlinNoiseGenerator14;
 import dev.krona.urbex.varia.TimedCache;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.gen.Scattered;
 import dev.krona.urbex.worldgen.lost.CityRarityMap;
-import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
+import dev.krona.urbex.worldgen.lost.ChunkCandidate;
 import dev.krona.urbex.worldgen.lost.MultiChunk;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
@@ -17,22 +17,22 @@ import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Every cache that used to be a static field on BuildingInfo, City, Highway, Railway, MultiChunk,
+ * Every cache that used to be a static field on ChunkPlan, City, Highway, Railway, MultiChunk,
  * BiomeInfo. Owned by the dimension, so unloading a world drops them instead of
  * relying on someone remembering to call cleanCache() - and so two dimensions with different
  * profiles can no longer see each other's answers.
  * <p>
  * Every map here is concurrent, and every population site uses get / compute-outside / putIfAbsent
  * rather than computeIfAbsent. These caches are mutually recursive - building a chunk's
- * BuildingInfo reads its neighbours' characteristics, which read their city styles - and
+ * ChunkPlan reads its neighbours' candidate, which read their city styles - and
  * ConcurrentHashMap.computeIfAbsent deadlocks on recursive population, even for distinct keys that
  * happen to land in the same bin. Racing threads may both compute; that is harmless, because every
  * one of these values is a pure function of the world seed and the coordinate.
  */
 public final class DimensionCaches {
 
-    public final TimedCache<ChunkCoord, BuildingInfo> buildingInfo = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
-    public final TimedCache<ChunkCoord, ChunkCharacteristics> characteristics = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
+    public final TimedCache<ChunkCoord, ChunkPlan> chunkPlan = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
+    public final TimedCache<ChunkCoord, ChunkCandidate> candidate = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, Integer> cityLevel = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     public final TimedCache<ChunkCoord, CityStyle> cityStyle = new TimedCache<>(Config.CACHE_CLEANUP_SECONDS::get);
     /**
@@ -84,8 +84,8 @@ public final class DimensionCaches {
     }
 
     public void clear() {
-        buildingInfo.clear();
-        characteristics.clear();
+        chunkPlan.clear();
+        candidate.clear();
         cityLevel.clear();
         cityStyle.clear();
         worldStyle.clear();

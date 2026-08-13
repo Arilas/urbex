@@ -30,6 +30,14 @@ loom {
     if (aw.exists()) {
         accessWidenerPath.set(aw)
     }
+    // -PurbexDigestVmArgs adds ad-hoc JVM arguments to every digest run configuration below,
+    // semicolon-separated: `-PurbexDigestVmArgs=-Dmax.bg.threads=2;-Durbex.digestCheck.detail`.
+    // On every one of them deliberately. Varying the worker thread count by hand is how the
+    // heightmap sample-block overlap behind issue #126 was found, and a configuration that quietly
+    // ignored the property would turn that experiment into a no-op that reads like a result - which
+    // is a worse failure than not having the hook at all. -Durbex.digestCheck.detail prints a
+    // per-chunk digest and -Durbex.digestCheck.dump=<file> every driver write, which is how a
+    // mismatch gets localised to a chunk and then to a block.
     runs {
         client {
             client()
@@ -48,6 +56,9 @@ loom {
             setConfigName('Urbex Digest Check')
             ideConfigGenerated(false)
             runDir('runs/digestcheck')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
             vmArg '-Durbex.digestCheck=3,rowmajor,100'
             // Two Urbex cross-chunk terrain reads at the carver stage - where a chunk may touch
             // only itself - survived for months because nothing watched for them (see
@@ -103,12 +114,224 @@ loom {
             setConfigName('Urbex Digest Check (features)')
             ideConfigGenerated(false)
             runDir('runs/digestcheckfeatures')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
             vmArg '-Durbex.digestCheck=9,rowmajor,83'
             vmArg '-Durbex.digestCheck.requireBridge'
             vmArg '-Durbex.digestCheck.requireSlope'
             // See the digestCheck block above: not window-specific, so both runs set it.
             vmArg '-Durbex.digestCheck.failOnUnsafeRead'
             def golden = file('digest-features.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The same window as digestCheck, generated in a shuffled order and pinned to the same
+        // golden. Order-independence is asserted here rather than assumed: the primary check has
+        // always run one fixed order, so a decision that depends on which neighbours happen to be
+        // loaded produces a stable hash there and is invisible. Issue #126 is exactly that -
+        // hasBlacklistedStructure probes a 3x3 neighbourhood through level.hasChunk and treats
+        // absent chunks as clear - so this exists to make the current behaviour observable before
+        // it is changed, not after.
+        //
+        // It shares digestCheck's golden deliberately. A different value here would not mean
+        // anything; equality with the row-major run is the whole assertion.
+        digestCheckShuffled {
+            server()
+            setConfigName('Urbex Digest Check (shuffled order)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckshuffled')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=3,shuffled,100'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The window that covers structure avoidance at all. Neither of the two above does:
+        // avoidedChunks is 0 in both, because seed 1337 has no village near either sample, so the
+        // suppression branch never executed and a change to it could not move their goldens. This
+        // seed spawns beside a plains village: 108 of the 625 sampled chunks carry a village
+        // reference, and suppression demonstrably changes the world rather than only the counter -
+        // with avoidVillages off the same window drives 654 chunks and 5804043 blocks instead of 580
+        // and 5359701, so 74 chunks of city are actually removed here. requireAvoided gates it so a
+        // window that stops containing a village fails instead of passing in silence - the same
+        // guard requireBridge and requireSlope are for the features window.
+        //
+        // It is also the first window centred on the origin, and that is how it found the heightmap
+        // sample-block overlap fixed in getHeightmap: rows x=0 and z=0 were claimed by two blocks at
+        // once, so the height published for them depended on which chunk generated first. The
+        // other three windows are sited entirely on positive chunks, where the old arithmetic and
+        // floorDiv agree, which is why they were stable through it. The two hashes recorded here
+        // before that fix - 995b19892c47e848 and 89d790a9182cff3f - were not a coin flip: each is
+        // reproducible, selected by the worker thread count (1 and 16 give the first, 2 and 3 the
+        // second). See the note on digestCheckAvoidShuffled for what now stands guard over it.
+        digestCheckAvoid {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoid')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The avoidance window in a shuffled generation order, pinned to the same golden, for the
+        // same reason digestCheckShuffled shares digestCheck's: equality with the row-major run is
+        // the whole assertion and a separate value here would mean nothing. It covers the request
+        // order over a window that, unlike digestCheckShuffled's, contains both an avoided structure
+        // and negative coordinates.
+        //
+        // Worth knowing what it is not: shuffling the request order did *not* expose the heightmap
+        // overlap. Measured on the pre-fix build, this run and the row-major one both returned
+        // 995b19892c47e848 - the race resolved the same way either way. digestCheckAvoidThreads
+        // below is the one with teeth for that.
+        digestCheckAvoidShuffled {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance, shuffled order)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoidshuffled')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=12,shuffled,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The same window again, row-major, on two worker threads instead of however many the host
+        // has. This is the standing version of the experiment that found the heightmap sample-block
+        // overlap, in the same way digestCheckShuffled is the standing version of the by-hand
+        // order experiment noted above.
+        //
+        // Generation fans out to the worker pool, so a decision resolved by whichever thread got
+        // there first produces one stable answer per pool size and looks perfectly reproducible
+        // until the pool size changes. Pre-fix this window returned 995b19892c47e848 on 1 and 16
+        // threads and 89d790a9182cff3f on 2 and 3 - each reproducible, neither a coin flip, and no
+        // amount of rerunning on one machine would have shown it. Two threads is chosen because it
+        // is the smallest count that still schedules concurrently, and because it is not the host's
+        // - a guard that inherits the CI runner's core count asserts nothing about anyone else's.
+        digestCheckAvoidThreads {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance, two workers)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoidthreads')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            vmArg '-Dmax.bg.threads=2'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The same window a third time, with every planning cache dropped after each 25 chunks and
+        // rebuilt from scratch. Planning lives in TimedCaches that a real world evicts on a timer, so
+        // "the plan a chunk was generated from" and "the plan its neighbour reads an hour later" are
+        // the same value only if every planning value is a pure function of seed and coordinate.
+        // That is the acceptance criterion "plans are identical before and after forced cache
+        // expiry", asserted rather than assumed: it shares the golden, so any planning value that
+        // remembers something about when it was first built moves the digest.
+        digestCheckAvoidExpire {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance, forced cache expiry)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoidexpire')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            vmArg '-Durbex.digestCheck.expireEvery=25'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The two structure-avoidance branches the window above does not reach. Measured on that
+        // window: all 108 of its suppressed chunks come from the village *tag* test, and turning
+        // avoidVillages off drops the count to zero - so the named-blacklist branch
+        // (Config.isAvoidedStructure, the avoidStructures list) and the surface-step catch-all
+        // (avoidSurfaceStructures) both matched nothing there, and the shipped defaults never reach
+        // them: the six structures in the default list are all absent from this window, and
+        // avoidSurfaceStructures ships off.
+        //
+        // So this configuration turns the village tag off and names the village in avoidStructures
+        // instead, which suppresses the same 108 chunks through the blacklist branch rather than the
+        // tag branch, and turns on avoidSurfaceStructures, which suppresses exactly one more. Every
+        // avoid* mode that survived the ADJACENT removal is now generated by one window or the
+        // other: the tag by digestCheckAvoid, the list and the surface catch-all by this one, and
+        // avoidFlattening by both, since it is what a suppressed chunk does with its terrain.
+        digestCheckAvoidModes {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance, other modes)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoidmodes')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest-avoid-modes.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The building-versus-railway conflict, which nothing else here reaches: it only exists under
+        // a world style setting railwayavoidance to block_railway, and the one this mod ships sets
+        // ignore. prepareDigestCheckRail writes a datapack that extends the shipped style with that
+        // one setting changed, so this window is the only place the collision is generated at all -
+        // which is how its resolution stayed order-dependent without any check noticing.
+        digestCheckRail {
+            server()
+            setConfigName('Urbex Digest Check (railway collision)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckrail')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck.requireRailCollision'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest-rail.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The railway-collision window in a shuffled generation order, sharing its golden. Criterion
+        // "parallel and shuffled-order digests cover ... railway collisions" of issue #126: the
+        // resolution is a pure query now rather than a write into the published railInfo, and this is
+        // what says so from the outside.
+        digestCheckRailShuffled {
+            server()
+            setConfigName('Urbex Digest Check (railway collision, shuffled order)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckrailshuffled')
+            if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
+                project.property('urbexDigestVmArgs').split(';').each { vmArg it }
+            }
+            vmArg '-Durbex.digestCheck=12,shuffled,0'
+            vmArg '-Durbex.digestCheck.requireRailCollision'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest-rail.golden')
             if (golden.exists()) {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
             }
@@ -138,7 +361,38 @@ loom {
 // loop, holding that thread far past max-tick-time; the generation itself still fans out to the
 // worker pool, so this is not a serial baseline. Shared by every digest run config, each against
 // its own run directory so the two checks cannot clobber each other's world.
-def registerPrepareDigestCheck = { String taskName, String runDirPath ->
+// Writes the world style the railway-collision window needs into the run's own world/datapacks. It
+// only has to override one setting, because world styles support `extends`: the mod ships exactly
+// one style and it sets railwayavoidance to `ignore`, so the building-versus-railway conflict has
+// no shipped configuration that reaches it and every window is blind to it by default. A directory
+// datapack rather than a jar - Minecraft's datapack repository takes directories and .zip files,
+// and a world style is registry data rather than the compiled assets an Urbex pack ships as, so
+// unlike prepareMixCheck this does not need the mods folder.
+def writeRailwayCollisionPack = { File worldDir ->
+    def packDir = new File(worldDir, 'datapacks/urbex-railcollision')
+    def stylesDir = new File(packDir, 'data/urbexrail/urbex/worldstyles')
+    stylesDir.mkdirs()
+    new File(packDir, 'pack.mcmeta').text = '''\
+{
+  "pack": {
+    "description": "Urbex digest check: a world style that lets buildings block railways",
+    "pack_format": 88
+  }
+}
+'''
+    new File(stylesDir, 'blockrailway.json').text = '''\
+{
+  "extends": "urbex:standard",
+  "settings": {
+    "railwayavoidance": "block_railway",
+    "railpartheight6": 1
+  }
+}
+'''
+}
+
+def registerPrepareDigestCheck = { String taskName, String runDirPath, String extraConfig = '', String seed = '1337',
+                                   boolean railwayCollisionPack = false ->
     tasks.register(taskName) {
         notCompatibleWithConfigurationCache("writes the run directory")
         doLast {
@@ -146,28 +400,95 @@ def registerPrepareDigestCheck = { String taskName, String runDirPath ->
             project.delete(new File(dir, 'world'))
             dir.mkdirs()
             new File(dir, 'eula.txt').text = 'eula=true\n'
-            new File(dir, 'server.properties').text = '''\
-level-seed=1337
+            new File(dir, 'server.properties').text = """\
+level-seed=${seed}
 online-mode=false
 spawn-protection=0
 view-distance=6
 max-tick-time=-1
 motd=urbex digest check
-'''
+"""
+            if (railwayCollisionPack) {
+                writeRailwayCollisionPack(new File(dir, 'world'))
+            }
             def cfgDir = new File(dir, 'world/serverconfig')
             cfgDir.mkdirs()
-            new File(cfgDir, 'urbex.json').text = '{ "selectedPreset": "urbex:default" }\n'
+            // -PurbexDigestConfig appends to this window's urbex.json, the config-side counterpart of
+            // -PurbexDigestVmArgs above: `-PurbexDigestConfig=, "avoidVillages": false`. Probing what
+            // a window actually covers means toggling the flag and reading the counter back, and
+            // every avoid* mode is config-gated - which is how they reached this issue uncovered.
+            def cfg = extraConfig
+            if (project.hasProperty('urbexDigestConfig')) {
+                cfg = cfg + project.property('urbexDigestConfig')
+            }
+            new File(cfgDir, 'urbex.json').text = '{ "selectedPreset": "urbex:default"' + cfg + ' }\n'
         }
     }
 }
 registerPrepareDigestCheck('prepareDigestCheck', 'runs/digestcheck')
 registerPrepareDigestCheck('prepareDigestCheckFeatures', 'runs/digestcheckfeatures')
+registerPrepareDigestCheck('prepareDigestCheckShuffled', 'runs/digestcheckshuffled')
+// A different seed from the other three, and the only place in this file that needs one: seed 1337
+// has no village within radius 24 of either sample window (measured - 842 chunks with structure
+// references, not one village), so avoidVillages - which is on by default and is the flag these two
+// windows exist to cover - can never fire there. This seed spawns beside one. The config is the
+// default one for the same reason: avoidVillages is what ships on, so it is what should be covered.
+registerPrepareDigestCheck('prepareDigestCheckAvoid', 'runs/digestcheckavoid', '',
+        '135132278163449878')
+registerPrepareDigestCheck('prepareDigestCheckAvoidShuffled', 'runs/digestcheckavoidshuffled', '',
+        '135132278163449878')
+registerPrepareDigestCheck('prepareDigestCheckAvoidThreads', 'runs/digestcheckavoidthreads', '',
+        '135132278163449878')
+registerPrepareDigestCheck('prepareDigestCheckAvoidExpire', 'runs/digestcheckavoidexpire', '',
+        '135132278163449878')
+// The railway-collision window: the same seed and square as the avoidance ones, with the world
+// style swapped for the datapack one above so railwayavoidance is block_railway. Nothing the mod
+// ships selects that policy, so this is the only configuration in the repository under which a
+// building cancelling a railway can happen at all.
+// selectedWorldStyle rather than a dimensionsWithPresets entry: the global config's own selection
+// replaces whatever a dimension entry put at the overworld (see Config.buildPresetCache), so an
+// entry there is silently overridden while selectedPreset is set - which it is, for every window
+// here.
+registerPrepareDigestCheck('prepareDigestCheckAvoidModes', 'runs/digestcheckavoidmodes',
+        ', "avoidVillages": false, "avoidSurfaceStructures": true,'
+                + ' "avoidStructures": ["minecraft:village_plains"]',
+        '135132278163449878')
+registerPrepareDigestCheck('prepareDigestCheckRail', 'runs/digestcheckrail',
+        ', "selectedWorldStyle": "urbexrail:blockrailway"',
+        '135132278163449878', true)
+registerPrepareDigestCheck('prepareDigestCheckRailShuffled', 'runs/digestcheckrailshuffled',
+        ', "selectedWorldStyle": "urbexrail:blockrailway"',
+        '135132278163449878', true)
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
     dependsOn 'prepareDigestCheck'
 }
 tasks.matching { it.name == 'runDigestCheckFeatures' }.configureEach {
     dependsOn 'prepareDigestCheckFeatures'
+}
+tasks.matching { it.name == 'runDigestCheckShuffled' }.configureEach {
+    dependsOn 'prepareDigestCheckShuffled'
+}
+tasks.matching { it.name == 'runDigestCheckAvoid' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoid'
+}
+tasks.matching { it.name == 'runDigestCheckAvoidShuffled' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoidShuffled'
+}
+tasks.matching { it.name == 'runDigestCheckAvoidThreads' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoidThreads'
+}
+tasks.matching { it.name == 'runDigestCheckAvoidExpire' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoidExpire'
+}
+tasks.matching { it.name == 'runDigestCheckAvoidModes' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoidModes'
+}
+tasks.matching { it.name == 'runDigestCheckRail' }.configureEach {
+    dependsOn 'prepareDigestCheckRail'
+}
+tasks.matching { it.name == 'runDigestCheckRailShuffled' }.configureEach {
+    dependsOn 'prepareDigestCheckRailShuffled'
 }
 
 // The mix census needs a different world config from the digest runs - the experimental flag on,

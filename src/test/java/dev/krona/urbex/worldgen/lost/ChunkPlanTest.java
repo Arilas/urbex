@@ -18,7 +18,7 @@ import java.lang.reflect.Proxy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * {@link BuildingInfo#effectiveRoadType} must return {@link RoadType#NONE} for a non-city chunk
+ * {@link ChunkPlan#effectiveRoadType} must return {@link RoadType#NONE} for a non-city chunk
  * without ever consulting the road field - {@code isCityRaw} gates it. This is exercised through
  * the void-chunk branch of {@code isCityRaw} (a floating-landscape profile whose heightmap reports
  * ground level 0), the cheapest way to force a non-city verdict without faking the whole
@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * <p>
  * Bootstrapped because {@code ChunkCoord}/{@code Level.OVERWORLD} need the vanilla registries.
  */
-class BuildingInfoTest {
+class ChunkPlanTest {
 
     @BeforeAll
     static void bootstrap() {
@@ -64,7 +64,7 @@ class BuildingInfoTest {
                     };
                 });
 
-        assertEquals(RoadType.NONE, BuildingInfo.effectiveRoadType(coord, fakeProvider, profile),
+        assertEquals(RoadType.NONE, ChunkPlan.effectiveRoadType(coord, fakeProvider, profile),
                 "a void (non-city) chunk must report no road, without ever reading the road field");
     }
 }

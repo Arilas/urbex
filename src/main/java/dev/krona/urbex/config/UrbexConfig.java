@@ -33,11 +33,9 @@ public record UrbexConfig(
         boolean forceSaplingGrowth,
         int cacheCleanupSeconds,
         List<String> avoidStructures,
-        boolean avoidStructuresAdjacent,
         boolean avoidSurfaceStructures,
         boolean structuresYieldToCities,
         boolean avoidVillages,
-        boolean avoidVillagesAdjacent,
         boolean avoidFlattening,
         boolean experimentalMultiWorldStyles) {
 
@@ -53,9 +51,7 @@ public record UrbexConfig(
                     "minecraft:igloo", "minecraft:swamp_huts", "minecraft:pillager_outpost"),
             false,
             false,
-            false,
             true,
-            false,
             true,
             false);
 
@@ -68,11 +64,9 @@ public record UrbexConfig(
             Codec.BOOL.optionalFieldOf("forceSaplingGrowth", DEFAULT.forceSaplingGrowth()).forGetter(UrbexConfig::forceSaplingGrowth),
             Codec.intRange(1, 86400).optionalFieldOf("cacheCleanupSeconds", DEFAULT.cacheCleanupSeconds()).forGetter(UrbexConfig::cacheCleanupSeconds),
             Codec.STRING.listOf().optionalFieldOf("avoidStructures", DEFAULT.avoidStructures()).forGetter(UrbexConfig::avoidStructures),
-            Codec.BOOL.optionalFieldOf("avoidStructuresAdjacent", DEFAULT.avoidStructuresAdjacent()).forGetter(UrbexConfig::avoidStructuresAdjacent),
             Codec.BOOL.optionalFieldOf("avoidSurfaceStructures", DEFAULT.avoidSurfaceStructures()).forGetter(UrbexConfig::avoidSurfaceStructures),
             Codec.BOOL.optionalFieldOf("structuresYieldToCities", DEFAULT.structuresYieldToCities()).forGetter(UrbexConfig::structuresYieldToCities),
             Codec.BOOL.optionalFieldOf("avoidVillages", DEFAULT.avoidVillages()).forGetter(UrbexConfig::avoidVillages),
-            Codec.BOOL.optionalFieldOf("avoidVillagesAdjacent", DEFAULT.avoidVillagesAdjacent()).forGetter(UrbexConfig::avoidVillagesAdjacent),
             Codec.BOOL.optionalFieldOf("avoidFlattening", DEFAULT.avoidFlattening()).forGetter(UrbexConfig::avoidFlattening),
             Codec.BOOL.optionalFieldOf("experimentalMultiWorldStyles", DEFAULT.experimentalMultiWorldStyles()).forGetter(UrbexConfig::experimentalMultiWorldStyles)
     ).apply(instance, UrbexConfig::new));

@@ -164,7 +164,7 @@ public class CityGenerator {
      * One leaf state for the block the driver is about to write. Addressed by that position, so
      * how many leaves this chunk placed first cannot change which one this is.
      */
-    private BlockState getRandomLeaf(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
+    private BlockState getRandomLeaf(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
         Character leavesBlock = info.getCityStyle().getLeavesBlock();
         if (leavesBlock != null) {
             return ctx.paletteHere(compiledPalette, leavesBlock);
@@ -173,7 +173,7 @@ public class CityGenerator {
                 Rng.Purpose.LEAVES, randomLeafs.length)];
     }
 
-    private Set<BlockState> getPossibleRandomDirts(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
+    private Set<BlockState> getPossibleRandomDirts(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
         if (rubbleDirtBlock != null) {
             return compiledPalette.getAll(rubbleDirtBlock);
@@ -187,7 +187,7 @@ public class CityGenerator {
      * the same reason as {@link #getRandomLeaf}. Nothing is regenerated here: {@code randomDirt} is
      * a final array built once in the constructor and never empty.
      */
-    private BlockState getRandomDirt(ChunkGenContext ctx, BuildingInfo info, CompiledPalette compiledPalette) {
+    private BlockState getRandomDirt(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
         if (rubbleDirtBlock != null) {
             return ctx.paletteHere(compiledPalette, rubbleDirtBlock);
@@ -236,7 +236,7 @@ public class CityGenerator {
         // read it - the neighbour's border height, and so the terrain, would depend on generation
         // order. See Arilas/urbex#24.
         ChunkHeightmap heightmap = new ChunkHeightmap(getHeightmap(coord, provider.getWorld()));
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
+        ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
         // runtime.tags() is read here and nowhere else in this generation: one call, at the start,
         // so a /reload landing mid-chunk cannot be observed halfway through a building (issue #128).
         ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info,
@@ -249,9 +249,18 @@ public class CityGenerator {
         if (!info.multiBuildingPos.isMulti()) {
             avoidChunk = hasBlacklistedStructure(region, chunkX, chunkZ);
             if (avoidChunk != AvoidChunk.NO) {
+                // Only this chunk's rendering. The cached ChunkPlan and ChunkCandidate used
+                // to be rewritten here too - isCity flipped to false, from the thread generating this
+                // chunk, on values every neighbour had already read and derived from. Everything they
+                // had settled off isCity == true stayed settled; only chunks planned after the flip
+                // saw it, so what a world looked like depended on generation order (issue #126).
+                //
+                // Suppression is local now, which is the same shape StructureSuppressor already uses
+                // for the opposite policy: it cancels a structure inside a city without touching the
+                // city's plan, and this cancels the city inside a structure without touching it
+                // either. Neighbours keep planning as though the city were here, which is the honest
+                // cost of the change - see the note on AvoidChunk.
                 doCity = false;
-                info.isCity = false;
-                BuildingInfo.setCityRaw(coord, provider, false);
             }
         }
 
@@ -270,7 +279,13 @@ public class CityGenerator {
             doNormalChunk(ctx, info, heightmap, avoidChunk);
         }
 
-        Railway.RailChunkInfo railInfo = info.getRailInfo();
+        // Suppressed here rather than removed from the plan, the same way a village suppresses this
+        // chunk's city above: a building deep enough to hit the line cancels the rails where they
+        // would be drawn, and the neighbouring chunks keep planning and rendering the line as though
+        // it ran through (issue #126, and see Railway.buildingBlocksRail for the precedence).
+        Railway.RailChunkInfo railInfo = Railway.buildingBlocksRail(coord, provider)
+                ? Railway.RailChunkInfo.NOTHING
+                : info.getRailInfo();
         if (railInfo.getType() != RailChunkType.NONE) {
             Railways.generateRailways(ctx, this, info, railInfo, heightmap);
         }
@@ -297,7 +312,7 @@ public class CityGenerator {
         return statistics;
     }
 
-    private int getTopLevel(BuildingInfo info) {
+    private int getTopLevel(ChunkPlan info) {
         if (info.hasBuilding) {
             return info.getCityGroundLevel() + info.getNumFloors() * FLOORHEIGHT;
         } else {
@@ -305,42 +320,51 @@ public class CityGenerator {
         }
     }
 
+    /**
+     * Whether structure avoidance suppresses this chunk's city.
+     *
+     * <p>{@code ADJACENT} is gone with the neighbourhood probe that produced it. It meant "a chunk
+     * next to this one has an avoided structure", and answering that needed reading neighbouring
+     * chunks - which the probe did through {@code level.hasChunk}, treating whatever the region did
+     * not happen to hold as clear. That made the answer a property of generation order rather than of
+     * the world (issue #126).</p>
+     *
+     * <p>It could not be made deterministic the way {@code StructureSuppressor} is. That one asks
+     * planning a question from generation - {@code ChunkPlan.isCity}, pure seed and coordinate -
+     * and the reverse, "is there a structure at that coordinate", has no seed-pure answer: vanilla
+     * picks candidate chunks from the seed and then accepts or rejects each one against biome and
+     * terrain at generation time. A mask built from candidates alone suppresses cities around
+     * villages that never appear.</p>
+     */
     public enum AvoidChunk {
         NO,
-        YES,
-        ADJACENT
+        YES
     }
 
-    private static AvoidChunk hasBlacklistedStructure(WorldGenLevel level, int chunkX, int chunkZ) {
-        boolean doAdjacent = Config.AVOID_VILLAGES_ADJACENT.get() || Config.AVOID_STRUCTURES_ADJACENT.get();
-        if (doAdjacent || Config.AVOID_VILLAGES.get() || Config.AVOID_SURFACE_STRUCTURES.get() || Config.hasAvoidedStructures()) {
-            if (doAdjacent) {
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        // Chunks that are not part of this region are unknown and assumed to be ok.
-                        // Skip them, but keep testing the ones we can see.
-                        if (level.hasChunk(chunkX + dx, chunkZ + dz)) {
-                            ChunkAccess ch = level.getChunk(chunkX + dx, chunkZ + dz, ChunkStatus.STRUCTURE_REFERENCES);
-                            boolean center = dx == 0 && dz == 0;
-                            if (testBlacklistedStructure(level, ch, center)) {
-                                return center ? AvoidChunk.YES : AvoidChunk.ADJACENT;
-                            }
-                        }
-                    }
-                }
-            } else {
-                if (level.hasChunk(chunkX, chunkZ)) {
-                    ChunkAccess ch = level.getChunk(chunkX, chunkZ, ChunkStatus.STRUCTURE_REFERENCES);
-                    return testBlacklistedStructure(level, ch, true) ? AvoidChunk.YES : AvoidChunk.NO;
-                } else {
-                    return AvoidChunk.NO; // If we have unknown chunks we assume it is ok
-                }
-            }
+    /**
+     * Package-visible for {@link DigestRunner}, which counts how many sampled chunks this suppresses
+     * so a digest window cannot silently stop covering avoidance. Called there after generation, with
+     * every chunk loaded, so it answers without the neighbourhood gaps that make it order-dependent
+     * on the generation path (issue #126).
+     */
+    static AvoidChunk hasBlacklistedStructure(WorldGenLevel level, int chunkX, int chunkZ) {
+        if (!Config.AVOID_VILLAGES.get() && !Config.AVOID_SURFACE_STRUCTURES.get()
+                && !Config.hasAvoidedStructures()) {
+            return AvoidChunk.NO;
         }
-        return AvoidChunk.NO;
+        // This chunk only. It is the one being generated, so its own structure references are already
+        // settled and reading them is a property of the chunk rather than of what else happens to be
+        // loaded - which is the whole of what made the 3x3 probe this replaces order-dependent
+        // (issue #126). The guard is kept for the one caller that asks about a chunk it does not hold:
+        // DigestRunner's coverage counter, after generation.
+        if (!level.hasChunk(chunkX, chunkZ)) {
+            return AvoidChunk.NO;
+        }
+        ChunkAccess ch = level.getChunk(chunkX, chunkZ, ChunkStatus.STRUCTURE_REFERENCES);
+        return testBlacklistedStructure(level, ch) ? AvoidChunk.YES : AvoidChunk.NO;
     }
 
-    private static boolean testBlacklistedStructure(WorldGenLevel level, ChunkAccess ch, boolean center) {
+    private static boolean testBlacklistedStructure(WorldGenLevel level, ChunkAccess ch) {
         if (ch.hasAnyStructureReferences()) {
             var structures = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
             var references = ch.getAllReferences();
@@ -348,22 +372,18 @@ public class CityGenerator {
                 if (!entry.getValue().isEmpty()) {
                     Structure structure = entry.getKey();
                     Optional<ResourceKey<Structure>> key = structures.getResourceKey(structure);
-                    if (Config.AVOID_VILLAGES.get()) {
-                        if (center || Config.AVOID_VILLAGES_ADJACENT.get()) {
-                            if (key.map(k -> structures.getOrThrow(k).is(StructureTags.VILLAGE)).orElse(false)) {
-                                return true;
-                            }
-                        }
+                    if (Config.AVOID_VILLAGES.get()
+                            && key.map(k -> structures.getOrThrow(k).is(StructureTags.VILLAGE)).orElse(false)) {
+                        return true;
                     }
-                    if (center || Config.AVOID_STRUCTURES_ADJACENT.get()) {
-                        // Catch-all for structure mods: everything that builds at the surface step
-                        if (Config.AVOID_SURFACE_STRUCTURES.get() && structure.step() == GenerationStep.Decoration.SURFACE_STRUCTURES) {
-                            return true;
-                        }
-                        // An unregistered structure has no id to match against the blacklist
-                        if (key.isPresent() && Config.isAvoidedStructure(key.get().identifier())) {
-                            return true;
-                        }
+                    // Catch-all for structure mods: everything that builds at the surface step
+                    if (Config.AVOID_SURFACE_STRUCTURES.get()
+                            && structure.step() == GenerationStep.Decoration.SURFACE_STRUCTURES) {
+                        return true;
+                    }
+                    // An unregistered structure has no id to match against the blacklist
+                    if (key.isPresent() && Config.isAvoidedStructure(key.get().identifier())) {
+                        return true;
                     }
                 }
             }
@@ -373,7 +393,7 @@ public class CityGenerator {
 
 
     /** Finalize every optional-light marker admitted by this chunk-generation context. */
-    public void placeOptionalLights(ChunkGenContext ctx, BuildingInfo info) {
+    public void placeOptionalLights(ChunkGenContext ctx, ChunkPlan info) {
         List<LightTodoQueue.Todo> lights = ctx.drainLightTodo();
         if (lights.isEmpty()) {
             return;
@@ -405,7 +425,7 @@ public class CityGenerator {
         return holder[0];
     }
 
-    private void doNormalChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
+    private void doNormalChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
 //        debugClearChunk(chunkX, chunkZ, primer);
         if ((avoidChunk != AvoidChunk.YES || !Config.AVOID_FLATTENING.get()) && profile.isDefault()) {
             correctTerrainShape(ctx, provider.getWorld(), info.coord, heightmap);
@@ -427,7 +447,7 @@ public class CityGenerator {
         }
     }
 
-    private void breakBlocksForDamageNew(ChunkGenContext ctx, int chunkX, int chunkZ, BuildingInfo info) {
+    private void breakBlocksForDamageNew(ChunkGenContext ctx, int chunkX, int chunkZ, ChunkPlan info) {
         ChunkDriver driver = ctx.driver;
         int cx = chunkX << 4;
         int cz = chunkZ << 4;
@@ -517,7 +537,7 @@ public class CityGenerator {
         }
     }
 
-    public void clearRange(ChunkGenContext ctx, BuildingInfo info, int x, int z, int height1, int height2, boolean dowater) {
+    public void clearRange(ChunkGenContext ctx, ChunkPlan info, int x, int z, int height1, int height2, boolean dowater) {
         ChunkDriver driver = ctx.driver;
         if (dowater) {
             // Special case for drowned city
@@ -528,7 +548,7 @@ public class CityGenerator {
         }
     }
 
-    public void clearRange(ChunkGenContext ctx, BuildingInfo info, int x, int z, int height1, int height2, boolean dowater, Predicate<BlockState> test) {
+    public void clearRange(ChunkGenContext ctx, ChunkPlan info, int x, int z, int height1, int height2, boolean dowater, Predicate<BlockState> test) {
         ChunkDriver driver = ctx.driver;
         if (dowater) {
             // Special case for drowned city
@@ -583,11 +603,11 @@ public class CityGenerator {
      * (bilinear interpolation).
      */
     private void correctTerrainShape(ChunkGenContext ctx, WorldGenLevel level, ChunkCoord coord, ChunkHeightmap heightmap) {
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
-        BuildingInfo.MinMax mm00 = info.getDesiredMaxHeightL2();
-        BuildingInfo.MinMax mm10 = info.getXmax().getDesiredMaxHeightL2();
-        BuildingInfo.MinMax mm01 = info.getZmax().getDesiredMaxHeightL2();
-        BuildingInfo.MinMax mm11 = info.getXmax().getZmax().getDesiredMaxHeightL2();
+        ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
+        ChunkPlan.MinMax mm00 = info.getDesiredMaxHeightL2();
+        ChunkPlan.MinMax mm10 = info.getXmax().getDesiredMaxHeightL2();
+        ChunkPlan.MinMax mm01 = info.getZmax().getDesiredMaxHeightL2();
+        ChunkPlan.MinMax mm11 = info.getXmax().getZmax().getDesiredMaxHeightL2();
 
         int min = level.getMinY();
         int max = level.getMaxY() + 1;
@@ -801,7 +821,7 @@ public class CityGenerator {
      * If the point is at a border and the adjacent chunk at that point happens to be lower
      * then this will return the minimum height
      */
-    public int getMinHeightAt(BuildingInfo info, int x, int z, ChunkHeightmap heightmap) {
+    public int getMinHeightAt(ChunkPlan info, int x, int z, ChunkHeightmap heightmap) {
         int height = heightmap.getHeight();
         WorldGenLevel world = info.provider.getWorld();
         int adjacent;
@@ -833,23 +853,15 @@ public class CityGenerator {
 
     public ChunkHeightmap getHeightmap(ChunkCoord chunk, @Nonnull WorldGenLevel world) {
         int heightSampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
-        int top, left;
-        int constX = 1, constZ = 1; // We'll need to take care of the negative part of the chunks as well
-        ChunkCoord sampler = chunk;
-        if (heightSampleSize > 1) {
-            // Recalculate chunk to be the center of the sample
-            top = (chunk.chunkX() / heightSampleSize) * heightSampleSize;
-            left = (chunk.chunkZ() / heightSampleSize) * heightSampleSize;
-            constX = chunk.chunkX() < 0 ? -1 : 1;
-            constZ = chunk.chunkZ() < 0 ? -1 : 1;
-            if (heightSampleSize > 2) {
-                int sampleOffset = heightSampleSize / 2;
-                sampler = new ChunkCoord(chunk.dimension(), top + (sampleOffset * constX), left + (sampleOffset * constZ));
-            }
-        } else {
-            top = chunk.chunkX();
-            left = chunk.chunkZ();
-        }
+        // The block this chunk shares a sampled height with, and the coordinate that height is taken
+        // at. Both come from HeightSampleGrid so that the tiling is a partition and the sampled
+        // coordinate is a function of the block rather than of whichever chunk asked first - see the
+        // note there for what the old arithmetic did at the origin, and issue #126.
+        int top = HeightSampleGrid.anchor(chunk.chunkX(), heightSampleSize);
+        int left = HeightSampleGrid.anchor(chunk.chunkZ(), heightSampleSize);
+        ChunkCoord sampler = new ChunkCoord(chunk.dimension(),
+                HeightSampleGrid.sampler(top, heightSampleSize),
+                HeightSampleGrid.sampler(left, heightSampleSize));
         // No lock. The heightmap is a pure function of the generator and the coordinate, so two
         // threads that race on the same chunk build two equal heightmaps and one of them is thrown
         // away; a third thread reading the cache sees whichever was published, and they agree.
@@ -869,7 +881,7 @@ public class CityGenerator {
         if (heightSampleSize > 1) {
             for (int i = 0; i < heightSampleSize; i++) {
                 for (int j = 0; j < heightSampleSize; j++) {
-                    ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + (i * constX), left + (j * constZ));
+                    ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + i, left + j);
                     cachedHeightmaps.putIfAbsent(sampleKey, new ChunkHeightmap(heightmap));
                 }
             }
@@ -890,7 +902,7 @@ public class CityGenerator {
         heightmap.update(height);
     }
 
-    private void doCityChunk(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, ChunkAccess chunk) {
+    private void doCityChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, ChunkAccess chunk) {
         ChunkDriver driver = ctx.driver;
         boolean building = info.hasBuilding;
 
@@ -959,7 +971,7 @@ public class CityGenerator {
         Stuff.generateStuff(ctx, this, info);
     }
 
-    private void generateStreetDecorations(ChunkGenContext ctx, BuildingInfo info) {
+    private void generateStreetDecorations(ChunkGenContext ctx, ChunkPlan info) {
         Direction stairDirection = info.getActualStairDirection();
         if (stairDirection != null) {
             BuildingPart stairs = info.stairType;
@@ -995,7 +1007,7 @@ public class CityGenerator {
     }
 
     /// Fix floating blocks after an explosion
-    private void fixAfterExplosion(ChunkGenContext ctx, BuildingInfo info) {
+    private void fixAfterExplosion(ChunkGenContext ctx, ChunkPlan info) {
         ChunkDriver driver = ctx.driver;
         if (info.profile.isCavern() && !info.hasBuilding) {
             // In a cavern we only do this correction when there is a building
@@ -1034,7 +1046,7 @@ public class CityGenerator {
         }
     }
 
-    private void generateRubble(ChunkGenContext ctx, BuildingInfo info) {
+    private void generateRubble(ChunkGenContext ctx, ChunkPlan info) {
         ChunkDriver driver = ctx.driver;
         int chunkX = info.coord.chunkX();
         int chunkZ = info.coord.chunkZ();
@@ -1075,7 +1087,7 @@ public class CityGenerator {
         }
     }
 
-    private int getInterpolatedHeight(BuildingInfo info, int x, int z) {
+    private int getInterpolatedHeight(ChunkPlan info, int x, int z) {
         if (x < 8 && z < 8) {
             // First quadrant
             float h00 = info.getXmin().getZmin().getCityGroundLevelOutsideLower();
@@ -1125,7 +1137,7 @@ public class CityGenerator {
         return Rng.floatAtPos(ctx.seed, driver.getX(), driver.getY(), driver.getZ(), purpose);
     }
 
-    private void generateRuins(ChunkGenContext ctx, BuildingInfo info) {
+    private void generateRuins(ChunkGenContext ctx, ChunkPlan info) {
         if (info.ruinHeight < 0) {
             return;
         }
@@ -1197,7 +1209,7 @@ public class CityGenerator {
         }
     }
 
-    private void generateStreet(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap) {
+    private void generateStreet(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap) {
         ChunkDriver driver = ctx.driver;
         boolean xRail = info.hasXCorridor();
         boolean zRail = info.hasZCorridor();
@@ -1218,7 +1230,7 @@ public class CityGenerator {
 //            }
 
             Direction streetSlopeDirection = info.getStreetSlopeDirection();
-            BuildingInfo.StreetType streetType = info.streetType;
+            ChunkPlan.StreetType streetType = info.streetType;
             boolean elevated = info.isElevatedParkSection();
             if (elevated) {
                 Character elevationBlock = info.getCityStyle().getParkElevationBlock();
@@ -1258,9 +1270,9 @@ public class CityGenerator {
             // a fountain, a park part, vegetation, a building front reaching out over the pavement -
             // is suppressed, because on a ramp it would sit in mid-air or in the middle of the route.
             if (streetSlopeDirection == null) {
-                if (streetType == BuildingInfo.StreetType.PARK || info.fountainType != null) {
+                if (streetType == ChunkPlan.StreetType.PARK || info.fountainType != null) {
                     BuildingPart part;
-                    if (streetType == BuildingInfo.StreetType.PARK) {
+                    if (streetType == ChunkPlan.StreetType.PARK) {
                         part = info.parkType;
                     } else {
                         part = info.fountainType;
@@ -1282,7 +1294,7 @@ public class CityGenerator {
         generateBorders(ctx, info, canDoStreetOrPark, heightmap);
     }
 
-    private void generateBorders(ChunkGenContext ctx, BuildingInfo info, boolean canDoParks, ChunkHeightmap heightmap) {
+    private void generateBorders(ChunkGenContext ctx, ChunkPlan info, boolean canDoParks, ChunkHeightmap heightmap) {
         Character borderBlock = info.getCityStyle().getBorderBlock();
 
         if (info.profile.isFloating()) {
@@ -1322,7 +1334,7 @@ public class CityGenerator {
     /**
      * Fill base blocks under streets to bedrock
      */
-    private void fillToBedrockStreetBlock(ChunkGenContext ctx, BuildingInfo info) {
+    private void fillToBedrockStreetBlock(ChunkGenContext ctx, ChunkPlan info) {
         ChunkDriver driver = ctx.driver;
         // Base blocks below streets
         int minHeight = info.provider.getWorld().getMinY();
@@ -1342,7 +1354,7 @@ public class CityGenerator {
     /**
      * Fill a main street block with base blocks and border blocks at the bottom
      */
-    private void fillMainStreetBlock(ChunkGenContext ctx, BuildingInfo info, Character borderBlock, int offset) {
+    private void fillMainStreetBlock(ChunkGenContext ctx, ChunkPlan info, Character borderBlock, int offset) {
         ChunkDriver driver = ctx.driver;
         BlockState border = ctx.paletteAt(info.getCompiledPalette(), borderBlock, 0, info.getCityGroundLevel() - offset, 0);
         for (int x = 0; x < 16; ++x) {
@@ -1356,7 +1368,7 @@ public class CityGenerator {
     /**
      * Generate a single border column for one side of a street block
      */
-    private void generateBorder(ChunkGenContext ctx, BuildingInfo info, boolean canDoParks, int x, int z, BuildingInfo adjacent, ChunkHeightmap heightmap) {
+    private void generateBorder(ChunkGenContext ctx, ChunkPlan info, boolean canDoParks, int x, int z, ChunkPlan adjacent, ChunkHeightmap heightmap) {
         ChunkDriver driver = ctx.driver;
         Character borderBlock = info.getCityStyle().getBorderBlock();
         Character wallBlock = info.getCityStyle().getWallBlock();
@@ -1392,7 +1404,7 @@ public class CityGenerator {
     /**
      * Generate a column of wall blocks (and stone below that in water)
      */
-    private void generateBorderSupport(ChunkGenContext ctx, BuildingInfo info, BlockState wall, int x, int z, int offset, ChunkHeightmap heightmap) {
+    private void generateBorderSupport(ChunkGenContext ctx, ChunkPlan info, BlockState wall, int x, int z, int offset, ChunkHeightmap heightmap) {
         ChunkDriver driver = ctx.driver;
         int height = heightmap.getHeight();
         if (height > 1) {
@@ -1410,14 +1422,14 @@ public class CityGenerator {
         }
     }
 
-    private int generateFrontPart(ChunkGenContext ctx, BuildingInfo info, int height, BuildingInfo adj, Transform rot) {
+    private int generateFrontPart(ChunkGenContext ctx, ChunkPlan info, int height, ChunkPlan adj, Transform rot) {
         if (info.hasFrontPartFrom(adj)) {
             return generatePart(ctx, adj, adj.frontType, rot, 0, height, 0, HardAirSetting.AIR);
         }
         return height;
     }
 
-    private void generateRandomVegetation(ChunkGenContext ctx, BuildingInfo info, int height) {
+    private void generateRandomVegetation(ChunkGenContext ctx, ChunkPlan info, int height) {
         ChunkDriver driver = ctx.driver;
 
         if (info.getXmin().hasBuilding) {
@@ -1494,7 +1506,7 @@ public class CityGenerator {
         }
     }
 
-    private void generateParkSection(ChunkGenContext ctx, BuildingInfo info, int height, boolean elevated) {
+    private void generateParkSection(ChunkGenContext ctx, ChunkPlan info, int height, boolean elevated) {
         ChunkDriver driver = ctx.driver;
         char street = ctx.street;
         BlockState b;
@@ -1573,7 +1585,7 @@ public class CityGenerator {
      * handles; a chunk with no planned road (an open lot rendered as paving) also uses the ordinary
      * family, because that is the narrowest surface available.
      */
-    private static StreetParts getStreetParts(BuildingInfo info) {
+    private static StreetParts getStreetParts(ChunkPlan info) {
         return switch (info.getEffectiveRoadType()) {
             case PRIMARY -> info.getCityStyle().getLargeStreetParts();
             case TERTIARY -> info.getCityStyle().getTertiaryStreetParts();
@@ -1592,8 +1604,8 @@ public class CityGenerator {
      * <p>A bridge still connects, primary or not: a bridge carries the road onward, so ignoring it
      * would end the road in a kerb with the bridge starting a chunk later out of nothing.
      */
-    private static boolean hasStreetPartConnection(BuildingInfo info, BuildingInfo adjacent, boolean bridgeConnection) {
-        boolean roadConnection = BuildingInfo.hasRoadConnection(info, adjacent);
+    private static boolean hasStreetPartConnection(ChunkPlan info, ChunkPlan adjacent, boolean bridgeConnection) {
+        boolean roadConnection = ChunkPlan.hasRoadConnection(info, adjacent);
         if (info.isPrimaryRoad()) {
             return (roadConnection && adjacent.isPrimaryRoad()) || bridgeConnection;
         }
@@ -1604,7 +1616,7 @@ public class CityGenerator {
      * The whole chunk as one ramp. The stair part is authored rising towards {@code XMIN}, so the
      * direction of the higher edge is exactly its rotation.
      */
-    private void generateStreetSlopeSection(ChunkGenContext ctx, BuildingInfo info, int height, Direction slopeDirection) {
+    private void generateStreetSlopeSection(ChunkGenContext ctx, ChunkPlan info, int height, Direction slopeDirection) {
         StreetParts parts = getStreetParts(info);
         // A style with no stair part has opted out of slopes the same way an empty connector list
         // opts out of connectors below: asset gaps degrade rather than crash. Without this guard,
@@ -1618,7 +1630,7 @@ public class CityGenerator {
         }
     }
 
-    private void generateNormalStreetSection(ChunkGenContext ctx, BuildingInfo info, int height) {
+    private void generateNormalStreetSection(ChunkGenContext ctx, ChunkPlan info, int height) {
         StreetParts parts = getStreetParts(info);
         boolean xmin = hasStreetPartConnection(info, info.getXmin(), info.getXmin().hasXBridge(provider) != null);
         boolean xmax = hasStreetPartConnection(info, info.getXmax(), info.getXmax().hasXBridge(provider) != null);
@@ -1697,7 +1709,7 @@ public class CityGenerator {
      * meeting another minor street is an ordinary junction the topology already covers. A style with
      * an empty connector list has opted out; that is a choice, not a missing asset, so no warning.
      */
-    private void generateMinorStreetConnectors(ChunkGenContext ctx, BuildingInfo info, StreetParts parts, int height) {
+    private void generateMinorStreetConnectors(ChunkGenContext ctx, ChunkPlan info, StreetParts parts, int height) {
         if (!info.isPrimaryRoad() || parts.connector().isEmpty()) {
             return;
         }
@@ -1707,9 +1719,9 @@ public class CityGenerator {
         generateMinorStreetConnector(ctx, info, info.getZmax(), parts, height, Transform.ROTATE_270);
     }
 
-    private void generateMinorStreetConnector(ChunkGenContext ctx, BuildingInfo info, BuildingInfo adjacent,
+    private void generateMinorStreetConnector(ChunkGenContext ctx, ChunkPlan info, ChunkPlan adjacent,
                                               StreetParts parts, int height, Transform transform) {
-        if (BuildingInfo.hasRoadConnection(info, adjacent) && !adjacent.isPrimaryRoad()) {
+        if (ChunkPlan.hasRoadConnection(info, adjacent) && !adjacent.isPrimaryRoad()) {
             BuildingPart connector = provider.assets().parts().getOrWarn(getRandomPart(ctx, parts.connector()));
             if (connector != null) {
                 generatePart(ctx, info, connector, transform, 0, height, 0, HardAirSetting.VOID);
@@ -1717,10 +1729,10 @@ public class CityGenerator {
         }
     }
 
-    private boolean borderNeedsConnectionToAdjacentChunk(BuildingInfo info, int x, int z) {
+    private boolean borderNeedsConnectionToAdjacentChunk(ChunkPlan info, int x, int z) {
         for (Direction direction : Direction.VALUES) {
             if (direction.atSide(x, z)) {
-                BuildingInfo adjacent = direction.get(info);
+                ChunkPlan adjacent = direction.get(info);
                 // A lower neighbour sloping up towards this chunk needs the retaining wall opened,
                 // but only across the ramp itself: the stair part's z1/z2 band, rotated to this
                 // edge. The rest of the wall stays, or the level change would read as a gap.
@@ -1776,7 +1788,7 @@ public class CityGenerator {
      * Generate a part. If 'airWaterLevel' is true then 'hard air' blocks are replaced with water below the waterLevel.
      * Otherwise they are replaced with air.
      */
-    public int generatePart(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part,
+    public int generatePart(ChunkGenContext ctx, ChunkPlan info, IBuildingPart part,
                              Transform transform,
                              int ox, int oy, int oz, HardAirSetting airWaterLevel) {
         ChunkDriver driver = ctx.driver;
@@ -1875,7 +1887,7 @@ public class CityGenerator {
         return air;
     }
 
-    public CompiledPalette computePalette(BuildingInfo info, IBuildingPart part) {
+    public CompiledPalette computePalette(ChunkPlan info, IBuildingPart part) {
         CompiledPalette compiledPalette = info.getCompiledPalette();
         // Cache the combined palette?
         Palette partPalette = part.getLocalPalette();
@@ -1903,7 +1915,7 @@ public class CityGenerator {
         return null;
     }
 
-    private BlockState handleBlockEntity(ChunkGenContext ctx, BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
+    private BlockState handleBlockEntity(ChunkGenContext ctx, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
         BlockPos pos = info.getRelativePos(rx, oy + y, rz);
         BlockEntityType type = getTypeForBlock(b);
         if (type == null) {
@@ -1954,7 +1966,7 @@ public class CityGenerator {
         }
     }
 
-    private BlockState handleSpawner(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
+    private BlockState handleSpawner(ChunkGenContext ctx, ChunkPlan info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
         if (SpecialMarkerPolicy.generateSpawner(info.profile)) {
             String mobid = inf.mobId();
             BlockPos pos = info.getRelativePos(rx, oy + y, rz);
@@ -1967,7 +1979,7 @@ public class CityGenerator {
             // how many spawners this chunk happened to place before it.
             RandomSource spawnerRandom = Rng.atPos(provider.getSeed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SPAWNERS);
             Identifier randomValue = getRandomSpawnerMob(world.getLevel(), spawnerRandom, provider, info,
-                    new BuildingInfo.ConditionTodo(mobid, part.getName(), info), pos);
+                    new ChunkPlan.ConditionTodo(mobid, part.getName(), info), pos);
             CompoundTag sd = new CompoundTag();
             sd.putString("id", randomValue.toString());
             SpawnData data = new SpawnData(sd, Optional.empty(), Optional.empty());
@@ -1980,7 +1992,7 @@ public class CityGenerator {
         return b;
     }
 
-    private void handleLoot(ChunkGenContext ctx, BuildingInfo info, IBuildingPart part,
+    private void handleLoot(ChunkGenContext ctx, ChunkPlan info, IBuildingPart part,
                             BlockState block, Palette.Info marker) {
         BlockPos pos = ctx.driver.getCurrentCopy();
         if (!SpecialMarkerPolicy.populateLoot(provider.getSeed(), pos, info.profile)) {
@@ -1990,12 +2002,12 @@ public class CityGenerator {
             if (!inWorld.getBlockState(pos).isAir()) {
                 inWorld.setBlock(pos, block, Block.UPDATE_CLIENTS);
                 generateLoot(info, inWorld, pos,
-                        new BuildingInfo.ConditionTodo(marker.loot(), part.getName(), info));
+                        new ChunkPlan.ConditionTodo(marker.loot(), part.getName(), info));
             }
         });
     }
 
-    private BlockState handleTodo(ChunkGenContext ctx, BuildingInfo info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
+    private BlockState handleTodo(ChunkGenContext ctx, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
         Block block = b.getBlock();
         CityStyle cs = info.getCityStyle();
         boolean avoidFoliage = info.profile.AVOID_FOLIAGE;
@@ -2049,7 +2061,7 @@ public class CityGenerator {
      * The tag used to be resolved once and cached on the generator, because the world style could
      * not change under a running generator. It can now: two cities in one world can come from
      * different packs whose {@code rotatable} tags differ, so the tag has to follow the chunk.
-     * {@link BuildingInfo#worldStyle()} memoises it per chunk, so this stays a field read in the hot
+     * {@link ChunkPlan#worldStyle()} memoises it per chunk, so this stays a field read in the hot
      * path rather than a neighbourhood walk. A world style that declares no {@code rotatable}
      * resolves {@code urbex:rotatable}, as before.
      * <p>
@@ -2057,7 +2069,7 @@ public class CityGenerator {
      * read, so every block of every part in this chunk sees one tag epoch even if a {@code /reload}
      * lands halfway through it (issue #128).
      */
-    private BlockState transformBlockState(TagSnapshot tags, BuildingInfo info, Transform transform, BlockState b) {
+    private BlockState transformBlockState(TagSnapshot tags, ChunkPlan info, Transform transform, BlockState b) {
         if (tags.isRotatable(info.worldStyle().getRotatableTag(), b)) {
             // Vanilla structure order: mirror first, then rotate. The mirror used to be
             // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
@@ -2079,7 +2091,7 @@ public class CityGenerator {
     }
 
 
-    public static Identifier getRandomSpawnerMob(Level world, RandomSource random, IDimensionInfo diminfo, BuildingInfo info, BuildingInfo.ConditionTodo todo, BlockPos pos) {
+    public static Identifier getRandomSpawnerMob(Level world, RandomSource random, IDimensionInfo diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();
         Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
         int level = (pos.getY() - diminfo.getProfile().GROUNDLEVEL) / FLOORHEIGHT;
@@ -2100,7 +2112,7 @@ public class CityGenerator {
     }
 
 
-    private void generateLoot(BuildingInfo info, LevelAccessor world, BlockPos pos, BuildingInfo.ConditionTodo condition) {
+    private void generateLoot(ChunkPlan info, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo condition) {
         BlockEntity te = world.getBlockEntity(pos);
         if (te instanceof RandomizableContainerBlockEntity) {
             // Runs from a post-todo, after generation of this chunk has finished, so it cannot
@@ -2112,7 +2124,7 @@ public class CityGenerator {
         }
     }
 
-    public static void createLoot(BuildingInfo info, RandomSource random, LevelAccessor world, BlockPos pos, BuildingInfo.ConditionTodo todo, IDimensionInfo diminfo) {
+    public static void createLoot(ChunkPlan info, RandomSource random, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo todo, IDimensionInfo diminfo) {
         BlockEntity tileentity = world.getBlockEntity(pos);
         if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
             if (todo != null) {
@@ -2137,7 +2149,7 @@ public class CityGenerator {
     }
 
 
-    private void generateDebris(ChunkGenContext ctx, BuildingInfo info) {
+    private void generateDebris(ChunkGenContext ctx, ChunkPlan info) {
         // One stream for all eight neighbours: a fresh one per direction would scatter the debris
         // from every one of them onto the same sixteen coordinates.
         RandomSource debrisRandom = ctx.rng(Rng.Purpose.DEBRIS);
@@ -2151,7 +2163,7 @@ public class CityGenerator {
         generateDebrisFromChunk(ctx, debrisRandom, info, info.getXmax().getZmin(), (xx, zz) -> (xx * (15.0f - zz)) / 256.0f);
     }
 
-    private void generateDebrisFromChunk(ChunkGenContext ctx, RandomSource debrisRandom, BuildingInfo info, BuildingInfo adjacentInfo, BiFunction<Integer, Integer, Float> locationFactor) {
+    private void generateDebrisFromChunk(ChunkGenContext ctx, RandomSource debrisRandom, ChunkPlan info, ChunkPlan adjacentInfo, BiFunction<Integer, Integer, Float> locationFactor) {
         ChunkDriver driver = ctx.driver;
         if (adjacentInfo.hasBuilding) {
             CompiledPalette adjacentPalette = adjacentInfo.getCompiledPalette();
@@ -2207,8 +2219,8 @@ public class CityGenerator {
         }
     }
 
-    private boolean doBorder(BuildingInfo info, Direction direction) {
-        BuildingInfo adjacent = direction.get(info);
+    private boolean doBorder(ChunkPlan info, Direction direction) {
+        ChunkPlan adjacent = direction.get(info);
         if (isHigherThenNearbyStreetChunk(info, adjacent)) {
             return true;
         } else if (!adjacent.isCity) {
@@ -2219,7 +2231,7 @@ public class CityGenerator {
         return false;
     }
 
-    private boolean isHigherThenNearbyStreetChunk(BuildingInfo info, BuildingInfo adjacent) {
+    private boolean isHigherThenNearbyStreetChunk(ChunkPlan info, ChunkPlan adjacent) {
         if (!adjacent.isCity) {
             return false;
         }
@@ -2244,7 +2256,7 @@ public class CityGenerator {
         }
     }
 
-    private void generateBuilding(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, ChunkAccess chunk) {
+    private void generateBuilding(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, ChunkAccess chunk) {
         ChunkDriver driver = ctx.driver;
         int lowestLevel = info.getBuildingBottomHeight();
         int cellars = info.cellars;
@@ -2315,7 +2327,7 @@ public class CityGenerator {
     /*
      * Make sure the space for the building is cleared and everything below the building is ok
      */
-    private void makeRoomForBuilding(ChunkGenContext ctx, BuildingInfo info, int lowestLevel, ChunkHeightmap heightmap, CompiledPalette palette) {
+    private void makeRoomForBuilding(ChunkGenContext ctx, ChunkPlan info, int lowestLevel, ChunkHeightmap heightmap, CompiledPalette palette) {
         ChunkDriver driver = ctx.driver;
         char borderBlock = info.getCityStyle().getBorderBlock();
         char fillerBlock = info.getBuilding().getFillerBlock();
@@ -2389,7 +2401,7 @@ public class CityGenerator {
         }
     }
 
-    private void clearToMax(ChunkGenContext ctx, BuildingInfo info, ChunkHeightmap heightmap, int height, int max) {
+    private void clearToMax(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, int height, int max) {
         int maximumHeight = Math.min(max, heightmap.getHeight() + 10);
         if (height < maximumHeight) {
             for (int x = 0; x < 16; x++) {
@@ -2411,7 +2423,7 @@ public class CityGenerator {
     /**
      * Queue a place-twice refresh at {@code pos} on the context generating this chunk.
      * <p>
-     * Takes the context rather than the chunk's {@code BuildingInfo}: the refresh belongs to one
+     * Takes the context rather than the chunk's {@code ChunkPlan}: the refresh belongs to one
      * generation, and a cached planning value is not allowed to hold it (issue #127).
      */
     public static void updateNeeded(ChunkGenContext ctx, BlockPos pos, int flags) {

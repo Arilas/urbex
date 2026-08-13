@@ -8,7 +8,7 @@ public class ChunkFixer {
     /**
      * Runs the post-generation todos this context queued, once.
      *
-     * <p>The context, not a re-fetched {@code BuildingInfo}: the todos belong to this generation of
+     * <p>The context, not a re-fetched {@code ChunkPlan}: the todos belong to this generation of
      * this chunk and nothing else may see them. Draining through the cache was how an evicted entry
      * lost them and how a second generation of the same chunk inherited the first one's (issue
      * #127); {@link PostTodoQueue} now refuses a second drain outright.</p>
