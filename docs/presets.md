@@ -29,9 +29,9 @@ or selectable.
 Every field in the file is **optional**. A preset only needs to state what it changes; anything
 left out falls through to what it `extends` (see [Resolution rules](#resolution-rules) below). The
 top-level object has six plain metadata fields (`extends`, `name`, `description`, `extraDescription`,
-`warning`, `icon`) plus eleven **sections**, each grouping related settings: `terrain`, `cities`,
-`buildings`, `roads`, `highways`, `railways`, `destruction`, `decoration`, `spawn`, `atmosphere`,
-`misc`. A section is only applied if it's present in the file, and within a present section only
+`warning`, `icon`) plus ten **sections**, each grouping related settings: `terrain`, `cities`,
+`buildings`, `roads`, `highways`, `railways`, `destruction`, `decoration`, `spawn`, `misc`.
+A section is only applied if it's present in the file, and within a present section only
 the fields you actually write are overridden — you never have to restate a whole section to change
 one number in it.
 

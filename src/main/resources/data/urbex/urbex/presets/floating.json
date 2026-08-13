@@ -20,9 +20,6 @@
     "cityLevel6Height": 92,
     "cityLevel7Height": 100
   },
-  "atmosphere": {
-    "horizon": 0
-  },
   "highways": {
     "highwaySupports": false,
     "highwayDistanceMask": 15

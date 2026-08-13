@@ -758,44 +758,6 @@
       "additionalProperties": false,
       "patternProperties": { "^_": {} }
     },
-    "atmosphere": {
-      "type": "object",
-      "description": "Client-side-only visuals (horizon height, fog color and density). Only applied on clients that also have Urbex installed.",
-      "properties": {
-        "horizon": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 256,
-          "description": "Used client-side (only if the client has this mod) to set the height of the horizon."
-        },
-        "fogRed": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1,
-          "description": "Used client-side (only if the client has this mod) for the fog color."
-        },
-        "fogGreen": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1,
-          "description": "Used client-side (only if the client has this mod) for the fog color."
-        },
-        "fogBlue": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1,
-          "description": "Used client-side (only if the client has this mod) for the fog color."
-        },
-        "fogDensity": {
-          "type": "number",
-          "minimum": -1,
-          "maximum": 1,
-          "description": "Used client-side (only if the client has this mod) for the fog density."
-        }
-      },
-      "additionalProperties": false,
-      "patternProperties": { "^_": {} }
-    },
     "misc": {
       "type": "object",
       "description": "Miscellaneous world-level switches.",

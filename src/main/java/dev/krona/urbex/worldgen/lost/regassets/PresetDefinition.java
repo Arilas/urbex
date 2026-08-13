@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.config.Preset;
-import dev.krona.urbex.worldgen.lost.regassets.data.preset.AtmosphereSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.DecorationSettings;
@@ -32,7 +31,7 @@ public class PresetDefinition implements Extendable {
 
     public static final Set<String> KEYS = Set.of("extends", "name", "description", "extraDescription", "warning",
             "icon", "terrain", "cities", "buildings", "roads", "highways", "railways", "destruction", "decoration",
-            "spawn", "atmosphere", "misc");
+            "spawn", "misc");
 
     /**
      * The six non-section keys, as one {@link MapCodec} inlined into the preset's own JSON object -
@@ -73,7 +72,6 @@ public class PresetDefinition implements Extendable {
                     DestructionSettings.CODEC.optionalFieldOf("destruction").forGetter(PresetDefinition::destruction),
                     DecorationSettings.CODEC.optionalFieldOf("decoration").forGetter(PresetDefinition::decoration),
                     SpawnSettings.CODEC.optionalFieldOf("spawn").forGetter(PresetDefinition::spawn),
-                    AtmosphereSettings.CODEC.optionalFieldOf("atmosphere").forGetter(PresetDefinition::atmosphere),
                     MiscSettings.CODEC.optionalFieldOf("misc").forGetter(PresetDefinition::misc)
             ).apply(instance, PresetDefinition::new));
 
@@ -103,7 +101,6 @@ public class PresetDefinition implements Extendable {
     private final Optional<DestructionSettings> destruction;
     private final Optional<DecorationSettings> decoration;
     private final Optional<SpawnSettings> spawn;
-    private final Optional<AtmosphereSettings> atmosphere;
     private final Optional<MiscSettings> misc;
 
     public PresetDefinition(Optional<Identifier> extendsId,
@@ -121,11 +118,10 @@ public class PresetDefinition implements Extendable {
                      Optional<DestructionSettings> destruction,
                      Optional<DecorationSettings> decoration,
                      Optional<SpawnSettings> spawn,
-                     Optional<AtmosphereSettings> atmosphere,
                      Optional<MiscSettings> misc) {
         this(new Meta(extendsId, displayName, description, extraDescription, warning, icon),
                 terrain, cities, buildings, roads, highways, railways, destruction, decoration,
-                spawn, atmosphere, misc);
+                spawn, misc);
     }
 
     /** The codec's own constructor; see {@link Meta} for why the metadata arrives bundled. */
@@ -139,7 +135,6 @@ public class PresetDefinition implements Extendable {
                      Optional<DestructionSettings> destruction,
                      Optional<DecorationSettings> decoration,
                      Optional<SpawnSettings> spawn,
-                     Optional<AtmosphereSettings> atmosphere,
                      Optional<MiscSettings> misc) {
         this.extendsId = meta.extendsId();
         this.displayName = meta.name();
@@ -156,7 +151,6 @@ public class PresetDefinition implements Extendable {
         this.destruction = destruction;
         this.decoration = decoration;
         this.spawn = spawn;
-        this.atmosphere = atmosphere;
         this.misc = misc;
     }
 
@@ -230,10 +224,6 @@ public class PresetDefinition implements Extendable {
         return spawn;
     }
 
-    public Optional<AtmosphereSettings> atmosphere() {
-        return atmosphere;
-    }
-
     public Optional<MiscSettings> misc() {
         return misc;
     }
@@ -254,7 +244,6 @@ public class PresetDefinition implements Extendable {
         destruction.ifPresent(s -> s.apply(p));
         decoration.ifPresent(s -> s.apply(p));
         spawn.ifPresent(s -> s.apply(p));
-        atmosphere.ifPresent(s -> s.apply(p));
         misc.ifPresent(s -> s.apply(p));
     }
 

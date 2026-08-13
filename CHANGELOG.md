@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **The `atmosphere` preset section is gone, along with its five settings sliders.** `horizon`,
+  `fogRed`, `fogGreen`, `fogBlue` and `fogDensity` were read by nothing on either side (issue #73).
+  - *They were dead in singleplayer too.* The tooltips promised "used client-side (but only if the
+    client has this mod)", but no renderer ever read them and the network package that would have
+    carried them to a client was already deleted — so a player could move five ADVANCED sliders and
+    nothing at all happened.
+  - *An existing pack that still writes the section keeps loading.* It is reported by the ordinary
+    unknown-key WARN and generates exactly what it generated before, because nothing ever consumed
+    the values. The JSON Schema flags it while you type.
+  - *No worldgen change*: every digest golden is unchanged.
+
 - **A palette character that resolves to nothing, and a road part that does not fit its chunk, are
   caught at load.** Both used to surface from a worldgen worker on the first chunk that placed the
   part (issue #56).

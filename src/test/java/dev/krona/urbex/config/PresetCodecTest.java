@@ -49,7 +49,6 @@ class PresetCodecTest {
         assertTrue(re.destruction().isEmpty());
         assertTrue(re.decoration().isEmpty());
         assertTrue(re.spawn().isEmpty());
-        assertTrue(re.atmosphere().isEmpty());
         assertTrue(re.misc().isEmpty());
     }
 
@@ -62,6 +61,23 @@ class PresetCodecTest {
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         Dynamic<JsonElement> dyn = new Dynamic<>(JsonOps.INSTANCE, root);
         assertEquals(List.of("citiez"), UnknownKeys.check(dyn, PresetDefinition.KEYS));
+    }
+
+    /**
+     * The removed {@code atmosphere} section is not a hard error. It never had a reader (issue #73),
+     * so a pack that still declares it generates exactly what it did before - it is reported through
+     * the ordinary unknown-key WARN, and the file still loads.
+     */
+    @Test
+    void removedAtmosphereSectionParsesButWarns() {
+        String json = "{\"description\":\"x\",\"atmosphere\":{\"horizon\":128,\"fogDensity\":0.02}}";
+
+        PresetDefinition re = assertDoesNotThrow(() -> decode(json));
+        assertEquals("x", re.description().orElseThrow());
+
+        JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+        Dynamic<JsonElement> dyn = new Dynamic<>(JsonOps.INSTANCE, root);
+        assertEquals(List.of("atmosphere"), UnknownKeys.check(dyn, PresetDefinition.KEYS));
     }
 
     @Test
