@@ -110,6 +110,55 @@ So the digests do not cover this class of defect, and a green six-suite run is n
 it. Anything that changes *which* positions the corrections pass visits needs a unit test;
 `ChunkDriverCorrectionsTest` is that test.
 
+## What the JFR profile said, and what it cost to not have run it earlier
+
+The allocation figure every claim in this milestone is measured against — ~12 MiB per generated
+chunk — is **not all generation**. Broken down by type:
+
+| Share | What |
+| --- | --- |
+| 24% | `byte[]` |
+| 7.6% | `String`, of which 800 MiB is `DigestRunner.hashChunk` calling `BlockState.toString()` |
+| 5.3% | `UnsafeReadGateMixin.recordFromStack` — on a run reporting `unsafeReads=0` |
+| ~15% | vanilla noise and density functions: `Xoroshiro128PlusPlus`, `NoiseChunk`, `MarsagliaPolarGaussian`, `DensityFunctions` |
+
+Two of those are the harness measuring itself. The unsafe-read gate walked the whole stack on every
+vanilla cross-chunk read, found no Urbex frame, and threw it away — 1424 MiB to count zero events,
+now 54 MiB via `StackWalker`. The digest's block-state hashing is 800 MiB and stays, because the
+hash is over those strings and changing it moves all five goldens.
+
+`ChunkCoord` does not appear anywhere in the profile. The issue lists "per-dimension cache keys
+redundantly carry a dimension key" as a suspected cost; removing it would have been a ~90-site
+mechanical change, and the profile says it would have bought nothing measurable. Not done, on
+purpose — that is the epic's "do not optimize from inspection" constraint working in the direction
+it is least often applied.
+
+## What the caches actually do
+
+`cityLevel`'s 32% hit rate, flagged in the baseline above as "either keyed wrong or asked about
+coordinates it will never be asked about again", is the second. The key is `ChunkCoord`, the value
+depends on seed and preset, and both are fixed per dimension — the keying is right. It is simply
+asked about each coordinate about 1.5 times.
+
+The soak (`runDigestSoak`, radius 40, 7200 generated chunks) is what sized the ceiling:
+
+```
+ms=192568 chunksPerSec=37.4 meanUs=4394.1 allocMiB=94997 queueHighWater=4988
+  heightmap size=10899   cityStyle size=10021   biomeInfo size=9523
+  railInfo  size=8743    cityLevel size=8651    candidate size=8592
+```
+
+Throughput held at 37.4 chunks/s over ten times the standard window, so the caches do not slow down
+as they grow — the problem was only that nothing stopped them. They grow at roughly 1.5 entries per
+generated chunk, so the 16384 ceiling is about 11k chunks away: a long exploration session reaches
+it, a normal one does not. `queueHighWater` scales linearly too (598 at 816 chunks, 4988 at 7200)
+and is *not* bounded by this work.
+
+Three independent demonstrations that evicting a planning entry is a recomputation rather than a
+change in output, all reproducing `b37050817cd94b93`: the pre-existing forced-expiry run
+(`expireEvery=25`), a ceiling forced to 512 (300k+ evictions, every cache pinned at ~510), and a TTL
+forced to 2 seconds (20 sweeps per cache, `sweepMs` 0 or 1).
+
 ## What this PR does not do
 
 It sets no cache limits and removes no allocation. Those are #132b, and doing them here would be
