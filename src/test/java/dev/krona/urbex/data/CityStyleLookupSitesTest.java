@@ -54,7 +54,9 @@ class CityStyleLookupSitesTest {
 
         assertEquals(List.of(
                         // The style of the chunk, blended from the styles its neighbours resolved.
-                        "ChunkPlan.java",
+                        // Was ChunkPlan.java until issue #11 split candidate resolution out of it;
+                        // the same lookup, in the class that now performs it.
+                        "ChunkCandidates.java",
                         // The world style's selectors, the preset alternative, the predefined city.
                         "City.java",
                         // Route 4: the per-world cityStyleAlternative override, which arrives as JSON
