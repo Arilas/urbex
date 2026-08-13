@@ -1,6 +1,5 @@
 package dev.krona.urbex.mixin;
 
-import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.worldgen.CityFeature;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.StructureManager;
@@ -36,9 +35,6 @@ public class CarverHookMixin {
     private void urbex$generateCity(WorldGenRegion region, long seed, RandomState randomState,
                                     BiomeManager biomeManager, StructureManager structureManager,
                                     ChunkAccess chunk, CallbackInfo ci) {
-        CityFeature feature = Registration.cityFeature();
-        if (feature != null) {
-            feature.generateFromPipeline(region, chunk);
-        }
+        CityFeature.generateFromPipeline(region, chunk);
     }
 }
