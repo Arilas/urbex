@@ -98,16 +98,10 @@ public class ChunkPlan {
     private volatile DamageArea damageArea = null;
     private Palette palette = null;             // written once, in the constructor
     private volatile CompiledPalette compiledPalette = null;
-    private volatile Boolean isOcean = null;
     private volatile WorldStyle chunkWorldStyle = null;
 
-    private volatile boolean xBridgeTypeCalculated = false;
-    private volatile boolean zBridgeTypeCalculated = false;
-    private volatile BuildingPart xBridgeType = null;
-    private volatile BuildingPart zBridgeType = null;
-
-    private volatile boolean plannedBridgeCalculated = false;
-    private volatile PrimaryBridgePlanner.BridgeSpan plannedBridge;
+    /** This chunk's bridge decisions and the state memoising them; see {@link BridgeDecisions}. */
+    final BridgeDecisions bridges = new BridgeDecisions(this);
 
     private volatile boolean streetSlopeCalculated = false;
     private volatile Direction streetSlopeDirection;
@@ -1120,199 +1114,28 @@ public class ChunkPlan {
      */
     @Nullable
     public PrimaryBridgePlanner.BridgeSpan getPlannedBridge() {
-        if (plannedBridgeCalculated) {
-            return plannedBridge;
-        }
-        PrimaryBridgePlanner.BridgeSpan result = PrimaryBridgePlanner.spanAt(coord, provider).orElse(null);
-        // Value first, then the flag.
-        plannedBridge = result;
-        plannedBridgeCalculated = true;
-        return result;
+        return bridges.planned();
     }
 
     public BuildingPart hasBridge(PlanningContext provider, Orientation orientation) {
-        return switch (orientation) {
-            case X -> hasXBridge(provider);
-            case Z -> hasZBridge(provider);
-        };
+        return bridges.at(provider, orientation);
     }
 
     public boolean hasBridge(PlanningContext provider) {
-        if (hasXBridge(provider) != null) {
-            return true;
-        }
-        if (hasZBridge(provider) != null) {
-            return true;
-        }
-        return false;
+        return bridges.any(provider);
     }
 
-    // To prevent adjacent bridges of the same direction we give the bridges at even chunk Z coordinates higher priority
     public BuildingPart hasXBridge(PlanningContext provider) {
-        if (xBridgeTypeCalculated) {
-            return xBridgeType;
-        }
-        BuildingPart result = computeXBridge(provider);
-        // Value first, then the flag. The old code set the flag up front and filled the value in
-        // afterwards, which is fine under a lock and a lie without one.
-        xBridgeType = result;
-        xBridgeTypeCalculated = true;
-        return result;
+        return bridges.x(provider);
     }
 
-    private BuildingPart computeXBridge(PlanningContext provider) {
-        PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
-        if (planned != null) {
-            // A planned span settles this chunk for both orientations. Falling through to the
-            // opportunistic scan below when the span runs the other way would let an ordinary bridge
-            // claim the chunk first and cancel the planned one.
-            return planned.orientation() == Orientation.X
-                    ? PrimaryBridgePlanner.deckPart(planned, coord, provider) : null;
-        }
-        if (!xBridge) {
-            return null;
-        }
-        if (!isSuitableForBridge(provider, this)) {
-            return null;
-        }
-        if (coord.chunkZ() % 2 != 0 && (getZmin().hasXBridge(provider) != null || getZmax().hasXBridge(provider) != null)) {
-            return null;
-        }
-        BuildingPart bt = bridgeType;
-        ChunkPlan i = getXmin();
-        while ((!i.isCity) && i.xBridge && isSuitableForBridge(provider, i)) {
-            if (coord.chunkZ() % 2 != 0 && (i.getZmin().hasXBridge(provider) != null || i.getZmax().hasXBridge(provider) != null)) {
-                return null;
-            }
-            bt = i.bridgeType;
-            i = i.getXmin();
-        }
-        if ((!i.isCity) || i.hasBuilding || i.cityLevel > 0) {  // @todo support bridges at higher levels?
-            return null;
-        }
-
-        ChunkPlan minimum = i;
-
-        i = getXmax();
-        while ((!i.isCity) && i.xBridge && isSuitableForBridge(provider, i)) {
-            if (coord.chunkZ() % 2 != 0 && (i.getZmin().hasXBridge(provider) != null || i.getZmax().hasXBridge(provider) != null)) {
-                return null;
-            }
-            i = i.getXmax();
-        }
-        if ((!i.isCity) || i.hasBuilding || i.cityLevel > 0) {
-            return null;
-        }
-        // Here we can automatically mark the rest of the bridge as ok. Saves on calculation
-        i = i.getXmin();
-        ChunkCoord minCoord = minimum.coord;
-        while (!i.coord.equals(minCoord)) {
-            i.xBridgeType = bt;
-            i.xBridgeTypeCalculated = true;
-            i.zBridgeType = null;
-            i.zBridgeTypeCalculated = true;
-            i = i.getXmin();
-        }
-
-        return bt;
-    }
-
-    // To prevent adjacent bridges of the same direction we give the bridges at even chunk X coordinates higher priority
     public BuildingPart hasZBridge(PlanningContext provider) {
-        if (zBridgeTypeCalculated) {
-            return zBridgeType;
-        }
-        BuildingPart result = computeZBridge(provider);
-        zBridgeType = result;
-        zBridgeTypeCalculated = true;
-        return result;
-    }
-
-    private BuildingPart computeZBridge(PlanningContext provider) {
-        PrimaryBridgePlanner.BridgeSpan planned = getPlannedBridge();
-        if (planned != null) {
-            return planned.orientation() == Orientation.Z
-                    ? PrimaryBridgePlanner.deckPart(planned, coord, provider) : null;
-        }
-        if (!zBridge) {
-            return null;
-        }
-        if (!isSuitableForBridge(provider, this)) {
-            return null;
-        }
-        if (hasXBridge(provider) != null) {
-            return null;
-        }
-
-        if (coord.chunkX() % 2 != 0 && (getXmin().hasZBridge(provider) != null || getXmax().hasZBridge(provider) != null)) {
-            return null;
-        }
-
-        BuildingPart bt = bridgeType;
-        ChunkPlan i = getZmin();
-        while ((!i.isCity) && i.zBridge && isSuitableForBridge(provider, i)) {
-            if (i.hasXBridge(provider) != null) {
-                return null;
-            }
-            if (coord.chunkX() % 2 != 0 && (i.getXmin().hasZBridge(provider) != null || i.getXmax().hasZBridge(provider) != null)) {
-                return null;
-            }
-
-            bt = i.bridgeType;
-            i = i.getZmin();
-        }
-
-        ChunkPlan minimum = i;
-
-        if ((!i.isCity) || i.hasBuilding || i.cityLevel > 0) {
-            return null;
-        }
-        i = getZmax();
-        while ((!i.isCity) && i.zBridge && isSuitableForBridge(provider, i)) {
-            if (i.hasXBridge(provider) != null) {
-                return null;
-            }
-            if (coord.chunkX() % 2 != 0 && (i.getXmin().hasZBridge(provider) != null || i.getXmax().hasZBridge(provider) != null)) {
-                return null;
-            }
-            i = i.getZmax();
-        }
-        if ((!i.isCity) || i.hasBuilding || i.cityLevel > 0) {
-            return null;
-        }
-        // Here we can automatically mark the rest of the bridge as ok. Saves on calculation
-        i = i.getZmin();
-        ChunkCoord minCoord = minimum.coord;
-        while (!i.coord.equals(minCoord)) {
-            i.zBridgeType = bt;
-            i.zBridgeTypeCalculated = true;
-            i.xBridgeType = null;
-            i.xBridgeTypeCalculated = true;
-            i = i.getZmin();
-        }
-
-        return bt;
+        return bridges.z(provider);
     }
 
     public boolean isOcean() {
-        if (isOcean != null) {
-            return isOcean;
-        }
-        Holder<Biome> mainBiome = BiomeInfo.getBiomeInfo(provider, coord).getMainBiome();
-        isOcean = mainBiome.is(BiomeTags.IS_OCEAN) || mainBiome.is(BiomeTags.IS_DEEP_OCEAN);
-        return isOcean;
+        return bridges.isOcean();
     }
-
-
-    private boolean isSuitableForBridge(PlanningContext provider, ChunkPlan i) {
-        if (i.getPlannedBridge() != null) {
-            // A planned span owns this chunk. An opportunistic bridge must not run through it -
-            // it would stamp its own part over the planned deck on its way past.
-            return false;
-        }
-        return i.cityLevel < cityLevel || Terrain.isWaterBiome(provider, i.coord);
-    }
-
 
     public boolean hasXCorridor() {
         if (!xRailCorridor) {
