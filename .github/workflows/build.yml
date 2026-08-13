@@ -58,6 +58,10 @@ jobs:
         run: |
           ./gradlew runDigestCheckAvoidThreads --no-daemon | tee digest-check-avoid-threads.log
           grep -q "URBEX-DIGEST-CHECK: OK" digest-check-avoid-threads.log
+      - name: Worldgen digest check (structure avoidance, forced cache expiry)
+        run: |
+          ./gradlew runDigestCheckAvoidExpire --no-daemon | tee digest-check-avoid-expire.log
+          grep -q "URBEX-DIGEST-CHECK: OK" digest-check-avoid-expire.log
       - uses: actions/upload-artifact@v4
         with:
           name: jar

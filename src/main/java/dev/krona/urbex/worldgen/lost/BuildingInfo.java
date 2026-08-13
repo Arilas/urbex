@@ -35,13 +35,22 @@ public class BuildingInfo {
 
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
+    /**
+     * True only for an instance built by {@link #detachedForEditing} and never published to the
+     * cache, which is the only kind {@link #setBuildingType} will touch. Everything reachable from
+     * {@code caches().buildingInfo} is immutable planning (issue #126).
+     */
+    private final boolean detached;
     public final Preset profile;
     public int groundLevel;
     public final int waterLevel;
 
-    // Volatile: CityGenerator.generate() clears this when it finds a blacklisted structure
-    // in the chunk, after the info is already in the shared cache and visible to other threads.
-    public volatile boolean isCity;
+    // Final, and no longer volatile: CityGenerator.generate() used to clear this when it found a
+    // blacklisted structure in the chunk, after the info was already in the shared cache and its
+    // neighbours had derived from the old value. Suppression is local to that chunk's rendering now,
+    // so what is published here is what the seed and the coordinate say and nothing rewrites it
+    // (issue #126).
+    public final boolean isCity;
     public boolean hasBuilding;
     public final MultiPos multiBuildingPos;
     public final MultiBuilding multiBuilding;
@@ -54,7 +63,7 @@ public class BuildingInfo {
     public final BuildingPart frontType;
     private final float stairPriority;      // A random number that indicates if this chunk should get a stair if there are competing stairs around it. The highest wins
     public final BuildingPart railDungeon;    // Dungeon next to rails. Will only generate if there are actually rails next to it
-    public StreetType streetType;
+    public final StreetType streetType;
     private final RoadType effectiveRoad;   // The planned road this chunk renders, NONE for most chunks
 
     private int floors;
@@ -426,12 +435,6 @@ public class BuildingInfo {
         return raced != null ? raced : characteristics;
     }
 
-    // Change city status
-    public static void setCityRaw(ChunkCoord coord, IDimensionInfo provider, boolean isCity) {
-        ChunkCharacteristics characteristics = getChunkCharacteristics(coord, provider);
-        characteristics.isCity = isCity;
-    }
-
     /**
      * Don't use the cache as we're busy building the cache.
      */
@@ -616,13 +619,37 @@ public class BuildingInfo {
         if (info != null) {
             return info;
         }
-        info = new BuildingInfo(key, provider);
+        info = new BuildingInfo(key, provider, false);
         BuildingInfo raced = provider.caches().buildingInfo.putIfAbsent(key, info);
         return raced != null ? raced : info;
     }
 
-    // Only used for editing!
+    /**
+     * A BuildingInfo for {@code key} that is deliberately never published to the cache, for the
+     * editing commands to overwrite with {@link #setBuildingType}.
+     * <p>
+     * {@code /urbex createbuilding} used to take the cached one and rewrite it in place, which left
+     * the shared plan for that chunk describing a building the seed never chose - for every later
+     * generation and every neighbour that read it, until the entry happened to be evicted. The
+     * values here are identical to the cached instance's, because the constructor is a pure function
+     * of seed and coordinate; the difference is only that nobody else can see this one (issue #126).
+     */
+    public static BuildingInfo detachedForEditing(ChunkCoord key, IDimensionInfo provider) {
+        return new BuildingInfo(key, provider, true);
+    }
+
+    /**
+     * Overwrites this chunk's building with an arbitrary one, for the editing commands to draw.
+     *
+     * @throws IllegalStateException if called on a cached instance. Published planning is immutable
+     *         - see {@link #detachedForEditing}, which is the only legal receiver.
+     */
     public void setBuildingType(Building building, int cellars, int floors, int groundLevel) {
+        if (!detached) {
+            throw new IllegalStateException(
+                    "setBuildingType on a published BuildingInfo at " + coord + ". Cached planning is "
+                            + "immutable; use BuildingInfo.detachedForEditing() (issue #126).");
+        }
         buildingType = building;
         hasBuilding = true;
         this.floors = floors;
@@ -667,9 +694,10 @@ public class BuildingInfo {
         }
     }
 
-    private BuildingInfo(ChunkCoord key, IDimensionInfo provider) {
+    private BuildingInfo(ChunkCoord key, IDimensionInfo provider, boolean detached) {
         this.provider = provider;
         this.coord = key;
+        this.detached = detached;
 
         profile = provider.getProfile();
 

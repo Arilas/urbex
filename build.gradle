@@ -215,6 +215,27 @@ loom {
                 vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
             }
         }
+        // The same window a third time, with every planning cache dropped after each 25 chunks and
+        // rebuilt from scratch. Planning lives in TimedCaches that a real world evicts on a timer, so
+        // "the plan a chunk was generated from" and "the plan its neighbour reads an hour later" are
+        // the same value only if every planning value is a pure function of seed and coordinate.
+        // That is the acceptance criterion "plans are identical before and after forced cache
+        // expiry", asserted rather than assumed: it shares the golden, so any planning value that
+        // remembers something about when it was first built moves the digest.
+        digestCheckAvoidExpire {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance, forced cache expiry)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoidexpire')
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            vmArg '-Durbex.digestCheck.expireEvery=25'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
         // The weighted-world-style-mix census. Not a golden check and not run by CI: mixing needs a
         // second datapack registering a second world style, and this repository ships only its own.
         // Point it at one or more with `-PurbexMixPack=<jar>[,<jar>...]` and run `./gradlew runMixCheck`;
@@ -276,6 +297,8 @@ registerPrepareDigestCheck('prepareDigestCheckAvoidShuffled', 'runs/digestchecka
         '135132278163449878')
 registerPrepareDigestCheck('prepareDigestCheckAvoidThreads', 'runs/digestcheckavoidthreads', '',
         '135132278163449878')
+registerPrepareDigestCheck('prepareDigestCheckAvoidExpire', 'runs/digestcheckavoidexpire', '',
+        '135132278163449878')
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
     dependsOn 'prepareDigestCheck'
@@ -294,6 +317,9 @@ tasks.matching { it.name == 'runDigestCheckAvoidShuffled' }.configureEach {
 }
 tasks.matching { it.name == 'runDigestCheckAvoidThreads' }.configureEach {
     dependsOn 'prepareDigestCheckAvoidThreads'
+}
+tasks.matching { it.name == 'runDigestCheckAvoidExpire' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoidExpire'
 }
 
 // The mix census needs a different world config from the digest runs - the experimental flag on,

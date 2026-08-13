@@ -66,7 +66,10 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         BlockPos bottom = pos.getBlockPos(context.getSource());
 
         ChunkCoord coord = new ChunkCoord(level.dimension(), bottom.getX() >> 4, bottom.getZ() >> 4);
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
+        // Detached, not the cached plan: this command draws an arbitrary building on request, and
+        // rewriting the published BuildingInfo left the shared plan for the chunk describing a
+        // building the seed never chose (issue #126).
+        BuildingInfo info = BuildingInfo.detachedForEditing(coord, dimInfo);
         info.setBuildingType(building, cellars, floors, bottom.getY());
 
         ChunkPos cp = ChunkPos.containing(bottom);

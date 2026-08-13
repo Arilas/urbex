@@ -31,6 +31,12 @@ public final class DigestRunner {
     private static final long FNV_OFFSET = 0xCBF29CE484222325L;
     private static final long FNV_PRIME = 0x100000001B3L;
 
+    /**
+     * Clear every planning cache after each {@code N} chunks driven, simulating the timed eviction
+     * a long-running world does by itself. Absent or zero leaves the caches alone.
+     */
+    public static final String EXPIRE_EVERY_PROPERTY = "urbex.digestCheck.expireEvery";
+
     private DigestRunner() {
     }
 
@@ -109,10 +115,23 @@ public final class DigestRunner {
         UnsafeReadCounter.reset();
         long start = System.currentTimeMillis();
         int recordedChunks;
+        // Forced cache expiry, off unless asked for. Planning caches are TimedCaches that can drop
+        // an entry at any moment in a real world, and a plan rebuilt from a different starting point
+        // than its neighbours saw is one of the two defects issue #126 was opened for. Clearing them
+        // mid-drive is the standing version of "wait for the eviction to happen by itself": if any
+        // planning value is not a pure function of the seed and the coordinate, the digest moves.
+        int expireEvery = Integer.getInteger(EXPIRE_EVERY_PROPERTY, 0);
+        int driven = 0;
         ChunkDriver.startRecordingWrites();
         try {
             for (ChunkPos pos : chunks) {
                 level.getChunk(pos.x(), pos.z(), ChunkStatus.FULL, true);
+                if (expireEvery > 0 && ++driven % expireEvery == 0) {
+                    IDimensionInfo dimInfo = GenerationSession.planningFor(level);
+                    if (dimInfo != null) {
+                        dimInfo.caches().clear();
+                    }
+                }
             }
         } finally {
             ChunkDriver.stopRecordingWrites();
