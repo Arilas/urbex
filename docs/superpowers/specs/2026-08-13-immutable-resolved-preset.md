@@ -2,10 +2,9 @@
 
 Phase 3, item 10 of epic #134: "Make the resolved runtime preset immutable as part of #130."
 
-This is the one Phase 3 item not implemented in stack #159. It is written down here rather than
-attempted at the end of that stack because it is a 738-call-site mechanical rewrite, and the epic's
-own rule — *separate mechanical moves and renames from logic changes* — is exactly the rule that
-makes it a stack of its own.
+Implemented in stack #159 as two PRs, after the rest of Phase 3 and the removal of the dead
+`atmosphere` section (#172) had settled what the field list actually is. The epic's own rule —
+*separate mechanical moves and renames from logic changes* — is why it is two and not one.
 
 ## What is already true
 
@@ -54,25 +53,37 @@ The GUI seam becomes `(getter, wither)` over the draft: `p -> p.cityChance()`,
 `(p, v) -> p.withCityChance(v)`. `SettingDescriptor` needs one change — its setter returns the new
 draft rather than mutating in place — and the 112 descriptor declarations change shape mechanically.
 
-## Order
+## What was done
 
-One PR per step, in this order, each digest-checked:
+1. **Accessors first, fields still public** (`10a`). A getter per field, named for the JSON key its
+   codec reads it from — so `cityChance()` is what a datapack author already calls `CITY_CHANCE` —
+   and all 707 reads moved onto them. No behaviour change and no type change, which is what makes
+   the second diff readable: one that also changed a `.FIELD` to a `.field()` on every line would
+   have hidden everything else.
 
-1. **Accessors first, fields still public.** Add a getter per field; migrate the 738 read sites to
-   them. No behaviour change, no type change, and it is the step that makes the rest reviewable — a
-   later diff that also changed a `.FIELD` to a `.field()` on every line would hide everything else.
-2. **Fields private.** The compiler now finds every writer: the twelve `applyTo` methods, `copy()`,
-   and `SettingDescriptor`'s setters. Nothing else should appear; anything that does is the defect
-   this issue is about, and belongs in its own commit with a note.
-3. **Sections.** Group the fields into the per-section records. `ResolvedPreset` composes them.
-4. **The draft.** `PresetDraft` becomes the mutable side; `Presets.resolve` returns a
-   `ResolvedPreset`; `PlanningContext.preset` changes type.
-5. **The GUI seam.** `SettingDescriptor` takes `(getter, wither)`.
+2. **The draft/resolved split** (`10b`). `Preset`'s fields became `private final`, and the compiler
+   named every writer: the eleven `*Settings.apply` methods, `copy()`, and `SettingDescriptor`'s
+   setters. Nothing else appeared. Those writers moved to `PresetDraft`, which carries the same
+   values mutably; `Presets.resolve` settles a draft into a `Preset`, and `Preset.toDraft()` is what
+   `copy()` was.
 
-Step 1 is the large diff and the safe one. Steps 2–5 are small and each is a real boundary.
+Two things went differently from the plan above:
+
+- **No per-section records.** `ResolvedPreset` composed of `Terrain`, `Cities`, … would have been a
+  second large mechanical pass over the same 707 sites for a grouping nothing currently asks for.
+  `Preset` *is* the resolved value; if a planner later wants only the road settings, the sections
+  can be carved out then, against a type that is already immutable.
+- **No `(getter, wither)` seam.** It was not needed. `PresetDraft` carries the same public fields
+  under the same names *and* answers the same accessors, so all 119 descriptor lambda pairs compile
+  against it untouched — only the type parameter moved. A wither per field would have been 119
+  allocations per keystroke to express the same thing less clearly.
+
+Three fields on `Preset` are not final: the icon identifier and the two resolved `BlockState`s.
+They are memoized derivations of final fields, computed on first ask because resolving a block needs
+a registry the class is not handed, and nothing can observe whether one has been computed.
 
 ## Verification
 
-Every step must leave the five digest goldens unchanged. Steps 1 and 3 in particular are where a
-transcription error would show up as a moved golden rather than as a compile failure, so neither may
-be merged on unit tests alone.
+Both PRs left the five digest goldens unchanged, which is the check that matters here: a
+transcription error in a mechanical pass over 707 sites shows up as a moved golden rather than as a
+compile failure, so neither could be merged on unit tests alone.
