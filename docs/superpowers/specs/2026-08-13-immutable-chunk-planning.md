@@ -251,6 +251,43 @@ more.
 Suppression demonstrably changes the world rather than only a counter: with `avoidVillages` off the
 avoidance window drives 658 chunks and 5942711 blocks against 580 and 5359701 with it on.
 
+## Immutability, and what was done instead of the record split
+
+The Direction section proposes publishing `record ChunkCandidate` / `record ChunkPlan` in place of
+`BuildingInfo` + `ChunkCharacteristics`. That was **not** done, and the criterion it serves -
+"cached candidate/final plan values are immutable after publication" - was met by making the values
+that are already published immutable instead:
+
+- `BuildingInfo.isCity` and `streetType` are `final`, and `isCity` is no longer `volatile`: the
+  keyword existed because structure avoidance flipped it after publication.
+- `setCityRaw` is deleted (its last caller went with local suppression).
+- `setBuildingType`, the last writer of a published plan, now throws unless it is handed an instance
+  from `detachedForEditing` - which `/urbex createbuilding` uses. That command used to rewrite the
+  cached plan for a chunk in place.
+- `Railway.removeRailChunkType` is deleted; see the precedence section.
+
+Audited afterwards: every remaining write into a planning cache is a `putIfAbsent` at first
+publication - `characteristics`, `buildingInfo`, `cityLevel`, `biomeInfo`, `heightmap`, `railInfo` -
+and the only `clear()` is `DimensionCaches.clear()`, which drops everything at once. Nothing writes
+into a second planning cache from a constructor or a query.
+
+Two things still mutate after publication, both memoization of pure functions rather than planning
+decisions: `BuildingInfo`'s lazily computed direction fields (`streetSlopeDirection`,
+`stairDirection`, `actualStairDirection`, the bridge fields), and `Highway`'s level cache, which uses
+`put` rather than `putIfAbsent` because every chunk of one highway run writes the run's level. The
+forced-expiry window exercises both - it re-derives everything from different starting points - and
+holds its golden.
+
+The record split remains available as a follow-up. It would be a large mechanical refactor of a
+~40-field class reached from most of the generator, and on this evidence it would not change
+behaviour: it makes the immutability structural rather than enforced, which is worth doing on its own
+schedule rather than inside the change that also moved a golden.
+
+*(Noted while auditing, not part of this issue: `Highway.getHighwayLevel` bounds its extent scan at
+`MAX_HIGHWAY_SCAN = 10_000` chunks, and two chunks of one run could only disagree about that run if
+it were near that long - which is the degenerate every-chunk-is-a-highway case the method already
+bails out of.)*
+
 ## Suggested PR split
 
 **126a — order-independence and avoidance coverage made observable.** *Landed.* The shuffled-order
