@@ -6,7 +6,6 @@ import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.WorldStyleMix;
-import dev.krona.urbex.gui.NullDimensionInfo;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.varia.ChunkCoord;
@@ -16,7 +15,6 @@ import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -29,8 +27,8 @@ import javax.annotation.Nullable;
 import java.util.Random;
 
 /**
- * The world-creation city/building preview: a small (62x58) chunk-grid image sampled from a
- * {@link NullDimensionInfo}, cached against the (profile, worldstyle, seed, mode) that produced it so
+ * The world-creation city/building preview: a small (62x58) chunk-grid image sampled through a
+ * {@link PreviewContext}, cached against the (profile, worldstyle, seed, mode) that produced it so
  * repeated {@link #update} calls while the player is merely dragging a slider don't recompute
  * anything.
  * <p>
@@ -50,11 +48,11 @@ import java.util.Random;
  *       chunk generates.</li>
  * </ul>
  * "Honest" relative to the old editor's preview map renderer: that preview always ran
- * with {@code PlanningContext.getWorld() == null}, which silently skipped the worldstyle
- * city-chance multiplier and the CITY_MINHEIGHT/MAXHEIGHT gate in {@code City.getCityFactor} (both
- * guarded on {@code getWorld() != null}). This preview is built with real registry access, so those
- * guards - now keyed on {@code registryAccess() != null} - evaluate the same rules a real dimension
- * would (see {@code City.java} and {@code NullDimensionInfo} for the registry-access plumbing).
+ * against a dimension with no level at all, which silently skipped the worldstyle city-chance
+ * multiplier and the CITY_MINHEIGHT/MAXHEIGHT gate in {@code City.getCityFactor} (both guarded on
+ * {@code getWorld() != null}). This preview is built with real registry access, so those guards -
+ * now keyed on {@code registryAccess() != null} - evaluate the same rules a real dimension would
+ * (see {@code City.java} and {@link PreviewContext} for the registry-access plumbing).
  */
 public class CityPreview implements AutoCloseable {
 
@@ -229,9 +227,9 @@ public class CityPreview implements AutoCloseable {
         // out from under whatever else was reading them. They are part of the snapshot the preview
         // compiles for itself now, so a new preview simply has its own (issue #129).
         //
-        // Only the map/transport/roads samplers walk a NullDimensionInfo; CITY renders straight from
-        // the preset, so it does not pay to build one there - nor to resolve the world styles, which
-        // is why that sits inside this branch and inside the guard rather than above it.
+        // Only the map/transport/roads samplers plan anything; CITY renders straight from the
+        // preset, so it does not pay to build a context there - nor to resolve the world styles,
+        // which is why that sits inside this branch and inside the guard rather than above it.
         //
         // Two things under the guard can throw, and both must leave the screen standing:
         //   - GridSettings.fromPreset validates the road settings, and a preset can be momentarily
@@ -242,7 +240,7 @@ public class CityPreview implements AutoCloseable {
         //     and taking the screen down mid-drag is no way to say so. Keep showing the last good
         //     preview until the preset makes sense again; a preset still inconsistent at world
         //     creation fails there, with the field named. (IllegalArgumentException.)
-        //   - NullDimensionInfo's world styles: building the fallback placeholder raises the
+        //   - The world styles: building the fallback placeholder raises the
         //     post-resolution requiredness error if a field required of a resolved chain is ever
         //     added and not added to the placeholder (IllegalStateException, out of Resolved.require
         //     - which is the whole reason the placeholder is covered by a test of its own). The
@@ -250,12 +248,12 @@ public class CityPreview implements AutoCloseable {
         //     registry access at all, so it is on the ordinary path and not a corner.
         // The guard stays wrapped around just this construction so a bug in a renderer's own math is
         // never silently swallowed as "the preset is invalid".
-        NullDimensionInfo diminfo = null;
+        PreviewContext context = null;
         if (mode != Mode.CITY) {
             try {
                 // The ids in a WorldStyleMix are validated on construction, so they are already
                 // qualified by the time they reach here.
-                diminfo = new NullDimensionInfo(preset, worldStyles, seed, registryAccess);
+                context = PreviewContext.create(preset, worldStyles, seed, registryAccess);
             } catch (IllegalArgumentException | IllegalStateException e) {
                 // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
                 // good render. Leaving `mode` alone too keeps the legend describing the image actually
@@ -266,9 +264,9 @@ public class CityPreview implements AutoCloseable {
             }
         }
         switch (mode) {
-            case MAP -> renderMap(diminfo);
-            case TRANSPORT -> renderTransport(diminfo, preset);
-            case ROADS -> renderRoads(diminfo, preset);
+            case MAP -> renderMap(context);
+            case TRANSPORT -> renderTransport(context, preset);
+            case ROADS -> renderRoads(context, preset);
             case CITY -> renderCity(preset, seed);
         }
         this.mode = mode;
@@ -277,16 +275,16 @@ public class CityPreview implements AutoCloseable {
 
     // ---- MAP -----------------------------------------------------------------
 
-    private void renderMap(NullDimensionInfo diminfo) {
+    private void renderMap(PreviewContext context) {
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
-                colors[z * WIDTH + x] = sampleColor(diminfo, x, z);
+                colors[z * WIDTH + x] = sampleColor(context, x, z);
             }
         }
     }
 
-    private static int sampleColor(NullDimensionInfo diminfo, int x, int z) {
-        char b = diminfo.getBiomeChar(x, z);
+    private static int sampleColor(PreviewContext context, int x, int z) {
+        char b = context.terrain().biomeChar(x, z);
         int terrainColor = switch (b) {
             // '-' and '=' are the ocean/river water chars - same blue the old renderPreviewMap used.
             case '-', '=' -> WATER_COLOR;
@@ -295,7 +293,7 @@ public class CityPreview implements AutoCloseable {
             case '*', 'd' -> 0xffcccc55;
             default -> 0xff005500;
         };
-        PlanningContext planning = diminfo.planning();
+        PlanningContext planning = context.planning();
         ChunkCoord coord = planning.coord(x, z);
         ChunkCandidate candidate = ChunkPlan.getChunkCandidateGui(coord, planning);
         if (candidate.isCity()) {
@@ -311,11 +309,11 @@ public class CityPreview implements AutoCloseable {
      * old {@code renderPreviewTransports} did with its {@code soft} base), with rail and highway
      * chunks blended over. Highway-over-rail is a distinct grey so an interchange is visible.
      */
-    private void renderTransport(NullDimensionInfo diminfo, Preset profile) {
-        PlanningContext planning = diminfo.planning();
+    private void renderTransport(PreviewContext context, Preset profile) {
+        PlanningContext planning = context.planning();
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
-                int base = soften(sampleColor(diminfo, x, z));
+                int base = soften(sampleColor(context, x, z));
                 ChunkCoord c = planning.coord(x, z);
                 boolean hasRail = Railway.getRailChunkType(c, planning, profile).getType() != RailChunkType.NONE;
                 int overlay = hasRail ? RAIL_OVERLAY : 0;
@@ -353,19 +351,19 @@ public class CityPreview implements AutoCloseable {
      * {@code ChunkPlan.getEffectiveRoadType()} - the field never learns about the content
      * decision, on purpose, to keep that decision graph acyclic). Real generation resolves multi-
      * building placement through {@link dev.krona.urbex.worldgen.lost.MultiChunk}, which reaches a
-     * live {@code WorldGenLevel} to look up building assets; this preview runs off
-     * {@link NullDimensionInfo} with no server, so that placement is not something it can reproduce
+     * live {@code WorldGenLevel} to look up building assets; this preview runs off a
+     * {@link PreviewContext} with no server, so that placement is not something it can reproduce
      * without touching generation-path code to add a registry-only asset lookup - out of this mode's
      * scope. So: a chunk an accepted multi-building will claim in the real world may still show a
      * road colour here. Unlike the predicate this replaced, that is an honest, narrow gap (multi-
      * building footprints only, not a random fraction of the whole grid), not a defect masquerading
      * as a guarantee.
      */
-    private void renderRoads(NullDimensionInfo diminfo, Preset profile) {
-        PlanningContext planning = diminfo.planning();
+    private void renderRoads(PreviewContext context, Preset profile) {
+        PlanningContext planning = context.planning();
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
-                int base = soften(sampleColor(diminfo, x, z));
+                int base = soften(sampleColor(context, x, z));
                 ChunkCoord c = planning.coord(x, z);
                 RoadType type = ChunkPlan.effectiveRoadType(c, planning, profile);
                 colors[z * WIDTH + x] = blend(base, roadColour(type));

@@ -460,7 +460,7 @@ class ChunkContentResolverTest {
      * </ol>
      * {@code MultiChunk}'s own random building <em>selection</em> stays out of reach either way -
      * it needs a datapack-loaded level ({@code AssetRegistries} resolves through
-     * {@code CommonLevelAccessor}, and {@code NullDimensionInfo.getWorld()} is {@code null}) that
+     * {@code CommonLevelAccessor}, which a world-creation preview has no way to produce) that
      * this suite deliberately keeps out (see the class javadoc). Both tests below reuse the real
      * conflict <em>rule</em>, {@code MULTI_BUILDING_STREET_CONFLICT.roadBlocks}, rather than
      * reimplementing it, and the second reads {@code MultiChunk}'s own file rather than asserting
