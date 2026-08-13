@@ -137,11 +137,22 @@ loom {
         }
         // The window that covers structure avoidance at all. Neither of the two above does:
         // avoidedChunks is 0 in both, because seed 1337 has no village near either sample, so the
-        // suppression branch never executed and a change to it could not move their goldens. This one
-        // turns on avoidSurfaceStructures, which the ruined portals and shipwrecks that *are* there do
-        // trigger, and gates on requireAvoided so a window that stops containing one fails instead of
-        // passing in silence - the same guard requireBridge and requireSlope are for the features
-        // window.
+        // suppression branch never executed and a change to it could not move their goldens. This
+        // seed spawns beside a plains village: 108 of the 625 sampled chunks carry a village
+        // reference, and suppression demonstrably changes the world rather than only the counter -
+        // with avoidVillages off the same window drives 654 chunks and 5804043 blocks instead of 580
+        // and 5359701, so 74 chunks of city are actually removed here. requireAvoided gates it so a
+        // window that stops containing a village fails instead of passing in silence - the same
+        // guard requireBridge and requireSlope are for the features window.
+        //
+        // It is also the first window centred on the origin, and that is how it found the heightmap
+        // sample-block overlap fixed in getHeightmap: rows x=0 and z=0 were claimed by two blocks at
+        // once, so the height published for them depended on which chunk generated first. The
+        // other three windows are sited entirely on positive chunks, where the old arithmetic and
+        // floorDiv agree, which is why they were stable through it. The two hashes recorded here
+        // before that fix - 995b19892c47e848 and 89d790a9182cff3f - were not a coin flip: each is
+        // reproducible, selected by the worker thread count (1 and 16 give the first, 2 and 3 the
+        // second). See the note on digestCheckAvoidShuffled for what now stands guard over it.
         digestCheckAvoid {
             server()
             setConfigName('Urbex Digest Check (structure avoidance)')
@@ -150,20 +161,59 @@ loom {
             vmArg '-Durbex.digestCheck=12,rowmajor,0'
             vmArg '-Durbex.digestCheck.requireAvoided'
             vmArg '-Durbex.digestCheck.failOnUnsafeRead'
-            // NO GOLDEN, deliberately. Two fresh runs of this window disagree - 995b19892c47e848 and
-            // 89d790a9182cff3f, identical in every count including blocks=5330728 and
-            // avoidedChunks=108, different in the digest. Pinning either would pin a coin flip.
-            //
-            // That instability is what this window was built to look for and the first place it has
-            // ever been visible: the other three windows contain no avoided structure, so their
-            // goldens have been stable while this path was free to wobble. Making local suppression
-            // order-independent was necessary and is not sufficient - something in generating a chunk
-            // that carries a structure is still run-to-run unstable, and whether that predates the
-            // local-suppression change or was introduced by it is the next thing to establish
-            // (stash it, run this window twice, compare).
-            //
-            // requireAvoided stays on so the window cannot quietly stop covering the path while that
-            // is worked out.
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The avoidance window in a shuffled generation order, pinned to the same golden, for the
+        // same reason digestCheckShuffled shares digestCheck's: equality with the row-major run is
+        // the whole assertion and a separate value here would mean nothing. It covers the request
+        // order over a window that, unlike digestCheckShuffled's, contains both an avoided structure
+        // and negative coordinates.
+        //
+        // Worth knowing what it is not: shuffling the request order did *not* expose the heightmap
+        // overlap. Measured on the pre-fix build, this run and the row-major one both returned
+        // 995b19892c47e848 - the race resolved the same way either way. digestCheckAvoidThreads
+        // below is the one with teeth for that.
+        digestCheckAvoidShuffled {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance, shuffled order)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoidshuffled')
+            vmArg '-Durbex.digestCheck=12,shuffled,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
+        }
+        // The same window again, row-major, on two worker threads instead of however many the host
+        // has. This is the standing version of the experiment that found the heightmap sample-block
+        // overlap, in the same way digestCheckShuffled is the standing version of the by-hand
+        // order experiment noted above.
+        //
+        // Generation fans out to the worker pool, so a decision resolved by whichever thread got
+        // there first produces one stable answer per pool size and looks perfectly reproducible
+        // until the pool size changes. Pre-fix this window returned 995b19892c47e848 on 1 and 16
+        // threads and 89d790a9182cff3f on 2 and 3 - each reproducible, neither a coin flip, and no
+        // amount of rerunning on one machine would have shown it. Two threads is chosen because it
+        // is the smallest count that still schedules concurrently, and because it is not the host's
+        // - a guard that inherits the CI runner's core count asserts nothing about anyone else's.
+        digestCheckAvoidThreads {
+            server()
+            setConfigName('Urbex Digest Check (structure avoidance, two workers)')
+            ideConfigGenerated(false)
+            runDir('runs/digestcheckavoidthreads')
+            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck.requireAvoided'
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
+            vmArg '-Dmax.bg.threads=2'
+            def golden = file('digest-avoid.golden')
+            if (golden.exists()) {
+                vmArg "-Durbex.digestCheck.expected=${golden.text.trim()}"
+            }
         }
         // The weighted-world-style-mix census. Not a golden check and not run by CI: mixing needs a
         // second datapack registering a second world style, and this repository ships only its own.
@@ -215,15 +265,16 @@ motd=urbex digest check
 registerPrepareDigestCheck('prepareDigestCheck', 'runs/digestcheck')
 registerPrepareDigestCheck('prepareDigestCheckFeatures', 'runs/digestcheckfeatures')
 registerPrepareDigestCheck('prepareDigestCheckShuffled', 'runs/digestcheckshuffled')
-// avoidSurfaceStructures rather than the default avoidVillages, because seed 1337 has no village
-// anywhere near either sample - a radius-24 probe found 842 chunks with structure references and not
-// one village, so a window relying on avoidVillages would test nothing. Ruined portals and shipwrecks
-// are there, both surface-step, so this is the flag that fires on a world we already have.
 // A different seed from the other three, and the only place in this file that needs one: seed 1337
 // has no village within radius 24 of either sample window (measured - 842 chunks with structure
-// references, not one village), so avoidVillages - which is on by default and is the flag this window
-// exists to cover - can never fire there. This seed spawns beside one.
+// references, not one village), so avoidVillages - which is on by default and is the flag these two
+// windows exist to cover - can never fire there. This seed spawns beside one. The config is the
+// default one for the same reason: avoidVillages is what ships on, so it is what should be covered.
 registerPrepareDigestCheck('prepareDigestCheckAvoid', 'runs/digestcheckavoid', '',
+        '135132278163449878')
+registerPrepareDigestCheck('prepareDigestCheckAvoidShuffled', 'runs/digestcheckavoidshuffled', '',
+        '135132278163449878')
+registerPrepareDigestCheck('prepareDigestCheckAvoidThreads', 'runs/digestcheckavoidthreads', '',
         '135132278163449878')
 
 tasks.matching { it.name == 'runDigestCheck' }.configureEach {
@@ -237,6 +288,12 @@ tasks.matching { it.name == 'runDigestCheckShuffled' }.configureEach {
 }
 tasks.matching { it.name == 'runDigestCheckAvoid' }.configureEach {
     dependsOn 'prepareDigestCheckAvoid'
+}
+tasks.matching { it.name == 'runDigestCheckAvoidShuffled' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoidShuffled'
+}
+tasks.matching { it.name == 'runDigestCheckAvoidThreads' }.configureEach {
+    dependsOn 'prepareDigestCheckAvoidThreads'
 }
 
 // The mix census needs a different world config from the digest runs - the experimental flag on,

@@ -141,6 +141,62 @@ what makes the coverage gap visible instead of assumed, and the shuffled run is 
 of an experiment that had only ever been done by hand (see the note in `build.gradle` about
 15dba5f2).
 
+## The third defect, found by the window this spec asked for
+
+Siting the avoidance window turned up an instability the spec had not predicted: the same window
+returned two different digests with every count identical, including `blocks` and `avoidedChunks`.
+It was recorded here as a coin flip and left unpinned. It is not a coin flip.
+
+**Measured.** The digest is a deterministic function of the worker thread count:
+
+```
+max.bg.threads=1   995b19892c47e848        max.bg.threads=2   89d790a9182cff3f
+max.bg.threads=8   995b19892c47e848        max.bg.threads=3   89d790a9182cff3f
+default (16 cpu)   995b19892c47e848
+```
+
+Eight consecutive runs at the default pool size agree. Nothing wobbles run to run; the two recorded
+hashes were taken under two different pool sizes.
+
+**It predates local suppression.** The pre-suppression build is unstable in the same window and
+worse - `drivenChunks` itself moves (575 / 576 / 575 across 1, 2, 3 threads). Local suppression
+narrowed the divergence to a single block; it did not introduce it.
+
+**Root cause, and it is not structure avoidance.** The two digests differ at exactly one block,
+`(-80, 65, -1)` - `stone_bricks` against `stone`, the corner of chunk (-5, -1). That chunk's border
+column starts at `getMinHeightAt`, which is `min` of its own sampled height and the diagonal
+neighbour's, and the neighbour is chunk (-6, **0**). Its published height is 66 on one pool size and
+67 on the other.
+
+`CityGenerator.getHeightmap` tiles the chunk grid into `heightSampleSize` squares that share one
+sampled height, and fills the cache a whole block at a time under `putIfAbsent`. The tiling was not
+a partition: the anchor was `(c / size) * size`, which truncates towards zero, and the block was
+then laid out away from the origin with a `-1` step for negative coordinates. Row 0 and column 0
+belonged to two blocks at once, sampling terrain at two different coordinates, and whichever chunk
+reached the cache first published its answer for the whole overlap.
+
+So the honest summary is that avoidance was a red herring twice over. Turning `avoidVillages` off
+made the window stable, which looked like evidence and was coincidence - it changes which chunks are
+cities and so which of them consult that diagonal. The defect is in planning's shared heightmap and
+would have been reachable by any world generated across the origin, with or without a village in it.
+
+**Why four windows missed it.** `floorDiv` and `/` agree for non-negative coordinates and the step
+was already `+1` there, so the tiling only ever overlapped at the origin row and column. `digestCheck`
+and `digestCheckShuffled` sample chunks 97..103; `digestCheckFeatures` samples 74..92. The avoidance
+window is the first one centred on the origin, and it found this on its first run.
+
+**What now stands guard.** `digestCheckAvoid` pins the window (`b37050817cd94b93`), and two more runs
+share that golden: `digestCheckAvoidShuffled` for the request order and `digestCheckAvoidThreads`,
+pinned to two workers, for the scheduling. The third is the one with teeth - measured on the pre-fix
+build, the shuffled run returned `995b19892c47e848` exactly as the row-major one did, so shuffling
+the request order would not have caught this. All three are in CI. `HeightSampleGridTest` asserts the
+partition property directly, in milliseconds rather than 25 seconds a run.
+
+**What it says about the shuffled run generally.** Order-independence checks that vary only the order
+chunks are *asked for* leave the pool free to resolve races the same way every time. A decision made
+by whichever worker arrives first produces one stable answer per pool size and looks reproducible
+until the pool size changes - which is not something a single machine rerunning a check will ever do.
+
 ## Suggested PR split
 
 **126a — order-independence and avoidance coverage made observable.** *Landed.* The shuffled-order

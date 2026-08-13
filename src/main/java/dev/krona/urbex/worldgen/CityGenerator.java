@@ -847,23 +847,15 @@ public class CityGenerator {
 
     public ChunkHeightmap getHeightmap(ChunkCoord chunk, @Nonnull WorldGenLevel world) {
         int heightSampleSize = Config.HEIGHT_SAMPLE_SIZE.get();
-        int top, left;
-        int constX = 1, constZ = 1; // We'll need to take care of the negative part of the chunks as well
-        ChunkCoord sampler = chunk;
-        if (heightSampleSize > 1) {
-            // Recalculate chunk to be the center of the sample
-            top = (chunk.chunkX() / heightSampleSize) * heightSampleSize;
-            left = (chunk.chunkZ() / heightSampleSize) * heightSampleSize;
-            constX = chunk.chunkX() < 0 ? -1 : 1;
-            constZ = chunk.chunkZ() < 0 ? -1 : 1;
-            if (heightSampleSize > 2) {
-                int sampleOffset = heightSampleSize / 2;
-                sampler = new ChunkCoord(chunk.dimension(), top + (sampleOffset * constX), left + (sampleOffset * constZ));
-            }
-        } else {
-            top = chunk.chunkX();
-            left = chunk.chunkZ();
-        }
+        // The block this chunk shares a sampled height with, and the coordinate that height is taken
+        // at. Both come from HeightSampleGrid so that the tiling is a partition and the sampled
+        // coordinate is a function of the block rather than of whichever chunk asked first - see the
+        // note there for what the old arithmetic did at the origin, and issue #126.
+        int top = HeightSampleGrid.anchor(chunk.chunkX(), heightSampleSize);
+        int left = HeightSampleGrid.anchor(chunk.chunkZ(), heightSampleSize);
+        ChunkCoord sampler = new ChunkCoord(chunk.dimension(),
+                HeightSampleGrid.sampler(top, heightSampleSize),
+                HeightSampleGrid.sampler(left, heightSampleSize));
         // No lock. The heightmap is a pure function of the generator and the coordinate, so two
         // threads that race on the same chunk build two equal heightmaps and one of them is thrown
         // away; a third thread reading the cache sees whichever was published, and they agree.
@@ -883,7 +875,7 @@ public class CityGenerator {
         if (heightSampleSize > 1) {
             for (int i = 0; i < heightSampleSize; i++) {
                 for (int j = 0; j < heightSampleSize; j++) {
-                    ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + (i * constX), left + (j * constZ));
+                    ChunkCoord sampleKey = new ChunkCoord(chunk.dimension(), top + i, left + j);
                     cachedHeightmaps.putIfAbsent(sampleKey, new ChunkHeightmap(heightmap));
                 }
             }

@@ -3,7 +3,7 @@ name: build
 on:
   push:
     branches: [main]
-    # Tags build like any other push - same suite, same two digest checks - and then the release
+    # Tags build like any other push - same suite, same digest checks - and then the release
     # job below attaches the jar that build produced. A release is never built from a separate,
     # unverified run.
     tags: ['v*']
@@ -39,6 +39,25 @@ jobs:
         run: |
           ./gradlew runDigestCheckFeatures --no-daemon | tee digest-check-features.log
           grep -q "URBEX-DIGEST-CHECK: OK" digest-check-features.log
+      # The three runs of the structure-avoidance window. It is the only one that generates a chunk
+      # a village suppresses, and the only one centred on the origin; both of the order-dependent
+      # defects issue #126 was opened for lived where the two checks above could not see them.
+      # Three configurations of one window, sharing one golden: what it generates, that the chunk
+      # request order does not change it, and that the worker thread count does not either. The last
+      # is not redundant - it is the only one of the three that caught the heightmap sample-block
+      # overlap, and shuffling the request order did not.
+      - name: Worldgen digest check (structure avoidance)
+        run: |
+          ./gradlew runDigestCheckAvoid --no-daemon | tee digest-check-avoid.log
+          grep -q "URBEX-DIGEST-CHECK: OK" digest-check-avoid.log
+      - name: Worldgen digest check (structure avoidance, shuffled order)
+        run: |
+          ./gradlew runDigestCheckAvoidShuffled --no-daemon | tee digest-check-avoid-shuffled.log
+          grep -q "URBEX-DIGEST-CHECK: OK" digest-check-avoid-shuffled.log
+      - name: Worldgen digest check (structure avoidance, two workers)
+        run: |
+          ./gradlew runDigestCheckAvoidThreads --no-daemon | tee digest-check-avoid-threads.log
+          grep -q "URBEX-DIGEST-CHECK: OK" digest-check-avoid-threads.log
       - uses: actions/upload-artifact@v4
         with:
           name: jar
@@ -91,7 +110,7 @@ jobs:
             gh release create "$tag" dist/*.jar \
               --draft $prerelease \
               --title "$version" \
-              --notes "Built by \`${GITHUB_WORKFLOW}\` run [\`${GITHUB_RUN_ID}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}), after the test suite and both worldgen digest checks passed.
+              --notes "Built by \`${GITHUB_WORKFLOW}\` run [\`${GITHUB_RUN_ID}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}), after the test suite and every worldgen digest check passed.
 
           Write the notes from \`CHANGELOG.md\` before publishing."
           fi
