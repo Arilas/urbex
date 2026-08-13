@@ -60,7 +60,7 @@ public class ChunkPlan {
     public final StreetType streetType;
     private final RoadType effectiveRoad;   // The planned road this chunk renders, NONE for most chunks
 
-    private final int floors;
+    final int floors;
     public final int cellars;
     public final BuildingPart[] floorTypes;
     public final BuildingPart[] floorTypes2;
@@ -106,8 +106,8 @@ public class ChunkPlan {
     /** Which way this chunk's street slopes and where its stairs face; see {@link SlopeDecisions}. */
     final SlopeDecisions slopes = new SlopeDecisions(this);
 
-    private volatile MinMax desiredTerrainCorrectionHeights = null;
-    private volatile MinMax desiredMaxHeight1 = null;
+    /** How high this chunk's city sits and what terrain correction it asks for; see {@link HeightDecisions}. */
+    final HeightDecisions heights = new HeightDecisions(this);
 
     // No per-generation runtime state here, and specifically no post-generation callbacks: those
     // belong to the ChunkGenContext that queued them (see PostTodoQueue). A ChunkPlan is a
@@ -1267,131 +1267,39 @@ public class ChunkPlan {
      * Return Integer.MIN_VALUE if the building is degenerate (no floors, no cellars).
      */
     public int getBuildingBottomHeight() {
-        int min = provider.shape().minY() + 2;
-        int max = provider.shape().maxY() - 1 - FLOORHEIGHT;
-
-        // Locals. This used to decrement the published cellars and floors as it walked, so the answer
-        // depended on how many times it had been asked: the first call shrank the building and every
-        // later one measured the shrunken version, and a TimedCache eviction reset the count by
-        // rebuilding the object. It is the "building queries such as bottom-height calculation mutate
-        // floors/cellars during consumption" defect in issue #126, and the only reason the fields it
-        // touched could not be final.
-        int remainingCellars = cellars;
-        int lowestLevel = getCityGroundLevel() - remainingCellars * FLOORHEIGHT;
-
-        // Fix lowest level so it goes above minimum build height
-        while (lowestLevel <= min) {
-            lowestLevel += FLOORHEIGHT;
-            remainingCellars--;
-            if (remainingCellars < 0) {
-                return Integer.MIN_VALUE;     // Bail out, this is a degenerate case
-            }
-        }
-
-        // Contributes nothing but the degenerate bail-out: the height returned is the cellar walk's.
-        int remainingFloors = floors;
-        while (getCityGroundLevel() + remainingFloors * FLOORHEIGHT >= max) {
-            remainingFloors--;
-            if (remainingFloors < 0) {
-                return Integer.MIN_VALUE;     // Bail out, this is a degenerate case
-            }
-        }
-        return lowestLevel;
+        return heights.buildingBottom();
     }
 
-    /**
-     * Return the building part at a given y value. Return null if there is no building part at that level
-     */
     public BuildingPart getFloorAtY(int lowestLevel, int y) {
-        if (y < lowestLevel || y >= lowestLevel + (floors + cellars + 1) * FLOORHEIGHT) {
-            return null;    // No building part at this level
-        }
-        int localY = (y - lowestLevel) / FLOORHEIGHT;
-        if (localY < 0 || localY >= floorTypes.length) {
-            return null;    // No building part at this level
-        }
-        return floorTypes[localY];
+        return heights.floorAtY(lowestLevel, y);
     }
 
-    /**
-     * Get the lowest height of a corner of four chunks (if it is a city chunk).
-     * info: reference to the bottom-right chunk. The 0,0 position of this chunk is the reference.
-     * Returns 100000 if the corner is not adjacent to any city chunk
-     * Also returns 100000 if all corners are city or landscape chunks (as
-     * this kind of corner should also have no effect on the landscape beyond those chunks)
-     * This is the level 0 version which looks at current chunk corner only
-     */
     public int getLowestCityHeightAtChunkCorner() {
-        ChunkPlan info00 = getXmin().getZmin();
-        ChunkPlan info01 = getXmin();
-        ChunkPlan info10 = getZmin();
-        if (isCity && info10.isCity && info00.isCity && info01.isCity) {
-            return 100000;
-        }
-        if (!isCity && !info10.isCity && !info00.isCity && !info01.isCity) {
-            return 100000;
-        }
-        // If we come here we have a mix of city and normal chunks
-        int h = getCityHeightForChunk();
-        h = Math.min(h, info01.getCityHeightForChunk());
-        h = Math.min(h, info10.getCityHeightForChunk());
-        h = Math.min(h, info00.getCityHeightForChunk());
-        return h;
+        return heights.lowestCityHeightAtCorner();
     }
 
-    /*
-     * This is used for correcting the terrain and indicates the desired
-     * level to which adjacent terrains should interpolate
-     */
     public int getCityHeightForChunk() {
-        if (isCity) {
-            return getCityGroundLevel();
-        } else {
-            if (isOcean()) {
-                return groundLevel - profile.oceanCorrectionBorder();
-            } else {
-                return 100000;
-            }
-        }
+        return heights.cityHeightForChunk();
     }
+
+    public MinMax getDesiredMaxHeightL2() {
+        return heights.desiredMaxHeightL2();
+    }
+
+    public void updateMinMaxL2(MinMax minMax, int offs) {
+        heights.updateMinMaxL2(minMax, offs);
+    }
+
 
     /**
-     * Given adjacent (city) chunks, calculate the desired height to interpolate the
-     * landscape to (minimum/maximum). This is calculated for the reference position of this chunk (0,0 point)
-     * This is the level 1 version which looks at adjacent heights only
+     * How a chunk with no building renders: a planned road is {@link #NORMAL} paving, an open lot is
+     * the {@link #PARK} grass surface. Nothing else decides between them - in particular the open-lot
+     * park chance does not, it only furnishes a lot that is already grass. There is no third surface:
+     * the old {@code FULL} type was reachable only from a coin flip the road field replaced.
      */
-    private MinMax getDesiredMaxHeightL1() {
-        if (desiredMaxHeight1 == null) {
-            int h = getLowestCityHeightAtChunkCorner();
-
-            int cx = coord.chunkX();
-            int cz = coord.chunkZ();
-
-            // @todo build limit
-            if (h < provider.shape().maxBuildHeight()) {
-                // The L0 height at this corner is fixed so we return that
-                desiredMaxHeight1 = new MinMax(
-                        h + Terrain.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixLowerMinOffset(), profile.terrainFixLowerMaxOffset(), Rng.Purpose.TERRAIN_FIX_LOWER),
-                        h + Terrain.getRandomizedOffset(provider.seed(), cx, cz, profile.terrainFixUpperMinOffset(), profile.terrainFixUpperMaxOffset(), Rng.Purpose.TERRAIN_FIX_UPPER));
-                return desiredMaxHeight1;
-            }
-
-            MinMax minMax = new MinMax();
-
-            getXmin().getZmin().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx - 1, cz + 1));
-
-            getZmin().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx, cz - 1));
-            getZmax().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx, cz + 1));
-
-            getXmax().getZmin().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL1(minMax, 20 + Terrain.getHeightOffsetL1(provider.seed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL1(minMax, 25 + Terrain.getHeightOffsetL1(provider.seed(), cx + 1, cz + 1));
-
-            desiredMaxHeight1 = minMax;
-        }
-        return desiredMaxHeight1;
+    public enum StreetType {
+        NORMAL,
+        PARK
     }
 
     public static class MinMax {
@@ -1412,75 +1320,6 @@ public class ChunkPlan {
             min = max = 100000;
         }
     }
-
-    /**
-     * Given adjacent (city) chunks, calculate the desired height to interpolate the
-     * landscape too. This is calculated for the reference position of this chunk (0,0 point)
-     * This is the level 2 version which looks at L1 heights of adjacent chunks
-     */
-    public MinMax getDesiredMaxHeightL2() {
-        if (desiredTerrainCorrectionHeights == null) {
-            MinMax mm = getDesiredMaxHeightL1();
-            // @todo build limit
-            if (mm.min < provider.shape().maxBuildHeight()) {
-                // The L1 height at this corner is fixed so we return that
-                desiredTerrainCorrectionHeights = new MinMax(mm);
-                return desiredTerrainCorrectionHeights;
-            }
-
-            int cx = coord.chunkX();
-            int cz = coord.chunkZ();
-
-            MinMax minMax = new MinMax();
-
-            getXmin().getZmin().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx - 1, cz - 1));
-            getXmin().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx - 1, cz));
-            getXmin().getZmax().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx - 1, cz + 1));
-
-            getZmin().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx, cz - 1));
-            getZmax().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx, cz + 1));
-
-            getXmax().getZmin().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx + 1, cz - 1));
-            getXmax().updateMinMaxL2(minMax, 20 + Terrain.getHeightOffsetL2(provider.seed(), cx + 1, cz));
-            getXmax().getZmax().updateMinMaxL2(minMax, 25 + Terrain.getHeightOffsetL2(provider.seed(), cx + 1, cz + 1));
-            desiredTerrainCorrectionHeights = minMax;
-        }
-        return desiredTerrainCorrectionHeights;
-    }
-
-    public void updateMinMaxL2(MinMax minMax, int offs) {
-        MinMax h = getDesiredMaxHeightL1();
-        if ((h.min - offs) < minMax.min) {
-            minMax.min = h.min - offs;
-        }
-        if ((h.max + offs) < minMax.max) {
-            minMax.max = h.max + offs;
-        }
-    }
-
-
-    private void updateMinMaxL1(MinMax minMax, int offs) {
-        int h = getLowestCityHeightAtChunkCorner();
-        if ((h - offs) < minMax.min) {
-            minMax.min = h - offs;
-        }
-        if ((h + offs) < minMax.max) {
-            minMax.max = h + offs;
-        }
-    }
-
-
-    /**
-     * How a chunk with no building renders: a planned road is {@link #NORMAL} paving, an open lot is
-     * the {@link #PARK} grass surface. Nothing else decides between them - in particular the open-lot
-     * park chance does not, it only furnishes a lot that is already grass. There is no third surface:
-     * the old {@code FULL} type was reachable only from a coin flip the road field replaced.
-     */
-    public enum StreetType {
-        NORMAL,
-        PARK
-    }
-
 
     public boolean isCity() {
         return this.isCity;
