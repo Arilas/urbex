@@ -17,6 +17,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelResource;
 
+import javax.annotation.Nullable;
+
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -206,49 +208,20 @@ public class Config {
         }
 
         UrbexData data = UrbexData.getData(level);
+        WorldSelectionResolver.Resolution resolution = WorldSelectionResolver.resolve(
+                publishedSelection(), savedSelection(data), !data.getSelectedPreset().isEmpty(),
+                configuredSelection(), level.dimension() == Level.OVERWORLD).orElse(null);
         Identifier selectedPreset = null;
         WorldStyleMix selectedWorldStyles = null;
         String selectedOverrides = null;
-
-        // A world that already recorded a choice keeps it, even with a client selection published.
-        // The client fields are how the create-world screen hands its choice to the integrated
-        // server, so they are only ever meant for a world being created - which by definition has
-        // no saved choice yet. Applying them to a world that has one is only reachable when they
-        // outlived the screen that set them (issue #113: abandon world creation, then load an
-        // existing world), and the cost of that was not a wrong preset for one session but a
-        // permanent one: the branch below writes what it resolved into UrbexData, overwriting the
-        // selection that world was created with. PresetSelection.discardPublication clears them at
-        // the source; this makes the overwrite unreachable even if some future path forgets to.
-        boolean worldHasOwnChoice = !data.getSelectedPreset().isEmpty();
-        if (presetFromClient != null && !worldHasOwnChoice) {
-            selectedPreset = presetFromClient;
-            selectedWorldStyles = gateMix(
-                    worldStyleMixFromClient != null ? worldStyleMixFromClient : DEFAULT_WORLD_STYLE_MIX,
-                    "The world being created");
-            selectedOverrides = overridesFromClient;
-            // Remember the client's selection in SavedData.
-            data.setChoice(selectedPreset.toString(), selectedWorldStyles,
-                    selectedOverrides == null ? "" : selectedOverrides);
-        } else {
-            String savedPreset = data.getSelectedPreset();
-            if (!savedPreset.isEmpty()) {
-                selectedPreset = Identifier.tryParse(savedPreset);
-                if (selectedPreset == null) {
-                    Urbex.getLogger().error("Malformed saved preset id '{}' in world data; treating the overworld's selection as unset.", savedPreset);
-                } else {
-                    // getSelectedWorldStyles is itself fail-soft: a corrupted or hand-edited save
-                    // degrades to the default rather than taking a worldgen worker down.
-                    selectedWorldStyles = gateMix(data.getSelectedWorldStyles(), "This world's saved selection");
-                    String savedOverrides = data.getSelectedOverrides();
-                    selectedOverrides = savedOverrides.isEmpty() ? null : savedOverrides;
-                }
-            } else if (level.dimension() == Level.OVERWORLD) {
-                // Parsed when the config was published. The global config's own selection stays a
-                // single id: it is the overworld-only default for installs that never open the
-                // Cities tab, and a mix there would add a third place to look for one setting
-                // without adding any reach.
-                selectedPreset = active.selectedPreset();
-                selectedWorldStyles = active.selectedWorldStyles();
+        if (resolution != null) {
+            WorldSelection selection = resolution.selection();
+            selectedPreset = selection.preset();
+            selectedWorldStyles = selection.worldStyles();
+            selectedOverrides = selection.patch().orElse(null);
+            if (resolution.persist()) {
+                data.setChoice(selectedPreset.toString(), selectedWorldStyles,
+                        selectedOverrides == null ? "" : selectedOverrides);
             }
         }
 
@@ -308,6 +281,54 @@ public class Config {
             }
         }
         return cache;
+    }
+
+    /**
+     * What the create-world screen published, or null.
+     * <p>
+     * The three static fields it arrives in are #73's business; this only reads them.
+     */
+    @Nullable
+    private static WorldSelection publishedSelection() {
+        if (presetFromClient == null) {
+            return null;
+        }
+        return new WorldSelection(presetFromClient,
+                gateMix(worldStyleMixFromClient != null ? worldStyleMixFromClient : DEFAULT_WORLD_STYLE_MIX,
+                        "The world being created"),
+                Optional.ofNullable(overridesFromClient));
+    }
+
+    /**
+     * What this world already recorded, or null.
+     * <p>
+     * Fail-soft throughout: saved data can be hand-edited between sessions, and a malformed id must
+     * degrade to "no selection" rather than taking a worldgen worker down.
+     */
+    @Nullable
+    private static WorldSelection savedSelection(UrbexData data) {
+        String savedPreset = data.getSelectedPreset();
+        if (savedPreset.isEmpty()) {
+            return null;
+        }
+        Identifier preset = Identifier.tryParse(savedPreset);
+        if (preset == null) {
+            Urbex.getLogger().error("Malformed saved preset id '{}' in world data; treating the "
+                    + "overworld's selection as unset.", savedPreset);
+            return null;
+        }
+        // getSelectedWorldStyles is itself fail-soft, for the same reason.
+        String savedOverrides = data.getSelectedOverrides();
+        return new WorldSelection(preset,
+                gateMix(data.getSelectedWorldStyles(), "This world's saved selection"),
+                savedOverrides.isEmpty() ? Optional.empty() : Optional.of(savedOverrides));
+    }
+
+    /** The global config's own selection, or null. Already parsed - see {@link GlobalConfig}. */
+    @Nullable
+    private static WorldSelection configuredSelection() {
+        Identifier preset = active.selectedPreset();
+        return preset == null ? null : new WorldSelection(preset, active.selectedWorldStyles());
     }
 
     /**
