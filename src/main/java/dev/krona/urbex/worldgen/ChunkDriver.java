@@ -1,20 +1,14 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
-import dev.krona.urbex.varia.Rng;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.StairsShape;
-import net.minecraft.world.level.block.state.properties.WallSide;
 import net.minecraft.world.level.chunk.BulkSectionAccess;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.minecraft.world.level.levelgen.XoroshiroRandomSource;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.world.level.ChunkPos;
@@ -211,10 +205,10 @@ public class ChunkDriver {
     private ChunkAccess primer;
     private final BlockPos.MutableBlockPos current = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
-    /** Reused across every shape update: thread-confined, reseeded per position via Rng.posSeed. */
-    private final XoroshiroRandomSource shapeRandom = new XoroshiroRandomSource(0);
     /** Where writes accumulate until {@link #flushToChunk}. */
     private ChunkBuffer buffer;
+    /** Resolves connections once the chunk is finished; see {@link #correctionsPass}. */
+    private BlockShaper shaper;
     private int cx;
     private int cz;
 
@@ -228,6 +222,7 @@ public class ChunkDriver {
                     primer.getPos().x() << 4, primer.getPos().z() << 4);
             this.cx = primer.getPos().x();
             this.cz = primer.getPos().z();
+            shaper = new BlockShaper(chunkView, region, seed);
         }
     }
 
@@ -296,14 +291,39 @@ public class ChunkDriver {
         long[] positions = written.keySet().toLongArray();
         Arrays.sort(positions);
         for (long packed : positions) {
-            current.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
-            BlockState state = getBlock(current);
-            BlockState corrected = correct(state);
+            int x = BlockPos.getX(packed);
+            int y = BlockPos.getY(packed);
+            int z = BlockPos.getZ(packed);
+            pos.set(x, y, z);
+            BlockState state = getBlock(pos);
+            BlockState corrected = shaper.correct(state, x, y, z);
             if (corrected != null && corrected != state) {
-                setBlock(current, corrected);
+                setBlock(pos, corrected);
             }
         }
     }
+
+    /**
+     * The chunk as {@link BlockShaper} needs to see it. An adapter rather than {@code implements},
+     * so resolving connections does not force the driver's read-through and containment checks into
+     * its public surface.
+     */
+    private final BlockShaper.ChunkView chunkView = new BlockShaper.ChunkView() {
+        @Override
+        public BlockState get(BlockPos pos) {
+            return getBlock(pos);
+        }
+
+        @Override
+        public void set(BlockPos pos, BlockState state) {
+            setBlock(pos, state);
+        }
+
+        @Override
+        public boolean contains(BlockPos pos) {
+            return isThisChunk(pos);
+        }
+    };
 
     private void setBlock(BlockPos p, BlockState state) {
         buffer.set(p.getX(), p.getY(), p.getZ(), state);
@@ -428,197 +448,6 @@ public class ChunkDriver {
         int px = pos.getX() >> 4;
         int pz = pos.getZ() >> 4;
         return px == cx && pz == cz;
-    }
-
-    /**
-     * True when this position sits on the edge of its own chunk, so at least one of its four
-     * horizontal neighbours lives in the next chunk along.
-     */
-    private static boolean isOnChunkBoundary(BlockPos pos) {
-        int lx = pos.getX() & 0xf;
-        int lz = pos.getZ() & 0xf;
-        return lx == 0 || lx == 15 || lz == 0 || lz == 15;
-    }
-
-    /**
-     * Shape-updates the in-chunk neighbour at {@code pos} against the newly placed {@code state}
-     * and returns the neighbour's (possibly updated) state for the placed block's own
-     * connection decisions.
-     * <p>
-     * Returns {@code null} - "unknown" - for positions outside the chunk being generated, and
-     * touches nothing. It used to read the neighbouring chunk (whose content depends on whether
-     * that chunk's features ran yet) and even write into it when it happened to be FULL; both
-     * made generated output depend on worker-thread timing - the run-to-run digest divergence
-     * behind issue #24. Border blocks are marked for vanilla postprocessing right here, below,
-     * instead of being shape-updated - which recomputes their connections from final neighbour
-     * data once every chunk involved has finished generating.
-     */
-    private BlockState updateAdjacent(BlockState state, Direction direction, BlockPos pos, ChunkAccess thisChunk) {
-        if (!isThisChunk(pos)) {
-            return null;
-        }
-        BlockState adjacent = getBlock(pos);
-        if (adjacent.getBlock() instanceof LadderBlock) {
-            return adjacent;
-        }
-        if (isOnChunkBoundary(pos)) {
-            // updateShape consults this block's own outward neighbour, which lives in the next
-            // chunk. At the carver stage the write radius is 0, so that read is forbidden - and
-            // the neighbour is not finished anyway. Defer instead: vanilla recomputes the
-            // connections from final neighbour data when the chunk is postprocessed, the same
-            // mechanism vanilla structures use across chunk borders. Marking here rather than
-            // relying on correct()'s mark is deliberate: that one only fires for positions the
-            // driver itself writes, and this position may be untouched terrain.
-            //
-            // Skip air and LiquidBlock: LevelChunk.postProcessGeneration only calls
-            // updateFromNeighbourShapes for the else branch of "is this a liquid" - a LiquidBlock
-            // position is ticked instead, never shape-updated, so marking one buys nothing and
-            // costs a tick this position would not otherwise have had during generation (e.g.
-            // untouched water at a chunk edge starting to flow into an adjacent excavated street).
-            // Air always resolves back to air, so marking it is pure waste. Neither case loses a
-            // shape update, since neither would have received one anyway.
-            if (!adjacent.isAir() && !(adjacent.getBlock() instanceof LiquidBlock)) {
-                thisChunk.markPosForPostProcessing(pos.immutable());
-            }
-            return adjacent;
-        }
-        BlockState newAdjacent = null;
-        try {
-            // updateShape hands the block a RandomSource; almost none use it, but the level's own
-            // source is shared across every chunk being generated, so address one on this
-            // position - by reseeding the reused instance, not allocating per block (issue #34)
-            //
-            // One stream per position, deliberately shared across the four directions, because the
-            // reshaped block is the same block. `pos` is the neighbour being reshaped, not the
-            // corrected block, so a position P that neighbours several corrected blocks is entered
-            // once per corrected neighbour and every entry gets the identical stream - same
-            // address, same purpose. That is the invariant, not an oversight (issue #30): keying on
-            // direction as well would make a block's shape depend on which of its neighbours was
-            // corrected first, i.e. on correction order, which is the one thing the whole addressed
-            // -RNG design exists to keep out of generation. Anyone adding direction to this address
-            // is trading determinism for independence no vanilla block asks for.
-            shapeRandom.setSeed(Rng.posSeed(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SHAPE));
-            newAdjacent = adjacent.updateShape(region, region, pos, direction, pos.relative(direction), state, shapeRandom);
-        } catch (Exception e) {
-            // We got an exception. For example for beehives there can potentially be a problem so in this case we just ignore it
-            return adjacent;
-        }
-        if (newAdjacent != adjacent) {
-            setBlock(pos, newAdjacent);
-        }
-        return newAdjacent;
-    }
-
-    public static boolean isBlockStairs(BlockState state) {
-        return state.getBlock() instanceof StairBlock;
-    }
-
-    /**
-     * In-chunk cache read; AIR for positions outside the chunk being generated. The constant
-     * placeholder keeps shape decisions deterministic - a real read of the neighbouring chunk
-     * would return different content depending on whether its features ran yet. Border blocks
-     * are marked for postprocessing, which recomputes shapes from the final neighbours.
-     */
-    private BlockState getBlockDeterministic(BlockPos p) {
-        return isThisChunk(p) ? getBlock(p) : Blocks.AIR.defaultBlockState();
-    }
-
-    private boolean isDifferentStairs(BlockState state, BlockPos pos, Direction face) {
-        BlockPos relative = pos.relative(face);
-        BlockState blockstate = getBlockDeterministic(relative);
-        return !isBlockStairs(blockstate) || blockstate.getValue(StairBlock.FACING) != state.getValue(StairBlock.FACING) || blockstate.getValue(StairBlock.HALF) != state.getValue(StairBlock.HALF);
-    }
-
-    private StairsShape getShapeProperty(BlockState state, BlockPos pos) {
-        Direction direction = state.getValue(StairBlock.FACING);
-        BlockPos relative = pos.relative(direction);
-        BlockState blockstate = getBlockDeterministic(relative);
-        if (isBlockStairs(blockstate) && state.getValue(StairBlock.HALF) == blockstate.getValue(StairBlock.HALF)) {
-            Direction direction1 = blockstate.getValue(StairBlock.FACING);
-            if (direction1.getAxis() != state.getValue(StairBlock.FACING).getAxis() && isDifferentStairs(state, pos, direction1.getOpposite())) {
-                if (direction1 == direction.getCounterClockWise()) {
-                    return StairsShape.OUTER_LEFT;
-                }
-
-                return StairsShape.OUTER_RIGHT;
-            }
-        }
-
-        BlockPos relativeOpposite = pos.relative(direction.getOpposite());
-        BlockState blockstate1 = getBlockDeterministic(relativeOpposite);
-        if (isBlockStairs(blockstate1) && state.getValue(StairBlock.HALF) == blockstate1.getValue(StairBlock.HALF)) {
-            Direction direction2 = blockstate1.getValue(StairBlock.FACING);
-            if (direction2.getAxis() != state.getValue(StairBlock.FACING).getAxis() && isDifferentStairs(state, pos, direction2)) {
-                if (direction2 == direction.getCounterClockWise()) {
-                    return StairsShape.INNER_LEFT;
-                }
-
-                return StairsShape.INNER_RIGHT;
-            }
-        }
-
-        return StairsShape.STRAIGHT;
-    }
-
-    private static WallSide canAttachWall(BlockState state) {
-        return canAttach(state) ? WallSide.LOW : WallSide.NONE;
-    }
-
-    private static boolean canAttach(BlockState state) {
-        if (state == null || state.isAir()) {
-            // null: the neighbour is in another chunk and deliberately unknown during
-            // generation - no connection now, postprocessing recomputes it later
-            return false;
-        }
-        if (state.canOcclude()) {
-            return true;
-        }
-        return !Block.isExceptionForConnection(state);
-    }
-
-    private BlockState correct(BlockState state) {
-        if (state == null) {
-            // A caller could not resolve a palette character. setBlock() already treats null
-            // as "leave what is there", so stop before dereferencing it. Whoever produced the
-            // null is responsible for reporting which asset is at fault.
-            return null;
-        }
-        int cx = current.getX();
-        int cy = current.getY();
-        int cz = current.getZ();
-
-        ChunkAccess thisChunk = region.getChunk(cx >> 4, cz >> 4);
-        BlockState westState = updateAdjacent(state, Direction.EAST, pos.set(cx - 1, cy, cz), thisChunk);
-        BlockState eastState = updateAdjacent(state, Direction.WEST, pos.set(cx + 1, cy, cz), thisChunk);
-        BlockState northState = updateAdjacent(state, Direction.SOUTH, pos.set(cx, cy, cz - 1), thisChunk);
-        BlockState southState = updateAdjacent(state, Direction.NORTH, pos.set(cx, cy, cz + 1), thisChunk);
-
-        // A border block could not see (or update) its out-of-chunk neighbours; have vanilla
-        // recompute its connections from the final neighbour data when the chunk is
-        // postprocessed - the same mechanism vanilla structures use across chunk borders.
-        int lx = cx & 0xf;
-        int lz = cz & 0xf;
-        if (lx == 0 || lx == 15 || lz == 0 || lz == 15) {
-            thisChunk.markPosForPostProcessing(pos.set(cx, cy, cz));
-        }
-
-        if (state.getBlock() instanceof CrossCollisionBlock) {
-            state = state.setValue(CrossCollisionBlock.WEST, canAttach(westState));
-            state = state.setValue(CrossCollisionBlock.EAST, canAttach(eastState));
-            state = state.setValue(CrossCollisionBlock.NORTH, canAttach(northState));
-            state = state.setValue(CrossCollisionBlock.SOUTH, canAttach(southState));
-        } else if (state.getBlock() instanceof WallBlock) {
-            state = state.setValue(WallBlock.WEST, canAttachWall(westState));
-            state = state.setValue(WallBlock.EAST, canAttachWall(eastState));
-            state = state.setValue(WallBlock.NORTH, canAttachWall(northState));
-            state = state.setValue(WallBlock.SOUTH, canAttachWall(southState));
-        } else if (state.getBlock() instanceof StairBlock) {
-            state = state.setValue(StairBlock.SHAPE, getShapeProperty(state, pos.set(cx, cy, cz)));
-        } else if (state.getBlock() instanceof StructureVoidBlock){
-            //like an alpha channel - but for parts! Uses whatever block was previously there instead of changing it!
-            return null;
-        }
-        return state;
     }
 
 //    private void validate() {
