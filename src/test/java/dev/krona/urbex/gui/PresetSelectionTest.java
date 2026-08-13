@@ -2,6 +2,7 @@ package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.setup.WorldSelectionHandoff;
 import dev.krona.urbex.setup.WorldStyleMix;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
@@ -17,6 +18,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -131,7 +133,7 @@ class PresetSelectionTest {
     }
 
     @Test
-    void disabledEntryPublishesAllThreeConfigFieldsNull() {
+    void theDisabledEntryPublishesNothingAtAll() {
         PresetSelection selection = new PresetSelection();
         selection.setAvailablePresets(List.of(entry("cavern")));
         selection.select(id("cavern"));
@@ -139,9 +141,11 @@ class PresetSelectionTest {
 
         selection.publish();
 
-        assertNull(Config.presetFromClient);
-        assertNull(Config.worldStyleMixFromClient);
-        assertNull(Config.overridesFromClient);
+        // One absence, not three nulls that a reader has to agree about. Publishing Disabled after
+        // publishing something else has to clear it, which is why publish() discards rather than
+        // returning early.
+        assertNull(WorldSelectionHandoff.pending());
+        assertFalse(WorldSelectionHandoff.isPending());
     }
 
     @Test
@@ -152,9 +156,9 @@ class PresetSelectionTest {
 
         selection.publish();
 
-        assertEquals(id("cavern"), Config.presetFromClient);
-        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
-        assertNull(Config.overridesFromClient);
+        assertEquals(id("cavern"), WorldSelectionHandoff.pending().preset());
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, WorldSelectionHandoff.pending().worldStyles());
+        assertTrue(WorldSelectionHandoff.pending().patch().isEmpty());
     }
 
     @Test
@@ -167,9 +171,9 @@ class PresetSelectionTest {
 
         selection.publish();
 
-        assertEquals(id("cavern"), Config.presetFromClient);
-        assertEquals(WorldStyleMix.of(id("lcmt")), Config.worldStyleMixFromClient);
-        assertNull(Config.overridesFromClient);
+        assertEquals(id("cavern"), WorldSelectionHandoff.pending().preset());
+        assertEquals(WorldStyleMix.of(id("lcmt")), WorldSelectionHandoff.pending().worldStyles());
+        assertTrue(WorldSelectionHandoff.pending().patch().isEmpty());
     }
 
     @Test
@@ -183,14 +187,14 @@ class PresetSelectionTest {
         selection.applyCustomized(copy);
         selection.publish();
 
-        assertEquals(id("default"), Config.presetFromClient, "the base preset id, not the sentinel");
-        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
-        assertNotNull(Config.overridesFromClient);
+        assertEquals(id("default"), WorldSelectionHandoff.pending().preset(), "the base preset id, not the sentinel");
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, WorldSelectionHandoff.pending().worldStyles());
+        assertNotNull(WorldSelectionHandoff.pending().patch().orElse(null));
 
         // The published JSON is a real, parseable PresetDefinition overlay (not a stringified profile).
         com.mojang.serialization.DataResult<dev.krona.urbex.worldgen.lost.regassets.PresetDefinition> parsed =
                 dev.krona.urbex.worldgen.lost.regassets.PresetDefinition.CODEC.parse(com.mojang.serialization.JsonOps.INSTANCE,
-                        com.google.gson.JsonParser.parseString(Config.overridesFromClient));
+                        com.google.gson.JsonParser.parseString(WorldSelectionHandoff.pending().patch().orElse(null)));
         assertTrue(parsed.isSuccess(), "overridesFromClient must decode as a PresetDefinition: " + parsed);
         assertEquals(0.5, parsed.getOrThrow().cities().orElseThrow().cityChance().orElseThrow(), 1e-9);
     }
@@ -206,7 +210,7 @@ class PresetSelectionTest {
 
         selection.publish();
 
-        assertEquals(WorldStyleMix.of(id("lcmt")), Config.worldStyleMixFromClient);
+        assertEquals(WorldStyleMix.of(id("lcmt")), WorldSelectionHandoff.pending().worldStyles());
     }
 
     // ---- restore() (Re-Create flow, issue #85) --------------------------------------------------
@@ -217,7 +221,7 @@ class PresetSelectionTest {
 
         selection.restore("", "", "");
 
-        assertNull(Config.presetFromClient);
+        assertNull(WorldSelectionHandoff.pending());
     }
 
     @Test
@@ -226,7 +230,7 @@ class PresetSelectionTest {
 
         selection.restore("not a valid identifier!!", "", "");
 
-        assertNull(Config.presetFromClient);
+        assertNull(WorldSelectionHandoff.pending());
     }
 
     @Test
@@ -237,9 +241,9 @@ class PresetSelectionTest {
 
         selection.restore("urbex:rare", "", "");
 
-        assertEquals(id("rare"), Config.presetFromClient);
-        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
-        assertNull(Config.overridesFromClient);
+        assertEquals(id("rare"), WorldSelectionHandoff.pending().preset());
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, WorldSelectionHandoff.pending().worldStyles());
+        assertTrue(WorldSelectionHandoff.pending().patch().isEmpty());
     }
 
     @Test
@@ -248,7 +252,7 @@ class PresetSelectionTest {
 
         selection.restore("urbex:rare", "urbex:lcmt", "");
 
-        assertEquals(WorldStyleMix.of(id("lcmt")), Config.worldStyleMixFromClient);
+        assertEquals(WorldStyleMix.of(id("lcmt")), WorldSelectionHandoff.pending().worldStyles());
     }
 
     @Test
@@ -257,12 +261,12 @@ class PresetSelectionTest {
 
         selection.restore("urbex:default", "", "{\"cities\":{\"cityChance\":0.9}}");
 
-        assertEquals(id("default"), Config.presetFromClient);
-        assertEquals("{\"cities\":{\"cityChance\":0.9}}", Config.overridesFromClient);
+        assertEquals(id("default"), WorldSelectionHandoff.pending().preset());
+        assertEquals("{\"cities\":{\"cityChance\":0.9}}", WorldSelectionHandoff.pending().patch().orElse(null));
     }
 
     /**
-     * Regression: an unparseable overridesJson must never reach {@code Config.overridesFromClient} -
+     * Regression: an unparseable overridesJson must never reach {@code WorldSelectionHandoff.pending().patch().orElse(null)} -
      * that field is read when a level loads and its runtime is built
      * ({@code DimensionRuntime.create}'s {@code PresetDefinition.CODEC.parse(...).getOrThrow()}), so a
      * corrupted/hand-edited save's garbage JSON must be rejected before publish, not after.
@@ -273,9 +277,9 @@ class PresetSelectionTest {
 
         selection.restore("urbex:default", "", "{not valid json at all");
 
-        assertEquals(id("default"), Config.presetFromClient, "the preset id itself is still restored");
-        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, Config.worldStyleMixFromClient);
-        assertNull(Config.overridesFromClient, "malformed overrides must never reach Config");
+        assertEquals(id("default"), WorldSelectionHandoff.pending().preset(), "the preset id itself is still restored");
+        assertEquals(Config.DEFAULT_WORLD_STYLE_MIX, WorldSelectionHandoff.pending().worldStyles());
+        assertTrue(WorldSelectionHandoff.pending().patch().isEmpty(), "malformed overrides must never reach Config");
     }
 
     @Test

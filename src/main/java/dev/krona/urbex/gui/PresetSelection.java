@@ -8,6 +8,8 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.setup.WorldSelection;
+import dev.krona.urbex.setup.WorldSelectionHandoff;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.network.chat.Component;
@@ -18,6 +20,7 @@ import dev.krona.urbex.setup.WorldStyleMix;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Client-side state for "which Urbex preset generates this world", registry-driven since Task 4:
@@ -248,17 +251,16 @@ public final class PresetSelection {
             worldStyles = Config.DEFAULT_WORLD_STYLE_MIX;
         }
         worldStyles = Config.gateMix(worldStyles, "The re-created world's saved selection");
-        // Validated BEFORE publishing, not after: Config.overridesFromClient is read on a worldgen
-        // worker thread the moment a chunk generates (DimensionRuntime.create), so an unparseable
-        // string must never reach it - publishing it and only catching the parse failure later (in
+        // Validated BEFORE publishing, not after: the published patch is read on a worldgen worker
+        // thread the moment a chunk generates (DimensionRuntime.create), so an unparseable string
+        // must never reach it - publishing it and only catching the parse failure later (in
         // reconcilePendingRestore's best-effort visual reconciliation) would leave the bad JSON sitting
-        // in Config while the visual selection quietly fell back to plain.
+        // in the handoff while the visual selection quietly fell back to plain.
         String overrides = validatedOverrides(overridesJson, presetId);
 
         Config.resetPresetCache();
-        Config.presetFromClient = presetId;
-        Config.worldStyleMixFromClient = worldStyles;
-        Config.overridesFromClient = overrides;
+        WorldSelectionHandoff.publish(new WorldSelection(presetId, worldStyles,
+                Optional.ofNullable(overrides)));
         Urbex.getLogger().info("Restored Urbex preset '{}' for world re-creation", presetId);
 
         this.selectedWorldStyles = worldStyles;
@@ -336,22 +338,19 @@ public final class PresetSelection {
      * world would generate with just as much as publishing does.
      */
     public void discardPublication() {
-        if (Config.presetFromClient == null && Config.worldStyleMixFromClient == null
-                && Config.overridesFromClient == null) {
+        if (!WorldSelectionHandoff.isPending()) {
             return;
         }
         Config.resetPresetCache();
-        Config.presetFromClient = null;
-        Config.worldStyleMixFromClient = null;
-        Config.overridesFromClient = null;
+        WorldSelectionHandoff.discard();
         Urbex.getLogger().debug("World creation abandoned; discarded the published Urbex selection");
     }
 
     /**
-     * Publishes the current selection so it reaches world generation: the three {@link Config}
-     * fields the server reads in {@code Config.buildPresetCache}.
+     * Publishes the current selection so it reaches world generation, through
+     * {@link WorldSelectionHandoff}.
      * <ul>
-     *   <li>Disabled: all three {@code null}.</li>
+     *   <li>Disabled: nothing published.</li>
      *   <li>A plain built-in entry: its own id, the effective worldStyle, no overrides.</li>
      *   <li>The transient customized entry: the <em>base</em> preset id it was customized from
      *       (carried, unchanged, in {@code Preset.getId()} through every {@link Preset#copy()}), the
@@ -365,25 +364,22 @@ public final class PresetSelection {
         Config.resetPresetCache();
 
         if (DISABLED_ID.equals(entry.id()) || entry.preset() == null) {
-            Config.presetFromClient = null;
-            Config.worldStyleMixFromClient = null;
-            Config.overridesFromClient = null;
+            WorldSelectionHandoff.discard();
             return;
         }
 
         // Gated here as well as server-side: with experimentalMultiWorldStyles off, what the client
         // publishes must already be what a non-opted-in install would generate.
-        Config.worldStyleMixFromClient = Config.gateMix(effectiveWorldStyles(), "The world being created");
+        WorldStyleMix worldStyles = Config.gateMix(effectiveWorldStyles(), "The world being created");
 
         if (CUSTOMIZED_ID.equals(entry.id())) {
             Preset preset = entry.preset();
-            Config.presetFromClient = preset.getId();
             PresetDefinition re = preset.toDefinition();
             JsonElement json = PresetDefinition.CODEC.encodeStart(JsonOps.INSTANCE, re).getOrThrow();
-            Config.overridesFromClient = GSON.toJson(json);
+            WorldSelectionHandoff.publish(new WorldSelection(preset.getId(), worldStyles,
+                    Optional.of(GSON.toJson(json))));
         } else {
-            Config.presetFromClient = entry.id();
-            Config.overridesFromClient = null;
+            WorldSelectionHandoff.publish(new WorldSelection(entry.id(), worldStyles));
         }
     }
 }
