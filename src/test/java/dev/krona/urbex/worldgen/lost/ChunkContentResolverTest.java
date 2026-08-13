@@ -366,7 +366,7 @@ class ChunkContentResolverTest {
             // open lot and has no say over any other chunk's surface.
             for (RoadType road : new RoadType[]{RoadType.PRIMARY, RoadType.SECONDARY, RoadType.TERTIARY}) {
                 ChunkContent content = resolveOn(road, 1.0f, true, false);
-                assertEquals(BuildingInfo.StreetType.NORMAL, content.streetType(), "road " + road);
+                assertEquals(ChunkPlan.StreetType.NORMAL, content.streetType(), "road " + road);
                 assertFalse(content.openLot(), "a road chunk is not an open lot, road " + road);
                 assertFalse(content.parkPart(), "a road chunk gets no park part, road " + road);
             }
@@ -379,7 +379,7 @@ class ChunkContentResolverTest {
             // park at a chance of 0 exactly as it does at 1.
             for (float chance : new float[]{0.0f, 0.5f, 1.0f}) {
                 ChunkContent content = resolveOn(RoadType.NONE, chance, true, false);
-                assertEquals(BuildingInfo.StreetType.PARK, content.streetType(), "chance " + chance);
+                assertEquals(ChunkPlan.StreetType.PARK, content.streetType(), "chance " + chance);
                 assertTrue(content.openLot(), "chance " + chance);
             }
         }
@@ -453,7 +453,7 @@ class ChunkContentResolverTest {
      *       {@link EffectiveRoad#resolve};</li>
      *   <li>{@link #multiChunkReadsTheRawRoadFieldNotTheEffectiveOne} pins {@link MultiChunk}'s
      *       actual source text: it must call {@code roadField().typeAt(...)} and must never call
-     *       {@code BuildingInfo.getEffectiveRoadType(...)} - the one substitution that would
+     *       {@code ChunkPlan.getEffectiveRoadType(...)} - the one substitution that would
      *       create the real cycle the comment at {@code MultiChunk.java}'s raw-road read guards
      *       by hand: multi-building acceptance depending on a content decision that itself
      *       depends on multi-building acceptance.</li>
@@ -500,7 +500,7 @@ class ChunkContentResolverTest {
             assertTrue(body.contains("roadField().typeAt("),
                     "MultiChunk.canPlaceBuilding must read the raw road field via roadField().typeAt(...)");
             assertFalse(body.contains("getEffectiveRoadType"),
-                    "MultiChunk.canPlaceBuilding must never call BuildingInfo.getEffectiveRoadType(...) - "
+                    "MultiChunk.canPlaceBuilding must never call ChunkPlan.getEffectiveRoadType(...) - "
                             + "doing so would make multi-building acceptance depend on a content decision "
                             + "that itself depends on multi-building acceptance");
         }
@@ -508,7 +508,7 @@ class ChunkContentResolverTest {
         /**
          * Comments are stripped before searching, not just the code: the guarded-against read is
          * itself named in a comment right next to the real one ("The RAW road, never
-         * BuildingInfo.getEffectiveRoadType()."), so a plain substring search over the raw file
+         * ChunkPlan.getEffectiveRoadType()."), so a plain substring search over the raw file
          * would trip on its own warning.
          */
         private static String stripComments(String source) {

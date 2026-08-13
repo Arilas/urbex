@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
 import dev.krona.urbex.worldgen.lost.Railway;
 import net.minecraft.core.BlockPos;
@@ -51,7 +51,7 @@ public final class DigestRunner {
      *                     all - announces itself instead of moving silently; see
      *                     {@code digestCheckFeatures} in {@code build.gradle}.
      * @param slopeChunks  how many sampled chunks carry a sloped minor road (see
-     *                     {@link BuildingInfo#getStreetSlopeDirection}). Printed for the same
+     *                     {@link ChunkPlan#getStreetSlopeDirection}). Printed for the same
      *                     reason as {@code bridgeChunks}: a sample window that stops containing a
      *                     slope - the only mechanical proof the full-chunk {@code street_stair}
      *                     part renders at all - announces itself instead of moving silently; see
@@ -294,7 +294,7 @@ public final class DigestRunner {
         int count = 0;
         for (ChunkPos pos : chunkPositions) {
             ChunkCoord coord = new ChunkCoord(level.dimension(), pos.x(), pos.z());
-            if (BuildingInfo.getBuildingInfo(coord, dimInfo).getStreetSlopeDirection() != null) {
+            if (ChunkPlan.getChunkPlan(coord, dimInfo).getStreetSlopeDirection() != null) {
                 count++;
             }
         }

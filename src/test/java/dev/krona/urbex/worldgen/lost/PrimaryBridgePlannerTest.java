@@ -210,7 +210,7 @@ class PrimaryBridgePlannerTest {
         // The verdict production actually uses. Two decks fighting over one chunk is the failure the
         // whole crossing rule exists to prevent, so it is asserted directly: one span survives, the
         // other does not, and every chunk of each - reconstructing its own span first, exactly as
-        // BuildingInfo does - reaches its span's verdict on its own.
+        // ChunkPlan does - reaches its span's verdict on its own.
         PrimaryBridgePlanner.ChunkFacts facts = crossing();
         boolean horizontalSurvives =
                 PrimaryBridgePlanner.survivesCrossings(HORIZONTAL, at(2, 2), facts, SEED, MAX_GAP, 1.0f);

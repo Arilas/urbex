@@ -9,8 +9,8 @@ import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.gui.NullDimensionInfo;
 import dev.krona.urbex.plan.RoadType;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
+import dev.krona.urbex.worldgen.lost.ChunkCandidate;
 import dev.krona.urbex.worldgen.lost.City;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
@@ -296,9 +296,9 @@ public class CityPreview implements AutoCloseable {
             default -> 0xff005500;
         };
         ChunkCoord coord = new ChunkCoord(diminfo.dimension(), x, z);
-        ChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristicsGui(coord, diminfo);
-        if (characteristics.isCity()) {
-            return BuildingInfo.hasBuildingGui(x, z, diminfo, characteristics) ? BUILDING_COLOR : CITY_COLOR;
+        ChunkCandidate candidate = ChunkPlan.getChunkCandidateGui(coord, diminfo);
+        if (candidate.isCity()) {
+            return ChunkPlan.hasBuildingGui(x, z, diminfo, candidate) ? BUILDING_COLOR : CITY_COLOR;
         }
         return terrainColor;
     }
@@ -334,13 +334,13 @@ public class CityPreview implements AutoCloseable {
      * over the top: one opaque colour per {@link RoadType} (see {@link #roadColour}), so the grid's
      * shape - primary spine, secondary fill, tertiary stubs - reads before any chunk generates.
      * <p>
-     * Classifies through {@link BuildingInfo#effectiveRoadType} rather than
+     * Classifies through {@link ChunkPlan#effectiveRoadType} rather than
      * {@link dev.krona.urbex.plan.RoadField#typeAt}. That is deliberate: {@code effectiveRoadType} is
      * the exact "raw field clipped to the city mask" computation real generation renders from (city
      * membership plus the connected-neighbour check that removes isolated one-chunk stubs at a city
      * mask's protrusions), and it is a pure function of coordinate, dimension and profile - it takes
      * no random draw and reads nothing about buildings. An earlier version of this method gated the
-     * road-field query on {@link BuildingInfo#hasBuildingGui}, meaning to skip chunks a building
+     * road-field query on {@link ChunkPlan#hasBuildingGui}, meaning to skip chunks a building
      * claims; that predicate is an <em>independent</em> {@code BUILDING_CHANCE} coin flip with no
      * correlation to the real per-chunk content decision (see below), so it silently recoloured
      * roughly a {@code BUILDING_CHANCE} fraction of genuine road chunks as background - the mode
@@ -348,7 +348,7 @@ public class CityPreview implements AutoCloseable {
      * <p>
      * <b>What this still cannot know:</b> whether an accepted multi-building has claimed a chunk that
      * the raw field still calls a road (the trap Task 4's review found in
-     * {@code BuildingInfo.getEffectiveRoadType()} - the field never learns about the content
+     * {@code ChunkPlan.getEffectiveRoadType()} - the field never learns about the content
      * decision, on purpose, to keep that decision graph acyclic). Real generation resolves multi-
      * building placement through {@link dev.krona.urbex.worldgen.lost.MultiChunk}, which reaches a
      * live {@code WorldGenLevel} to look up building assets; this preview runs off
@@ -364,7 +364,7 @@ public class CityPreview implements AutoCloseable {
             for (int x = 0; x < WIDTH; x++) {
                 int base = soften(sampleColor(diminfo, x, z));
                 ChunkCoord c = new ChunkCoord(diminfo.dimension(), x, z);
-                RoadType type = BuildingInfo.effectiveRoadType(c, diminfo, profile);
+                RoadType type = ChunkPlan.effectiveRoadType(c, diminfo, profile);
                 colors[z * WIDTH + x] = blend(base, roadColour(type));
             }
         }

@@ -66,7 +66,7 @@ public class TimedCache<K, V> {
 
     /**
      * Get, or compute and store. Deliberately not {@link ConcurrentHashMap#computeIfAbsent}: the
-     * city caches are mutually recursive (a chunk's info reads its neighbours' characteristics,
+     * city caches are mutually recursive (a chunk's info reads its neighbours' candidate,
      * which read their city styles), and computeIfAbsent deadlocks on recursive population - even
      * for distinct keys that land in the same bin. Computing outside the map means two threads may
      * race and both compute; that is harmless, because the computation is a pure function of the

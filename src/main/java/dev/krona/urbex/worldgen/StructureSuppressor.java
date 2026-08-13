@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.Registration;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
@@ -36,10 +36,10 @@ public class StructureSuppressor {
         // is final. Structure placement runs on the worker pool too, so this used to be one of the
         // threads contending for the per-dimension monitor.
         ChunkCoord coord = new ChunkCoord(diminfo.getType(), chunkPos.x(), chunkPos.z());
-        if (!BuildingInfo.isCity(coord, diminfo)) {
+        if (!ChunkPlan.isCity(coord, diminfo)) {
             return false;
         }
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, diminfo);
+        ChunkPlan info = ChunkPlan.getChunkPlan(coord, diminfo);
         int ground = info.getCityGroundLevel();
         // One extra floor of slack at both ends so a structure does not clip the roof or
         // undermine the lowest cellar.

@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.gen;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.Orientation;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class Bridges {
 
-    public static void generateBridges(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
+    public static void generateBridges(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info) {
         if (info.getHighwayXLevel() == 0 || info.getHighwayZLevel() == 0) {
             // If there is a highway at level 0 we cannot generate bridge parts. If there
             // is no highway or a highway at level 1 then bridge sections can generate just fine
@@ -29,7 +29,7 @@ public class Bridges {
         }
     }
 
-    private static void generateBridge(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, BuildingPart bt, Orientation orientation) {
+    private static void generateBridge(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, BuildingPart bt, Orientation orientation) {
         CompiledPalette compiledPalette = feature.computePalette(info, bt);
         ChunkDriver driver = ctx.driver;
         // The opportunistic bridge parts are authored one block above the street surface, as a deck
@@ -65,8 +65,8 @@ public class Bridges {
             // off GROUNDLEVEL instead and a planned bridge, whose deck sits a block lower, would
             // have its supports written straight through its own road surface.
             int underDeck = bridgeLevel - 1;
-            BuildingInfo minDir = orientation.getMinDir().get(info);
-            BuildingInfo maxDir = orientation.getMaxDir().get(info);
+            ChunkPlan minDir = orientation.getMinDir().get(info);
+            ChunkPlan maxDir = orientation.getMaxDir().get(info);
             if (minDir.hasBridge(info.provider, orientation) != null && maxDir.hasBridge(info.provider, orientation) != null) {
                 // Needs support
                 for (int y = info.waterLevel - 10; y <= underDeck; y++) {

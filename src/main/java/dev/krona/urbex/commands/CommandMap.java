@@ -7,7 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.server.level.ServerPlayer;
@@ -46,7 +46,7 @@ public class CommandMap implements Command<CommandSourceStack> {
                 StringBuilder buf = new StringBuilder();
                 for (int x = pos.x() - 20 ; x <= pos.x() + 20 ; x++) {
                     ChunkCoord coord = new ChunkCoord(dimInfo.getType(), x, z);
-                    BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
+                    ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimInfo);
                     if (info.isCity && info.hasBuilding) {
                         buf.append("B");
                     } else if (info.isCity) {

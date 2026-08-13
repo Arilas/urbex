@@ -8,7 +8,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -67,10 +67,10 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
 
         ChunkCoord coord = new ChunkCoord(level.dimension(), bottom.getX() >> 4, bottom.getZ() >> 4);
         // Detached, not the cached plan: this command draws an arbitrary building on request, and
-        // rewriting the published BuildingInfo left the shared plan for the chunk describing a
+        // rewriting the published ChunkPlan left the shared plan for the chunk describing a
         // building the seed never chose (issue #126).
-        BuildingInfo info = BuildingInfo.detachedForEditing(coord, dimInfo,
-                new BuildingInfo.BuildingOverride(building, cellars, floors, bottom.getY()));
+        ChunkPlan info = ChunkPlan.detachedForEditing(coord, dimInfo,
+                new ChunkPlan.BuildingOverride(building, cellars, floors, bottom.getY()));
 
         ChunkPos cp = ChunkPos.containing(bottom);
 
@@ -98,7 +98,7 @@ public class CommandCreateBuilding implements Command<CommandSourceStack> {
         return Command.SINGLE_SUCCESS;
     }
 
-    private static void generatePart(Level level, ChunkPos cp, BuildingInfo info, IBuildingPart part, int oy) {
+    private static void generatePart(Level level, ChunkPos cp, ChunkPlan info, IBuildingPart part, int oy) {
         CompiledPalette compiledPalette = info.getCompiledPalette();
         // Cache the combined palette?
         Palette partPalette = part.getLocalPalette();

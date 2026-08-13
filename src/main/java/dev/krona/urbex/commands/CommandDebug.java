@@ -10,7 +10,7 @@ import dev.krona.urbex.plan.TertiarySegment;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
@@ -58,7 +58,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
             return 0;
         }
         ChunkCoord coord = new ChunkCoord(dimInfo.getType(), position.getX() >> 4, position.getZ() >> 4);
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
+        ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimInfo);
         line(context, "profile = " + info.profile.getId());
         line(context, "buildingType = " + info.buildingType.getName());
         line(context, "floors = " + info.getNumFloors());
@@ -68,7 +68,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
         line(context, "isCity = " + info.isCity);
         line(context, "chunkX = " + info.coord.chunkX());
         line(context, "chunkZ = " + info.coord.chunkZ());
-        CityStyle cityStyle = BuildingInfo.getChunkCharacteristics(info.coord, info.provider).cityStyle();
+        CityStyle cityStyle = ChunkPlan.getChunkCandidate(info.coord, info.provider).cityStyle();
         // Name first, id after: the id is what you edit, the name is what the world-style picker
         // showed you, and a debug dump is the one place both are worth having side by side.
         line(context, "getCityStyle() = " + cityStyle.getDisplayName() + " (" + cityStyle.getName() + ")");
@@ -108,7 +108,7 @@ public class CommandDebug implements Command<CommandSourceStack> {
      * containing multi-building). Printed only on command - never during ordinary generation - and
      * grouped under three headers so the three kinds of information don't run together.
      */
-    private static void printRoadDebug(CommandContext<CommandSourceStack> context, BuildingInfo info, IDimensionInfo dimInfo) {
+    private static void printRoadDebug(CommandContext<CommandSourceStack> context, ChunkPlan info, IDimensionInfo dimInfo) {
         RoadCell road = dimInfo.roadField().at(info.coord.chunkX(), info.coord.chunkZ());
 
         line(context, "-- roads: raw vs effective --");

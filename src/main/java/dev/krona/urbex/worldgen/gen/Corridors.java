@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.gen;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Block;
@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.RailShape;
 
 public class Corridors {
-    public static void generateCorridors(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, boolean xRail, boolean zRail) {
+    public static void generateCorridors(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, boolean xRail, boolean zRail) {
         BlockState air = Blocks.AIR.defaultBlockState();
         BlockState base = info.profile.getBaseBlock();
         BlockState railx = Blocks.RAIL.defaultBlockState().setValue(RailBlock.SHAPE, RailShape.EAST_WEST);
@@ -57,7 +57,7 @@ public class Corridors {
         }
     }
 
-    public static void generateCorridorConnections(ChunkDriver driver, BuildingInfo info) {
+    public static void generateCorridorConnections(ChunkDriver driver, ChunkPlan info) {
         if (info.getXmin().hasXCorridor()) {
             int x = 0;
             for (int z = 7; z <= 10; z++) {

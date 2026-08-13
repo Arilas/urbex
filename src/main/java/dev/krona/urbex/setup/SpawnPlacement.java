@@ -112,7 +112,7 @@ public class SpawnPlacement {
                 Set<String> parts = Set.copyOf(profile.FORCE_SPAWN_PARTS);
                 isSuitable = isSuitable.and(blockPos -> {
                     ChunkCoord coord = new ChunkCoord(dimensionInfo.getType(), blockPos.getX() >> 4, blockPos.getZ() >> 4);
-                    BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimensionInfo);
+                    ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimensionInfo);
                     if (info == null) {
                         return false;
                     }
@@ -168,7 +168,7 @@ public class SpawnPlacement {
 
     private static boolean isOutsideBuilding(IDimensionInfo provider, BlockPos pos) {
         ChunkCoord coord = new ChunkCoord(provider.getType(), pos.getX() >> 4, pos.getZ() >> 4);
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
+        ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
         return !(info.isCity() && info.hasBuilding);
     }
 

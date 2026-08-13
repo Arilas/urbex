@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import net.minecraft.core.BlockPos;
@@ -31,7 +31,7 @@ public final class ChunkGenContext {
     public final ChunkCoord coord;
     public final IDimensionInfo provider;
     public final Preset profile;
-    public final BuildingInfo info;
+    public final ChunkPlan info;
     public final CompiledPalette palette;
     public final char street;
     public final NoiseBuffers buffers;
@@ -44,7 +44,7 @@ public final class ChunkGenContext {
     public final TagSnapshot tags;
     /**
      * Deferred writes this generation queues for after the driver has run. Owned here, not on the
-     * cached {@link BuildingInfo}: see {@link PostTodoQueue}.
+     * cached {@link ChunkPlan}: see {@link PostTodoQueue}.
      */
     private final PostTodoQueue postTodo = new PostTodoQueue();
     /**
@@ -67,7 +67,7 @@ public final class ChunkGenContext {
     public final long seed;
 
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
-                           IDimensionInfo provider, Preset profile, BuildingInfo info,
+                           IDimensionInfo provider, Preset profile, ChunkPlan info,
                            LevelTaskQueue levelTasks, TagSnapshot tags) {
         this.levelTasks = levelTasks;
         this.tags = tags;

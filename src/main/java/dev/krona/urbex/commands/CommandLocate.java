@@ -8,7 +8,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.IdentifierArgument;
@@ -26,7 +26,7 @@ public class CommandLocate implements Command<CommandSourceStack> {
      * Chunks searched out from the sender when no radius is given.
      * <p>
      * Kept at what used to be hardcoded, because the cost is not the search - it is that every
-     * chunk visited builds a full {@link BuildingInfo}, synchronously, on the server thread. At 30
+     * chunk visited builds a full {@link ChunkPlan}, synchronously, on the server thread. At 30
      * that is ~3700 chunks and already a visible stall; {@link #MAX_RADIUS} is where it stops being
      * a stall and starts being a timeout.
      */
@@ -68,7 +68,7 @@ public class CommandLocate implements Command<CommandSourceStack> {
         // Abuse BlockPos as ChunkPos
         int cnt = 0;
         for (BlockPos.MutableBlockPos mpos : BlockPos.spiralAround(new BlockPos(cp.x(), 0, cp.z()), radius, Direction.EAST, Direction.SOUTH)) {
-            BuildingInfo info = BuildingInfo.getBuildingInfo(new ChunkCoord(level.dimension(), mpos.getX(), mpos.getZ()), dimInfo);
+            ChunkPlan info = ChunkPlan.getChunkPlan(new ChunkCoord(level.dimension(), mpos.getX(), mpos.getZ()), dimInfo);
             if (info != null && info.hasBuilding && info.getBuilding().getId().equals(name)) {
                 context.getSource().sendSuccess(() -> Component.literal("Found at " + ((mpos.getX() << 4) + 8) + "," + info.groundLevel + "," + ((mpos.getZ() << 4) + 8)), false);
                 cnt++;

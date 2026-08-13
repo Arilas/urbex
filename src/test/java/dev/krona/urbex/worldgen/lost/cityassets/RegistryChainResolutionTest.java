@@ -165,7 +165,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void stuffOrderIsPathFirstThenNamespace() {
-        // Identifier's own order, the same one MultiChunk sorts city styles by and BuildingInfo
+        // Identifier's own order, the same one MultiChunk sorts city styles by and ChunkPlan
         // breaks its cityStyle vote on. Ordering on toString() instead would put both urbex entries
         // ahead of the third-party one and silently relocate its decoration the day it is installed.
         StuffObject ownRope = new StuffObject(Identifier.fromNamespaceAndPath("urbex", "rope"), List.of(stuff("urbex", "rope").tags(true, "rubble").build()));

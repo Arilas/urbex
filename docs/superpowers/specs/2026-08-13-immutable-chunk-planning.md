@@ -253,40 +253,43 @@ avoidance window drives 658 chunks and 5942711 blocks against 580 and 5359701 wi
 
 ## Immutability, as landed
 
-The Direction section proposes publishing `record ChunkCandidate` / `record ChunkPlan`. The candidate
-half is now literally that; the plan half is the same property reached without renaming a class the
-whole generator reads.
+The Direction section proposes publishing `record ChunkCandidate` / `record ChunkPlan`. Both names
+exist now, and both are the types that were already there:
 
-**`ChunkCharacteristics` is a record.** It is the candidate — the raw city, style and building
-choices, a pure function of seed and coordinate. It used to be a class of public mutable fields
-assembled field-by-field, handed half-built to its own helpers, and then published into the cache.
-Assembly now computes into locals and constructs once at the end; `initMultiBuildingSection` returns
-a `MultiSection` instead of writing into a half-built object, and the helpers that only wanted
-`multiPos` take it directly. Three `Identifier` components went away in the process —
-`cityStyleId`, `multiBuildingId`, `buildingTypeId` were never read or written anywhere.
+**`ChunkCharacteristics` → `record ChunkCandidate`.** The raw city, style and building choices, a pure
+function of seed and coordinate. It used to be a class of public mutable fields assembled
+field-by-field, handed half-built to its own helpers, and then published into the cache. Assembly now
+computes into locals and constructs once at the end; `initMultiBuildingSection` returns a
+`MultiSection` instead of writing into a half-built object, and the helpers that only wanted
+`multiPos` take it directly. Three components went away with it — `cityStyleId`, `multiBuildingId`
+and `buildingTypeId` were never read or written anywhere.
 
-**Every planning-decision field on `BuildingInfo` is `final`.** Two writers stood in the way:
+**`BuildingInfo` → `ChunkPlan`.** The settled occupancy, topology, transport and layout. Every
+planning-decision field on it is `final`. Two writers stood in the way:
 
 - `setBuildingType`, which `/urbex createbuilding` used to rewrite the cached plan for a chunk in
-  place. It is gone. The override is a constructor argument (`BuildingOverride`), so the editing
-  command gets a detached instance built that way rather than a published one edited afterwards, and
-  the seven fields it touched are final. Every override use inside the constructor is a ternary whose
-  null branch is exactly the previous expression, so the ordinary path draws from the layout stream in
-  the same order and the same number of times.
+  place. It is gone; the override is a constructor argument (`BuildingOverride`), so the command gets
+  a detached instance built that way rather than a published one edited afterwards. Every override use
+  inside the constructor is a ternary whose null branch is exactly the previous expression, so the
+  ordinary path draws from the layout stream in the same order and the same number of times.
 - **`getBuildingBottomHeight`, which decremented `cellars` and `floors` as it walked** — the issue's
-  "building queries such as bottom-height calculation mutate floors/cellars during consumption",
-  found only when `final` refused to compile. The first call shrank the building and every later call
-  measured the shrunken one, and a `TimedCache` eviction reset the count by rebuilding the object. It
-  uses locals now. **No golden moved**, so the repeat call never happened in any sampled window: the
-  defect was latent rather than active, and is now unrepresentable rather than merely absent.
+  "building queries such as bottom-height calculation mutate floors/cellars during consumption". The
+  first call shrank the building and every later call measured the shrunken one; a `TimedCache`
+  eviction reset the count by rebuilding the object. It uses locals now.
+
+  It was found only when `final` refused to compile. The audit that had run before it looked for
+  assignments, and this is a `--`. Worth recording as a method note: "no writes" established by
+  grepping for `=` is not the same claim as "no mutation".
+
+  **No golden moved**, so the repeat call never happened in any sampled window: the defect was latent
+  rather than active, and is now unrepresentable rather than merely absent.
+
+The caches follow the types — `caches().candidate` and `caches().chunkPlan`. The rename touched 48
+files and moved no digest: all ten windows hold.
 
 What still changes after publication is memoization of pure functions and nothing else: the neighbour
 links, the damage area, the palettes, and the lazily computed direction/bridge/height fields. The
 forced-expiry window re-derives all of them and holds its golden.
-
-Renaming `BuildingInfo` to `ChunkPlan` was not done. It is reached from most of the generator, the
-rename buys no property that `final` has not already bought, and it would bury the two real fixes
-above in a diff nobody could review.
 
 *(Noted while auditing, not part of this issue: `Highway.getHighwayLevel` memoizes with `put` rather
 than `putIfAbsent` because every chunk of one run writes the run's level, and it bounds its extent

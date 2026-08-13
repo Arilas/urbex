@@ -5,7 +5,7 @@ import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.IDimensionInfo;
 import dev.krona.urbex.worldgen.CityGenerator;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.Transform;
@@ -15,7 +15,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 public class Railways {
-    public static void generateRailwayDungeons(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
+    public static void generateRailwayDungeons(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info) {
         if (info.railDungeon == null) {
             return;
         }
@@ -26,7 +26,7 @@ public class Railways {
         }
     }
 
-    public static void generateRailways(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, Railway.RailChunkInfo railInfo, ChunkHeightmap heightmap) {
+    public static void generateRailways(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, Railway.RailChunkInfo railInfo, ChunkHeightmap heightmap) {
         IDimensionInfo provider = feature.provider;
         ChunkDriver driver = ctx.driver;
         BlockState liquid = feature.liquid;

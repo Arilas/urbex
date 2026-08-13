@@ -145,8 +145,8 @@ public final class WorldStyleField {
         if (single) {
             return primary;
         }
-        // getOrCompute, not computeIfAbsent: this is reached from BuildingInfo while its
-        // neighbours' characteristics are being built, and a recursive computeIfAbsent deadlocks on
+        // getOrCompute, not computeIfAbsent: this is reached from ChunkPlan while its
+        // neighbours' candidate are being built, and a recursive computeIfAbsent deadlocks on
         // the bin lock even for distinct keys. Same rule as every other cache in DimensionCaches.
         return provider.caches().worldStyle.getOrCompute(coord, k -> atChunkInt(provider, coord));
     }

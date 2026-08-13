@@ -291,18 +291,18 @@ public final class PrimaryBridgePlanner {
 
             @Override
             public boolean isCity(ChunkCoord coord) {
-                return BuildingInfo.isCityRaw(coord, provider, provider.getProfile());
+                return ChunkPlan.isCityRaw(coord, provider, provider.getProfile());
             }
 
             @Override
             public boolean isEffectivePrimary(ChunkCoord coord) {
                 Preset profile = provider.getProfile();
-                return BuildingInfo.effectiveRoadType(coord, provider, profile) == RoadType.PRIMARY;
+                return ChunkPlan.effectiveRoadType(coord, provider, profile) == RoadType.PRIMARY;
             }
 
             @Override
             public int cityLevel(ChunkCoord coord) {
-                return BuildingInfo.getCityLevel(coord, provider);
+                return ChunkPlan.getCityLevel(coord, provider);
             }
 
             @Override

@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
@@ -24,28 +24,28 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PostTodoOwnershipTest {
 
     /**
-     * A {@code BuildingInfo} is cached per coordinate and shared by every generation that reads the
+     * A {@code ChunkPlan} is cached per coordinate and shared by every generation that reads the
      * chunk, so nothing belonging to a single generation may be stored on it. Callbacks are the case
      * that actually bit (post-todos), and they are what this scans for.
      */
     @Test
     void buildingInfoHoldsNoRuntimeCallbacks() {
-        for (Field field : BuildingInfo.class.getDeclaredFields()) {
+        for (Field field : ChunkPlan.class.getDeclaredFields()) {
             assertTrue(Consumer.class != field.getType(),
-                    "BuildingInfo." + field.getName() + " is a callback on a cached planning value; "
+                    "ChunkPlan." + field.getName() + " is a callback on a cached planning value; "
                             + "per-generation work belongs on the ChunkGenContext");
             assertTrue(!field.getGenericType().toString().contains(Consumer.class.getName()),
-                    "BuildingInfo." + field.getName() + " holds callbacks (" + field.getGenericType()
+                    "ChunkPlan." + field.getName() + " holds callbacks (" + field.getGenericType()
                             + ") on a cached planning value; per-generation work belongs on the "
                             + "ChunkGenContext");
         }
         assertArrayEquals(new String[0],
-                Arrays.stream(BuildingInfo.class.getDeclaredMethods())
+                Arrays.stream(ChunkPlan.class.getDeclaredMethods())
                         .map(Method::getName)
                         .filter(name -> name.toLowerCase().contains("posttodo"))
                         .sorted()
                         .toArray(String[]::new),
-                "BuildingInfo must expose no post-todo API at all - an accessor is how the drain "
+                "ChunkPlan must expose no post-todo API at all - an accessor is how the drain "
                         + "found its way back into the cache");
     }
 

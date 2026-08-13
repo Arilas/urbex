@@ -96,20 +96,20 @@ public class Highway {
             if (higher.getCoord(orientation)-lower.getCoord(orientation) >= 5) {
                 boolean valid;
                 if (profile.HIGHWAY_REQUIRES_TWO_CITIES) {
-                    valid = BuildingInfo.isCityRaw(lower, provider, profile) && BuildingInfo.isCityRaw(higher, provider, profile);
+                    valid = ChunkPlan.isCityRaw(lower, provider, profile) && ChunkPlan.isCityRaw(higher, provider, profile);
                 } else {
-                    valid = BuildingInfo.isCityRaw(lower, provider, profile) || BuildingInfo.isCityRaw(higher, provider, profile);
+                    valid = ChunkPlan.isCityRaw(lower, provider, profile) || ChunkPlan.isCityRaw(higher, provider, profile);
                 }
                 if (valid) {
                     // We have at least one city. Valid highway:
                     level = switch (profile.HIGHWAY_LEVEL_FROM_CITIES_MODE) {
-                        case 0 -> BuildingInfo.getCityLevel(lower, provider);
-                        case 1 -> Math.min(BuildingInfo.getCityLevel(lower, provider),
-                                BuildingInfo.getCityLevel(higher, provider));
-                        case 2 -> Math.max(BuildingInfo.getCityLevel(lower, provider),
-                                BuildingInfo.getCityLevel(higher, provider));
-                        case 3 -> (BuildingInfo.getCityLevel(lower, provider) +
-                                BuildingInfo.getCityLevel(higher, provider)) / 2;
+                        case 0 -> ChunkPlan.getCityLevel(lower, provider);
+                        case 1 -> Math.min(ChunkPlan.getCityLevel(lower, provider),
+                                ChunkPlan.getCityLevel(higher, provider));
+                        case 2 -> Math.max(ChunkPlan.getCityLevel(lower, provider),
+                                ChunkPlan.getCityLevel(higher, provider));
+                        case 3 -> (ChunkPlan.getCityLevel(lower, provider) +
+                                ChunkPlan.getCityLevel(higher, provider)) / 2;
                         default -> throw new RuntimeException("Bad value for 'highwayLevelFromCities'!");
                     };
                     for (ChunkCoord cc = lower; cc.getCoord(orientation) <= higher.getCoord(orientation); cc = cc.higher(orientation)) {

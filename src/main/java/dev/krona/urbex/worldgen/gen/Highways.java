@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.gen;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.Transform;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
@@ -12,7 +12,7 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.state.BlockState;
 
 public class Highways {
-    public static void generateHighways(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info) {
+    public static void generateHighways(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info) {
         int levelX = Highway.getXHighwayLevel(info.coord, info.provider, info.profile);
         int levelZ = Highway.getZHighwayLevel(info.coord, info.provider, info.profile);
         if (levelX == levelZ && levelX >= 0) {
@@ -41,7 +41,7 @@ public class Highways {
         return !st.is(BlockTags.LEAVES) && !st.is(BlockTags.LOGS);
     }
 
-    private static void generateHighwayPart(ChunkGenContext ctx, CityGenerator feature, BuildingInfo info, int level, Transform transform, BuildingInfo adjacent1, BuildingInfo adjacent2, boolean bidirectional) {
+    private static void generateHighwayPart(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int level, Transform transform, ChunkPlan adjacent1, ChunkPlan adjacent2, boolean bidirectional) {
         ChunkDriver driver = ctx.driver;
         int highwayGroundLevel = info.groundLevel + level * CityGenerator.FLOORHEIGHT;
         HighwayParts highwayParts = info.provider.worldStyles().primary().getPartSelector().highwayParts();

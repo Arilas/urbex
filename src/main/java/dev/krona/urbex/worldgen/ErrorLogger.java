@@ -2,8 +2,8 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
-import dev.krona.urbex.worldgen.lost.ChunkCharacteristics;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
+import dev.krona.urbex.worldgen.lost.ChunkCandidate;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -51,16 +51,16 @@ public class ErrorLogger {
         Logger logger = Urbex.getLogger();
         try {
             ChunkCoord coord = new ChunkCoord(provider.getType(), chunkX, chunkZ);
-            logger.info("IsCity: " + BuildingInfo.isCityRaw(coord, provider, provider.getProfile()));
-            ChunkCharacteristics characteristics = BuildingInfo.getChunkCharacteristics(coord, provider);
-            logger.info("    Level: " + characteristics.cityLevel());
-            if (characteristics.multiBuilding() != null) {
-                logger.info("    Multibuilding: " + characteristics.multiBuilding().getName());
+            logger.info("IsCity: " + ChunkPlan.isCityRaw(coord, provider, provider.getProfile()));
+            ChunkCandidate candidate = ChunkPlan.getChunkCandidate(coord, provider);
+            logger.info("    Level: " + candidate.cityLevel());
+            if (candidate.multiBuilding() != null) {
+                logger.info("    Multibuilding: " + candidate.multiBuilding().getName());
             }
-            if (characteristics.buildingType() != null) {
-                logger.info("    Building: " + characteristics.buildingType().getName());
+            if (candidate.buildingType() != null) {
+                logger.info("    Building: " + candidate.buildingType().getName());
             }
-            BuildingInfo info = BuildingInfo.getBuildingInfo(coord, provider);
+            ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
             if (info.hasBuilding) {
                 logger.info("        Floors: " + info.getNumFloors());
                 logger.info("        Cellars: " + info.getNumCellars());

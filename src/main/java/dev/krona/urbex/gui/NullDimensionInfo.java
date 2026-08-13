@@ -345,7 +345,7 @@ public class NullDimensionInfo implements IDimensionInfo {
             // whenever the world-creation context has no biome registry yet, or (in the Customize
             // screen) no parent screen at all - see CitiesTab.previewRegistries and
             // CustomizeScreen.previewRegistries. Every caller currently reachable without registry
-            // access (BuildingInfo.getChunkCharacteristicsGui and friends) never dereferences this
+            // access (ChunkPlan.getChunkCandidateGui and friends) never dereferences this
             // result: the registryAccess()-gated rules in City that do read biomes only run when
             // we're not in this branch.
             Urbex.LOGGER.warn("NullDimensionInfo.getBiome() called without registry access; returning null.");

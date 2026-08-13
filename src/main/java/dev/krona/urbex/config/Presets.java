@@ -78,7 +78,7 @@ public class Presets {
      * tag's declared order nor the registry's survives it. {@code urbex:default} sorts first, then
      * the rest by {@link Identifier#compareTo}, which is <em>path, then namespace</em> and not
      * lexicographic on the whole id: {@code b:apple} sorts before {@code a:zebra}. That is the same
-     * order {@code MultiChunk}'s city-style sort and {@code BuildingInfo}'s city-style vote already
+     * order {@code MultiChunk}'s city-style sort and {@code ChunkPlan}'s city-style vote already
      * use.
      */
     public static List<Identifier> listBrowsable(RegistryAccess access) {

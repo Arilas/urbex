@@ -13,7 +13,7 @@ import dev.krona.urbex.editor.EditorInfo;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.IDimensionInfo;
-import dev.krona.urbex.worldgen.lost.BuildingInfo;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
@@ -74,7 +74,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         }
 
         ChunkCoord coord = new ChunkCoord(dimInfo.getType(), start.getX() >> 4, start.getZ() >> 4);
-        BuildingInfo info = BuildingInfo.getBuildingInfo(coord, dimInfo);
+        ChunkPlan info = ChunkPlan.getChunkPlan(coord, dimInfo);
         CompiledPalette palette = info.getCompiledPalette();
         Palette partPalette = part.getLocalPalette();
         Palette buildingPalette = info.getBuilding().getLocalPalette();
