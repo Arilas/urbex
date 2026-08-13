@@ -10,6 +10,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.TerrainSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys;
+import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -50,6 +51,27 @@ class PresetCodecTest {
         assertTrue(re.decoration().isEmpty());
         assertTrue(re.spawn().isEmpty());
         assertTrue(re.misc().isEmpty());
+    }
+
+    /**
+     * All six metadata keys are top-level keys of the preset object, decoded alongside the sections.
+     * Pinned because they have been routed through the codec two different ways - see the flat
+     * {@code RecordCodecBuilder.group} in {@code PresetDefinition}, which they were briefly lifted
+     * out of to buy back a field slot.
+     */
+    @Test
+    void everyMetadataKeyDecodes() {
+        PresetDefinition re = decode("{\"extends\":\"urbex:default\",\"name\":\"Tall Buildings\","
+                + "\"description\":\"d\",\"extraDescription\":\"e\",\"warning\":\"w\","
+                + "\"icon\":\"i.png\",\"cities\":{\"cityChance\":0.25}}");
+
+        assertEquals(Identifier.fromNamespaceAndPath("urbex", "default"), re.getExtends().orElseThrow());
+        assertEquals("Tall Buildings", re.displayName().orElseThrow());
+        assertEquals("d", re.description().orElseThrow());
+        assertEquals("e", re.extraDescription().orElseThrow());
+        assertEquals("w", re.warning().orElseThrow());
+        assertEquals("i.png", re.icon().orElseThrow());
+        assertEquals(0.25, re.cities().orElseThrow().cityChance().orElseThrow());
     }
 
     @Test
