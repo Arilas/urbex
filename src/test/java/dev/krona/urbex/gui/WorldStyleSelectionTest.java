@@ -2,6 +2,7 @@ package dev.krona.urbex.gui;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.setup.WorldSelectionHandoff;
 import dev.krona.urbex.setup.WorldStyleMix;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
@@ -16,11 +17,12 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * worldStyle is orthogonal to the chosen preset (spec 1a): since Task 4 a {@link Preset} carries no
  * worldStyle field of its own at all, so switching styles never edits or clones a preset - it is
- * simply its own value published alongside {@code Config.presetFromClient}. The enumeration of
+ * simply its own value published alongside {@code WorldSelectionHandoff.pending().preset()}. The enumeration of
  * registered styles needs a live datapack registry that can't be built headless, so the state under
  * test takes the available style ids injected via {@link PresetSelection#setAvailableWorldStyles(List)} -
  * exactly what the Cities tab feeds it from the real registry. Everything else here is pure state.
@@ -80,10 +82,10 @@ class WorldStyleSelectionTest {
         assertEquals("urbex:lcmt", selection.effectiveWorldStyle());
 
         selection.publish();
-        // A worldStyle choice publishes as its own Config field - no preset customization involved.
-        assertEquals(id("default"), Config.presetFromClient);
-        assertEquals(WorldStyleMix.parse("urbex:lcmt"), Config.worldStyleMixFromClient);
-        assertNull(Config.overridesFromClient);
+        // A worldStyle choice publishes alongside the preset - no customization involved.
+        assertEquals(id("default"), WorldSelectionHandoff.pending().preset());
+        assertEquals(WorldStyleMix.parse("urbex:lcmt"), WorldSelectionHandoff.pending().worldStyles());
+        assertTrue(WorldSelectionHandoff.pending().patch().isEmpty());
     }
 
     @Test

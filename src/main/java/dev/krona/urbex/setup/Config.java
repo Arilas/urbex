@@ -152,15 +152,8 @@ public class Config {
      */
     private static volatile Map<ResourceKey<Level>, PresetChoice> dimensionPresetCache = null;
 
-    // Selection as published by the client.
-    public static Identifier presetFromClient = null;
-    public static WorldStyleMix worldStyleMixFromClient = null;
-    public static String overridesFromClient = null;
-
     public static void reset() {
-        presetFromClient = null;
-        worldStyleMixFromClient = null;
-        overridesFromClient = null;
+        WorldSelectionHandoff.discard();
         dimensionPresetCache = null;
         active = global;
     }
@@ -284,19 +277,20 @@ public class Config {
     }
 
     /**
-     * What the create-world screen published, or null.
+     * What the create-world screen published, or null. See {@link WorldSelectionHandoff}.
      * <p>
-     * The three static fields it arrives in are #73's business; this only reads them.
+     * Gated again on the way out, not only where it was published: the flag can be off on the
+     * install that reads a publication even if it was on where one was written, and a mix must never
+     * reach generation on an install that never opted in.
      */
     @Nullable
     private static WorldSelection publishedSelection() {
-        if (presetFromClient == null) {
+        WorldSelection published = WorldSelectionHandoff.pending();
+        if (published == null) {
             return null;
         }
-        return new WorldSelection(presetFromClient,
-                gateMix(worldStyleMixFromClient != null ? worldStyleMixFromClient : DEFAULT_WORLD_STYLE_MIX,
-                        "The world being created"),
-                Optional.ofNullable(overridesFromClient));
+        return new WorldSelection(published.preset(),
+                gateMix(published.worldStyles(), "The world being created"), published.patch());
     }
 
     /**
