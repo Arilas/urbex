@@ -5,6 +5,7 @@ import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.CityGenerator;
+import dev.krona.urbex.worldgen.Parts;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
@@ -49,7 +50,7 @@ public class Streets {
                     case ZMAX -> Transform.ROTATE_270;
                 };
 
-                feature.generatePart(ctx, info, stairs, transform, 0, oy, 0, CityGenerator.HardAirSetting.AIR);
+                Parts.generatePart(ctx, feature, info, stairs, transform, 0, oy, 0, CityGenerator.HardAirSetting.AIR);
             }
         }
     }
@@ -123,7 +124,7 @@ public class Streets {
                         part = info.fountainType;
                     }
                     if (part != null) {
-                        feature.generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+                        Parts.generatePart(ctx, feature, info, part, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
                     }
                 }
 
@@ -220,21 +221,21 @@ public class Streets {
         BlockState wall = ctx.paletteAt(info.getCompiledPalette(), wallBlock, x, info.getCityGroundLevel() + 1, z);
 
         if (info.profile.isFloating()) {
-                feature.setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                Parts.setBlocksFromPalette(ctx, feature, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 if (isCorner(x, z)) {
                     generateBorderSupport(ctx, feature, info, wall, x, z, 3, heightmap);
                 }
         } else if (info.profile.isCavern()) {
-                feature.setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                Parts.setBlocksFromPalette(ctx, feature, x, info.getCityGroundLevel() - 2, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
                 if (isCorner(x, z)) {
                     generateBorderSupport(ctx, feature, info, wall, x, z, 2, heightmap);
                 }
         } else {
             int y = feature.getMinHeightAt(info, x, z, heightmap);
             if (y < info.getCityGroundLevel() + 1) {
-                feature.setBlocksFromPalette(ctx, x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                Parts.setBlocksFromPalette(ctx, feature, x, y - 1, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
             } else {
-                feature.setBlocksFromPalette(ctx, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
+                Parts.setBlocksFromPalette(ctx, feature, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
             }
         }
         if (canDoParks) {
@@ -269,7 +270,7 @@ public class Streets {
 
     private static int generateFrontPart(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int height, ChunkPlan adj, Transform rot) {
         if (info.hasFrontPartFrom(adj)) {
-            return feature.generatePart(ctx, adj, adj.frontType, rot, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+            return Parts.generatePart(ctx, feature, adj, adj.frontType, rot, 0, height, 0, CityGenerator.HardAirSetting.AIR);
         }
         return height;
     }
@@ -315,7 +316,7 @@ public class Streets {
         }
         BuildingPart part = feature.provider.assets().parts().getOrWarn(feature.getRandomPart(ctx, parts.stair()));
         if (part != null) {
-            feature.generatePart(ctx, info, part, slopeDirection.getRotation(), 0, height, 0, CityGenerator.HardAirSetting.VOID);
+            Parts.generatePart(ctx, feature, info, part, slopeDirection.getRotation(), 0, height, 0, CityGenerator.HardAirSetting.VOID);
         }
     }
 
@@ -387,7 +388,7 @@ public class Streets {
             default -> throw new RuntimeException("Not possible!");
         };
         if (part != null) {
-            feature.generatePart(ctx, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.VOID);
+            Parts.generatePart(ctx, feature, info, part, transform, 0, height, 0, CityGenerator.HardAirSetting.VOID);
             generateMinorStreetConnectors(ctx, feature, info, parts, height);
         }
     }
@@ -413,7 +414,7 @@ public class Streets {
         if (ChunkPlan.hasRoadConnection(info, adjacent) && !adjacent.isPrimaryRoad()) {
             BuildingPart connector = feature.provider.assets().parts().getOrWarn(feature.getRandomPart(ctx, parts.connector()));
             if (connector != null) {
-                feature.generatePart(ctx, info, connector, transform, 0, height, 0, CityGenerator.HardAirSetting.VOID);
+                Parts.generatePart(ctx, feature, info, connector, transform, 0, height, 0, CityGenerator.HardAirSetting.VOID);
             }
         }
     }

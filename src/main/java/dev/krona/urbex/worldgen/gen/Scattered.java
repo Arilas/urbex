@@ -8,6 +8,7 @@ import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.CityGenerator;
+import dev.krona.urbex.worldgen.Parts;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredReference;
@@ -331,7 +332,7 @@ public class Scattered {
                         }
                     }
                     case REPEATSLICE -> {
-                        CompiledPalette compiledPalette = feature.computePalette(info, part);
+                        CompiledPalette compiledPalette = Parts.computePalette(feature, info, part);
                         for (int x = 0; x < 16; x++) {
                             for (int z = 0; z < 16; z++) {
                                 char c = part.getPaletteChar(x, 0, z);
@@ -351,9 +352,9 @@ public class Scattered {
                 }
             }
 
-            height = feature.generatePart(ctx, info, part, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+            height = Parts.generatePart(ctx, feature, info, part, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
             if (part2 != null) {
-                feature.generatePart(ctx, info, part2, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
+                Parts.generatePart(ctx, feature, info, part2, Transform.ROTATE_NONE, 0, height, 0, CityGenerator.HardAirSetting.AIR);
             }
         }
     }
