@@ -78,12 +78,26 @@ public abstract class UnsafeReadGateMixin {
     }
 
     @Unique
+    private static final StackWalker URBEX_WALKER = StackWalker.getInstance();
+
+    /**
+     * Attributes this call to the nearest Urbex frame, or to nothing if there is none.
+     *
+     * <p>A {@link StackWalker} rather than {@code new Throwable().getStackTrace()}, which
+     * materialises the entire stack as {@code StackTraceElement} objects before the first one is
+     * looked at. Most calls that reach here are vanilla's own cross-chunk reads with no Urbex frame
+     * anywhere below them, so the whole array was built and discarded to record nothing: a JFR
+     * profile of {@code runDigestCheckAvoid} attributed <strong>815 MiB</strong> to this method over
+     * 625 chunks - against a reported {@code unsafeReads=0}. The gate is off in normal play, so this
+     * was never a player-facing cost, but it was 8% of every allocation figure this milestone
+     * measured (issue #132).</p>
+     */
+    @Unique
     private static void urbex$recordFromStack() {
-        for (StackTraceElement element : new Throwable().getStackTrace()) {
-            if (element.getClassName().startsWith("dev.krona.urbex")) {
-                UnsafeReadCounter.record(element.toString());
-                return;
-            }
-        }
+        URBEX_WALKER.walk(frames -> frames
+                        .filter(frame -> frame.getClassName().startsWith("dev.krona.urbex"))
+                        .findFirst()
+                        .map(frame -> frame.toStackTraceElement().toString()))
+                .ifPresent(UnsafeReadCounter::record);
     }
 }
