@@ -99,8 +99,6 @@
   "urbex.section.advanced.identifiers.desc": "Named styles, presets and forced-spawn part lists.",
   "urbex.section.advanced.misc": "Generation Internals",
   "urbex.section.advanced.misc.desc": "Low-level switches that change how geometry is assembled.",
-  "urbex.section.advanced.visuals": "Client Visuals",
-  "urbex.section.advanced.visuals.desc": "Client-side horizon and fog tuning; no effect on generation.",
   "urbex.setting.DEBRIS_TO_NEARBYCHUNK_FACTOR": "Debris To Nearbychunk Factor",
   "urbex.setting.DEBRIS_TO_NEARBYCHUNK_FACTOR.tooltip": "A factor that determines how much debris will overflow from nearby damaged chunks. Bigger numbers mean less debris",
   "urbex.setting.CHANCE_OF_RANDOM_LEAFBLOCKS": "Chance Of Random Leafblocks",
