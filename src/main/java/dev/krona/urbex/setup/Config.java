@@ -1,13 +1,11 @@
 package dev.krona.urbex.setup;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
+import dev.krona.urbex.config.ConfigRepository;
 import dev.krona.urbex.config.UrbexConfig;
 import dev.krona.urbex.data.UrbexData;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
@@ -22,9 +20,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.LevelResource;
 
-import java.io.IOException;
-import java.io.Reader;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -84,99 +79,25 @@ public class Config {
         return reduced;
     }
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
-
     /**
-     * Loads the global config from {@code config/urbex/urbex.json}, migrating the legacy
-     * {@code common.toml} on first run. Called once from mod init.
+     * Loads the global config. Called once from mod init.
+     * <p>
+     * Reading the file, migrating a legacy one and writing it back are {@link ConfigRepository}'s
+     * business; what happens here is publication - the two slots every other path reads (issue #130).
      */
     public static void loadGlobal(Path configDir) {
-        Path dir = configDir.resolve("urbex");
-        Path file = dir.resolve("urbex.json");
-        JsonObject json = null;
-        if (Files.exists(file)) {
-            json = readJson(file);
-        } else {
-            Path legacy = dir.resolve("common.toml");
-            if (Files.exists(legacy)) {
-                json = readLegacyToml(legacy);
-                Urbex.getLogger().info("Migrating legacy config {} to {}", legacy, file);
-            }
-        }
-        if (json != null) {
-            Optional<UrbexConfig> parsed = UrbexConfig.fromJson(json);
-            if (parsed.isPresent()) {
-                global = parsed.get();
-            } else {
-                Urbex.getLogger().error("Invalid config in {} - using defaults. Fix or delete the file.", file);
-            }
-        }
+        global = ConfigRepository.loadGlobal(configDir);
         active = global;
-        // Write back the full, normalized file so every available option is visible
-        try {
-            Files.createDirectories(dir);
-            Files.writeString(file, GSON.toJson(UrbexConfig.toJson(global)));
-        } catch (IOException e) {
-            Urbex.getLogger().error("Could not write {}", file, e);
-        }
     }
 
     /**
-     * Applies {@code <world>/serverconfig/urbex.json} (or the legacy
-     * {@code urbex-server.toml}) over the global config. Called at SERVER_STARTING, before any
-     * worldgen; the merge is per-key, so a world file only carries what it changes.
+     * Applies this world's own overrides over the global config. Called at SERVER_STARTING, before
+     * any worldgen.
      */
     public static void applyWorldOverrides(MinecraftServer server) {
-        UrbexConfig result = global;
-        Path dir = server.getWorldPath(LevelResource.ROOT).resolve("serverconfig");
-        Path file = dir.resolve("urbex.json");
-        JsonObject overrides = null;
-        if (Files.exists(file)) {
-            overrides = readJson(file);
-        } else {
-            Path legacy = dir.resolve("urbex-server.toml");
-            if (Files.exists(legacy)) {
-                overrides = readLegacyToml(legacy);
-                Urbex.getLogger().info("Migrating legacy world config {} to {}", legacy, file);
-                try {
-                    Files.createDirectories(dir);
-                    Files.writeString(file, GSON.toJson(overrides));
-                } catch (IOException e) {
-                    Urbex.getLogger().error("Could not write {}", file, e);
-                }
-            }
-        }
-        if (overrides != null && !overrides.isEmpty()) {
-            JsonObject merged = UrbexConfig.merge(UrbexConfig.toJson(global), overrides);
-            Optional<UrbexConfig> parsed = UrbexConfig.fromJson(merged);
-            if (parsed.isPresent()) {
-                result = parsed.get();
-                Urbex.getLogger().info("Applied {} world config override(s) from {}", overrides.size(), file);
-            } else {
-                Urbex.getLogger().error("Invalid world config in {} - ignoring it.", file);
-            }
-        }
-        active = result;
+        active = ConfigRepository.applyWorldOverrides(global, server.getWorldPath(LevelResource.ROOT));
         AVOID_STRUCTURES_SET = null;
         resetPresetCache();
-    }
-
-    private static JsonObject readJson(Path file) {
-        try (Reader reader = Files.newBufferedReader(file)) {
-            return JsonParser.parseReader(reader).getAsJsonObject();
-        } catch (Exception e) {
-            Urbex.getLogger().error("Could not read {}", file, e);
-            return null;
-        }
-    }
-
-    private static JsonObject readLegacyToml(Path file) {
-        try {
-            return dev.krona.urbex.config.LegacyToml.toJson(Files.readAllLines(file));
-        } catch (IOException e) {
-            Urbex.getLogger().error("Could not read {}", file, e);
-            return null;
-        }
     }
 
     /**
