@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.Config;
+import dev.krona.urbex.varia.GenerationMetrics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
@@ -99,7 +100,7 @@ public final class LevelTaskQueue {
 
     public void add(BlockPos pos, Task task) {
         pending.add(new Entry(pos, task));
-        pendingCount.incrementAndGet();
+        GenerationMetrics.queueDepth(pendingCount.incrementAndGet());
     }
 
     /**

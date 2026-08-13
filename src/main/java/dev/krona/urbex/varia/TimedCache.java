@@ -16,6 +16,13 @@ import java.util.function.IntSupplier;
  */
 public class TimedCache<K, V> {
 
+    /**
+     * Where this cache's counters go, or null when metrics are off - which is every run that is not
+     * measuring. Null rather than a no-op object so the branch below is a null check the JIT can
+     * fold, and so an unmeasured run allocates no counters at all (issue #132).
+     */
+    private final GenerationMetrics.CacheStats stats;
+
     private static class Entry<V> {
         private final V value;
         // Written on every read, from whichever thread did the reading. Volatile so a later
@@ -33,27 +40,52 @@ public class TimedCache<K, V> {
     private final AtomicLong nextCleanupAt;
 
     public TimedCache(IntSupplier ttlSecondsSupplier) {
+        this(ttlSecondsSupplier, null);
+    }
+
+    /**
+     * @param name what this cache is called in a {@code PERF=} report. A cache built without one is
+     *             not reported, which is how a cache created inside a test stays out of the numbers.
+     */
+    public TimedCache(IntSupplier ttlSecondsSupplier, String name) {
         this.ttlSecondsSupplier = ttlSecondsSupplier;
         this.nextCleanupAt = new AtomicLong(System.currentTimeMillis());
+        this.stats = GenerationMetrics.enabled() && name != null
+                ? GenerationMetrics.cache(name, cache::size) : null;
     }
 
     public void clear() {
         cache.clear();
     }
 
+    /** How many entries are held right now. O(n) on a ConcurrentHashMap, so: reporting only. */
+    public int size() {
+        return cache.size();
+    }
+
     public V get(K key) {
         long now = System.currentTimeMillis();
         Entry<V> entry = cache.get(key);
         if (entry == null) {
+            if (stats != null) {
+                stats.miss();
+            }
             maybeCleanup(now);
             return null;
         }
         if (isExpired(entry, now)) {
             cache.remove(key, entry);
+            if (stats != null) {
+                stats.miss();
+                stats.evicted(1);
+            }
             maybeCleanup(now);
             return null;
         }
         entry.lastAccess = now;
+        if (stats != null) {
+            stats.hit();
+        }
         maybeCleanup(now);
         return entry.value;
     }
@@ -82,6 +114,11 @@ public class TimedCache<K, V> {
             return null;
         }
         V raced = putIfAbsent(key, computed);
+        if (raced != null && stats != null) {
+            // Two threads computed the same pure value and one result is dropped. Correct, and
+            // documented above; also duplicated work nothing counted until #132.
+            stats.raced();
+        }
         return raced != null ? raced : computed;
     }
 
@@ -113,17 +150,27 @@ public class TimedCache<K, V> {
     }
 
     private void cleanup(long now) {
+        long started = stats == null ? 0 : System.nanoTime();
+        long removed = 0;
         long ttlMillis = getTtlMillis();
         if (ttlMillis <= 0) {
+            removed = cache.size();
             cache.clear();
-            return;
-        }
-        Iterator<Map.Entry<K, Entry<V>>> iterator = cache.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<K, Entry<V>> entry = iterator.next();
-            if (now - entry.getValue().lastAccess >= ttlMillis) {
-                iterator.remove();
+        } else {
+            Iterator<Map.Entry<K, Entry<V>>> iterator = cache.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<K, Entry<V>> entry = iterator.next();
+                if (now - entry.getValue().lastAccess >= ttlMillis) {
+                    iterator.remove();
+                    removed++;
+                }
             }
+        }
+        if (stats != null) {
+            // The sweep is O(n) on whichever worldgen worker won the CAS above, which is the
+            // specific thing #132 asks to measure before anything is done about it.
+            stats.evicted(removed);
+            stats.swept(System.nanoTime() - started, cache.size());
         }
     }
 

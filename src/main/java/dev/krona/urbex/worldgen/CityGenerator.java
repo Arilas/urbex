@@ -251,6 +251,7 @@ public class CityGenerator {
     private void generateOrThrow(DimensionRuntime runtime, WorldGenRegion region,
                                  ChunkAccess chunk, ChunkCoord coord) {
         long start = System.currentTimeMillis();
+        long startNanos = GenerationMetrics.enabled() ? System.nanoTime() : 0;
 
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
@@ -334,6 +335,10 @@ public class CityGenerator {
 
         long time = System.currentTimeMillis() - start;
         statistics.addTime(time);
+        // Nanoseconds, separately from the millisecond Statistics that /urbex stats reports: a
+        // chunk taking under a millisecond rounds to zero there, which is most of them, and a tail
+        // latency built out of those numbers would be made of zeroes (issue #132).
+        GenerationMetrics.chunk(System.nanoTime() - startNanos);
         } catch (Throwable t) {
             throw new ChunkGenerationFailure(coord, ctx.driver.commitState(), t);
         }

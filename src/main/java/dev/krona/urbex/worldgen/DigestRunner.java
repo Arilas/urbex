@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.ChunkCoord;
+import dev.krona.urbex.varia.GenerationMetrics;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.PrimaryBridgePlanner;
 import dev.krona.urbex.worldgen.lost.Railway;
@@ -56,6 +57,10 @@ public final class DigestRunner {
      *                     slope - the only mechanical proof the full-chunk {@code street_stair}
      *                     part renders at all - announces itself instead of moving silently; see
      *                     {@code digestCheckFeatures} in {@code build.gradle}.
+     * @param perfLine     what the run cost, when {@code -Durbex.metrics} asked. Emitted beside the
+     *                     digest so a measurement is a digest run rather than a separate exercise
+     *                     with its own scheduling and its own caches (issue #132); {@code PERF=off}
+     *                     when nobody asked.
      * @param unsafeReads  how many cross-chunk terrain reads Urbex made during this run (see
      *                     {@link UnsafeReadCounter}). City generation runs at the carver stage,
      *                     where a chunk may touch only itself; a non-zero count here is a
@@ -64,7 +69,7 @@ public final class DigestRunner {
      */
     public record Result(long driverDigest, long fullDigest, long driverBlocks, int drivenChunks,
                          int chunkCount, long elapsedMs, int bridgeChunks, int slopeChunks, int avoidedChunks,
-                         int railCollisionChunks, long unsafeReads) {
+                         int railCollisionChunks, long unsafeReads, String perfLine) {
 
         public String driverLine(String order, int offset) {
             return String.format(
@@ -114,6 +119,9 @@ public final class DigestRunner {
         List<ChunkPos> chunks = chunkSquare(radius, order, offset);
 
         UnsafeReadCounter.reset();
+        // Reset here rather than at server start: a digest run is the measured unit, and a run that
+        // included whatever the spawn-area generation did would not be comparable with the next one.
+        GenerationMetrics.reset();
         long start = System.currentTimeMillis();
         int recordedChunks;
         // Forced cache expiry, off unless asked for. Planning caches are TimedCaches that can drop
@@ -191,7 +199,8 @@ public final class DigestRunner {
 
         long elapsed = System.currentTimeMillis() - start;
         return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed, bridgeChunks,
-                slopeChunks, avoidedChunks, railCollisionChunks, unsafeReads);
+                slopeChunks, avoidedChunks, railCollisionChunks, unsafeReads,
+                GenerationMetrics.report(chunks.size(), elapsed));
     }
 
     /**
