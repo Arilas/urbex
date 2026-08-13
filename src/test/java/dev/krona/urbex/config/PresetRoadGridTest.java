@@ -1,6 +1,6 @@
-package dev.krona.urbex.plan.grid;
+package dev.krona.urbex.config;
 
-import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.plan.grid.GridSettings;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.Test;
 
@@ -9,12 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link GridSettings#fromPreset} is the only adapter between the profile and the strictly validated
- * settings record, and it deliberately does not soften anything on the way through: a profile whose
- * minimum exceeds its maximum describes a world nobody can generate, and widening the pair here would
- * hand its author a different world with no diagnostic at all.
+ * {@link PresetRoadGrid} is the only adapter between the preset and the strictly validated settings
+ * record, and it deliberately does not soften anything on the way through: a preset whose minimum
+ * exceeds its maximum describes a world nobody can generate, and widening the pair here would hand
+ * its author a different world with no diagnostic at all.
+ * <p>
+ * It sits on the configuration side of the boundary. It used to be a {@code GridSettings.fromPreset}
+ * factory inside {@code dev.krona.urbex.plan}, written with a fully-qualified parameter type so the
+ * package's own purity test would not see the reach (issue #129).
  */
-class GridSettingsTest {
+class PresetRoadGridTest {
 
     private static Preset profile() {
         return new Preset(Identifier.fromNamespaceAndPath("urbex", "test"));
@@ -22,7 +26,7 @@ class GridSettingsTest {
 
     @Test
     void aFreshProfileProducesUpstreamsDefaults() {
-        assertEquals(GridSettings.defaults(), GridSettings.fromPreset(profile()));
+        assertEquals(GridSettings.defaults(), PresetRoadGrid.of(profile()));
     }
 
     @Test
@@ -106,7 +110,7 @@ class GridSettingsTest {
      */
     private static void assertNamesTheField(Preset p, String configKey) {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> GridSettings.fromPreset(p));
+                () -> PresetRoadGrid.of(p));
         assertTrue(e.getMessage().contains(configKey),
                 "message must name the offending profile setting '" + configKey + "', was: " + e.getMessage());
     }

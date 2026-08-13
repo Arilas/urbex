@@ -7,7 +7,7 @@ import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.plan.grid.GridRoadField;
-import dev.krona.urbex.plan.grid.GridSettings;
+import dev.krona.urbex.config.PresetRoadGrid;
 import dev.krona.urbex.setup.PresetChoice;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
@@ -153,7 +153,7 @@ public record DimensionRuntime(ServerLevel level, @Nullable PlanningContext plan
                 preset,
                 assets,
                 WorldStyleField.resolve(assets, seed, worldStyles),
-                new GridRoadField(seed, dimension.identifier().toString(), GridSettings.fromPreset(preset)),
+                new GridRoadField(seed, dimension.identifier().toString(), PresetRoadGrid.of(preset)),
                 caches,
                 LevelShape.of(level),
                 new LevelTerrain(level, preset, caches));
