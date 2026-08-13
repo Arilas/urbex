@@ -104,6 +104,23 @@ The practical consequence: a pack that is not the heaviest in a mix will not see
 railway parts used. Nothing about that is worth designing around — author the world style as if it
 were the only one, and it will be, for every city it owns.
 
+### Do not place the `urbex:city` feature
+
+Urbex generates each chunk once, at the end of the carver stage, without any feature placement. You
+do not need to place anything, and you should not: **placing `urbex:city` in a biome's `features` is
+refused**, with one warning per dimension in the log. It used to generate the chunk a second time,
+planning against terrain the first pass had already rewritten.
+
+The feature exists for one case: a **custom chunk generator** that is neither
+`minecraft:noise` nor `minecraft:flat` (nor a mod generator extending one of those classes). Urbex
+has no hook into such a generator, so a world using one gets no cities at all unless the pack places
+`urbex:city` itself. That is what the feature is for, and it is the supported way in.
+
+Placing it costs one guarantee. Features run at the decoration stage, where a neighbouring chunk's
+own feature pass may or may not have run yet, so what Urbex reads from the terrain depends on how the
+server scheduled its worker threads — the same world can generate differently twice. The carver-stage
+path has no such problem. If your world runs on a vanilla generator, leave the feature alone.
+
 ## `extends`
 
 `extends` takes **one fully-qualified id, in the same registry as the file declaring it**:
