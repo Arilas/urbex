@@ -203,8 +203,9 @@ public class ChunkDriver {
     private LevelAccessor region;
     private long seed;
     private ChunkAccess primer;
-    private final BlockPos.MutableBlockPos current = new BlockPos.MutableBlockPos();
     private final BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+    /** Where the caller is walking; see {@link BlockCursor}. */
+    private BlockCursor cursor;
     /** Where writes accumulate until {@link #flushToChunk}. */
     private ChunkBuffer buffer;
     /** Resolves connections once the chunk is finished; see {@link #correctionsPass}. */
@@ -223,6 +224,7 @@ public class ChunkDriver {
             this.cx = primer.getPos().x();
             this.cz = primer.getPos().z();
             shaper = new BlockShaper(chunkView, region, seed);
+            cursor = new BlockCursor(blockAccess, primer.getPos().x() << 4, primer.getPos().z() << 4);
         }
     }
 
@@ -325,6 +327,24 @@ public class ChunkDriver {
         }
     };
 
+    /** What a {@link BlockCursor} does to this chunk: explicit positions, absolute. */
+    private final BlockCursor.Blocks blockAccess = new BlockCursor.Blocks() {
+        @Override
+        public void set(int x, int y, int z, BlockState state) {
+            setBlock(x, y, z, state);
+        }
+
+        @Override
+        public BlockState get(int x, int y, int z) {
+            return getBlock(pos.set(x, y, z));
+        }
+    };
+
+    /** Writes one block, by position rather than by where the cursor happens to be (issue #52). */
+    public void setBlock(int x, int y, int z, BlockState state) {
+        buffer.set(x, y, z, state);
+    }
+
     private void setBlock(BlockPos p, BlockState state) {
         buffer.set(p.getX(), p.getY(), p.getZ(), state);
     }
@@ -369,55 +389,59 @@ public class ChunkDriver {
         return primer;
     }
 
+    // -----------------------------------------------------------------------------------------
+    // The cursor. State and behaviour live in BlockCursor; these delegate, and keep the shape every
+    // caller already writes against (issue #52).
+    // -----------------------------------------------------------------------------------------
+
     public ChunkDriver current(int x, int y, int z) {
-        current.set(x + (primer.getPos().x() << 4), y, z + (primer.getPos().z() << 4));
+        cursor.at(x, y, z);
         return this;
     }
 
     public ChunkDriver currentAbsolute(BlockPos pos) {
-        current.set(pos);
+        cursor.atAbsolute(pos);
         return this;
     }
 
     public ChunkDriver currentRelative(BlockPos pos) {
-        current(pos.getX(), pos.getY(), pos.getZ());
-        return this;
+        return current(pos.getX(), pos.getY(), pos.getZ());
     }
 
     public BlockPos getCurrentCopy() {
-        return current.immutable();
+        return cursor.copy();
     }
 
     public BlockPos.MutableBlockPos getCurrent() {
-        return current;
+        return cursor.position();
     }
 
     public void incY() {
-        current.setY(current.getY()+1);
+        cursor.up();
     }
 
     public void decY() {
-        current.setY(current.getY()-1);
+        cursor.down();
     }
 
     public void incX() {
-        current.setX(current.getX()+1);
+        cursor.east();
     }
 
     public void incZ() {
-        current.setZ(current.getZ()+1);
+        cursor.south();
     }
 
     public int getX() {
-        return current.getX();
+        return cursor.x();
     }
 
     public int getY() {
-        return current.getY();
+        return cursor.y();
     }
 
     public int getZ() {
-        return current.getZ();
+        return cursor.z();
     }
 
     public void setBlockRange(int x, int y, int z, int y2, BlockState state) {
@@ -460,22 +484,21 @@ public class ChunkDriver {
 //    }
 
     public ChunkDriver block(BlockState c) {
-        setBlock(current, c);
+        cursor.write(c);
         return this;
     }
 
     public ChunkDriver add(BlockState state) {
-        setBlock(current, state);
-        incY();
+        cursor.writeAndRise(state);
         return this;
     }
 
     public BlockState getBlock() {
-        return getBlock(current);
+        return cursor.read();
     }
 
     public BlockState getBlockDown() {
-        return getBlock(pos.set(current.getX(), current.getY()-1, current.getZ()));
+        return cursor.readBelow();
     }
 
 
