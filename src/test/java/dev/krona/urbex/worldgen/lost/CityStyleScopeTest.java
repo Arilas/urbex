@@ -44,6 +44,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CityStyleScopeTest {
@@ -87,6 +88,18 @@ class CityStyleScopeTest {
     }
 
     @Test
+    void centredSelectorGapStaysNullInsteadOfRerollingAtTheObserverBiome() {
+        WorldStyle worldStyle = TestWorldStyles.minimal("centred-gap", List.of(
+                selector(1.0f, "cold", null, 0, matches(COLD))));
+        PredefinedCity city = predefined("centre", 0, 0, 64, null);
+        PlanningContext planning = context(142L, centredPreset(), worldStyle, List.of(city),
+                (x, z) -> x == 0 && z == 0 ? HOT : COLD, "cold");
+
+        assertNull(City.getCityStyle(coord(3, 0), planning, planning.preset()),
+                "the HOT centre selected no family; the COLD observer must not get another draw");
+    }
+
+    @Test
     void overlappingCentresKeepTheirFactorWeightsAfterBaseEdgeResolution() {
         WorldStyle worldStyle = TestWorldStyles.minimal("overlap", List.of(
                 selector(1.0f, "hot_base", "hot_edge", 0.5f, matches(HOT)),
@@ -112,6 +125,29 @@ class CityStyleScopeTest {
         double hotShare = (double) hotBase / samples;
         assertTrue(hotShare > 0.67 && hotShare < 0.83,
                 "0.75-factor centre won " + hotShare + " of overlap draws");
+    }
+
+    @Test
+    void selectorGapAtAnOverlappingCentreKeepsItsFactorWeight() {
+        WorldStyle worldStyle = TestWorldStyles.minimal("overlap-gap", List.of(
+                selector(1.0f, "cold", null, 0, matches(COLD))));
+        List<PredefinedCity> cities = List.of(
+                predefined("hot-centre", 0, 0, 64, null),
+                predefined("cold-centre", 4, 0, 64, null));
+        int cold = 0;
+        int samples = 400;
+        for (long seed = 0; seed < samples; seed++) {
+            PlanningContext planning = context(seed, centredPreset(), worldStyle, cities,
+                    (x, z) -> x == 0 ? HOT : COLD, "cold");
+            if (City.getCityStyle(coord(1, 0), planning, planning.preset()) != null) {
+                cold++;
+            }
+        }
+
+        double coldShare = (double) cold / samples;
+        assertTrue(coldShare > 0.17 && coldShare < 0.33,
+                "the 0.25-factor matched centre won " + coldShare
+                        + " of draws; the 0.75-factor selector gap must remain a null candidate");
     }
 
     @Test
@@ -190,6 +226,18 @@ class CityStyleScopeTest {
                 (x, z) -> x == 0 && z == 0 ? HOT : COLD, "hot", "cold");
 
         assertEquals("urbextest:hot", City.getCityStyle(coord(15, 15), planning, preset).getName());
+    }
+
+    @Test
+    void perlinSelectorGapStaysNullInsteadOfRerollingAtTheObserverBiome() {
+        Preset preset = perlinPreset();
+        WorldStyle worldStyle = TestWorldStyles.minimal("perlin-gap", List.of(
+                selector(1.0f, "cold", null, 0, matches(COLD))));
+        PlanningContext planning = context(147L, preset, worldStyle, List.of(),
+                (x, z) -> x == 0 && z == 0 ? HOT : COLD, "cold");
+
+        assertNull(City.getCityStyle(coord(15, 15), planning, preset),
+                "the HOT region anchor selected no family; the COLD observer must not get another draw");
     }
 
     private static Preset centredPreset() {

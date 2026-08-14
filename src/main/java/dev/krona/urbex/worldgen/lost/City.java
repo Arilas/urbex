@@ -195,9 +195,8 @@ public class City {
                     profile.cityPerlinScale(), profile.cityPerlinOffset(), profile.cityPerlinInnerScale());
             float factor = rarityMap.getCityFactor(chunkX, chunkZ);
             CityStyleSelection selection = getCityStyleSelectionForPerlinRegion(coord, provider);
-            if (selection != null) {
-                styles.add(Pair.of(factor, selection.styleAt(factor)));
-            }
+            styles.add(Pair.of(factor,
+                    selection == null ? null : selection.styleAt(factor)));
         } else {
             int offset = (profile.cityMaxRadius() + 15) / 16;
             for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {
@@ -211,9 +210,8 @@ public class City {
                             float factor = (radius - dist) / radius;
                             CityStyleSelection selection =
                                     getCityStyleSelectionForCityCenter(c, provider);
-                            if (selection != null) {
-                                styles.add(Pair.of(factor, selection.styleAt(factor)));
-                            }
+                            styles.add(Pair.of(factor,
+                                    selection == null ? null : selection.styleAt(factor)));
                         }
                     }
                 }
