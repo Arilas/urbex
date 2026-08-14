@@ -188,11 +188,14 @@ class PresetSchemaTest {
 
         assertTrue(schema.validate(mapper.readTree("{\"cities\":{\"cityChance\":0.5}}" )).isEmpty(),
                 "expected current cities content to validate");
-        for (String retired : List.of("cityStyleThreshold", "cityStyleAlternative")) {
+        for (Map.Entry<String, String> retired : Map.of(
+                "cityStyleThreshold", "0.4",
+                "cityStyleAlternative", "\"urbextest:alternative\"").entrySet()) {
             Set<ValidationMessage> messages = schema.validate(
-                    mapper.readTree("{\"cities\":{\"" + retired + "\":0}}"));
+                    mapper.readTree("{\"cities\":{\"" + retired.getKey() + "\":"
+                            + retired.getValue() + "}}"));
             assertFalse(messages.isEmpty(),
-                    "expected retired cities property '" + retired + "' to be rejected");
+                    "expected retired cities property '" + retired.getKey() + "' to be rejected");
         }
     }
 }

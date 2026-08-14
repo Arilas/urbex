@@ -19,7 +19,6 @@ import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
-import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;

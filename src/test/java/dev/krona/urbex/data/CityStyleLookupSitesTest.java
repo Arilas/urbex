@@ -16,17 +16,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Every place that looks a city style up by name, so that adding one fails the build.
  * <p>
- * Since part wiring became required, a city style that does not resolve is a load error - but only
- * where something resolves it at load. {@code AssetCompiler} does that by compiling every registered style, and
- * enumerating the routes a name can arrive by, and that list is maintained by hand: a new selection
- * path that forgets to register there reverts silently to failing from a worldgen worker,
- * mid-generation, with the whole suite still green. Nothing in the type system prevents it.
+ * Since part wiring became required, a reachable city style that does not resolve is a load error -
+ * but only when something registers it as a root. {@code AssetCompiler} gathers the base and edge
+ * roots from world-style selectors plus explicit predefined-city roots, and that source list is
+ * maintained by hand: a new selection path that forgets to register there reverts silently to
+ * failing from a worldgen worker, mid-generation, with the whole suite still green. Nothing in the
+ * type system prevents it.
  * <p>
  * This pins the shape that is easiest to add by accident - a <em>new lookup site</em>. It cannot see
- * a new name <em>source</em> feeding an existing site, which is exactly what the per-world preset
- * overrides route turned out to be, so it is a guard rather than a proof. If this test fails,
- * the fix is not to widen the list here: it is to make the new site's name reachable from
- * {@code loadReachableCityStyles}, or to check it where it is built as {@code CityFeature} does.
+ * a new name <em>source</em> feeding an existing site, so it is a guard rather than a proof. If this
+ * test fails, the fix is not merely to widen the list here: make the new root reachable from
+ * {@code AssetCompiler.reachableCityStyles}, or validate it eagerly at the producer boundary.
  */
 class CityStyleLookupSitesTest {
 
@@ -57,7 +57,7 @@ class CityStyleLookupSitesTest {
                         // Was ChunkPlan.java until issue #11 split candidate resolution out of it;
                         // the same lookup, in the class that now performs it.
                         "ChunkCandidates.java",
-                        // The world style's selectors and the predefined city.
+                        // The final member selected from world-style and predefined-city roots.
                         "City.java"),
                 List.copyOf(found),
                 "a new city-style lookup site appeared; see this test's javadoc before adding it here");

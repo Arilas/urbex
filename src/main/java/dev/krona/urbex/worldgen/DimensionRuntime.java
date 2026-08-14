@@ -104,11 +104,11 @@ public record DimensionRuntime(ServerLevel level, @Nullable PlanningContext plan
         }
         Preset preset = Presets.resolve(level.registryAccess(), choice.preset());
         if (choice.overridesJson().isPresent()) {
-            // Fail-soft, unlike the preset id resolution above: the overrides JSON is either a
-            // client-published payload PresetSelection.publish() encoded itself (trustworthy), or
-            // saved data read back from disk - a corrupted/hand-edited save file must not refuse the
-            // level. PresetSelection.restore() already validates before publishing, so this guard is
-            // a backstop against corrupted saved data reaching this far, not the primary defense.
+            // Unrelated malformed overrides remain fail-soft: the JSON is either a client-published
+            // payload PresetSelection.publish() encoded itself (trustworthy), or saved data read back
+            // from disk, where corruption must not refuse the level. parseOverrides is the central
+            // retired-key guard, though, and that specific exception is rethrown at this boundary so
+            // removed fields cannot silently become an un-overridden preset.
             try {
                 PresetDefinition re = PresetDefinition.parseOverrides(
                         JsonParser.parseString(choice.overridesJson().get()));

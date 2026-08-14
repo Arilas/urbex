@@ -44,7 +44,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CityStyleScopeTest {
@@ -176,6 +178,41 @@ class CityStyleScopeTest {
     }
 
     @Test
+    void explicitPredefinedStyleOverridesPerlinFamilyAtLowFactorAcrossItsWholeRadius() {
+        Preset preset = perlinPreset();
+        WorldStyle worldStyle = TestWorldStyles.minimal("perlin-explicit", List.of(
+                selector(1.0f, "ordinary_base", "ordinary_edge", 1.0f, null)));
+        PredefinedCity city = predefined("perlin-explicit-centre", 0, 0, 192,
+                "urbextest:explicit");
+        PlanningContext planning = context(145L, preset, worldStyle, List.of(city),
+                (x, z) -> HOT, "explicit", "ordinary_base", "ordinary_edge");
+
+        assertEquals("urbextest:explicit",
+                City.getCityStyle(coord(11, 0), planning, preset).getName(),
+                "the 1/12-factor chunk is inside the declared 192-block radius and the exact "
+                        + "predefined style must remain base-only there");
+    }
+
+    @Test
+    void unstyledPredefinedCityOverridesPerlinRegionWithItsCentreFamilyAndEdge() {
+        Preset preset = perlinPreset();
+        WorldStyle worldStyle = TestWorldStyles.minimal("perlin-implicit", List.of(
+                selector(1.0f, "hot_base", "hot_edge", 0.5f, matches(HOT)),
+                selector(1.0f, "cold_base", "cold_edge", 0.5f, matches(COLD))));
+        PredefinedCity city = predefined("perlin-implicit-centre", 5, 5, 192, null);
+        PlanningContext planning = context(146L, preset, worldStyle, List.of(city),
+                (x, z) -> x == 5 && z == 5 ? HOT : COLD,
+                "hot_base", "hot_edge", "cold_base", "cold_edge");
+
+        assertEquals("urbextest:hot_base",
+                City.getCityStyle(coord(5, 5), planning, preset).getName(),
+                "the predefined centre chooses its ordinary family from the centre biome");
+        assertEquals("urbextest:hot_edge",
+                City.getCityStyle(coord(16, 5), planning, preset).getName(),
+                "the 1/12-factor observer keeps that centre family and resolves its edge");
+    }
+
+    @Test
     void onePerlinRegionUsesOneFamilyWhileLocalFactorsChooseBaseAndEdge() {
         Preset preset = perlinPreset();
         RegionSample sample = varyingRegion(preset, 0.25f);
@@ -214,6 +251,68 @@ class CityStyleScopeTest {
         }
 
         assertTrue(found, "the addressed region draws never produced adjacent distinct families");
+    }
+
+    @Test
+    void mixedWorldStylePerlinRegionsNeverCrossBaseEdgeFamilies() {
+        long seed = 148L;
+        Preset preset = perlinPreset();
+        WorldStyle alpha = TestWorldStyles.minimal("perlin-alpha", List.of(
+                selector(1.0f, "alpha_base", "alpha_edge", 0.2f, null)));
+        WorldStyle beta = TestWorldStyles.minimal("perlin-beta", List.of(
+                selector(1.0f, "beta_base", "beta_edge", 0.35f, null)));
+        WorldStyleField field = new WorldStyleField(seed, List.of(
+                new WorldStyleField.Weighted(1.0f, alpha),
+                new WorldStyleField.Weighted(1.0f, beta)));
+        PlanningContext planning = context(seed, preset, field, List.of(),
+                (x, z) -> HOT, "alpha_base", "alpha_edge", "beta_base", "beta_edge");
+        CityRarityMap rarity = new CityRarityMap(seed, preset.cityPerlinScale(),
+                preset.cityPerlinOffset(), preset.cityPerlinInnerScale());
+
+        WorldStyle previous = null;
+        boolean adjacentRegionsDiffer = false;
+        boolean sawAlphaBase = false;
+        boolean sawAlphaEdge = false;
+        boolean sawBetaBase = false;
+        boolean sawBetaEdge = false;
+        for (int regionX = -12; regionX <= 12; regionX++) {
+            ChunkCoord anchor = coord(regionX * 16, 0);
+            // atChunk addresses the field by region coordinate (regionX, 0), so this is an
+            // independent statement of which world-style family the whole region must use.
+            WorldStyle regionStyle = field.atCityCenter(coord(regionX, 0));
+            assertSame(regionStyle, field.atChunk(planning, anchor));
+            if (previous != null && previous != regionStyle) {
+                adjacentRegionsDiffer = true;
+            }
+            previous = regionStyle;
+
+            for (int x = anchor.chunkX(); x < anchor.chunkX() + 16; x++) {
+                for (int z = anchor.chunkZ(); z < anchor.chunkZ() + 16; z++) {
+                    ChunkCoord observer = coord(x, z);
+                    assertSame(regionStyle, field.atChunk(planning, observer),
+                            "one 16x16 Perlin region must not change world-style family");
+                    float factor = rarity.getCityFactor(x, z);
+                    String expected;
+                    if (regionStyle == alpha) {
+                        expected = factor < 0.2f ? "urbextest:alpha_edge" : "urbextest:alpha_base";
+                        sawAlphaEdge |= factor < 0.2f;
+                        sawAlphaBase |= factor >= 0.2f;
+                    } else {
+                        expected = factor < 0.35f ? "urbextest:beta_edge" : "urbextest:beta_base";
+                        sawBetaEdge |= factor < 0.35f;
+                        sawBetaBase |= factor >= 0.35f;
+                    }
+                    CityStyle actual = City.getCityStyle(observer, planning, preset);
+                    assertNotNull(actual);
+                    assertEquals(expected, actual.getName(),
+                            "a base must resolve only the edge declared by its own world-style family");
+                }
+            }
+        }
+
+        assertTrue(adjacentRegionsDiffer, "fixed adjacent regions never selected different world styles");
+        assertTrue(sawAlphaBase && sawAlphaEdge && sawBetaBase && sawBetaEdge,
+                "fixture must exercise both members of both disjoint families");
     }
 
     @Test
@@ -308,6 +407,13 @@ class CityStyleScopeTest {
     private static PlanningContext context(long seed, Preset preset, WorldStyle worldStyle,
                                            List<PredefinedCity> cities, BiomeAt biomeAt,
                                            String... cityStylePaths) {
+        return context(seed, preset, WorldStyleField.single(seed, worldStyle), cities, biomeAt,
+                cityStylePaths);
+    }
+
+    private static PlanningContext context(long seed, Preset preset, WorldStyleField worldStyles,
+                                           List<PredefinedCity> cities, BiomeAt biomeAt,
+                                           String... cityStylePaths) {
         Map<Identifier, CityStyle> styles = new LinkedHashMap<>();
         for (String path : cityStylePaths) {
             CityStyle style = TestWorldStyles.cityStyle(path);
@@ -326,7 +432,7 @@ class CityStyleScopeTest {
                 empty.worldStyles(), new AssetIndex<>("urbex:citystyles", styles), cityIndex,
                 empty.stuff(), empty.stuffByTag(), PredefinedIndex.build(cityIndex, multiIndex));
         return new PlanningContext(seed, Level.OVERWORLD, preset, assets,
-                WorldStyleField.single(seed, worldStyle), (x, z) -> {
+                worldStyles, (x, z) -> {
                     throw new AssertionError("city-style selection must not read the road field");
                 },
                 new DimensionCaches(seed), LevelShape.VANILLA_OVERWORLD, terrain(biomeAt));

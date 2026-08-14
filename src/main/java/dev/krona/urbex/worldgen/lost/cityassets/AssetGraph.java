@@ -103,10 +103,10 @@ public final class AssetGraph {
      *
      * @param reachableCityStyles the city styles something can select, already resolved. Handed over
      *                            as objects rather than as names on purpose: the compiler works the
-     *                            set out from the world styles, the presets and the predefined
-     *                            cities - a route only the registries expose - and taking it
-     *                            pre-resolved means this class cannot become a fifth place that
-     *                            looks a city style up by name (see {@code CityStyleLookupSitesTest},
+     *                            set out from world-style base/edge selectors and explicit
+     *                            predefined-city styles - routes only the registries expose - and
+     *                            taking it pre-resolved means this class cannot become another place
+     *                            that looks a city style up by name (see {@code CityStyleLookupSitesTest},
      *                            which exists because such a site reverts silently to failing from a
      *                            worldgen worker). One that did not compile is not here, and is
      *                            already reported by the compiler.
@@ -330,8 +330,9 @@ public final class AssetGraph {
             return;
         }
         for (PredefinedBuilding building : city.getPredefinedBuildings()) {
-            // The predefined city names its own city style, and the compiler has already checked that
-            // it resolves; the palette context comes from there when it does.
+            // An explicit predefined style is an eagerly checked root and supplies the palette
+            // context. An omitted style follows a runtime-selected world-style family, so there is
+            // no single palette to attach to this static usage walk.
             Style palette = paletteOf(city.getCityStyle());
             if (building.multi()) {
                 multiBuilding(city.getId(), building.building(), "buildings", palette);

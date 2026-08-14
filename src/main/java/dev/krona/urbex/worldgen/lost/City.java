@@ -174,6 +174,19 @@ public class City {
                 .getRandomCityStyle(provider, anchor, familyRandom);
     }
 
+    private static void addPredefinedCityStyleCandidates(
+            ChunkCoord coord, PlanningContext provider, List<Pair<Float, String>> styles) {
+        for (PredefinedCity city : predefined(provider).citiesCovering(coord)) {
+            float radius = city.getRadius();
+            float dx = (city.getChunkX() - coord.chunkX()) * 16.0f;
+            float dz = (city.getChunkZ() - coord.chunkZ()) * 16.0f;
+            float factor = (radius - (float) Math.sqrt(dx * dx + dz * dz)) / radius;
+            ChunkCoord center = new ChunkCoord(city.getDimension(), city.getChunkX(), city.getChunkZ());
+            CityStyleSelection selection = getCityStyleSelectionForCityCenter(center, provider);
+            styles.add(Pair.of(factor, selection == null ? null : selection.styleAt(factor)));
+        }
+    }
+
     // Calculate the citystyle based on all surrounding cities
     public static CityStyle getCityStyle(ChunkCoord coord, PlanningContext provider, Preset profile) {
         // getOrCompute, not computeIfAbsent: this is reached from ChunkPlan
@@ -186,17 +199,21 @@ public class City {
         List<Pair<Float, String>> styles = new ArrayList<>();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        // Not CITY_STYLE: getCityStyleForCityCenter draws from that address for this same chunk,
-        // and this method calls it, so one purpose would make the blend agree with the centre.
+        // Not CITY_STYLE: the centre and Perlin helpers use that purpose at their scope anchors.
+        // This addressed draw chooses among local overlap candidates and must not correlate with a
+        // family draw merely because an observer happens to share an anchor coordinate.
         RandomSource cityStyleRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE_LOCAL);
 
         if (profile.cityChance() < 0) {
-            CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
-                    profile.cityPerlinScale(), profile.cityPerlinOffset(), profile.cityPerlinInnerScale());
-            float factor = rarityMap.getCityFactor(chunkX, chunkZ);
-            CityStyleSelection selection = getCityStyleSelectionForPerlinRegion(coord, provider);
-            styles.add(Pair.of(factor,
-                    selection == null ? null : selection.styleAt(factor)));
+            addPredefinedCityStyleCandidates(coord, provider, styles);
+            if (styles.isEmpty()) {
+                CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
+                        profile.cityPerlinScale(), profile.cityPerlinOffset(), profile.cityPerlinInnerScale());
+                float factor = rarityMap.getCityFactor(chunkX, chunkZ);
+                CityStyleSelection selection = getCityStyleSelectionForPerlinRegion(coord, provider);
+                styles.add(Pair.of(factor,
+                        selection == null ? null : selection.styleAt(factor)));
+            }
         } else {
             int offset = (profile.cityMaxRadius() + 15) / 16;
             for (int cx = chunkX - offset; cx <= chunkX + offset; cx++) {

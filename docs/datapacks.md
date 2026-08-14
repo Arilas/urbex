@@ -345,19 +345,19 @@ is wrong but at least unique, instead of borrowing a label that belongs to somet
 
 ### When each asset is resolved
 
-In **ten** registries the check above runs on every registered asset, whether or not anything
+In **eleven** registries the check above runs on every registered asset, whether or not anything
 selects it. Loading a world resolves all of `variants`, `palettes`, `conditions`, `styles`, `parts`,
-`buildings`, `multibuildings`, `scattered`, `worldstyles` and `stuff` up front, so a broken file in
-your pack fails the world even for a player who never picks your world style. That is the intended
-trade: a load error naming the file beats an exception from a worldgen worker thread three hours
-into someone's save.
+`buildings`, `multibuildings`, `scattered`, `worldstyles`, `predefinedcities` and `stuff` up front in
+`AssetCompiler`, so a broken file in your pack fails the world even for a player who never picks your
+world style. That is the intended trade: a load error naming the file beats an exception from a
+worldgen worker thread three hours into someone's save.
 
-It has one consequence for how you write bases. In those ten registries an **incomplete** chain root
+It has one consequence for how you write bases. In those eleven registries an **incomplete** chain root
 is not allowed — a "base part" that carries only a `refpalette`, meaning to be completed by
 children, fails the load on its own. Bases there have to be complete assets that children
 specialise.
 
-The other three registries are each resolved differently, and it is worth knowing which you are in:
+The other two registries are each resolved differently, and it is worth knowing which you are in:
 
 - **`citystyles` is resolved by reachability.** Only city styles something can actually *select* are
   resolved: the base and optional edge styles named by a world style's `citystyles` selectors, and
@@ -365,14 +365,12 @@ The other three registries are each resolved differently, and it is worth knowin
   — which is what lets the bundled `urbex:citystyle_config` exist as a street width and nothing else,
   complete only through `urbex:citystyle_common`, which extends it. It is the one registry where an
   incomplete chain root is legal.
-- **`predefinedcities` is resolved on the generation path**, not at world load — the first time
-  `City` looks for a predefined city. So a predefined city missing `radius` throws from a worldgen
-  worker rather than refusing the world. Its optional `citystyle` reference is checked at load when
-  supplied, because the reachability sweep above reads that field out of the raw entry; do not read
-  that as the entry itself having been validated. An explicit style is base-only; omission uses the
-  matching world-style family instead.
 - **`presets`** have no required fields at all, so there is nothing for this check to do. A preset
   resolves when it is selected.
+
+A predefined city's optional `citystyle` is also added to the reachable city-style roots during
+that eager compilation. An explicit style is base-only; omission uses the matching world-style
+family instead.
 
 Everything a resolution can raise — a required field nothing declared, a cycle, a dangling
 `extends` — surfaces at whichever of those moments applies to the registry.
