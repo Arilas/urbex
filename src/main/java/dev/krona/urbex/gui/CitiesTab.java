@@ -524,6 +524,9 @@ public class CitiesTab extends GridLayoutTab {
             activePreview.close();
             activePreview = null;
         }
+        // The compiled assets outlive any one preview - the editor's is a second one - so they are
+        // released here, with the screen, rather than in CityPreview.close().
+        CityPreview.releaseSharedAssets();
     }
 
     /** Asks for the next {@code CreateWorldScreen.init()} to land on this tab. */

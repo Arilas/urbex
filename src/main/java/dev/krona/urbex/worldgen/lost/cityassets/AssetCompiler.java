@@ -66,6 +66,43 @@ public final class AssetCompiler {
      *         class exists to make impossible, so don't.
      */
     public static AssetSnapshot compile(RegistryAccess access, AssetDiagnostics diagnostics) {
+        AssetSnapshot snapshot = compileStages(access, diagnostics, true);
+        Urbex.getLogger().info("Compiled {} Urbex assets ({} problem(s))",
+                snapshot.totalAssets(), diagnostics.size());
+        return snapshot;
+    }
+
+    /**
+     * The same snapshot {@link #compile} builds, without the two passes that only produce a report.
+     *
+     * <p>For callers that discard the diagnostics: today that is the world-creation preview alone
+     * (see {@code PreviewContext}), which runs on the client before any server exists, has no
+     * session to refuse a world from, and rebuilds its context whenever the player changes a preset
+     * or a world style. Reporting a broken pack is the world load's business, and the preview
+     * throwing or logging on its behalf would only leave the player unable to see why.</p>
+     *
+     * <p>What it skips is {@link AssetGraph#validate} and {@link #promoteReachableCityStyleProblems},
+     * both of which write into an {@link AssetDiagnostics} and touch nothing else - the snapshot's
+     * indexes are already immutable by then. That is not a micro-optimisation: measured against the
+     * bundled datapack the graph walk is ~96% of a compile (~290 ms of ~300 ms), and it scales with
+     * the number of loaded packs, so the preview was spending seconds per click computing a report
+     * it dropped on the floor. {@code AssetCompilerTest} pins that the two paths agree on the
+     * snapshot.</p>
+     *
+     * <p><strong>Not for world load.</strong> {@code GenerationSession} and {@code CommandValidate}
+     * must keep using {@link #compile}: a pack whose references dangle has to be refused before a
+     * chunk generates, which is the whole of issue #56.</p>
+     */
+    public static AssetSnapshot compileWithoutValidation(RegistryAccess access) {
+        return compileStages(access, new AssetDiagnostics(), false);
+    }
+
+    /**
+     * Every compilation stage, in the dependency order documented on this class, optionally followed
+     * by the two report-only passes.
+     */
+    private static AssetSnapshot compileStages(RegistryAccess access, AssetDiagnostics diagnostics,
+                                               boolean validate) {
         // The block registry the whole compilation resolves against, taken once from the world
         // being loaded. Every block string below reaches it through a parameter: resolution used
         // to pick a registry for itself, from a static server reference that may or may not have
@@ -104,20 +141,22 @@ public final class AssetCompiler {
         AssetIndex<StuffObject> stuff = AssetStage.compileAll(access,
                 CustomRegistries.STUFF_REGISTRY_KEY, (id, chain) -> new StuffObject(id, chain), diagnostics);
 
-        Set<Identifier> reachableCityStyles = reachableCityStyles(access, worldStyles);
-        promoteReachableCityStyleProblems(cityStyles, reachableCityStyles, cityStyleProblems, diagnostics);
-
         AssetSnapshot snapshot = new AssetSnapshot(variants, palettes, conditions, styles, parts,
                 buildings, multiBuildings, scattered, worldStyles, cityStyles, predefinedCities,
                 stuff, groupStuffByTag(stuff.all()),
                 PredefinedIndex.build(predefinedCities, multiBuildings));
+        if (!validate) {
+            // The city-style problems collected above are dropped with the rest of the report: the
+            // caller asked for a snapshot, not for an opinion about the pack.
+            return snapshot;
+        }
+        Set<Identifier> reachableCityStyles = reachableCityStyles(access, worldStyles);
+        promoteReachableCityStyleProblems(cityStyles, reachableCityStyles, cityStyleProblems, diagnostics);
         // Last, on the finished snapshot: the cross-asset references are names, and resolving them
         // needs every index built. Generation resolves them one at a time on whichever chunk first
         // needs one, which is the whole of what issue #56's second half is about.
         AssetGraph.validate(snapshot, reachableCityStyles.stream()
                 .map(cityStyles::get).filter(Objects::nonNull).toList(), diagnostics);
-        Urbex.getLogger().info("Compiled {} Urbex assets ({} problem(s))",
-                snapshot.totalAssets(), diagnostics.size());
         return snapshot;
     }
 
