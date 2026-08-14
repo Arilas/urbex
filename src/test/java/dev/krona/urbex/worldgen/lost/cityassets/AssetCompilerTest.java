@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -89,6 +90,42 @@ class AssetCompilerTest {
         assertNull(snapshot.palettes().get("urbex:broken"), "the broken one is absent");
         assertNotNull(snapshot.palettes().get("urbex:walls"), "the one after it compiled anyway");
         assertEquals(1, snapshot.variants().size(), "and the stage before it is untouched");
+    }
+
+    /**
+     * The snapshot {@link AssetCompiler#compileWithoutValidation} builds is the same snapshot
+     * {@link AssetCompiler#compile} builds. Only the report differs.
+     * <p>
+     * This is the whole licence for the world-creation preview to take the cheap path: the
+     * validation it skips is {@link AssetGraph} and the city-style promotion, both of which write
+     * into an {@link AssetDiagnostics} and touch nothing else. If validation ever gains a side
+     * effect on the snapshot, this test is what fails.
+     */
+    @Test
+    void skippingValidationChangesTheReportAndNotTheSnapshot() {
+        RegistryAccess access = registries(
+                variant("rubble", "minecraft:deepslate"),
+                paletteNamingVariant("walls", 'V', "urbex:rubble"),
+                // Names a city style nothing registers, so the validated path has something to report.
+                worldStyleEntry("missing", Optional.empty()));
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+
+        AssetSnapshot validated = AssetCompiler.compile(access, diagnostics);
+        AssetSnapshot unvalidated = AssetCompiler.compileWithoutValidation(access);
+
+        assertFalse(diagnostics.isEmpty(), "the validated path has something to say about this pack");
+        assertEquals(validated.totalAssets(), unvalidated.totalAssets());
+        assertEquals(names(validated.variants()), names(unvalidated.variants()));
+        assertEquals(names(validated.palettes()), names(unvalidated.palettes()));
+        assertEquals(names(validated.worldStyles()), names(unvalidated.worldStyles()));
+        assertEquals(names(validated.cityStyles()), names(unvalidated.cityStyles()));
+        assertNotNull(unvalidated.palettes().get("urbex:walls"),
+                "and the stages themselves still ran");
+    }
+
+    /** Ids, not instances: two compiles of the same registries build equal content, not the same objects. */
+    private static List<String> names(AssetIndex<?> index) {
+        return index.ids().stream().map(Identifier::toString).sorted().toList();
     }
 
     /**

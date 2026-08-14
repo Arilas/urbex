@@ -25,6 +25,7 @@ import net.minecraft.world.level.levelgen.WorldOptions;
 
 import javax.annotation.Nullable;
 import java.util.Random;
+import java.util.concurrent.Executor;
 
 /**
  * The world-creation city/building preview: a small (62x58) chunk-grid image sampled through a
@@ -108,35 +109,67 @@ public class CityPreview implements AutoCloseable {
     @Nullable
     private final RegistryAccess registryAccess;
 
-    private final int[] colors = new int[WIDTH * HEIGHT];
+    /** The colour computation, off the render thread; see {@link PendingWork}. */
+    private final PendingWork<Key> work;
 
     @Nullable
     private Key key;
     @Nullable
     private DynamicTexture texture;
-    /** The mode the current {@link #colors}/{@link #texture} were rendered in; drives the legend. */
+    /** The mode the current {@link #texture} was rendered in; drives the legend. */
     private Mode mode = Mode.MAP;
 
     public CityPreview(@Nullable RegistryAccess registryAccess) {
+        this(registryAccess, PreviewWorker.executor());
+    }
+
+    /** Visible for tests, which need the computation to run somewhere they can observe. */
+    CityPreview(@Nullable RegistryAccess registryAccess, Executor executor) {
         this.registryAccess = registryAccess;
+        this.work = new PendingWork<>(executor);
     }
 
     /**
-     * Recomputes the preview iff (preset content, worldStyles, seed, mode) differs from the last
-     * call. {@code preset == null} clears whatever is showing (nothing selected yet). The whole mix
-     * is passed rather than one id, so a mixed selection previews as a mix - judging a balance
-     * before committing to the world is the point of the control.
+     * Drops the compiled assets shared by every preview (see {@code PreviewAssets}).
+     * <p>
+     * Belongs to the create-world screen going away, not to one preview closing: the Cities tab and
+     * the Customize screen hold separate previews and hand each other control, so releasing on
+     * {@link #close} would recompile every time the player opened the editor. A world that is never
+     * created must not leave its assets - and through them its registries - alive, which is the same
+     * reason {@code CitiesTab.closeActivePreview} exists.
+     */
+    public static void releaseSharedAssets() {
+        PreviewAssets.clear();
+    }
+
+    /**
+     * Asks for a recompute iff (preset content, worldStyles, seed, mode) differs from the last call.
+     * {@code preset == null} clears whatever is showing (nothing selected yet). The whole mix is
+     * passed rather than one id, so a mixed selection previews as a mix - judging a balance before
+     * committing to the world is the point of the control.
+     * <p>
+     * Asks, rather than does: the computation goes to a worker and the screen keeps showing the
+     * image it already has until the result arrives (see {@link PendingWork}). Callers drive this
+     * from the render pass, so doing the walk here was a dropped frame on every change.
+     * <p>
+     * Both arguments are immutable - {@code PresetDraft.resolve} hands out a fresh {@link Preset}
+     * and {@link WorldStyleMix} is a record - so handing them to another thread copies nothing and
+     * races with nothing, even while the editor goes on mutating the draft they came from.
      */
     public void update(@Nullable Preset preset, WorldStyleMix worldStyles, long seed, Mode mode) {
         if (preset == null) {
             key = null;
+            work.cancel();
             closeTexture();
             return;
         }
-        if (!needsRecompute(presetHash(preset), worldStyles.format(), seed, mode)) {
-            return;
+        if (needsRecompute(presetHash(preset), worldStyles.format(), seed, mode)) {
+            // needsRecompute has just stored the new key, and that is the key this request is for.
+            Key requested = key;
+            work.request(requested,
+                    () -> computeColors(preset, worldStyles, seed, mode, registryAccess));
         }
-        recompute(preset, worldStyles, seed, mode);
+        applyFinishedWork();
     }
 
     /**
@@ -196,8 +229,19 @@ public class CityPreview implements AutoCloseable {
     }
 
     public void render(GuiGraphicsExtractor g, int x, int y, int w, int h) {
+        // Also drained here, not only in update(): the Customize screen drives update() from a
+        // debounce timer rather than per frame, so a result landing between two debounces would
+        // otherwise sit unshown until the player touched another setting.
+        applyFinishedWork();
         if (texture == null) {
-            renderUnavailable(g, x, y, w, h);
+            // Nothing yet - but "unavailable" is a statement about the pack, not about a frame that
+            // has not arrived, and the first computation after the screen opens always takes a frame
+            // or two. Saying it while a result is on its way would flash an error on every open, so
+            // the empty space simply stays empty until there is something to say or something to
+            // show.
+            if (!work.isBusy()) {
+                renderUnavailable(g, x, y, w, h);
+            }
             return;
         }
         int mapHeight = Math.max(0, h - LEGEND_HEIGHT);
@@ -211,8 +255,26 @@ public class CityPreview implements AutoCloseable {
         renderLegend(g, x, y + mapHeight);
     }
 
+    /**
+     * Uploads a finished computation, if one is ready and still wanted. The render thread's half of
+     * {@link PendingWork}: the walk happens on the worker, the GL upload can only happen here.
+     */
+    private void applyFinishedWork() {
+        if (key == null) {
+            return;
+        }
+        int[] colors = work.take(key);
+        if (colors == null) {
+            return;
+        }
+        // Only now does the legend follow, so it never describes an image that is not on screen yet.
+        this.mode = key.mode();
+        uploadTexture(colors);
+    }
+
     @Override
     public void close() {
+        work.cancel();
         closeTexture();
         // Drop the cache key too: leaving it set would make a reused-after-close preview believe its
         // (now-null) texture is still valid for that key and render "unavailable" forever. Callers
@@ -220,7 +282,17 @@ public class CityPreview implements AutoCloseable {
         key = null;
     }
 
-    private void recompute(Preset preset, WorldStyleMix worldStyles, long seed, Mode mode) {
+    /**
+     * The whole of a recompute, as a pure function: no field is read and none is written, so this is
+     * what the worker thread runs. Returns a fresh {@link #WIDTH}x{@link #HEIGHT} buffer, or
+     * {@code null} for a preset that does not currently make sense, which the render thread reads as
+     * "keep showing the last good image" (see the guard below).
+     * <p>
+     * The buffer is allocated per computation rather than reused, because a reused one would be
+     * written by the worker while the render thread was still uploading the previous image out of it.
+     */
+    private static int[] computeColors(Preset preset, WorldStyleMix worldStyles, long seed, Mode mode,
+                                       @Nullable RegistryAccess registryAccess) {
         // Nothing to drop before recomputing any more. The predefined-city/street maps this used to
         // clear were static and shared with live worldgen - the preview cleared them so a new
         // preset/seed combo would not see the previous one's content, and in doing so cleared them
@@ -255,27 +327,27 @@ public class CityPreview implements AutoCloseable {
                 // qualified by the time they reach here.
                 context = PreviewContext.create(preset, worldStyles, seed, registryAccess);
             } catch (IllegalArgumentException | IllegalStateException e) {
-                // Nothing has been drawn at this point, so `colors` and `texture` still hold the last
-                // good render. Leaving `mode` alone too keeps the legend describing the image actually
-                // on screen.
+                // Nothing has been drawn at this point, and this returns before anything is uploaded,
+                // so the texture and the mode driving the legend both still describe the last good
+                // render - which stays on screen.
                 Urbex.LOGGER.debug("Preview not recomputed - preset or world style is not currently valid: {}",
                         e.getMessage());
-                return;
+                return null;
             }
         }
+        int[] colors = new int[WIDTH * HEIGHT];
         switch (mode) {
-            case MAP -> renderMap(context);
-            case TRANSPORT -> renderTransport(context, preset);
-            case ROADS -> renderRoads(context, preset);
-            case CITY -> renderCity(preset, seed);
+            case MAP -> renderMap(colors, context);
+            case TRANSPORT -> renderTransport(colors, context, preset);
+            case ROADS -> renderRoads(colors, context, preset);
+            case CITY -> renderCity(colors, preset, seed);
         }
-        this.mode = mode;
-        uploadTexture();
+        return colors;
     }
 
     // ---- MAP -----------------------------------------------------------------
 
-    private void renderMap(PreviewContext context) {
+    private static void renderMap(int[] colors, PreviewContext context) {
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
                 colors[z * WIDTH + x] = sampleColor(context, x, z);
@@ -309,7 +381,7 @@ public class CityPreview implements AutoCloseable {
      * old {@code renderPreviewTransports} did with its {@code soft} base), with rail and highway
      * chunks blended over. Highway-over-rail is a distinct grey so an interchange is visible.
      */
-    private void renderTransport(PreviewContext context, Preset profile) {
+    private static void renderTransport(int[] colors, PreviewContext context, Preset profile) {
         PlanningContext planning = context.planning();
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
@@ -359,7 +431,7 @@ public class CityPreview implements AutoCloseable {
      * building footprints only, not a random fraction of the whole grid), not a defect masquerading
      * as a guarantee.
      */
-    private void renderRoads(PreviewContext context, Preset profile) {
+    private static void renderRoads(int[] colors, PreviewContext context, Preset profile) {
         PlanningContext planning = context.planning();
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {
@@ -398,14 +470,14 @@ public class CityPreview implements AutoCloseable {
      * 150-pixel canvas into the {@link #WIDTH}x{@link #HEIGHT} texture buffer, so the proportions match
      * the original at a smaller size.
      */
-    private void renderCity(Preset profile, long seed) {
+    private static void renderCity(int[] colors, Preset profile, long seed) {
         final int base = 44;      // ground line (of HEIGHT = 58): ~0.8 down, as the old base/150 was
         final int dimHor = 4;     // column pitch (old 10 of 150 -> 4 of 62)
         final int dimVer = 2;     // floor/cellar pitch (old 4 of 150 -> 2 of 58)
 
         // Sky above the ground line, ground below it.
-        fillRect(0, 0, WIDTH, base, SKY_COLOR);
-        fillRect(0, base, WIDTH, HEIGHT, GROUND_COLOR);
+        fillRect(colors, 0, 0, WIDTH, base, SKY_COLOR);
+        fillRect(colors, 0, base, WIDTH, HEIGHT, GROUND_COLOR);
 
         final float radius = 190;
         Random rand = new Random(seed);
@@ -433,14 +505,14 @@ public class CityPreview implements AutoCloseable {
                     f = minfloors;
                 }
                 for (int i = 0; i < f; i++) {
-                    fillRect(dimHor * x, base - i * dimVer - dimVer,
+                    fillRect(colors, dimHor * x, base - i * dimVer - dimVer,
                             dimHor * x + dimHor - 1, base - i * dimVer + dimVer - 1 - dimVer, FLOOR_COLOR);
                 }
 
                 int maxcellars = profile.buildingMaxCellars();
                 int fb = profile.buildingMinCellars() + ((maxcellars <= 0) ? 0 : rand.nextInt(maxcellars + 1));
                 for (int i = 0; i < fb; i++) {
-                    fillRect(dimHor * x, base + i * dimVer,
+                    fillRect(colors, dimHor * x, base + i * dimVer,
                             dimHor * x + dimHor - 1, base + i * dimVer + dimVer - 1, CELLAR_COLOR);
                 }
             }
@@ -452,14 +524,14 @@ public class CityPreview implements AutoCloseable {
         float verFactor = 1.0f * dimVer / 6.0f;
         Random rnd = new Random(333);
         // Old centres were leftRender+75 and leftRender+35 within a 150-wide canvas (0.5 and ~0.233).
-        drawExplosion(base, horFactor, verFactor, Math.round(WIDTH * 0.5f),
+        drawExplosion(colors, base, horFactor, verFactor, Math.round(WIDTH * 0.5f),
                 profile.explosionMinHeight(), profile.explosionMaxRadius(), rnd);
-        drawExplosion(base, horFactor, verFactor, Math.round(WIDTH * 0.233f),
+        drawExplosion(colors, base, horFactor, verFactor, Math.round(WIDTH * 0.233f),
                 profile.miniExplosionMinHeight(), profile.miniExplosionMaxRadius(), rnd);
     }
 
-    private void drawExplosion(int base, float horFactor, float verFactor, int cx,
-                               int minHeight, int explosionRadius, Random rnd) {
+    private static void drawExplosion(int[] colors, int base, float horFactor, float verFactor, int cx,
+                                      int minHeight, int explosionRadius, Random rnd) {
         int cz = (int) (base - (minHeight - 65) * verFactor);
         for (int x = (int) (cx - explosionRadius * horFactor); x <= cx + explosionRadius * horFactor; x++) {
             for (int z = (int) (cz - explosionRadius * verFactor); z <= cz + explosionRadius * verFactor; z++) {
@@ -469,7 +541,7 @@ public class CityPreview implements AutoCloseable {
                 if (dist < explosionRadius - 3) {
                     double damage = 3.0f * (explosionRadius - dist) / explosionRadius;
                     if (rnd.nextFloat() < damage) {
-                        fillRect(x, z, x + 1, z + 1, DAMAGE_OVERLAY);
+                        fillRect(colors, x, z, x + 1, z + 1, DAMAGE_OVERLAY);
                     }
                 }
             }
@@ -484,7 +556,7 @@ public class CityPreview implements AutoCloseable {
      * with alpha &lt; 0xff is alpha-blended over what is already there. Out-of-bounds pixels are
      * clipped, so callers don't have to bounds-check the elevation/explosion math.
      */
-    private void fillRect(int x0, int y0, int x1, int y1, int argb) {
+    private static void fillRect(int[] colors, int x0, int y0, int x1, int y1, int argb) {
         int lox = Math.max(0, x0);
         int loy = Math.max(0, y0);
         int hix = Math.min(WIDTH, x1);
@@ -522,7 +594,7 @@ public class CityPreview implements AutoCloseable {
         return 0xff000000 | (r << 16) | (g << 8) | b;
     }
 
-    private void uploadTexture() {
+    private void uploadTexture(int[] colors) {
         NativeImage image = new NativeImage(NativeImage.Format.RGBA, WIDTH, HEIGHT, false);
         for (int z = 0; z < HEIGHT; z++) {
             for (int x = 0; x < WIDTH; x++) {

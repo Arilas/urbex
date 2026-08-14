@@ -129,10 +129,24 @@ final class PaletteCharacterCheck {
 
         SortedSet<Character> never = new TreeSet<>();
         SortedSet<Character> sometimes = new TreeSet<>();
+        // The witnesses are a function of (groups, building, local) and of no character at all, so
+        // they are built once for the whole part rather than once per character it uses. They were
+        // rebuilt per character until issue #198, which made this check ~96% of a compile and 890 MB
+        // of allocation on the shipped pack alone - a part uses tens of distinct characters, and each
+        // one was re-merging every choice of every group from scratch.
+        //
+        // Built lazily, because a part every one of whose characters is undefined everywhere never
+        // asks the question, and building them for it would be the one case where this is pure waste.
+        List<CompiledPalette> witnesses = null;
         for (char c : used) {
             if (!everything.isDefined(c)) {
                 never.add(c);
-            } else if (hasFailingSelection(c, groups, building, local)) {
+                continue;
+            }
+            if (witnesses == null) {
+                witnesses = witnesses(groups, building, local);
+            }
+            if (hasFailingSelection(c, witnesses)) {
                 sometimes.add(c);
             }
         }
@@ -166,15 +180,20 @@ final class PaletteCharacterCheck {
     }
 
     /**
-     * Whether some selection provably fails to define {@code c}.
+     * One palette per (group, choice): that choice, plus everything every <em>other</em> group
+     * offers, merged over the building's and the part's own.
      *
-     * <p>The witness is one choice plus everything every other group offers. That is more than any
-     * real selection gets, so a character missing from it is missing from every selection containing
-     * that choice - which makes this sound in the only direction that matters: nothing is reported
-     * without a selection that really breaks.</p>
+     * <p>Each is more than any real selection gets - the other groups were given all their choices at
+     * once, where a selection picks one - so a character missing from a witness is missing from every
+     * selection that picks that choice. That is what makes {@link #hasFailingSelection} sound in the
+     * only direction that matters: nothing is reported without a selection that really breaks.</p>
+     *
+     * <p>None of this depends on the character being asked about, which is why it is built once per
+     * part rather than once per character (issue #198).</p>
      */
-    private static boolean hasFailingSelection(char c, List<List<Pair<Float, Palette>>> groups,
-                                               @Nullable Palette building, @Nullable Palette part) {
+    private static List<CompiledPalette> witnesses(List<List<Pair<Float, Palette>>> groups,
+                                                   @Nullable Palette building, @Nullable Palette part) {
+        List<CompiledPalette> witnesses = new ArrayList<>();
         for (int g = 0; g < groups.size(); g++) {
             for (Pair<Float, Palette> choice : groups.get(g)) {
                 List<Palette> witness = new ArrayList<>();
@@ -185,9 +204,17 @@ final class PaletteCharacterCheck {
                         groups.get(other).forEach(alternative -> witness.add(alternative.getRight()));
                     }
                 }
-                if (!merge(witness, building, part).isDefined(c)) {
-                    return true;
-                }
+                witnesses.add(merge(witness, building, part));
+            }
+        }
+        return witnesses;
+    }
+
+    /** Whether some selection provably fails to define {@code c}; see {@link #witnesses}. */
+    private static boolean hasFailingSelection(char c, List<CompiledPalette> witnesses) {
+        for (CompiledPalette witness : witnesses) {
+            if (!witness.isDefined(c)) {
+                return true;
             }
         }
         return false;

@@ -69,12 +69,12 @@ public record PreviewContext(PlanningContext planning, PreviewTerrain terrain) {
                                         @Nullable RegistryAccess registryAccess) {
         // The preview compiles its own snapshot and owns it, rather than reaching for the server's.
         // It has no session - it runs on the client, on the world-creation screen, before any server
-        // exists - and must not acquire one. Diagnostics are discarded on purpose: a broken pack is
-        // the world load's business to refuse, and a preview that threw would leave the player unable
-        // to see why. Individual ids still fall back to the placeholder below.
-        AssetSnapshot assets = registryAccess == null
-                ? AssetSnapshot.empty()
-                : AssetCompiler.compile(registryAccess, new AssetDiagnostics());
+        // exists - and must not acquire one. Diagnostics are not merely discarded, they are never
+        // produced: a broken pack is the world load's business to refuse, and a preview that threw
+        // would leave the player unable to see why, so computing the report here was seconds of work
+        // per click for nothing (see AssetCompiler.compileWithoutValidation). Individual ids still
+        // fall back to the placeholder below.
+        AssetSnapshot assets = PreviewAssets.of(registryAccess);
         List<WorldStyleField.Weighted> resolvedEntries = new ArrayList<>(worldStyles.entries().size());
         for (WorldStyleMix.Entry entry : worldStyles.entries()) {
             WorldStyle resolved = null;
