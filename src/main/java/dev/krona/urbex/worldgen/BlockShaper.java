@@ -59,8 +59,14 @@ final class BlockShaper {
     private final long seed;
 
     /** Reused across every shape update: thread-confined, reseeded per position via Rng.posSeed. */
-    private final XoroshiroRandomSource shapeRandom = new XoroshiroRandomSource(0);
+    private final ReseedOnDemandRandomSource shapeRandom = new ReseedOnDemandRandomSource();
     private final BlockPos.MutableBlockPos scratch = new BlockPos.MutableBlockPos();
+    /**
+     * The far side of the block being reshaped. Separate from {@link #scratch}, which is holding
+     * the neighbour's own position at the same time, and mutable because {@code updateShape} only
+     * reads it - the same reason vanilla passes mutable positions through its own neighbour walks.
+     */
+    private final BlockPos.MutableBlockPos facing = new BlockPos.MutableBlockPos();
 
     BlockShaper(ChunkView chunk, LevelAccessor region, long seed) {
         this.chunk = chunk;
@@ -184,7 +190,8 @@ final class BlockShaper {
             // -RNG design exists to keep out of generation. Anyone adding direction to this address
             // is trading determinism for independence no vanilla block asks for.
             shapeRandom.setSeed(Rng.posSeed(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SHAPE));
-            newAdjacent = adjacent.updateShape(region, region, pos, direction, pos.relative(direction), state, shapeRandom);
+            newAdjacent = adjacent.updateShape(region, region, pos, direction,
+                    facing.setWithOffset(pos, direction), state, shapeRandom);
         } catch (Exception e) {
             // We got an exception. For example for beehives there can potentially be a problem so in this case we just ignore it
             return adjacent;
