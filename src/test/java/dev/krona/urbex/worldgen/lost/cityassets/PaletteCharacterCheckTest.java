@@ -16,6 +16,7 @@ import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +91,33 @@ class PaletteCharacterCheckTest {
         assertFalse(diagnostics.hasFatal(), "the world still loads: most draws place this part fine");
         assertTrue(diagnostics.problems().getFirst().message().contains("'b'"),
                 diagnostics.problems().getFirst().message());
+    }
+
+    /**
+     * Each character gets its own answer, even though the witness palettes they are tested against
+     * are now built once for the whole part rather than once per character (issue #198).
+     * <p>
+     * Hoisting that construction out of the character loop is what makes this check affordable - it
+     * was ~96% of a compile and 890 MB of allocation - and the way to get it wrong is to let one
+     * character's result leak into the next. Here {@code 'b'} is defined by only one choice (a
+     * warning), {@code 'z'} by none (a load error), and {@code 'a'} by both (silence); a shared
+     * witness that had been mutated or short-circuited would collapse them together.
+     */
+    @Test
+    void charactersInOneMixedPartAreEachAnsweredSeparately() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Style style = style(group(
+                palette("rich", entry('a', "minecraft:stone"), entry('b', "minecraft:glass")),
+                palette("plain", entry('a', "minecraft:stone"))));
+
+        PaletteCharacterCheck.check(part("tower", "abz"), usage(style), diagnostics);
+
+        assertEquals(2, diagnostics.size(), () -> diagnostics.format(""));
+        assertTrue(diagnostics.hasFatal(), "'z' is defined nowhere, so the world must not load");
+        String report = diagnostics.format("");
+        assertTrue(report.contains("'z'"), report);
+        assertTrue(report.contains("'b'"), report);
+        assertFalse(report.contains("'a'"), () -> "'a' is defined by every choice: " + report);
     }
 
     /**
@@ -181,13 +209,19 @@ class PaletteCharacterCheckTest {
                 new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries)))));
     }
 
-    /** A 1x{@code slice.length()} part, so the slice string is the character list under test. */
+    /**
+     * A 1x1 part one level tall per character, so the slice string is exactly the character list
+     * under test - any length, rather than the two the shape of this fixture used to fix it at.
+     */
     private static BuildingPart buildPart(String path, String slice, Optional<PaletteDefinition> local) {
         Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
+        List<List<String>> levels = new ArrayList<>(slice.length());
+        for (char c : slice.toCharArray()) {
+            levels.add(List.of(String.valueOf(c)));
+        }
         return new BuildingPart(id, BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"),
                 List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(1), Optional.of(1),
-                        Optional.of(List.of(List.of(slice.substring(0, 1)), List.of(slice.substring(1)))),
-                        Optional.empty(), local, Optional.empty())));
+                        Optional.of(levels), Optional.empty(), local, Optional.empty())));
     }
 
     @SafeVarargs
