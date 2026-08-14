@@ -345,8 +345,8 @@ default threshold and does not infer one from the former Large Cities value.
 - Non-finite, zero, negative, and greater-than-one thresholds fail.
 - Both retired preset keys fail independently and together with the migration
   hint.
-- The generated/checked JSON schemas accept the new object and refuse the old
-  fields.
+- Codec tests accept the new edge object, and the preset JSON schema refuses
+  the old fields.
 
 ### 11.2 Selection semantics
 
@@ -391,8 +391,11 @@ test of the feature.
 
 ## 12. Documentation
 
-Update the datapack guide and world-style schema with one base-only example and
-one edge example. Explain the two similarly named numeric concepts explicitly:
+Update the datapack guide with one base-only example and one edge example.
+There is no world-style JSON schema in this repository, and this feature does
+not create one; `docs/schema/preset.schema.json` is updated only to remove the
+two retired preset fields. Explain the two similarly named numeric concepts
+explicitly:
 
 - selector `factor` is a weighted-choice weight;
 - `edge.threshold` is a spatial city-factor boundary.
@@ -431,4 +434,4 @@ The change is complete when:
 7. Base and edge references receive identical eager asset validation.
 8. Bundled standard and desert families use `urbex:citystyle_border` at `0.4`.
 9. Targeted tests pass and the intentional digest changes are reviewed.
-10. Datapack and schema documentation describe the new ownership accurately.
+10. The datapack guide and preset schema describe the new ownership accurately.
