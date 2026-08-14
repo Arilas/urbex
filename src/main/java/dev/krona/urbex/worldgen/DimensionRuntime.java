@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen;
 
 import com.google.gson.JsonParser;
-import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
@@ -11,8 +10,8 @@ import dev.krona.urbex.config.PresetRoadGrid;
 import dev.krona.urbex.setup.PresetChoice;
 import dev.krona.urbex.setup.WorldStyleMix;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
-import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.RetiredPresetKeyException;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
@@ -90,8 +89,7 @@ public record DimensionRuntime(ServerLevel level, @Nullable PlanningContext plan
      * <p>Everything here used to happen lazily on the generation path, the first time a chunk of the
      * dimension was built, behind a {@code putIfAbsent} race that two worker threads could both
      * enter. It happens once now, on the thread that loads the level, before that level can generate
-     * anything - which is also what makes the {@code CITY_STYLE_ALTERNATIVE} check below a load-time
-     * refusal rather than an exception from a worker.</p>
+     * anything.</p>
      *
      * <p>The snapshot arrives already compiled; {@link GenerationSession#load} is the one caller and
      * builds it before calling this. A runtime cannot exist without one, which is what makes "no
@@ -112,24 +110,16 @@ public record DimensionRuntime(ServerLevel level, @Nullable PlanningContext plan
             // level. PresetSelection.restore() already validates before publishing, so this guard is
             // a backstop against corrupted saved data reaching this far, not the primary defense.
             try {
-                PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE,
-                        JsonParser.parseString(choice.overridesJson().get())).getOrThrow();
+                PresetDefinition re = PresetDefinition.parseOverrides(
+                        JsonParser.parseString(choice.overridesJson().get()));
                 preset = Presets.applyOverrides(preset, re);
+            } catch (RetiredPresetKeyException e) {
+                throw e;
             } catch (Exception e) {
                 Urbex.getLogger().error("Malformed Urbex preset overrides for dimension '{}'; " +
                         "generating with the un-overridden preset '{}'.", type.identifier(), choice.preset(), e);
             }
         }
-        // Route 4 of the four that name a city style (see AssetRegistries.loadReachableCityStyles):
-        // the alternative style can arrive as per-world override JSON rather than from a registry
-        // entry, so the load-time sweep cannot see it - a player types an id into the ADVANCED
-        // settings box and it rides into the world through UrbexData. Checked here instead, once per
-        // level load and before any chunk work, so an incomplete or missing style refuses the level
-        // naming the dimension rather than throwing from a worker on every chunk. This is
-        // deliberately not fail-soft like the overrides parse above: a malformed payload can be
-        // ignored and the un-overridden preset used, but a style that cannot resolve has no such
-        // fallback - City.getCityStyle would simply hand null on to generation.
-        requireCityStyle(assets, preset.cityStyleAlternative(), type.identifier());
         PlanningContext planning = planningFor(level, assets, preset, choice.worldStyles());
         return new DimensionRuntime(level, planning, new CityGenerator(planning, preset), tagEpoch);
     }
@@ -159,25 +149,4 @@ public record DimensionRuntime(ServerLevel level, @Nullable PlanningContext plan
                 new LevelTerrain(level, preset, caches));
     }
 
-    /**
-     * Refuses the level if its per-world {@code cityStyleAlternative} override names a city style the
-     * pack does not have.
-     * <p>
-     * The one city-style reference no load-time sweep can see: it arrives as override JSON from the
-     * customization GUI through {@code UrbexData} rather than from a registry entry, so the compiler
-     * never walked it. Checked here, once per level load and before any chunk work, and deliberately
-     * not fail-soft like the overrides parse above - a malformed payload can be ignored and the
-     * un-overridden preset used, but a style that cannot resolve has no such fallback:
-     * {@code City.getCityStyle} would hand null on to generation.
-     */
-    private static void requireCityStyle(AssetSnapshot assets, @Nullable String name, Object selectedBy) {
-        if (name == null || name.isBlank()) {
-            return;
-        }
-        CityStyle style = assets.cityStyles().get(name);
-        if (style == null) {
-            throw new IllegalStateException("City style '" + name + "', selected by '" + selectedBy
-                    + "', is not registered by any loaded datapack.");
-        }
-    }
 }

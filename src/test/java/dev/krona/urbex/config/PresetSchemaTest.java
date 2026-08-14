@@ -146,14 +146,12 @@ class PresetSchemaTest {
 
         Map<String, String> bare = new LinkedHashMap<>();
         bare.put("extends", "{\"extends\":\"default\"}");
-        bare.put("cities.cityStyleAlternative", "{\"cities\":{\"cityStyleAlternative\":\"citystyle_border\"}}");
         bare.put("spawn.spawnCity", "{\"spawn\":{\"spawnCity\":\"city1\"}}");
         bare.put("spawn.forceSpawnBuildings", "{\"spawn\":{\"forceSpawnBuildings\":[\"building1\"]}}");
         bare.put("spawn.forceSpawnParts", "{\"spawn\":{\"forceSpawnParts\":[\"part1\"]}}");
 
         Map<String, String> qualified = new LinkedHashMap<>();
         qualified.put("extends", "{\"extends\":\"urbex:default\"}");
-        qualified.put("cities.cityStyleAlternative", "{\"cities\":{\"cityStyleAlternative\":\"urbex:citystyle_border\"}}");
         qualified.put("spawn.spawnCity", "{\"spawn\":{\"spawnCity\":\"urbex:city1\"}}");
         qualified.put("spawn.forceSpawnBuildings", "{\"spawn\":{\"forceSpawnBuildings\":[\"urbex:building1\"]}}");
         qualified.put("spawn.forceSpawnParts", "{\"spawn\":{\"forceSpawnParts\":[\"urbex:part1\"]}}");
@@ -181,5 +179,20 @@ class PresetSchemaTest {
 
         Set<ValidationMessage> messages = schema.validate(node);
         assertFalse(messages.isEmpty(), "expected the typo'd key 'cityChanse' to fail validation");
+    }
+
+    @Test
+    void schemaAcceptsCurrentCitiesAndRejectsBothRetiredProperties() throws IOException {
+        JsonSchema schema = loadSchema();
+        ObjectMapper mapper = new ObjectMapper();
+
+        assertTrue(schema.validate(mapper.readTree("{\"cities\":{\"cityChance\":0.5}}" )).isEmpty(),
+                "expected current cities content to validate");
+        for (String retired : List.of("cityStyleThreshold", "cityStyleAlternative")) {
+            Set<ValidationMessage> messages = schema.validate(
+                    mapper.readTree("{\"cities\":{\"" + retired + "\":0}}"));
+            assertFalse(messages.isEmpty(),
+                    "expected retired cities property '" + retired + "' to be rejected");
+        }
     }
 }

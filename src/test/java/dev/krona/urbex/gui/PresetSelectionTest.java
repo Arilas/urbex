@@ -274,7 +274,7 @@ class PresetSelectionTest {
     /**
      * Regression: an unparseable overridesJson must never reach {@code WorldSelectionHandoff.pending().patch().orElse(null)} -
      * that field is read when a level loads and its runtime is built
-     * ({@code DimensionRuntime.create}'s {@code PresetDefinition.CODEC.parse(...).getOrThrow()}), so a
+     * ({@code DimensionRuntime.create}'s {@code PresetDefinition.parseOverrides(...)}), so a
      * corrupted/hand-edited save's garbage JSON must be rejected before publish, not after.
      */
     @Test

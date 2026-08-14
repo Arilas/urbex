@@ -183,16 +183,6 @@
           "maximum": 1,
           "description": "City factor at citySpawnDistance2."
         },
-        "cityStyleThreshold": {
-          "type": "number",
-          "minimum": -1.0,
-          "maximum": 1.0,
-          "description": "A city factor below this threshold will use the city style specified in cityStyleAlternative."
-        },
-        "cityStyleAlternative": {
-          "$ref": "#/$defs/qualifiedIdentifier",
-          "description": "Alternative city style, fully qualified. Used with cityStyleThreshold."
-        },
         "cityAvoidVoid": {
           "type": "boolean",
           "description": "Only used with the floating landscape type: if true an additional detection is done to see if the chunk is void, and in that case the city isn't generated there. Otherwise you might get city chunks on the border of islands which sometimes looks weird."

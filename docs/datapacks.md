@@ -269,11 +269,11 @@ specialise.
 The other three registries are each resolved differently, and it is worth knowing which you are in:
 
 - **`citystyles` is resolved by reachability.** Only city styles something can actually *select* are
-  resolved: the ones a world style's `citystyles` selectors name, a preset's
-  `cities.cityStyleAlternative`, and a predefined city's `citystyle`. A city style nothing names is
-  never resolved and never validated — which is what lets the bundled `urbex:citystyle_config` exist
-  as a street width and nothing else, complete only through `urbex:citystyle_common`, which extends
-  it. It is the one registry where an incomplete chain root is legal.
+  resolved: the base and optional edge styles named by a world style's `citystyles` selectors, and
+  a predefined city's `citystyle`. A city style nothing names is never resolved and never validated
+  — which is what lets the bundled `urbex:citystyle_config` exist as a street width and nothing else,
+  complete only through `urbex:citystyle_common`, which extends it. It is the one registry where an
+  incomplete chain root is legal.
 - **`predefinedcities` is resolved on the generation path**, not at world load — the first time
   `City` looks for a predefined city. So a predefined city missing `radius` throws from a worldgen
   worker rather than refusing the world. Its `citystyle` *reference* is checked at load, because the
@@ -492,9 +492,9 @@ two silent ways to resolve a name the author never wrote.
 bare `extends` refuses the datapack immediately. Every other reference is checked when it is
 resolved:
 
-- References the load-time sweep reaches — a world style's `citystyles`, a preset's
-  `cities.cityStyleAlternative`, a predefined city's `citystyle` — fail the world load, and the
-  message names what pulled the asset in:
+- References the load-time sweep reaches — a world style's base and edge `citystyles`, and a
+  predefined city's `citystyle` — fail the world load, and the message names what pulled the asset
+  in:
   `City style 'downtown', selected by 'urbexmt:modern', cannot be used: Unqualified datapack
   reference 'downtown': ...`
 - References generation resolves lazily — a part's `refpalette`, the part ids inside street,
@@ -863,7 +863,7 @@ optional worth having: the whole file is `extends` plus two coordinates.
 }
 ```
 
-A **preset**, naming a city style for the sparse edges of a city — see
+A **preset**, changing the city chance — see
 [`docs/presets.md`](presets.md) for the rest of the format:
 
 <!-- example: presets -->
@@ -872,7 +872,7 @@ A **preset**, naming a city style for the sparse edges of a city — see
   "extends": "urbex:default",
   "description": "Modern cities",
   "cities": {
-    "cityStyleAlternative": "urbexmt:downtown_border"
+    "cityChance": 0.2
   }
 }
 ```

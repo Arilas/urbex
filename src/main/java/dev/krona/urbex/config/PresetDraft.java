@@ -63,8 +63,6 @@ public final class PresetDraft {
     public int CITY_SPAWN_DISTANCE2 = 0;
     public double CITY_SPAWN_MULTIPLIER1 = 1.0;
     public double CITY_SPAWN_MULTIPLIER2 = 1.0;
-    public float CITY_STYLE_THRESHOLD = -1f;
-    public String CITY_STYLE_ALTERNATIVE = "";
     public boolean CITY_AVOID_VOID = true;
     public int CITY_LEVEL0_HEIGHT = 75;
     public int CITY_LEVEL1_HEIGHT = 83;
@@ -205,8 +203,6 @@ public final class PresetDraft {
         draft.CITY_SPAWN_DISTANCE2 = CITY_SPAWN_DISTANCE2;
         draft.CITY_SPAWN_MULTIPLIER1 = CITY_SPAWN_MULTIPLIER1;
         draft.CITY_SPAWN_MULTIPLIER2 = CITY_SPAWN_MULTIPLIER2;
-        draft.CITY_STYLE_THRESHOLD = CITY_STYLE_THRESHOLD;
-        draft.CITY_STYLE_ALTERNATIVE = CITY_STYLE_ALTERNATIVE;
         draft.CITY_AVOID_VOID = CITY_AVOID_VOID;
         draft.CITY_LEVEL0_HEIGHT = CITY_LEVEL0_HEIGHT;
         draft.CITY_LEVEL1_HEIGHT = CITY_LEVEL1_HEIGHT;
@@ -444,14 +440,6 @@ public final class PresetDraft {
 
     public double citySpawnMultiplier2() {
         return CITY_SPAWN_MULTIPLIER2;
-    }
-
-    public float cityStyleThreshold() {
-        return CITY_STYLE_THRESHOLD;
-    }
-
-    public String cityStyleAlternative() {
-        return CITY_STYLE_ALTERNATIVE;
     }
 
     public boolean cityAvoidVoid() {

@@ -139,10 +139,6 @@ class DatapackReferenceIntegrityTest {
             }
             case "presets" -> {
                 // "extends" is already checked unconditionally above, for every category.
-                JsonObject cities = asObject(d.get("cities"));
-                if (cities != null) {
-                    ref(src, cities.get("cityStyleAlternative"), "citystyles");
-                }
                 JsonObject spawn = asObject(d.get("spawn"));
                 if (spawn != null) {
                     ref(src, spawn.get("spawnCity"), "predefinedcities");

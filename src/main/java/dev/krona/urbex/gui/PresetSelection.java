@@ -12,6 +12,7 @@ import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.WorldSelection;
 import dev.krona.urbex.setup.WorldSelectionHandoff;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.RetiredPresetKeyException;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -275,7 +276,7 @@ public final class PresetSelection {
     }
 
     /**
-     * Validates a saved-data overrides string against {@link PresetDefinition#CODEC} before it is allowed
+     * Validates a saved-data overrides string through {@link PresetDefinition#parseOverrides} before it is allowed
      * anywhere near {@link Config#overridesFromClient} - that field is read on a worldgen worker
      * thread the instant a chunk generates ({@code DimensionRuntime.create}), so a string that
      * fails to parse must never be published in the first place. Returns {@code null} - "plain
@@ -288,8 +289,10 @@ public final class PresetSelection {
             return null;
         }
         try {
-            PresetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(overridesJson)).getOrThrow();
+            PresetDefinition.parseOverrides(JsonParser.parseString(overridesJson));
             return overridesJson;
+        } catch (RetiredPresetKeyException e) {
+            throw e;
         } catch (Exception e) {
             Urbex.getLogger().warn("Re-created world '{}' had malformed Urbex preset overrides; " +
                     "restoring it as the plain preset instead.", presetId, e);
@@ -320,8 +323,10 @@ public final class PresetSelection {
             return;
         }
         try {
-            PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(pending.overridesJson())).getOrThrow();
+            PresetDefinition re = PresetDefinition.parseOverrides(JsonParser.parseString(pending.overridesJson()));
             applyCustomized(Presets.applyOverrides(base.preset(), re).toDraft());
+        } catch (RetiredPresetKeyException e) {
+            throw e;
         } catch (Exception e) {
             Urbex.getLogger().warn("Could not rebuild the restored customized preset '{}'; showing it plain.",
                     pending.presetId(), e);

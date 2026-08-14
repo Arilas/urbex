@@ -57,11 +57,8 @@ class CityStyleLookupSitesTest {
                         // Was ChunkPlan.java until issue #11 split candidate resolution out of it;
                         // the same lookup, in the class that now performs it.
                         "ChunkCandidates.java",
-                        // The world style's selectors, the preset alternative, the predefined city.
-                        "City.java",
-                        // Route 4: the per-world cityStyleAlternative override, which arrives as JSON
-                        // rather than from a registry, so no compile-time sweep can see it.
-                        "DimensionRuntime.java"),
+                        // The world style's selectors and the predefined city.
+                        "City.java"),
                 List.copyOf(found),
                 "a new city-style lookup site appeared; see this test's javadoc before adding it here");
     }
