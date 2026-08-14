@@ -4,6 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -28,20 +30,58 @@ class DatapackReferenceIntegrityTest {
     private static final Path ROOT = Path.of("src/main/resources/data/urbex/urbex");
     private static final Path ASSETS_ROOT = Path.of("src/main/resources/assets/urbex");
 
+    private Path root = ROOT;
+    private Path assetsRoot = ASSETS_ROOT;
     /** target category (directory under ROOT) -> collected [sourceFile, reference] pairs */
     private final List<String> problems = new ArrayList<>();
 
     @Test
     void allDatapackReferencesAreNamespacedAndResolve() throws IOException {
-        try (Stream<Path> files = Files.walk(ROOT)) {
+        try (Stream<Path> files = Files.walk(root)) {
             files.filter(p -> p.toString().endsWith(".json")).forEach(this::checkFile);
         }
         assertTrue(problems.isEmpty(),
                 () -> problems.size() + " bad datapack references:\n" + String.join("\n", problems));
     }
 
+    /** The optional nested edge is a city-style reference under the same static validation as its base. */
+    @Test
+    void missingNestedEdgeCityStyleFailsTheSameStaticIntegrityCheckAsAMissingBase(@TempDir Path temp)
+            throws IOException {
+        Path fixtureRoot = temp.resolve("data/urbex/urbex");
+        Path source = fixtureRoot.resolve("worldstyles/family.json");
+        Files.createDirectories(source.getParent());
+        Files.writeString(source, """
+                {
+                  "citystyles": [
+                    {
+                      "factor": 1.0,
+                      "citystyle": "urbex:missing_base",
+                      "edge": {
+                        "citystyle": "urbex:missing_edge",
+                        "threshold": 0.4
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        DatapackReferenceIntegrityTest fixture = new DatapackReferenceIntegrityTest();
+        fixture.root = fixtureRoot;
+        fixture.assetsRoot = temp.resolve("assets/urbex");
+        fixture.checkFile(source);
+
+        assertEquals(List.of(
+                        source + ": \"urbex:missing_base\" does not resolve to "
+                                + fixtureRoot.resolve("citystyles/missing_base.json"),
+                        source + ": \"urbex:missing_edge\" does not resolve to "
+                                + fixtureRoot.resolve("citystyles/missing_edge.json")),
+                fixture.problems,
+                "the actual world-style walker must report the nested edge just like its base");
+    }
+
     private void checkFile(Path file) {
-        String category = ROOT.relativize(file).getName(0).toString();
+        String category = root.relativize(file).getName(0).toString();
         JsonObject d;
         try {
             d = JsonParser.parseString(Files.readString(file)).getAsJsonObject();
@@ -200,7 +240,7 @@ class DatapackReferenceIntegrityTest {
         if (!namespace.equals("urbex")) {
             return; // foreign namespace: not resolvable from this repo, and none are shipped
         }
-        Path target = ROOT.resolve(targetCategory).resolve(name.substring(colon + 1) + ".json");
+        Path target = root.resolve(targetCategory).resolve(name.substring(colon + 1) + ".json");
         if (!Files.isRegularFile(target)) {
             problems.add(src + ": \"" + name + "\" does not resolve to " + target);
         }
@@ -213,7 +253,7 @@ class DatapackReferenceIntegrityTest {
             return;
         }
         String path = el.getAsString();
-        Path target = ASSETS_ROOT.resolve(path);
+        Path target = assetsRoot.resolve(path);
         if (!Files.isRegularFile(target)) {
             problems.add(src + ": icon \"" + path + "\" does not resolve to " + target);
         }
