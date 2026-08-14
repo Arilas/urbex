@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,17 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * uses. A shipped file that stops declaring a family fails here, at build time, instead of at
  * someone's world load.
  * <p>
- * "Anything can select" is routes 1-3 of the four {@code AssetRegistries.loadReachableCityStyles}
- * enumerates - a world style's {@code citystyles}, a preset's {@code cities.cityStyleAlternative},
- * and a predefined city's {@code citystyle}. Route 2 is why this is not just the world styles' own
- * lists: the bundled {@code citystyle_border} is named by no world style at all, only by
- * {@code presets/largecities.json}. It generates real cities, and before that route was swept it had
- * no completeness check at build time or at load time - it passed only by inheriting
- * {@code citystyle_common}'s wiring.
- * <p>
- * Route 4 has no build-time equivalent and is <b>not</b> covered here: it is a city style id typed
- * into the customization GUI and carried in per-world override JSON, so it exists in no file in this
- * repository. {@code CityFeature} checks that one where it builds the preset.
+ * "Anything can select" is the routes {@code AssetCompiler.reachableCityStyles} enumerates - a
+ * world style's base and edge {@code citystyles} selections, and a predefined city's
+ * {@code citystyle}.
  * <p>
  * It asserts on the <em>union</em> over a chain rather than on any single file, because that is the
  * rule: {@code citystyle_border} declares no {@code parts} of its own and correctly takes
@@ -84,6 +77,28 @@ class WorldStyleCompletenessTest {
         Bootstrap.bootStrap();
     }
 
+    /**
+     * The bundled border is a member of each selected world-style family, not a preset override.
+     * Keeping this data assertion beside the reachability sweep means removing either nested edge
+     * cannot quietly make the intentionally sparse border style unreachable again.
+     */
+    @Test
+    void bundledStandardSelectsTheBorderAsEachFamilyEdge() throws IOException {
+        JsonObject standard = read(ROOT.resolve("worldstyles/standard.json"));
+        List<JsonElement> selectors = standard.getAsJsonArray("citystyles").asList();
+
+        assertEquals(2, selectors.size(), "urbex:standard must declare its standard and desert families");
+        for (JsonElement entry : selectors) {
+            JsonObject edge = entry.getAsJsonObject().getAsJsonObject("edge");
+            assertEquals("urbex:citystyle_border", edge.get("citystyle").getAsString());
+            assertEquals(0.4f, edge.get("threshold").getAsFloat());
+        }
+        assertEquals(List.of("urbex:citystyle_standard", "urbex:citystyle_border",
+                        "urbex:citystyle_desert", "urbex:citystyle_border"),
+                cityStyleRefs(ROOT.resolve("worldstyles/standard.json")),
+                "the reachability sweep must find both border edges without a preset route");
+    }
+
     @Test
     void everyReachableWorldStyleAndCityStyleWiresEveryPartFamily() throws IOException {
         List<Path> worldStyles;
@@ -103,7 +118,6 @@ class WorldStyleCompletenessTest {
             requireWorldStyleWiring(new WorldStyle(TestAssetId.ANY, entries));
         }
 
-        cityStylesNamed.addAll(namedIn("presets", "cities", "cityStyleAlternative"));
         cityStylesNamed.addAll(namedIn("predefinedcities", null, "citystyle"));
 
         assertFalse(cityStylesNamed.isEmpty(), "no world style names a city style; the sweep found nothing");
@@ -221,7 +235,7 @@ class WorldStyleCompletenessTest {
         return refs;
     }
 
-    /** Every {@code citystyles[].citystyle} one file names, whether it replaces or appends. */
+    /** Every base and optional edge city style one selector names, whether it replaces or appends. */
     private static List<String> cityStyleRefs(Path file) throws IOException {
         List<String> refs = new ArrayList<>();
         JsonElement citystyles = read(file).get("citystyles");
@@ -230,9 +244,10 @@ class WorldStyleCompletenessTest {
                 : citystyles;
         if (entries != null && entries.isJsonArray()) {
             for (JsonElement entry : entries.getAsJsonArray()) {
-                JsonElement ref = entry.getAsJsonObject().get("citystyle");
-                if (ref != null) {
-                    refs.add(ref.getAsString());
+                JsonObject selector = entry.getAsJsonObject();
+                refs.add(selector.get("citystyle").getAsString());
+                if (selector.has("edge")) {
+                    refs.add(selector.getAsJsonObject("edge").get("citystyle").getAsString());
                 }
             }
         }

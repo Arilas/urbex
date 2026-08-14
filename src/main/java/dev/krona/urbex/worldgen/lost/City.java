@@ -6,7 +6,9 @@ import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.PlanningContext;
+import dev.krona.urbex.worldgen.WorldStyleField;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelection;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.resources.ResourceKey;
@@ -144,22 +146,45 @@ public class City {
         return profile.cityMinRadius() + cityRadiusRandom.nextInt(cityRange);
     }
 
-    // Call this on a city center to get the style of that city
-    public static String getCityStyleForCityCenter(ChunkCoord coord, PlanningContext provider) {
-        PredefinedCity city = getPredefinedCity(provider, coord);
-        if (city != null) {
-            if (city.getCityStyle() != null) {
-                return city.getCityStyle();
-            }
-            // Otherwise we chose a random city style
+    // Call this on a city center to get the stable style family of that city.
+    static CityStyleSelection getCityStyleSelectionForCityCenter(
+            ChunkCoord center, PlanningContext provider) {
+        PredefinedCity predefined = getPredefinedCity(provider, center);
+        if (predefined != null && predefined.getCityStyle() != null) {
+            return CityStyleSelection.baseOnly(predefined.getCityStyle());
         }
-        int chunkX = coord.chunkX();
-        int chunkZ = coord.chunkZ();
-        RandomSource cityStyleForCenterRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
-        // The centre's own world style, drawn at the centre: this is what makes one city internally
-        // coherent when a world mixes several datapacks, since every chunk of that city asks here.
-        return provider.worldStyles().atCityCenter(coord)
-                .getRandomCityStyle(provider, coord, cityStyleForCenterRandom);
+        RandomSource random = Rng.at(provider.seed(), center.chunkX(), center.chunkZ(),
+                Rng.Purpose.CITY_STYLE);
+        return provider.worldStyles().atCityCenter(center)
+                .getRandomCityStyle(provider, center, random);
+    }
+
+    /** Compatibility surface for the mix diagnostic; generation resolves the whole family. */
+    public static String getCityStyleForCityCenter(ChunkCoord center, PlanningContext provider) {
+        CityStyleSelection selection = getCityStyleSelectionForCityCenter(center, provider);
+        return selection == null ? null : selection.citystyle();
+    }
+
+    static CityStyleSelection getCityStyleSelectionForPerlinRegion(
+            ChunkCoord coord, PlanningContext provider) {
+        ChunkCoord anchor = WorldStyleField.perlinRegionAnchor(coord);
+        RandomSource familyRandom = Rng.at(provider.seed(), anchor.chunkX(), anchor.chunkZ(),
+                Rng.Purpose.CITY_STYLE);
+        return provider.worldStyles().atChunk(provider, anchor)
+                .getRandomCityStyle(provider, anchor, familyRandom);
+    }
+
+    private static void addPredefinedCityStyleCandidates(
+            ChunkCoord coord, PlanningContext provider, List<Pair<Float, String>> styles) {
+        for (PredefinedCity city : predefined(provider).citiesCovering(coord)) {
+            float radius = city.getRadius();
+            float dx = (city.getChunkX() - coord.chunkX()) * 16.0f;
+            float dz = (city.getChunkZ() - coord.chunkZ()) * 16.0f;
+            float factor = (radius - (float) Math.sqrt(dx * dx + dz * dz)) / radius;
+            ChunkCoord center = new ChunkCoord(city.getDimension(), city.getChunkX(), city.getChunkZ());
+            CityStyleSelection selection = getCityStyleSelectionForCityCenter(center, provider);
+            styles.add(Pair.of(factor, selection == null ? null : selection.styleAt(factor)));
+        }
     }
 
     // Calculate the citystyle based on all surrounding cities
@@ -174,18 +199,20 @@ public class City {
         List<Pair<Float, String>> styles = new ArrayList<>();
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
-        // Not CITY_STYLE: getCityStyleForCityCenter draws from that address for this same chunk,
-        // and this method calls it, so one purpose would make the blend agree with the centre.
+        // Not CITY_STYLE: the centre and Perlin helpers use that purpose at their scope anchors.
+        // This addressed draw chooses among local overlap candidates and must not correlate with a
+        // family draw merely because an observer happens to share an anchor coordinate.
         RandomSource cityStyleRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE_LOCAL);
 
         if (profile.cityChance() < 0) {
-            CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
-                    profile.cityPerlinScale(), profile.cityPerlinOffset(), profile.cityPerlinInnerScale());
-            float factor = rarityMap.getCityFactor(chunkX, chunkZ);
-            if (factor < profile.cityStyleThreshold()) {
-                styles.add(Pair.of(factor, profile.cityStyleAlternative()));
-            } else {
-                styles.add(Pair.of(factor, getCityStyleForCityCenter(coord, provider)));
+            addPredefinedCityStyleCandidates(coord, provider, styles);
+            if (styles.isEmpty()) {
+                CityRarityMap rarityMap = provider.caches().getCityRarityMap(provider.seed(),
+                        profile.cityPerlinScale(), profile.cityPerlinOffset(), profile.cityPerlinInnerScale());
+                float factor = rarityMap.getCityFactor(chunkX, chunkZ);
+                CityStyleSelection selection = getCityStyleSelectionForPerlinRegion(coord, provider);
+                styles.add(Pair.of(factor,
+                        selection == null ? null : selection.styleAt(factor)));
             }
         } else {
             int offset = (profile.cityMaxRadius() + 15) / 16;
@@ -198,14 +225,10 @@ public class City {
                         if (sqdist < radius * radius) {
                             float dist = (float) Math.sqrt(sqdist);
                             float factor = (radius - dist) / radius;
-                            if (factor < profile.cityStyleThreshold()) {
-                                styles.add(Pair.of(factor, profile.cityStyleAlternative()));
-                            } else {
-                                // The centre's style, not the observing chunk's: asking at
-                                // `coord` gave every chunk of one city its own roll, so a
-                                // single city had no coherent style (issue #37).
-                                styles.add(Pair.of(factor, getCityStyleForCityCenter(c, provider)));
-                            }
+                            CityStyleSelection selection =
+                                    getCityStyleSelectionForCityCenter(c, provider);
+                            styles.add(Pair.of(factor,
+                                    selection == null ? null : selection.styleAt(factor)));
                         }
                     }
                 }
@@ -214,8 +237,9 @@ public class City {
 
         String cityStyleName;
         if (styles.isEmpty()) {
-            cityStyleName = provider.worldStyles().atChunk(provider, coord)
+            CityStyleSelection selection = provider.worldStyles().atChunk(provider, coord)
                     .getRandomCityStyle(provider, coord, cityStyleRandom);
+            cityStyleName = selection == null ? null : selection.citystyle();
         } else {
             Pair<Float, String> fromList = Tools.getRandomFromList(cityStyleRandom, styles, Pair::getLeft);
             if (fromList == null) {

@@ -86,8 +86,6 @@ public class Preset {
     private final int CITY_SPAWN_DISTANCE2;
     private final double CITY_SPAWN_MULTIPLIER1;
     private final double CITY_SPAWN_MULTIPLIER2;
-    private final float CITY_STYLE_THRESHOLD;
-    private final String CITY_STYLE_ALTERNATIVE;
     private final boolean CITY_AVOID_VOID;
     private final int CITY_LEVEL0_HEIGHT;
     private final int CITY_LEVEL1_HEIGHT;
@@ -219,8 +217,6 @@ public class Preset {
         this.CITY_SPAWN_DISTANCE2 = draft.CITY_SPAWN_DISTANCE2;
         this.CITY_SPAWN_MULTIPLIER1 = draft.CITY_SPAWN_MULTIPLIER1;
         this.CITY_SPAWN_MULTIPLIER2 = draft.CITY_SPAWN_MULTIPLIER2;
-        this.CITY_STYLE_THRESHOLD = draft.CITY_STYLE_THRESHOLD;
-        this.CITY_STYLE_ALTERNATIVE = draft.CITY_STYLE_ALTERNATIVE;
         this.CITY_AVOID_VOID = draft.CITY_AVOID_VOID;
         this.CITY_LEVEL0_HEIGHT = draft.CITY_LEVEL0_HEIGHT;
         this.CITY_LEVEL1_HEIGHT = draft.CITY_LEVEL1_HEIGHT;
@@ -358,8 +354,6 @@ public class Preset {
         draft.CITY_SPAWN_DISTANCE2 = CITY_SPAWN_DISTANCE2;
         draft.CITY_SPAWN_MULTIPLIER1 = CITY_SPAWN_MULTIPLIER1;
         draft.CITY_SPAWN_MULTIPLIER2 = CITY_SPAWN_MULTIPLIER2;
-        draft.CITY_STYLE_THRESHOLD = CITY_STYLE_THRESHOLD;
-        draft.CITY_STYLE_ALTERNATIVE = CITY_STYLE_ALTERNATIVE;
         draft.CITY_AVOID_VOID = CITY_AVOID_VOID;
         draft.CITY_LEVEL0_HEIGHT = CITY_LEVEL0_HEIGHT;
         draft.CITY_LEVEL1_HEIGHT = CITY_LEVEL1_HEIGHT;
@@ -578,8 +572,6 @@ public class Preset {
                 Optional.of(CITY_SPAWN_DISTANCE2),
                 Optional.of(CITY_SPAWN_MULTIPLIER1),
                 Optional.of(CITY_SPAWN_MULTIPLIER2),
-                Optional.of(CITY_STYLE_THRESHOLD),
-                Optional.of(CITY_STYLE_ALTERNATIVE),
                 Optional.of(CITY_AVOID_VOID),
                 Optional.of(CITY_LEVEL0_HEIGHT),
                 Optional.of(CITY_LEVEL1_HEIGHT),
@@ -811,14 +803,6 @@ public class Preset {
 
     public double citySpawnMultiplier2() {
         return CITY_SPAWN_MULTIPLIER2;
-    }
-
-    public float cityStyleThreshold() {
-        return CITY_STYLE_THRESHOLD;
-    }
-
-    public String cityStyleAlternative() {
-        return CITY_STYLE_ALTERNATIVE;
     }
 
     public boolean cityAvoidVoid() {

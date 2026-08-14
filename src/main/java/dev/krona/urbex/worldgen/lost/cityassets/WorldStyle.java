@@ -29,7 +29,7 @@ public class WorldStyle {
 
     private final ScatteredSettings scatteredSettings;
     @Nonnull private final PartSelector partSelector;
-    private final List<Pair<Predicate<Holder<Biome>>, Pair<Float, String>>> cityStyleSelector = new ArrayList<>();
+    private final List<Pair<Predicate<Holder<Biome>>, Pair<Float, CityStyleSelection>>> cityStyleSelector = new ArrayList<>();
     private final List<Pair<Predicate<Holder<Biome>>, Float>> cityBiomeMultiplier = new ArrayList<>();
     @Nonnull private final MultiSettings multiSettings;
     @Nonnull private final WorldSettings worldSettings;
@@ -101,7 +101,7 @@ public class WorldStyle {
             if (selector.biomeMatcher() != null) {
                 predicate = selector.biomeMatcher();
             }
-            cityStyleSelector.add(Pair.of(predicate, Pair.of(selector.factor(), selector.citystyle())));
+            cityStyleSelector.add(Pair.of(predicate, Pair.of(selector.factor(), selector.selection())));
         }
         for (CityBiomeMultiplier multiplier : multipliers) {
             cityBiomeMultiplier.add(Pair.of(multiplier.biomeMatcher(), multiplier.multiplier()));
@@ -165,7 +165,7 @@ public class WorldStyle {
      * The resolved {@code citystyles}, for tests. The public surface offers only a weighted draw
      * that needs a level and a biome, so without this the chain fold is unobservable.
      */
-    List<Pair<Predicate<Holder<Biome>>, Pair<Float, String>>> cityStyleSelectors() {
+    List<Pair<Predicate<Holder<Biome>>, Pair<Float, CityStyleSelection>>> cityStyleSelectors() {
         return cityStyleSelector;
     }
 
@@ -199,16 +199,16 @@ public class WorldStyle {
         return 1.0f;
     }
 
-    public String getRandomCityStyle(PlanningContext provider, ChunkCoord coord, RandomSource random) {
+    public CityStyleSelection getRandomCityStyle(PlanningContext provider, ChunkCoord coord, RandomSource random) {
         Holder<Biome> biome = BiomeInfo.getBiomeInfo(provider, coord).getMainBiome();
-        List<Pair<Float, String>> ct = new ArrayList<>();
-        for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> pair : cityStyleSelector) {
+        List<Pair<Float, CityStyleSelection>> ct = new ArrayList<>();
+        for (Pair<Predicate<Holder<Biome>>, Pair<Float, CityStyleSelection>> pair : cityStyleSelector) {
             if (pair.getKey().test(biome)) {
                 ct.add(pair.getValue());
             }
         }
 
-        Pair<Float, String> randomFromList = Tools.getRandomFromList(random, ct, Pair::getLeft);
+        Pair<Float, CityStyleSelection> randomFromList = Tools.getRandomFromList(random, ct, Pair::getLeft);
         if (randomFromList == null) {
             return null;
         } else {

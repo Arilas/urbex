@@ -22,6 +22,7 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -241,6 +242,30 @@ class SettingsCompletenessTest {
             }
         }
         assertTrue(missing.isEmpty(), "Missing lang entries in en_us.json: " + missing);
+    }
+
+    @Test
+    void retiredCityStyleAlternativeSettingsAreNotExposed() {
+        Set<String> retiredFields = Set.of("CITY_STYLE_THRESHOLD", "CITY_STYLE_ALTERNATIVE");
+        Set<String> draftFields = new HashSet<>();
+        for (Field field : PresetDraft.class.getFields()) {
+            draftFields.add(field.getName());
+        }
+        Set<String> descriptorKeys = new HashSet<>();
+        for (SettingDescriptor descriptor : Settings.ALL) {
+            descriptorKeys.add(descriptor.key());
+        }
+        JsonObject lang = loadLang();
+
+        assertTrue(java.util.Collections.disjoint(retiredFields, draftFields),
+                "retired fields remain on PresetDraft: " + draftFields);
+        assertTrue(java.util.Collections.disjoint(retiredFields, descriptorKeys),
+                "retired settings remain in Settings: " + descriptorKeys);
+        for (String retired : retiredFields) {
+            assertFalse(lang.has("urbex.setting." + retired), "retired setting label remains: " + retired);
+            assertFalse(lang.has("urbex.setting." + retired + ".tooltip"),
+                    "retired setting tooltip remains: " + retired);
+        }
     }
 
     /**

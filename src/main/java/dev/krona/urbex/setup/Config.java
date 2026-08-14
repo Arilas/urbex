@@ -1,13 +1,13 @@
 package dev.krona.urbex.setup;
 
 import com.google.gson.JsonParser;
-import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.config.ConfigRepository;
 import dev.krona.urbex.data.UrbexData;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.RetiredPresetKeyException;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.resources.ResourceKey;
@@ -271,9 +271,11 @@ public class Config {
             // override that flips GENERATE_NETHER (on or off) would silently not count here.
             if (overworldChoice.overridesJson().isPresent()) {
                 try {
-                    PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE,
-                            JsonParser.parseString(overworldChoice.overridesJson().get())).getOrThrow();
+                    PresetDefinition re = PresetDefinition.parseOverrides(
+                            JsonParser.parseString(overworldChoice.overridesJson().get()));
                     overworldPreset = Presets.applyOverrides(overworldPreset, re);
+                } catch (RetiredPresetKeyException e) {
+                    throw e;
                 } catch (Exception e) {
                     Urbex.getLogger().error("Malformed Urbex preset overrides for the overworld; " +
                             "the GENERATE_NETHER probe will see the un-overridden preset.", e);

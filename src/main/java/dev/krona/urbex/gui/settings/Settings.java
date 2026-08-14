@@ -185,10 +185,6 @@ public final class Settings {
         r.slider("CITY_SPAWN_MULTIPLIER2", SettingCategory.CITIES, 0.0, 1.0, 0.01,
                 p -> p.citySpawnMultiplier2(), (p, v) -> p.CITY_SPAWN_MULTIPLIER2 = (Double) v);
 
-        r.section("style");
-        r.slider("CITY_STYLE_THRESHOLD", SettingCategory.CITIES, 0.0, 1.0, 0.01,
-                p -> (double) p.cityStyleThreshold(), (p, v) -> p.CITY_STYLE_THRESHOLD = ((Double) v).floatValue());
-
         // Where a city is allowed to sit: the terrain-height gate in City.getCityFactor plus the void guard. The
         // config ceiling (-1024..2048) is far past any real world Y, so min/max height are tightened to the
         // vanilla buildable range so the handle tracks meaningful heights.
@@ -463,8 +459,6 @@ public final class Settings {
         // ==== ADVANCED =======================================================
         // Identifier/list TEXT fields and low-level generation switches.
         r.section("identifiers");
-        r.text("CITY_STYLE_ALTERNATIVE", SettingCategory.ADVANCED,
-                p -> p.cityStyleAlternative(), (p, v) -> p.CITY_STYLE_ALTERNATIVE = (String) v);
         r.text("SPAWN_BIOME", SettingCategory.ADVANCED,
                 p -> p.spawnBiome(), (p, v) -> p.SPAWN_BIOME = (String) v);
         r.text("SPAWN_CITY", SettingCategory.ADVANCED,

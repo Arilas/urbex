@@ -60,7 +60,7 @@ public class PredefinedCity {
         chunkX = Resolved.require(declaredChunkX, name, "chunkx");
         chunkZ = Resolved.require(declaredChunkZ, name, "chunkz");
         radius = Resolved.require(declaredRadius, name, "radius");
-        cityStyle = Resolved.require(declaredCityStyle, name, "citystyle");
+        cityStyle = declaredCityStyle;
         for (PredefinedCityDefinition object : chainRootFirst) {
             if (object.getPredefinedBuildings() != null) {
                 Mergeable.apply(predefinedBuildings, object.getPredefinedBuildings());

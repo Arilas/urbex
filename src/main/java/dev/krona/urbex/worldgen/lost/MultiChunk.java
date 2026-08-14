@@ -128,7 +128,12 @@ public class MultiChunk {
         // buildings, pairing them with the wrong styles (issue #39).
         record Chosen(MultiBuilding building, CityStyle style) {}
         List<Chosen> chosen = new ArrayList<>();
-        List<CityStyle> styleList = new ArrayList<>(cityStyleCounter.getMap().keySet());
+        List<CityStyle> styleList = eligibleMultiBuildingStyles(cityStyleCounter);
+        if (styleList.isEmpty()) {
+            // An edge city style may deliberately opt out of multibuildings. An area containing
+            // only such styles has no valid source to sample, so it simply gets none.
+            return this;
+        }
         // Sorted on getId(), not getName(): this imposes deterministic order on a HashMap
         // keySet, and Tools.getRandomFromList below walks the list subtracting weights, so the
         // order decides which style (and therefore which multibuilding) gets picked. getId()
@@ -179,6 +184,17 @@ public class MultiChunk {
         }
 
         return this;
+    }
+
+    /**
+     * A style can explicitly declare no multibuildings, which is an opt-out rather than a broken
+     * selector. Keep it out of the weighted source list: sampling it would produce {@code null}
+     * and turn an ordinary city edge into a chunk-generation failure.
+     */
+    static List<CityStyle> eligibleMultiBuildingStyles(Counter<CityStyle> cityStyleCounter) {
+        return cityStyleCounter.getMap().keySet().stream()
+                .filter(CityStyle::hasMultiBuildings)
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     private void dump() {

@@ -1,6 +1,9 @@
 package dev.krona.urbex.worldgen.lost.regassets;
 
+import com.google.gson.JsonElement;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
@@ -60,6 +63,17 @@ public class PresetDefinition implements Extendable {
     public static final Codec<PresetDefinition> CODEC = RetiredKeys.reject(
             dev.krona.urbex.worldgen.lost.regassets.data.preset.UnknownKeys.warning(RAW, KEYS, "preset"),
             "preset");
+
+    /** Decodes per-world overrides, refusing retired nested city-style alternative keys. */
+    public static PresetDefinition parseOverrides(JsonElement json) {
+        Dynamic<JsonElement> root = new Dynamic<>(JsonOps.INSTANCE, json);
+        root.get("cities").result().ifPresent(cities ->
+                RetiredKeys.problem(cities, CitySettings.RETIRED_KEY_ERRORS)
+                        .ifPresent(message -> {
+                            throw new RetiredPresetKeyException(message);
+                        }));
+        return CODEC.parse(JsonOps.INSTANCE, json).getOrThrow();
+    }
 
 
     private final Optional<Identifier> extendsId;

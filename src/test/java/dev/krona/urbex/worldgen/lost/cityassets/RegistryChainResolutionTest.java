@@ -12,6 +12,7 @@ import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleEdge;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
@@ -335,7 +336,8 @@ class RegistryChainResolutionTest {
                 Optional.empty(), Optional.empty(), Optional.of(scattered),
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
-                        List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
+                        List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null,
+                                Optional.of(new CityStyleEdge("urbex:citystyle_edge", 0.4f)))))),
                 Optional.empty(), Optional.empty());
         WorldStyleDefinition child = new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:bleak"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
@@ -346,7 +348,9 @@ class RegistryChainResolutionTest {
         assertEquals("urbex:bleak", resolved.getOutsideStyle(), "what the child declares wins");
         assertSame(scattered, resolved.getScatteredSettings(), "the settings block is inherited");
         assertEquals(List.of("urbex:citystyle_common"), resolved.cityStyleSelectors().stream()
-                .map(pair -> pair.getRight().getRight()).toList());
+                .map(pair -> pair.getRight().getRight().citystyle()).toList());
+        assertEquals("urbex:citystyle_edge", resolved.cityStyleSelectors().getFirst().getRight().getRight()
+                .edge().orElseThrow().citystyle(), "the edge remains atomic with its selector entry");
     }
 
     // -------------------------------------------------------- multibuildings

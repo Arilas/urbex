@@ -328,7 +328,7 @@ loom {
             if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
                 project.property('urbexDigestVmArgs').split(';').each { vmArg it }
             }
-            vmArg '-Durbex.digestCheck=12,rowmajor,0'
+            vmArg '-Durbex.digestCheck=3,rowmajor,31'
             vmArg '-Durbex.digestCheck.requireRailCollision'
             vmArg '-Durbex.digestCheck.failOnUnsafeRead'
             def golden = file('digest-rail.golden')
@@ -348,7 +348,7 @@ loom {
             if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
                 project.property('urbexDigestVmArgs').split(';').each { vmArg it }
             }
-            vmArg '-Durbex.digestCheck=12,shuffled,0'
+            vmArg '-Durbex.digestCheck=3,shuffled,31'
             vmArg '-Durbex.digestCheck.requireRailCollision'
             vmArg '-Durbex.digestCheck.failOnUnsafeRead'
             def golden = file('digest-rail.golden')
@@ -463,10 +463,11 @@ registerPrepareDigestCheck('prepareDigestCheckAvoidExpire', 'runs/digestcheckavo
         '135132278163449878')
 registerPrepareDigestCheck('prepareDigestSoak', 'runs/digestsoak', '',
         '135132278163449878')
-// The railway-collision window: the same seed and square as the avoidance ones, with the world
-// style swapped for the datapack one above so railwayavoidance is block_railway. Nothing the mod
-// ships selects that policy, so this is the only configuration in the repository under which a
-// building cancelling a railway can happen at all.
+// The railway-collision window: seed 135132278163449878, radius 3 around chunk (31,31), with the
+// style swapped for the datapack one above so railwayavoidance is block_railway. A radius-40 probe
+// after selector-owned city edges found collisions at (33,29) and (34,29), both inside this compact
+// square. Nothing the mod ships selects that policy, so this is the only configuration in the
+// repository under which a building cancelling a railway can happen at all.
 // selectedWorldStyle rather than a dimensionsWithPresets entry: the global config's own selection
 // replaces whatever a dimension entry put at the overworld (see Config.buildPresetCache), so an
 // entry there is silently overridden while selectedPreset is set - which it is, for every window

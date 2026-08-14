@@ -12,10 +12,15 @@ import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleEdge;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
+import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
-import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
+import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
+import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetSettings;
 import net.minecraft.SharedConstants;
@@ -252,7 +257,48 @@ class AssetGraphTest {
                 diagnostics.problems().getFirst().message());
     }
 
+    @Test
+    void anEdgeCityStyleParticipatesInWorldRoadPaletteValidation() {
+        Fixture fixture = familyFixture();
+        CityStyle base = fixture.cityStyle("base", "urbex:base_style", "urbex:city_road");
+        CityStyle edge = fixture.cityStyle("edge", "urbex:edge_style", "urbex:city_road");
+        fixture.worldStyle("family", new CityStyleSelector(1.0f, "urbex:base", null,
+                Optional.of(new CityStyleEdge("urbex:edge", 0.4f))));
+
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        AssetGraph.validate(fixture.snapshot(), List.of(base, edge), diagnostics);
+
+        assertTrue(diagnostics.problems().stream().anyMatch(problem ->
+                        problem.asset().equals(Identifier.fromNamespaceAndPath("urbex", "world_road"))
+                                && problem.message().contains("'x'")),
+                () -> "the edge palette lacks the world road marker, so graph validation must report it: "
+                        + diagnostics.format("problems"));
+    }
+
+    @Test
+    void aBaseOnlyCityStyleSelectorKeepsWorldRoadPaletteValidationBaseOnly() {
+        Fixture fixture = familyFixture();
+        CityStyle base = fixture.cityStyle("base", "urbex:base_style", "urbex:city_road");
+        CityStyle edge = fixture.cityStyle("edge", "urbex:edge_style", "urbex:city_road");
+        fixture.worldStyle("family", new CityStyleSelector(1.0f, "urbex:base", null));
+
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        AssetGraph.validate(fixture.snapshot(), List.of(base, edge), diagnostics);
+
+        assertTrue(diagnostics.isEmpty(), () -> diagnostics.format("a base-only selector must not validate an unselected edge"));
+    }
+
     // ------------------------------------------------------------------ fixtures
+
+    private static Fixture familyFixture() {
+        Fixture fixture = new Fixture();
+        fixture.paletteStyle("outside", 'z');
+        fixture.paletteStyle("base_style", 'x');
+        fixture.paletteStyle("edge_style", 'y');
+        fixture.partWithPalette("city_road", 16, 16, 'x', 'x');
+        fixture.part("world_road", 16, 16, 'x');
+        return fixture;
+    }
 
     private static PredefinedBuilding building(String name) {
         return new PredefinedBuilding(name, 0, 0, false, false);
@@ -271,6 +317,8 @@ class AssetGraphTest {
         private final Map<Identifier, BuildingPart> extraParts = new HashMap<>();
         private final Map<Identifier, Condition> conditions = new HashMap<>();
         private final Map<Identifier, Style> styles = new HashMap<>();
+        private final Map<Identifier, WorldStyle> worldStyles = new HashMap<>();
+        private final Map<Identifier, CityStyle> cityStyles = new HashMap<>();
 
         Fixture building(String path, String partName) {
             PartRef ref = new PartRef(partName, Optional.empty(), Optional.empty(), Optional.empty(),
@@ -312,12 +360,59 @@ class AssetGraphTest {
 
         /** A part of an explicit size, for the road-geometry check. */
         Fixture part(String path, int xSize, int zSize) {
+            return part(path, xSize, zSize, 'a');
+        }
+
+        Fixture part(String path, int xSize, int zSize, char marker) {
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
-            List<List<String>> slices = List.of(List.of("a".repeat(xSize * zSize)));
+            List<List<String>> slices = List.of(List.of(Character.toString(marker).repeat(xSize * zSize)));
             extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK, null,
                     AssetIndex.empty("urbex:palettes"), List.of(new BuildingPartDefinition(
                     Optional.empty(), Optional.of(xSize), Optional.of(zSize), Optional.of(slices),
                     Optional.empty(), Optional.empty(), Optional.empty()))));
+            return this;
+        }
+
+        Fixture partWithPalette(String path, int xSize, int zSize, char marker, char paletteMarker) {
+            Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
+            List<List<String>> slices = List.of(List.of(Character.toString(marker).repeat(xSize * zSize)));
+            extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"),
+                    List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(xSize), Optional.of(zSize),
+                            Optional.of(slices), Optional.empty(),
+                            Optional.of(singleMarkerPaletteDefinition(paletteMarker)), Optional.empty()))));
+            return this;
+        }
+
+        Fixture paletteStyle(String path, char marker) {
+            Identifier paletteId = Identifier.fromNamespaceAndPath("urbex", path + "_palette");
+            Palette palette = singleMarkerPalette(path + "_palette", marker);
+            Identifier styleId = Identifier.fromNamespaceAndPath("urbex", path);
+            styles.put(styleId, new Style(styleId, new AssetIndex<>("urbex:palettes", Map.of(paletteId, palette)),
+                    List.of(new StyleDefinition(Optional.empty(), Optional.of(new Mergeable<>(true,
+                            List.of(List.of(new PaletteSelector(1.0f, paletteId.toString())))))))));
+            return this;
+        }
+
+        CityStyle cityStyle(String path, String style, String streetPart) {
+            Optional<Mergeable<String>> one = Optional.of(new Mergeable<>(true, List.of(streetPart)));
+            StreetParts.Decl family = new StreetParts.Decl(one, one, one, one, one, one, one, one);
+            CityStyle cityStyle = new CityStyle(Identifier.fromNamespaceAndPath("urbex", path),
+                    List.of(new CityStyleDefinition(Optional.empty(), Optional.of(style), Optional.empty(),
+                            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                            Optional.empty(), Optional.empty(), Optional.of(new StreetSettings(Optional.empty(),
+                                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(family),
+                                    Optional.empty(), Optional.empty())), Optional.empty())));
+            cityStyles.put(cityStyle.getId(), cityStyle);
+            return cityStyle;
+        }
+
+        Fixture worldStyle(String path, CityStyleSelector selector) {
+            WorldStyle worldStyle = new WorldStyle(Identifier.fromNamespaceAndPath("urbex", path),
+                    List.of(new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
+                            Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(worldRoadParts()),
+                            Optional.of(new Mergeable<>(true, List.of(selector))), Optional.empty(), Optional.empty())));
+            worldStyles.put(worldStyle.getId(), worldStyle);
             return this;
         }
 
@@ -398,6 +493,25 @@ class AssetGraphTest {
             return new StreetParts.Decl(one, one, one, one, one, one, one, one);
         }
 
+        private static Palette singleMarkerPalette(String path, char marker) {
+            return new Palette(Identifier.fromNamespaceAndPath("urbex", path), BuiltInRegistries.BLOCK, null,
+                    List.of(singleMarkerPaletteDefinition(marker)));
+        }
+
+        private static PaletteDefinition singleMarkerPaletteDefinition(char marker) {
+            PaletteEntry entry = new PaletteEntry(Character.toString(marker), Optional.of("minecraft:stone"),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+            return new PaletteDefinition(Optional.empty(), Optional.of(List.of(entry)));
+        }
+
+        private static PartSelector.Decl worldRoadParts() {
+            Optional<Mergeable<String>> one = Optional.of(new Mergeable<>(true, List.of("urbex:world_road")));
+            return new PartSelector.Decl(Optional.of(new HighwayParts.Decl(one, one, one, one, one, one)),
+                    Optional.of(new RailwayParts.Decl(one, one, one, one, one, one, one, one, one, one, one,
+                            one, one, one, one, one)));
+        }
+
         Fixture city(String path, PredefinedBuilding... contents) {
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
             cities.put(id, new PredefinedCity(id, List.of(new PredefinedCityDefinition(
@@ -423,7 +537,7 @@ class AssetGraphTest {
                     new AssetIndex<>("urbex:styles", styles), new AssetIndex<>("urbex:parts", parts),
                     new AssetIndex<>("urbex:buildings", buildings),
                     new AssetIndex<>("urbex:multibuildings", multiBuildings), empty.scattered(),
-                    empty.worldStyles(), empty.cityStyles(),
+                    new AssetIndex<>("urbex:worldstyles", worldStyles), new AssetIndex<>("urbex:citystyles", cityStyles),
                     new AssetIndex<>("urbex:predefinedcities", cities), empty.stuff(), empty.stuffByTag(),
                     empty.predefined());
         }

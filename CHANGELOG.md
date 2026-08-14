@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **City-style edges now belong to individual world-style selectors.** A selector may declare an
+  optional `citystyles[].edge` with its edge `citystyle` and spatial `threshold`; both the base and
+  edge assets are validated eagerly when the world loads.
+  - *Families stay stable where the generator anchors them.* A centred city chooses its family at
+    its centre, while a Perlin-rarity world chooses one family per stable 16-by-16 region; only the
+    local city factor switches that family between its base and edge.
+  - *The two preset alternatives are deleted.* `cities.cityStyleAlternative` and
+    `cities.cityStyleThreshold` are no longer supported; move each intended alternative into the
+    relevant world-style selector's `edge`.
+  - *The bundled border now applies through `urbex:standard` under every preset.* Both bundled
+    standard-world-style families use `urbex:citystyle_border` below factor `0.4`.
+
 - **The `atmosphere` preset section is gone, along with its five settings sliders.** `horizon`,
   `fogRed`, `fogGreen`, `fogBlue` and `fogDensity` were read by nothing on either side (issue #73).
   - *They were dead in singleplayer too.* The tooltips promised "used client-side (but only if the
