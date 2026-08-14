@@ -124,6 +124,23 @@ public class ChunkDriver {
      */
     private Long2ObjectOpenHashMap<BlockState> written;
 
+    /**
+     * What {@link #written} is sized for on creation, rather than grown into from fastutil's
+     * default of 16.
+     *
+     * <p>A driven chunk writes about 9200 positions - measured at 9241 on both the
+     * {@code digestCheckAvoid} window and a 625-chunk {@code onlycities} one - so the map was
+     * doubling its way up through eleven rehashes, and the last few of those allocate the
+     * expensive pairs. Growing to capacity C allocates about 2C of backing arrays; starting at C
+     * allocates C. At fastutil's 0.75 load factor this asks for the 16384-slot table that 9200
+     * entries were going to end up in anyway.</p>
+     *
+     * <p>Chunks that write far less than that over-allocate, which is the trade: the map is
+     * created lazily on the first write, so a chunk the driver never touches still costs nothing,
+     * and one that writes at all is overwhelmingly a city chunk writing thousands.</p>
+     */
+    private static final int EXPECTED_WRITES_PER_CHUNK = 12288;
+
     private boolean published;
     private boolean loggedLateWrite;
 
@@ -134,7 +151,7 @@ public class ChunkDriver {
             return;
         }
         if (written == null) {
-            written = new Long2ObjectOpenHashMap<>();
+            written = new Long2ObjectOpenHashMap<>(EXPECTED_WRITES_PER_CHUNK);
         }
         // put, not putIfAbsent: within one driver, the last write to a position wins - the same
         // property the old read-the-final-world approach had for driver-internal overwrites

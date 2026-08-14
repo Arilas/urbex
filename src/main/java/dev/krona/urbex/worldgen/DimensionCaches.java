@@ -43,6 +43,19 @@ public final class DimensionCaches {
      */
     public final TimedCache<ChunkCoord, WorldStyle> worldStyle = new TimedCache<>(Config::cacheCleanupSeconds, "worldStyle");
     public final TimedCache<ChunkCoord, MultiChunk> multiChunk = new TimedCache<>(Config::cacheCleanupSeconds, "multiChunk");
+    /**
+     * Whether a coordinate rolled a city centre and, if so, that city's radius - {@code NaN} when
+     * it is not one. See {@code City.centreRadiusOrNone}: the city-factor scan asks this of every
+     * coordinate within {@code cityMaxRadius} of the chunk being planned, so neighbouring chunks
+     * ask overwhelmingly the same questions.
+     */
+    public final TimedCache<ChunkCoord, Float> cityCentre = new TimedCache<>(Config::cacheCleanupSeconds, "cityCentre");
+    /**
+     * How strongly a coordinate sits inside a city. See {@code City.getCityFactor}: the value is
+     * asked for the same chunk from several planning passes, and computing it scans every
+     * coordinate within {@code cityMaxRadius}.
+     */
+    public final TimedCache<ChunkCoord, Float> cityFactor = new TimedCache<>(Config::cacheCleanupSeconds, "cityFactor");
     public final TimedCache<ChunkCoord, BiomeInfo> biomeInfo = new TimedCache<>(Config::cacheCleanupSeconds, "biomeInfo");
     /**
      * The railway and highway coordinate maps.
@@ -107,6 +120,8 @@ public final class DimensionCaches {
         cityStyle.clear();
         worldStyle.clear();
         multiChunk.clear();
+        cityCentre.clear();
+        cityFactor.clear();
         biomeInfo.clear();
         railInfo.clear();
         xHighwayLevel.clear();

@@ -65,7 +65,46 @@ public class City {
     }
 
 
+    /**
+     * The memo value for a coordinate that is not a city centre. A radius is always a real
+     * number, so this cannot collide with one - which a negative sentinel could, since a
+     * predefined city carries whatever radius its datapack declares.
+     */
+    private static final float NOT_A_CENTRE = Float.NaN;
+
+    /**
+     * Whether this coordinate rolled a city centre and, if it did, that city's radius - memoized,
+     * because {@link #getCityFactor} asks this of every chunk within {@code cityMaxRadius}.
+     *
+     * <p>That scan is {@code (2 * ceil(maxRadius / 16) + 1)^2} coordinates per chunk planned:
+     * 1089 of them at the shipped {@code onlycities} radius of 256. Both rolls are pure functions
+     * of the seed and the coordinate - neither depends on which chunk is doing the asking - so
+     * every chunk was re-rolling almost exactly the window its neighbour had just rolled, and
+     * paying two {@link Rng#at} allocations per coordinate to do it. Against a 625-chunk
+     * {@code onlycities} window that was 0.9 GiB, the largest remaining allocation site in
+     * generation after the shape-update fix.</p>
+     *
+     * <p>One entry covers both rolls because nothing ever wants the radius of a coordinate that
+     * is not a centre except {@link #getCityRadius}, which stays total by falling through to the
+     * uncached roll for that case.</p>
+     */
+    private static float centreRadiusOrNone(ChunkCoord coord, PlanningContext provider) {
+        Float cached = provider.caches().cityCentre.get(coord);
+        if (cached != null) {
+            return cached;
+        }
+        float result = isCityCentreUncached(coord, provider)
+                ? cityRadiusUncached(coord, provider)
+                : NOT_A_CENTRE;
+        Float raced = provider.caches().cityCentre.putIfAbsent(coord, result);
+        return raced != null ? raced : result;
+    }
+
     public static boolean isCityCenter(ChunkCoord coord, PlanningContext provider) {
+        return !Float.isNaN(centreRadiusOrNone(coord, provider));
+    }
+
+    private static boolean isCityCentreUncached(ChunkCoord coord, PlanningContext provider) {
         PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             return true;
@@ -80,6 +119,16 @@ public class City {
      * Return the radius of the city with the given center
      */
     public static float getCityRadius(ChunkCoord coord, PlanningContext provider) {
+        float cached = centreRadiusOrNone(coord, provider);
+        if (!Float.isNaN(cached)) {
+            return cached;
+        }
+        // Not a centre. Callers reach here only by asking for the radius of a coordinate that
+        // never rolled one; answer exactly as before rather than inventing a value.
+        return cityRadiusUncached(coord, provider);
+    }
+
+    private static float cityRadiusUncached(ChunkCoord coord, PlanningContext provider) {
         PredefinedCity city = getPredefinedCity(provider, coord);
         if (city != null) {
             return city.getRadius();
@@ -178,7 +227,33 @@ public class City {
         return provider.assets().cityStyles().get(cityStyleName);
     }
 
+    /**
+     * How strongly this chunk sits inside a city, memoized per coordinate.
+     *
+     * <p>The uncached body scans every coordinate within {@code cityMaxRadius} - 1089 of them at
+     * the shipped {@code onlycities} radius - and it is asked several times for the same chunk:
+     * once from {@code ChunkCandidates.candidate}, once from {@code ChunkPlan}, and up to four
+     * more from {@code CityField.getCityLevelNormal}, whose averaging path calls
+     * {@code isCityRaw} on the four neighbours it samples. Nothing in the scan depends on which
+     * chunk is asking, so those repeats re-derived an identical answer.</p>
+     *
+     * <p>get-then-{@code putIfAbsent} rather than {@code getOrCompute} deliberately, for the
+     * reason {@code getCityStyle} documents: the computation reaches other planning state, and
+     * running it inside a {@code ConcurrentHashMap} bin lock is how that deadlocks. Two threads
+     * racing on one coordinate both compute and agree, because this is a pure function of the
+     * seed, the coordinate and the preset.</p>
+     */
     public static float getCityFactor(ChunkCoord coord, PlanningContext provider, Preset profile) {
+        Float cached = provider.caches().cityFactor.get(coord);
+        if (cached != null) {
+            return cached;
+        }
+        float result = cityFactorUncached(coord, provider, profile);
+        Float raced = provider.caches().cityFactor.putIfAbsent(coord, result);
+        return raced != null ? raced : result;
+    }
+
+    private static float cityFactorUncached(ChunkCoord coord, PlanningContext provider, Preset profile) {
         ResourceKey<Level> type = provider.dimension();
         // If we have a predefined building here we force a high city factor
 
