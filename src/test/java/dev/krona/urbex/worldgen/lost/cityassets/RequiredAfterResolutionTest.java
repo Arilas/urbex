@@ -274,7 +274,7 @@ class RequiredAfterResolutionTest {
     // -------------------------------------------------------------- helpers
 
     private static List<String> cityStyleNames(WorldStyle style) {
-        return style.cityStyleSelectors().stream().map(pair -> pair.getRight().getRight()).toList();
+        return style.cityStyleSelectors().stream().map(pair -> pair.getRight().getRight().citystyle()).toList();
     }
 
     private static ScatteredDefinition scattered(Optional<Mergeable<String>> buildings,

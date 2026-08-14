@@ -7,6 +7,7 @@ import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelection;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 import net.minecraft.resources.ResourceKey;
@@ -158,8 +159,9 @@ public class City {
         RandomSource cityStyleForCenterRandom = Rng.at(provider.seed(), chunkX, chunkZ, Rng.Purpose.CITY_STYLE);
         // The centre's own world style, drawn at the centre: this is what makes one city internally
         // coherent when a world mixes several datapacks, since every chunk of that city asks here.
-        return provider.worldStyles().atCityCenter(coord)
+        CityStyleSelection selection = provider.worldStyles().atCityCenter(coord)
                 .getRandomCityStyle(provider, coord, cityStyleForCenterRandom);
+        return selection == null ? null : selection.citystyle();
     }
 
     // Calculate the citystyle based on all surrounding cities
@@ -214,8 +216,9 @@ public class City {
 
         String cityStyleName;
         if (styles.isEmpty()) {
-            cityStyleName = provider.worldStyles().atChunk(provider, coord)
+            CityStyleSelection selection = provider.worldStyles().atChunk(provider, coord)
                     .getRandomCityStyle(provider, coord, cityStyleRandom);
+            cityStyleName = selection == null ? null : selection.citystyle();
         } else {
             Pair<Float, String> fromList = Tools.getRandomFromList(cityStyleRandom, styles, Pair::getLeft);
             if (fromList == null) {

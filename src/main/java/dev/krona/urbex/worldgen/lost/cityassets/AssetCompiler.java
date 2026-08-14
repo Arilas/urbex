@@ -4,6 +4,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelection;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import net.minecraft.core.Holder;
@@ -139,8 +140,10 @@ public final class AssetCompiler {
     static Set<Identifier> reachableCityStyles(RegistryAccess access, AssetIndex<WorldStyle> worldStyles) {
         Set<Identifier> reachable = new HashSet<>();
         for (WorldStyle style : worldStyles.all()) {
-            for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selector : style.cityStyleSelectors()) {
-                reachable.add(DataTools.fromName(selector.getRight().getRight()));
+            for (Pair<Predicate<Holder<Biome>>, Pair<Float, CityStyleSelection>> weighted : style.cityStyleSelectors()) {
+                CityStyleSelection selection = weighted.getRight().getRight();
+                reachable.add(DataTools.fromName(selection.citystyle()));
+                selection.edge().ifPresent(edge -> reachable.add(DataTools.fromName(edge.citystyle())));
             }
         }
         for (PresetDefinition preset : access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY)) {

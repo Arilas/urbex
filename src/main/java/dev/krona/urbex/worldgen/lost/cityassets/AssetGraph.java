@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelection;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.ObjectSelector;
@@ -157,14 +158,10 @@ public final class AssetGraph {
         // nothing that resolved.
         List<Style> roadStyles = new ArrayList<>();
         roadStyles.add(null);
-        for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selected : style.cityStyleSelectors()) {
-            CityStyle city = reachable.get(DataTools.fromName(selected.getRight().getRight()));
-            if (city != null) {
-                Style resolved = assets.styles().get(city.getStyle());
-                if (resolved != null) {
-                    roadStyles.add(resolved);
-                }
-            }
+        for (Pair<Predicate<Holder<Biome>>, Pair<Float, CityStyleSelection>> selected : style.cityStyleSelectors()) {
+            CityStyleSelection selection = selected.getRight().getRight();
+            addRoadStyle(roadStyles, selection.citystyle());
+            selection.edge().ifPresent(edge -> addRoadStyle(roadStyles, edge.citystyle()));
         }
         PartSelector selector = style.getPartSelector();
         HighwayParts highways = selector.highwayParts();
@@ -191,6 +188,16 @@ public final class AssetGraph {
         roadParts(owner, railways.railsVertical(), "parts.railways.railsvertical", roadStyles);
         roadParts(owner, railways.railsVerticalWater(), "parts.railways.railsverticalwater", roadStyles);
         roadParts(owner, railways.stationOpenRoof(), "parts.railways.stationopenroof", roadStyles);
+    }
+
+    private void addRoadStyle(List<Style> roadStyles, String cityStyleName) {
+        CityStyle city = reachable.get(DataTools.fromName(cityStyleName));
+        if (city != null) {
+            Style resolved = assets.styles().get(city.getStyle());
+            if (resolved != null) {
+                roadStyles.add(resolved);
+            }
+        }
     }
 
     private void walkCityStyle(CityStyle style) {
