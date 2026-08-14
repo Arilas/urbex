@@ -12,6 +12,7 @@ import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.setup.WorldSelection;
 import dev.krona.urbex.setup.WorldSelectionHandoff;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.RetiredPresetKeyException;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -275,12 +276,13 @@ public final class PresetSelection {
     }
 
     /**
-     * Validates a saved-data overrides string against {@link PresetDefinition#CODEC} before it is allowed
+     * Validates a saved-data overrides string through {@link PresetDefinition#parseOverrides} before it is allowed
      * anywhere near {@link Config#overridesFromClient} - that field is read on a worldgen worker
-     * thread the instant a chunk generates ({@code DimensionRuntime.create}), so a string that
-     * fails to parse must never be published in the first place. Returns {@code null} - "plain
-     * preset, no overrides" - for a blank input or one that fails to parse (logged either way the
-     * failure differs).
+     * thread the instant a chunk generates ({@code DimensionRuntime.create}), so a malformed string
+     * must never be published in the first place. Returns {@code null} - "plain preset, no
+     * overrides" - for blank or otherwise malformed input. The central parser's
+     * {@link RetiredPresetKeyException} is deliberately rethrown so removed fields cannot degrade
+     * into a plain-preset fallback.
      */
     @Nullable
     private static String validatedOverrides(String overridesJson, Identifier presetId) {
@@ -288,8 +290,10 @@ public final class PresetSelection {
             return null;
         }
         try {
-            PresetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(overridesJson)).getOrThrow();
+            PresetDefinition.parseOverrides(JsonParser.parseString(overridesJson));
             return overridesJson;
+        } catch (RetiredPresetKeyException e) {
+            throw e;
         } catch (Exception e) {
             Urbex.getLogger().warn("Re-created world '{}' had malformed Urbex preset overrides; " +
                     "restoring it as the plain preset instead.", presetId, e);
@@ -302,9 +306,9 @@ public final class PresetSelection {
      * {@link #availablePresets} currently holds. Leaves the pending restore in place (retried on the
      * next {@link #setAvailablePresets}) if the base preset isn't among them yet. The overrides JSON
      * (if any) was already validated by {@link #restore} before it ever reached {@link Config}, so the
-     * parse here is a backstop, not the primary defense - kept anyway so a decode edge case this
-     * method's own {@code applyTo}/{@code applyOverrides} step might hit still degrades to "select it
-     * plain" instead of throwing out of a widget callback.
+     * parse here is a backstop, not the primary defense - kept anyway so an unrelated decode/apply
+     * error still degrades to "select it plain" instead of throwing out of a widget callback.
+     * Retired preset keys remain a hard failure here just as they are at every override boundary.
      */
     private void reconcilePendingRestore() {
         PendingRestore pending = pendingRestore;
@@ -320,8 +324,10 @@ public final class PresetSelection {
             return;
         }
         try {
-            PresetDefinition re = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(pending.overridesJson())).getOrThrow();
+            PresetDefinition re = PresetDefinition.parseOverrides(JsonParser.parseString(pending.overridesJson()));
             applyCustomized(Presets.applyOverrides(base.preset(), re).toDraft());
+        } catch (RetiredPresetKeyException e) {
+            throw e;
         } catch (Exception e) {
             Urbex.getLogger().warn("Could not rebuild the restored customized preset '{}'; showing it plain.",
                     pending.presetId(), e);

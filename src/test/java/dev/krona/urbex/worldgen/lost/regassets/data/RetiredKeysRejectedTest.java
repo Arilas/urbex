@@ -6,6 +6,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.RetiredPresetKeyException;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
@@ -24,6 +26,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -42,6 +45,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code CustomRegistries} actually registers, so a fourteenth registry cannot be added uncovered.
  */
 class RetiredKeysRejectedTest {
+
+    private static final Map<String, String> RETIRED_CITY_KEYS = Map.of(
+            "cityStyleThreshold", "Preset key 'cities.cityStyleThreshold' was removed; declare the selected world style's 'citystyles[].edge' with 'citystyle' and 'threshold' instead.",
+            "cityStyleAlternative", "Preset key 'cities.cityStyleAlternative' was removed; declare the selected world style's 'citystyles[].edge' with 'citystyle' and 'threshold' instead.");
 
     @BeforeAll
     static void bootstrap() {
@@ -145,6 +152,47 @@ class RetiredKeysRejectedTest {
                     .parse(JsonOps.INSTANCE, JsonParser.parseString(json)).error().orElseThrow().message());
         }
         assertTrue(first.contains("'inherit'"), first);
+    }
+
+    @Test
+    void presetRegistryRejectsEachRetiredCityKeyWithItsMigrationMessage() {
+        for (Map.Entry<String, String> entry : RETIRED_CITY_KEYS.entrySet()) {
+            JsonElement json = JsonParser.parseString("{\"cities\":{\"" + entry.getKey() + "\":0}}");
+            String message = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, json)
+                    .error().orElseThrow().message();
+            assertTrue(message.contains(entry.getValue()), message);
+        }
+    }
+
+    @Test
+    void overrideParserRejectsEachRetiredCityKeyWithItsMigrationMessage() {
+        for (Map.Entry<String, String> entry : RETIRED_CITY_KEYS.entrySet()) {
+            JsonElement json = JsonParser.parseString("{\"cities\":{\"" + entry.getKey() + "\":0}}");
+            RetiredPresetKeyException error = assertThrows(
+                    RetiredPresetKeyException.class, () -> PresetDefinition.parseOverrides(json));
+            assertEquals(entry.getValue(), error.getMessage());
+        }
+    }
+
+    @Test
+    void bothRetiredCityKeysChooseOneDeterministicMessageAtBothDecodeRoutes() {
+        JsonElement json = JsonParser.parseString(
+                "{\"cities\":{\"cityStyleAlternative\":\"urbex:border\",\"cityStyleThreshold\":0.4}}");
+
+        String registryMessage = PresetDefinition.CODEC.parse(JsonOps.INSTANCE, json)
+                .error().orElseThrow().message();
+        RetiredPresetKeyException overrideError = assertThrows(
+                RetiredPresetKeyException.class, () -> PresetDefinition.parseOverrides(json));
+
+        String expected = RETIRED_CITY_KEYS.get("cityStyleThreshold");
+        assertTrue(registryMessage.contains(expected), registryMessage);
+        assertEquals(expected, overrideError.getMessage());
+        for (int i = 0; i < 20; i++) {
+            assertTrue(PresetDefinition.CODEC.parse(JsonOps.INSTANCE, json)
+                    .error().orElseThrow().message().contains(expected));
+            assertEquals(expected, assertThrows(RetiredPresetKeyException.class,
+                    () -> PresetDefinition.parseOverrides(json)).getMessage());
+        }
     }
 
     /**

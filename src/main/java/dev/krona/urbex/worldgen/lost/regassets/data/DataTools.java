@@ -53,6 +53,9 @@ public class DataTools {
             },
             Identifier::toString);
 
+    public static final Codec<String> STRICT_REFERENCE_CODEC =
+            STRICT_IDENTIFIER_CODEC.xmap(Identifier::toString, DataTools::fromName);
+
     /**
      * Strict codec for a field that always names a block tag, written with the leading {@code #}
      * every other tag reference in the format uses ({@code biomes.if_any}, a {@code stuff}

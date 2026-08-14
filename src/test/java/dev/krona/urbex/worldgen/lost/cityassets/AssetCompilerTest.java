@@ -7,8 +7,12 @@ import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleEdge;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
+import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistrationInfo;
@@ -25,7 +29,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -140,6 +146,47 @@ class AssetCompilerTest {
                 "it did not compile, which is why nothing may resolve it either");
     }
 
+    @Test
+    void aWorldStyleSelectionMakesBothBaseAndEdgeCityStylesReachable() {
+        WorldStyle worldStyle = new WorldStyle(id("family_world"), List.of(new WorldStyleDefinition(
+                Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(TestWiring.partSelector()),
+                Optional.of(new Mergeable<>(true, List.of(new CityStyleSelector(1.0f, "urbex:base", null,
+                        Optional.of(new CityStyleEdge("urbex:edge", 0.4f)))))),
+                Optional.empty(), Optional.empty())));
+
+        Set<Identifier> reachable = AssetCompiler.reachableCityStyles(registries(),
+                new AssetIndex<>("urbex:worldstyles", Map.of(id("family_world"), worldStyle)));
+
+        assertEquals(Set.of(id("base"), id("edge")), reachable,
+                "both members of a selected family must compile and validate eagerly");
+    }
+
+    @Test
+    void aMissingEdgeCityStyleGetsTheSameLoadDiagnosticAsAMissingBaseCityStyle() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+
+        AssetCompiler.compile(registries(worldStyleEntry("base", Optional.of(new CityStyleEdge("urbex:edge", 0.4f)))),
+                diagnostics);
+
+        Set<Identifier> missing = diagnostics.problems().stream()
+                .filter(problem -> problem.message().contains("is selected by a world style"))
+                .map(AssetDiagnostics.Problem::asset)
+                .collect(java.util.stream.Collectors.toSet());
+        assertEquals(Set.of(id("base"), id("edge")), missing);
+    }
+
+    @Test
+    void anIncompleteEdgeCityStyleRefusesCompilation() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+
+        AssetCompiler.compile(registries(worldStyleEntry("base", Optional.of(new CityStyleEdge("urbex:edge", 0.4f))),
+                abstractBaseCityStyle("edge")), diagnostics);
+
+        assertTrue(diagnostics.problems().stream().anyMatch(problem -> id("edge").equals(problem.asset())),
+                () -> diagnostics.format("the selected edge must not remain an unreachable incomplete style"));
+    }
+
     /** A tag nothing files under is empty, not null - a pack may ship no stuff for another's tag. */
     @Test
     void aTagNothingIsFiledUnderIsEmptyRatherThanNull() {
@@ -183,6 +230,14 @@ class AssetCompilerTest {
                 new CityStyleDefinition(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()));
+    }
+
+    private static Entry<WorldStyleDefinition> worldStyleEntry(String base, Optional<CityStyleEdge> edge) {
+        return new Entry<>(CustomRegistries.WORLDSTYLES_REGISTRY_KEY, id("family_world"),
+                new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(TestWiring.partSelector()),
+                        Optional.of(new Mergeable<>(true, List.of(new CityStyleSelector(1.0f, "urbex:" + base,
+                                null, edge)))), Optional.empty(), Optional.empty()));
     }
 
     private static StuffSettingsDefinition stuffTagged(String path, String tag) {

@@ -3,9 +3,8 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelection;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
-import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
@@ -125,28 +124,22 @@ public final class AssetCompiler {
     /**
      * Turns "this city style did not compile" into a load error only when something can select it.
      *
-     * <p>Three routes name a city style from inside the registries, and this walks all three: a world
-     * style's {@code citystyles} selectors, a preset's {@code cities.cityStyleAlternative}, and a
-     * predefined city's {@code citystyle}. A fourth exists and cannot be seen from here - the
-     * per-world override that arrives as JSON through {@code UrbexData} - and is checked by
-     * {@code DimensionRuntime.create} against the compiled index instead.</p>
+     * <p>Two routes name a city style from inside the registries, and this walks both: a world
+     * style's base and edge {@code citystyles} selectors, and a predefined city's
+     * {@code citystyle}.</p>
      *
-     * <p>Presets and predefined cities are read one raw registry entry at a time rather than through
-     * their own {@code extends} resolution: a value declared anywhere in a chain is a value some asset
-     * in that chain resolves to, so the union over raw entries is the same set of city styles, and
-     * reading them raw means a broken preset chain is not turned into a city-style failure.</p>
+     * <p>Predefined cities are read one raw registry entry at a time rather than through their own
+     * {@code extends} resolution: a value declared anywhere in a chain is a value some asset in that
+     * chain resolves to, so the union over raw entries is the same set of city styles.</p>
      */
     static Set<Identifier> reachableCityStyles(RegistryAccess access, AssetIndex<WorldStyle> worldStyles) {
         Set<Identifier> reachable = new HashSet<>();
         for (WorldStyle style : worldStyles.all()) {
-            for (Pair<Predicate<Holder<Biome>>, Pair<Float, String>> selector : style.cityStyleSelectors()) {
-                reachable.add(DataTools.fromName(selector.getRight().getRight()));
+            for (Pair<Predicate<Holder<Biome>>, Pair<Float, CityStyleSelection>> weighted : style.cityStyleSelectors()) {
+                CityStyleSelection selection = weighted.getRight().getRight();
+                reachable.add(DataTools.fromName(selection.citystyle()));
+                selection.edge().ifPresent(edge -> reachable.add(DataTools.fromName(edge.citystyle())));
             }
-        }
-        for (PresetDefinition preset : access.lookupOrThrow(CustomRegistries.PRESET_REGISTRY_KEY)) {
-            preset.cities().flatMap(CitySettings::cityStyleAlternative)
-                    .filter(name -> !name.isBlank())
-                    .ifPresent(name -> reachable.add(DataTools.fromName(name)));
         }
         for (PredefinedCityDefinition city : access.lookupOrThrow(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY)) {
             if (city.getCityStyle() != null && !city.getCityStyle().isBlank()) {
@@ -173,7 +166,7 @@ public final class AssetCompiler {
             if (cityStyles.get(name) == null && candidates.problems().stream()
                     .noneMatch(problem -> name.equals(problem.asset()))) {
                 fatal.record(cityStyles.registry(), name,
-                        "is selected by a world style, preset or predefined city, but no loaded "
+                        "is selected by a world style or predefined city, but no loaded "
                                 + "datapack registers it");
             }
         }

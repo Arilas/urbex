@@ -5,8 +5,11 @@ import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedStreet;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -139,6 +142,32 @@ public final class PredefinedIndex {
     @Nullable
     public PredefinedCity cityAt(ChunkCoord coord) {
         return cities.get(coord);
+    }
+
+    /**
+     * The predefined cities whose strict radius contains {@code coord}, in the same coordinate order
+     * as {@code City}'s radius-centre scan. Perlin presets have no rolled centres, so this direct
+     * index query lets their predefined cities keep their declared radius without bounding the
+     * search by the preset's unrelated {@code cityMaxRadius}.
+     */
+    public List<PredefinedCity> citiesCovering(ChunkCoord coord) {
+        List<Map.Entry<ChunkCoord, PredefinedCity>> covering = new ArrayList<>();
+        for (Map.Entry<ChunkCoord, PredefinedCity> entry : cities.entrySet()) {
+            ChunkCoord center = entry.getKey();
+            if (!center.dimension().equals(coord.dimension())) {
+                continue;
+            }
+            float dx = (center.chunkX() - coord.chunkX()) * 16.0f;
+            float dz = (center.chunkZ() - coord.chunkZ()) * 16.0f;
+            float radius = entry.getValue().getRadius();
+            if (dx * dx + dz * dz < radius * radius) {
+                covering.add(entry);
+            }
+        }
+        covering.sort(Comparator
+                .comparingInt((Map.Entry<ChunkCoord, PredefinedCity> entry) -> entry.getKey().chunkX())
+                .thenComparingInt(entry -> entry.getKey().chunkZ()));
+        return covering.stream().map(Map.Entry::getValue).toList();
     }
 
     /** The predefined building declared <em>at</em> {@code coord} - its top-left chunk - or null. */

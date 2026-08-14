@@ -4,7 +4,11 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.config.PresetDraft;
+import dev.krona.urbex.worldgen.lost.regassets.data.RetiredKeys;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -20,8 +24,6 @@ public record CitySettings(
         Optional<Integer> citySpawnDistance2,
         Optional<Double> citySpawnMultiplier1,
         Optional<Double> citySpawnMultiplier2,
-        Optional<Float> cityStyleThreshold,
-        Optional<String> cityStyleAlternative,
         Optional<Boolean> cityAvoidVoid,
         Optional<Integer> cityLevel0Height,
         Optional<Integer> cityLevel1Height,
@@ -35,7 +37,17 @@ public record CitySettings(
         Optional<Integer> cityMaxHeight,
         Optional<Float> scatteredChanceMultiplier) {
 
-    public static final Set<String> KEYS = Set.of("cityChance", "cityMinRadius", "cityMaxRadius", "cityPerlinScale", "cityPerlinOffset", "cityPerlinInnerScale", "cityThreshold", "citySpawnDistance1", "citySpawnDistance2", "citySpawnMultiplier1", "citySpawnMultiplier2", "cityStyleThreshold", "cityStyleAlternative", "cityAvoidVoid", "cityLevel0Height", "cityLevel1Height", "cityLevel2Height", "cityLevel3Height", "cityLevel4Height", "cityLevel5Height", "cityLevel6Height", "cityLevel7Height", "cityMinHeight", "cityMaxHeight", "scatteredChanceMultiplier");
+    public static final Set<String> KEYS = Set.of("cityChance", "cityMinRadius", "cityMaxRadius", "cityPerlinScale", "cityPerlinOffset", "cityPerlinInnerScale", "cityThreshold", "citySpawnDistance1", "citySpawnDistance2", "citySpawnMultiplier1", "citySpawnMultiplier2", "cityAvoidVoid", "cityLevel0Height", "cityLevel1Height", "cityLevel2Height", "cityLevel3Height", "cityLevel4Height", "cityLevel5Height", "cityLevel6Height", "cityLevel7Height", "cityMinHeight", "cityMaxHeight", "scatteredChanceMultiplier");
+
+    /** Retired preset keys in deterministic reporting order, shared with per-world override parsing. */
+    public static final Map<String, String> RETIRED_KEY_ERRORS;
+
+    static {
+        Map<String, String> errors = new LinkedHashMap<>();
+        errors.put("cityStyleThreshold", "Preset key 'cities.cityStyleThreshold' was removed; declare the selected world style's 'citystyles[].edge' with 'citystyle' and 'threshold' instead.");
+        errors.put("cityStyleAlternative", "Preset key 'cities.cityStyleAlternative' was removed; declare the selected world style's 'citystyles[].edge' with 'citystyle' and 'threshold' instead.");
+        RETIRED_KEY_ERRORS = Collections.unmodifiableMap(errors);
+    }
 
     private record Part1(
             Optional<Double> cityChance,
@@ -49,8 +61,6 @@ public record CitySettings(
             Optional<Integer> citySpawnDistance2,
             Optional<Double> citySpawnMultiplier1,
             Optional<Double> citySpawnMultiplier2,
-            Optional<Float> cityStyleThreshold,
-            Optional<String> cityStyleAlternative,
             Optional<Boolean> cityAvoidVoid) {
         private static final MapCodec<Part1> CODEC = RecordCodecBuilder.mapCodec(i ->
                 i.group(
@@ -65,8 +75,6 @@ public record CitySettings(
                         Codec.intRange(0, 10000000).optionalFieldOf("citySpawnDistance2").forGetter(Part1::citySpawnDistance2),
                         Codec.doubleRange(0, 1).optionalFieldOf("citySpawnMultiplier1").forGetter(Part1::citySpawnMultiplier1),
                         Codec.doubleRange(0, 1).optionalFieldOf("citySpawnMultiplier2").forGetter(Part1::citySpawnMultiplier2),
-                        Codec.floatRange(-1.0f, 1.0f).optionalFieldOf("cityStyleThreshold").forGetter(Part1::cityStyleThreshold),
-                        Codec.STRING.optionalFieldOf("cityStyleAlternative").forGetter(Part1::cityStyleAlternative),
                         Codec.BOOL.optionalFieldOf("cityAvoidVoid").forGetter(Part1::cityAvoidVoid)
                 ).apply(i, Part1::new));
     }
@@ -112,8 +120,6 @@ public record CitySettings(
                     pair.getFirst().citySpawnDistance2(),
                     pair.getFirst().citySpawnMultiplier1(),
                     pair.getFirst().citySpawnMultiplier2(),
-                    pair.getFirst().cityStyleThreshold(),
-                    pair.getFirst().cityStyleAlternative(),
                     pair.getFirst().cityAvoidVoid(),
                     pair.getSecond().cityLevel0Height(),
                     pair.getSecond().cityLevel1Height(),
@@ -127,10 +133,11 @@ public record CitySettings(
                     pair.getSecond().cityMaxHeight(),
                     pair.getSecond().scatteredChanceMultiplier()),
             s -> com.mojang.datafixers.util.Pair.of(
-                    new Part1(s.cityChance(), s.cityMinRadius(), s.cityMaxRadius(), s.cityPerlinScale(), s.cityPerlinOffset(), s.cityPerlinInnerScale(), s.cityThreshold(), s.citySpawnDistance1(), s.citySpawnDistance2(), s.citySpawnMultiplier1(), s.citySpawnMultiplier2(), s.cityStyleThreshold(), s.cityStyleAlternative(), s.cityAvoidVoid()),
+                    new Part1(s.cityChance(), s.cityMinRadius(), s.cityMaxRadius(), s.cityPerlinScale(), s.cityPerlinOffset(), s.cityPerlinInnerScale(), s.cityThreshold(), s.citySpawnDistance1(), s.citySpawnDistance2(), s.citySpawnMultiplier1(), s.citySpawnMultiplier2(), s.cityAvoidVoid()),
                     new Part2(s.cityLevel0Height(), s.cityLevel1Height(), s.cityLevel2Height(), s.cityLevel3Height(), s.cityLevel4Height(), s.cityLevel5Height(), s.cityLevel6Height(), s.cityLevel7Height(), s.cityMinHeight(), s.cityMaxHeight(), s.scatteredChanceMultiplier()))
     ).codec();
-    public static final Codec<CitySettings> CODEC = UnknownKeys.warning(RAW, KEYS, "cities");
+    public static final Codec<CitySettings> CODEC = UnknownKeys.warning(
+            RetiredKeys.reject(RAW, RETIRED_KEY_ERRORS), KEYS, "cities");
 
     public void apply(PresetDraft p) {
         cityChance.ifPresent(v -> p.CITY_CHANCE = v);
@@ -144,8 +151,6 @@ public record CitySettings(
         citySpawnDistance2.ifPresent(v -> p.CITY_SPAWN_DISTANCE2 = v);
         citySpawnMultiplier1.ifPresent(v -> p.CITY_SPAWN_MULTIPLIER1 = v);
         citySpawnMultiplier2.ifPresent(v -> p.CITY_SPAWN_MULTIPLIER2 = v);
-        cityStyleThreshold.ifPresent(v -> p.CITY_STYLE_THRESHOLD = v);
-        cityStyleAlternative.ifPresent(v -> p.CITY_STYLE_ALTERNATIVE = v);
         cityAvoidVoid.ifPresent(v -> p.CITY_AVOID_VOID = v);
         cityLevel0Height.ifPresent(v -> p.CITY_LEVEL0_HEIGHT = v);
         cityLevel1Height.ifPresent(v -> p.CITY_LEVEL1_HEIGHT = v);

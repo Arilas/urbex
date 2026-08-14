@@ -57,18 +57,20 @@ public final class RetiredKeys {
      * own terms, and saying "retired key" about a JSON array would be nonsense.
      */
     public static Optional<String> problem(Dynamic<?> dyn, String context) {
+        return problem(dyn, inheritanceErrors(context));
+    }
+
+    /** Pure: the configured error for the first present key, in map iteration order, or empty. */
+    public static Optional<String> problem(Dynamic<?> dyn, Map<String, String> errorsByKey) {
         Set<String> present = dyn.asMapOpt().result().stream().flatMap(stream -> stream)
                 .map(pair -> pair.getFirst().asString(""))
                 .collect(Collectors.toSet());
-        // Iterating REPLACEMENTS, not present: a file carrying both keys reports the same one every
+        // Iterating errorsByKey, not present: a file carrying both keys reports the same one every
         // run, in declaration order, rather than in whatever order the map yielded its keys.
-        return REPLACEMENTS.entrySet().stream()
+        return errorsByKey.entrySet().stream()
                 .filter(entry -> present.contains(entry.getKey()))
                 .findFirst()
-                .map(entry -> "This " + context + " declares '" + entry.getKey() + "', which Urbex"
-                        + " deleted rather than renamed: use '" + entry.getValue() + "' instead."
-                        + " Left as it is, the key is ignored and this file loads with no"
-                        + " inheritance at all.");
+                .map(Map.Entry::getValue);
     }
 
     /**
@@ -78,10 +80,25 @@ public final class RetiredKeys {
      * themselves.
      */
     public static <A> Codec<A> reject(Codec<A> base, String context) {
+        return reject(base, inheritanceErrors(context));
+    }
+
+    private static Map<String, String> inheritanceErrors(String context) {
+        Map<String, String> errorsByKey = new LinkedHashMap<>();
+        REPLACEMENTS.forEach((key, replacement) -> errorsByKey.put(key,
+                "This " + context + " declares '" + key + "', which Urbex"
+                        + " deleted rather than renamed: use '" + replacement + "' instead."
+                        + " Left as it is, the key is ignored and this file loads with no"
+                        + " inheritance at all."));
+        return errorsByKey;
+    }
+
+    /** Wraps a codec so any key in {@code errorsByKey} fails with its configured message. */
+    public static <A> Codec<A> reject(Codec<A> base, Map<String, String> errorsByKey) {
         return new Codec<>() {
             @Override
             public <T> DataResult<Pair<A, T>> decode(DynamicOps<T> ops, T input) {
-                Optional<String> problem = problem(new Dynamic<>(ops, input), context);
+                Optional<String> problem = problem(new Dynamic<>(ops, input), errorsByKey);
                 if (problem.isPresent()) {
                     String message = problem.get();
                     return DataResult.error(() -> message);
