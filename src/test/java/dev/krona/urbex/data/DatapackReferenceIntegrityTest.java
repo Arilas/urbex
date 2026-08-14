@@ -101,7 +101,13 @@ class DatapackReferenceIntegrityTest {
             case "parts" -> ref(src, d.get("refpalette"), "palettes");
             case "worldstyles" -> {
                 ref(src, d.get("outsidestyle"), "styles");
-                forEachObject(d.get("citystyles"), e -> ref(src, e.get("citystyle"), "citystyles"));
+                forEachObject(d.get("citystyles"), selector -> {
+                    ref(src, selector.get("citystyle"), "citystyles");
+                    JsonObject edge = asObject(selector.get("edge"));
+                    if (edge != null) {
+                        ref(src, edge.get("citystyle"), "citystyles");
+                    }
+                });
                 JsonObject scattered = asObject(d.get("scattered"));
                 if (scattered != null) {
                     forEachObject(scattered.get("list"), e -> ref(src, e.get("name"), "scattered"));

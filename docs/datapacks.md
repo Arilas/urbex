@@ -45,7 +45,7 @@ string every other file uses to name it. Directory names are the registry names 
 | `conditions` | A weighted, conditional set of values — loot tables, mob ids | `values` |
 | `variants` | A weighted set of blockstates behind one palette character | `blocks` |
 | `stuff` | A small decoration pass: cobwebs, chains, rubble | `column`, `mincount`, `maxcount`, `attempts`, `inbuilding` |
-| `predefinedcities` | A city pinned to fixed chunk coordinates | `dimension`, `chunkx`, `chunkz`, `radius`, `citystyle` |
+| `predefinedcities` | A city pinned to fixed chunk coordinates | `dimension`, `chunkx`, `chunkz`, `radius` — `citystyle` is optional |
 | `presets` | Per-dimension worldgen tuning — see [`docs/presets.md`](presets.md) | *(nothing)* |
 
 Every one of them accepts `extends`, and every one of them merges by the same rules. That
@@ -103,6 +103,97 @@ all have the same scope:
 The practical consequence: a pack that is not the heaviest in a mix will not see its highway or
 railway parts used. Nothing about that is worth designing around — author the world style as if it
 were the only one, and it will be, for every city it owns.
+
+## City-style families and optional edges
+
+A `worldstyles[].citystyles` entry selects a **family** for a city. Its `factor` is the
+weighted-choice weight among the selector entries whose `biomes` match; it is not the distance into
+a city and it does not set the edge boundary. A selector with no `edge` is base-only:
+
+<!-- example: worldstyles -->
+```json
+{
+  "citystyles": [
+    {
+      "factor": 1.0,
+      "citystyle": "urbexmt:downtown"
+    }
+  ]
+}
+```
+
+To give that family a sparse edge, nest a complete `edge` object in the selector that owns it:
+
+<!-- example: worldstyles -->
+```json
+{
+  "citystyles": [
+    {
+      "factor": 1.0,
+      "citystyle": "urbexmt:downtown",
+      "edge": {
+        "citystyle": "urbexmt:downtown_border",
+        "threshold": 0.4
+      }
+    }
+  ]
+}
+```
+
+`edge.threshold` is a spatial city-factor boundary. Urbex uses the edge when
+`cityFactor < threshold`; equality stays with the base. In the example, factors below `0.4` use
+`urbexmt:downtown_border`, while `0.4` and above use `urbexmt:downtown`. The threshold must be
+finite and in `(0, 1]`.
+
+The family is chosen once at its anchor, then its base or edge is chosen from each chunk's local
+city factor. With ordinary centred cities, the anchor is the city centre: the world style, weighted
+selector draw, and `biomes` match all use the centre's chunk and biome, not the observer chunk's.
+With a Perlin-rarity preset (`cityChance < 0`), there is no city centre, so the anchor is the
+minimum chunk coordinate of the containing 16-by-16 region (using floor division in every
+quadrant). All chunks in that region share the family draw, and its selector `biomes` match is made
+against that anchor biome; their local Perlin factors can still independently choose base or edge.
+
+An edge therefore applies with every preset that uses the world style, and omitting `edge` means
+base-only with every preset. A predefined city that explicitly supplies `citystyle` is also
+base-only: that field names an exact style. Leave `citystyle` out of a predefined city to let the
+ordinary world-style family, including its edge, apply there. Future typed districts may add a
+sibling field to `edge`; no district syntax exists today.
+
+### Breaking migration from preset alternatives
+
+`cities.cityStyleAlternative` and `cities.cityStyleThreshold` were removed from presets. Move their
+meaning to every relevant world-style selector. The removed preset fragment and its world-style
+replacement are both valid JSON snippets, but only the latter is supported datapack syntax:
+
+<!-- example: none -->
+```json
+{
+  "cities": {
+    "cityStyleAlternative": "urbexmt:downtown_border",
+    "cityStyleThreshold": 0.4
+  }
+}
+```
+
+<!-- example: worldstyles -->
+```json
+{
+  "citystyles": [
+    {
+      "factor": 1.0,
+      "citystyle": "urbexmt:downtown",
+      "edge": {
+        "citystyle": "urbexmt:downtown_border",
+        "threshold": 0.4
+      }
+    }
+  ]
+}
+```
+
+Repeat the nested edge for every family that should have one. This makes the owner explicit: a
+selector's edge travels with that selector under every preset instead of one preset replacing all
+world styles' city edges.
 
 ### Do not place the `urbex:city` feature
 
@@ -276,9 +367,10 @@ The other three registries are each resolved differently, and it is worth knowin
   incomplete chain root is legal.
 - **`predefinedcities` is resolved on the generation path**, not at world load — the first time
   `City` looks for a predefined city. So a predefined city missing `radius` throws from a worldgen
-  worker rather than refusing the world. Its `citystyle` *reference* is checked at load, because the
-  reachability sweep above reads that field out of the raw entry; do not read that as the entry
-  itself having been validated.
+  worker rather than refusing the world. Its optional `citystyle` reference is checked at load when
+  supplied, because the reachability sweep above reads that field out of the raw entry; do not read
+  that as the entry itself having been validated. An explicit style is base-only; omission uses the
+  matching world-style family instead.
 - **`presets`** have no required fields at all, so there is nothing for this check to do. A preset
   resolves when it is selected.
 
