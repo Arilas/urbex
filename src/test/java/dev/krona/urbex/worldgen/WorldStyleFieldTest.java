@@ -45,6 +45,14 @@ class WorldStyleFieldTest {
     }
 
     @Test
+    void perlinRegionAnchorUsesFloorDivisionAcrossAllQuadrants() {
+        assertEquals(coord(0, 0), WorldStyleField.perlinRegionAnchor(coord(15, 15)));
+        assertEquals(coord(16, 0), WorldStyleField.perlinRegionAnchor(coord(16, 15)));
+        assertEquals(coord(-16, -16), WorldStyleField.perlinRegionAnchor(coord(-1, -1)));
+        assertEquals(coord(-32, 0), WorldStyleField.perlinRegionAnchor(coord(-17, 3)));
+    }
+
+    @Test
     void oneStyleAlwaysAnswersItselfWithoutDrawing() {
         WorldStyle only = TestWorldStyles.minimal("light");
         WorldStyleField field = WorldStyleField.single(SEED, only);

@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
@@ -11,6 +12,9 @@ import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -269,6 +273,23 @@ class RequiredAfterResolutionTest {
 
         assertEquals(List.of(), cityStyleNames(resolved),
                 "an empty list is a declaration - only absence reads as 'inherit'");
+    }
+
+    // ----------------------------------------------------- predefinedcities
+
+    @Test
+    void predefinedCityMayOmitCityStyleWhileKeepingItsSpatialFieldsRequired() {
+        PredefinedCity resolved = new PredefinedCity(TestAssetId.of("unstyled_city"), List.of(
+                new PredefinedCityDefinition(Optional.empty(), Optional.of("minecraft:overworld"),
+                        Optional.of(7), Optional.of(-9), Optional.of(48), Optional.empty(),
+                        Optional.empty(), Optional.empty())));
+
+        assertNull(resolved.getCityStyle(), "absence means the ordinary world-style family applies");
+        assertEquals(ResourceKey.create(Registries.DIMENSION, Identifier.parse("minecraft:overworld")),
+                resolved.getDimension());
+        assertEquals(7, resolved.getChunkX());
+        assertEquals(-9, resolved.getChunkZ());
+        assertEquals(48, resolved.getRadius());
     }
 
     // -------------------------------------------------------------- helpers

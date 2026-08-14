@@ -1,11 +1,15 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
+import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
+import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
+import dev.krona.urbex.worldgen.lost.regassets.data.TestWiring;
 import net.minecraft.resources.Identifier;
 
 import java.util.Collections;
@@ -38,6 +42,11 @@ public final class TestWorldStyles {
 
     /** One minimal resolvable world style, named {@code urbextest:<path>}. */
     public static WorldStyle minimal(String path) {
+        return minimal(path, List.of());
+    }
+
+    /** A minimal world style carrying exactly the selector entries a scope test names. */
+    public static WorldStyle minimal(String path, List<CityStyleSelector> selectors) {
         WorldStyleDefinition declaration = new WorldStyleDefinition(
                 Optional.empty(),
                 // No display name: these exist to be told apart by id, and getName() is what the
@@ -54,10 +63,19 @@ public final class TestWorldStyles {
                                 noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
                                 noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
                                 noParts(), noParts(), noParts(), noParts())))),
-                Optional.of(new Mergeable<>(true, Collections.emptyList())),
+                Optional.of(new Mergeable<>(true, selectors)),
                 Optional.empty(),
                 Optional.empty());
         return new WorldStyle(Identifier.fromNamespaceAndPath("urbextest", path), List.of(declaration));
+    }
+
+    /** A minimal resolvable city style, named {@code urbextest:<path>}. */
+    public static CityStyle cityStyle(String path) {
+        return new CityStyle(Identifier.fromNamespaceAndPath("urbextest", path), List.of(new CityStyleDefinition(
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(TestWiring.streetSettings()),
+                Optional.empty())));
     }
 
     private static Optional<Mergeable<String>> noParts() {

@@ -42,6 +42,13 @@ public final class WorldStyleField {
      */
     private static final int PERLIN_REGION_CHUNKS = 16;
 
+    /** The minimum chunk coordinate of the 16-by-16 Perlin style region containing {@code coord}. */
+    public static ChunkCoord perlinRegionAnchor(ChunkCoord coord) {
+        int x = Math.floorDiv(coord.chunkX(), PERLIN_REGION_CHUNKS) * PERLIN_REGION_CHUNKS;
+        int z = Math.floorDiv(coord.chunkZ(), PERLIN_REGION_CHUNKS) * PERLIN_REGION_CHUNKS;
+        return new ChunkCoord(coord.dimension(), x, z);
+    }
+
     /** One resolved, weighted style. */
     public record Weighted(float weight, WorldStyle style) {
     }
@@ -156,7 +163,9 @@ public final class WorldStyleField {
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
         if (profile.cityChance() < 0) {
-            return draw(Math.floorDiv(chunkX, PERLIN_REGION_CHUNKS), Math.floorDiv(chunkZ, PERLIN_REGION_CHUNKS));
+            ChunkCoord anchor = perlinRegionAnchor(coord);
+            return draw(anchor.chunkX() / PERLIN_REGION_CHUNKS,
+                    anchor.chunkZ() / PERLIN_REGION_CHUNKS);
         }
         ChunkCoord best = null;
         float bestFactor = 0;
