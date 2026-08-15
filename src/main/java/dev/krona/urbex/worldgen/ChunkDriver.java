@@ -338,7 +338,8 @@ public class ChunkDriver {
         long mark = GenerationMetrics.mark();
         long alloc = GenerationMetrics.allocMark();
         long[] positions = written.keySet().toLongArray();
-        Arrays.sort(positions);
+        // Not Arrays.sort: same order, a fraction of the cost on this input. See PositionSort.
+        PositionSort.sort(positions);
         GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CORRECT_SORT, mark, alloc);
 
         mark = GenerationMetrics.mark();
