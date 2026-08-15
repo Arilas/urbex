@@ -3,8 +3,10 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.config.Preset;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -13,10 +15,10 @@ import javax.annotation.Nullable;
 import java.util.function.Consumer;
 
 /**
- * The preset picker on the left of the Cities tab: one row per {@link PresetSelection.Entry},
- * {@code disabled} first, customs last. Picking a row is the single place the player's choice is
- * committed - it {@code select}s <em>and</em> {@code publish}es on {@link PresetSelection#CLIENT},
- * because {@code select} alone never reaches world generation.
+ * The preset picker on the left of the Cities tab: one row per {@link PresetSelection.Entry}, in the
+ * order {@code PresetSelection.entries()} gives them. Picking a row is the single place the player's
+ * choice is committed - it {@code select}s <em>and</em> {@code publish}es on
+ * {@link PresetSelection#CLIENT}, because {@code select} alone never reaches world generation.
  */
 public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> {
 
@@ -48,6 +50,12 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
      */
     private boolean restoringSelection;
 
+    /**
+     * Set when the modpack's {@code citiesTabAccess} is {@code locked}: the rows still render and the
+     * configured choice still shows as selected, but nothing the player does moves it (issue #204).
+     */
+    private boolean locked;
+
     public PresetListWidget(Minecraft minecraft, int width, int height, int y,
                             Consumer<PresetSelection.Entry> onSelectionChanged) {
         super(minecraft, width, height, y, ROW_HEIGHT);
@@ -56,7 +64,18 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
         refreshEntries();
     }
 
-    /** Rebuilds the rows from {@link PresetSelection#CLIENT} and re-selects its current entry. */
+    /**
+     * Rebuilds the rows from {@link PresetSelection#CLIENT}, re-selects its current entry, and
+     * scrolls that entry into view.
+     * <p>
+     * The scroll is not a nicety - it is the fix for issue #201. {@code clearEntries()} clears the
+     * row list <em>and</em> nulls the selection ({@code children.clear(); this.selected = null}), so
+     * the scroll amount clamps back to the top; {@code setSelected} restores the selection state and
+     * moves nothing. Every rebuild therefore showed the top of the list whatever was selected. With
+     * the customized row appended last that put it off-screen on any list too short for all the
+     * rows, so pressing Done in the customize editor looked like it had done nothing at all - and a
+     * Re-Create restore of a preset far down the list looked the same way.
+     */
     public final void refreshEntries() {
         restoringSelection = true;
         try {
@@ -72,9 +91,25 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
             }
             if (toSelect != null) {
                 setSelected(toSelect);
+                scrollSelectionIntoView();
             }
         } finally {
             restoringSelection = false;
+        }
+    }
+
+    /**
+     * Scrolls whatever is selected back into view. A no-op with nothing selected.
+     * <p>
+     * Also called from {@code CitiesTab.doLayout}, because {@link #refreshEntries()} runs from this
+     * widget's constructor - while the list still has its placeholder size - and the real height only
+     * arrives with the first layout. Scrolling once at each is what makes the row actually visible
+     * rather than merely selected.
+     */
+    public void scrollSelectionIntoView() {
+        Row selectedRow = getSelected();
+        if (selectedRow != null) {
+            scrollToEntry(selectedRow);
         }
     }
 
@@ -87,6 +122,14 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
      */
     @Override
     public void setSelected(@Nullable Row row) {
+        // Locked: the highlight must not move either, not just the committed selection. Letting
+        // super run would paint the row the player clicked as selected while PresetSelection still
+        // held the configured one - the exact "the tab shows something the world will not generate
+        // with" failure this change is about. refreshEntries still gets through, which is what
+        // establishes the highlight in the first place.
+        if (locked && !restoringSelection) {
+            return;
+        }
         Row previous = getSelected();
         super.setSelected(row);
         if (row == null || restoringSelection || row == previous) {
@@ -95,6 +138,24 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
         PresetSelection.CLIENT.select(row.entry.id());
         PresetSelection.CLIENT.publish();
         onSelectionChanged.accept(row.entry);
+    }
+
+    /** @see #locked */
+    public void setLocked(boolean locked) {
+        this.locked = locked;
+    }
+
+    /**
+     * Keyboard navigation is refused outright when locked, since arrowing through a list whose
+     * selection cannot move has nothing to offer. Mouse input is deliberately <em>not</em> blocked
+     * here: {@code mouseClicked} is also how {@code AbstractSelectionList} drags its scrollbar, and
+     * reading a list too long to fit is the whole point of {@code locked} rather than {@code hidden}.
+     * The guard in {@link #setSelected} is what makes the click itself inert.
+     */
+    @Override
+    @Nullable
+    public ComponentPath nextFocusPath(FocusNavigationEvent event) {
+        return locked ? null : super.nextFocusPath(event);
     }
 
     @Override

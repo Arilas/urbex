@@ -18,9 +18,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -108,11 +108,30 @@ class PresetSelectionTest {
         assertEquals(List.of(PresetSelection.DISABLED_ID, id("default"), id("alpha"), id("cavern")), ids);
     }
 
+    /**
+     * Issue #201. Appended last it was row 14 of 14 with the shipped presets, so on a list too short
+     * to show them all it sat off-screen - and pressing Done in the editor looked like it had done
+     * nothing. Beside its base it lands where the player was already looking.
+     */
     @Test
-    void customizedEntrySortsLastAndCarriesTheSentinelId() {
+    void customizedEntrySitsDirectlyAfterThePresetItWasCustomizedFrom() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("default"), entry("rarecities"), entry("safe")));
+        selection.applyCustomized(draft("rarecities"));
+
+        List<Identifier> ids = selection.entries().stream().map(PresetSelection.Entry::id).toList();
+
+        assertEquals(List.of(PresetSelection.DISABLED_ID, id("default"), id("rarecities"),
+                PresetSelection.CUSTOMIZED_ID, id("safe")), ids);
+    }
+
+    /** With nothing to sit beside - the pack providing the base was turned off - it still has to be
+     *  reachable, so it goes last. */
+    @Test
+    void aCustomizedEntryWhoseBaseIsGoneStillAppears() {
         PresetSelection selection = new PresetSelection();
         selection.setAvailablePresets(List.of(entry("default")));
-        selection.applyCustomized(draft("default"));
+        selection.applyCustomized(draft("frompack"));
 
         List<Identifier> ids = selection.entries().stream().map(PresetSelection.Entry::id).toList();
 
@@ -120,11 +139,65 @@ class PresetSelectionTest {
     }
 
     @Test
-    void customizedEntryNameIsGenericNotTiedToAnyBaseId() {
+    void customizedEntryIsNamedForItsBaseAndMarkedAsModified() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("rarecities")));
+        selection.applyCustomized(draft("rarecities"));
+
+        // "Customized: %s *" - the base's name plus the same marker the editor puts in its title.
+        assertEquals("urbex.preset.custom.of", keyOf(selection.selected().name()));
+        assertEquals("rarecities", selection.customizedBaseName().getString());
+    }
+
+    /** With no base to name it after, it falls back to the generic label rather than to a blank. */
+    @Test
+    void customizedEntryWithNoInjectedBaseKeepsTheGenericName() {
         PresetSelection selection = new PresetSelection();
         selection.applyCustomized(draft("default"));
 
         assertEquals("urbex.preset.custom", keyOf(selection.selected().name()));
+        assertNull(selection.customizedBaseName());
+    }
+
+    // ---- revert (issue #201) --------------------------------------------------------------------
+
+    @Test
+    void revertDropsTheCustomizationAndGoesBackToItsBase() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("default"), entry("rarecities")));
+        PresetDraft copy = draft("rarecities");
+        copy.CITY_CHANCE = 0.5;
+        selection.applyCustomized(copy);
+
+        selection.revertCustomization();
+
+        assertEquals(id("rarecities"), selection.selected().id());
+        assertFalse(selection.hasCustomization());
+        assertEquals(List.of(PresetSelection.DISABLED_ID, id("default"), id("rarecities")),
+                selection.entries().stream().map(PresetSelection.Entry::id).toList());
+    }
+
+    @Test
+    void revertWithNothingCustomizedIsANoOp() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("cavern")));
+        selection.select(id("cavern"));
+
+        selection.revertCustomization();
+
+        assertEquals(id("cavern"), selection.selected().id());
+    }
+
+    /** Nothing to go back to - the base is no longer injected - so it lands on Disabled rather than
+     *  on a row that does not exist. */
+    @Test
+    void revertFallsBackToDisabledWhenTheBaseIsNoLongerAvailable() {
+        PresetSelection selection = new PresetSelection();
+        selection.applyCustomized(draft("frompack"));
+
+        selection.revertCustomization();
+
+        assertEquals(PresetSelection.DISABLED_ID, selection.selected().id());
     }
 
     @Test
@@ -312,6 +385,157 @@ class PresetSelectionTest {
 
         assertEquals(PresetSelection.CUSTOMIZED_ID, selection.selected().id());
         assertEquals(0.9, selection.selected().preset().cityChance(), 1e-9);
+    }
+
+    // ---- the unlisted row (issue #202) ----------------------------------------------------------
+
+    /**
+     * A saved preset the enabled datapacks do not offer gets a row of its own. Before this the tab
+     * showed Disabled while {@code restore} had already published the saved id, so the screen said
+     * "no cities" about a world that was about to have them.
+     */
+    @Test
+    void aRestoredPresetTheDatapacksDoNotOfferGetsItsOwnSelectedRow() {
+        PresetSelection selection = new PresetSelection();
+        selection.restore("urbexpack:ruins", "", "");
+
+        selection.setAvailablePresets(List.of(entry("default")));
+
+        assertEquals(Identifier.parse("urbexpack:ruins"), selection.selected().id());
+        assertNull(selection.selected().preset(), "nothing here can resolve it");
+        assertEquals("urbex.preset.unlisted", keyOf(selection.selected().name()));
+        assertEquals(List.of(PresetSelection.DISABLED_ID, Identifier.parse("urbexpack:ruins"), id("default")),
+                selection.entries().stream().map(PresetSelection.Entry::id).toList());
+    }
+
+    /**
+     * The unlisted row carries a real selection even though it carries no {@code Preset}, so
+     * re-selecting it must republish what {@code restore} published rather than discarding it the way
+     * Disabled does.
+     */
+    @Test
+    void theUnlistedRowRepublishesTheSavedSelectionRatherThanTurningItOff() {
+        PresetSelection selection = new PresetSelection();
+        selection.restore("urbexpack:ruins", "", "{\"cities\":{\"cityChance\":0.9}}");
+        selection.setAvailablePresets(List.of(entry("default")));
+
+        selection.select(id("default"));
+        selection.publish();
+        assertEquals(id("default"), WorldSelectionHandoff.pending().preset());
+
+        selection.select(Identifier.parse("urbexpack:ruins"));
+        selection.publish();
+
+        assertEquals(Identifier.parse("urbexpack:ruins"), WorldSelectionHandoff.pending().preset());
+        assertEquals("{\"cities\":{\"cityChance\":0.9}}", WorldSelectionHandoff.pending().patch().orElse(null));
+    }
+
+    /** Turn the pack back on and the real entry takes over; the exceptional row must not outlive the
+     *  condition it reports. */
+    @Test
+    void theUnlistedRowGivesWayOnceTheRealPresetIsInjected() {
+        PresetSelection selection = new PresetSelection();
+        selection.restore("urbexpack:ruins", "", "");
+        selection.setAvailablePresets(List.of(entry("default")));
+
+        PresetSelection.Entry real = new PresetSelection.Entry(Identifier.parse("urbexpack:ruins"),
+                Component.literal("Ruins"), new Preset(Identifier.parse("urbexpack:ruins")));
+        selection.setAvailablePresets(List.of(entry("default"), real));
+
+        assertEquals(List.of(PresetSelection.DISABLED_ID, id("default"), Identifier.parse("urbexpack:ruins")),
+                selection.entries().stream().map(PresetSelection.Entry::id).toList());
+        assertNotNull(selection.selected().preset(), "and it is now a real, editable entry");
+    }
+
+    /** Before anything is injected there is nothing to be absent from, so the restore keeps waiting
+     *  rather than declaring the preset unlisted on the strength of an empty list. */
+    @Test
+    void anEmptyInjectionIsTooEarlyToCallAPresetUnlisted() {
+        PresetSelection selection = new PresetSelection();
+        selection.restore("urbex:cavern", "", "");
+
+        selection.setAvailablePresets(List.of());
+
+        assertEquals(PresetSelection.DISABLED_ID, selection.selected().id());
+
+        selection.setAvailablePresets(List.of(entry("cavern")));
+        assertEquals(id("cavern"), selection.selected().id());
+        assertNotNull(selection.selected().preset());
+    }
+
+    // ---- the modpack default (issue #204) -------------------------------------------------------
+
+    @Test
+    void theConfiguredDefaultBecomesTheTabsStartingSelection() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("default"), entry("largecities")));
+        selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
+
+        assertTrue(selection.applyConfiguredDefault(id("largecities"), WorldStyleMix.parse("urbex:lcmt")));
+
+        assertEquals(id("largecities"), selection.selected().id());
+        assertEquals(WorldStyleMix.parse("urbex:lcmt"), selection.selectedWorldStyles());
+    }
+
+    /**
+     * The Cities tab is rebuilt on every {@code CreateWorldScreen.init()} - every window resize
+     * included - so a default that re-applied would put the pack's preset back over a player who
+     * deliberately chose Disabled.
+     */
+    @Test
+    void theConfiguredDefaultIsAppliedOnceAndNeverReAppliedOverAPlayersChoice() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("default"), entry("largecities")));
+        selection.applyConfiguredDefault(id("largecities"), null);
+
+        selection.select(PresetSelection.DISABLED_ID);
+        assertFalse(selection.applyConfiguredDefault(id("largecities"), null));
+
+        assertEquals(PresetSelection.DISABLED_ID, selection.selected().id());
+    }
+
+    /** This world's own history outranks a pack default. */
+    @Test
+    void aReCreateRestoreWinsOverTheConfiguredDefault() {
+        PresetSelection selection = new PresetSelection();
+        selection.restore("urbex:cavern", "", "");
+        selection.setAvailablePresets(List.of(entry("cavern"), entry("largecities")));
+
+        assertFalse(selection.applyConfiguredDefault(id("largecities"), null));
+
+        assertEquals(id("cavern"), selection.selected().id());
+    }
+
+    /**
+     * The latch must not be armed by a call that never had a list to match against. {@code CitiesTab}
+     * injects an empty list whenever the preset registry is not reachable, and spending the pack's
+     * one chance on that call left the default silently unapplied for the rest of the screen's life.
+     */
+    @Test
+    void theConfiguredDefaultIsStillAppliedAfterAnInjectionThatCameTooEarly() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of());
+
+        assertFalse(selection.applyConfiguredDefault(id("largecities"), null),
+                "nothing to resolve against yet");
+
+        selection.setAvailablePresets(List.of(entry("default"), entry("largecities")));
+
+        assertTrue(selection.applyConfiguredDefault(id("largecities"), null),
+                "the pack's default must survive a registry that was not ready the first time");
+        assertEquals(id("largecities"), selection.selected().id());
+    }
+
+    /** A configured preset the enabled datapacks do not offer leaves the tab alone; the server still
+     *  resolves and reports the id. */
+    @Test
+    void anUnknownConfiguredDefaultChangesNothing() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of(entry("default")));
+
+        assertFalse(selection.applyConfiguredDefault(id("nosuchpreset"), null));
+
+        assertEquals(PresetSelection.DISABLED_ID, selection.selected().id());
     }
 
     @Test

@@ -67,14 +67,33 @@ class WorldSelectionResolverTest {
                         + "the player can act on");
     }
 
+    /**
+     * Issue #203. The configured selection is recorded, so this is the only load at which it reaches
+     * this world: a later config edit cannot half-regenerate a world that already exists, and the
+     * vanilla Re-Create flow - which reads {@code UrbexData}'s {@code preset} key - finds a record on
+     * every world Urbex generated, not only on the ones created through the Cities tab.
+     */
     @Test
-    void theConfigsOwnSelectionIsTheOverworldsDefault() {
+    void theConfigsOwnSelectionIsTheOverworldsDefaultAndIsFrozenIntoTheWorld() {
         WorldSelectionResolver.Resolution resolution =
                 resolve(null, null, false, CONFIGURED, true).orElseThrow();
 
         assertEquals(CONFIGURED, resolution.selection());
-        assertFalse(resolution.persist(),
-                "a default a player can change between sessions must not be frozen into the world");
+        assertTrue(resolution.persist(),
+                "a worldgen selection a world was created with must not stay at the config's mercy");
+    }
+
+    /**
+     * The other half of #203: once it is recorded, the record wins. A modpack that changes its
+     * {@code selectedPreset} in an update must not reach back into worlds its players already have.
+     */
+    @Test
+    void aRecordedConfigDefaultSurvivesTheConfigChangingUnderneathIt() {
+        WorldSelectionResolver.Resolution resolution =
+                resolve(null, SAVED, true, CONFIGURED, true).orElseThrow();
+
+        assertEquals(SAVED, resolution.selection());
+        assertFalse(resolution.persist());
     }
 
     @Test

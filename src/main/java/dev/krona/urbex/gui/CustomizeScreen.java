@@ -19,6 +19,7 @@ import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
+import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.core.RegistryAccess;
@@ -78,7 +79,12 @@ public class CustomizeScreen extends Screen {
     private final CreateWorldScreen createWorldScreen;
     /** Display name only ({@code base.getDisplayName()}) - not the editor's own state. */
     private final String baseName;
-    private final Preset base;
+    /**
+     * What Reset restores: the <em>stock</em> preset, which is not necessarily what the editor
+     * opened on. Re-opening the editor on an already-customized row opens on the edits, and a Reset
+     * that restored those could not undo anything (issue #201).
+     */
+    private final Preset stock;
     private PresetDraft copy;
     private CityPreview preview;
     /** True once {@link #removed()} has closed the preview, so the next {@link #init()} rebuilds it. */
@@ -105,10 +111,18 @@ public class CustomizeScreen extends Screen {
     private boolean suppressSearchResponder;
 
     public CustomizeScreen(Screen parent, Preset base) {
+        this(parent, base, base);
+    }
+
+    /**
+     * @param base  the preset the editor opens on - the customization itself when re-editing one
+     * @param stock the preset Reset restores; the same object as {@code base} for a plain preset
+     */
+    public CustomizeScreen(Screen parent, Preset base, Preset stock) {
         super(Component.translatable("urbex.screen.customize.title", base.getDisplayName()));
         this.parent = parent;
         this.createWorldScreen = parent instanceof CreateWorldScreen cws ? cws : null;
-        this.base = base;
+        this.stock = stock;
         this.baseName = base.getDisplayName();
         this.copy = base.toDraft();
         this.preview = new CityPreview(previewRegistries(createWorldScreen));
@@ -326,13 +340,35 @@ public class CustomizeScreen extends Screen {
         returnToTab();
     }
 
+    /**
+     * Cancel and Escape. Nothing global was touched, so the copy is simply dropped - but silently
+     * dropping a draft the player spent time on is what made "did my changes apply?" unanswerable
+     * (issue #201), so a dirty draft asks first. A clean one closes straight through, since there is
+     * nothing to lose and a prompt on every Escape would be noise.
+     */
     private void cancel() {
-        // No publish and nothing global was touched: the copy is simply dropped.
-        returnToTab();
+        if (!dirty) {
+            returnToTab();
+            return;
+        }
+        this.minecraft.gui.setScreen(new ConfirmScreen(
+                confirmed -> {
+                    if (confirmed) {
+                        returnToTab();
+                    } else {
+                        // Back to this editor with the draft intact - init() rebuilds the preview
+                        // that removed() closed on the way out.
+                        this.minecraft.gui.setScreen(this);
+                    }
+                },
+                Component.translatable("urbex.screen.customize.discard.title"),
+                Component.translatable("urbex.screen.customize.discard.message"),
+                Component.translatable("urbex.screen.customize.discard.yes"),
+                CommonComponents.GUI_CANCEL));
     }
 
     private void reset() {
-        copy = base.toDraft();
+        copy = stock.toDraft();
         dirty = false;
         rebuildControls();
         schedulePreview();

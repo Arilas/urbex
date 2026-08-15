@@ -105,6 +105,13 @@ public class CitiesTab extends GridLayoutTab {
     private final RandomSource random = RandomSource.create();
 
     /**
+     * True when the modpack's {@code citiesTabAccess} is {@code locked}: everything renders and
+     * nothing commits, so a player can see the pack's choice without being able to break it
+     * (issue #204). Read once - the config cannot change while this screen is open.
+     */
+    private final boolean locked;
+
+    /**
      * Fully-qualified worldStyle id -> the label to show for it, in the order the selector lists
      * them. Read once in the constructor: the registry cannot change while this tab is alive (a
      * datapack toggle rebuilds the whole screen, and with it this tab).
@@ -117,6 +124,12 @@ public class CitiesTab extends GridLayoutTab {
     private final PreviewWidget previewWidget;
     private final Button rerollButton;
     private final Button customizeButton;
+    /**
+     * Drops the in-memory customization and goes back to the preset it was edited from. Always
+     * present, inactive when there is nothing to revert - a customization used to be a one-way door
+     * (issue #201), and a button that appeared and vanished would reflow the row under the cursor.
+     */
+    private final Button revertButton;
 
     /**
      * The worldStyle selector - {@code null} (and absent from the layout entirely) whenever the
@@ -160,6 +173,14 @@ public class CitiesTab extends GridLayoutTab {
         List<String> worldStyles = List.copyOf(worldStyleNames.keySet());
         PresetSelection.CLIENT.setAvailableWorldStyles(worldStyles);
         PresetSelection.CLIENT.setAvailablePresets(registeredPresets(screen));
+        // Only now that the entries exist can the modpack's configured selection be resolved against
+        // them (issue #204). Published straight away, so what the tab shows and what the integrated
+        // server is told are the same thing even if the player never touches the tab.
+        if (PresetSelection.CLIENT.applyConfiguredDefault(Config.configuredPreset(),
+                Config.configuredWorldStyles())) {
+            PresetSelection.CLIENT.publish();
+        }
+        this.locked = !Config.citiesTabAccess().editable();
 
         Font font = Minecraft.getInstance().font;
 
@@ -167,6 +188,7 @@ public class CitiesTab extends GridLayoutTab {
         // the tab area before the first frame is drawn.
         this.list = new PresetListWidget(Minecraft.getInstance(), MIN_LIST_WIDTH, MIN_LIST_WIDTH, 0,
                 entry -> refreshDetail());
+        this.list.setLocked(locked);
         this.nameLabel = new StringWidget(MIN_DETAIL_WIDTH, font.lineHeight, CommonComponents.EMPTY, font);
         this.infoText = new MultiLineTextWidget(CommonComponents.EMPTY, font);
         this.previewWidget = new PreviewWidget();
@@ -174,13 +196,17 @@ public class CitiesTab extends GridLayoutTab {
                 b -> previewSeedFallback = random.nextLong()).build();
         this.customizeButton = Button.builder(Component.translatable("urbex.screen.customize"),
                 b -> openCustomizeEditor()).build();
+        this.revertButton = Button.builder(Component.translatable("urbex.preset.revert"),
+                b -> revertCustomization()).build();
 
         // Only offer the selector when there's an actual choice to make (more than one registered
-        // style); a single-style install keeps the tab exactly as it was.
+        // style); a single-style install keeps the tab exactly as it was. A locked pack still shows
+        // it - reading the pack's choice is the point - it just cannot be opened.
         if (worldStyles.size() > 1) {
             WorldStyleMix initial = PresetSelection.CLIENT.effectiveWorldStyles();
             this.worldStyleButton = Button.builder(worldStyleLabel(initial), b -> openWorldStyleDropdown()).build();
             this.worldStyleButton.setTooltip(worldStyleTooltip(initial));
+            this.worldStyleButton.active = !locked;
         } else {
             this.worldStyleButton = null;
         }
@@ -197,6 +223,7 @@ public class CitiesTab extends GridLayoutTab {
         LinearLayout buttonRow = detailColumn.addChild(LinearLayout.horizontal().spacing(ROW_SPACING));
         buttonRow.addChild(rerollButton);
         buttonRow.addChild(customizeButton);
+        buttonRow.addChild(revertButton);
 
         // Vanilla's own tabs (GameTab, WorldTab) subscribe to the shared ui state the same way; the
         // listener lives exactly as long as the screen does. We need it because the reroll button
@@ -215,6 +242,9 @@ public class CitiesTab extends GridLayoutTab {
         // The grid moved the list widget by setting x/y; its rows are positioned separately and
         // only follow via updateSizeAndPosition.
         list.updateSizeAndPosition(list.getWidth(), list.getHeight(), list.getX(), list.getY());
+        // Only now does the list know its real height, so this is the first point at which "scroll
+        // the selected row into view" can compute the right answer (issue #201).
+        list.scrollSelectionIntoView();
     }
 
     /**
@@ -237,10 +267,15 @@ public class CitiesTab extends GridLayoutTab {
         nameLabel.setWidth(detailWidth);
         nameLabel.setHeight(font.lineHeight);
 
-        rerollButton.setWidth((detailWidth - ROW_SPACING) / 2);
+        // Three across, with the last absorbing the integer-division remainder so the row reaches
+        // the column's right edge exactly.
+        int buttonSpan = detailWidth - ROW_SPACING * 2;
+        rerollButton.setWidth(buttonSpan / 3);
         rerollButton.setHeight(BUTTON_HEIGHT);
-        customizeButton.setWidth(detailWidth - ROW_SPACING - rerollButton.getWidth());
+        customizeButton.setWidth(buttonSpan / 3);
         customizeButton.setHeight(BUTTON_HEIGHT);
+        revertButton.setWidth(buttonSpan - rerollButton.getWidth() - customizeButton.getWidth());
+        revertButton.setHeight(BUTTON_HEIGHT);
 
         // Everything the description and the preview have to share, after the fixed-height blocks
         // (the name row, the button row, and the worldStyle selector when present) and the gaps
@@ -288,26 +323,62 @@ public class CitiesTab extends GridLayoutTab {
         PresetSelection.Entry entry = PresetSelection.CLIENT.selected();
         Preset preset = entry.preset();
         if (preset == null) {
-            // The "disabled" entry has no preset to customize; its button is inactive anyway.
+            // Disabled and the unlisted row have no preset to customize; the button is inactive for
+            // both anyway.
             forgetReopenOnCitiesTab();
             return;
         }
-        Minecraft.getInstance().gui.setScreen(new CustomizeScreen(screen, preset));
+        // Editing an already-customized row starts from the edits but resets to the stock preset:
+        // "Reset" meaning "back to my last customization" is a reset that cannot undo anything
+        // (issue #201). Falls back to the entry itself when the base is no longer injected.
+        Preset stock = PresetSelection.CUSTOMIZED_ID.equals(entry.id())
+                ? PresetSelection.CLIENT.customizedBasePreset() : null;
+        Minecraft.getInstance().gui.setScreen(
+                new CustomizeScreen(screen, preset, stock != null ? stock : preset));
+    }
+
+    /**
+     * Drops the customization and re-selects the preset it was edited from, then republishes so the
+     * server stops seeing the overrides overlay. Republishing is the point: {@code select} alone
+     * never reaches world generation, exactly as in {@code PresetListWidget.setSelected}.
+     */
+    private void revertCustomization() {
+        PresetSelection.CLIENT.revertCustomization();
+        PresetSelection.CLIENT.publish();
+        list.refreshEntries();
+        refreshDetail();
     }
 
     /** Repopulates the detail panel from whatever {@link PresetSelection#CLIENT} currently holds. */
     private void refreshDetail() {
         PresetSelection.Entry entry = PresetSelection.CLIENT.selected();
+        boolean isCustomized = PresetSelection.CUSTOMIZED_ID.equals(entry.id());
         nameLabel.setMessage(entry.name().copy().withStyle(ChatFormatting.BOLD));
-        infoText.setMessage(describe(entry));
-        customizeButton.active = !PresetSelection.DISABLED_ID.equals(entry.id());
+        infoText.setMessage(describe(entry,
+                isCustomized ? PresetSelection.CLIENT.customizedBaseName() : null));
+        // The unlisted row has no resolved preset to open an editor on, and Disabled has nothing to
+        // edit at all - so this follows the preset, not just the id.
+        customizeButton.active = !locked && entry.preset() != null;
+        // Only on the customized row itself. Offered from any row it would publish the customization's
+        // base while the player was looking at some other preset - the selection would jump out from
+        // under them, and what generated would be neither of the two they had seen.
+        revertButton.active = !locked && isCustomized && PresetSelection.CLIENT.hasCustomization();
+        if (locked) {
+            Tooltip lockedNote = Tooltip.create(Component.translatable("urbex.tab.locked"));
+            customizeButton.setTooltip(lockedNote);
+            revertButton.setTooltip(lockedNote);
+        }
         // A preset change may have carried over the chosen style (still valid) or reset it to the new
         // preset's own; either way the selector's label must show what actually generates. The disabled
         // row has no style ("" is never a choice), so its button simply keeps its last label.
         if (worldStyleButton != null) {
             WorldStyleMix effective = PresetSelection.CLIENT.effectiveWorldStyles();
             worldStyleButton.setMessage(worldStyleLabel(effective));
-            worldStyleButton.setTooltip(worldStyleTooltip(effective));
+            // Locked wins over the per-share breakdown: "you cannot change this" is the more useful
+            // thing to read off a control that does nothing.
+            worldStyleButton.setTooltip(locked
+                    ? Tooltip.create(Component.translatable("urbex.tab.locked"))
+                    : worldStyleTooltip(effective));
         }
         refreshSeedControls();
         if (lastTabArea != null) {
@@ -473,16 +544,39 @@ public class CitiesTab extends GridLayoutTab {
         rerollButton.setTooltip(seedTyped ? Tooltip.create(Component.translatable("urbex.preview.seed_locked")) : null);
     }
 
+    static Component describe(PresetSelection.Entry entry) {
+        return describe(entry, null);
+    }
+
     /**
      * The same three-part blurb the old editor's {@code getProfileInfo} tooltip showed - plain
      * description, aqua "extra" line, red warning - minus the parts a profile leaves empty.
+     * <p>
+     * {@code customizedBase}, when non-null, prepends the gold "modified copy of X" line that tells
+     * the player the panel below it describes the preset they <em>started</em> from. Everything a
+     * customization shows reads through to its base - the description here, the icon on the row - so
+     * without this line an edited preset was indistinguishable from the stock one (issue #201).
      */
-    static Component describe(PresetSelection.Entry entry) {
+    static Component describe(PresetSelection.Entry entry, @Nullable Component customizedBase) {
         Preset preset = entry.preset();
         if (preset == null) {
-            return Component.translatable("urbex.preset.disabled.info");
+            // Two different "no resolved preset" rows: Disabled generates nothing, the unlisted row
+            // generates a preset these datapacks cannot describe. Saying the former about the latter
+            // is the lie issue #202 is about.
+            return PresetSelection.DISABLED_ID.equals(entry.id())
+                    ? Component.translatable("urbex.preset.disabled.info")
+                    : Component.translatable("urbex.preset.unlisted.info", entry.id().toString())
+                            .withStyle(ChatFormatting.GOLD);
         }
-        MutableComponent result = Component.literal(preset.getDescription());
+        // Built around the description rather than wrapping it in an empty root, so a preset with no
+        // extra/warning and no customization keeps producing a component with no siblings at all -
+        // the "empty parts must not add blank lines" shape the extra/warning tests below pin.
+        MutableComponent result = customizedBase == null
+                ? Component.literal(preset.getDescription())
+                : Component.translatable("urbex.preset.custom.info", customizedBase)
+                        .withStyle(ChatFormatting.GOLD)
+                        .append(CommonComponents.NEW_LINE)
+                        .append(Component.literal(preset.getDescription()));
         if (!preset.getExtraDescription().isEmpty()) {
             result.append(CommonComponents.NEW_LINE)
                     .append(Component.literal(preset.getExtraDescription()).withStyle(ChatFormatting.AQUA));

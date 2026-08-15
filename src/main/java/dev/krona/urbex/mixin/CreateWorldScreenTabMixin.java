@@ -2,6 +2,7 @@ package dev.krona.urbex.mixin;
 
 import dev.krona.urbex.gui.CitiesTab;
 import dev.krona.urbex.gui.PresetSelection;
+import dev.krona.urbex.setup.Config;
 import net.minecraft.client.gui.components.tabs.MenuTabBar;
 import net.minecraft.client.gui.components.tabs.Tab;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
@@ -43,6 +44,13 @@ public abstract class CreateWorldScreenTabMixin {
             )
     )
     private Tab[] urbex$appendCitiesTab(Tab[] tabs) {
+        // A modpack can take the tab away entirely (issue #204). Nothing else changes: the configured
+        // selection still reaches generation through Config.configuredSelection and is still recorded
+        // into the world on first load, so a hidden tab means "the player does not choose", not
+        // "Urbex is off".
+        if (!Config.citiesTabAccess().visible()) {
+            return tabs;
+        }
         Tab[] withCities = Arrays.copyOf(tabs, tabs.length + 1);
         withCities[tabs.length] = new CitiesTab((CreateWorldScreen) (Object) this);
         return withCities;

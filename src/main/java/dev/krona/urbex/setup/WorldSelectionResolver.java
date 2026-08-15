@@ -20,9 +20,18 @@ public final class WorldSelectionResolver {
     /**
      * A resolved selection, and whether the world should record it.
      *
-     * <p>Only a client publication is recorded. The other two sources are already durable - saved
-     * data is where the record would go, and the global config is a default a player can change
-     * between sessions and expect to take effect.</p>
+     * <p>Everything a world is <em>given</em> is recorded - both a client publication and the global
+     * config's own selection. Only a selection read back out of the world's own saved data is not,
+     * because that is already where the record would go.</p>
+     *
+     * <p>The configured selection used to be exempt, on the grounds that the global config is "a
+     * default a player can change between sessions and expect to take effect" (issue #203). That
+     * reasoning holds for a runtime setting like {@code todoQueueSize}. It does not hold for a
+     * worldgen selection: terrain is written once, so a config edit reaching a world that already
+     * exists leaves it half one preset and half another. It also left a world created on a modpack's
+     * {@code selectedPreset} with an empty {@code preset} key, which is what the vanilla Re-Create
+     * flow reads - so re-creating such a world restored nothing and dropped the player on Disabled
+     * (issue #202).</p>
      */
     public record Resolution(WorldSelection selection, boolean persist) {}
 
@@ -63,8 +72,12 @@ public final class WorldSelectionResolver {
         // different preset into a world that was created with one is the expensive kind of wrong -
         // the terrain is written once - and the log line naming the malformed id is the thing the
         // player can act on. An unrecorded world has nothing to contradict.
+        //
+        // Recorded, like a publication: this is the one and only load at which the config's default
+        // reaches this world, and freezing it here is what stops the next config edit reaching it
+        // too. See Resolution.
         if (overworld && !hasRecord && configured != null) {
-            return Optional.of(new Resolution(configured, false));
+            return Optional.of(new Resolution(configured, true));
         }
         return Optional.empty();
     }

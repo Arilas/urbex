@@ -42,11 +42,16 @@ public final class PresetSelection {
     private static final Gson GSON = new Gson();
 
     /**
-     * One selectable row. {@code preset} is {@code null} only for the Disabled row; every other
-     * entry (built-in or the transient customized one) always carries the resolved {@link Preset} it
-     * would generate with. {@code Preset.getId()} on the customized entry's preset is the base
-     * preset it was customized from (an unchanged, immutable field that survives {@link Preset#toDraft()}),
-     * which is what {@link #publish()} reports as the preset id underneath the overrides.
+     * One selectable row. {@code preset} is {@code null} for the Disabled row and for the synthesized
+     * "unlisted" row (see {@link #unlisted}); every other entry - built-in or the transient
+     * customized one - carries the resolved {@link Preset} it would generate with.
+     * {@code Preset.getId()} on the customized entry's preset is the base preset it was customized
+     * from (an unchanged, immutable field that survives {@link Preset#toDraft()}), which is what
+     * {@link #publish()} reports as the preset id underneath the overrides.
+     * <p>
+     * A {@code null} preset therefore means "nothing here can be resolved, edited or previewed", not
+     * "nothing will generate" - the unlisted row publishes a real selection. Callers that mean the
+     * latter must test {@code id} against {@link #DISABLED_ID}.
      */
     public record Entry(Identifier id, Component name, @Nullable Preset preset) {
     }
@@ -65,12 +70,28 @@ public final class PresetSelection {
     private record PendingRestore(Identifier presetId, @Nullable String overridesJson) {
     }
 
+    /**
+     * A restored selection whose preset the enabled datapacks do not offer - a pack turned off since
+     * the world was made, or one that never marked its preset browsable.
+     *
+     * <p>It gets a row of its own so the tab shows what the world will actually generate with.
+     * Before this it showed Disabled while {@link #restore} had already published the saved id, so
+     * the screen said "no cities" about a world that was about to have them (issue #202).</p>
+     */
+    private record Unlisted(Identifier presetId, @Nullable String overridesJson) {
+    }
+
     /** Registry-backed browsable presets, injected by {@link CitiesTab}; empty until then. */
     private List<Entry> availablePresets = List.of();
 
     private Entry selected = DISABLED_ENTRY;
     @Nullable
     private Preset customized = null;
+    /** The preset the {@link #customized} draft was edited from, for the row's label and Revert. */
+    @Nullable
+    private Entry customizedBase = null;
+    @Nullable
+    private Unlisted unlisted = null;
 
     private List<String> availableWorldStyles = List.of();
     @Nullable
@@ -78,6 +99,14 @@ public final class PresetSelection {
 
     @Nullable
     private PendingRestore pendingRestore = null;
+
+    /**
+     * One-shot latch for {@link #applyConfiguredDefault}. The Cities tab is rebuilt on every
+     * {@code CreateWorldScreen.init()} - every window resize included - so without this a player who
+     * deliberately chose Disabled would have the modpack's default put back the next time they
+     * resized the window.
+     */
+    private boolean configuredDefaultApplied = false;
 
     public PresetSelection() {
     }
@@ -92,6 +121,16 @@ public final class PresetSelection {
      */
     public void setAvailablePresets(List<Entry> entries) {
         this.availablePresets = entries == null ? List.of() : List.copyOf(entries);
+        // A pack that was turned back on since the unlisted row was synthesized offers the real
+        // entry again; prefer it, so the exceptional row does not outlive the condition it reports.
+        if (unlisted != null && findAvailable(unlisted.presetId()) != null) {
+            unlisted = null;
+        }
+        // The customized row is positioned relative to its base, so the base has to be re-resolved
+        // against every fresh injection - the Entry objects are rebuilt each time.
+        if (customized != null) {
+            customizedBase = findAvailable(customized.getId());
+        }
         if (pendingRestore != null) {
             reconcilePendingRestore();
         } else {
@@ -100,19 +139,99 @@ public final class PresetSelection {
     }
 
     /**
-     * The full, current list of choices: {@code disabled} first, then the injected browsable presets
-     * (already {@code urbex:default} first and the rest in {@code Identifier}'s own path-then-namespace
-     * order, not alphabetical on the whole id, per {@code Presets.listBrowsable}), then
-     * the transient customized entry (if any) last.
+     * The full, current list of choices: {@code disabled} first, then the unlisted row when a restore
+     * produced one, then the injected browsable presets (already {@code urbex:default} first and the
+     * rest in {@code Identifier}'s own path-then-namespace order, not alphabetical on the whole id,
+     * per {@code Presets.listBrowsable}).
+     * <p>
+     * The transient customized entry sits <em>directly after the preset it was customized from</em>
+     * rather than at the end of the list (issue #201). Appended last it was row 14 of 14 with the
+     * shipped presets, which on a list too short to show them all put it off-screen - so pressing
+     * Done in the editor appeared to do nothing at all. Next to its base it lands where the player
+     * was already looking. A customization whose base is no longer injected still goes last, since
+     * there is nothing left to sit beside.
      */
     public List<Entry> entries() {
-        List<Entry> result = new ArrayList<>(availablePresets.size() + 2);
+        List<Entry> result = new ArrayList<>(availablePresets.size() + 3);
         result.add(DISABLED_ENTRY);
-        result.addAll(availablePresets);
-        if (customized != null) {
-            result.add(new Entry(CUSTOMIZED_ID, Component.translatable("urbex.preset.custom"), customized));
+        if (unlisted != null) {
+            result.add(unlistedEntry());
+        }
+        boolean customPlaced = false;
+        for (Entry entry : availablePresets) {
+            result.add(entry);
+            if (customized != null && customizedBase != null && customizedBase.id().equals(entry.id())) {
+                result.add(customizedEntry());
+                customPlaced = true;
+            }
+        }
+        if (customized != null && !customPlaced) {
+            result.add(customizedEntry());
         }
         return result;
+    }
+
+    /**
+     * The customized row. Named for the preset it was edited from and marked with the same {@code *}
+     * the editor puts in its own title, because "Custom" alone - over the base preset's icon and
+     * description, both of which read through - was indistinguishable from another stock preset.
+     */
+    private Entry customizedEntry() {
+        Component name = customizedBase == null
+                ? Component.translatable("urbex.preset.custom")
+                : Component.translatable("urbex.preset.custom.of", customizedBase.name());
+        return new Entry(CUSTOMIZED_ID, name, customized);
+    }
+
+    /** The row standing in for a saved preset the enabled datapacks do not offer. See {@link Unlisted}. */
+    private Entry unlistedEntry() {
+        return new Entry(unlisted.presetId(),
+                Component.translatable("urbex.preset.unlisted", unlisted.presetId().toString()), null);
+    }
+
+    @Nullable
+    private Entry findAvailable(Identifier id) {
+        for (Entry entry : availablePresets) {
+            if (entry.id().equals(id)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Starts the tab on the selection the global config names, for modpacks that are built around a
+     * particular preset (issue #204). Call after {@link #setAvailablePresets}, once per screen.
+     * <p>
+     * Deliberately narrow. It applies only on the first call, and only when nothing else has already
+     * spoken for the selection: a Re-Create restore (pending or already reconciled into an unlisted
+     * row) is this world's own history and outranks a pack default, and a selection that is no longer
+     * Disabled means the player has already chosen. Everything about it is best-effort - a configured
+     * preset the datapacks do not offer simply leaves the tab on Disabled, and the server still
+     * resolves and reports the id through {@code Config.buildPresetCache}.
+     * <p>
+     * The latch is only armed once there are entries to resolve against. {@code CitiesTab} injects an
+     * empty list whenever the preset registry is not reachable - the same condition
+     * {@code reconcilePendingRestore} treats as "too early" - and latching on that call would have
+     * spent the pack's one chance on a list that could not have matched, leaving the default silently
+     * unapplied for the rest of the screen's life.
+     *
+     * @return whether the selection was actually changed, so the caller knows to publish
+     */
+    public boolean applyConfiguredDefault(@Nullable Identifier preset, @Nullable WorldStyleMix styles) {
+        if (configuredDefaultApplied || availablePresets.isEmpty()) {
+            return false;
+        }
+        configuredDefaultApplied = true;
+        if (preset == null || pendingRestore != null || unlisted != null
+                || !DISABLED_ID.equals(selected.id()) || findEntry(preset) == null) {
+            return false;
+        }
+        select(preset);
+        if (styles != null) {
+            selectedWorldStyles = styles;
+        }
+        return true;
     }
 
     /** Selects the entry with the given id. Unknown ids (e.g. a stale id from a rebuilt list) are a no-op. */
@@ -139,12 +258,21 @@ public final class PresetSelection {
      * <p>
      * A style the injected list no longer carries is pruned from the chosen mix rather than
      * clearing the whole selection: turning one datapack off on the Data Packs screen should cost
-     * that pack's cities, not the balance the player set up for the others. Only when nothing is
-     * left does the override go back to "use the default".
+     * that pack's cities, not the balance the player set up for the others.
+     * <p>
+     * Two things this deliberately does <em>not</em> do (issue #202). An <strong>empty</strong>
+     * injected list is "the registry was not reachable" - {@code CitiesTab.registeredWorldStyles}
+     * returns {@code Map.of()} for that - and not "every style you chose is invalid", so it prunes
+     * nothing; this runs on every tab construction, window resizes included, and it used to be able
+     * to quietly reset a restored or hand-picked style back to the default and then republish the
+     * default on the next click. And a mix that prunes away to nothing keeps its primary rather than
+     * falling back to {@code null}: the client does not get to silently rewrite the player's choice,
+     * and an id no registry knows is reported and dropped server-side by
+     * {@code Config.buildPresetCache}, which is where that message is worth reading.
      */
     public void setAvailableWorldStyles(List<String> ids) {
         this.availableWorldStyles = ids == null ? List.of() : List.copyOf(ids);
-        if (selectedWorldStyles == null) {
+        if (selectedWorldStyles == null || availableWorldStyles.isEmpty()) {
             return;
         }
         List<WorldStyleMix.Entry> kept = new ArrayList<>();
@@ -153,7 +281,8 @@ public final class PresetSelection {
                 kept.add(entry);
             }
         }
-        selectedWorldStyles = kept.isEmpty() ? null : WorldStyleMix.of(kept);
+        selectedWorldStyles = kept.isEmpty()
+                ? selectedWorldStyles.reducedToPrimary() : WorldStyleMix.of(kept);
     }
 
     /** What the Cities tab renders in its worldStyle selector; empty until injected. */
@@ -207,16 +336,64 @@ public final class PresetSelection {
      */
     public void applyCustomized(PresetDraft draft) {
         this.customized = draft.resolve();
+        // Preset.getId() is the base preset the draft was taken from, carried unchanged through
+        // toDraft()/resolve() - which is what lets the row be named after it and sit beside it.
+        this.customizedBase = findAvailable(customized.getId());
         select(CUSTOMIZED_ID);
+    }
+
+    /**
+     * Drops the customization and goes back to the preset it was edited from, for the tab's Revert
+     * action. Without it a customization was a one-way door: the row could be left, but never
+     * removed, and the only way back to the stock preset was to abandon the screen (issue #201).
+     * <p>
+     * Falls back to Disabled only if the base preset is no longer injected at all.
+     */
+    public void revertCustomization() {
+        if (customized == null) {
+            return;
+        }
+        Identifier baseId = customized.getId();
+        customized = null;
+        customizedBase = null;
+        select(findAvailable(baseId) != null ? baseId : DISABLED_ID);
+    }
+
+    /** Whether a customization exists at all - what the tab's Revert action is offered for. */
+    public boolean hasCustomization() {
+        return customized != null;
+    }
+
+    /**
+     * The name of the preset the current customization was edited from, or {@code null} when there is
+     * no customization (or its base is no longer injected). Drives the detail panel's
+     * "modified copy of X" line.
+     */
+    @Nullable
+    public Component customizedBaseName() {
+        return customizedBase == null ? null : customizedBase.name();
+    }
+
+    /**
+     * The stock preset the current customization was edited from, or {@code null} when there is no
+     * customization (or its base is no longer injected). This is what the editor's Reset means, as
+     * opposed to the customization itself, which is what it opens on.
+     */
+    @Nullable
+    public Preset customizedBasePreset() {
+        return customizedBase == null ? null : customizedBase.preset();
     }
 
     public void reset() {
         availablePresets = List.of();
         selected = DISABLED_ENTRY;
         customized = null;
+        customizedBase = null;
+        unlisted = null;
         selectedWorldStyles = null;
         availableWorldStyles = List.of();
         pendingRestore = null;
+        configuredDefaultApplied = false;
     }
 
     /**
@@ -314,8 +491,21 @@ public final class PresetSelection {
         PendingRestore pending = pendingRestore;
         Entry base = findEntry(pending.presetId());
         if (base == null) {
-            // Not found yet (or genuinely unknown - the server-side check will report that once a
-            // chunk generates). Keep waiting; what was published is already correct either way.
+            if (availablePresets.isEmpty()) {
+                // Nothing has been injected yet, so this is "too early", not "unknown". Keep
+                // waiting; what was published is already correct either way.
+                return;
+            }
+            // The registry was read and does not offer this preset - a datapack turned off since the
+            // world was made, or one that never tagged the preset browsable. Stand a row in for it
+            // rather than leaving the tab on Disabled while restore() has already published the
+            // saved id: the screen must not say "no cities" about a world that is about to have them
+            // (issue #202). Server-side validation still gets the final word once a chunk generates.
+            pendingRestore = null;
+            unlisted = new Unlisted(pending.presetId(), pending.overridesJson());
+            select(pending.presetId());
+            Urbex.getLogger().warn("The re-created world's preset '{}' is not among the presets these "
+                    + "datapacks offer; showing it as unlisted.", pending.presetId());
             return;
         }
         pendingRestore = null;
@@ -368,6 +558,8 @@ public final class PresetSelection {
      *       (carried, unchanged, in {@code Preset.getId()} through every {@link Preset#copy()}), the
      *       effective worldStyle, and the full edited preset encoded as a {@link PresetDefinition} overlay -
      *       so the server rebuilds exactly what the editor showed, not an approximation.</li>
+     *   <li>The unlisted row: the saved id and overrides verbatim, since nothing here can resolve
+     *       them. Re-selecting that row therefore republishes exactly what {@link #restore} did.</li>
      * </ul>
      */
     public void publish() {
@@ -375,7 +567,22 @@ public final class PresetSelection {
 
         Config.resetPresetCache();
 
-        if (DISABLED_ID.equals(entry.id()) || entry.preset() == null) {
+        if (DISABLED_ID.equals(entry.id())) {
+            WorldSelectionHandoff.discard();
+            return;
+        }
+
+        // Before the null-preset check below: an unlisted entry carries no resolved Preset but does
+        // name a real selection, and discarding it would have the tab silently turn the world's own
+        // preset off (issue #202).
+        if (unlisted != null && unlisted.presetId().equals(entry.id())) {
+            WorldSelectionHandoff.publish(new WorldSelection(unlisted.presetId(),
+                    Config.gateMix(effectiveWorldStyles(), "The world being created"),
+                    Optional.ofNullable(unlisted.overridesJson())));
+            return;
+        }
+
+        if (entry.preset() == null) {
             WorldSelectionHandoff.discard();
             return;
         }
