@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.varia.GenerationMetrics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.WorldGenLevel;
@@ -284,16 +285,43 @@ public class ChunkDriver {
         commitState = CommitState.COMMITTED;
     }
 
+    /** @see #actuallyGenerate(ChunkAccess, long) */
     public void actuallyGenerate(ChunkAccess chunk) {
-        correctionsPass();
+        actuallyGenerate(chunk, 0L);
+    }
+
+    /**
+     * @param ordinal this chunk's {@link dev.krona.urbex.varia.GenerationMetrics#beginChunk}, so the
+     *                three passes below can be measured apart. This step is two thirds of a chunk's
+     *                cost and the three things it does have nothing in common, so one figure for it
+     *                names no target; the overload above exists for callers that have no ordinal to
+     *                give and are not being measured.
+     */
+    public void actuallyGenerate(ChunkAccess chunk, long ordinal) {
+        long mark = GenerationMetrics.mark();
+        long alloc = GenerationMetrics.allocMark();
+        correctionsPass(ordinal);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CORRECT, mark, alloc);
+
+        mark = GenerationMetrics.mark();
+        alloc = GenerationMetrics.allocMark();
         flushToChunk(chunk);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.FLUSH, mark, alloc);
+
         // Full recompute instead of the old fake-bedrock Heightmap.update calls, which could
         // only ever raise heights and lied to MOTION_BLOCKING_NO_LEAVES (issue #46). O(chunk),
         // once, unconditionally correct in both directions.
+        mark = GenerationMetrics.mark();
+        alloc = GenerationMetrics.allocMark();
         Heightmap.primeHeightmaps(chunk, java.util.EnumSet.of(
                 Heightmap.Types.MOTION_BLOCKING, Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
                 Heightmap.Types.OCEAN_FLOOR, Heightmap.Types.WORLD_SURFACE));
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.HEIGHTMAP, mark, alloc);
+
+        mark = GenerationMetrics.mark();
+        alloc = GenerationMetrics.allocMark();
         publishRecordedWrites();
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.PUBLISH, mark, alloc);
     }
 
     /**
@@ -303,12 +331,18 @@ public class ChunkDriver {
      * run once per finally-written position, against the finished chunk, in sorted order so the
      * result cannot depend on write order.
      */
-    private void correctionsPass() {
+    private void correctionsPass(long ordinal) {
         if (written == null || written.isEmpty()) {
             return;
         }
+        long mark = GenerationMetrics.mark();
+        long alloc = GenerationMetrics.allocMark();
         long[] positions = written.keySet().toLongArray();
         Arrays.sort(positions);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CORRECT_SORT, mark, alloc);
+
+        mark = GenerationMetrics.mark();
+        alloc = GenerationMetrics.allocMark();
         for (long packed : positions) {
             int x = BlockPos.getX(packed);
             int y = BlockPos.getY(packed);
@@ -320,6 +354,7 @@ public class ChunkDriver {
                 setBlock(pos, corrected);
             }
         }
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CORRECT_SHAPE, mark, alloc);
     }
 
     /**

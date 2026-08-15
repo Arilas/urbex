@@ -39,6 +39,27 @@ public final class DigestRunner {
      */
     public static final String EXPIRE_EVERY_PROPERTY = "urbex.digestCheck.expireEvery";
 
+    /**
+     * Plan the whole square before the timed drive starts, so generation meets warm planning caches.
+     *
+     * <p>A measurement rather than a feature, and the only honest way to size one: "how much of a
+     * chunk is planning?" cannot be answered by bracketing {@code getChunkPlan} in
+     * {@code CityGenerator}, because planning recurses into neighbours and the build half calls back
+     * into it - a chunk's plan is usually built while a neighbour was generating and charged there.
+     * Driving the same square with everything already planned moves that cost out of the timed
+     * window entirely, so the difference between the two runs is the whole of what planning costs,
+     * wherever it was being charged. That difference is also the ceiling on what any scheme that
+     * computes plans ahead of demand could ever return.</p>
+     *
+     * <p><strong>The digest must not move.</strong> Planning claims to be a pure function of the
+     * seed and the coordinate - {@code PlanningContext} says so, and {@code DimensionCaches} relies
+     * on it to let racing threads recompute freely. Planning every chunk in a different order from
+     * the one generation would have planned them in, before any of them generates, is the strongest
+     * available test of that claim: if the {@code DRIVERDIGEST} moves, some planning answer depends
+     * on when it was asked, and that is a defect in generation rather than in this flag.</p>
+     */
+    public static final String PREWARM_PROPERTY = "urbex.digestCheck.prewarm";
+
     private DigestRunner() {
     }
 
@@ -119,6 +140,11 @@ public final class DigestRunner {
         List<ChunkPos> chunks = chunkSquare(radius, order, offset);
 
         UnsafeReadCounter.reset();
+        // Before the reset below, deliberately: the point of pre-warming is that its cost lands
+        // outside the measured window. See PREWARM_PROPERTY.
+        if (System.getProperty(PREWARM_PROPERTY) != null) {
+            prewarm(level, chunks);
+        }
         // Reset here rather than at server start: a digest run is the measured unit, and a run that
         // included whatever the spawn-area generation did would not be comparable with the next one.
         GenerationMetrics.reset();
@@ -201,6 +227,41 @@ public final class DigestRunner {
         return new Result(driverDigest, digest, driverBlocks, recordedChunks, chunks.size(), elapsed, bridgeChunks,
                 slopeChunks, avoidedChunks, railCollisionChunks, unsafeReads,
                 GenerationMetrics.report(chunks.size(), elapsed));
+    }
+
+    /**
+     * Plans every chunk of the square before any of it generates. See {@link #PREWARM_PROPERTY}.
+     *
+     * <p>Asks for exactly what {@code CityGenerator.generateOrThrow} asks for at its top - the
+     * heightmap and the chunk plan - and nothing else. Everything the rest of a chunk consults
+     * (candidates, city styles, rail info, highway levels, the two city fields) is reached
+     * transitively from those two, so warming them by hand would be a second, drifting copy of what
+     * planning already does. What is left cold afterwards is exactly what is <em>not</em>
+     * precomputable, which is the distinction the measurement is trying to draw.</p>
+     *
+     * <p>Single-threaded and in the drive's own order. A pre-warm pass that fanned out over a pool
+     * would measure the pool as much as the work, and the point here is to move a known quantity of
+     * work outside the timed window, not to discover how fast it can be made to run.</p>
+     *
+     * <p>Says what it cost on its own line. That figure is the other half of the comparison: the
+     * timed drive shows what warm caches save, and this shows what filling them took - and a saving
+     * bought for more than it is worth is not a saving.</p>
+     */
+    private static void prewarm(ServerLevel level, List<ChunkPos> chunks) {
+        PlanningContext planning = GenerationSession.planningFor(level);
+        if (planning == null) {
+            // No Urbex profile here. Nothing to warm, and the driver-writes check already fails this
+            // case loudly, so this stays quiet rather than inventing a second complaint about it.
+            return;
+        }
+        long start = System.currentTimeMillis();
+        for (ChunkPos pos : chunks) {
+            ChunkCoord coord = new ChunkCoord(level.dimension(), pos.x(), pos.z());
+            planning.heightmap(coord);
+            ChunkPlan.getChunkPlan(coord, planning);
+        }
+        Urbex.getLogger().info("PREWARM chunks={} ms={}", chunks.size(),
+                System.currentTimeMillis() - start);
     }
 
     /**

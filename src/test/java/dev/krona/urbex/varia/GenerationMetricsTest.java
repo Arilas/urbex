@@ -32,12 +32,51 @@ class GenerationMetricsTest {
 
     @Test
     void recordingWhileOffCostsNothingAndChangesNothing() {
-        GenerationMetrics.chunk(5_000_000L);
+        long ordinal = GenerationMetrics.beginChunk();
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.PLAN, 0L, 0L);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.BUILD, 0L, 0L);
+        GenerationMetrics.chunk(ordinal, 5_000_000L);
         GenerationMetrics.queueDepth(4096);
 
         assertEquals(0, GenerationMetrics.percentileMicros(99),
                 "a chunk recorded while off must not appear in a later measured run");
         assertEquals(0, GenerationMetrics.allocatedBytes());
+    }
+
+    /**
+     * The marks are the two values a phase is closed against, and off they must be free. Zero is
+     * also what {@code phase} reads as "there was no baseline", so an off run records no allocation
+     * rather than a delta against a clock it never started.
+     */
+    @Test
+    void theMarksAnswerZeroWhileOffRatherThanReadingAClock() {
+        assertEquals(0, GenerationMetrics.mark());
+        assertEquals(0, GenerationMetrics.allocMark());
+        assertEquals(0, GenerationMetrics.beginChunk(),
+                "no ordinal is handed out when nothing is counting them");
+    }
+
+    /**
+     * Both phases appear in every measured report, including one where nothing generated. A phase
+     * that only appeared once it had samples would make "planning cost nothing" and "planning was
+     * not measured" the same line.
+     */
+    @Test
+    void anUnaskedReportNamesNoPhasesBecauseItReportsNothingAtAll() {
+        String report = GenerationMetrics.report(625, 24000);
+
+        assertFalse(report.contains("plan="), report);
+        assertFalse(report.contains("build="), report);
+    }
+
+    /**
+     * Warm-up exclusion is off by default, so an unasked run measures what it always measured. The
+     * property exists to be set for one comparison run and then compared against a run without it.
+     */
+    @Test
+    void warmupExclusionIsOffUnlessAskedFor() {
+        assertEquals(null, System.getProperty(GenerationMetrics.WARMUP_PROPERTY),
+                "the test JVM sets no warm-up, so this is the shipped default");
     }
 
     /**
