@@ -209,11 +209,17 @@ public final class PresetSelection {
      * Disabled means the player has already chosen. Everything about it is best-effort - a configured
      * preset the datapacks do not offer simply leaves the tab on Disabled, and the server still
      * resolves and reports the id through {@code Config.buildPresetCache}.
+     * <p>
+     * The latch is only armed once there are entries to resolve against. {@code CitiesTab} injects an
+     * empty list whenever the preset registry is not reachable - the same condition
+     * {@code reconcilePendingRestore} treats as "too early" - and latching on that call would have
+     * spent the pack's one chance on a list that could not have matched, leaving the default silently
+     * unapplied for the rest of the screen's life.
      *
      * @return whether the selection was actually changed, so the caller knows to publish
      */
     public boolean applyConfiguredDefault(@Nullable Identifier preset, @Nullable WorldStyleMix styles) {
-        if (configuredDefaultApplied) {
+        if (configuredDefaultApplied || availablePresets.isEmpty()) {
             return false;
         }
         configuredDefaultApplied = true;

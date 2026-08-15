@@ -506,6 +506,26 @@ class PresetSelectionTest {
         assertEquals(id("cavern"), selection.selected().id());
     }
 
+    /**
+     * The latch must not be armed by a call that never had a list to match against. {@code CitiesTab}
+     * injects an empty list whenever the preset registry is not reachable, and spending the pack's
+     * one chance on that call left the default silently unapplied for the rest of the screen's life.
+     */
+    @Test
+    void theConfiguredDefaultIsStillAppliedAfterAnInjectionThatCameTooEarly() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailablePresets(List.of());
+
+        assertFalse(selection.applyConfiguredDefault(id("largecities"), null),
+                "nothing to resolve against yet");
+
+        selection.setAvailablePresets(List.of(entry("default"), entry("largecities")));
+
+        assertTrue(selection.applyConfiguredDefault(id("largecities"), null),
+                "the pack's default must survive a registry that was not ready the first time");
+        assertEquals(id("largecities"), selection.selected().id());
+    }
+
     /** A configured preset the enabled datapacks do not offer leaves the tab alone; the server still
      *  resolves and reports the id. */
     @Test

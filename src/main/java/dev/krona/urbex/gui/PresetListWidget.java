@@ -7,7 +7,6 @@ import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
-import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -16,10 +15,10 @@ import javax.annotation.Nullable;
 import java.util.function.Consumer;
 
 /**
- * The preset picker on the left of the Cities tab: one row per {@link PresetSelection.Entry},
- * {@code disabled} first, customs last. Picking a row is the single place the player's choice is
- * committed - it {@code select}s <em>and</em> {@code publish}es on {@link PresetSelection#CLIENT},
- * because {@code select} alone never reaches world generation.
+ * The preset picker on the left of the Cities tab: one row per {@link PresetSelection.Entry}, in the
+ * order {@code PresetSelection.entries()} gives them. Picking a row is the single place the player's
+ * choice is committed - it {@code select}s <em>and</em> {@code publish}es on
+ * {@link PresetSelection#CLIENT}, because {@code select} alone never reaches world generation.
  */
 public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> {
 
@@ -123,9 +122,17 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
      */
     @Override
     public void setSelected(@Nullable Row row) {
+        // Locked: the highlight must not move either, not just the committed selection. Letting
+        // super run would paint the row the player clicked as selected while PresetSelection still
+        // held the configured one - the exact "the tab shows something the world will not generate
+        // with" failure this change is about. refreshEntries still gets through, which is what
+        // establishes the highlight in the first place.
+        if (locked && !restoringSelection) {
+            return;
+        }
         Row previous = getSelected();
         super.setSelected(row);
-        if (row == null || restoringSelection || locked || row == previous) {
+        if (row == null || restoringSelection || row == previous) {
             return;
         }
         PresetSelection.CLIENT.select(row.entry.id());
@@ -139,15 +146,12 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
     }
 
     /**
-     * Blocked at the input layer as well as in {@link #setSelected}, so a locked list does not even
-     * paint a moving highlight the player cannot commit. Scrolling still works - reading the list is
-     * the whole point of {@code locked} rather than {@code hidden}.
+     * Keyboard navigation is refused outright when locked, since arrowing through a list whose
+     * selection cannot move has nothing to offer. Mouse input is deliberately <em>not</em> blocked
+     * here: {@code mouseClicked} is also how {@code AbstractSelectionList} drags its scrollbar, and
+     * reading a list too long to fit is the whole point of {@code locked} rather than {@code hidden}.
+     * The guard in {@link #setSelected} is what makes the click itself inert.
      */
-    @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        return !locked && super.mouseClicked(event, doubleClick);
-    }
-
     @Override
     @Nullable
     public ComponentPath nextFocusPath(FocusNavigationEvent event) {

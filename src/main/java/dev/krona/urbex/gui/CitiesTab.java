@@ -359,7 +359,10 @@ public class CitiesTab extends GridLayoutTab {
         // The unlisted row has no resolved preset to open an editor on, and Disabled has nothing to
         // edit at all - so this follows the preset, not just the id.
         customizeButton.active = !locked && entry.preset() != null;
-        revertButton.active = !locked && PresetSelection.CLIENT.hasCustomization();
+        // Only on the customized row itself. Offered from any row it would publish the customization's
+        // base while the player was looking at some other preset - the selection would jump out from
+        // under them, and what generated would be neither of the two they had seen.
+        revertButton.active = !locked && isCustomized && PresetSelection.CLIENT.hasCustomization();
         if (locked) {
             Tooltip lockedNote = Tooltip.create(Component.translatable("urbex.tab.locked"));
             customizeButton.setTooltip(lockedNote);
