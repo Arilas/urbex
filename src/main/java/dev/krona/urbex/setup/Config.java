@@ -2,6 +2,7 @@ package dev.krona.urbex.setup;
 
 import com.google.gson.JsonParser;
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.config.CitiesTabAccess;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.Presets;
 import dev.krona.urbex.config.ConfigRepository;
@@ -101,6 +102,28 @@ public class Config {
 
     public static boolean experimentalMultiWorldStyles() {
         return active.file().experimentalMultiWorldStyles();
+    }
+
+    /**
+     * How much of the Cities tab this install lets the player touch (issue #204).
+     * <p>
+     * Read on the client, off the <em>global</em> config: the create-world screen runs before any
+     * server exists, so a world's own {@code serverconfig} overrides cannot be in effect yet. That is
+     * the right file anyway - this is a modpack-shipped decision, not a per-world one.
+     */
+    public static CitiesTabAccess citiesTabAccess() {
+        return active.file().citiesTabAccess();
+    }
+
+    /** The global config's own preset selection, or null. What the Cities tab starts on. */
+    @Nullable
+    public static Identifier configuredPreset() {
+        return active.selectedPreset();
+    }
+
+    /** The global config's own world styles. Only meaningful alongside {@link #configuredPreset()}. */
+    public static WorldStyleMix configuredWorldStyles() {
+        return active.selectedWorldStyles();
     }
 
     /**

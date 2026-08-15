@@ -80,6 +80,40 @@ class CitiesTabTest {
         assertEquals(TextColor.fromLegacyFormat(ChatFormatting.RED), siblings.get(1).getStyle().getColor());
     }
 
+    /**
+     * Issue #201. A customization shows the base preset's icon on its row and the base preset's
+     * description in this panel, both by reading through - so without a line naming that base, an
+     * edited preset was indistinguishable from the stock one.
+     */
+    @Test
+    void aCustomizationSaysWhichPresetItIsAModifiedCopyOf() {
+        Component described = CitiesTab.describe(entryFor(preset("Common cities", "", "")),
+                Component.literal("Rare Cities"));
+        List<Component> siblings = described.getSiblings();
+
+        assertEquals("urbex.preset.custom.info",
+                assertInstanceOf(TranslatableContents.class, described.getContents()).getKey());
+        assertEquals(TextColor.fromLegacyFormat(ChatFormatting.GOLD), described.getStyle().getColor());
+        // newline, then the base preset's own description underneath it
+        assertEquals(2, siblings.size());
+        assertEquals("Common cities", siblings.get(1).getString());
+    }
+
+    /**
+     * Issue #202. Disabled generates nothing; the unlisted row generates a preset these datapacks
+     * cannot describe. Both carry a null {@code Preset}, and saying the former about the latter is
+     * exactly the lie that made a re-created world look like it had no cities coming.
+     */
+    @Test
+    void anUnlistedPresetIsNotDescribedAsDisabled() {
+        PresetSelection.Entry unlisted = new PresetSelection.Entry(
+                Identifier.parse("urbexpack:ruins"), Component.literal("Ruins"), null);
+
+        assertEquals("urbex.preset.unlisted.info",
+                assertInstanceOf(TranslatableContents.class,
+                        CitiesTab.describe(unlisted).getContents()).getKey());
+    }
+
     @Test
     void noReopenIsRequestedUntilTheEditorIsOpened() {
         assertFalse(CitiesTab.consumeReopenOnCitiesTab(),

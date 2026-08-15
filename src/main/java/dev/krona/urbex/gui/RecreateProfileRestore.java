@@ -21,8 +21,15 @@ import java.util.Optional;
  */
 public final class RecreateProfileRestore {
 
-    /** The preset selection read from a source world: {@link dev.krona.urbex.data.UrbexData}'s three
-     *  fields, verbatim. */
+    /**
+     * The preset selection read from a source world: {@link dev.krona.urbex.data.UrbexData}'s fields,
+     * verbatim.
+     *
+     * @param worldStyle the saved world-style <em>spec</em> - the weighted {@code worldStyleMix} form
+     *                   when the source world had a real mix, else the single {@code worldStyle} id.
+     *                   One field for both because a bare qualified id is just a one-entry mix in
+     *                   {@code WorldStyleMix}'s grammar, so the two parse through the same call.
+     */
     public record Pending(String preset, String worldStyle, String overridesJson) {
     }
 
@@ -51,14 +58,25 @@ public final class RecreateProfileRestore {
         }
     }
 
-    /** Extracts the preset selection from a saved-data NBT root. Empty if none was stored. */
+    /**
+     * Extracts the preset selection from a saved-data NBT root. Empty if none was stored.
+     * <p>
+     * The world-style keys are read in the same order {@code UrbexData.getSelectedWorldStyles} reads
+     * them: {@code worldStyleMix} when the source world had a real mix, else the legacy single
+     * {@code worldStyle}. Reading only the latter - which is what this did - silently collapsed a
+     * re-created world to the mix's primary style, because {@code UrbexData.setChoice} writes the
+     * weighted form to {@code worldStyleMix} and leaves {@code worldStyle} holding the primary alone
+     * (issue #202).
+     */
     public static Optional<Pending> parse(CompoundTag root) {
         CompoundTag data = root.getCompoundOrEmpty("data");
         String preset = data.getStringOr("preset", "");
         if (preset.isEmpty()) {
             return Optional.empty();
         }
-        return Optional.of(new Pending(preset, data.getStringOr("worldStyle", ""), data.getStringOr("overrides", "")));
+        String mix = data.getStringOr("worldStyleMix", "");
+        String worldStyle = mix.isEmpty() ? data.getStringOr("worldStyle", "") : mix;
+        return Optional.of(new Pending(preset, worldStyle, data.getStringOr("overrides", "")));
     }
 
     /** Applies and clears the stashed preset selection; called when a fresh CreateWorldScreen opens. */

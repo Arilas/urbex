@@ -43,6 +43,34 @@ To get cities:
   Entries are `dimension=preset`, optionally `dimension=preset@worldstyle`, and **every id names
   its namespace**: `minecraft:overworld=urbex:default`, not `minecraft:overworld=default`.
 
+### For modpack creators
+
+A pack that is built around a particular preset can say so in `config/urbex/urbex.json`, and decide
+how much of that its players may change:
+
+    {
+      "selectedPreset": "urbex:largecities",
+      "selectedWorldStyle": "urbex:standard",
+      "citiesTabAccess": "locked"
+    }
+
+`selectedPreset` and `selectedWorldStyle` are what the **Cities** tab starts on, and what a world
+generates with if the player never opens the tab at all. Both name their namespace.
+`selectedWorldStyle` takes the same weighted grammar as `dimensionsWithPresets` (see below), so a
+pack can ship a mix.
+
+`citiesTabAccess` is one of:
+
+| Value | Effect |
+| --- | --- |
+| `editable` (default) | The player picks whatever they like. |
+| `locked` | The tab still shows the pack's choice, with every control inactive. |
+| `hidden` | The tab is gone. The configured selection still generates. |
+
+Whatever a world ends up created with is written into the save on first generation, so changing
+these values later affects **new** worlds only — an existing world keeps the preset its terrain was
+built from.
+
 ### Mixing world styles (experimental)
 
 Set `experimentalMultiWorldStyles: true` in `config/urbex/urbex.json` and the **World Style** picker

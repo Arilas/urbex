@@ -89,7 +89,12 @@ public record GlobalConfig(
         String style = file.selectedWorldStyle();
         if (style != null && !style.isEmpty()) {
             try {
-                selectedStyles = WorldStyleMix.of(DataTools.fromName(style));
+                // The whole spec, not a single id (issue #204): a bare qualified id is a one-entry
+                // mix in this grammar, so every config written before this parses unchanged, and a
+                // modpack can now name a mix here exactly as dimensionsWithPresets already could.
+                // Gated like every other mix, on the value rather than only on the UI.
+                selectedStyles = Config.gateMix(WorldStyleMix.parse(style),
+                        file.experimentalMultiWorldStyles(), "config selectedWorldStyle '" + style + "'");
             } catch (Exception e) {
                 Urbex.getLogger().error("Bad selectedWorldStyle '{}' in config; using '{}'. {}",
                         style, Config.DEFAULT_WORLD_STYLE, e.getMessage());

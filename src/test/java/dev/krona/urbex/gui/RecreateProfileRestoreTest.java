@@ -38,6 +38,32 @@ public class RecreateProfileRestoreTest {
         assertEquals("{\"cities\":{\"cityChance\":0.9}}", pending.orElseThrow().overridesJson());
     }
 
+    /**
+     * Issue #202. {@code UrbexData.setChoice} writes the weighted form to {@code worldStyleMix} and
+     * leaves {@code worldStyle} holding the primary alone, so reading only the latter - which is what
+     * this did - silently collapsed a re-created world from a mix to one style. The read order here
+     * has to be the one {@code UrbexData.getSelectedWorldStyles} already uses.
+     */
+    @Test
+    public void aMixIsReadFromWorldStyleMixRatherThanCollapsingToThePrimary() {
+        CompoundTag data = payload("urbex:default", "urbex:standard", "");
+        data.putString("worldStyleMix", "urbex:standard*0.25+urbexmt:moderntweaks*0.75");
+        CompoundTag root = new CompoundTag();
+        root.put("data", data);
+
+        assertEquals("urbex:standard*0.25+urbexmt:moderntweaks*0.75",
+                RecreateProfileRestore.parse(root).orElseThrow().worldStyle());
+    }
+
+    /** A single-style world writes only the legacy key, and must keep restoring exactly as it did. */
+    @Test
+    public void anAbsentMixFallsBackToTheLegacySingleWorldStyleKey() {
+        CompoundTag root = new CompoundTag();
+        root.put("data", payload("urbex:default", "urbex:lcmt", ""));
+
+        assertEquals("urbex:lcmt", RecreateProfileRestore.parse(root).orElseThrow().worldStyle());
+    }
+
     @Test
     public void emptyPresetMeansNothingToRestore() {
         CompoundTag root = new CompoundTag();

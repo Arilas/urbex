@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+- **The Cities tab no longer shows a selection that is not the one the world will generate with.**
+  Four separate defects shared that shape.
+  - *Customizing a preset appeared to do nothing* (issue #201). The preset list resets its scroll on
+    every rebuild and never scrolled the selected row back into view, and the customized entry was
+    appended last — row 14 of 14 with the shipped presets — so pressing **Done** returned to a list
+    scrolled to the top with the selection off-screen below it. The list now scrolls to whatever is
+    selected, and the customized entry sits directly under the preset it was customized from.
+  - *A customization now says so.* Its row reads `Customized: <preset> *`, the detail panel names
+    the preset it is a modified copy of, and a new **Revert** button drops it — it used to be a
+    one-way door. Leaving the editor with unsaved changes asks before discarding them, and **Reset**
+    now always means the stock preset rather than the last customization.
+  - *Re-Create restores what the world actually had* (issue #202). The saved `worldStyleMix` key was
+    never read, so a re-created world silently collapsed to one style. A chosen style is no longer
+    reset to the default when the world-style registry is momentarily unreadable — which happened on
+    every window resize. And a saved preset the enabled datapacks do not offer now gets a row of its
+    own instead of the tab claiming **Disabled** about a world that was about to have cities.
+  - *Every world records the selection it was created with* (issue #203). A world created from the
+    config's `selectedPreset` recorded nothing, so editing that config later changed what an
+    **existing** world generated — and left Re-Create with nothing to restore. Behaviour change:
+    such a world now freezes the selection on first generation, like one created through the tab.
+
+- **Modpacks can set the Urbex selection and lock it down** (issue #204). `selectedPreset` and
+  `selectedWorldStyle` now drive what the **Cities** tab starts on, not just the server-side
+  fallback, and `selectedWorldStyle` accepts a weighted mix like `dimensionsWithPresets` already
+  did. A new `citiesTabAccess` config option takes `editable` (default), `locked` — the tab renders
+  read-only so players can see the pack's choice — or `hidden`, which removes the tab while the
+  configured selection still generates.
+  - *No worldgen change*: every digest golden is unchanged.
+
 - **City-style edges now belong to individual world-style selectors.** A selector may declare an
   optional `citystyles[].edge` with its edge `citystyle` and spatial `threshold`; both the base and
   edge assets are validated eagerly when the world loads.

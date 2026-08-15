@@ -101,16 +101,52 @@ class WorldStyleSelectionTest {
         assertEquals(WorldStyleMix.parse("urbex:lcmt"), selection.selectedWorldStyles(), "the preset and the style are independent choices");
     }
 
+    /**
+     * A style the registry no longer offers is pruned - but a mix that prunes away to <em>nothing</em>
+     * keeps its primary rather than collapsing to "use the default" (issue #202). The client does not
+     * get to silently rewrite the player's choice into a different one; an id no registry knows is
+     * reported and dropped server-side by {@code Config.buildPresetCache}, where the message is worth
+     * reading.
+     */
     @Test
-    void aRegistryThatDropsTheChosenStyleClearsTheOverride() {
+    void aRegistryThatDropsTheChosenStyleKeepsThePrimaryRatherThanResettingToTheDefault() {
         PresetSelection selection = new PresetSelection();
         selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
         selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
         assertEquals(WorldStyleMix.parse("urbex:lcmt"), selection.selectedWorldStyles());
 
-        // The registry no longer offers "urbex:lcmt": the stale choice must reset to "the default".
         selection.setAvailableWorldStyles(List.of("urbex:standard"));
 
-        assertNull(selection.selectedWorldStyles());
+        assertEquals(WorldStyleMix.parse("urbex:lcmt"), selection.selectedWorldStyles());
+    }
+
+    /** A mix that only partly survives keeps the entries that did - one pack going away costs that
+     *  pack's cities, not the balance set up for the others. */
+    @Test
+    void aPartiallySurvivingMixKeepsTheStylesThatAreStillRegistered() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
+        selection.setWorldStyles(WorldStyleMix.parse("urbex:standard*3+urbex:lcmt*1"));
+
+        selection.setAvailableWorldStyles(List.of("urbex:standard"));
+
+        assertEquals(WorldStyleMix.parse("urbex:standard*3"), selection.selectedWorldStyles());
+    }
+
+    /**
+     * The regression that made a chosen style unstick on its own (issue #202): {@code CitiesTab}
+     * injects {@code Map.of()} whenever the worldstyle registry is not reachable, and this runs on
+     * every tab construction - every window resize included. Treating that as "every style you chose
+     * is invalid" reset the choice to the default and then republished the default on the next click.
+     */
+    @Test
+    void anEmptyInjectedListMeansTheRegistryIsNotReachableAndPrunesNothing() {
+        PresetSelection selection = new PresetSelection();
+        selection.setAvailableWorldStyles(List.of("urbex:standard", "urbex:lcmt"));
+        selection.setWorldStyles(WorldStyleMix.parse("urbex:lcmt"));
+
+        selection.setAvailableWorldStyles(List.of());
+
+        assertEquals(WorldStyleMix.parse("urbex:lcmt"), selection.selectedWorldStyles());
     }
 }

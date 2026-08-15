@@ -23,6 +23,9 @@ import java.util.Optional;
  *        by weight, so cities from several datapacks can share one world. Off by default, and
  *        gating behaviour rather than only the UI: a save or a config line hand-edited to carry a
  *        mix is reduced to its primary style on an install that never opted in.
+ * @param citiesTabAccess how much of the Cities tab a modpack lets its players touch. Pairs with
+ *        {@code selectedPreset} / {@code selectedWorldStyle}, which say what they get when they
+ *        cannot choose - and which are the tab's starting selection when they can.
  */
 public record UrbexConfig(
         List<String> dimensionsWithPresets,
@@ -38,7 +41,8 @@ public record UrbexConfig(
         boolean structuresYieldToCities,
         boolean avoidVillages,
         boolean avoidFlattening,
-        boolean experimentalMultiWorldStyles) {
+        boolean experimentalMultiWorldStyles,
+        CitiesTabAccess citiesTabAccess) {
 
     public static final UrbexConfig DEFAULT = new UrbexConfig(
             List.of(),
@@ -55,7 +59,8 @@ public record UrbexConfig(
             false,
             true,
             true,
-            false);
+            false,
+            CitiesTabAccess.EDITABLE);
 
     public static final Codec<UrbexConfig> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.STRING.listOf().optionalFieldOf("dimensionsWithPresets", DEFAULT.dimensionsWithPresets()).forGetter(UrbexConfig::dimensionsWithPresets),
@@ -71,7 +76,8 @@ public record UrbexConfig(
             Codec.BOOL.optionalFieldOf("structuresYieldToCities", DEFAULT.structuresYieldToCities()).forGetter(UrbexConfig::structuresYieldToCities),
             Codec.BOOL.optionalFieldOf("avoidVillages", DEFAULT.avoidVillages()).forGetter(UrbexConfig::avoidVillages),
             Codec.BOOL.optionalFieldOf("avoidFlattening", DEFAULT.avoidFlattening()).forGetter(UrbexConfig::avoidFlattening),
-            Codec.BOOL.optionalFieldOf("experimentalMultiWorldStyles", DEFAULT.experimentalMultiWorldStyles()).forGetter(UrbexConfig::experimentalMultiWorldStyles)
+            Codec.BOOL.optionalFieldOf("experimentalMultiWorldStyles", DEFAULT.experimentalMultiWorldStyles()).forGetter(UrbexConfig::experimentalMultiWorldStyles),
+            CitiesTabAccess.CODEC.optionalFieldOf("citiesTabAccess", DEFAULT.citiesTabAccess()).forGetter(UrbexConfig::citiesTabAccess)
     ).apply(instance, UrbexConfig::new));
 
     /**
@@ -92,7 +98,8 @@ public record UrbexConfig(
             Codec.BOOL.fieldOf("structuresYieldToCities").forGetter(UrbexConfig::structuresYieldToCities),
             Codec.BOOL.fieldOf("avoidVillages").forGetter(UrbexConfig::avoidVillages),
             Codec.BOOL.fieldOf("avoidFlattening").forGetter(UrbexConfig::avoidFlattening),
-            Codec.BOOL.fieldOf("experimentalMultiWorldStyles").forGetter(UrbexConfig::experimentalMultiWorldStyles)
+            Codec.BOOL.fieldOf("experimentalMultiWorldStyles").forGetter(UrbexConfig::experimentalMultiWorldStyles),
+            CitiesTabAccess.CODEC.fieldOf("citiesTabAccess").forGetter(UrbexConfig::citiesTabAccess)
     ).apply(instance, UrbexConfig::new));
 
     /** Parses a config from JSON; empty if any present key fails validation. */

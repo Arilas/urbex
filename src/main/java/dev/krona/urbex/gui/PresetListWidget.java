@@ -3,8 +3,11 @@ package dev.krona.urbex.gui;
 import dev.krona.urbex.config.Preset;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.ObjectSelectionList;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -48,6 +51,12 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
      */
     private boolean restoringSelection;
 
+    /**
+     * Set when the modpack's {@code citiesTabAccess} is {@code locked}: the rows still render and the
+     * configured choice still shows as selected, but nothing the player does moves it (issue #204).
+     */
+    private boolean locked;
+
     public PresetListWidget(Minecraft minecraft, int width, int height, int y,
                             Consumer<PresetSelection.Entry> onSelectionChanged) {
         super(minecraft, width, height, y, ROW_HEIGHT);
@@ -56,7 +65,18 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
         refreshEntries();
     }
 
-    /** Rebuilds the rows from {@link PresetSelection#CLIENT} and re-selects its current entry. */
+    /**
+     * Rebuilds the rows from {@link PresetSelection#CLIENT}, re-selects its current entry, and
+     * scrolls that entry into view.
+     * <p>
+     * The scroll is not a nicety - it is the fix for issue #201. {@code clearEntries()} clears the
+     * row list <em>and</em> nulls the selection ({@code children.clear(); this.selected = null}), so
+     * the scroll amount clamps back to the top; {@code setSelected} restores the selection state and
+     * moves nothing. Every rebuild therefore showed the top of the list whatever was selected. With
+     * the customized row appended last that put it off-screen on any list too short for all the
+     * rows, so pressing Done in the customize editor looked like it had done nothing at all - and a
+     * Re-Create restore of a preset far down the list looked the same way.
+     */
     public final void refreshEntries() {
         restoringSelection = true;
         try {
@@ -72,9 +92,25 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
             }
             if (toSelect != null) {
                 setSelected(toSelect);
+                scrollSelectionIntoView();
             }
         } finally {
             restoringSelection = false;
+        }
+    }
+
+    /**
+     * Scrolls whatever is selected back into view. A no-op with nothing selected.
+     * <p>
+     * Also called from {@code CitiesTab.doLayout}, because {@link #refreshEntries()} runs from this
+     * widget's constructor - while the list still has its placeholder size - and the real height only
+     * arrives with the first layout. Scrolling once at each is what makes the row actually visible
+     * rather than merely selected.
+     */
+    public void scrollSelectionIntoView() {
+        Row selectedRow = getSelected();
+        if (selectedRow != null) {
+            scrollToEntry(selectedRow);
         }
     }
 
@@ -89,12 +125,33 @@ public class PresetListWidget extends ObjectSelectionList<PresetListWidget.Row> 
     public void setSelected(@Nullable Row row) {
         Row previous = getSelected();
         super.setSelected(row);
-        if (row == null || restoringSelection || row == previous) {
+        if (row == null || restoringSelection || locked || row == previous) {
             return;
         }
         PresetSelection.CLIENT.select(row.entry.id());
         PresetSelection.CLIENT.publish();
         onSelectionChanged.accept(row.entry);
+    }
+
+    /** @see #locked */
+    public void setLocked(boolean locked) {
+        this.locked = locked;
+    }
+
+    /**
+     * Blocked at the input layer as well as in {@link #setSelected}, so a locked list does not even
+     * paint a moving highlight the player cannot commit. Scrolling still works - reading the list is
+     * the whole point of {@code locked} rather than {@code hidden}.
+     */
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        return !locked && super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    @Nullable
+    public ComponentPath nextFocusPath(FocusNavigationEvent event) {
+        return locked ? null : super.nextFocusPath(event);
     }
 
     @Override
