@@ -66,6 +66,17 @@ public final class ChunkGenContext {
     /** The world seed, for the position-addressed picks that resolve palette characters. */
     public final long seed;
 
+    /**
+     * The lowest and highest Y this generation may write at, inclusive.
+     *
+     * <p>The level's own bounds for an ordinary chunk, and a {@link SiteBinding site}'s window when
+     * a caller named one. {@link ChunkBuffer} is what enforces this for driver writes; these two
+     * fields exist because the three deferred queues below <em>bypass</em> the driver - they hand a
+     * callback to the world, later - so the buffer never sees them.</p>
+     */
+    private final int writeMinY;
+    private final int writeMaxY;
+
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
                            PlanningContext provider, Preset profile, ChunkPlan info,
                            LevelTaskQueue levelTasks, TagSnapshot tags) {
@@ -79,14 +90,33 @@ public final class ChunkGenContext {
         this.info = info;
         this.palette = info.getCompiledPalette();
         this.street = info.getCityStyle().getStreetBlock();
+        SiteBinding site = provider.site();
+        this.writeMinY = site != null ? Math.max(site.minY(), region.getMinY()) : region.getMinY();
+        this.writeMaxY = site != null ? Math.min(site.maxY(), region.getMaxY()) : region.getMaxY();
         this.driver = new ChunkDriver();
-        this.driver.setPrimer(region, chunk);
+        this.driver.setPrimer(region, chunk, writeMinY, writeMaxY);
         this.buffers = new NoiseBuffers();
         this.seed = provider.seed();
         this.lightTodo = new LightTodoQueue(coord.chunkX(), coord.chunkZ());
     }
 
+    /**
+     * Whether a deferred write anchored at {@code pos} is inside this generation's window.
+     *
+     * <p>Exact for the block a todo names and approximate for anything the callback touches around
+     * it - the upper half of a door, the block a light is attached to. The queues hold opaque
+     * callbacks, so the anchor is the only thing there is to test. What this buys is that a site
+     * cannot place a chest, a spawner or a light one block outside its window, which is the whole of
+     * what these queues are used for; what it does not buy is a proof about the block beside it.</p>
+     */
+    private boolean inWindow(BlockPos pos) {
+        return pos.getY() >= writeMinY && pos.getY() <= writeMaxY;
+    }
+
     void addLightTodo(BlockPos pos, @Nullable LightPool pool) {
+        if (!inWindow(pos)) {
+            return;
+        }
         lightTodo.add(pos, pool);
     }
 
@@ -99,6 +129,9 @@ public final class ChunkGenContext {
      * todo at the same position replaces the first.
      */
     void addPostTodo(BlockPos pos, Consumer<WorldGenLevel> todo) {
+        if (!inWindow(pos)) {
+            return;
+        }
         postTodo.add(pos, todo);
     }
 
@@ -115,6 +148,9 @@ public final class ChunkGenContext {
      * be run against the next world with the same dimension id.
      */
     public void addLevelTask(BlockPos pos, LevelTaskQueue.Task task) {
+        if (!inWindow(pos)) {
+            return;
+        }
         levelTasks.add(pos, task);
     }
 

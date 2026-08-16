@@ -10,6 +10,7 @@ import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.*;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.PlanningContext;
+import dev.krona.urbex.worldgen.SiteBinding;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
@@ -425,7 +426,13 @@ public class ChunkPlan {
                 candidate.buildingType().getName());
         hasBuilding = override != null || content.hasBuilding();
 
-        groundLevel = override != null ? override.groundLevel() : profile.groundLevel();
+        // A site's ground is wherever the caller said it is, chunk by chunk, in place of the
+        // preset's one fixed number for the whole dimension. The editing override still wins over
+        // both: it is a command naming a height, and it names it for either kind of context.
+        SiteBinding site = provider.site();
+        int plannedGround = site != null ? site.groundY(key.chunkX(), key.chunkZ())
+                : profile.groundLevel();
+        groundLevel = override != null ? override.groundLevel() : plannedGround;
         int wl = profile.seaLevel();
         waterLevel = wl == -1 ? provider.shape().seaLevel() : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();

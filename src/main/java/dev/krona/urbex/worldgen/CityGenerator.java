@@ -201,6 +201,25 @@ public class CityGenerator {
 
         boolean doCity = info.isCity;
 
+        if (!doCity && provider.site() != null) {
+            // A site is sparse, and this is what makes it so. Where the caller's field says there is
+            // nothing, this chunk is left exactly as it was found - no ground cover, no terrain
+            // correction, no scattered building, no bridge scan, no rails, no debris. The driver has
+            // nothing buffered and is never flushed.
+            //
+            // The alternative is what a dimension does: every chunk that is not city is still a
+            // chunk Urbex renders, because outside a city is somewhere it has an opinion about. A
+            // site has no opinion about outside. A bunker layer that ran doNormalChunk would repaint
+            // the world it lives inside - a mod asking for a cavern filled would find its surface
+            // grass replaced, three hundred blocks up, by a pass reading a heightmap that says the
+            // ground is in the cavern.
+            //
+            // Ahead of the structure probe below, which reads the region: there is nothing here for
+            // a village to be avoided by.
+            GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.PROBE, phaseNanos, phaseAlloc);
+            return;
+        }
+
         // Check if there is no village or other structure here. We don't do this for multibuildings because otherwise part of the multibuilding might be cut off
         AvoidChunk avoidChunk = AvoidChunk.NO;
         if (!info.multiBuildingPos.isMulti()) {

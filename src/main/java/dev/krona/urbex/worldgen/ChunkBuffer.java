@@ -67,6 +67,20 @@ final class ChunkBuffer {
     private final int originX;
     private final int originZ;
     /**
+     * The lowest and highest Y this buffer will accept a block at, inclusive.
+     *
+     * <p>Ordinarily the level's own bounds, in which case these reject nothing. A
+     * {@link SiteBinding site} narrows them to its window, and this is where that window stops being
+     * a convention and becomes a guarantee: every driver write in the mod passes through
+     * {@link #set}, {@link #fill} or {@link #fillWhere}, so a pass that believes it may build to the
+     * sky writes nothing above the window whatever it believes. The alternative - clamping at each
+     * of the eighteen generation passes - is a rule someone has to keep, and the nineteenth pass
+     * breaks it silently, in a world nobody is looking at, hundreds of blocks from the caller who
+     * asked for a bunker.</p>
+     */
+    private final int writeMinY;
+    private final int writeMaxY;
+    /**
      * One slot per section, filled on first write to that section.
      *
      * <p>Lazily, and that is the point: a chunk touches a handful of the level's 24 sections, but
@@ -80,14 +94,35 @@ final class ChunkBuffer {
     /** Reused by {@link #fillWhere}'s fallback read; created on first use, never escapes. */
     private BlockPos.MutableBlockPos scratch;
 
+    /** A buffer that will write anywhere in the level. */
     ChunkBuffer(WriteLog log, WorldView world, int minY, int maxY, int originX, int originZ) {
+        this(log, world, minY, maxY, originX, originZ, minY, maxY - 1);
+    }
+
+    /**
+     * @param minY      the level's lowest block Y, which sizes the section table
+     * @param maxY      one past the level's highest block Y, likewise
+     * @param writeMinY the lowest Y this buffer accepts a write at, inclusive
+     * @param writeMaxY the highest Y this buffer accepts a write at, inclusive
+     */
+    ChunkBuffer(WriteLog log, WorldView world, int minY, int maxY, int originX, int originZ,
+                int writeMinY, int writeMaxY) {
         this.log = log;
         this.world = world;
         this.minY = minY;
         this.sections = (maxY - minY) / SECTION_HEIGHT;
         this.originX = originX;
         this.originZ = originZ;
+        // Intersected with the level rather than trusted: a caller may name a window wider than the
+        // dimension, and the section table is sized for the dimension.
+        this.writeMinY = Math.max(writeMinY, minY);
+        this.writeMaxY = Math.min(writeMaxY, maxY - 1);
         this.cache = new Section[sections];
+    }
+
+    /** Whether this buffer will accept a write at {@code y}. */
+    private boolean inWindow(int y) {
+        return y >= writeMinY && y <= writeMaxY;
     }
 
     /** The section holding {@code y}, created if this is the first write to it. */
@@ -110,7 +145,7 @@ final class ChunkBuffer {
      * call site is what stopped bulk fills placing literal {@code structure_void} blocks.</p>
      */
     void set(int x, int y, int z, BlockState state) {
-        if (isTransparent(state)) {
+        if (isTransparent(state) || !inWindow(y)) {
             return;
         }
         int idx = index(x, y, z);
@@ -127,7 +162,9 @@ final class ChunkBuffer {
         if (isTransparent(state)) {
             return;
         }
-        for (int y = y1; y <= y2; y++) {
+        // Clamped once rather than tested per block: a run reaching from a cellar floor to a roof
+        // crosses the window boundary at most twice, and the loop is hot.
+        for (int y = Math.max(y1, writeMinY), top = Math.min(y2, writeMaxY); y <= top; y++) {
             int idx = index(x, y, z);
             Section section = sectionFor(y);
             if (section.blocks[idx] != state) {
@@ -149,7 +186,7 @@ final class ChunkBuffer {
         if (isTransparent(state)) {
             return;
         }
-        for (int y = y1; y <= y2; y++) {
+        for (int y = Math.max(y1, writeMinY), top = Math.min(y2, writeMaxY); y <= top; y++) {
             int idx = index(x, y, z);
             Section section = sectionFor(y);
             BlockState existing = section.blocks[idx];
@@ -202,6 +239,15 @@ final class ChunkBuffer {
      * chunk - 4096 slots of terrain rewritten with the values they already had (issue #52).</p>
      */
     void remember(int x, int y, int z, BlockState state) {
+        // Windowed too, though a remembered block is a read rather than a write. A section that
+        // straddles the boundary is flushed in full once anything inside the window writes to it,
+        // and every non-null slot in a flushed section is copied out - so an out-of-window slot
+        // holding a remembered value would be written back to the world. Harmless today, because
+        // what it writes back is what the world already holds; not something the window's guarantee
+        // should rest on. Dropping it costs a re-read at most.
+        if (!inWindow(y)) {
+            return;
+        }
         sectionFor(y).blocks[index(x, y, z)] = state;
     }
 

@@ -40,8 +40,12 @@ import javax.annotation.Nullable;
  * @param worldStyles which world style governs where, when the world mixes several.
  * @param roadField   where the roads are: a pure function of seed, dimension id and grid settings.
  * @param caches      the per-dimension memo tables. Every entry is a pure function of the above.
- * @param shape       how deep and how high the dimension goes, and where its water sits.
+ * @param shape       how deep and how high the dimension goes, and where its water sits. Clamped to
+ *                    the window when this context belongs to a {@code site}.
  * @param terrain     the ground height and the biome, sampled without reading a block.
+ * @param site        null for a level planning for itself, which is every chunk Urbex generates on
+ *                    its own behalf. Non-null when another mod asked for this patch of city and
+ *                    answers three of planning's inputs itself; see {@link SiteBinding}.
  */
 public record PlanningContext(
         long seed,
@@ -52,7 +56,21 @@ public record PlanningContext(
         RoadField roadField,
         DimensionCaches caches,
         LevelShape shape,
-        TerrainSampler terrain) {
+        TerrainSampler terrain,
+        @Nullable SiteBinding site) {
+
+    /**
+     * A context for a level planning on its own behalf.
+     *
+     * <p>Every caller that existed before sites did builds one of these, and none of them had to
+     * change: a site is an addition to what a planning context can be, not a new argument every
+     * composition root has to have an opinion about.</p>
+     */
+    public PlanningContext(long seed, ResourceKey<Level> dimension, Preset preset,
+                           AssetSnapshot assets, WorldStyleField worldStyles, RoadField roadField,
+                           DimensionCaches caches, LevelShape shape, TerrainSampler terrain) {
+        this(seed, dimension, preset, assets, worldStyles, roadField, caches, shape, terrain, null);
+    }
 
     /**
      * The heightmap at {@code coord}. Shared and not to be written to - see
