@@ -9,6 +9,7 @@ import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.BulkSectionAccess;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -432,6 +433,41 @@ public class ChunkDriver {
             buffer.remember(p.getX(), p.getY(), p.getZ(), state);
         }
         return state;
+    }
+
+    /**
+     * Whether every block in the section holding {@code y} is air, in this column's chunk.
+     *
+     * <p>For a caller scanning down a column looking for the first non-air block. Answering yes
+     * means the next sixteen levels can be stepped over without reading any of them, which is worth
+     * a great deal here: {@link #getBlock(BlockPos)} misses go to {@code region.getBlockState} and
+     * then {@code remember} them, and remembering the first block of a section allocates a
+     * {@code BlockState[4096]} for it. A scan that starts at the build limit therefore pays a world
+     * read and, once per section, a 32 KiB allocation, to discover a couple of hundred blocks of air
+     * above the terrain - per column, 256 times a chunk.</p>
+     *
+     * <p>Conservative in both directions. The buffer must not have touched the section, because a
+     * write or a remembered block makes the buffer the authority and the world's own section stale;
+     * and only <em>air</em> counts, not the wider "empty" that includes water and lava, because
+     * {@code hasOnlyAir} is what the section can answer without being walked. A section this says no
+     * about is simply scanned block by block as before, so a wrong-but-conservative answer costs
+     * time rather than correctness.</p>
+     */
+    public boolean sectionIsAllAir(int y) {
+        if (primer == null || !buffer.sectionUntouched(y)) {
+            return false;
+        }
+        int index = primer.getSectionIndex(y);
+        LevelChunkSection[] sections = primer.getSections();
+        if (index < 0 || index >= sections.length) {
+            return false;
+        }
+        return sections[index].hasOnlyAir();
+    }
+
+    /** The lowest {@code y} in the section holding {@code y}. @see #sectionIsAllAir */
+    public int sectionBottomAt(int y) {
+        return buffer.sectionBottom(y);
     }
 
     public LevelAccessor getRegion() {
