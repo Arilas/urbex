@@ -233,11 +233,11 @@ public class CityGenerator {
         phaseNanos = GenerationMetrics.mark();
         phaseAlloc = GenerationMetrics.allocMark();
         if (doCity) {
-            doCityChunk(ctx, info, heightmap, chunk);
+            doCityChunk(ctx, info, heightmap, chunk, ordinal);
             GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY, phaseNanos, phaseAlloc);
         } else {
             // We already have a prefilled core chunk (as generated from doCoreChunk)
-            doNormalChunk(ctx, info, heightmap, avoidChunk);
+            doNormalChunk(ctx, info, heightmap, avoidChunk, ordinal);
             // Counted apart from CITY rather than together with it: the two are alternatives, and a
             // combined figure would average a city chunk with a field and describe neither. Their
             // sample counts also say how much of the window is city at all, which is the number that
@@ -420,15 +420,25 @@ public class CityGenerator {
         return holder[0];
     }
 
-    private void doNormalChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, AvoidChunk avoidChunk) {
+    private void doNormalChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, AvoidChunk avoidChunk,
+                               long ordinal) {
 //        debugClearChunk(chunkX, chunkZ, primer);
+        long phaseNanos = GenerationMetrics.mark();
+        long phaseAlloc = GenerationMetrics.allocMark();
         if ((avoidChunk != AvoidChunk.YES || !Config.avoidFlattening()) && profile.isDefault()) {
             Terrain.correctTerrainShape(ctx, this, info.coord, heightmap);
 //            flattenChunkToCityBorder(chunkX, chunkZ);
         }
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.TERRAIN_SHAPE, phaseNanos, phaseAlloc);
 
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         Bridges.generateBridges(ctx, this, info);
         Highways.generateHighways(ctx, this, info);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.TERRAIN_LINKS, phaseNanos, phaseAlloc);
+
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
 
         // Drawn at the scatter area's own anchor, so every chunk of one area agrees about which
         // pack's structure stands there - the same rule Scattered already applies to the reference
@@ -440,6 +450,7 @@ public class CityGenerator {
                 Scattered.generateScattered(ctx, this, info, scatteredSettings);
             }
         }
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.TERRAIN_SCATTERED, phaseNanos, phaseAlloc);
     }
 
     public String getRandomPart(ChunkGenContext ctx, List<String> parts) {
@@ -464,10 +475,13 @@ public class CityGenerator {
     }
 
     // Return true if state is Empty or Plant based - stops (most) funny tree/mushroom action on chunk borders
-    private void doCityChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, ChunkAccess chunk) {
+    private void doCityChunk(ChunkGenContext ctx, ChunkPlan info, ChunkHeightmap heightmap, ChunkAccess chunk,
+                             long ordinal) {
         ChunkDriver driver = ctx.driver;
         boolean building = info.hasBuilding;
 
+        long phaseNanos = GenerationMetrics.mark();
+        long phaseAlloc = GenerationMetrics.allocMark();
         if (info.profile.isDefault()) {
             int minHeight = info.provider.shape().minY();
             BlockState bedrock = Blocks.BEDROCK.defaultBlockState();
@@ -487,8 +501,12 @@ public class CityGenerator {
             }
         }
 
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY_BEDROCK, phaseNanos, phaseAlloc);
+
         // City surface leveling - for prettier cities
         // Note: Better results may be achieved with terrain noise adjustment (like how newer structures do it)
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         if (profile.isDefault()) {
             int ground = info.getCityGroundLevel();
             for (int x = 0; x < 16; x++) {
@@ -500,13 +518,20 @@ public class CityGenerator {
                 }
             }
         }
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY_LEVEL, phaseNanos, phaseAlloc);
 
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         if (building) {
             generateBuilding(ctx, info, heightmap, chunk);
+            GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY_BUILDING, phaseNanos, phaseAlloc);
         } else {
             Streets.generateStreet(ctx, this, info, heightmap);
+            GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY_STREET, phaseNanos, phaseAlloc);
         }
 
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         if (info.profile.ruinChance() > 0.0) {
             decorations.ruins(ctx, this, info);
         }
@@ -529,8 +554,12 @@ public class CityGenerator {
                 decorations.rubble(ctx, this, info);
             }
         }
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY_DECOR, phaseNanos, phaseAlloc);
 
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         Stuff.generateStuff(ctx, this, info);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY_STUFF, phaseNanos, phaseAlloc);
     }
 
     public enum HardAirSetting {

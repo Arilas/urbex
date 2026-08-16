@@ -167,6 +167,26 @@ final class ChunkBuffer {
         }
     }
 
+    /**
+     * Whether this buffer has never touched the section holding {@code y} - neither written to it
+     * nor remembered a world block in it.
+     *
+     * <p>Both count, and they are the same test because both go through {@link #sectionFor}: a
+     * remembered block is a block this buffer is now the authority on, so a caller cannot conclude
+     * anything about the section from the world alone once one is in there. Out-of-range y answers
+     * false rather than throwing - the caller is scanning and a coordinate past the world is simply
+     * not skippable.</p>
+     */
+    boolean sectionUntouched(int y) {
+        int index = (y - minY) / SECTION_HEIGHT;
+        return index >= 0 && index < sections && cache[index] == null;
+    }
+
+    /** The lowest {@code y} in the section holding {@code y}. */
+    int sectionBottom(int y) {
+        return minY + ((y - minY) / SECTION_HEIGHT) * SECTION_HEIGHT;
+    }
+
     /** What this buffer holds at a position, or null if it has never seen it. */
     @Nullable
     BlockState get(int x, int y, int z) {

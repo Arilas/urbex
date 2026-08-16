@@ -244,6 +244,27 @@ public class Terrain {
         int maxYTouched = Short.MIN_VALUE;       // Max Y that we touched
         int y = maxBuildLimit-1;
         driver.current(x, y, z);
+        // Step over whole sections of nothing but air before reading a single block.
+        //
+        // The scan below starts at the build limit and walks down to the first non-empty block, so
+        // on ordinary terrain it reads a couple of hundred blocks of sky per column, 256 columns a
+        // chunk. Each of those reads misses the buffer, goes to the world, and gets remembered -
+        // and remembering the first block of a section allocates a BlockState[4096] for it. So the
+        // sky above a city was costing tens of thousands of world reads and several hundred KiB per
+        // chunk, to establish that it is air.
+        //
+        // Exactly equivalent, not approximately: every block in a skipped section is air, air is
+        // empty, so the loop below would have stepped through all sixteen and stopped nowhere. A
+        // section is only skipped when it lies wholly above `height`, so the loop still stops at
+        // `height` on a column that is empty all the way down - which is the "nothing to do" case
+        // immediately after.
+        while (driver.getY() > height) {
+            int bottom = driver.sectionBottomAt(driver.getY());
+            if (bottom <= height || !driver.sectionIsAllAir(driver.getY())) {
+                break;
+            }
+            driver.current(x, bottom - 1, z);
+        }
         // We assume here we are not in a void chunk
         while (CityGenerator.isEmpty(driver.getBlock()) && driver.getY() > height) {
             driver.decY();
