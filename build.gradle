@@ -282,8 +282,18 @@ loom {
             if (project.hasProperty('urbexDigestVmArgs')) {     // see the note above `runs`
                 project.property('urbexDigestVmArgs').split(';').each { vmArg it }
             }
+            // -PurbexSoakOffset moves the window off the origin, which is how a divergence found at
+            // radius 40 gets a reproducer small enough to iterate on. The window is a square centred
+            // on (offset, offset), so covering a particular chunk means choosing both.
             def radius = project.hasProperty('urbexSoakRadius') ? project.property('urbexSoakRadius') : '40'
-            vmArg "-Durbex.digestCheck=${radius},rowmajor,0"
+            def offset = project.hasProperty('urbexSoakOffset') ? project.property('urbexSoakOffset') : '0'
+            vmArg "-Durbex.digestCheck=${radius},rowmajor,${offset}"
+            // The one gated window that was not gated. UnsafeReadGateMixin is a no-op unless this
+            // property is set, so every `unsafeReads=0` this run has ever printed was a switched-off
+            // counter rather than a measurement - and this is the only configuration large enough to
+            // exercise the cross-chunk class it guards. Switched on and measured before being added:
+            // radius 40 reports zero, so Urbex talks to no neighbour at any scale the suite covers.
+            vmArg '-Durbex.digestCheck.failOnUnsafeRead'
         }
         // The two structure-avoidance branches the window above does not reach. Measured on that
         // window: all 108 of its suppressed chunks come from the village *tag* test, and turning

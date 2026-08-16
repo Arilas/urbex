@@ -100,6 +100,18 @@ public final class DigestCheck {
                 String driverLine = result.driverLine(spec.order(), spec.offset());
                 Urbex.getLogger().info(driverLine);
                 System.out.println(driverLine);
+                // The whole-world hash, beside the driver's. Computed on every run since this check
+                // existed and printed on none of them, which cost more than it saved: the two
+                // disagree in a way that localises a fault. DRIVERDIGEST is what the mod says it
+                // wrote plus block entities read back from the live world; DIGEST is every non-air
+                // block actually in the chunks. A run where DRIVERDIGEST moves and DIGEST does not
+                // has a bookkeeping fault rather than a generation one, and until now there was no
+                // way to tell those apart (issue #207). Not a gate - it hashes vanilla decoration
+                // too, whose border bleed is pipeline-timing dependent by design - so it is
+                // reported and never compared.
+                String fullLine = result.fullLine(spec.order(), spec.offset());
+                Urbex.getLogger().info(fullLine);
+                System.out.println(fullLine);
                 Urbex.getLogger().info(result.perfLine());
                 System.out.println(result.perfLine());
 

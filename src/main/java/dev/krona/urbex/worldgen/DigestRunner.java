@@ -208,8 +208,19 @@ public final class DigestRunner {
                 java.util.Arrays.sort(sortedWrites);
                 for (long packed : sortedWrites) {
                     mutable.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
-                    dump.printf("%d %d %d %s%n", mutable.getX(), mutable.getY(), mutable.getZ(),
-                            ChunkDriver.recordedState(pos, packed));
+                    // The block entity too, because the dump is only useful for chasing a digest
+                    // mismatch and this is the one input to that digest the dump used to omit -
+                    // which made a run whose states were identical and whose digest was not look
+                    // like a contradiction rather than a localisation (issue #207). Printed exactly
+                    // as it is hashed, including the live-world read and the null case, so a diff of
+                    // two dumps names the position and the difference.
+                    BlockState dumpedState = ChunkDriver.recordedState(pos, packed);
+                    BlockEntity dumped = recordedEntityStillThere(level, mutable, dumpedState)
+                            ? level.getBlockEntity(mutable)
+                            : null;
+                    dump.printf("%d %d %d %s%s%n", mutable.getX(), mutable.getY(), mutable.getZ(),
+                            dumpedState,
+                            dumped == null ? "" : " BE=" + dumped.saveWithFullMetadata(level.registryAccess()));
                 }
             }
         }
@@ -379,8 +390,29 @@ public final class DigestRunner {
      * overwrites border columns in pipeline-timing-dependent order, and a digest reading the
      * final world would measure vanilla's scheduling rather than this mod's output. A position
      * overwritten several times by the driver contributes its last state exactly once, so two
-     * runs that reach the same blocks by different internal paths agree. Block entities are
-     * still read from the world; ores cannot replace containers, so those positions are stable.
+     * runs that reach the same blocks by different internal paths agree.
+     *
+     * <h2>Block entities, and the hole that used to be here</h2>
+     *
+     * <p>Block entities are the one thing this cannot capture at write time - the driver records a
+     * {@link BlockState}, and the entity behind it is only assembled once the chunk is real - so
+     * they are read back from the live world. That read used to be unconditional, defended by "ores
+     * cannot replace containers, so those positions are stable". The reasoning was about vanilla
+     * <em>replacing</em> something this mod placed. What actually happened was vanilla
+     * <em>adding</em> one where this mod had placed none (issue #207).</p>
+     *
+     * <p>A pale oak from a neighbouring chunk's feature pass put a {@code creaking_heart} at a
+     * position this mod had written {@code air} to. {@link net.minecraft.world.level.Level
+     * #getBlockEntity} creates an entity for whatever the live block is, so the hash picked one up
+     * in some runs and not others - from a feature that lands on a border column in an order the
+     * chunk pipeline does not fix. Every recorded state in the window was identical across those
+     * runs; one block entity was not, and the digest moved. That is precisely the vanilla scheduling
+     * this method's first paragraph exists to keep out, readmitted through the one door left open.
+     *
+     * <p>So the entity is hashed only where this mod's own recorded state carries one, and only
+     * while the live block is still that block. Loot chests and spawners - the entities Urbex
+     * actually places, and the only ones a digest of Urbex's output should describe - are covered
+     * exactly as before. Anything vanilla adds afterwards at a position this mod wrote is not.</p>
      */
     private static long hashDriverWrites(ServerLevel level, ChunkPos chunkPos, long[] written, long digest) {
         BlockPos.MutableBlockPos mutable = new BlockPos.MutableBlockPos();
@@ -389,12 +421,33 @@ public final class DigestRunner {
             digest = hashLong(digest, packed);
             BlockState recorded = ChunkDriver.recordedState(chunkPos, packed);
             digest = hashString(digest, recorded == null ? "null" : recorded.toString());
-            BlockEntity be = level.getBlockEntity(mutable);
+            BlockEntity be = recordedEntityStillThere(level, mutable, recorded)
+                    ? level.getBlockEntity(mutable)
+                    : null;
             if (be != null) {
                 digest = hashString(digest, be.saveWithFullMetadata(level.registryAccess()).toString());
             }
         }
         return digest;
+    }
+
+    /**
+     * Whether the block entity at {@code pos} is one this mod's own write put there.
+     *
+     * <p>Two conditions, and both are needed. The recorded state must carry an entity at all -
+     * otherwise anything found live arrived after this mod wrote, which is the {@code creaking_heart}
+     * case. And the live block must still be that block - otherwise this mod's chest was overwritten
+     * by something else with an entity of its own, and hashing that would measure the overwriter.</p>
+     *
+     * <p>Deliberately compares the block rather than the whole state: a chest whose {@code facing} or
+     * waterlogging vanilla adjusted is still this mod's chest, and the state itself is already hashed
+     * from the write-time record on the line above.</p>
+     */
+    private static boolean recordedEntityStillThere(ServerLevel level, BlockPos pos,
+                                                    @javax.annotation.Nullable BlockState recorded) {
+        return recorded != null
+                && recorded.hasBlockEntity()
+                && level.getBlockState(pos).is(recorded.getBlock());
     }
 
     private static long hashChunk(ServerLevel level, ChunkPos pos, long digest) {
