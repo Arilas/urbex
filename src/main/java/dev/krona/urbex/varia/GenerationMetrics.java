@@ -88,6 +88,24 @@ public final class GenerationMetrics {
         CITY,
         /** {@code doNormalChunk}: the terrain a non-city chunk gets instead. */
         TERRAIN,
+        /** Inside {@code CITY}: the bedrock floor and the high-water fill. */
+        CITY_BEDROCK,
+        /** Inside {@code CITY}: surface levelling - 256 columns through {@code Terrain.moveDown/moveUp}. */
+        CITY_LEVEL,
+        /** Inside {@code CITY}: the building itself, for a chunk that has one. */
+        CITY_BUILDING,
+        /** Inside {@code CITY}: the street, for a chunk that has no building. */
+        CITY_STREET,
+        /** Inside {@code CITY}: ruins, street decorations, highways and rubble. */
+        CITY_DECOR,
+        /** Inside {@code CITY}: {@code Stuff.generateStuff}. */
+        CITY_STUFF,
+        /** Inside {@code TERRAIN}: {@code correctTerrainShape} - the same 256-column scan as {@code CITY_LEVEL}. */
+        TERRAIN_SHAPE,
+        /** Inside {@code TERRAIN}: bridges and highways. */
+        TERRAIN_LINKS,
+        /** Inside {@code TERRAIN}: scattered structures. */
+        TERRAIN_SCATTERED,
         /** Railways, their dungeons, and the building-collision test that can cancel them. */
         RAIL,
         /** The deferred optional lights, planned and placed. */
