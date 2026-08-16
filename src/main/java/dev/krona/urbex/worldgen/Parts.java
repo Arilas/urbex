@@ -388,7 +388,7 @@ public class Parts {
     public static Identifier getRandomSpawnerMob(Level world, RandomSource random, PlanningContext diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();
         Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
-        int level = (pos.getY() - diminfo.preset().groundLevel()) / CityGenerator.FLOORHEIGHT;
+        int level = (pos.getY() - diminfo.baseGroundLevel()) / CityGenerator.FLOORHEIGHT;
         int floor = (pos.getY() - info.getCityGroundLevel()) / CityGenerator.FLOORHEIGHT;
         String belowFloor = ConditionContext.NO_PART;
         ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
@@ -423,7 +423,7 @@ public class Parts {
         if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
             if (todo != null) {
                 String lootTable = todo.getCondition();
-                int level = (pos.getY() - diminfo.preset().groundLevel()) / CityGenerator.FLOORHEIGHT;
+                int level = (pos.getY() - diminfo.baseGroundLevel()) / CityGenerator.FLOORHEIGHT;
                 int floor = (pos.getY() - info.getCityGroundLevel()) / CityGenerator.FLOORHEIGHT;
                 ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
                         todo.getPart(), ConditionContext.NO_PART, todo.getBuilding(), info.coord) {

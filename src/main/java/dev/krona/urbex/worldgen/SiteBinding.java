@@ -48,9 +48,39 @@ public record SiteBinding(Identifier id, SiteField field, int minY, int maxY) {
         }
     }
 
-    /** The site's ground level at a coordinate; see {@link SiteField#groundY}. */
-    public int groundY(int chunkX, int chunkZ) {
-        return field.groundY(chunkX, chunkZ);
+    /**
+     * Which six-block band above {@link #minY} this chunk's ground sits in.
+     *
+     * <p><strong>This, and not the ground level, is how a site's height reaches planning.</strong>
+     * The distinction is not a detail. {@code cityLevel} is the number every height comparison in
+     * Urbex is written against - whether a doorway can be cut through a shared wall, whether a
+     * street may slope, which of two stairs wins, whether a bridge has anything to land on. A
+     * dimension's {@code groundLevel} is one constant for the whole world, so all of the variation
+     * lives in {@code cityLevel} and those comparisons are total.</p>
+     *
+     * <p>Putting a site's per-chunk height in {@code groundLevel} instead left every one of them
+     * reading {@code cityLevel == 0} for two chunks twenty blocks apart, concluding they were level,
+     * and cutting doors between them accordingly. The height has to travel down the channel built to
+     * carry it.</p>
+     *
+     * <p>The cost is that a site's ground is quantised to {@link CityGenerator#FLOORHEIGHT}, which
+     * is what {@link SiteField#groundY} documents. That is not an arbitrary rounding: six blocks is
+     * a storey, and a city whose grounds differ by less than one storey has no way to say so.</p>
+     */
+    public int cityLevelAt(int chunkX, int chunkZ) {
+        return Math.floorDiv(field.groundY(chunkX, chunkZ) - minY, CityGenerator.FLOORHEIGHT);
+    }
+
+    /**
+     * The Y this chunk's ground floor actually sits at: {@link SiteField#groundY} snapped down to
+     * the storey lattice rising from {@link #minY}.
+     *
+     * <p>What the terrain sampler reports and what the buildings stand on, so the two cannot
+     * disagree - a heightmap saying one thing while {@code getCityGroundLevel()} says another is a
+     * building floating over its own corrected terrain, or buried in it.</p>
+     */
+    public int effectiveGroundY(int chunkX, int chunkZ) {
+        return minY + cityLevelAt(chunkX, chunkZ) * CityGenerator.FLOORHEIGHT;
     }
 
     /** Whether the site covers a coordinate; see {@link SiteField#isSite}. */

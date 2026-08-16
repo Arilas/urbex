@@ -53,6 +53,13 @@ public interface SiteField {
      * {@link UrbexApi#DEFAULT_GROUND_Y}, which suits a fixed-depth layer; override it for a field
      * whose depth varies.</p>
      *
+     * <p><strong>Snapped down to a multiple of six above the window's bottom.</strong> Six blocks is
+     * a storey, and it is the unit every height comparison in Urbex counts in - whether a doorway
+     * can be cut through a shared wall, whether a street may slope, which of two competing stairs
+     * wins. Two parts of a site whose grounds differ by less than one storey have no way to say so
+     * to each other, so a value between two storeys is rounded rather than half-honoured. Return
+     * multiples of six above {@code minY} and nothing is lost.</p>
+     *
      * <p>Only consulted where {@link #isSite} answers {@code true}, but it must still be pure and
      * total: a chunk on the edge of a site reads its neighbours' ground to decide whether a street
      * can slope and where a stair goes.</p>

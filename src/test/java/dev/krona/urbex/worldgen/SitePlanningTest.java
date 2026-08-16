@@ -46,9 +46,10 @@ class SitePlanningTest {
 
         @Override
         public int groundY(int chunkX, int chunkZ) {
-            // Varying by coordinate on purpose: a constant would pass even if the code read the
-            // preset's single ground level and ignored the field.
-            return -30 + chunkX;
+            // Varying by coordinate on purpose, and by whole storeys: a constant would pass even if
+            // the code read the preset's single ground level and ignored the field, and a sub-storey
+            // step would only prove the rounding.
+            return -30 + 6 * chunkX;
         }
     };
 
@@ -91,22 +92,61 @@ class SitePlanningTest {
         PlanningContext site = planning(binding());
 
         assertEquals(-30, site.heightmap(0, 0).getHeight());
-        assertEquals(-29, site.heightmap(1, 0).getHeight(),
+        assertEquals(-24, site.heightmap(1, 0).getHeight(),
                 "the ground follows the field's coordinate, not one number for the dimension");
     }
 
     /**
-     * The nine bands raise a city six blocks at a time as the terrain under it climbs. A site's
-     * ground is already exact, so banding it again would lift every building off the floor the
-     * caller named, in multiples of six, for no reason visible from outside.
+     * The bug this exists to prevent: a site's per-chunk height must travel in {@code cityLevel},
+     * because that is the number every height comparison in Urbex is written against. With the
+     * height in {@code groundLevel} and {@code cityLevel} pinned to 0, two chunks a storey apart
+     * both reported level 0, {@code Doors.hasConnectionToTopOrOutside} concluded they were level,
+     * and a door was cut between a floor and the wall beside it.
      */
     @Test
-    void aSiteHasNoHeightBands() {
+    void aSitesHeightTravelsInTheCityLevel() {
+        PlanningContext site = planning(binding());
+
+        // The window's bottom is -60, so ground -30 is five storeys up and -24 is six.
+        assertEquals(5, CityField.getCityLevel(new ChunkCoord(Level.OVERWORLD, 0, 0), site));
+        assertEquals(6, CityField.getCityLevel(new ChunkCoord(Level.OVERWORLD, 1, 0), site));
+        assertEquals(5, CityField.cityLevelUncached(new ChunkCoord(Level.OVERWORLD, 0, 0), site));
+    }
+
+    /**
+     * And the two halves must agree: {@code groundLevel + cityLevel * 6} is what buildings stand on,
+     * and the heightmap is what the terrain under them is corrected to.
+     */
+    @Test
+    void theGroundABuildingStandsOnIsTheGroundTheTerrainIsCorrectedTo() {
         PlanningContext site = planning(binding());
         ChunkCoord coord = new ChunkCoord(Level.OVERWORLD, 0, 0);
 
-        assertEquals(0, CityField.getCityLevel(coord, site));
-        assertEquals(0, CityField.cityLevelUncached(coord, site));
+        int base = site.baseGroundLevel();
+        int cityGround = base + CityField.getCityLevel(coord, site) * CityGenerator.FLOORHEIGHT;
+
+        assertEquals(-60, base, "a site's base is its window's bottom, not the preset's ground");
+        assertEquals(site.heightmap(0, 0).getHeight(), cityGround);
+    }
+
+    /** Six blocks is a storey, and a site cannot express a step smaller than one. */
+    @Test
+    void aGroundBetweenTwoStoreysIsSnappedDown() {
+        SiteBinding binding = new SiteBinding(Identifier.fromNamespaceAndPath("urbextest", "odd"),
+                new SiteField() {
+                    @Override
+                    public boolean isSite(int chunkX, int chunkZ) {
+                        return true;
+                    }
+
+                    @Override
+                    public int groundY(int chunkX, int chunkZ) {
+                        return -27;     // four blocks above the -31 storey line, not six
+                    }
+                }, -60, 0);
+
+        assertEquals(5, binding.cityLevelAt(0, 0));
+        assertEquals(-30, binding.effectiveGroundY(0, 0));
     }
 
     @Test
@@ -119,7 +159,7 @@ class SitePlanningTest {
                 new ChunkCoord(Level.OVERWORLD, 9, 9), site);
 
         assertTrue(inside.isCity());
-        assertEquals(0, inside.cityLevel());
+        assertEquals(5, inside.cityLevel(), "ground -30 is five storeys above the window's -60");
         assertFalse(outside.isCity());
     }
 
@@ -135,7 +175,7 @@ class SitePlanningTest {
         ChunkCoord coord = new ChunkCoord(Level.OVERWORLD, 0, 0);
 
         assertNotSame(level.caches(), site.caches());
-        assertEquals(0, CityField.getCityLevel(coord, site));
+        assertEquals(5, CityField.getCityLevel(coord, site));
         assertEquals(0, level.caches().cityLevel.size(),
                 "asking the site did not populate the level's cache");
     }

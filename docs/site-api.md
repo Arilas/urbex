@@ -100,9 +100,27 @@ callback touches around that block — the upper half of a door, the block a lig
 Leave room. The window bounds planning as well as writing, so a window ten blocks tall does not
 produce a squashed building, it produces a building with no floors in it.
 
+It is also the only ceiling Urbex knows about. If your sites are chambers of differing heights, a
+fixed window can only be tight for one of them, and every site with headroom to spare will plan a
+building taller than its own chamber and drive the excess into the rock. Carve your roofs *to the
+window* rather than to a fixed clearance above each floor, and the two agree at every depth at once —
+`Urbex-Bunkers` does exactly this, and the comment on its `WINDOW_MAX_Y` explains why the obvious
+alternative does not work.
+
 One consequence worth knowing: because the window is absolute, a site and the surface city
 **commute**. It does not matter which of them runs first, so you need not reason about mixin priority
 against Urbex's own hook.
+
+## Ground height is quantised to six blocks
+
+`SiteField.groundY` is snapped down to a multiple of six above the window's bottom. Six blocks is a
+storey, and it is the unit Urbex's whole height graph counts in: internally a site's ground becomes
+`cityLevel`, the number every height comparison is written against — whether a doorway can be cut
+through a shared wall, whether a street may slope, which of two competing stairs wins.
+
+Return multiples of six above `minY` and nothing is lost. Return anything else and it is rounded,
+because two parts of a site whose grounds differ by less than a storey have no way to say so to each
+other.
 
 ## Water
 
@@ -136,8 +154,8 @@ the first.
 | | A dimension | A site |
 |---|---|---|
 | Where the city is | perlin city field vs. threshold | `SiteField.isSite` |
-| Ground level | the preset's, one number for the dimension | `SiteField.groundY`, per chunk |
-| City height band | 0–8, from the terrain height | always 0 — the ground is already exact |
+| Ground level | the preset's, one number for the dimension | the window's bottom, one number for the site |
+| City height band | 0–8, from the terrain height | `(groundY − minY) / 6`, from `SiteField.groundY` |
 | A non-city chunk | rendered: ground cover, terrain fix, scattered buildings | **untouched** |
 | Structure avoidance | a village suppresses the city here | not applied; you named the place |
 | Water | the preset's sea level, else the dimension's | `waterY`, and dry by default |
@@ -191,5 +209,7 @@ public final class MyMod implements ModInitializer {
 | Streets end in rock, doorways open into stone | the field is not pure or not total |
 | The site is flooded | `waterY` was set, or the window's bottom is under a water table you asked for |
 | Buildings have no floors | the window is too short — it bounds planning too |
+| Buildings punch through the chamber roof | the window is taller than the chamber; carve to the window |
+| Doors open into a wall, or a floor has none | `groundY` steps by less than six, so two heights collapse to one band |
 | A warning about two definitions under one id | the spec is not stable across calls; build it once |
 | Nothing generates at all | `fill` is never called, or the field answers false everywhere |

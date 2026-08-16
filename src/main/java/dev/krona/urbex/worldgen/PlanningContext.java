@@ -106,4 +106,16 @@ public record PlanningContext(
     public ChunkCoord coord(int chunkX, int chunkZ) {
         return new ChunkCoord(dimension, chunkX, chunkZ);
     }
+
+    /**
+     * The Y that {@code cityLevel} 0 sits at: the preset's ground level, or a site's window bottom.
+     * <p>
+     * What a condition means by "level" - the number a loot table or a spawner rule is matched
+     * against. Asking the preset directly, as this used to, gives a site the ground level of a
+     * dimension it is nowhere near: {@code urbex:cavern} says 40, so a bunker at -36 reported level
+     * -12 and matched whatever a datapack wrote for the bottom of the world.
+     */
+    public int baseGroundLevel() {
+        return site != null ? site.minY() : preset.groundLevel();
+    }
 }

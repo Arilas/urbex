@@ -68,10 +68,11 @@ public final class CityField {
      * This function uses its own cache.
      */
     public static int getCityLevel(ChunkCoord key, PlanningContext provider) {
-        if (provider.site() != null) {
-            // Uncached, and ahead of the cache lookup, because there is nothing to compute: see
-            // siteCityLevel().
-            return siteCityLevel();
+        SiteBinding boundSite = provider.site();
+        if (boundSite != null) {
+            // Uncached, and ahead of the cache lookup: it is a floorDiv of a field call, which is
+            // cheaper than the map lookup that would memoise it.
+            return boundSite.cityLevelAt(key.chunkX(), key.chunkZ());
         }
         // Unconditional. This used to be gated on provider.getWorld() != null, "In LC preview we
         // don't want to use the cache as the config isn't loaded yet" - a guard from when the
@@ -98,8 +99,9 @@ public final class CityField {
     }
 
     public static int cityLevelUncached(ChunkCoord key, PlanningContext provider) {
-        if (provider.site() != null) {
-            return siteCityLevel();
+        SiteBinding boundSite = provider.site();
+        if (boundSite != null) {
+            return boundSite.cityLevelAt(key.chunkX(), key.chunkZ());
         }
         int result;
         if (provider.preset().isFloating()) {
@@ -110,21 +112,6 @@ public final class CityField {
             result = getCityLevelNormal(key, provider, provider.preset());
         }
         return result;
-    }
-
-    /**
-     * A site's city level, which is always the ground floor.
-     *
-     * <p>The nine level bands exist to let a city climb a hillside: a chunk whose terrain is higher
-     * gets a higher band, and its buildings start six blocks further up per band, so a city drapes
-     * over the landscape instead of being cut into it. A site has no landscape to drape over - its
-     * ground is wherever the caller said, flat, chunk by chunk - and the height it wants is already
-     * expressed exactly, by {@link dev.krona.urbex.api.SiteField#groundY}. Banding it a second time
-     * would raise buildings off the floor the caller named, in multiples of six, for no reason
-     * anybody could see from outside.</p>
-     */
-    private static int siteCityLevel() {
-        return 0;
     }
 
     private static int getCityLevelCavern(ChunkCoord coord, PlanningContext provider) {

@@ -44,7 +44,7 @@ public final class SiteTerrain implements TerrainSampler {
      */
     @Override
     public ChunkHeightmap heightmap(ChunkCoord coord) {
-        return new ChunkHeightmap(LandscapeType.DEFAULT, site.groundY(coord.chunkX(), coord.chunkZ()));
+        return new ChunkHeightmap(LandscapeType.DEFAULT, site.effectiveGroundY(coord.chunkX(), coord.chunkZ()));
     }
 
     /**
@@ -55,7 +55,7 @@ public final class SiteTerrain implements TerrainSampler {
      */
     @Override
     public void sampleAccurateHeight(ChunkHeightmap heightmap, int chunkX, int chunkZ) {
-        int ground = site.groundY(chunkX, chunkZ);
+        int ground = site.effectiveGroundY(chunkX, chunkZ);
         heightmap.accurateHeights(ground, ground, ground, ground);
     }
 

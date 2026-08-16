@@ -426,12 +426,13 @@ public class ChunkPlan {
                 candidate.buildingType().getName());
         hasBuilding = override != null || content.hasBuilding();
 
-        // A site's ground is wherever the caller said it is, chunk by chunk, in place of the
-        // preset's one fixed number for the whole dimension. The editing override still wins over
-        // both: it is a command naming a height, and it names it for either kind of context.
+        // A site's base, not its ground: the per-chunk height travels in cityLevel above, because
+        // that is the number every height comparison in Urbex is written against. See
+        // SiteBinding.cityLevelAt for what putting it here instead did to doors. The editing
+        // override still wins over both - it is a command naming a height, for either kind of
+        // context.
         SiteBinding site = provider.site();
-        int plannedGround = site != null ? site.groundY(key.chunkX(), key.chunkZ())
-                : profile.groundLevel();
+        int plannedGround = site != null ? site.minY() : profile.groundLevel();
         groundLevel = override != null ? override.groundLevel() : plannedGround;
         // A site's water is the caller's, not the preset's. A preset names one absolute sea level for
         // a whole dimension, and a site three hundred blocks under that dimension's sea is not
