@@ -161,7 +161,11 @@ public class CityGenerator {
     private void generateOrThrow(DimensionRuntime runtime, WorldGenRegion region,
                                  ChunkAccess chunk, ChunkCoord coord) {
         long start = System.currentTimeMillis();
+        // One ordinal for this chunk, claimed before anything is measured, so the warm-up exclusion
+        // reaches the same verdict for both phases and for the chunk itself (issue #132).
+        long ordinal = GenerationMetrics.beginChunk();
         long startNanos = GenerationMetrics.enabled() ? System.nanoTime() : 0;
+        long planAlloc = GenerationMetrics.allocMark();
 
         int chunkX = coord.chunkX();
         int chunkZ = coord.chunkZ();
@@ -175,11 +179,25 @@ public class CityGenerator {
         // order. See Arilas/urbex#24.
         ChunkHeightmap heightmap = new ChunkHeightmap(provider.heightmap(coord));
         ChunkPlan info = ChunkPlan.getChunkPlan(coord, provider);
+        // The planning/building boundary, and the only place in this method it exists. Everything
+        // above is a pure function of the seed and the coordinate - the heightmap comes from
+        // TerrainSampler, which reads no block, and the plan from caches DimensionCaches documents
+        // as recomputable by any thread - so it is the half that could in principle be computed
+        // before this chunk was ever asked for. Everything below needs this region and this chunk.
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.PLAN, startNanos, planAlloc);
+        long buildNanos = GenerationMetrics.mark();
+        long buildAlloc = GenerationMetrics.allocMark();
         // runtime.tags() is read here and nowhere else in this generation: one call, at the start,
         // so a /reload landing mid-chunk cannot be observed halfway through a building (issue #128).
         ChunkGenContext ctx = new ChunkGenContext(region, chunk, coord, provider, profile, info,
                 runtime.tasks(), runtime.tags());
         try {
+
+        // Reused for each pass below rather than one pair of locals per pass: the passes are
+        // strictly sequential, so a single mark that is closed and immediately retaken measures each
+        // of them exactly once, and the alternative is eighteen names for the same two numbers.
+        long phaseNanos = GenerationMetrics.mark();
+        long phaseAlloc = GenerationMetrics.allocMark();
 
         boolean doCity = info.isCity;
 
@@ -210,18 +228,29 @@ public class CityGenerator {
             boolean v = isVoid(ctx, 2, 2) || isVoid(ctx, 2, 14) || isVoid(ctx, 14, 2) || isVoid(ctx, 14, 14) || isVoid(ctx, 8, 8);
             doCity = !v;
         }
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.PROBE, phaseNanos, phaseAlloc);
 
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         if (doCity) {
             doCityChunk(ctx, info, heightmap, chunk);
+            GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CITY, phaseNanos, phaseAlloc);
         } else {
             // We already have a prefilled core chunk (as generated from doCoreChunk)
             doNormalChunk(ctx, info, heightmap, avoidChunk);
+            // Counted apart from CITY rather than together with it: the two are alternatives, and a
+            // combined figure would average a city chunk with a field and describe neither. Their
+            // sample counts also say how much of the window is city at all, which is the number that
+            // decides whether a city-side saving is worth anything here.
+            GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.TERRAIN, phaseNanos, phaseAlloc);
         }
 
         // Suppressed here rather than removed from the plan, the same way a village suppresses this
         // chunk's city above: a building deep enough to hit the line cancels the rails where they
         // would be drawn, and the neighbouring chunks keep planning and rendering the line as though
         // it ran through (issue #126, and see Railway.buildingBlocksRail for the precedence).
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         Railway.RailChunkInfo railInfo = Railway.buildingBlocksRail(coord, provider)
                 ? Railway.RailChunkInfo.NOTHING
                 : info.getRailInfo();
@@ -229,26 +258,46 @@ public class CityGenerator {
             Railways.generateRailways(ctx, this, info, railInfo, heightmap);
         }
         Railways.generateRailwayDungeons(ctx, this, info);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.RAIL, phaseNanos, phaseAlloc);
 
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         placeOptionalLights(ctx, info);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.LIGHTS, phaseNanos, phaseAlloc);
 
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         if (info.getDamageArea().hasExplosions()) {
             Damage.breakBlocks(ctx, this, chunkX, chunkZ, info);
             Damage.fixFloatingBlocks(ctx, this, info);
         }
-        generateDebris(ctx, info);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.DAMAGE, phaseNanos, phaseAlloc);
 
-        ctx.driver.actuallyGenerate(chunk);
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
+        generateDebris(ctx, info);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.DEBRIS, phaseNanos, phaseAlloc);
+
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
+        ctx.driver.actuallyGenerate(chunk, ordinal);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.COMMIT, phaseNanos, phaseAlloc);
+
+        phaseNanos = GenerationMetrics.mark();
+        phaseAlloc = GenerationMetrics.allocMark();
         ChunkFixer.fix(ctx);
         // After the fixer, so the post-todos have placed their blocks and what we see is final
         Parts.forgetBlockEntities(chunk);
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.FIXER, phaseNanos, phaseAlloc);
+
+        GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.BUILD, buildNanos, buildAlloc);
 
         long time = System.currentTimeMillis() - start;
         statistics.addTime(time);
         // Nanoseconds, separately from the millisecond Statistics that /urbex stats reports: a
         // chunk taking under a millisecond rounds to zero there, which is most of them, and a tail
         // latency built out of those numbers would be made of zeroes (issue #132).
-        GenerationMetrics.chunk(System.nanoTime() - startNanos);
+        GenerationMetrics.chunk(ordinal, System.nanoTime() - startNanos);
         } catch (Throwable t) {
             throw new ChunkGenerationFailure(coord, ctx.driver.commitState(), t);
         }

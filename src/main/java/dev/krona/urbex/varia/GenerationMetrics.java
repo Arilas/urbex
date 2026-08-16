@@ -34,15 +34,117 @@ public final class GenerationMetrics {
     /** {@code -Durbex.metrics} to switch the counters on. */
     public static final String ENABLED_PROPERTY = "urbex.metrics";
 
+    /**
+     * {@code -Durbex.metrics.warmup=N} discards the first {@code N} chunks a run generates.
+     *
+     * <p>Nothing here is measured from a cold JVM by choice. The asset compile is already outside
+     * the window - {@code AssetCompiler.compile} runs at level load and {@link #reset} runs when the
+     * drive starts - but two things still warm up inside it: the palette cache, whose misses are
+     * almost entirely in the first few hundred chunks, and the JIT, which over a three-minute run
+     * has compiled the generation path long before the run ends. Both inflate the early chunks and
+     * neither is a property of the steady state.</p>
+     *
+     * <p>Zero by default, so an unasked run measures exactly what it measured before. The point is
+     * to run the same drive twice and compare, rather than to pick one number and defend it: if the
+     * two lines agree, warm-up was not distorting anything and the exclusion can be forgotten.</p>
+     */
+    public static final String WARMUP_PROPERTY = "urbex.metrics.warmup";
+
     private static final boolean ENABLED = System.getProperty(ENABLED_PROPERTY) != null;
 
+    private static final int WARMUP_CHUNKS = Math.max(0, Integer.getInteger(WARMUP_PROPERTY, 0));
+
     private static final com.sun.management.ThreadMXBean THREADS = threadBean();
+
+    /**
+     * Which half of a chunk's generation a sample belongs to.
+     *
+     * <p>The split is the one {@code CityGenerator.generateOrThrow} already makes and that every
+     * proposal to move work off the chunk pipeline's critical path depends on. {@link #PLAN} is a
+     * pure function of the seed and the coordinate - {@code TerrainSampler} reads no block, and
+     * {@code DimensionCaches} documents every value in it as recomputable by any thread at any time
+     * - so it is the half that <em>could</em> be computed before anyone asks for the chunk.
+     * {@link #BUILD} needs the real chunk and the real region, so it cannot.</p>
+     *
+     * <p>Measuring them separately is what turns "planning looks expensive" into a ratio.
+     * {@link #PLAN} and {@link #BUILD} are contiguous and exhaustive: every nanosecond
+     * {@link #chunk} counts is in exactly one of them, which is why the report can print each as a
+     * percentage of the chunk mean.</p>
+     *
+     * <p>Every phase after {@code BUILD} is one pass <em>inside</em> it, so those overlap {@code
+     * BUILD} rather than partitioning the chunk - they sum to roughly what {@code BUILD} reports,
+     * and the shortfall is the glue between passes. Each is a share of the same chunk mean, which
+     * is the comparison that matters: a pass owning a visible fraction of a chunk is worth opening
+     * up, and one owning 0.3% is not, whatever its internals look like.</p>
+     */
+    public enum Phase {
+        /** The heightmap copy and the chunk plan: pure, cached, speculatable. */
+        PLAN,
+        /** Everything after it, as one figure. The sub-phases below partition this. */
+        BUILD,
+        /** The village/structure blacklist probe, and the floating-profile void test. */
+        PROBE,
+        /** {@code doCityChunk}: streets, buildings, parts. The city itself. */
+        CITY,
+        /** {@code doNormalChunk}: the terrain a non-city chunk gets instead. */
+        TERRAIN,
+        /** Railways, their dungeons, and the building-collision test that can cancel them. */
+        RAIL,
+        /** The deferred optional lights, planned and placed. */
+        LIGHTS,
+        /** Explosion damage and the floating-block repair that follows it. */
+        DAMAGE,
+        /** Scattered debris. */
+        DEBRIS,
+        /** {@code driver.actuallyGenerate}: the buffered blocks reaching the chunk. */
+        COMMIT,
+        /** Inside {@code COMMIT}: the connection/shape corrections pass over every written position. */
+        CORRECT,
+        /** Inside {@code CORRECT}: extracting and sorting the written positions. */
+        CORRECT_SORT,
+        /** Inside {@code CORRECT}: the shape/connection resolution over those positions. */
+        CORRECT_SHAPE,
+        /** Inside {@code COMMIT}: the buffered sections being flushed into the chunk. */
+        FLUSH,
+        /** Inside {@code COMMIT}: {@code Heightmap.primeHeightmaps} over four heightmap types. */
+        HEIGHTMAP,
+        /**
+         * Inside {@code COMMIT}: handing this chunk's write log to the digest harness.
+         *
+         * <p><strong>Harness overhead, not generation.</strong> It does nothing unless
+         * {@code /urbex digest} switched write recording on - which the digest suites do for every
+         * run, including the soak this report comes from. So it is measured precisely so it can be
+         * subtracted: a figure taken from a digest run describes the mod as shipped only once this
+         * phase is taken out of it.</p>
+         */
+        PUBLISH,
+        /** {@code ChunkFixer.fix} and the block-entity sweep after it. */
+        FIXER
+    }
 
     /** Chunk generation times, bucketed by {@code floor(log2(micros))}. */
     private static final LongAdder[] CHUNK_BUCKETS = newBuckets();
     private static final LongAdder CHUNK_COUNT = new LongAdder();
     private static final LongAdder CHUNK_NANOS = new LongAdder();
     private static final AtomicLong CHUNK_MAX_NANOS = new AtomicLong();
+
+    /**
+     * How many chunks have <em>started</em> generating, which is what an ordinal is taken from.
+     *
+     * <p>Counted at the start rather than derived from {@link #CHUNK_COUNT} because a phase is
+     * recorded before its chunk finishes, and the warm-up rule has to reach the same verdict for a
+     * chunk's phases as it does for the chunk itself. An ordinal handed out once, at the top,
+     * settles that for every sample the chunk will produce.</p>
+     */
+    private static final AtomicLong CHUNK_ORDINAL = new AtomicLong();
+
+    /** How many chunks the warm-up exclusion discarded, so a report can say so rather than imply it. */
+    private static final LongAdder WARMUP_SKIPPED = new LongAdder();
+
+    private static final LongAdder[] PHASE_NANOS = newPhaseAdders();
+    private static final LongAdder[] PHASE_COUNT = newPhaseAdders();
+    private static final LongAdder[] PHASE_ALLOC = newPhaseAdders();
+    private static final AtomicLong[] PHASE_MAX_NANOS = newPhaseMaxima();
 
     /** Thread id -> allocated bytes when that thread first generated something. */
     private static final Map<Long, Long> ALLOCATION_BASELINE = new ConcurrentHashMap<>();
@@ -67,6 +169,17 @@ public final class GenerationMetrics {
         CHUNK_COUNT.reset();
         CHUNK_NANOS.reset();
         CHUNK_MAX_NANOS.set(0);
+        // The ordinal too, so the warm-up exclusion applies to the first chunks of *this* run. A
+        // counter that kept climbing would exclude nothing on a second run in the same JVM, which is
+        // the shape the digest suites use.
+        CHUNK_ORDINAL.set(0);
+        WARMUP_SKIPPED.reset();
+        for (int i = 0; i < PHASE_NANOS.length; i++) {
+            PHASE_NANOS[i].reset();
+            PHASE_COUNT[i].reset();
+            PHASE_ALLOC[i].reset();
+            PHASE_MAX_NANOS[i].set(0);
+        }
         ALLOCATION_BASELINE.clear();
         ALLOCATION_LATEST.clear();
         // Zeroed in place, not dropped: a TimedCache takes its CacheStats once, at construction, so
@@ -83,8 +196,12 @@ public final class GenerationMetrics {
      * allocation is the sum over threads of {@code latest - baseline}. Sampling here rather than
      * around the whole run is what keeps it to the threads that actually generated.</p>
      */
-    public static void chunk(long nanos) {
+    public static void chunk(long ordinal, long nanos) {
         if (!ENABLED) {
+            return;
+        }
+        if (isWarmup(ordinal)) {
+            WARMUP_SKIPPED.increment();
             return;
         }
         CHUNK_COUNT.increment();
@@ -99,6 +216,81 @@ public final class GenerationMetrics {
                 ALLOCATION_LATEST.put(id, allocated);
             }
         }
+    }
+
+    /**
+     * Claims this chunk's ordinal, at the top of its generation.
+     *
+     * <p>Every sample the chunk goes on to produce carries it, so the warm-up rule reaches one
+     * verdict per chunk rather than one per sample - a chunk cannot have its planning discarded as
+     * warm-up and its building counted. Returns zero, and counts nothing, when metrics are off.</p>
+     */
+    public static long beginChunk() {
+        return ENABLED ? CHUNK_ORDINAL.getAndIncrement() : 0L;
+    }
+
+    /** A nanosecond baseline for {@link #phase}, or zero when nobody is measuring. */
+    public static long mark() {
+        return ENABLED ? System.nanoTime() : 0L;
+    }
+
+    /**
+     * An allocation baseline for {@link #phase}, in bytes, or zero when nobody is measuring.
+     *
+     * <p>Per thread and cumulative, so the delta across a phase is exactly what that phase
+     * allocated on the thread that ran it - which is the only figure worth having here, since
+     * worldgen fans out and a heap delta would measure the collector's mood instead. Zero when the
+     * JVM is not HotSpot or the counter is off, and a phase whose baseline is zero contributes no
+     * allocation rather than a nonsense one.</p>
+     */
+    public static long allocMark() {
+        if (!ENABLED || THREADS == null) {
+            return 0L;
+        }
+        long allocated = THREADS.getCurrentThreadAllocatedBytes();
+        // The bean answers -1 when the counter is unavailable for this thread. Normalised to zero so
+        // the "no baseline" test below is one condition rather than two.
+        return allocated < 0 ? 0L : allocated;
+    }
+
+    /**
+     * One half of a chunk's generation cost, closing the marks taken before it started.
+     *
+     * <p>The two phases are contiguous and exhaustive, so their nanoseconds sum to what
+     * {@link #chunk} recorded for the same chunk and each can be reported as a share of it. Both
+     * are recorded before the chunk is, and all three agree about warm-up because all three are
+     * told the same {@code ordinal}.</p>
+     *
+     * @param ordinal from {@link #beginChunk}, for this chunk
+     * @param phase   which half this is
+     * @param nanoMark  the {@link #mark} taken when the phase started
+     * @param allocMark the {@link #allocMark} taken when the phase started, or zero if there was none
+     */
+    public static void phase(long ordinal, Phase phase, long nanoMark, long allocMark) {
+        if (!ENABLED || isWarmup(ordinal)) {
+            return;
+        }
+        int index = phase.ordinal();
+        long nanos = System.nanoTime() - nanoMark;
+        PHASE_NANOS[index].add(nanos);
+        PHASE_COUNT[index].increment();
+        PHASE_MAX_NANOS[index].accumulateAndGet(nanos, Math::max);
+        if (allocMark > 0) {
+            long allocated = allocMark();
+            if (allocated > allocMark) {
+                PHASE_ALLOC[index].add(allocated - allocMark);
+            }
+        }
+    }
+
+    /**
+     * Whether this chunk is early enough in the run to be discarded.
+     *
+     * <p>By ordinal rather than by elapsed time: the run is driven chunk by chunk, so "the first N
+     * chunks" is the unit warm-up actually happens in, and it is the same N whatever the machine.</p>
+     */
+    private static boolean isWarmup(long ordinal) {
+        return ordinal < WARMUP_CHUNKS;
     }
 
     /**
@@ -147,6 +339,11 @@ public final class GenerationMetrics {
         line.append(" allocMiB=").append(allocatedBytes() >> 20);
         line.append(" allocThreads=").append(ALLOCATION_BASELINE.size());
         line.append(" queueHighWater=").append(QUEUE_HIGH_WATER.get());
+        line.append(" warmup=").append(WARMUP_CHUNKS);
+        line.append(" warmupSkipped=").append(WARMUP_SKIPPED.sum());
+        for (Phase phase : Phase.values()) {
+            line.append(' ').append(phaseReport(phase, totalNanos));
+        }
         CACHES.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> line.append(' ').append(entry.getKey()).append('=')
@@ -193,6 +390,50 @@ public final class GenerationMetrics {
         long micros = Math.max(1, nanos / 1000);
         int bucket = 63 - Long.numberOfLeadingZeros(micros);
         return Math.min(bucket, CHUNK_BUCKETS.length - 1);
+    }
+
+    /**
+     * One phase's block of the report: its share of the chunk mean, its own mean and tail, and what
+     * it allocated per chunk.
+     *
+     * <p>The share is of {@code totalNanos} - the sum {@link #chunk} recorded - rather than of the
+     * two phases added together, so a share that does not add up to 100% is visible rather than
+     * normalised away. It should: the phases are contiguous and cover the whole of the generation
+     * {@link #chunk} times.</p>
+     *
+     * <p>Allocation is per chunk rather than a total, because a total only means something next to
+     * a chunk count and the whole point of this figure is to be compared with the {@code allocMiB}
+     * beside it. In KiB: a phase allocating single-digit MiB per chunk rounds to nothing otherwise,
+     * and single-digit MiB per chunk is the interesting case.</p>
+     */
+    private static String phaseReport(Phase phase, long totalNanos) {
+        int index = phase.ordinal();
+        long count = PHASE_COUNT[index].sum();
+        long nanos = PHASE_NANOS[index].sum();
+        long alloc = PHASE_ALLOC[index].sum();
+        return String.format("%s=%.0f%%(meanUs=%.1f maxUs=%d allocKiB=%d n=%d)",
+                phase.name().toLowerCase(java.util.Locale.ROOT),
+                totalNanos == 0 ? 0.0 : nanos * 100.0 / totalNanos,
+                count == 0 ? 0.0 : nanos / 1000.0 / count,
+                PHASE_MAX_NANOS[index].get() / 1000,
+                count == 0 ? 0L : (alloc / count) >> 10,
+                count);
+    }
+
+    private static LongAdder[] newPhaseAdders() {
+        LongAdder[] adders = new LongAdder[Phase.values().length];
+        for (int i = 0; i < adders.length; i++) {
+            adders[i] = new LongAdder();
+        }
+        return adders;
+    }
+
+    private static AtomicLong[] newPhaseMaxima() {
+        AtomicLong[] maxima = new AtomicLong[Phase.values().length];
+        for (int i = 0; i < maxima.length; i++) {
+            maxima[i] = new AtomicLong();
+        }
+        return maxima;
     }
 
     private static LongAdder[] newBuckets() {

@@ -174,6 +174,26 @@ final class BlockShaper {
             }
             return adjacent;
         }
+        // Air cannot be reshaped, so the call below would hand back exactly what was passed in.
+        //
+        // Identity-compared against the three vanilla air blocks rather than asking
+        // BlockState.isAir(). isAir is a property any block may set, so a modded block could answer
+        // true and still override updateShape - and this skip is only sound for blocks that
+        // inherit BlockBehaviour's identity implementation. These three are AirBlock instances from
+        // the vanilla registry and cannot be anything else, which turns "probably fine" into a
+        // fact. Everything a caller can observe is unchanged: the returned state is the same object
+        // updateShape would have returned, nothing is written, and the seed that is skipped with it
+        // would have gone unread (air draws nothing) and is reset before the next call that does
+        // draw.
+        //
+        // Worth the special case because of how many there are: a chunk runs this four times per
+        // written position, tens of thousands of times, and a city is mostly hollow - rooms,
+        // streets and the space above roofs are all air.
+        Block adjacentBlock = adjacent.getBlock();
+        if (adjacentBlock == Blocks.AIR || adjacentBlock == Blocks.CAVE_AIR
+                || adjacentBlock == Blocks.VOID_AIR) {
+            return adjacent;
+        }
         BlockState newAdjacent = null;
         try {
             // updateShape hands the block a RandomSource; almost none use it, but the level's own
