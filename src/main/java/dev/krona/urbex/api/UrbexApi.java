@@ -73,6 +73,9 @@ public final class UrbexApi {
     /** The bottom of a window a spec does not name: deep enough for anything underground. */
     public static final int DEFAULT_MIN_Y = -60;
 
+    /** {@link SiteSpec.Builder#waterY}'s default: a dry site, with no water table at any height. */
+    public static final int NO_WATER = Integer.MIN_VALUE;
+
     /**
      * The top of a window a spec does not name. Below sea level on purpose - the defaults describe
      * something underground, because a site that wanted the surface would not need this API.

@@ -32,9 +32,12 @@ import java.util.Objects;
  *                            read {@link SiteField} before writing one.
  * @param minY                the lowest block Y the site may write at, inclusive.
  * @param maxY                the highest block Y the site may write at, inclusive.
+ * @param waterY              the Y the site's water table sits at, or {@link UrbexApi#NO_WATER} for
+ *                            a dry site. See {@link Builder#waterY}.
  */
 public record SiteSpec(Identifier id, Identifier preset, WorldStyleMix worldStyles,
-                       @Nullable String presetOverridesJson, SiteField field, int minY, int maxY) {
+                       @Nullable String presetOverridesJson, SiteField field, int minY, int maxY,
+                       int waterY) {
 
     public SiteSpec {
         Objects.requireNonNull(id, "an Urbex site needs an id");
@@ -65,6 +68,7 @@ public record SiteSpec(Identifier id, Identifier preset, WorldStyleMix worldStyl
         private String presetOverridesJson;
         private int minY = UrbexApi.DEFAULT_MIN_Y;
         private int maxY = UrbexApi.DEFAULT_MAX_Y;
+        private int waterY = UrbexApi.NO_WATER;
 
         private Builder(Identifier id, Identifier preset, SiteField field) {
             this.id = id;
@@ -103,8 +107,24 @@ public record SiteSpec(Identifier id, Identifier preset, WorldStyleMix worldStyl
             return this;
         }
 
+        /**
+         * Floods the site up to {@code y}. Omit it and the site is dry.
+         *
+         * <p>This exists because the alternative is a trap. A preset's own sea level is one absolute
+         * height for a whole dimension - {@code urbex:cavern} says 32 - and a site forty blocks
+         * under that is not underwater, but every rule that fills below the water line thinks it is.
+         * A caller who reached for the obvious underground preset would get a bunker flooded to the
+         * ceiling and no clue why. So a site ignores the preset's sea level entirely and takes this
+         * instead, which defaults to "there is no water here".</p>
+         */
+        public Builder waterY(int y) {
+            this.waterY = y;
+            return this;
+        }
+
         public SiteSpec build() {
-            return new SiteSpec(id, preset, worldStyles, presetOverridesJson, field, minY, maxY);
+            return new SiteSpec(id, preset, worldStyles, presetOverridesJson, field, minY, maxY,
+                    waterY);
         }
     }
 }

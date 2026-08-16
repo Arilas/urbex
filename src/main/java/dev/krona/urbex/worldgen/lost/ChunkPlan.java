@@ -433,8 +433,14 @@ public class ChunkPlan {
         int plannedGround = site != null ? site.groundY(key.chunkX(), key.chunkZ())
                 : profile.groundLevel();
         groundLevel = override != null ? override.groundLevel() : plannedGround;
+        // A site's water is the caller's, not the preset's. A preset names one absolute sea level for
+        // a whole dimension, and a site three hundred blocks under that dimension's sea is not
+        // underwater - but every rule that fills below the water line would think it was, and a
+        // bunker built with urbex:cavern (sea level 32) comes out flooded to the ceiling. The site's
+        // LevelShape carries what SiteSpec.waterY asked for, which is "below everything here" unless
+        // the caller said otherwise.
         int wl = profile.seaLevel();
-        waterLevel = wl == -1 ? provider.shape().seaLevel() : wl;
+        waterLevel = site != null || wl == -1 ? provider.shape().seaLevel() : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
 
         // In a multi building we copy all information from the top-left chunk

@@ -1,6 +1,7 @@
 # Experimental site API: letting another mod ask Urbex to build somewhere
 
-**Status:** design approved 2026-08-16.
+**Status:** design approved 2026-08-16; implemented the same day. Two things changed during
+implementation, both because a real world showed them — see "What building it changed" at the end.
 
 ## The problem
 
@@ -170,3 +171,31 @@ New unit tests:
   in each.
 - `SiteField` answers drive `isCity` and `groundLevel`, and a site's `cityLevel` is 0.
 - A spec re-registered under the same id in the same level returns the same handle.
+
+## What building it changed
+
+Both of these were found by generating a world with `Urbex-Bunkers` loaded and diffing the driver's
+per-chunk write log against a run without it. Neither was visible from the design.
+
+**A site is not subject to structure avoidance.** The design put the sparse early return before the
+structure probe, which left a path around it: the probe can turn `doCity` off *after* that point, and
+a site reaching the `else` branch ran `doNormalChunk` — exactly the world-repainting this was
+supposed to prevent. In the probe world it cost ten of a bunker's eleven chunks, which generated four
+layers of terrain correction and nothing else.
+
+The fix is not another guard in the same place. Avoidance exists to stop Urbex's own city noise
+bulldozing a village it happened to roll on top of; a caller naming a place has already decided, and
+a bunker suppressed by a village forty blocks overhead is a hole in the middle of itself with streets
+running into it — its neighbours' plans still say the middle is there. So a site skips the probe
+entirely, along with the floating-dimension void probe, which asks a question `isCityRaw` has already
+answered for a site. Two region reads saved per chunk as well.
+
+**A site ignores its preset's sea level, and gains `waterY`.** A preset names one absolute sea level
+for a whole dimension. `urbex:cavern` — the obvious preset for anything underground, and the one the
+example mod reaches for — says 32, so the first working bunker came out flooded to the ceiling with
+21,868 blocks of water. Nothing in the design was wrong; the interaction simply does not survive
+contact with a site forty blocks below a dimension's surface.
+
+Making the preset's sea level apply anyway would leave a trap every caller walks into once. So a site
+takes its water level from `SiteSpec.waterY`, which defaults to "there is none", and a caller who
+wants a flooded site asks for one.

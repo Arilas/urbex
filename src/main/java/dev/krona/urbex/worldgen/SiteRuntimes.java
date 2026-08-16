@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen;
 import com.google.gson.JsonParser;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.api.SiteSpec;
+import dev.krona.urbex.api.UrbexApi;
 import dev.krona.urbex.api.UrbexSite;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.config.PresetRoadGrid;
@@ -121,18 +122,17 @@ public final class SiteRuntimes {
      * {@code shape().maxY()}, so a site plans buildings that fit rather than buildings that get cut
      * off at the top by {@link ChunkBuffer}.</p>
      *
-     * <p>The sea level is put <em>below</em> the window rather than carried over from the level.
-     * A dimension's sea level is a fact about its surface; a site three hundred blocks under it is
-     * not underwater, and every rule that fills below the water line would think it was. A preset
-     * that wants a flooded site says so with its own {@code seaLevel}, which takes precedence over
-     * this everywhere it is read.</p>
+     * <p>The sea level is {@link SiteSpec#waterY}'s, and neither the level's nor the preset's. Both
+     * of those are one absolute height for a whole dimension, which says nothing useful about
+     * somewhere three hundred blocks under it - see {@link SiteSpec.Builder#waterY}. A dry site puts
+     * the water table one block below its own floor, which is the honest way to say "there is none".
+     * </p>
      */
     private static LevelShape shapeFor(ServerLevel level, SiteSpec spec) {
         LevelShape whole = LevelShape.of(level);
-        return new LevelShape(
-                Math.max(whole.minY(), spec.minY()),
-                Math.min(whole.maxY(), spec.maxY()),
-                Math.max(whole.minY(), spec.minY()) - 1);
+        int bottom = Math.max(whole.minY(), spec.minY());
+        int water = spec.waterY() == UrbexApi.NO_WATER ? bottom - 1 : spec.waterY();
+        return new LevelShape(bottom, Math.min(whole.maxY(), spec.maxY()), water);
     }
 
     /**
