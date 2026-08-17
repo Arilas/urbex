@@ -1,0 +1,662 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Arilas/urbex/main/docs/schema/palette.v2.schema.json",
+  "title": "Urbex palette (version 2)",
+  "description": "A version 2 palette asset (data/<namespace>/urbex/palettes/<name>.json) or a definitions asset, as MODEL.001 through MODEL.005 in docs/format/palette/00-model.md define it. The node model - MODEL.010's five positions a node appears in - is expressed as one recursive '$defs/node', referenced by every position a node can occupy: a marker's value, a '$defs' value, a 'choices' entry, a socket candidate, and a block-valued trait field. What this schema cannot check is anything that needs another document, a registry, or arithmetic across sibling choices - REF.013's dangling $ref, WEIGHT.014's share totals, TRAIT.021's pool lookup and the rest are refused by the loader, not here; see PaletteSchemaTest for exactly which REJECT fixtures this schema is expected to catch.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 2,
+      "description": "MODEL.002: a palette file with no 'version' is version 1, and any value other than 1 or 2 is refused. This schema describes the version 2 shape alone, so it fixes the value rather than leaving it an integer."
+    },
+    "extends": {
+      "$ref": "#/$defs/qualifiedIdentifier",
+      "description": "MERGE.001: the one palette this file builds on, fully qualified."
+    },
+    "$imports": {
+      "type": "object",
+      "description": "REF.080: an alias name to a pointer prefix, expanded textually wherever '$<name>' is written.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "propertyNames": {
+        "not": {
+          "const": "super"
+        },
+        "description": "REF.082: '$super' is a built-in alias and may not be declared in '$imports'."
+      }
+    },
+    "$defs": {
+      "type": "object",
+      "description": "REF.001: a definition name to a node.",
+      "additionalProperties": {
+        "$ref": "#/$defs/nodeOrBlock"
+      },
+      "propertyNames": {
+        "minLength": 1
+      }
+    },
+    "palette": {
+      "type": "object",
+      "description": "MODEL.003: a marker to a node. Required somewhere in the 'extends' chain, not in every file - so this key is optional here.",
+      "additionalProperties": {
+        "$ref": "#/$defs/nodeOrBlock"
+      },
+      "propertyNames": {
+        "minLength": 1
+      }
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "qualifiedIdentifier": {
+      "type": "string",
+      "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$",
+      "description": "A datapack asset reference. The namespace is mandatory."
+    },
+    "when": {
+      "type": "object",
+      "description": "WEIGHT.020 through WEIGHT.023: a load-time condition on one alternative.",
+      "properties": {
+        "mod": {
+          "type": "string",
+          "description": "WEIGHT.023: a mod id that must be loaded."
+        },
+        "pack": {
+          "type": "string",
+          "description": "WEIGHT.023: a namespace that must register assets."
+        }
+      },
+      "additionalProperties": false
+    },
+    "node": {
+      "type": "object",
+      "description": "MODEL.010: the single value type of the format, in all five positions it may appear. Deliberately not closed here - additionalProperties/unevaluatedProperties is applied at each usage site ('nodeOrBlock', 'choice'), because a node's closed key set differs from a choice's by exactly RawChoice.OWN_KEYS, and one open definition lets both close over it rather than needing two copies of the same property list.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "block",
+            "weighted",
+            "tag",
+            "alias",
+            "light_socket"
+          ],
+          "description": "MODEL.012: a kind outside these five values is refused. MODEL.011: absent, a node has kind 'block'."
+        },
+        "block": {
+          "type": "string",
+          "description": "MODEL.040, MODEL.041: a block id, optionally followed by a bracketed property expression."
+        },
+        "choices": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/sizedList"
+            }
+          ],
+          "minItems": 1,
+          "description": "MODEL.044: the alternatives of a 'weighted' node. MODEL.045: empty is refused."
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^#",
+          "description": "MODEL.050, MODEL.051: a block tag reference with a leading '#' and a namespace."
+        },
+        "of": {
+          "type": "string",
+          "description": "MODEL.060, MODEL.061: the marker an 'alias' node resolves through - exactly one character (CHAR.001), which this schema cannot check without risking a false rejection of an astral-plane marker; see PaletteSchemaTest's note."
+        },
+        "floor": {
+          "$ref": "#/$defs/sizedList",
+          "description": "MODEL.071: one of a 'light_socket' node's four placement lists."
+        },
+        "wall": {
+          "$ref": "#/$defs/sizedList",
+          "description": "MODEL.071: one of a 'light_socket' node's four placement lists."
+        },
+        "ceiling": {
+          "$ref": "#/$defs/sizedList",
+          "description": "MODEL.071: one of a 'light_socket' node's four placement lists."
+        },
+        "free": {
+          "$ref": "#/$defs/sizedList",
+          "description": "MODEL.071: one of a 'light_socket' node's four placement lists."
+        },
+        "traits": {
+          "$ref": "#/$defs/traits"
+        },
+        "$ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "REF.002: a pointer naming the definition this node is based on."
+        },
+        "$only": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "kind",
+              "traits",
+              "block",
+              "choices",
+              "tag",
+              "of",
+              "floor",
+              "wall",
+              "ceiling",
+              "free"
+            ]
+          },
+          "description": "REF.051, REF.054: the top-level keys of the target a '$ref' contributes. REF.055: a name that is not a key of a node is refused."
+        },
+        "$without": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "kind",
+              "traits",
+              "block",
+              "choices",
+              "tag",
+              "of",
+              "floor",
+              "wall",
+              "ceiling",
+              "free"
+            ]
+          },
+          "description": "REF.052, REF.054: the top-level keys of the target a '$ref' does not contribute."
+        },
+        "$spread": {
+          "type": "string",
+          "minLength": 1,
+          "description": "REF.070: a pointer to the list this element is replaced by."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "block"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "choices": false,
+              "tag": false,
+              "of": false,
+              "floor": false,
+              "wall": false,
+              "ceiling": false,
+              "free": false
+            }
+          },
+          "description": "MODEL.013: a kind's specific keys are not accepted on another - 'block' accepts only 'block' among the five kind-specific keys."
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "weighted"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "block": false,
+              "tag": false,
+              "of": false,
+              "floor": false,
+              "wall": false,
+              "ceiling": false,
+              "free": false
+            }
+          },
+          "description": "MODEL.013: 'weighted' accepts only 'choices' among the five kind-specific keys."
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "tag"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "block": false,
+              "choices": false,
+              "of": false,
+              "floor": false,
+              "wall": false,
+              "ceiling": false,
+              "free": false
+            }
+          },
+          "description": "MODEL.013: 'tag' accepts only 'tag' among the five kind-specific keys."
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "alias"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "block": false,
+              "choices": false,
+              "tag": false,
+              "floor": false,
+              "wall": false,
+              "ceiling": false,
+              "free": false
+            }
+          },
+          "description": "MODEL.013: 'alias' accepts only 'of' among the five kind-specific keys."
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "light_socket"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "block": false,
+              "choices": false,
+              "tag": false,
+              "of": false
+            }
+          },
+          "description": "MODEL.013: 'light_socket' accepts only its four placement lists among the five kind-specific keys."
+        },
+        {
+          "if": {
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "light_socket"
+              }
+            }
+          },
+          "then": {
+            "if": {
+              "not": {
+                "required": [
+                  "$ref"
+                ]
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "floor"
+                  ],
+                  "properties": {
+                    "floor": {
+                      "minItems": 1
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "wall"
+                  ],
+                  "properties": {
+                    "wall": {
+                      "minItems": 1
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "ceiling"
+                  ],
+                  "properties": {
+                    "ceiling": {
+                      "minItems": 1
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "free"
+                  ],
+                  "properties": {
+                    "free": {
+                      "minItems": 1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "description": "MODEL.072: a 'light_socket' declaring no candidate in any of the four lists is refused, unless it takes its lists from a '$ref' this node cannot see."
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "not": {
+                  "required": [
+                    "kind"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "$ref"
+                  ]
+                }
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "choices": false,
+              "tag": false,
+              "of": false,
+              "floor": false,
+              "wall": false,
+              "ceiling": false,
+              "free": false
+            }
+          },
+          "description": "MODEL.011: absent 'kind' and absent '$ref' defaults to kind 'block' - the referenced node's kind is not knowable here, so only that case is restricted."
+        },
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "$only"
+                ]
+              },
+              {
+                "required": [
+                  "$without"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "$ref"
+            ]
+          },
+          "description": "REF.056: '$only' or '$without' on a node with no '$ref' is refused - a filter selects the keys a reference contributes, and one with none has nothing to select from."
+        },
+        {
+          "not": {
+            "allOf": [
+              {
+                "required": [
+                  "$only"
+                ]
+              },
+              {
+                "required": [
+                  "$without"
+                ]
+              }
+            ]
+          },
+          "description": "REF.053: a node carrying both '$only' and '$without' is refused."
+        }
+      ]
+    },
+    "nodeOrBlock": {
+      "description": "MODEL.020: wherever a node is expected, a JSON string is that node with kind 'block' and that string as its 'block'. MODEL.021: a string is never a reference - the object form is required to name one.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/node"
+            }
+          ],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "choice": {
+      "type": "object",
+      "description": "MODEL.046, MODEL.071: an entry in 'choices' or in a 'light_socket' placement list - a node carrying additionally 'share', 'weight' or 'rest', and optionally 'when'. A bare '$spread' element carries no other key (REF.072) and so states no size (REF.070).",
+      "allOf": [
+        {
+          "$ref": "#/$defs/node"
+        }
+      ],
+      "properties": {
+        "share": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1,
+          "description": "WEIGHT.004, WEIGHT.010: a fraction strictly between 0 and 1."
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "WEIGHT.002, WEIGHT.004: a positive integer."
+        },
+        "rest": {
+          "type": "boolean",
+          "description": "WEIGHT.012: 'rest: true' is the sole 'weight' choice written without a number."
+        },
+        "when": {
+          "$ref": "#/$defs/when"
+        }
+      },
+      "if": {
+        "not": {
+          "required": [
+            "$spread"
+          ]
+        }
+      },
+      "then": {
+        "oneOf": [
+          {
+            "required": [
+              "share"
+            ]
+          },
+          {
+            "required": [
+              "weight"
+            ]
+          },
+          {
+            "required": [
+              "rest"
+            ]
+          }
+        ]
+      },
+      "unevaluatedProperties": false
+    },
+    "sizedList": {
+      "type": "array",
+      "description": "WEIGHT.001: one spelling of size, wherever a list of alternatives appears. WEIGHT.013: more than one 'rest' in a list is refused, and so is a 'rest' in a list that also carries a 'weight'.",
+      "items": {
+        "$ref": "#/$defs/choice"
+      },
+      "contains": {
+        "required": [
+          "rest"
+        ]
+      },
+      "minContains": 0,
+      "maxContains": 1,
+      "if": {
+        "contains": {
+          "required": [
+            "rest"
+          ]
+        }
+      },
+      "then": {
+        "not": {
+          "contains": {
+            "required": [
+              "weight"
+            ]
+          }
+        }
+      }
+    },
+    "traits": {
+      "type": "object",
+      "description": "TRAIT.001: an object mapping a trait id to that trait's value. Only the seven traits this specification defines have a known shape here - TRAIT.090 makes traits the format's extension point, so an id this schema does not recognise is left open rather than refused; TRAIT.003's refusal of an unregistered id is a registry lookup, not a shape this schema can check. TRAIT.064: a node carrying two traits of the selection phase - today, 'urbex:light' and 'urbex:optional' - is refused.",
+      "properties": {
+        "urbex:damaged": {
+          "$ref": "#/$defs/traitDamaged"
+        },
+        "urbex:loot": {
+          "$ref": "#/$defs/traitLoot"
+        },
+        "urbex:spawner": {
+          "$ref": "#/$defs/traitSpawner"
+        },
+        "urbex:block_entity": {
+          "$ref": "#/$defs/traitBlockEntity"
+        },
+        "urbex:light": {
+          "$ref": "#/$defs/traitLight"
+        },
+        "urbex:optional": {
+          "$ref": "#/$defs/traitOptional"
+        },
+        "urbex:rotatable": {
+          "$ref": "#/$defs/traitRotatable"
+        }
+      },
+      "additionalProperties": true,
+      "not": {
+        "allOf": [
+          {
+            "required": [
+              "urbex:light"
+            ]
+          },
+          {
+            "required": [
+              "urbex:optional"
+            ]
+          }
+        ]
+      }
+    },
+    "traitDamaged": {
+      "type": "object",
+      "description": "TRAIT.010: 'urbex:damaged' - what this node's block becomes where the damage pass applies.",
+      "properties": {
+        "into": {
+          "$ref": "#/$defs/nodeOrBlock"
+        }
+      },
+      "required": [
+        "into"
+      ],
+      "additionalProperties": false
+    },
+    "traitLoot": {
+      "type": "object",
+      "description": "TRAIT.020: 'urbex:loot' - this node's block is a loot container. 'pool' names a 'conditions' asset whose values are loot tables.",
+      "properties": {
+        "pool": {
+          "$ref": "#/$defs/qualifiedIdentifier"
+        }
+      },
+      "required": [
+        "pool"
+      ],
+      "additionalProperties": false
+    },
+    "traitSpawner": {
+      "type": "object",
+      "description": "TRAIT.030: 'urbex:spawner' - this node's block is initialised as a mob spawner. 'pool' names a 'conditions' asset whose values are entity ids.",
+      "properties": {
+        "pool": {
+          "$ref": "#/$defs/qualifiedIdentifier"
+        }
+      },
+      "required": [
+        "pool"
+      ],
+      "additionalProperties": false
+    },
+    "traitBlockEntity": {
+      "type": "object",
+      "description": "TRAIT.040: 'urbex:block_entity' - the NBT a block entity is initialised with. TRAIT.042: the positional keys 'x', 'y', 'z' and the type key 'id' are accepted here and dropped with a warning, not refused - so this schema does not exclude them.",
+      "properties": {
+        "nbt": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "nbt"
+      ],
+      "additionalProperties": false
+    },
+    "traitLight": {
+      "type": "object",
+      "description": "TRAIT.050: 'urbex:light' - this node's block is an optional light. TRAIT.051: an absent 'unlit' is air, so it is not required here.",
+      "properties": {
+        "unlit": {
+          "$ref": "#/$defs/nodeOrBlock"
+        }
+      },
+      "additionalProperties": false
+    },
+    "traitOptional": {
+      "type": "object",
+      "description": "TRAIT.060: 'urbex:optional' - this node is placed only when a named density roll accepts it. TRAIT.062: an absent 'replacement' is air, so it is not required here.",
+      "properties": {
+        "density": {
+          "type": "string",
+          "description": "TRAIT.061: names a density in the preset's decoration settings."
+        },
+        "replacement": {
+          "$ref": "#/$defs/nodeOrBlock"
+        }
+      },
+      "required": [
+        "density"
+      ],
+      "additionalProperties": false
+    },
+    "traitRotatable": {
+      "type": "boolean",
+      "description": "TRAIT.070 through TRAIT.072: 'urbex:rotatable' is the one trait with a scalar shorthand - its whole content is one boolean, and there are no keys to name."
+    }
+  }
+}

@@ -317,11 +317,6 @@ so that a fixture cannot fall out of coverage or stay listed after it becomes ru
 four that remain need a style with several palette groups, a part file's slice rows, or a command
 invocation, and `ConformanceIndexTest` carries the enumerated exemptions until they do.
 
-**`docs/schema/palette.v2.schema.json` does not exist.** §7 names it as the machine-readable shape
-and as the thing `PaletteSchemaTest` drift-guards against the codec's key sets. Until it is written,
-`DIAG.003` tells an author to "check the spelling against the schema" and there is no schema to
-check against.
-
 **The design record does not exist.** §2 forbids these documents from holding discussion,
 alternatives considered and measurements, on the grounds that a design record holds them. That record
 has not been written, so the rejected alternatives currently survive only in `> Why` blocks — which
