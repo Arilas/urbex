@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.format.palette.CompiledV2Palette;
 import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
@@ -34,6 +35,28 @@ public class Palette {
     private final Map<BlockState, BlockState> damaged = new HashMap<>();
 
     /**
+     * The version 2 form, or null for a version 1 palette.
+     *
+     * <p><b>One asset type for both formats, which is not the same as one model for both.</b> The
+     * {@code palettes} registry has one value type and one {@link AssetIndex}, and every consumer -
+     * {@link Style}, {@link BuildingPart}, {@link AssetGraph} - names {@code Palette}. Giving version 2
+     * its own asset type would mean a second index, a second selector in every style, and a second
+     * branch at every one of those consumers, which is what {@code VER.006} forbids being necessary:
+     * a style's {@code randompalettes} may draw a version 1 and a version 2 palette into one merge, so
+     * they have to be drawable from one list.</p>
+     *
+     * <p>What is <em>not</em> shared is the model. When this field is set, {@link #palette} and
+     * {@link #damaged} are empty and stay empty: a version 2 palette is compiled by
+     * {@code CompiledV2Palette}, all eight stages of {@code LOAD.001}, and none of version 1's
+     * per-entry compilation runs. {@link CompiledPalette} is where the two meet, and it meets them as
+     * compiled markers rather than as a common node model - which is
+     * {@code PaletteAssetDefinition}'s "no common node model, no shared merge, and nothing here invites
+     * one" held one layer further in.</p>
+     */
+    @Nullable
+    private final CompiledV2Palette v2;
+
+    /**
      * Builds a fully resolved palette from its {@code extends} chain, root first.
      * <p>
      * A palette is a keyed collection, so the chain merges <em>by character</em> rather than by
@@ -54,11 +77,36 @@ public class Palette {
     public Palette(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
                    List<PaletteDefinition> chainRootFirst) {
         name = id;
+        v2 = null;
         compile(blockLookup, variants, mergeByCharacter(chainRootFirst, name));
     }
 
     public Palette(String name) {
         this.name = Identifier.fromNamespaceAndPath(Urbex.MODID, name);
+        this.v2 = null;
+    }
+
+    private Palette(Identifier id, CompiledV2Palette compiled) {
+        this.name = id;
+        this.v2 = compiled;
+    }
+
+    /**
+     * A registered palette written in format version 2, already compiled.
+     *
+     * <p>The compilation happened before this: {@code CompiledV2Palette.compile} runs stages 4 to 8 of
+     * {@code LOAD.001} and refuses the palette by name if anything is wrong, which is {@code LOAD.004}
+     * and {@code LOAD.010}. By the time one of these exists, every question generation can ask it has
+     * an answer - {@code LOAD.011} - so this constructor cannot fail and does not validate.</p>
+     */
+    public static Palette version2(Identifier id, CompiledV2Palette compiled) {
+        return new Palette(id, compiled);
+    }
+
+    /** The compiled version 2 form, or null for a version 1 palette. */
+    @Nullable
+    public CompiledV2Palette v2() {
+        return v2;
     }
 
     /**
@@ -128,7 +176,24 @@ public class Palette {
         return merged.values();
     }
 
+    /**
+     * Version 1's in-place merge, which a version 2 palette does not take part in.
+     *
+     * <p>{@code Style.getRandomPalette} used this to flatten a draw into one {@code Palette} before
+     * compiling it. That cannot express a cross-version draw ({@code VER.006}) - there is nothing to
+     * copy a {@code CompiledV2Palette} into - so composition moved up to {@link CompiledPalette}, which
+     * merges compiled markers rather than authored entries. This remains for version 1's own callers.</p>
+     *
+     * @throws IllegalStateException if either side is a version 2 palette, rather than silently
+     *         producing a palette with none of its markers
+     */
     public void merge(Palette other) {
+        if (v2 != null || other.v2 != null) {
+            throw new IllegalStateException("Palette '" + name + "' cannot merge '" + other.name
+                    + "' in place: a version 2 palette is composed as compiled markers, by "
+                    + "CompiledPalette, and copying its maps here would produce a palette with no "
+                    + "markers at all");
+        }
         palette.putAll(other.palette);
         damaged.putAll(other.damaged);
     }

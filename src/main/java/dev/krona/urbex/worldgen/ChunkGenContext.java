@@ -147,6 +147,17 @@ public final class ChunkGenContext {
     }
 
     /**
+     * What {@code c} places here and everything that applies to it, in one lookup.
+     * <p>
+     * {@link #paletteAt}'s answer plus the marker's metadata, which {@code LOAD.022} requires be the
+     * same lookup rather than two. This is what {@code Parts.generatePart} uses; {@code paletteAt}
+     * remains for the passes that only want a state.
+     */
+    public CompiledPalette.Placed placedAt(CompiledPalette p, char c, int x, int y, int z) {
+        return p.placedAt(c, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
+    }
+
+    /**
      * An independent, seed-derived stream for {@code purpose} at this chunk.
      * <p>
      * A <em>new</em> stream every call. Obtain one per pass, before the loop that draws from it -

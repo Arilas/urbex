@@ -95,12 +95,18 @@ public class Parts {
                     int len = vs.length;
                     for (int y = 0; y < len; y++) {
                         char c = vs[y];
-                        BlockState b = ctx.paletteAt(compiledPalette, c, rx, oy + y, rz);
-                        if (b == null) {
+                        // One lookup for the state and what the marker carries, which LOAD.022 makes an
+                        // INVARIANT: "Resolving a marker to a state and to its traits is one lookup, not
+                        // two". It used to be paletteAt followed by getInfo, two lookups into two maps,
+                        // and a version 2 marker cannot answer the second at all - its traits are per
+                        // slot (LOAD.021), so there is no per-marker Info to fetch. One call path here,
+                        // whichever format the palette that defined this marker was written in.
+                        CompiledPalette.Placed placed = ctx.placedAt(compiledPalette, c, rx, oy + y, rz);
+                        if (placed == null) {
                             throw new RuntimeException("Could not find entry '" + c + "' in the palette for part '" + part.getName() + "'!");
                         }
-
-                        Palette.Info inf = compiledPalette.getInfo(c);
+                        BlockState b = placed.state();
+                        Palette.Info inf = placed.info();
 
                         if (transform != Transform.ROTATE_NONE) {
                             b = transformBlockState(feature, ctx.tags, info, transform, b);

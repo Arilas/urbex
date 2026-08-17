@@ -111,12 +111,18 @@ public final class AssetCompiler {
         HolderLookup<Block> blockLookup = access.lookupOrThrow(Registries.BLOCK);
         AssetIndex<Variant> variants = AssetStage.compileAll(access,
                 CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(id, blockLookup, chain), diagnostics);
-        AssetIndex<Palette> palettes = AssetStage.compileAll(access,
-                CustomRegistries.PALETTE_REGISTRY_KEY,
-                (id, chain) -> new Palette(id, blockLookup, variants,
-                        PaletteAssetDefinition.version1Only(id, chain)), diagnostics);
+        // Conditions before palettes, which is new in this task and is a dependency rather than a
+        // preference. A version 2 palette's urbex:loot and urbex:spawner traits name a conditions asset
+        // and TRAIT.021/TRAIT.031 refuse one that is not loaded, so the compiler has to be handed the
+        // set - LOAD.003, "never one it fetches". Version 1 read the same ids at generation and crashed
+        // on the first chunk that used a bad one, which is why the order did not matter before.
         AssetIndex<Condition> conditions = AssetStage.compileAll(access,
                 CustomRegistries.CONDITIONS_REGISTRY_KEY, (id, chain) -> new Condition(id, chain), diagnostics);
+        V2Palettes.Context v2Context = V2Palettes.context(access, blockLookup, conditions);
+        AssetIndex<Palette> palettes = AssetStage.compileAll(access,
+                CustomRegistries.PALETTE_REGISTRY_KEY,
+                (id, chain) -> V2Palettes.compile(id, blockLookup, variants, chain, v2Context),
+                diagnostics);
         AssetIndex<Style> styles = AssetStage.compileAll(access,
                 CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(id, palettes, chain), diagnostics);
         AssetIndex<BuildingPart> parts = AssetStage.compileAll(access,
