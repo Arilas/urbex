@@ -41,7 +41,27 @@ import java.util.function.Predicate;
  */
 public class SpawnPlacement {
 
-    private static final Map<ResourceKey<Level>, BlockPos> spawnPositions = new HashMap<>();
+    private static final Map<ResourceKey<Level>, Pending> spawnPositions = new HashMap<>();
+
+    /**
+     * A spawn this class chose, waiting for the first player to arrive.
+     *
+     * @param pos    where the player should end up
+     * @param forced whether to put them there even if the world spawn already says so.
+     *               <p>
+     *               The difference is vanilla's {@code fudgeSpawnLocation}, which does not use the
+     *               world spawn as given: with sky light it searches around it on the
+     *               {@code MOTION_BLOCKING} heightmap for somewhere to stand. For a city on the
+     *               surface that lands on the same street and nobody notices. For a spawn forty
+     *               blocks underground it finds the roof of the world instead, so the world spawn is
+     *               correct, the log says so, and the player is standing in daylight.
+     *               <p>
+     *               So a site's spawn is forced: the fudge is precisely what has to be undone. The
+     *               unforced case is the older one this map was built for - a single-player world
+     *               whose {@code level.dat} did not exist when the spawn was chosen, where the world
+     *               spawn is wrong and correcting it is the whole job.
+     */
+    private record Pending(BlockPos pos, boolean forced) {}
 
     static void reset() {
         spawnPositions.clear();
@@ -51,22 +71,33 @@ public class SpawnPlacement {
         ServerLevel level = serverPlayer.level();
         ResourceKey<Level> dimKey = level.dimension();
 
-        if (spawnPositions.containsKey(dimKey)) {
-            BlockPos correctPos = spawnPositions.get(dimKey);
-            LevelData.RespawnData rd = level.getRespawnData();
-            BlockPos currentWorldSpawn = rd.pos();
+        Pending pending = spawnPositions.get(dimKey);
+        if (pending == null) {
+            return;
+        }
+        BlockPos correctPos = pending.pos();
+        LevelData.RespawnData rd = level.getRespawnData();
+        BlockPos currentWorldSpawn = rd.pos();
 
-            if (!currentWorldSpawn.equals(correctPos)) {
-                LevelData.RespawnData newd = new LevelData.RespawnData(new GlobalPos(level.dimension(), correctPos), 0.0f, 0.0f);
-                level.setRespawnData(newd);
-
-                if (level.getLevelData() instanceof ServerLevelData data) {
-                    data.setSpawn(newd);
-                }
-                serverPlayer.teleportTo(level, correctPos.getX() + 0.5, correctPos.getY(), correctPos.getZ() + 0.5, Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot(), true);
-                spawnPositions.remove(dimKey);
+        if (!pending.forced() && currentWorldSpawn.equals(correctPos)) {
+            return;
+        }
+        LevelData.RespawnData newd = new LevelData.RespawnData(new GlobalPos(level.dimension(), correctPos), 0.0f, 0.0f);
+        if (!currentWorldSpawn.equals(correctPos)) {
+            level.setRespawnData(newd);
+            if (level.getLevelData() instanceof ServerLevelData data) {
+                data.setSpawn(newd);
             }
         }
+        serverPlayer.teleportTo(level, correctPos.getX() + 0.5, correctPos.getY(), correctPos.getZ() + 0.5, Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot(), true);
+        if (pending.forced()) {
+            // Their personal respawn point too, as though they had slept there. Without it the first
+            // death undoes the whole thing: respawning goes back through the world spawn and the
+            // same fudge, and a player who woke up sealed underground finds themselves on the
+            // surface for good the first time something kills them.
+            serverPlayer.setRespawnPosition(new ServerPlayer.RespawnConfig(newd, true), false);
+        }
+        spawnPositions.remove(dimKey);
     }
 
     /**
@@ -159,7 +190,7 @@ public class SpawnPlacement {
                     LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
                     serverLevel.setRespawnData(data);
                     settings.setSpawn(data);
-                    spawnPositions.put(serverLevel.dimension(), pos);
+                    spawnPositions.put(serverLevel.dimension(), new Pending(pos, false));
                     return true;
                 }
             } else {
@@ -167,7 +198,7 @@ public class SpawnPlacement {
                 LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
                 serverLevel.setRespawnData(data);
                 settings.setSpawn(data);
-                spawnPositions.put(serverLevel.dimension(), pos);
+                spawnPositions.put(serverLevel.dimension(), new Pending(pos, false));
                 return true;
             }
         }
@@ -204,9 +235,9 @@ public class SpawnPlacement {
                     new GlobalPos(serverLevel.dimension(), spawn), 0.0f, 0.0f);
             serverLevel.setRespawnData(data);
             settings.setSpawn(data);
-            // Stored as well as set, for the single-player case this map exists for: level.dat may
-            // not exist yet, so the spawn is re-applied when the first player joins.
-            spawnPositions.put(serverLevel.dimension(), spawn);
+            // Forced, because the player still has to be moved even though the world spawn is now
+            // right: vanilla fudges the arrival position onto the surface heightmap. See Pending.
+            spawnPositions.put(serverLevel.dimension(), new Pending(spawn, true));
             Urbex.getLogger().info("Urbex site '{}' placed this world's spawn at {}, {}, {}.",
                     anchor.site(), spawn.getX(), spawn.getY(), spawn.getZ());
             return true;
