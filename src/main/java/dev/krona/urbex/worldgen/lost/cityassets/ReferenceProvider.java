@@ -43,7 +43,15 @@ public final class ReferenceProvider {
      * {@code isModLoaded("minecraft")} answers false.</p>
      */
     public static boolean modIsInstalled(Identifier reference) {
-        String namespace = reference.getNamespace();
+        return modIsInstalled(reference.getNamespace());
+    }
+
+    /**
+     * The same question asked of a namespace directly, for a caller that has one and no id to hang it
+     * on - a version 2 palette's {@code "when": {"mod": "create"}} ({@code WEIGHT.023}), which names a
+     * mod and nothing in it.
+     */
+    public static boolean modIsInstalled(String namespace) {
         return "minecraft".equals(namespace) || FabricLoader.getInstance().isModLoaded(namespace);
     }
 

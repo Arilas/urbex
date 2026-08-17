@@ -98,6 +98,26 @@ class RngTest {
         assertArrayEquals(GOLDEN_LAST, take(Rng.at(42L, 100, -100, LAST_PURPOSE), 4));
     }
 
+    /**
+     * A third golden vector, over the palette addressing both formats now share.
+     * <p>
+     * {@code paletteSlotAt} decides which block every weighted palette marker places at every position,
+     * so a change to it rewrites every generated world exactly as a change to the mixing function would.
+     * It used to be an expression inside {@code CompiledPalette.getAt} with nothing pinning it; it moved
+     * here when the version 2 format needed the same addressing, and this is what makes the move
+     * checkable rather than asserted. Regenerate the same way as {@code GOLDEN}, after a deliberate
+     * change, and say so in the commit.
+     */
+    @Test
+    void thePaletteSlotAddressIsStableAcrossRuns() {
+        assertArrayEquals(new int[]{93, 127, 1, 104},
+                new int[]{
+                        Rng.paletteSlotAt(42L, '#', 100, 64, -100, 128),
+                        Rng.paletteSlotAt(42L, '#', 100, 65, -100, 128),
+                        Rng.paletteSlotAt(42L, 'F', 100, 64, -100, 128),
+                        Rng.paletteSlotAt(1337L, '#', 100, 64, -100, 128)});
+    }
+
     @Test
     void theEnumLayoutIsPinned() {
         // purpose.ordinal() feeds the hash, so inserting, removing or reordering a constant

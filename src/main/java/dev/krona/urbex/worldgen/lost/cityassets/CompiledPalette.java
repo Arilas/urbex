@@ -13,9 +13,6 @@ import java.util.*;
  */
 public class CompiledPalette {
 
-    /** Keys the world seed by a palette character. Odd, so distinct characters give distinct keys. */
-    private static final long CHARACTER_KEY = 0x9E3779B97F4A7C15L;
-
     /**
      * What a palette character resolves to.
      *
@@ -294,29 +291,19 @@ public class CompiledPalette {
      * characters this chunk resolved first cannot change it - which is exactly what a per-chunk
      * sequential stream got wrong, and what {@link dev.krona.urbex.varia.Rng} exists to prevent.
      * <p>
-     * The character is part of the address. Without it every weighted character resolves to the
-     * same index at a given block, so a mossy-cobble wall and a cracked-brick floor put their
-     * minority variants at identical offsets - one spatial pattern shared by the whole palette
-     * instead of one per character. The character is keyed into the seed rather than into
-     * {@code x}, {@code y} or {@code z} so that the address stays the block itself: perturbing a
-     * coordinate would alias two characters at neighbouring blocks onto one draw, and
-     * {@link Rng.Purpose} cannot carry it because palette characters are datapack-defined.
+     * The character is part of the address, and the addressing itself lives in
+     * {@link Rng#paletteSlotAt} rather than here - unchanged, and moved so that the version 2 format
+     * addresses its weighted markers with the same function instead of a second copy of the same
+     * expression. Why the character is keyed into the seed rather than into a coordinate, and what a
+     * palette looks like without it, is recorded there.
      */
     public BlockState getAt(char c, long seed, int x, int y, int z) {
         return switch (entry(c)) {
             case null -> null;
             case Entry.Simple simple -> simple.state();
-            case Entry.Weighted weighted -> weighted.slots()[Rng.indexAtPos(
-                    characterSeed(seed, c), x, y, z, Rng.Purpose.PALETTE, weighted.slots().length)];
+            case Entry.Weighted weighted -> weighted.slots()[
+                    Rng.paletteSlotAt(seed, c, x, y, z, weighted.slots().length)];
         };
-    }
-
-    /**
-     * The world seed keyed by a palette character. The multiplier is odd, so distinct characters
-     * always give distinct keys and no two characters can share a stream.
-     */
-    private static long characterSeed(long seed, char c) {
-        return seed ^ (c * CHARACTER_KEY);
     }
 
     /**

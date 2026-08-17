@@ -4,7 +4,13 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
+import dev.krona.urbex.format.palette.Apportion;
+import dev.krona.urbex.format.palette.Exclusion;
+import dev.krona.urbex.format.palette.Marker;
 import dev.krona.urbex.format.palette.NodeResolver;
+import dev.krona.urbex.format.palette.PointerResolver;
+import dev.krona.urbex.format.palette.ResolvedNode;
+import net.minecraft.core.registries.BuiltInRegistries;
 import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.format.palette.Pointer;
 import dev.krona.urbex.format.palette.RawNode;
@@ -88,11 +94,6 @@ class FormatFixtureTest {
         pending.put("MODEL.062#1", "an alias is answered by the merged palette a part is generated with"
                 + " (MODEL.062, MODEL.064), so an unresolvable one is only knowable where a style's"
                 + " palette groups are merged - LOAD.013's stage (Task 7)");
-
-        // Task 5 - sizes and selection.
-        pending.put("WEIGHT.024#1", "exclusion by 'when' is evaluated against the loaded mods (Task 5)");
-        pending.put("WEIGHT.032#1", "exclusion by absent blocks is evaluated against the block registry"
-                + " (Task 5)");
 
         // Task 6 - traits, characters, and the compiled palette.
         pending.put("MODEL.033#1", "the satellite is a node inside a trait payload, which stays opaque"
@@ -271,17 +272,28 @@ class FormatFixtureTest {
      * @param decoded stage 1 of {@code LOAD.001}
      * @param linked  stage 3, or empty when this document reaches outside itself - see
      *                {@link #selfContained}
+     * @param sized   stage 4 - sizes, exclusion and the 128 slots - or empty when stage 3 was, or when
+     *                stage 3 refused the document and there is nothing to size
      */
     private record Loaded(DataResult<?> decoded,
-                          Optional<DataResult<NodeResolver.ResolvedPalette>> linked) {
+                          Optional<DataResult<NodeResolver.ResolvedPalette>> linked,
+                          Optional<Optional<String>> sized) {
 
-        /** The first stage that refused the document, if either did. */
+        /** The first stage that refused the document, if any did. */
         Optional<String> error() {
             return decoded.error().map(DataResult.Error::message)
-                    .or(() -> linked.flatMap(DataResult::error).map(DataResult.Error::message));
+                    .or(() -> linked.flatMap(DataResult::error).map(DataResult.Error::message))
+                    .or(() -> sized.flatMap(refusal -> refusal));
         }
 
-        /** The strongest form this fixture reached, which is what an {@code equiv} group compares. */
+        /**
+         * The strongest form this fixture reached, which is what an {@code equiv} group compares.
+         * <p>
+         * Deliberately still the linked palette rather than the materialised slots: {@code MODEL.011}'s
+         * and {@code MODEL.020}'s groups are claims about what two spellings <em>mean</em>, and a slot
+         * array of 128 repeated nodes compares two distributions instead. Stage 4 contributes its
+         * refusals to {@link #error()} and nothing to the comparison.
+         */
         Object value() {
             return linked.flatMap(DataResult::result)
                     .map(Object.class::cast)
@@ -290,8 +302,48 @@ class FormatFixtureTest {
 
         /** What the dynamic test's name claims was asserted. */
         String strength() {
+            if (sized.isPresent()) {
+                return "decode, link and size";
+            }
             return linked.isPresent() ? "decode and link" : "decode";
         }
+    }
+
+    /**
+     * Stage 4 over every marker of a linked palette: sizes, then exclusion, then the 128 slots.
+     * <p>
+     * The order is {@code 05-weights.md}'s and not an implementation convenience - {@code WEIGHT.013},
+     * {@code WEIGHT.014} and {@code WEIGHT.019} on the expanded list, then {@code when} and absent blocks
+     * ({@code WEIGHT.020}, {@code WEIGHT.030}), then one materialisation at the root
+     * ({@code WEIGHT.052}). It is what makes {@code WEIGHT.024}'s and {@code WEIGHT.032}'s fixtures
+     * decidable here at all: both are documents that decode and link cleanly and are refused by what the
+     * game they load into does or does not have.
+     * <p>
+     * The presence is the real one, so a fixture naming {@code create} is excluded because {@code create}
+     * is genuinely not installed rather than because a stub said so.
+     *
+     * @return the refusal, or empty when every marker survived
+     */
+    private static Optional<String> size(NodeResolver.ResolvedPalette resolved) {
+        Diagnostics diagnostics = new Diagnostics();
+        Exclusion.Presence presence =
+                Exclusion.installed(BuiltInRegistries.BLOCK, Set.of("urbex", "minecraft"));
+        for (Map.Entry<Marker, ResolvedNode> marker : resolved.palette().entrySet()) {
+            PointerResolver.Site site = new PointerResolver.Site(Diagnostics.DECODING_LOCATION,
+                    "marker " + marker.getKey(), List.of());
+            if (!Apportion.checkSizes(marker.getValue(), site, diagnostics)) {
+                continue;
+            }
+            Optional<ResolvedNode> pruned =
+                    Exclusion.prune(marker.getValue(), presence, site, diagnostics);
+            if (pruned.isEmpty()) {
+                continue;
+            }
+            if (pruned.get().source() instanceof ResolvedNode.Source.Weighted weighted) {
+                Apportion.materialise(weighted.choices(), site, diagnostics);
+            }
+        }
+        return diagnostics.asError();
     }
 
     /**
@@ -308,7 +360,7 @@ class FormatFixtureTest {
         JsonElement document = JsonParser.parseString(json);
         if (document.isJsonObject() && document.getAsJsonObject().has("slices")) {
             return new Loaded(BuildingPartDefinition.CODEC.parse(JsonOps.INSTANCE, document),
-                    Optional.empty());
+                    Optional.empty(), Optional.empty());
         }
         DataResult<PaletteAssetDefinition> decoded =
                 PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, document);
@@ -317,7 +369,7 @@ class FormatFixtureTest {
                 .map(PaletteV2Definition.class::cast)
                 .filter(FormatFixtureTest::selfContained);
         if (file.isEmpty()) {
-            return new Loaded(decoded, Optional.empty());
+            return new Loaded(decoded, Optional.empty(), Optional.empty());
         }
         Diagnostics diagnostics = new Diagnostics();
         Optional<NodeResolver.ResolvedPalette> resolved =
@@ -326,7 +378,7 @@ class FormatFixtureTest {
                 .map(DataResult::success)
                 .orElseGet(() -> DataResult.error(() -> diagnostics.asError()
                         .orElse("the link stage refused the document and said nothing")));
-        return new Loaded(decoded, Optional.of(linked));
+        return new Loaded(decoded, Optional.of(linked), resolved.map(FormatFixtureTest::size));
     }
 
     /**

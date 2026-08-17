@@ -103,7 +103,18 @@ public record ResolvedNode(Kind kind, Source source, Map<Identifier, Trait> trai
      * exclusion has not, and neither has the check that every remaining element states a size. Both are
      * the next stage's ({@code LOAD.001} stage 4 and {@code 05-weights.md}), and a non-optional field
      * here would have to be filled with a guess in the meantime.
+     *
+     * @param spreadFrom the {@code $spread} pointer this alternative arrived through, when it did; see
+     *                   {@link RawChoice#spreadFrom()}. {@code WEIGHT.019}'s message is the only reader,
+     *                   and it is the only place the two halves of an expanded list's share total can
+     *                   still be told apart
      */
-    public record Choice(ResolvedNode node, Optional<Size> size, Optional<When> when) {
+    public record Choice(ResolvedNode node, Optional<Size> size, Optional<When> when,
+                         Optional<String> spreadFrom) {
+
+        /** An alternative the file in hand wrote itself. */
+        public Choice(ResolvedNode node, Optional<Size> size, Optional<When> when) {
+            this(node, size, when, Optional.empty());
+        }
     }
 }

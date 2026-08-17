@@ -56,8 +56,6 @@ class ConformanceIndexTest {
 
     private static Map<String, String> noFixtureRulesAwaitingACitingTest() {
         Map<String, String> awaiting = new LinkedHashMap<>();
-        awaiting.put("WEIGHT.019", "a parent palette to spread shares from; Task 5");
-        awaiting.put("WEIGHT.063", "a generated 129-choice list; Task 5");
         awaiting.put("LOAD.013", "a style with several palette groups; Task 7");
         awaiting.put("VER.006", "a style drawing both versions into one merge; Task 7");
         awaiting.put("VER.013", "a version 2 palette referencing a conditions asset; Task 6");

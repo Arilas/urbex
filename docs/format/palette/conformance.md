@@ -23,7 +23,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (101):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.070`, `MODEL.073`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `WEIGHT.012`, `WEIGHT.015`, `WEIGHT.016`, `WEIGHT.018`, `WEIGHT.022`, `WEIGHT.023`, `WEIGHT.025`, `WEIGHT.031`, `WEIGHT.040`, `WEIGHT.041`, `WEIGHT.042`, `WEIGHT.043`, `WEIGHT.050`, `WEIGHT.051`, `WEIGHT.052`, `WEIGHT.053`, `WEIGHT.060`, `WEIGHT.061`, `WEIGHT.062`, `WEIGHT.064`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (81):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.070`, `MODEL.073`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 109 of 303 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 141 of 303 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -87,11 +87,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.064` | `MUST` |  |  | — |
 | `MODEL.070` | `MUST` |  |  | — |
 | `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists` |
-| `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
+| `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndOneEmptiedListIsNotARefusal`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
 | `MODEL.073` | `MUST` |  |  | — |
 | `MODEL.074` | `MUST` |  |  | — |
 | `MODEL.075` | `MUST` |  |  | — |
-| `MODEL.076` | `MUST` |  |  | `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
+| `MODEL.076` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndOneEmptiedListIsNotARefusal`, `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
 | `MODEL.080` | `MUST` |  |  | — |
 | `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource` |
 | `MODEL.082` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
@@ -232,39 +232,39 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.002` | `REJECT` | `DIAG.040` | `reject=DIAG.040` | — |
 | `WEIGHT.003` | `MUST` |  |  | `PaletteV2DecodeTest.aChoiceStatesItsSizeOnceInOneOfThreeSpellings` |
 | `WEIGHT.004` | `MUST` |  |  | `PaletteV2DecodeTest.aChoiceStatesItsSizeOnceInOneOfThreeSpellings`, `PaletteV2DecodeTest.aFractionalWeightIsRefusedRatherThanTruncatedToAnInteger` |
-| `WEIGHT.005` | `MUST` |  |  | `PaletteV2DecodeTest.aListCarryingASpreadOrAWhenIsNotSizeCheckedAsWritten` |
-| `WEIGHT.010` | `MUST` |  | `accept` | — |
-| `WEIGHT.011` | `MUST` |  | `accept` | — |
-| `WEIGHT.012` | `MUST` |  |  | — |
-| `WEIGHT.013` | `REJECT` | `DIAG.041` | `reject=DIAG.041` | — |
-| `WEIGHT.014` | `REJECT` | `DIAG.045` | `reject=DIAG.045` | — |
-| `WEIGHT.015` | `INVARIANT` |  |  | — |
-| `WEIGHT.016` | `MUST` |  |  | — |
-| `WEIGHT.017` | `MUST` |  | `accept` | — |
-| `WEIGHT.018` | `MUST` |  |  | — |
-| `WEIGHT.019` | `REJECT` | `DIAG.045` | *n/a* | — |
-| `WEIGHT.020` | `MUST` |  | `accept` | — |
-| `WEIGHT.021` | `MUST` |  | `accept` | — |
-| `WEIGHT.022` | `MUST` |  |  | — |
-| `WEIGHT.023` | `MUST` |  |  | — |
-| `WEIGHT.024` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | — |
-| `WEIGHT.025` | `MUST NOT` |  |  | — |
-| `WEIGHT.030` | `ACCEPT` |  | `accept` | — |
-| `WEIGHT.031` | `MUST` |  |  | — |
-| `WEIGHT.032` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | — |
-| `WEIGHT.040` | `MUST` |  |  | — |
-| `WEIGHT.041` | `MUST` |  |  | — |
-| `WEIGHT.042` | `INVARIANT` |  |  | — |
-| `WEIGHT.043` | `MUST` |  |  | — |
-| `WEIGHT.050` | `MUST` |  |  | — |
-| `WEIGHT.051` | `MUST` |  |  | — |
-| `WEIGHT.052` | `MUST` |  |  | — |
-| `WEIGHT.053` | `INVARIANT` |  |  | — |
-| `WEIGHT.060` | `MUST` |  |  | — |
-| `WEIGHT.061` | `INVARIANT` |  |  | — |
-| `WEIGHT.062` | `MUST` |  |  | — |
-| `WEIGHT.063` | `REJECT` | `DIAG.044` | *n/a* | — |
-| `WEIGHT.064` | `MUST` |  |  | — |
+| `WEIGHT.005` | `MUST` |  |  | `ApportionTest.everySizeRuleIsEvaluatedOnTheListAfterASpreadHasBeenExpanded`, `PaletteV2DecodeTest.aListCarryingASpreadOrAWhenIsNotSizeCheckedAsWritten` |
+| `WEIGHT.010` | `MUST` |  | `accept` | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint` |
+| `WEIGHT.011` | `MUST` |  | `accept` | `ApportionTest.aWeightAddedToASpreadListOfWeightsTakesItsPartOfTheCombinedTotal` |
+| `WEIGHT.012` | `MUST` |  |  | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint` |
+| `WEIGHT.013` | `REJECT` | `DIAG.041` | `reject=DIAG.041` | `ApportionTest.moreThanOneRestOrARestBesideAWeightIsRefusedOnTheExpandedList` |
+| `WEIGHT.014` | `REJECT` | `DIAG.045` | `reject=DIAG.045` | `ApportionTest.sharesMustLeaveARemainderWhenSomethingTakesItAndMustTotalOneWhenNothingDoes` |
+| `WEIGHT.015` | `INVARIANT` |  |  | `ApportionTest.shufflingAListsDeclarationOrderDoesNotChangeItsDistribution` |
+| `WEIGHT.016` | `MUST` |  |  | `ApportionTest.aWeightAddedToASpreadListOfWeightsTakesItsPartOfTheCombinedTotal` |
+| `WEIGHT.017` | `MUST` |  | `accept` | `ApportionTest.everySizeRuleIsEvaluatedOnTheListAfterASpreadHasBeenExpanded` |
+| `WEIGHT.018` | `MUST` |  |  | `ApportionTest.everySizeRuleIsEvaluatedOnTheListAfterASpreadHasBeenExpanded` |
+| `WEIGHT.019` | `REJECT` | `DIAG.045` | *n/a* | `ApportionTest.aSpreadThatBringsTheSharesToOneNamesTheWrittenAndInheritedTotalsSeparately` |
+| `WEIGHT.020` | `MUST` |  | `accept` | `ExclusionTest.aChoiceWhoseConditionDoesNotHoldLeavesTheListAndTheSurvivorsDivideItsSize` |
+| `WEIGHT.021` | `MUST` |  | `accept` | `ExclusionTest.aChoiceWhoseConditionDoesNotHoldLeavesTheListAndTheSurvivorsDivideItsSize`, `ExclusionTest.aRemovedShareGoesToTheWeightChoicesOrProportionallyToTheSharesThatAreLeft` |
+| `WEIGHT.022` | `MUST` |  |  | `ExclusionTest.whenIsEvaluatedOnceSoEveryPositionSeesTheSameReducedList` |
+| `WEIGHT.023` | `MUST` |  |  | `ExclusionTest.whenAcceptsAModIdAndAPackNamespaceAndNoOtherCondition`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
+| `WEIGHT.024` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay` |
+| `WEIGHT.025` | `MUST NOT` |  |  | `ExclusionTest.aChoiceCarryingATraitKeepsItsSizeWhereAChoiceCarryingAWhenLeavesTheList` |
+| `WEIGHT.030` | `ACCEPT` |  | `accept` | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
+| `WEIGHT.031` | `MUST` |  |  | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed` |
+| `WEIGHT.032` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay` |
+| `WEIGHT.040` | `MUST` |  |  | `ApportionTest.aWeightedNodeCompilesToExactlyOneHundredAndTwentyEightSlots` |
+| `WEIGHT.041` | `MUST` |  |  | `ApportionTest.twoMarkersPlaceTheirMinorityChoicesAtDifferentOffsets` |
+| `WEIGHT.042` | `INVARIANT` |  |  | `ApportionTest.selectionIsAddressedSoResolutionOrderCannotChangeIt` |
+| `WEIGHT.043` | `MUST` |  |  | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition` |
+| `WEIGHT.050` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
+| `WEIGHT.051` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
+| `WEIGHT.052` | `MUST` |  |  | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint` |
+| `WEIGHT.053` | `INVARIANT` |  |  | `ApportionTest.aNestedTreesDistributionEqualsItsFlattenedEquivalentsToWithinOneSlot` |
+| `WEIGHT.060` | `MUST` |  |  | `ApportionTest.slotsGoByLargestRemainderWithTiesToTheLowestIndexAndNoneLeftOver` |
+| `WEIGHT.061` | `INVARIANT` |  |  | `ApportionTest.slotsGoByLargestRemainderWithTiesToTheLowestIndexAndNoneLeftOver` |
+| `WEIGHT.062` | `MUST` |  |  | `ApportionTest.aChoiceRoundingBelowOneSlotStillGetsOneAndTheDeficitComesFromTheLargest` |
+| `WEIGHT.063` | `REJECT` | `DIAG.044` | *n/a* | `ApportionTest.moreAlternativesThanSlotsIsRefusedBecauseEveryOneOfThemIsOwedASlot` |
+| `WEIGHT.064` | `MUST` |  |  | `ApportionTest.shufflingAListsDeclarationOrderDoesNotChangeItsDistribution` |
 
 ### `palette/06-characters.md`
 

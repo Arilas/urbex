@@ -367,13 +367,17 @@ public final class NodeResolver {
                 expanded.add(choice);
                 continue;
             }
-            Optional<List<RawChoice>> spread = spread(choice.node().spread().orElseThrow(), scope,
-                    site);
+            String pointer = choice.node().spread().orElseThrow();
+            Optional<List<RawChoice>> spread = spread(pointer, scope, site);
             if (spread.isEmpty()) {
                 ok = false;
                 continue;
             }
-            expanded.addAll(spread.get());
+            // Each incoming element is stamped with the pointer this file wrote, overwriting whatever
+            // provenance it carried in its own document: WEIGHT.019's message divides a total into what
+            // the reader can see in the file they are editing and what arrived from somewhere else, and
+            // "somewhere else" is this pointer whether or not the list it names was itself assembled.
+            spread.get().forEach(element -> expanded.add(element.broughtInBy(pointer)));
         }
         if (!ok) {
             return Optional.empty();
@@ -389,7 +393,8 @@ public final class NodeResolver {
                 ok = false;
                 continue;
             }
-            resolvedChoices.add(new RawChoice(value.get(), choice.size(), choice.when()));
+            resolvedChoices.add(new RawChoice(value.get(), choice.size(), choice.when(),
+                    choice.spreadFrom()));
         }
         return ok ? Optional.of(List.copyOf(resolvedChoices)) : Optional.empty();
     }
@@ -630,7 +635,8 @@ public final class NodeResolver {
                 ok = false;
                 continue;
             }
-            resolvedChoices.add(new ResolvedNode.Choice(value.get(), choice.size(), choice.when()));
+            resolvedChoices.add(new ResolvedNode.Choice(value.get(), choice.size(), choice.when(),
+                    choice.spreadFrom()));
         }
         return ok ? List.copyOf(resolvedChoices) : null;
     }

@@ -213,11 +213,18 @@ public enum Diag {
             + " Reduce the list, or nest the rare choices under one weighted choice."),
 
     /**
-     * {@code WEIGHT.014}, {@code WEIGHT.019}: args are the location, the total, and which of the two
-     * requirements was broken - a list with a {@code weight} or {@code rest} must leave something
-     * for it, and a list without one must total exactly 1.
+     * {@code WEIGHT.014}, {@code WEIGHT.019}: args are the location, the total, the clause naming where
+     * the total came from, and which of the two requirements was broken - a list with a {@code weight}
+     * or {@code rest} must leave something for it, and a list without one must total exactly 1.
+     * <p>
+     * <b>The third slot is the row's {@code < — <a> written here and <b> spread from '<id>'>} clause,</b>
+     * and it went unimplemented while nothing could expand a {@code $spread}. {@code WEIGHT.019} is the
+     * rule that needs it: a spread that brings a list's shares to 1 is refused "naming the incoming and
+     * inherited totals separately", because - in that rule's own words - "Shares total 1.15" sends an
+     * author looking through their own four lines for a number that came from a file they did not write.
+     * It is empty whenever every share in the sum was written where the diagnostic points.
      */
-    DIAG_045("%s: shares total %s. %s."),
+    DIAG_045("%s: shares total %s%s. %s."),
 
     // ---- Characters (050-059) ------------------------------------------------------------------
 

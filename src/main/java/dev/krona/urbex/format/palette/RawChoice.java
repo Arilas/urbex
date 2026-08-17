@@ -8,7 +8,6 @@ import com.mojang.serialization.DynamicOps;
 import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Diagnostics;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -28,8 +27,28 @@ import java.util.Set;
  *             {@code accept} fixtures both write a bare {@code {"$spread": …}} element, which such a
  *             record cannot hold.
  * @param when the load-time condition, if any ({@code WEIGHT.020})
+ * @param spreadFrom the {@code $spread} pointer this element arrived through, when it did. Empty for
+ *                   every element a file wrote itself, and empty on everything a decode produces -
+ *                   only {@code NodeResolver}'s expansion fills it. It exists for one message:
+ *                   {@code WEIGHT.019} refuses a spread that brings a list's shares to 1 "naming the
+ *                   incoming and inherited totals separately", and by {@code WEIGHT.005} that refusal
+ *                   is decided on the expanded list, where nothing else records which half of the
+ *                   total the author can see in their own file. "Shares total 1.15" sends an author
+ *                   looking through their own four lines for a number that came from a file they did
+ *                   not write
  */
-public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) {
+public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when,
+                        Optional<String> spreadFrom) {
+
+    /** An element as written: nothing has expanded a {@code $spread} into it yet. */
+    public RawChoice(RawNode node, Optional<Size> size, Optional<When> when) {
+        this(node, size, when, Optional.empty());
+    }
+
+    /** The same element, recorded as having arrived through {@code pointer}. */
+    public RawChoice broughtInBy(String pointer) {
+        return new RawChoice(node, size, when, Optional.of(pointer));
+    }
 
     /**
      * The keys a choice adds to the node keys it shares its object with, in a fixed order.
@@ -253,11 +272,12 @@ public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) 
     /**
      * {@code WEIGHT.013} and {@code WEIGHT.014}, on the list as written.
      * <p>
-     * Shares are summed as {@link BigDecimal#valueOf(double)}, so the comparison against 1 is exact
-     * rather than within a tolerance: {@code 0.7 + 0.4} is {@code 1.1000000000000001} in binary
-     * floating point, and both the message and the decision would then be about the encoding rather
-     * than about the file. {@code WEIGHT.052} asks for exact rational arithmetic where the slots are
-     * apportioned; this is the same reasoning one step earlier.
+     * Shares are summed as {@link Fraction}s, so the comparison against 1 is exact rather than within a
+     * tolerance: {@code 0.7 + 0.4} is {@code 1.1000000000000001} in binary floating point, and both the
+     * message and the decision would then be about the encoding rather than about the file.
+     * {@code WEIGHT.052} asks for exact rational arithmetic where the slots are apportioned;
+     * {@code Apportion} runs these same two rules again on the expanded, excluded list, and the two must
+     * not be able to disagree about what a share is worth - which is why both go through one type.
      */
     private static void checkList(List<RawChoice> choices, Diagnostics diagnostics) {
         if (choices.isEmpty()) {
@@ -283,26 +303,27 @@ public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) 
                     "'rest' is declared beside " + weights + " weighted choices");
         }
 
-        BigDecimal total = BigDecimal.ZERO;
+        Fraction total = Fraction.ZERO;
         for (RawChoice choice : choices) {
             if (choice.size().orElse(null) instanceof Size.Share share) {
-                total = total.add(BigDecimal.valueOf(share.fraction()));
+                total = total.plus(Fraction.ofDecimal(share.fraction()));
             }
         }
+        // The empty third argument is DIAG.045's optional "<a> written here and <b> spread from
+        // '<id>'" clause, which cannot apply here: a list holding a $spread is deferred above, so
+        // every share this sees is one the file in hand wrote.
         boolean somethingTakesTheRemainder = rests + weights > 0;
         if (somethingTakesTheRemainder) {
-            if (total.compareTo(BigDecimal.ONE) >= 0) {
-                diagnostics.error(Diag.DIAG_045, Diagnostics.DECODING_LOCATION, plain(total),
+            if (total.compareTo(Fraction.ONE) >= 0) {
+                diagnostics.error(Diag.DIAG_045, Diagnostics.DECODING_LOCATION,
+                        total.toPlainString(), "",
                         "Shares must leave something for the weight choices");
             }
-        } else if (total.compareTo(BigDecimal.ONE) != 0) {
-            diagnostics.error(Diag.DIAG_045, Diagnostics.DECODING_LOCATION, plain(total),
+        } else if (total.compareTo(Fraction.ONE) != 0) {
+            diagnostics.error(Diag.DIAG_045, Diagnostics.DECODING_LOCATION,
+                    total.toPlainString(), "",
                     "Shares must total exactly 1 when nothing takes the remainder");
         }
-    }
-
-    private static String plain(BigDecimal total) {
-        return total.stripTrailingZeros().toPlainString();
     }
 
     private static <T> DataResult<T> encodeElement(DynamicOps<T> ops, Codec<RawNode> node,
