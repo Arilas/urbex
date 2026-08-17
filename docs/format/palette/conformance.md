@@ -1,6 +1,6 @@
 # Conformance index
 
-`[GENERATED]` — do not edit. Regenerate with `python3 docs/format/conformance.py`;
+`[GENERATED]` — do not edit. Regenerate with `./gradlew regenerateConformance`;
 `ConformanceIndexTest` fails if the checked-in copy differs from what the documents say.
 
 Every rule in this specification, its class, its fixtures, and the tests that cite it. See

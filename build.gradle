@@ -616,20 +616,31 @@ dependencies {
 
 test {
     useJUnitPlatform()
-    // Two tests read files under docs/ - DatapackGuideExamplesTest decodes every JSON example in
-    // docs/datapacks.md and checks the error messages it quotes, PresetSchemaTest drift-guards
-    // docs/schema/preset.schema.json against the section codecs - and docs/ is on no classpath, so
+    // Three concerns read files under docs/ - DatapackGuideExamplesTest decodes every JSON example
+    // in docs/datapacks.md and checks the error messages it quotes, PresetSchemaTest drift-guards
+    // docs/schema/preset.schema.json against the section codecs, and ConformanceIndexTest /
+    // FixtureWellFormednessTest parse every rule, fixture and diagnostic under docs/format/ and
+    // drift-guard the checked-in conformance.md against them - and docs/ is on no classpath, so
     // without declaring these Gradle leaves :test UP-TO-DATE after a documentation-only edit. That is
-    // exactly the edit those two exist to catch. Listed file by file rather than as fileTree('docs'):
+    // exactly the edit those tests exist to catch. Listed file by file rather than as fileTree('docs'):
     // nothing reads docs/presets.md - its prose is unasserted, only the schema beside it is checked -
     // and the specs and plans under docs/superpowers/ change with every task, so a whole-directory
-    // input would cost a full suite run per plan edit.
-    inputs.files(files('docs/datapacks.md'), fileTree('docs/schema'))
+    // input would cost a full suite run per plan edit. docs/format is the exception: every file in it
+    // is read by SpecDocuments, so it is declared as a whole tree rather than file by file.
+    inputs.files(files('docs/datapacks.md'), fileTree('docs/schema'), fileTree('docs/format'))
             .withPropertyName('docsReadByTests')
             .withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {
         events "passed", "skipped", "failed"
     }
+}
+
+tasks.register('regenerateConformance', JavaExec) {
+    description = 'Rewrites docs/format/palette/conformance.md from the specification documents.'
+    group = 'documentation'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.krona.urbex.format.SpecDocuments'
+    args 'write'
 }
 
 jar {
