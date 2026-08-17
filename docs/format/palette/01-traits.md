@@ -140,11 +140,32 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.010** · `MUST` — `urbex:damaged` states what this node's block becomes where the damage
 > pass applies. Its required field is `into`.
 
-> **TRAIT.011** · `MUST` — The mapping is keyed by the marker carrying the trait, not by the block
-> state it resolves to.
+> **TRAIT.011** · `MUST` `[NOT-YET-REACHED: issue #216]` — The mapping is keyed by the marker carrying
+> the trait, not by the block state it resolves to.
 
 > > **Why** — version 1 kept one `Map<BlockState, BlockState>` per palette, so two markers resolving
 > > to the same block shared one mapping and the last compiled won.
+
+> > **Why it is stated and not yet reached, and exactly how far it gets** — the *compiled palette*
+> > satisfies this rule: a marker's `urbex:damaged` is a satellite of that marker's own entry, and two
+> > markers on one block keep their own damaged forms, which `TraitTest` pins. What cannot consume it is
+> > the *damage pass*. That pass runs over blocks it reads back out of the chunk, after the part that
+> > wrote them has finished (`DamageArea`, `Decorations`), and a marker is neither carried on a placed
+> > block nor recoverable from one — which is exactly why version 1 keyed its map by state. So the
+> > mapping is correct where it is built and collapses where it is used, and a version 2 palette
+> > generated today gets version 1's outcome.
+> >
+> > Reaching it needs the marker recorded per position while the part is written, for the damage pass to
+> > read — a change to version 1 generation infrastructure with its own memory and lifetime decisions
+> > and its own goldens, which is [issue #216](https://github.com/Arilas/urbex/issues/216) and not the
+> > palette format's. The two alternatives were rejected on the record: damaging at write time moves the
+> > digest goldens for reasons unrelated to version 2, and keying by state permanently would mean
+> > amending this rule to match an implementation that does not fix the defect the `> Why` above says it
+> > exists to fix.
+> >
+> > Stated here rather than only in a plan, in the style [VER.015](09-migration.md#11-what-version-2-does-not-reach-yet)
+> > uses for version 2 compilation: a reader who finds the mapping collapsing two markers should find
+> > out why from the rule, not from a commit message.
 
 > **TRAIT.012** · `ACCEPT` — An `into` naming a block this game does not have leaves the marker
 > undamaged, and the load succeeds.
@@ -346,6 +367,16 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 
 > > **Why** — a floor torch and a hanging lantern go dark as different blocks, so one replacement for
 > > the whole socket could be right for at most one of its placements.
+
+> > **Why this needs no mechanism of its own** — it is [TRAIT.005](#2-inheritance) and
+> > [TRAIT.006](#2-inheritance) read one position over, and stating it as an instance is worth more than
+> > stating it as a rule. A candidate is an [alternative](00-model.md#3-alternatives-and-satellites), so
+> > it inherits the socket's traits; a candidate declaring its own `urbex:light` replaces the inherited
+> > one whole. The precedence is therefore already decided by the time anything looks at a candidate,
+> > and a loader that implemented this rule separately — carrying "no replacement here, ask the socket"
+> > forward to placement time, which is what version 1 did — would be implementing a fallback that
+> > inheritance has already performed. A candidate that carries `urbex:light` with no `unlit` written
+> > gets air by [TRAIT.051](#45-urbexlight), deliberately, and not the socket's.
 
 ```json fixture:TRAIT.053 reject=DIAG.024
 {
