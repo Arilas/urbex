@@ -40,9 +40,10 @@ class ConformanceIndexTest {
      * replaces: it must have a citing test, and unlike the general check that requirement is never
      * suspended by draft. That is the right rule and this list does not weaken it - it records that
      * <em>today</em> none of the entries below is coverable, because each needs something no stage that
-     * exists has: a resolved {@code extends} chain, a part file, a command invocation, or a generated
-     * 129-choice list. The three a second asset was enough for - {@code REF.043}, {@code REF.045} and
-     * {@code REF.062} - went when the resolver landed and could be handed one.
+     * exists has: a style with several palette groups, a conditions asset, a part file's slice rows, or a
+     * command invocation. The three a second asset was enough for - {@code REF.043}, {@code REF.045} and
+     * {@code REF.062} - went when the resolver landed and could be handed one, and the two a generated
+     * list was enough for - {@code WEIGHT.019} and {@code WEIGHT.063} - went when stage 4 landed.
      * <p>
      * <b>Why a list and not a disabled test.</b> Until Task 2 this whole test was {@code @Disabled},
      * which checked nothing at all - including the twelve other assertions in it and the five hundred
@@ -114,16 +115,26 @@ class ConformanceIndexTest {
         assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
     }
 
+    /**
+     * {@code README.md} §3.2: "A {@code REJECT} or {@code WARN} rule always cites a {@code DIAG}
+     * identifier."
+     * <p>
+     * Both classes and not only {@code REJECT}, since the {@code WARN} class landed: the reason the
+     * section gives is that a refusal whose message is not specified cannot be tested without pinning an
+     * implementation detail, and that is just as true of a report which does not refuse. A {@code WARN}
+     * rule with no diagnostic would be a rule saying only "something is said", which is not falsifiable.
+     */
     @Test
-    void everyRejectRuleCitesADefinedDiagnostic() {
+    void everyRejectOrWarnRuleCitesADefinedDiagnostic() {
         SpecDocuments spec = SpecDocuments.load();
         List<String> failures = new ArrayList<>();
         for (SpecDocuments.SpecRule rule : spec.rules().values()) {
-            if (!"REJECT".equals(rule.cls())) {
+            if (!"REJECT".equals(rule.cls()) && !"WARN".equals(rule.cls())) {
                 continue;
             }
             if (rule.diag().isEmpty()) {
-                failures.add(rule.file() + ": " + rule.id() + " is REJECT but cites no DIAG");
+                failures.add(rule.file() + ": " + rule.id() + " is " + rule.cls()
+                        + " but cites no DIAG");
             } else if (!spec.rules().containsKey(rule.diag().get())) {
                 failures.add(rule.file() + ": " + rule.id() + " cites " + rule.diag().get()
                         + ", which the catalogue does not define");
@@ -165,7 +176,7 @@ class ConformanceIndexTest {
      * {@code MUST} or {@code INVARIANT} rule with neither a fixture nor a citing test is just as
      * much an unenforced claim as an {@code ACCEPT} rule would be, so this checks every rule, not
      * only the four classes a fixture alone can discharge. The one exclusion is a diagnostic
-     * catalogue row (cls {@code DIAG}) - not a rule under §3.2's own six classes, only a
+     * catalogue row (cls {@code DIAG}) - not a rule under §3.2's own eight classes, only a
      * bookkeeping entry this parser stores alongside rules; {@code DIAG.001} is exercised through
      * the {@code REJECT} rule that cites it, not by a test of its own.
      * <p>

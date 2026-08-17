@@ -246,7 +246,7 @@ a quarter of the result and the inherited choices keep their ratios across the o
 > > message is true of it word for word. MODEL.072 refuses a socket that *declares* no candidate;
 > > this is the same absence arriving from the installed environment instead.
 
-> **WEIGHT.026** · `MUST` (`DIAG.046`) — A node removed by WEIGHT.024's cascade is reported as a
+> **WEIGHT.026** · `WARN` (`DIAG.046`) — A node removed by WEIGHT.024's cascade is reported as a
 > warning, naming how many of its alternatives went each way. It is a warning and not a rejection: by
 > DIAG.904 a warning does not refuse the world, and this one does not.
 
@@ -262,6 +262,13 @@ a quarter of the result and the inherited choices keep their ratios across the o
 > > be installed, and both are decisions about the one nested list. The warning is not raised at all
 > > when the list that absorbed the node is itself empty, because "the choices around it divide its
 > > share" would then be false and something further up is about to report the real failure.
+
+> > **One case reports nothing, deliberately** — a `light_socket` whose `floor` is emptied by the same
+> > exclusion that absorbed a node *inside* `floor`, while its `ceiling` survives. The socket lives, so
+> > the warning would be true, but the emptied list cannot see that its owner survived and withholds it
+> > by the rule above. This is stated here rather than only in a task report because closing it means
+> > threading the owner's fate back through the recursion, which is a signature change for a shape no
+> > file in the measured corpus has: whoever makes that change should know this is what it buys.
 
 ```json fixture:WEIGHT.024 reject=DIAG.043
 { "version": 2, "palette": { "c": { "kind": "weighted", "choices": [

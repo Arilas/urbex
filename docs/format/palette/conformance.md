@@ -248,7 +248,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.022` | `MUST` |  |  | `ExclusionTest.whenIsEvaluatedOnceSoEveryPositionSeesTheSameReducedList` |
 | `WEIGHT.023` | `MUST` |  |  | `ExclusionTest.whenAcceptsAModIdAndAPackNamespaceAndNoOtherCondition`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
 | `WEIGHT.024` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay`, `ExclusionTest.aNestedNodeWithNothingLeftIsRemovedFromItsParentRatherThanRefused`, `ExclusionTest.aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade` |
-| `WEIGHT.026` | `MUST` | `DIAG.046` |  | `ExclusionTest.aNodeTheCascadeAbsorbsIsReportedAsAWarningThatDoesNotRefuseTheWorld`, `ExclusionTest.theCascadeWarningIsWithheldWhenNothingSurvivedToDivideTheShare` |
+| `WEIGHT.026` | `WARN` | `DIAG.046` |  | `ExclusionTest.aNodeTheCascadeAbsorbsIsReportedAsAWarningThatDoesNotRefuseTheWorld`, `ExclusionTest.theCascadeWarningIsWithheldWhenNothingSurvivedToDivideTheShare` |
 | `WEIGHT.025` | `MUST NOT` |  |  | `ExclusionTest.aChoiceCarryingATraitKeepsItsSizeWhereAChoiceCarryingAWhenLeavesTheList` |
 | `WEIGHT.030` | `ACCEPT` |  | `accept` | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
 | `WEIGHT.031` | `MUST` |  |  | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed` |

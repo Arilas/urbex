@@ -86,7 +86,7 @@ a test.
 ### 3.2 Classes
 
 A rule's class states **how it is falsifiable**, which is what makes the test writable without
-rereading the prose. Seven classes, and every rule has exactly one:
+rereading the prose. Eight classes, and every rule has exactly one:
 
 | Class | The rule says | A test proves it by |
 |---|---|---|
@@ -94,6 +94,7 @@ rereading the prose. Seven classes, and every rule has exactly one:
 | `MUST NOT` | a conforming loader never does this | exercising the situation the rule forbids and asserting the behaviour does not occur — the negative of `MUST`, and no weaker: the situation has to be reachable, or the test asserts nothing |
 | `REJECT` | this input is refused at load | feeding the input and asserting the load fails with the cited `DIAG` |
 | `ACCEPT` | this input is *not* refused | feeding the input and asserting the load succeeds |
+| `WARN` | this input is accepted, and reported | feeding the input, asserting the load succeeds, and asserting the cited `DIAG` is recorded at warning level |
 | `DEFAULT` | an absent field takes this value | comparing the compiled output of the absent and explicit forms |
 | `EQUIV` | two spellings compile identically | compiling both and asserting the compiled forms are equal |
 | `INVARIANT` | a property holds of every compiled palette | asserting it over the shipped corpus and over generated inputs |
@@ -105,8 +106,18 @@ resolve; `VER.004` — version 1 does not become stricter — accepts a version 
 and asserts it still loads. Neither has a diagnostic, because neither is a rejection, which is why
 `MUST NOT` carries no `DIAG` and the fixture-completeness check in §4.2 does not reach it.
 
-`REJECT` rules always cite a `DIAG` identifier. A rejection whose message is not specified is a
-rejection that cannot be tested without pinning an implementation detail.
+A `REJECT` or `WARN` rule always cites a `DIAG` identifier. A rejection whose message is not specified
+is a rejection that cannot be tested without pinning an implementation detail, and the same is true of
+a report that does not refuse.
+
+`WARN` is neither `ACCEPT` nor `REJECT`, and that is why it is a class rather than a `MUST` with a
+diagnostic bolted on. `ACCEPT` asserts the load succeeds and says nothing about what was reported;
+`REJECT` asserts it fails. A `WARN` rule asserts both halves at once — the document loads *and* the
+author is told something — and a test that checks only one of them passes while the other is broken.
+[DIAG.904](palette/08-errors.md#1-what-a-diagnostic-must-contain) fixes error and warning as the only
+two levels, so this class is what the catalogue already assumed existed. It carries no `reject=`
+fixture, because there is nothing to refuse; §4.2's fixture-completeness check therefore does not reach
+it and §4.3's citing-test requirement does.
 
 `ACCEPT` exists because the expensive mistakes in version 1 were over-rejection as often as
 under-rejection: a validator that reported 45 warnings about a correct pack is a validator nobody

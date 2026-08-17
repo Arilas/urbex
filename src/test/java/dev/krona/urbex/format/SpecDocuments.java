@@ -48,7 +48,15 @@ public final class SpecDocuments {
     /** §3.1: reserved for examples in {@code README.md}; defines no rule and is ignored everywhere. */
     private static final String RESERVED_AREA = "DEMO";
 
-    /** §4.2 rule 4: the rule classes a fixture-completeness check applies to. */
+    /**
+     * §4.2 rule 4: the rule classes a fixture-completeness check applies to.
+     * <p>
+     * {@code WARN} is deliberately not among them, and §3.2 says why: a warning refuses nothing, so
+     * there is no {@code reject=} fixture to write and an {@code accept} one would assert the half of
+     * the rule that is not in doubt. §4.3's citing-test requirement is what covers the class instead -
+     * a {@code WARN} rule is proved by loading the document, asserting it succeeded, and asserting the
+     * cited row arrived at warning level, which is three assertions no fixture grammar can express.
+     */
     public static final Set<String> NEEDS_FIXTURE = Set.of("ACCEPT", "REJECT", "DEFAULT", "EQUIV");
 
     /** Path of the generated index, relative to {@code docs/format}. */
@@ -56,7 +64,7 @@ public final class SpecDocuments {
 
     /**
      * The class assigned to a diagnostic-catalogue row (a table row in {@code palette/08-errors.md}
-     * §4, not a rule definition line). It is not one of the six rule classes {@code README.md} §3.2
+     * §4, not a rule definition line). It is not one of the eight rule classes {@code README.md} §3.2
      * defines - a catalogue row is data (an id and a message), not a normative statement - so it is
      * excluded wherever a check means "every rule": {@code DIAG.001} is exercised through the
      * {@code REJECT} rule that cites it, not by a test or fixture of its own.
@@ -73,7 +81,7 @@ public final class SpecDocuments {
      * accident - its catalogue row survives, holding {@code —}, which registers the id - and the first
      * retired <em>rule</em> ({@code VER.014}) is what showed that a rule had no equivalent.
      * <p>
-     * It is not one of {@code README.md} §3.2's six classes, and it is excluded wherever a check means
+     * It is not one of {@code README.md} §3.2's eight classes, and it is excluded wherever a check means
      * "every rule", for the same reason {@link #CATALOGUE_ROW_CLASS} is: a tombstone states no
      * requirement, so it can have no fixture and needs no citing test - §3.4 says outright that "tests
      * citing DEMO.007 were deleted".
