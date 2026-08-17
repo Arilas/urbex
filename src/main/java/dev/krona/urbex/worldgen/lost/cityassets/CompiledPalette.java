@@ -557,11 +557,20 @@ public class CompiledPalette {
     /**
      * Return true if this is a simple character that can have only one value in the palette.
      * <p>
-     * The check that rotted, and the reason for the sealed type. It used to read
+     * <b>The check that rotted twice, ten months apart, in this method.</b> First it read
      * {@code palette.get(c) instanceof Character} against a map holding {@code BlockState} or
      * {@code BlockState[]} - matching neither, so the bulk-fill fast path behind it was dead and
-     * nothing said so (issue #33). {@code instanceof Entry.Simple} cannot be wrong about a case
-     * that does not exist.
+     * nothing said so (issue #33). Then it read {@code instanceof Entry.Simple}, and when
+     * {@link Entry.V2} was added every version 2 marker answered {@code false} - including a plain
+     * one-block marker - so {@link #setBlocksFromPalette}'s {@code driver.setBlockRange} fast path was
+     * dead for the whole of version 2.
+     * <p>
+     * <b>The sealed type did not prevent the second one and was never going to.</b> It makes an
+     * exhaustive {@code switch} checkable: add a case and every switch over the type stops compiling
+     * until it is handled. It does nothing for an {@code instanceof} against one case, which keeps
+     * compiling and quietly answers {@code false} for the case that was added. That is why this is a
+     * {@code switch} even though a single arm would express the same thing - the next case added to
+     * {@link Entry} has to break this method rather than be silently excluded by it.
      */
     public boolean isSimple(char c) {
         return switch (entry(c)) {
