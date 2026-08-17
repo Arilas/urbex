@@ -87,13 +87,15 @@ class FormatFixtureTest {
     private static Map<String, String> pending() {
         Map<String, String> pending = new LinkedHashMap<>();
 
-        // MODEL.062 was listed for Task 4 and is not decidable there, or by any check over one palette
-        // chain. The rule now says so itself - "decided there, and not against one palette's extends
-        // chain" - because MODEL.064 makes the answer include "markers contributed by palettes this file
-        // never mentions". The shipped pack relies on exactly that: urbex:glass_side_variant_glass maps
-        // '@' to 'a' and declares no marker of its own, and the validator that read one palette at a time
-        // reported 45 problems in a pack that generates correctly. It becomes decidable where a style's
-        // palette groups are merged, which is LOAD.013's stage.
+        // MODEL.062 is decided at LOAD.013's stage, over a style's randompalettes, and is implemented
+        // there - PaletteCharacterCheck.checkAliases, with three citing tests including LOAD.013's
+        // report-nothing case. It stays listed here because the harness holds one document and this
+        // rule's input is a style with palette groups: the fixture's own palette compiles cleanly on
+        // its own, which is the whole point of the rule ("decided there, and not against one palette's
+        // extends chain"), so there is no outcome for a one-document harness to assert. The shipped
+        // pack relies on exactly that - urbex:glass_side_variant_glass maps '@' to 'a' and declares no
+        // marker of its own, and the validator that read one palette at a time reported 45 problems in
+        // a pack that generates correctly.
         pending.put("MODEL.062#1", "an alias is answered by the merged palette a part is generated with"
                 + " (MODEL.062, MODEL.064), so an unresolvable one is only knowable where a style's"
                 + " palette groups are merged - LOAD.013's stage (Task 7)");

@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
@@ -224,6 +225,112 @@ class PaletteCharacterCheckTest {
         return new BuildingPart(id, BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"),
                 List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(1), Optional.of(1),
                         Optional.of(levels), Optional.empty(), local, Optional.empty())));
+    }
+
+    // ---- MODEL.062 at LOAD.013's stage --------------------------------------------------------
+
+    @Rule("MODEL.062")
+    @Test
+    void aVersion2AliasNoDrawCanAnswerIsALoadError() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Style style = style(group(v2Palette("only_alias",
+                "{ \"version\": 2, \"palette\": { \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")));
+
+        PaletteCharacterCheck.checkAliases(style, diagnostics);
+
+        assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
+        assertTrue(diagnostics.hasFatal(), "no selection can resolve it, so the world must not load");
+        assertTrue(diagnostics.problems().getFirst().message().contains("'@' -> 'a'"),
+                () -> diagnostics.format(""));
+    }
+
+    @Rule("LOAD.013")
+    @Rule("MODEL.064")
+    @Test
+    void aVersion2AliasAnsweredByAnotherGroupsPaletteIsReportedAsNeitherErrorNorWarning() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        // The shipped idiom, in version 2: urbex:glass_side_variant_glass maps '@' to 'a' and declares
+        // nothing else at all, and the marker it names comes from a different randompalettes group.
+        // LOAD.013 is explicit that this is reported as neither, and the first implementation of the
+        // version 1 check reported 45 of these about a pack that generates correctly.
+        Style style = style(
+                group(v2Palette("side_glass",
+                        "{ \"version\": 2, \"palette\": { \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")),
+                group(palette("wall_a", entry('a', "minecraft:stone")),
+                        palette("wall_b", entry('a', "minecraft:stone_bricks"))));
+
+        PaletteCharacterCheck.checkAliases(style, diagnostics);
+
+        assertEquals(0, diagnostics.size(),
+                () -> "every draw of every group defines 'a', so LOAD.013 says report nothing: "
+                        + diagnostics.format(""));
+    }
+
+    @Rule("LOAD.012")
+    @Test
+    void aVersion2AliasOnlySomeDrawsAnswerIsAWarningRatherThanARefusal() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Style style = style(
+                group(v2Palette("side_glass",
+                        "{ \"version\": 2, \"palette\": { \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")),
+                group(palette("wall_a", entry('a', "minecraft:stone")),
+                        palette("wall_none", entry('b', "minecraft:stone_bricks"))));
+
+        PaletteCharacterCheck.checkAliases(style, diagnostics);
+
+        assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
+        assertFalse(diagnostics.hasFatal(),
+                "some draws work, so a pack that ships this generates correctly most of the time and "
+                        + "refusing it would be this check inventing a rule");
+    }
+
+    @Rule("VER.006")
+    @Rule("MODEL.060")
+    @Test
+    void aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays() {
+        // VER.006: "a style's randompalettes may draw a version 1 palette and a version 2 palette into
+        // the same merge", because that composition "operates on compiled palettes, not on extends, so
+        // it needs no correspondence between the two formats".
+        Palette version2 = PALETTES.get(Identifier.parse(v2Palette("mixed_v2",
+                "{ \"version\": 2, \"palette\": {"
+                        + " \"x\": \"minecraft:deepslate_bricks\","
+                        + " \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")));
+        Palette version1 = PALETTES.get(Identifier.parse(
+                palette("mixed_v1", entry('a', "minecraft:stone"))));
+
+        CompiledPalette merged = new CompiledPalette(version1, version2);
+
+        assertTrue(merged.isDefined('a'), "the version 1 palette's marker survives the merge");
+        assertTrue(merged.isDefined('x'), "and so does the version 2 palette's");
+        assertTrue(merged.isDefined('@'),
+                "and a version 2 alias is answered by a marker only the version 1 palette defines, "
+                        + "which is MODEL.064's 'markers contributed by palettes this file never "
+                        + "mentions' arriving across a format boundary");
+        assertEquals(BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:stone"))
+                        .defaultBlockState(),
+                merged.getAt('@', 1L, 0, 0, 0),
+                "and it resolves to what its target resolves to, by MODEL.060");
+    }
+
+    /** Registers a version 2 palette from its JSON and returns its id. */
+    private static String v2Palette(String path, String json) {
+        Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
+        dev.krona.urbex.format.Diagnostics diagnostics = new dev.krona.urbex.format.Diagnostics();
+        dev.krona.urbex.format.palette.PaletteV2Definition file =
+                dev.krona.urbex.format.palette.PaletteV2Definition.CODEC
+                        .parse(com.mojang.serialization.JsonOps.INSTANCE,
+                                com.google.gson.JsonParser.parseString(json))
+                        .result().orElseThrow();
+        PALETTES.put(id, Palette.version2(id,
+                dev.krona.urbex.format.palette.NodeResolver.resolve(file, diagnostics)
+                        .flatMap(resolved -> dev.krona.urbex.format.palette.CompiledV2Palette.compile(
+                                resolved,
+                                dev.krona.urbex.format.palette.Exclusion.installed(
+                                        BuiltInRegistries.BLOCK, java.util.Set.of("urbex", "minecraft")),
+                                dev.krona.urbex.format.palette.TraitContext.of(BuiltInRegistries.BLOCK),
+                                dev.krona.urbex.format.Diagnostics.DECODING_LOCATION, diagnostics))
+                        .orElseThrow()));
+        return id.toString();
     }
 
     @SafeVarargs

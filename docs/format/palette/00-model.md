@@ -301,6 +301,11 @@ same structure by two spellings. A named weighted node in the
 > `extends` chain: by [MODEL.064](#44-alias) that merge includes markers contributed by palettes this
 > file never mentions, so a chain on its own cannot say whether an alias resolves.
 
+> > **Where it is decided** — at [LOAD.013](07-compilation.md#2-diagnostics-are-load-time)'s stage, over a
+> > style's `randompalettes`, against the same two merges the marker check uses: the everything-merge
+> > answers "no draw resolves it" and the per-choice witnesses answer "some draw does not". A target that
+> > every draw defines is reported as neither, which is LOAD.013.
+
 > > **Why** — version 1's `frompalette` read only the first character of its value, so `"ab"`
 > > silently meant `"a"`; it could not override a marker already defined, so its effect depended on
 > > merge order; and an unresolvable one left the marker undefined with no diagnostic at all.

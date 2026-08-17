@@ -478,6 +478,20 @@ public class CompiledPalette {
     /** {@code LOAD.023}'s interning, extended across the merge rather than per palette. */
     private final Map<TraitSet, TraitSet> aliasTraitSets = new HashMap<>();
 
+    /**
+     * Every version 2 {@code alias} this merge carried in, as marker to target.
+     *
+     * <p>What {@code MODEL.062} is asked about. An alias whose target its own palette defined was
+     * answered at compile time and is not here; these are the ones {@code MODEL.064} says only the merge
+     * can answer, which is exactly the set a load-time check has to look at.</p>
+     */
+    public Map<Character, Character> aliasTargets() {
+        Map<Character, Character> targets = new LinkedHashMap<>();
+        pendingAliases.forEach((marker, pending) ->
+                targets.put((char) marker.codepoint(), (char) pending.target().codepoint()));
+        return targets;
+    }
+
     public Set<Character> getCharacters() {
         return palette.keySet();
     }

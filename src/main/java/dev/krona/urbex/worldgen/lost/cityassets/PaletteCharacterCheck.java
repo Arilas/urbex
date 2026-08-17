@@ -117,6 +117,67 @@ final class PaletteCharacterCheck {
     @Nullable
     private static Map<Character, List<String>> namedFields;
 
+    /**
+     * {@code MODEL.062} and {@code LOAD.013}: every version 2 {@code alias} in this style's palettes,
+     * answered against the merge a part is generated with.
+     *
+     * <p>{@code MODEL.062} refuses "an {@code alias} whose target is defined by no palette of the merge a
+     * part is generated with" and says outright that it "is decided there, and not against one palette's
+     * {@code extends} chain". This is that stage. The two answers are the same two the character check
+     * draws, for the same reason and with the same witnesses:</p>
+     *
+     * <ul>
+     *   <li><b>No draw answers it</b> — the target is missing even when every choice of every group is
+     *       merged at once, so no selection can resolve the alias. {@code DIAG.009}, a load error.</li>
+     *   <li><b>Some draw does not</b> — present in that everything-merge, missing from a witness, so a
+     *       failing selection provably exists. A warning, by {@code LOAD.012}'s second half.</li>
+     *   <li><b>Every draw answers it</b> — {@code LOAD.013}, reported as neither.</li>
+     * </ul>
+     *
+     * <p><b>The third answer is the one with a measured price.</b> {@code LOAD.013}'s {@code > Why}
+     * records it: "The first implementation of this check produced 45 warnings about a pack that was
+     * correct, which is a check nobody reads." {@code urbex:glass_side_variant_glass} maps {@code '@'} to
+     * {@code 'a'} and declares nothing else at all, so a check that asked one palette at a time would
+     * report the shipped idiom as broken. Nothing here asks one palette anything — every question goes to
+     * a merge that a real selection is a subset of.</p>
+     */
+    static void checkAliases(Style style, AssetDiagnostics diagnostics) {
+        List<List<Pair<Float, Palette>>> groups = style.paletteChoices();
+        CompiledPalette everything = merge(groups.stream().flatMap(List::stream)
+                .map(Pair::getRight).toList(), null, null);
+        Map<Character, Character> aliases = everything.aliasTargets();
+        if (aliases.isEmpty()) {
+            return;
+        }
+
+        SortedSet<String> never = new TreeSet<>();
+        SortedSet<String> sometimes = new TreeSet<>();
+        List<CompiledPalette> witnesses = null;
+        for (Map.Entry<Character, Character> alias : aliases.entrySet()) {
+            if (!everything.isDefined(alias.getValue())) {
+                never.add("'" + alias.getKey() + "' -> '" + alias.getValue() + "'");
+                continue;
+            }
+            if (witnesses == null) {
+                witnesses = witnesses(groups, null, null);
+            }
+            if (hasFailingSelection(alias.getValue(), witnesses)) {
+                sometimes.add("'" + alias.getKey() + "' -> '" + alias.getValue() + "'");
+            }
+        }
+
+        if (!never.isEmpty()) {
+            diagnostics.record("urbex:styles", style.getId(), "declares alias(es) "
+                    + String.join(", ", never) + " whose target no palette of any 'randompalettes' "
+                    + "draw defines. Alias a marker that exists, or give this one a block of its own");
+        }
+        if (!sometimes.isEmpty()) {
+            diagnostics.warn("urbex:styles", style.getId(), "declares alias(es) "
+                    + String.join(", ", sometimes) + " whose target only some 'randompalettes' choices "
+                    + "define, so whether it resolves depends on the draw");
+        }
+    }
+
     private static void check(String registry, Identifier asset, SortedSet<Character> used, Style style,
                               @Nullable Palette building, @Nullable Palette local, String verb,
                               AssetDiagnostics diagnostics) {
