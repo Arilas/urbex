@@ -43,7 +43,7 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > correspondence between the two formats. Forbidding it as well would mean a pack could only
 > > migrate every palette at once — and the packs this has to work for hold 30 and 98 palette files.
 
-> **VER.007** · `MUST NOT` — The palettes written inline along one part's or building's `extends`
+> **VER.007** · `REJECT` (`DIAG.065`) `[NO-FIXTURE: a part and its ancestor, each with an inline palette]` — The palettes written inline along one part's or building's `extends`
 > chain are all of one format version. A part whose ancestor writes a version 1 inline palette may not
 > write a version 2 one, or the reverse.
 
@@ -53,13 +53,13 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > than through the palette's, and it needs saying separately because VER.005 is about a chain of
 > > palettes and this chain is a chain of parts.
 
-> > **Why it is stated and not yet checked** — until [VER.015](#11-what-version-2-does-not-reach-yet)
-> > retires, an inline version 2 palette is refused where it is compiled — that rule covers an inline
-> > palette as well as a registered one — so no mixed stack survives long enough to be merged and nothing
-> > enforces this rule on its own. When VER.015 goes, this needs a check and a diagnostic of its own. The
-> > rule used to read "a version 2 palette may not carry an inline
-> > version 1 palette, and the reverse, by VER.005", which named a construct that does not exist: a
-> > palette carries no inline palette, a part or a building does.
+> > **Why it became a `REJECT` only now** — it was a `MUST NOT` with nothing enforcing it, because
+> > VER.015 refused every inline version 2 palette where it was compiled: no mixed stack survived long
+> > enough to be merged, so the rule could not be observed being broken. VER.015 is retired, a part whose
+> > ancestor writes a version 1 inline palette and which writes a version 2 one is now a thing an author
+> > can express, and `DIAG.065` is what it gets. The rule used to read "a version 2 palette may not carry
+> > an inline version 1 palette, and the reverse, by VER.005", which named a construct that does not
+> > exist: a palette carries no inline palette, a part or a building does.
 
 > **VER.013** · `ACCEPT` `[NO-FIXTURE: a palette and a conditions asset]` — VER.005 governs `extends` between palettes and nothing else. A version 2
 > palette references `conditions`, `variants`, block tags and every other registry exactly as a
@@ -68,32 +68,6 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > **Why** — otherwise adopting version 2 for one palette would require adopting it for every
 > > registry that palette touches, at once, across every pack. The palette registry is the first to
 > > be specified this way precisely so the others can follow one at a time.
-
-### 1.1 What version 2 does not reach yet
-
-One rule in this section is transitional: it refuses something this specification allows, because the
-loader does not implement it yet, and it names the rule that retires it. It exists rather than the
-behaviour being absent because the alternative to refusing is accepting and then not acting, which is
-the failure [VER.012](#3-retired-keys) forbids for a key and this section forbids for a whole file.
-
-> **VER.015** · `REJECT` (`DIAG.063`) `[NO-FIXTURE: an entry that must be compiled, not a document]` `[DEPRECATED → VER.002]` — A version 2 palette is refused where it is compiled, naming the
-> asset, until version 2 compilation lands. Both kinds: a registry entry, and a palette written inline
-> in a part or building.
-
-> > **Why** — a version 2 palette decodes before it compiles, and between the two the loader holds an
-> > entry it can read and cannot use. Dropping it gives the pack a palette with no markers; casting it
-> > gives a `ClassCastException` from a worker thread, naming no file. VER.002 says `"version": 2`
-> > selects this specification in full, and this rule is the admission that it does not yet — so it is
-> > retired, with a tombstone, when it does. It carries no fixture because its input is not a document:
-> > the file it refuses is a *valid* version 2 palette, and no fixture can be both accepted as a
-> > document and refused as an entry.
-
-> > **Why both kinds** — [MERGE.011](04-merging.md#1-extends) made an inline palette declare its own
-> > version, so an inline version 2 palette is now a thing an author can write and the loader can read.
-> > It reaches compilation by the same two bad roads and gets the same refusal, naming the part or
-> > building it is written in. This rule said "a *registered* version 2 palette" while MERGE.011 was
-> > unimplemented and there was no other kind; the word is gone rather than an inline clause added,
-> > because when this rule retires both cases retire together.
 
 ## 2. What every version 1 construct becomes
 
@@ -242,6 +216,18 @@ The retired set, and what each becomes:
 > that rule with `DIAG.074`, which is narrower and carries the remedy this one could not: put the
 > reference on a block-valued field, or share the whole trait with a partial definition. No replacement
 > identifier.
+
+> **VER.015** — *retired in draft.* Refused a version 2 palette where it was compiled — a registry entry
+> and a palette written inline in a part or building alike — while the loader could decode one and not
+> use it: "between the two the loader holds an entry it can read and cannot use", where dropping it gave
+> the pack a palette with no markers and casting it gave a `ClassCastException` from a worker thread
+> naming no file. Version 2 palettes compile now, through all eight stages of
+> [LOAD.001](07-compilation.md#1-the-pipeline), so [VER.002](#1-versioning) — "`"version": 2` selects this
+> specification in full" — is simply true and there is nothing left to refuse. It was the only rule of
+> §1.1, and that section is deleted with it. Its diagnostic `DIAG.063` is retired with it, with its own
+> tombstone; the test citing VER.015 was deleted. **No replacement identifier, but one consequence:**
+> [VER.007](#1-versioning) was stated and unenforced *because* this rule covered it, and is now a
+> `REJECT` of its own with `DIAG.065`.
 
 > **VER.014** — *retired in draft.* Refused a palette written inline in a part or building that
 > declared a `version` other than 1, while nothing could read one: the version 1 codec ignores keys it

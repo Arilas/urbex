@@ -126,9 +126,11 @@ public class Palette {
      * {@link PaletteAssetDefinition#INLINE_CODEC}, so this loop is version 1's half of it - see that
      * field for why the two halves fire at different times.</p>
      *
-     * <p>{@code VER.015} is the second: an inline palette may declare version 2 as of {@code MERGE.011},
-     * and nothing compiles a version 2 palette yet, so {@link PaletteAssetDefinition#version1Only} says
-     * so by name rather than this method casting and failing from a worker thread.</p>
+     * <p>{@code VER.007} is the second: the inline palettes stacked along one owner's {@code extends}
+     * chain are all of one format version. That rule was stated and unenforced while {@code VER.015}
+     * refused every inline version 2 palette outright - no mixed stack survived long enough to be
+     * merged - and enforcing it is what that rule's retirement made this method owe. {@code DIAG.065}
+     * is its message, naming both links and both versions.</p>
      *
      * @param blockLookup    the block registry the inline entries resolve against
      * @param owner          the part or building the block is written in, for error messages and
@@ -137,16 +139,62 @@ public class Palette {
      */
     public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
                                  Identifier owner, List<PaletteAssetDefinition> chainRootFirst) {
+        return inline(blockLookup, variants, owner, chainRootFirst, null);
+    }
+
+    /**
+     * @param v2 the version 2 compiler's context, or null for a caller that has none - in which case an
+     *           inline version 2 palette fails naming itself rather than being read as a palette with
+     *           no markers
+     */
+    public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+                                 Identifier owner, List<PaletteAssetDefinition> chainRootFirst,
+                                 @Nullable V2Palettes.Context v2) {
         for (PaletteAssetDefinition re : chainRootFirst) {
             if (re.getExtends().isPresent()) {
                 throw new IllegalStateException(Diag.DIAG_031.message("'" + owner + "'",
                         "'" + re.getExtends().orElseThrow() + "'", "'" + owner + "'"));
             }
         }
-        List<PaletteDefinition> version1 = PaletteAssetDefinition.version1Only(owner, chainRootFirst);
+        requireOneVersion(owner, chainRootFirst);
+        if (chainRootFirst.getLast().formatVersion() == 2) {
+            if (v2 == null) {
+                throw new IllegalStateException("'" + owner + "' carries an inline palette written in "
+                        + "format version 2, and this caller compiles without the registries version 2 "
+                        + "needs; compile it through AssetCompiler");
+            }
+            return version2(Identifier.fromNamespaceAndPath(Urbex.MODID,
+                            "__local__" + owner.getPath()),
+                    V2Palettes.compileV2(owner, "'" + owner + "'", chainRootFirst, v2));
+        }
+        List<PaletteDefinition> version1 = new ArrayList<>(chainRootFirst.size());
+        chainRootFirst.forEach(link -> version1.add((PaletteDefinition) link));
         Palette palette = new Palette("__local__" + owner.getPath());
         palette.compile(blockLookup, variants, mergeByCharacter(version1, owner));
         return palette;
+    }
+
+    /**
+     * {@code VER.007}: the inline palettes along one owner's {@code extends} chain are all of one
+     * format version.
+     * <p>
+     * This is {@code MERGE.010}'s constraint arriving through the <em>owner's</em> {@code extends}
+     * rather than through the palette's, and it needs stating separately because {@code VER.005} is
+     * about a chain of palettes and this chain is a chain of parts. The reason is the same: the inline
+     * blocks an owner's chain declares are merged by marker exactly as a registry chain is, and there is
+     * no correspondence between the two formats for that merge to preserve.
+     * <p>
+     * The message names the first link whose version differs from the leaf's, both versions, and the
+     * owner - which is the asset an author can actually edit.
+     */
+    private static void requireOneVersion(Identifier owner, List<PaletteAssetDefinition> chain) {
+        int leaf = chain.getLast().formatVersion();
+        for (PaletteAssetDefinition link : chain) {
+            if (link.formatVersion() != leaf) {
+                throw new IllegalStateException(Diag.DIAG_065.message("'" + owner + "'",
+                        link.formatVersion(), leaf));
+            }
+        }
     }
 
     /**

@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -244,54 +245,6 @@ class VersionDispatchTest {
         return decoded.getOrThrow().getLocalPalette();
     }
 
-    /**
-     * {@code VER.015}: a version 2 palette is refused where it is compiled, naming the asset — a
-     * registry entry, and a palette written inline in a part or building.
-     * <p>
-     * The last transitional rule of its section now that {@code VER.014} is retired, and the one most
-     * likely to be hit: an author adopting version 2 writes a registry palette, and a registry palette is
-     * what reaches the compiler. It used to throw an uncatalogued {@link IllegalStateException};
-     * {@code DIAG.063} names the asset id, which it can because this runs where the id is known rather
-     * than inside a codec handed only a document.
-     * <p>
-     * <b>Both kinds are asserted, because the rule now says both.</b> {@code MERGE.011} made an inline
-     * palette able to declare version 2, so it reaches compilation by the same two bad roads — a palette
-     * with no markers, or a {@link ClassCastException} from a worker thread naming no file — and
-     * {@code Palette.inline} sends it through the same refusal, naming the part or building it is written
-     * in. The rule's sentence said "a <em>registered</em> version 2 palette" until the widening was
-     * adjudicated; it says both now, and this is what keeps the two in step until they retire together.
-     * <p>
-     * The chain is passed directly rather than driven through {@code AssetCompiler}, which needs a loaded
-     * world's {@code RegistryAccess}. {@code AssetStage} records a thrown exception against the asset it
-     * was compiling and carries on, so this surfaces as one named palette failing to load.
-     */
-    @Test
-    @Rule("VER.015")
-    void aVersionTwoPaletteIsRefusedWhereItIsCompiledRegisteredOrInline() {
-        Identifier id = Identifier.parse("urbex:bricks_standard");
-        PaletteAssetDefinition version2 = decoded("""
-                { "version": 2, "palette": { "X": "minecraft:stone_bricks" } }
-                """);
-
-        IllegalStateException refused = assertThrows(IllegalStateException.class,
-                () -> PaletteAssetDefinition.version1Only(id, List.of(version2)));
-        assertTrue(Diag.DIAG_063.matches(refused.getMessage()), refused.getMessage());
-        assertTrue(refused.getMessage().contains(id.toString()),
-                () -> "the diagnostic names the asset: " + refused.getMessage());
-
-        Identifier owner = Identifier.parse("urbex:tower");
-        IllegalStateException inline = assertThrows(IllegalStateException.class,
-                () -> Palette.inline(BuiltInRegistries.BLOCK, null, owner, List.of(version2)));
-        assertTrue(Diag.DIAG_063.matches(inline.getMessage()), inline.getMessage());
-        assertTrue(inline.getMessage().contains(owner.toString()),
-                () -> "and names the part it is written in: " + inline.getMessage());
-
-        PaletteAssetDefinition version1 = decoded("""
-                { "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }
-                """);
-        assertEquals(1, PaletteAssetDefinition.version1Only(id, List.of(version1)).size(),
-                "a version 1 chain passes through untouched");
-    }
 
     /**
      * {@code VER.040}: a registry adopting version 2 follows {@code VER.001}-{@code VER.004} unchanged,
@@ -339,6 +292,48 @@ class VersionDispatchTest {
                 Codec.INT.fieldOf("version").forGetter(Thing::formatVersion),
                 Codec.STRING.fieldOf("name").forGetter(Thing::name)
         ).apply(instance, Thing::new));
+    }
+
+    /**
+     * {@code VER.007}: the inline palettes along one owner's {@code extends} chain are all of one
+     * format version.
+     * <p>
+     * The rule this task's {@code VER.015} retirement made enforceable. While version 2 was refused
+     * where it compiled, no mixed stack survived long enough to be merged, so the rule was stated with a
+     * {@code > Why it is stated and not yet checked} block and nothing could observe it being broken.
+     * <p>
+     * It carries {@code [NO-FIXTURE]} because its input is two assets - a part and the ancestor it
+     * extends, each with an inline palette - and a fixture is one document. This is the citing test that
+     * marker obliges, and it drives both directions: a version 1 ancestor under a version 2 leaf, and
+     * the reverse. Both name the owner, which is the asset an author can edit.
+     */
+    @Test
+    @Rule("VER.007")
+    void inlinePalettesAlongOneOwnersChainAreAllOfOneVersionInEitherDirection() {
+        Identifier owner = Identifier.parse("urbex:tower");
+        PaletteAssetDefinition version1 = decoded("""
+                { "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }
+                """);
+        PaletteAssetDefinition version2 = decoded("""
+                { "version": 2, "palette": { "X": "minecraft:stone_bricks" } }
+                """);
+
+        IllegalStateException upgrading = assertThrows(IllegalStateException.class,
+                () -> Palette.inline(BuiltInRegistries.BLOCK, null, owner,
+                        List.of(version1, version2)));
+        assertTrue(Diag.DIAG_065.matches(upgrading.getMessage()), upgrading.getMessage());
+        assertTrue(upgrading.getMessage().contains(owner.toString()),
+                () -> "the diagnostic names the owner, which is the asset an author can edit: "
+                        + upgrading.getMessage());
+
+        IllegalStateException downgrading = assertThrows(IllegalStateException.class,
+                () -> Palette.inline(BuiltInRegistries.BLOCK, null, owner,
+                        List.of(version2, version1)));
+        assertTrue(Diag.DIAG_065.matches(downgrading.getMessage()), downgrading.getMessage());
+
+        assertDoesNotThrow(() -> Palette.inline(BuiltInRegistries.BLOCK, null, owner,
+                        List.of(version1, version1)),
+                "a chain of one version is what the rule permits, and is the common case");
     }
 
     private static DataResult<PaletteAssetDefinition> decode(String json) {

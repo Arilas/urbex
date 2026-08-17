@@ -292,13 +292,22 @@ renumbered — the permanence guarantee in §3.1 begins when the document leaves
 
 Recorded here rather than discovered later. Each of these is a known hole, not an oversight.
 
-**The pipeline is implemented and has no production caller.** A version 2 palette decodes, merges its
-`extends` chain, resolves every pointer, is sized, excluded, expanded, apportioned and compiled to
-per-slot states and traits — all of [LOAD.001](palette/07-compilation.md#1-the-pipeline). What is
-missing is the wiring: [VER.015](palette/09-migration.md#11-what-version-2-does-not-reach-yet) still
-refuses a version 2 palette where it is compiled, so the whole pipeline runs from tests and from the
-fixture harness and never from a world load. The [conformance index](palette/conformance.md) is the
-list of which rules that leaves unenforced.
+**A version 2 palette generates, and three things about it are not finished.** The pipeline has a
+production caller as of `VER.015`'s retirement: a registered or inline version 2 palette is compiled at
+world load through all of [LOAD.001](palette/07-compilation.md#1-the-pipeline), merges with version 1
+palettes into one lookup, and places blocks. What is not finished:
+
+- **[TRAIT.011](palette/01-traits.md#41-urbexdamaged) is not reached.** The damage pass has no marker to
+  key on, so a version 2 palette's damage mapping collapses exactly as version 1's does. The rule carries
+  a `[NOT-YET-REACHED]` marker naming the issue that fixes it.
+- **A pointer into another asset does not resolve at load.**
+  [REF.043](palette/02-references.md) and [REF.045](palette/03-pointers.md#1-pointers) let a pointer name
+  another palette or a `definitions` asset; the compiler is handed an empty definitions index, so such a
+  pointer is refused by name rather than resolved. That registry is the next task's.
+- **The bundled pack is still version 1.** Nothing that ships is written in version 2, so the evidence
+  that any of this works against real data is the test pack rather than the shipped one.
+
+The [conformance index](palette/conformance.md) is the list of which rules remain unenforced.
 
 **Not every fixture runs.** `FormatFixtureTest` runs every fixture whose outcome decoding alone
 decides; the rest are listed in that class, each naming the task it waits for, and the list is checked

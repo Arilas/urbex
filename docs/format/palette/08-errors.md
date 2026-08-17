@@ -132,7 +132,8 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.060` | [VER.010](09-migration.md#3-retired-keys) | *`<asset>` marker `'<m>'`: `<key>` was retired in version 2. Write `<replacement>` instead.* |
 | `DIAG.061` | [VER.011](09-migration.md#3-retired-keys) | *`<asset>`: `<key>` was deleted, not renamed. `<explanation>`* |
 | `DIAG.062` | *retired — see tombstones* | — |
-| `DIAG.063` | [VER.015](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>`: resolves through an entry written in palette format version `<n>`, which this Urbex decodes but does not yet compile. Write it in the version 1 format, or omit `version`, until version 2 compilation lands.* |
+| `DIAG.063` | *retired — see tombstones* | — |
+| `DIAG.065` | [VER.007](09-migration.md#1-versioning) | *`<owner>`: the inline palettes along this asset's `extends` chain declare format version `<n>` and version `<m>`. An owner's inline palettes are merged by marker, so they are all of one format version; convert one of them.* |
 | `DIAG.064` | *retired — see tombstones* | — |
 
 ## 5. Retired identifiers
@@ -158,6 +159,13 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 > ([WEIGHT.010](05-weights.md#2-share-weight-and-rest)), which has no total to exceed. The
 > over-allocation case that survives is shares totalling 1 or more, which is `DIAG.045`, a different
 > message with a different remedy. The number stays retired.
+
+> **DIAG.063** — *retired in draft.* Raised when a version 2 palette reached compilation, registered or
+> inline, under [VER.015](09-migration.md#tombstones), which is retired with it. Version 2 palettes
+> compile, so the case this named is no longer a rejection at all. The refusal that survives beside it is
+> `DIAG.065` — the inline palettes along one owner's chain disagreeing about their version — which is
+> [VER.007](09-migration.md#1-versioning), a permanent rule with a different message and a different
+> remedy, and which this row's existence was what made unenforceable. The number stays retired.
 
 > **DIAG.064** — *retired in draft.* Raised when an operand — `$ref`, `$only`, `$without` or
 > `$spread` — was written anywhere inside a `traits` value, under

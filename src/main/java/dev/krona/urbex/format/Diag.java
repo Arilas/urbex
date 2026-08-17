@@ -357,15 +357,36 @@ public enum Diag {
     DIAG_062("—"),
 
     /**
-     * {@code VER.015}: args are the asset and the version the entry declared.
+     * Retired in draft with {@code VER.015}; see {@code 08-errors.md}'s tombstone.
      * <p>
-     * Retired with {@code VER.015} when version 2 palettes compile, at which point {@code VER.002} -
-     * "{@code \"version\": 2} selects this specification in full" - is simply true and there is nothing
-     * left to refuse. Its number stays retired, by {@code DIAG.910}.
+     * It refused a version 2 palette where it was compiled, registered or inline, while the loader could
+     * decode one and not use it. Version 2 palettes compile now, so {@code VER.002} - "{@code \"version\":
+     * 2} selects this specification in full" - is simply true and there is nothing left to refuse. The
+     * constant stays, holding the row's own {@code —}, for the reason {@link #DIAG_042} records: a number
+     * is permanent by {@code DIAG.910}, and the only way to prove it is not silently reused is for this
+     * enum and the catalogue to be provably the same set of identifiers. Nothing raises it, and nothing
+     * may.
+     * <p>
+     * What survives beside it is {@link #DIAG_065} - the inline palettes along one owner's chain
+     * disagreeing about their version - which is {@code VER.007}, a permanent rule with a different
+     * message and a different remedy, and which was unenforceable while this row existed.
      */
-    DIAG_063("%s: resolves through an entry written in palette format version %s, which this Urbex"
-            + " decodes but does not yet compile. Write it in the version 1 format, or omit 'version',"
-            + " until version 2 compilation lands."),
+    DIAG_063("—"),
+
+    /**
+     * {@code VER.007}: args are the owner, the version some link declares, and the version the leaf
+     * declares.
+     * <p>
+     * New with {@code VER.015}'s retirement rather than before it, and that is the whole of why
+     * {@code VER.007} carried a "Why it is stated and not yet checked" block: an inline version 2
+     * palette was refused outright, so no mixed stack survived long enough to be merged and nothing
+     * could observe the rule being broken. Once version 2 compiles, a part whose ancestor writes a
+     * version 1 inline palette and which writes a version 2 one is a thing an author can express, and
+     * this is what it gets.
+     */
+    DIAG_065("%s: the inline palettes along this asset's 'extends' chain declare format version %s and"
+            + " version %s. An owner's inline palettes are merged by marker, so they are all of one"
+            + " format version; convert one of them."),
 
     /**
      * Retired in draft with {@code VER.016}; see {@code 08-errors.md}'s tombstone.

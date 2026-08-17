@@ -8,7 +8,6 @@ import dev.krona.urbex.format.Versioned;
 import dev.krona.urbex.format.palette.PaletteV2Definition;
 import net.minecraft.resources.Identifier;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -36,8 +35,10 @@ import java.util.Map;
  * always been in - moving it would be the refactor of version 1 that {@code VER.004}'s reasoning says
  * not to do - and version 2 lives with the rest of the format code under
  * {@code dev.krona.urbex.format}. Sealing would therefore cost one of those two placements, which is a
- * worse trade than losing exhaustiveness checking on the one {@code instanceof} that exists
- * ({@link #version1Only}), where the fallback branch is a named load error rather than a gap.
+ * worse trade than losing exhaustiveness checking on the two casts that exist - in
+ * {@code V2Palettes.compile} and {@code Palette.inline} - each of which is guarded by the version test
+ * immediately above it and by {@code VER.005}, which refuses a chain that mixes versions before either
+ * is reached.
  */
 public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
 
@@ -84,40 +85,4 @@ public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
                             "'" + palette.getExtends().orElseThrow() + "'",
                             Diagnostics.INLINE_OWNER_LOCATION)));
 
-    /**
-     * One {@code extends} chain, as version 1 entries, refusing the chain if any link is version 2.
-     * <p>
-     * {@code VER.015}, and it is a catalogued refusal ({@code DIAG.063}) rather than a bare exception
-     * because this is the <em>likely</em> path, not an edge: an author adopting version 2 today writes a
-     * registry palette, and the registry palette is the one that reaches here. The message names the
-     * asset id, because this runs where the id is known rather than inside a codec that is handed only a
-     * document.
-     * <p>
-     * It reaches an <b>inline</b> palette too, since {@code MERGE.011} let one declare version 2:
-     * {@link dev.krona.urbex.worldgen.lost.cityassets.Palette#inline} calls this with the owner's id, so
-     * a part carrying a version 2 palette decodes - which is what the rule asks for - and then says why
-     * it cannot yet be compiled, rather than being read as a palette with no markers.
-     * <p>
-     * A version 2 palette decodes as of this task and compiles as of a later one. Between the two,
-     * dropping the entry would give the pack a palette with no markers and casting would give a
-     * {@link ClassCastException} out of a worker thread naming no file. Same reasoning as
-     * {@code VER.012}'s: a thing the format accepted and then did not act on is how a pack ends up
-     * meaning something other than what it says.
-     * <p>
-     * Thrown rather than returned, because {@code AssetStage} records a thrown exception against the
-     * asset it was compiling and carries on with the rest of the registry, which is the reporting this
-     * needs: one named palette failed, and the load error says which.
-     */
-    static List<PaletteDefinition> version1Only(Identifier id, List<PaletteAssetDefinition> chain) {
-        List<PaletteDefinition> version1 = new ArrayList<>(chain.size());
-        for (PaletteAssetDefinition link : chain) {
-            if (link instanceof PaletteDefinition definition) {
-                version1.add(definition);
-                continue;
-            }
-            throw new IllegalStateException(
-                    Diag.DIAG_063.message("'" + id + "'", link.formatVersion()));
-        }
-        return version1;
-    }
 }

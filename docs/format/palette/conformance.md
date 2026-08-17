@@ -17,13 +17,13 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT` | 38 | 11 |
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
-| `DIAG` | 57 | 0 |
+| `DIAG` | 58 | 0 |
 | `VER` | 24 | 2 |
-| **total** | **312** | **77** |
+| **total** | **313** | **77** |
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (42):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.061`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.012`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (41):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.061`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.012`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
 
@@ -41,10 +41,10 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.013` | a style with several palette groups |
 | `VER.005` | a version 1 and a version 2 file |
 | `VER.006` | a style and two palettes |
+| `VER.007` | a part and its ancestor, each with an inline palette |
 | `VER.013` | a palette and a conditions asset |
-| `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 199 of 312 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 199 of 313 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -379,6 +379,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.061` | `DIAG` |  |  | — |
 | `DIAG.062` | `DIAG` |  |  | — |
 | `DIAG.063` | `DIAG` |  |  | — |
+| `DIAG.065` | `DIAG` |  |  | — |
 | `DIAG.064` | `DIAG` |  |  | — |
 | `DIAG.910` | `MUST` |  |  | `DiagCatalogueTest.theDiagEnumCoversExactlyTheCatalogue`, `DiagCatalogueTest.everyDiagTemplateIsWordedAsItsCatalogueRowIs`, `DiagCatalogueTest.everyWordACatalogueRowStatesOutrightAppearsInItsTemplate`, `DiagCatalogueTest.aFormattedMessageIsRecognisedAsItsOwnDiagnostic`, `DiagCatalogueTest.everyCatalogueIdentifierIsLookedUpByItsId`, `DiagCatalogueTest.everyClauseACatalogueRowDelegatesIsASlotOrIsSpelledOutInTheTemplate` |
 
@@ -392,9 +393,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.004` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt` |
 | `VER.005` | `REJECT` | `DIAG.038` | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
 | `VER.006` | `ACCEPT` |  | *n/a* | — |
-| `VER.007` | `MUST NOT` |  |  | — |
+| `VER.007` | `REJECT` | `DIAG.065` | *n/a* | `VersionDispatchTest.inlinePalettesAlongOneOwnersChainAreAllOfOneVersionInEitherDirection` |
 | `VER.013` | `ACCEPT` |  | *n/a* | `TraitTest.aTraitsReferenceIsCheckedThroughItsOwnDeclaration` |
-| `VER.015` | `REJECT` | `DIAG.063` | *n/a* | `VersionDispatchTest.aVersionTwoPaletteIsRefusedWhereItIsCompiledRegisteredOrInline` |
 | `VER.008` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind` |
 | `VER.009` | `MUST` |  |  | — |
 | `VER.010` | `REJECT` | `DIAG.060` | `reject=DIAG.060` | `PaletteV2DecodeTest.aRenamedVersionOneKeyIsRefusedNamingTheKeyThatReplacedIt` |
@@ -409,5 +409,6 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.040` | `MUST` |  |  | `VersionDispatchTest.theVersionMechanismIsRegistryAgnostic` |
 | `VER.041` | `MUST` |  |  | — |
 | `VER.016` | `RETIRED` |  |  | — |
+| `VER.015` | `RETIRED` |  |  | — |
 | `VER.014` | `RETIRED` |  |  | — |
 
