@@ -12,12 +12,14 @@ import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -171,9 +173,14 @@ class NodeResolverTest {
                 .filter(entry -> entry.diag() == Diag.DIAG_032).toList();
         assertEquals(1, cycles.size(), () -> "one cycle, reported once: " + diagnostics.all());
         assertTrue(cycles.get(0).message().contains("a → b → c → a"), cycles.get(0).message());
-        assertEquals(1, diagnostics.all().size() + diagnostics.nestedMessages().size(),
+        // all() alone, with nothing to add from nestedMessages(): every diagnostic resolution reports
+        // carries its catalogue row, which is what Outcome exists for. Summing the two lists to state
+        // this claim was the smell that said five rows were travelling as untyped text.
+        assertEquals(1, diagnostics.all().size(),
                 () -> "a node whose dependency is in a cycle says nothing further: "
-                        + diagnostics.all() + diagnostics.nestedMessages());
+                        + diagnostics.all());
+        assertEquals(List.of(), diagnostics.nestedMessages(),
+                "no resolution diagnostic travels without its row");
     }
 
     /** {@code REF.032}: a node that references itself is a cycle of one, not a stack overflow. */
@@ -723,22 +730,29 @@ class NodeResolverTest {
     }
 
     /**
-     * {@code VER.016}: at any depth, and on the trait object itself.
+     * {@code VER.016}: every operand, at any depth, and on the trait object itself.
      * <p>
-     * At any depth because a satellite may be a weighted node whose choices are nodes, and a
-     * {@code $ref} three levels down is exactly as unresolved as one at the top. On the trait object
-     * itself because {@code REF.022} forbids that permanently and has no check of its own yet - this one
-     * catches it meanwhile, for its own narrower reason.
+     * At any depth because a satellite may be a weighted node whose choices are nodes, and an operand
+     * three levels down is exactly as unresolved as one at the top. Every operand because the first
+     * version of this check named {@code $ref} alone: a {@code $spread} inside a satellite's
+     * {@code choices} then loaded and survived into the resolved palette as a list element that places
+     * nothing - the same silence, in the operand an author reaches for when extending an inherited list.
+     * On the trait object itself because {@code REF.022} forbids that permanently and has no check of its
+     * own yet; this one catches it meanwhile, for its own narrower reason.
      */
     @Test
     @Rule("VER.016")
     @Rule("REF.022")
-    void aReferenceAnywhereInsideATraitIsRefused() {
+    void anyOperandAnywhereInsideATraitIsRefused() {
         for (String payload : List.of(
                 "{ \"$ref\": \"rubble\" }",
                 "{ \"into\": { \"$ref\": \"rubble\" } }",
                 "{ \"into\": { \"kind\": \"weighted\", \"choices\": ["
-                        + " { \"weight\": 1, \"$ref\": \"rubble\" } ] } }")) {
+                        + " { \"weight\": 1, \"$ref\": \"rubble\" } ] } }",
+                "{ \"into\": { \"kind\": \"weighted\", \"choices\": ["
+                        + " { \"$spread\": \"rubble#/choices\" } ] } }",
+                "{ \"into\": { \"$ref\": \"rubble\", \"$only\": [\"block\"] } }",
+                "{ \"into\": { \"$without\": [\"traits\"] } }")) {
             DataResult<PaletteV2Definition> decoded = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
                     JsonParser.parseString("""
                             { "version": 2, "$defs": { "rubble": "minecraft:iron_bars" },
@@ -914,10 +928,215 @@ class NodeResolverTest {
         // "before any of its $refs are" - the address is of the document, not of the resolved form.
         ResolutionScope scope = ResolutionScope.of(decode("{ \"version\": 2, \"palette\": {} }"),
                 DefinitionIndex.empty(), palettes);
-        Pointer pointer = Pointer.parse("urbex:common#/$defs/rubble", "a test").getOrThrow();
+        Pointer pointer = Pointer.parse("urbex:common#/$defs/rubble", Map.of(), "a test")
+                .result().orElseThrow();
         RawNode addressed = PointerResolver.resolve(pointer, scope)
                 .orElseThrow(() -> new AssertionError("the pointer should address a node"));
         assertEquals(Optional.of("cobble"), addressed.ref());
+    }
+
+    /**
+     * Every diagnostic resolution reports names the catalogue row it came from.
+     * <p>
+     * {@code DIAG.903} makes {@link Diagnostics} a collector and {@code Diagnostics.all()} promises
+     * "every catalogue diagnostic recorded". Five of resolution's rows - {@code DIAG.030},
+     * {@code DIAG.034}, {@code DIAG.036}, {@code DIAG.037} and {@code DIAG.039} - reached it through
+     * {@code nested(String)} instead, whose whole meaning is a failure that <em>has</em> no row, so
+     * {@code all()} was quietly not what it said. Swept rather than asserted one at a time, because the
+     * failure mode is a new row added down the same path: Task 4 puts {@code DIAG.031} and
+     * {@code DIAG.038} there.
+     */
+    @Test
+    @Rule("DIAG.903")
+    void everyDiagnosticResolutionReportsCarriesItsCatalogueRow() {
+        Map<Diag, String> byRow = new LinkedHashMap<>();
+        byRow.put(Diag.DIAG_030, """
+                { "version": 2, "palette": { "X": { "$ref": "nosuch" } } }
+                """);
+        byRow.put(Diag.DIAG_034, """
+                { "version": 2, "$defs": { "d": { "block": "minecraft:stone" } },
+                  "palette": { "X": { "$ref": "d#/nosuch" } } }
+                """);
+        byRow.put(Diag.DIAG_036, """
+                { "version": 2, "palette": { "X": { "$ref": "$super" } } }
+                """);
+        byRow.put(Diag.DIAG_037, """
+                { "version": 2, "$defs": { "d": { "block": "minecraft:stone" } },
+                  "palette": { "#": { "kind": "weighted", "choices": [
+                      { "$spread": "d#/block" } ] } } }
+                """);
+        byRow.put(Diag.DIAG_039, """
+                { "version": 2, "palette": { "X": { "$ref": "$nosuch/thing" } } }
+                """);
+        byRow.put(Diag.DIAG_032, """
+                { "version": 2, "$defs": { "a": { "$ref": "a" } },
+                  "palette": { "X": { "$ref": "a" } } }
+                """);
+        byRow.put(Diag.DIAG_011, """
+                { "version": 2, "$defs": { "d": { "traits": {} } },
+                  "palette": { "X": { "$ref": "d" } } }
+                """);
+
+        byRow.forEach((expected, json) -> {
+            Diagnostics diagnostics = new Diagnostics();
+            NodeResolver.resolve(decode(json), diagnostics);
+            assertEquals(List.of(), diagnostics.nestedMessages(),
+                    () -> expected.id() + " travelled as untyped text");
+            assertEquals(List.of(expected), diagnostics.all().stream()
+                            .map(Diagnostics.Entry::diag).toList(),
+                    () -> "expected exactly " + expected.id() + ", got " + diagnostics.all());
+        });
+    }
+
+    /**
+     * {@code DIAG.903}: every list of a node, and every element of a list, is resolved before any failure
+     * is acted on.
+     * <p>
+     * "A palette with four misspelt keys is four lines the author fixes in one pass; reporting the first
+     * and stopping is four load-fail-edit cycles" - {@link Diagnostics}'s own words about decode, and
+     * resolution stopped at the first failing element of a list and the first failing list of a node
+     * until this round, while its completeness pass and its entry loop both collected. The code
+     * disagreed with itself.
+     */
+    @Test
+    @Rule("DIAG.903")
+    @Rule("LOAD.004")
+    void everyFailureInOneNodeIsCollectedRatherThanTheFirst() {
+        Diagnostics inOneList = new Diagnostics();
+        NodeResolver.resolve(decode("""
+                { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
+                    { "weight": 1, "$ref": "nosuchA" },
+                    { "weight": 1, "$ref": "nosuchB" } ] } } }
+                """), inOneList);
+        assertEquals(2, inOneList.all().size(),
+                () -> "both broken pointers in one list: " + inOneList.all());
+
+        Diagnostics acrossLists = new Diagnostics();
+        NodeResolver.resolve(decode("""
+                { "version": 2, "palette": { "T": { "kind": "light_socket",
+                    "floor": [ { "weight": 1, "$ref": "nosuchA" } ],
+                    "wall":  [ { "weight": 1, "$ref": "nosuchB" } ] } } }
+                """), acrossLists);
+        assertEquals(2, acrossLists.all().size(),
+                () -> "one broken pointer in 'floor' and one in 'wall': " + acrossLists.all());
+    }
+
+    /**
+     * {@code DIAG.011} names the filter when a filter is what dropped the block source, and never blames
+     * a definition for lacking a key it declares.
+     * <p>
+     * The failure this pins is a false statement about a real file: {@code $without: ["block"]} against a
+     * definition that <em>does</em> declare {@code block} said "'d' declares no 'block'". Every phrasing
+     * is now chosen by what can be proved - see {@code noBlockSource} - and the two cases below are the
+     * two that were wrong.
+     */
+    @Test
+    @Rule("MODEL.081")
+    void aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource() {
+        String dropped = refusalOf("""
+                { "version": 2, "$defs": { "d": { "block": "minecraft:stone" } },
+                  "palette": { "X": { "$ref": "d", "$without": ["block"] } } }
+                """);
+        assertTrue(Diag.DIAG_011.matches(dropped), dropped);
+        assertTrue(dropped.contains("'$without' kept no key of 'd' that places a block"), dropped);
+        assertFalse(dropped.contains("declares no 'block'"),
+                () -> "'d' does declare a block, so nothing may say it does not: " + dropped);
+
+        String filteredKind = refusalOf("""
+                { "version": 2,
+                  "$defs": { "d": { "kind": "weighted", "choices": [
+                      { "rest": true, "block": "minecraft:stone" } ] } },
+                  "palette": { "#": { "$ref": "d", "$only": ["kind"] } } }
+                """);
+        assertTrue(Diag.DIAG_011.matches(filteredKind), filteredKind);
+        assertTrue(filteredKind.contains("'$only' kept no key of 'd' that places a block"),
+                filteredKind);
+        assertFalse(filteredKind.contains("declares kind weighted and no"),
+                () -> "'d' does declare choices: " + filteredKind);
+
+        // And the marker's own kind is the marker's, not a definition's: 'd' declares no kind at all.
+        String ownKind = refusalOf("""
+                { "version": 2, "$defs": { "d": { "traits": {} } },
+                  "palette": { "#": { "$ref": "d", "kind": "weighted" } } }
+                """);
+        assertTrue(ownKind.contains("this marker declares kind weighted and no 'choices'"), ownKind);
+    }
+
+    /**
+     * A diagnostic that names several placement lists names them in {@link Kind.Placement}'s order.
+     * <p>
+     * {@code RawNode} built its placement map with {@code Map.copyOf}, whose iteration order is perturbed
+     * by a per-JVM salt - the reviewer measured six distinct orders across eight runs. Nothing observed it
+     * while the lists were only decoded; {@code MODEL.013}'s second pass observes it, because it reports
+     * one {@code DIAG.003} per key that does not belong on the resolved kind, and a socket reached as a
+     * {@code block} node contributes all four. {@code Kind.Placement.ordered} fixes the order to the
+     * enum's, which {@code MODEL.073} also makes the format's own search order.
+     * <p>
+     * <b>What this can and cannot prove.</b> The salt is drawn once per JVM, so a test cannot make the
+     * old code fail on demand from inside one - restoring {@code Map.copyOf} and running this six times
+     * passed six times, because every run shared a daemon and therefore a salt. So the first assertion is
+     * the deterministic one: {@code ordered} does not depend on the order it was handed, which
+     * {@code Map.copyOf} cannot promise. The second pins the observable order to one specific sequence,
+     * which fails under any salt that disagrees - most of them.
+     */
+    @Test
+    @Rule("MODEL.013")
+    @Rule("DIAG.903")
+    void aDiagnosticNamingSeveralPlacementListsOrdersThemByPlacement() {
+        Map<Kind.Placement, String> reversed = new LinkedHashMap<>();
+        for (int at = Kind.Placement.values().length - 1; at >= 0; at--) {
+            reversed.put(Kind.Placement.values()[at], "candidate");
+        }
+        assertEquals(List.of(Kind.Placement.values()),
+                List.copyOf(Kind.Placement.ordered(reversed).keySet()),
+                "ordered() iterates by placement, whatever order it was built in");
+        assertEquals(Map.of(), Kind.Placement.ordered(Map.of()),
+                "an empty map has no key type to infer, and EnumMap(Map) throws on one");
+
+        // Written deliberately out of order, so insertion order and enum order differ.
+        Diagnostics diagnostics = new Diagnostics();
+        NodeResolver.resolve(decode("""
+                { "version": 2,
+                  "$defs": { "socket": { "kind": "light_socket",
+                      "free":    [ { "weight": 1, "block": "minecraft:torch" } ],
+                      "ceiling": [ { "weight": 1, "block": "minecraft:lantern" } ],
+                      "wall":    [ { "weight": 1, "block": "minecraft:wall_torch" } ],
+                      "floor":   [ { "weight": 1, "block": "minecraft:torch" } ] } },
+                  "palette": { "X": { "$ref": "socket", "kind": "block",
+                                      "block": "minecraft:stone" } } }
+                """), diagnostics);
+        List<String> named = diagnostics.all().stream()
+                .filter(entry -> entry.diag() == Diag.DIAG_003)
+                .map(Diagnostics.Entry::message)
+                .map(message -> message.replaceAll(".*: '([a-z]+)' is not a key.*", "$1"))
+                .toList();
+        assertEquals(List.of("floor", "wall", "ceiling", "free"), named,
+                () -> "the four lists, in Kind.Placement order: " + diagnostics.all());
+    }
+
+    /** {@code REF.056}: a filter with no {@code $ref} has nothing to filter, and is refused. */
+    @Test
+    @Rule("REF.056")
+    void aFilterWithNoReferenceIsRefused() {
+        for (String operand : List.of("$only", "$without")) {
+            DataResult<PaletteV2Definition> decoded = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
+                    JsonParser.parseString("""
+                            { "version": 2, "palette": { "X": { "%s": ["traits"],
+                                "block": "minecraft:stone" } } }
+                            """.formatted(operand)));
+            String message = decoded.error()
+                    .orElseThrow(() -> new AssertionError(operand + " with no $ref was accepted"))
+                    .message();
+            assertTrue(Diag.DIAG_073.matches(message), message);
+            assertTrue(message.contains("'" + operand + "'"), message);
+        }
+
+        // With a $ref there is something to filter, and the same node loads.
+        assertEquals("minecraft:stone", blockOf(resolve("""
+                { "version": 2, "$defs": { "d": { "traits": {} } },
+                  "palette": { "X": { "$ref": "d", "$only": ["traits"],
+                                      "block": "minecraft:stone" } } }
+                """), 'X'));
     }
 
     // ---- Helpers -------------------------------------------------------------------------------
@@ -938,6 +1157,15 @@ class NodeResolverTest {
         return NodeResolver.resolve(decode(json), diagnostics)
                 .orElseThrow(() -> new AssertionError(
                         "expected the palette to resolve: " + diagnostics.asError().orElse("?")));
+    }
+
+    /** The message resolving {@code json} is refused with. */
+    private static String refusalOf(String json) {
+        Diagnostics diagnostics = new Diagnostics();
+        Optional<NodeResolver.ResolvedPalette> resolved =
+                NodeResolver.resolve(decode(json), diagnostics);
+        assertTrue(resolved.isEmpty(), "expected a refusal, but it resolved");
+        return diagnostics.asError().orElseThrow();
     }
 
     private static void assertRefused(Diag expected, String json) {

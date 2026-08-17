@@ -5,6 +5,8 @@ import com.mojang.serialization.DataResult;
 import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Diagnostics;
 
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -52,6 +54,33 @@ public enum Kind {
         /** The key this list is written under. */
         public String key() {
             return key;
+        }
+
+        /**
+         * A placement map that iterates in this enum's own order, whatever order it was built in.
+         * <p>
+         * <b>Not {@link Map#copyOf}, and that is a bug fix rather than a preference.</b>
+         * {@code Map.copyOf} returns one of the JDK's immutable maps, whose iteration order is perturbed
+         * by a per-JVM salt: the same palette produced six different orders across eight runs. Nothing
+         * observed it while the placement lists were only decoded, and stage 3 observes it everywhere -
+         * {@code MODEL.013} reports one {@code DIAG.003} per offending key, so a node that reaches
+         * {@code kind: block} through a {@code $ref} to a socket prints four of them, and their order was
+         * the salt's. That is the property {@code RawChoice.OWN_KEYS_IN_ORDER} exists to protect, stated
+         * there in the same words: a message that shuffles between runs cannot be pinned by a test or
+         * quoted in a bug report.
+         * <p>
+         * {@code MODEL.073} is the other reason it is <em>this</em> order rather than insertion order: the
+         * four lists are one ordered search - floor, wall, ceiling, {@code free} - so the enum's order is
+         * the format's, and a diagnostic that walks them walks them the way the loader will.
+         */
+        public static <V> Map<Placement, V> ordered(Map<Placement, V> byPlacement) {
+            if (byPlacement.isEmpty()) {
+                // EnumMap(Map) cannot infer the key type from an empty non-EnumMap, and throws.
+                return Map.of();
+            }
+            Map<Placement, V> ordered = new EnumMap<>(Placement.class);
+            ordered.putAll(byPlacement);
+            return Collections.unmodifiableMap(ordered);
         }
     }
 

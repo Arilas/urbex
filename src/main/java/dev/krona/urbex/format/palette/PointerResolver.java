@@ -2,6 +2,7 @@ package dev.krona.urbex.format.palette;
 
 import com.mojang.serialization.DataResult;
 import dev.krona.urbex.format.Diag;
+import dev.krona.urbex.format.Outcome;
 import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import net.minecraft.resources.Identifier;
 
@@ -153,8 +154,8 @@ public final class PointerResolver {
      *                {@code DIAG.030} names, because both fail in a tier the same way and only the
      *                caller knows which one asked
      */
-    public static DataResult<Addressed> address(Pointer pointer, String written, String operand,
-                                               ResolutionScope scope, Site site) {
+    public static Outcome<Addressed> address(Pointer pointer, String written, String operand,
+                                             ResolutionScope scope, Site site) {
         String location = site.location();
         return switch (pointer) {
             case Pointer.Local local -> local(local, written, operand, scope, location);
@@ -190,51 +191,51 @@ public final class PointerResolver {
      * is not retried in the other." Its {@code > Why} says what a search order would cost - "would make
      * {@code \"rubble\"} resolve differently depending on what else happened to be loaded".
      */
-    private static DataResult<Addressed> local(Pointer.Local local, String written, String operand,
-                                               ResolutionScope scope, String location) {
+    private static Outcome<Addressed> local(Pointer.Local local, String written, String operand,
+                                            ResolutionScope scope, String location) {
         RawNode node = scope.document().defs().get(local.name());
         if (node == null) {
             // REF.013, and the diagnostic names the operand that failed and the tier that was searched.
-            return DataResult.error(() -> Diag.DIAG_030.message(location, operand,
-                    Pointer.describe(written, local), "'$defs'"));
+            return Outcome.failed(Diag.DIAG_030, location, operand,
+                    Pointer.describe(written, local), "'$defs'");
         }
-        return DataResult.success(new Addressed(scope.document().defKey(local.name()), node, scope,
+        return Outcome.ok(new Addressed(scope.document().defKey(local.name()), node, scope,
                 local.path()));
     }
 
     /** {@code REF.010} and {@code REF.041}: a name with a colon is a {@code definitions} asset. */
-    private static DataResult<Addressed> registry(Pointer.Registry pointer, String written,
-                                                 String operand, ResolutionScope scope,
-                                                 String location) {
+    private static Outcome<Addressed> registry(Pointer.Registry pointer, String written,
+                                              String operand, ResolutionScope scope,
+                                              String location) {
         Optional<DefinitionAssetDefinition> asset = scope.registry().get(pointer.asset());
         if (asset.isEmpty()) {
-            return DataResult.error(() -> Diag.DIAG_030.message(location, operand,
-                    Pointer.describe(written, pointer), "registry"));
+            return Outcome.failed(Diag.DIAG_030, location, operand,
+                    Pointer.describe(written, pointer), "registry");
         }
-        return DataResult.success(definitionsEntry(pointer.asset(), asset.get(), scope, List.of()));
+        return Outcome.ok(definitionsEntry(pointer.asset(), asset.get(), scope, List.of()));
     }
 
     /** {@code REF.042}: a path into another asset's decoded document. */
-    private static DataResult<Addressed> fragment(Pointer.Fragment fragment, String written,
-                                                  ResolutionScope scope, String location) {
+    private static Outcome<Addressed> fragment(Pointer.Fragment fragment, String written,
+                                               ResolutionScope scope, String location) {
         Identifier registry = fragment.registry();
         if (registry.equals(Pointer.DEFINITIONS_REGISTRY)) {
             Optional<DefinitionAssetDefinition> asset = scope.registry().get(fragment.asset());
             return asset
-                    .map(value -> DataResult.success(
+                    .map(value -> Outcome.ok(
                             definitionsEntry(fragment.asset(), value, scope, fragment.path())))
-                    .orElseGet(() -> DataResult.error(() -> noAsset(location, written, fragment)));
+                    .orElseGet(() -> noAsset(location, written, fragment));
         }
         if (!registry.equals(Pointer.DEFAULT_FRAGMENT_REGISTRY)) {
-            return DataResult.error(() -> Diag.DIAG_034.message(location,
+            return Outcome.failed(Diag.DIAG_034, location,
                     Pointer.describe(written, fragment),
                     "no asset '" + fragment.asset() + "' to reach into",
                     "A fragment pointer reaches into the 'palettes' or the 'definitions' registry,"
-                            + " and '" + registry.getPath() + "' is neither."));
+                            + " and '" + registry.getPath() + "' is neither.");
         }
         PaletteV2Definition palette = scope.palettes().get(fragment.asset());
         if (palette == null) {
-            return DataResult.error(() -> noAsset(location, written, fragment));
+            return noAsset(location, written, fragment);
         }
         return paletteEntry(fragment, written, palette, scope, location);
     }
@@ -247,15 +248,15 @@ public final class PointerResolver {
      * {@code $imports} names something real and not a node, and {@code REF.045}'s diagnostic is
      * required to say "which half failed" - so it says the path did, in the asset that does exist.
      */
-    private static DataResult<Addressed> paletteEntry(Pointer.Fragment fragment, String written,
-                                                     PaletteV2Definition palette,
-                                                     ResolutionScope scope, String location) {
+    private static Outcome<Addressed> paletteEntry(Pointer.Fragment fragment, String written,
+                                                  PaletteV2Definition palette,
+                                                  ResolutionScope scope, String location) {
         List<String> path = fragment.path();
         ResolutionScope target = scope.in(ResolutionScope.Document.of(fragment.asset(), palette));
         if (path.size() >= 2 && path.get(0).equals("$defs")) {
             RawNode node = palette.defs().get(path.get(1));
             if (node != null) {
-                return DataResult.success(new Addressed(target.document().defKey(path.get(1)), node,
+                return Outcome.ok(new Addressed(target.document().defKey(path.get(1)), node,
                         target, path.subList(2, path.size())));
             }
         }
@@ -264,12 +265,12 @@ public final class PointerResolver {
             RawNode node = marker.flatMap(at -> palette.palette()
                     .map(entries -> entries.get(at))).orElse(null);
             if (node != null) {
-                return DataResult.success(new Addressed(
+                return Outcome.ok(new Addressed(
                         target.document().markerKey(marker.orElseThrow()), node, target,
                         path.subList(2, path.size())));
             }
         }
-        return DataResult.error(() -> noNode(location, written, fragment));
+        return noNode(location, written, fragment);
     }
 
     private static Addressed definitionsEntry(Identifier id, DefinitionAssetDefinition asset,
@@ -290,16 +291,16 @@ public final class PointerResolver {
      * {@code extends} merge already produced, so it arrives resolved. {@code REF.033}'s cycle "through
      * both" is a cycle in that merge, found where the chain is built.
      */
-    private static DataResult<Addressed> inherited(Pointer.Super pointer, String written,
-                                                   ResolutionScope scope, Site site) {
+    private static Outcome<Addressed> inherited(Pointer.Super pointer, String written,
+                                                ResolutionScope scope, Site site) {
         Optional<RawNode> value = scope.inherited();
         if (value.isEmpty()) {
             String reason = scope.document().extendsId().isPresent()
                     ? "nothing in its extends chain declares " + site.entryName()
                     : "this file declares no extends";
-            return DataResult.error(() -> Diag.DIAG_036.message(site.location(), reason));
+            return Outcome.failed(Diag.DIAG_036, site.location(), reason);
         }
-        return DataResult.success(new Addressed("$" + Pointer.SUPER + " of " + site.entryName(),
+        return Outcome.ok(new Addressed("$" + Pointer.SUPER + " of " + site.entryName(),
                 value.get(), scope, pointer.path()));
     }
 
@@ -310,6 +311,12 @@ public final class PointerResolver {
      * {@code REF.054} means nothing needs to walk into one - "{@code $only} and {@code $without} name
      * top-level keys of the target node only", and a satellite is reached by pointing at the trait
      * field, which is a node this walk already returns.
+     * <p>
+     * <b>A {@link DataResult} here, and not an {@link Outcome}, on purpose.</b> Every other step in
+     * resolution fails with a catalogue row and carries it, so that {@code Diagnostics.all()} holds it.
+     * This one's failure is not a diagnostic: it is the phrase that goes in {@code DIAG.034}'s
+     * "{@code <no node at '<path>' in '<id>'>}" slot, and which <em>row</em> the caller wraps it in
+     * depends on which operand asked. So it stays a string, and every caller of it formats a row.
      */
     public static DataResult<Target> walk(RawNode node, List<String> path) {
         if (path.isEmpty()) {
@@ -382,14 +389,15 @@ public final class PointerResolver {
         };
     }
 
-    private static String noAsset(String location, String written, Pointer pointer) {
-        return Diag.DIAG_034.message(location, Pointer.describe(written, pointer),
+    private static Outcome<Addressed> noAsset(String location, String written, Pointer pointer) {
+        return Outcome.failed(Diag.DIAG_034, location, Pointer.describe(written, pointer),
                 "no asset '" + assetOf(pointer) + "'",
                 "Nothing loaded registers that id; check the namespace and the file's path.");
     }
 
-    private static String noNode(String location, String written, Pointer.Fragment fragment) {
-        return Diag.DIAG_034.message(location, Pointer.describe(written, fragment),
+    private static Outcome<Addressed> noNode(String location, String written,
+                                             Pointer.Fragment fragment) {
+        return Outcome.failed(Diag.DIAG_034, location, Pointer.describe(written, fragment),
                 "no node at '/" + String.join("/", fragment.path()) + "' in '"
                         + fragment.asset() + "'",
                 "The asset exists; the path does not. A palette's nodes are under '/$defs/<name>'"

@@ -56,6 +56,23 @@ public final class Diagnostics {
         entries.add(new Entry(diag, Level.ERROR, diag.message(args)));
     }
 
+    /**
+     * Records an error whose message was formatted elsewhere, with the row it came from.
+     * <p>
+     * For a step that finds the failure and does not hold the collector - a pointer parse, a pointer
+     * resolution - which is what {@link Outcome} carries between the two. Distinct from
+     * {@link #nested(String)} because the row is <em>not</em> lost: this is an {@link Entry} like any
+     * other, and {@link #all()} stays the list of every catalogue diagnostic recorded.
+     * <p>
+     * Named apart from {@link #error(Diag, Object...)} rather than overloading it, deliberately. An
+     * overload taking one {@code String} would silently win over the varargs form for every existing
+     * one-argument call - {@code error(DIAG_007, site.location())} would stop formatting and start being
+     * read as a finished message - and the two mean opposite things.
+     */
+    public void errorAlreadyFormatted(Diag diag, String message) {
+        entries.add(new Entry(diag, Level.ERROR, message));
+    }
+
     /** Records {@code diag} as a warning, formatted with {@code args}. */
     public void warn(Diag diag, Object... args) {
         entries.add(new Entry(diag, Level.WARN, diag.message(args)));

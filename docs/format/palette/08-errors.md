@@ -67,7 +67,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.008` | [MODEL.053](00-model.md#43-tag) | *`<asset>` marker `'<m>'`: tag `<tag>` contains no blocks. An empty tag has nothing to place; name a tag with members, or name blocks directly.* |
 | `DIAG.009` | [MODEL.062](00-model.md#44-alias) | *`<asset>` marker `'<m>'`: aliases `'<t>'`, which no palette in this context defines. Alias a marker that exists, or give this one a block of its own.* |
 | `DIAG.010` | [MODEL.072](00-model.md#45-light_socket) | *`<asset>` marker `'<m>'`: a light_socket declares no candidate in floor, wall, ceiling or free. Give it at least one.* |
-| `DIAG.011` | [MODEL.081](00-model.md#5-completeness) | *`<asset>` marker `'<m>'` `<via>`: resolves to no block. `<def>` `<declares only traits` / `declares kind <k> and no <key>>`; give this marker a `block`, `choices`, `tag` or `alias` as well.* |
+| `DIAG.011` | [MODEL.081](00-model.md#5-completeness) | *`<asset>` marker `'<m>'` `<via>`: resolves to no block. `<`<def>` declares only traits` / `<def>` declares kind `<k>` and no `<key>`` / `<def>` declares no `<key>`` / `<operand>` kept no key of `<def>` that places a block` / `this marker declares kind `<k>` and no `<key>`>`; give this marker a `block`, `choices`, `tag` or `alias` as well.* |
 | `DIAG.012` | [MODEL.051](00-model.md#43-tag) | *`<asset>` marker `'<m>'`: tag `<tag>` has no leading `#`. A block tag reference is written `#namespace:path`.* |
 
 ### Traits
@@ -99,6 +99,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.070` | [REF.082](03-pointers.md#3-imports) | *`<asset>`: `$imports` declares `super`, which is a built-in alias naming what this entry inherits and cannot be redeclared. Remove it, or choose another alias name.* |
 | `DIAG.071` | [REF.019](02-references.md#2-where-a-name-resolves) | *`<asset>`: a definitions asset `<declares no `version`` / `declares version `<n>`>`. The `definitions` registry is new in palette format version 2 and has no version 1 form, so an absent `version` is not one; write `"version": 2`.* |
 | `DIAG.072` | [REF.055](03-pointers.md#21-only-and-without) | *`<asset>` marker `'<m>'`: `<operand>` names `<key>`, which is not a key of a node`<, and the closest is `<near>`>`. The keys a filter may name are kind, block, choices, tag, of, floor, wall, ceiling, free and traits.* |
+| `DIAG.073` | [REF.056](03-pointers.md#21-only-and-without) | *`<asset>` marker `'<m>'`: `<operand>` is written with no `$ref`, so there is nothing for it to filter. Remove it, or name the definition whose keys it selects.* |
 
 ### Weights
 
@@ -129,7 +130,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.061` | [VER.011](09-migration.md#3-retired-keys) | *`<asset>`: `<key>` was deleted, not renamed. `<explanation>`* |
 | `DIAG.062` | [VER.014](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<owner>`: the inline palette declares version `<n>`, which this Urbex cannot yet read inline. Write it in the version 1 format, or move it to the `palettes` registry and name it with `refpalette`.* |
 | `DIAG.063` | [VER.015](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>`: resolves through an entry written in palette format version `<n>`, which this Urbex decodes but does not yet compile. Write it in the version 1 format, or omit `version`, until version 2 compilation lands.* |
-| `DIAG.064` | [VER.016](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>` marker `'<m>'`: trait `<id>` holds a `$ref`, and this Urbex cannot yet resolve a reference inside a trait. Write the block, or the weighted list, in full.* |
+| `DIAG.064` | [VER.016](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>` marker `'<m>'`: trait `<id>` holds `<operand>`, and this Urbex cannot yet resolve an operand inside a trait. Write the block, or the weighted list, in full.* |
 
 ## 5. Retired identifiers
 

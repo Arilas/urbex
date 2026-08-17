@@ -39,8 +39,10 @@ is [04 · Merging](04-merging.md).
 ```
 
 > **REF.005** · `MUST` — A `$ref` value is a [pointer](03-pointers.md#1-pointers): a bare definition
-> name, an asset in the `definitions` registry, an asset id with a JSON Pointer fragment, or `$super`.
-> Any of the four may be written through an [alias](03-pointers.md#3-imports).
+> name, a bare definition name with a JSON Pointer fragment, an asset in the `definitions` registry, an
+> asset id with a fragment, or `$super`. The four forms [REF.040](03-pointers.md#1-pointers) lists may be
+> written through an [alias](03-pointers.md#3-imports); `$super` may not, because
+> [REF.082](03-pointers.md#3-imports) makes it a built-in that no `$imports` entry can stand for.
 
 > > **Why** — the keys are borrowed from JSON Schema because readers already know they mean
 > > indirection, and because JSON Schema 2019-09 defines `$ref` with siblings as combining rather
@@ -111,6 +113,10 @@ not in who may point at it: by REF.016 both are addressable from anywhere.
 
 > **REF.018** · `MUST` — A definitions asset may carry `$imports`, and may not carry `$defs`.
 
+> > **Why** — it is one node, so it has nothing to put names on; a definition it wants to share is
+> > another asset in the same registry. It still needs `$imports`, because a shared definition is
+> > exactly the thing most likely to point somewhere else.
+
 > **REF.019** · `REJECT` (`DIAG.071`) — A definitions asset declares `"version": 2`. An absent `version`
 > is refused rather than read as version 1, and so is any other value.
 
@@ -120,10 +126,6 @@ not in who may point at it: by REF.016 both are addressable from anywhere.
 > > so there is nothing for the absence to select. Reading it as version 1 would hand the file to a codec
 > > that does not exist, and `DIAG.001`'s remedy — "omit it for the version 1 format" — would send the
 > > author looking for a format this registry has never had.
-
-> > **Why** — it is one node, so it has nothing to put names on; a definition it wants to share is
-> > another asset in the same registry. It still needs `$imports`, because a shared definition is
-> > exactly the thing most likely to point somewhere else.
 
 ## 4. Partial definitions
 

@@ -98,8 +98,9 @@ is the failure [VER.012](#3-retired-keys) forbids for a key and this section for
 > > the file it refuses is a *valid* version 2 palette, and no fixture can be both accepted as a
 > > document and refused as an entry.
 
-> **VER.016** · `REJECT` (`DIAG.064`) `[DEPRECATED → TRAIT.009]` — A `$ref` written anywhere inside a
-> `traits` value is refused, at any depth, until references inside traits are resolved.
+> **VER.016** · `REJECT` (`DIAG.064`) `[DEPRECATED → TRAIT.009]` — Any of the four
+> [operands](03-pointers.md#2-operands) — `$ref`, `$only`, `$without` or `$spread` — written anywhere
+> inside a `traits` value is refused, at any depth, until operands inside traits are resolved.
 
 > > **Why** — [TRAIT.009](01-traits.md#3-block-valued-fields) makes a block-valued trait field a node and
 > > [MODEL.032](00-model.md#3-alternatives-and-satellites) lets a node carry `$ref`, so a satellite
@@ -108,6 +109,12 @@ is the failure [VER.012](#3-retired-keys) forbids for a key and this section for
 > > hold nodes, and *not* expanding it silently gives the satellite no block — a marker whose damaged
 > > form or unlit form is air, with no message, which is the exact class of silence version 2 exists to
 > > remove. Refusing costs an author who wrote one a rewrite in full and tells them why.
+
+> > **Why all four and not `$ref` alone** — every operand inside a trait is unresolved for the same
+> > reason, and each fails silently in its own way. A `$spread` in a satellite's `choices` survives into
+> > the compiled palette as a list element that places nothing; a `$only` or `$without` with nothing to
+> > filter is simply dropped. Naming one operand and leaving three would refuse the case an author is
+> > least likely to write and accept the three they might.
 
 > > **Why it also covers REF.022** — [REF.022](02-references.md#4-partial-definitions) forbids `$ref` on a
 > > trait *object* permanently, for a different reason: sharing a trait is done with a partial definition,

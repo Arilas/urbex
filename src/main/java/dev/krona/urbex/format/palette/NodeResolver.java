@@ -28,8 +28,11 @@ import java.util.function.Predicate;
  * The order the graph is walked in is a depth-first search from the entries in <b>declaration order</b>,
  * which is what {@code REF.032} needs: "The diagnostic names every node in the cycle, in declaration
  * order, beginning with the node the loader reached first." The recursion carries an explicit stack, so
- * a cycle is <em>found</em> - reported once, naming its members - rather than recursed into until the
- * JVM runs out of frames.
+ * a <em>cycle</em> is found and named rather than followed forever. Depth is still bounded by the JVM's
+ * frames and not by a rule: a chain of some sixteen hundred definitions, each referencing the next,
+ * overflows the stack instead of loading. Nothing in the corpus is within three orders of magnitude of
+ * that - the deepest shipped chain is two - and no rule states a limit, so this records the bound rather
+ * than inventing a diagnostic for it.
  * <p>
  * <b>Order within one node</b> ({@code REF.003}, {@code REF.004}, {@code REF.051}, {@code REF.052}):
  * <ol>
@@ -129,7 +132,8 @@ public final class NodeResolver {
         NodeResolver resolver = new NodeResolver(scope, diagnostics);
         PointerResolver.Site site = PointerResolver.Site.wholeAsset(scope);
         return resolver.node(node, scope, site)
-                .flatMap(flat -> resolver.complete(flat, node.ref(), reached(site, node.ref())));
+                .flatMap(flat -> resolver.complete(flat, Origin.of(node),
+                        reached(site, node.ref())));
     }
 
     /**
@@ -160,9 +164,9 @@ public final class NodeResolver {
                 : file.palette().orElse(Map.of()).entrySet()) {
             ResolutionScope scope = entryScope();
             PointerResolver.Site site = PointerResolver.Site.marker(scope, marker.getKey());
-            Optional<String> from = marker.getValue().ref();
+            Origin origin = Origin.of(marker.getValue());
             entry(fileScope.document().markerKey(marker.getKey()), marker.getValue(), scope, site)
-                    .flatMap(flat -> complete(flat, from, reached(site, from)))
+                    .flatMap(flat -> complete(flat, origin, reached(site, origin.ref())))
                     .ifPresent(value -> palette.put(marker.getKey(), value));
         }
         return failed ? Optional.empty() : Optional.of(new ResolvedPalette(defs, palette));
@@ -219,21 +223,27 @@ public final class NodeResolver {
     /** One node's tree: spreads, then children, then its own {@code $ref}. */
     private Optional<RawNode> node(RawNode node, ResolutionScope scope,
                                    PointerResolver.Site site) {
+        // Every list of this node is resolved before any failure is acted on, by DIAG.903: a node whose
+        // 'floor' and 'wall' each hold a broken pointer is two mistakes, and reporting the first and
+        // stopping is two load-fail-edit cycles. The same reason RawChoice checks a whole list.
+        boolean ok = true;
         Optional<List<RawChoice>> choices = Optional.empty();
         if (node.choices().isPresent()) {
             choices = list(node.choices().get(), scope, site, "choice");
-            if (choices.isEmpty()) {
-                return Optional.empty();
-            }
+            ok = choices.isPresent();
         }
         Map<Kind.Placement, List<RawChoice>> placements = new LinkedHashMap<>();
         for (Map.Entry<Kind.Placement, List<RawChoice>> placement : node.placements().entrySet()) {
             Optional<List<RawChoice>> candidates = list(placement.getValue(), scope,
                     site.inside("'" + placement.getKey().key() + "'"), "candidate");
             if (candidates.isEmpty()) {
-                return Optional.empty();
+                ok = false;
+                continue;
             }
             placements.put(placement.getKey(), candidates.get());
+        }
+        if (!ok) {
+            return Optional.empty();
         }
 
         Fields own = new Fields(node.kind(), node.block(), choices, node.tag(), node.aliasOf(),
@@ -257,9 +267,9 @@ public final class NodeResolver {
         }
         Reached found = reached.orElseThrow();
         if (!(found.target() instanceof PointerResolver.Target.Node target)) {
-            return fail(Diag.DIAG_034.message(site.location(), found.describe(),
+            return fail(Diag.DIAG_034, site.location(), found.describe(),
                     "no node at '/" + String.join("/", found.path()) + "'",
-                    "A '$ref' names a node, and a " + describe(found.target()) + " is not one."));
+                    "A '$ref' names a node, and a " + describe(found.target()) + " is not one.");
         }
         Fields base = Fields.of(target.node()).filter(node.only(), node.without());
         return Optional.of(base.overlay(own).node());
@@ -288,18 +298,21 @@ public final class NodeResolver {
      */
     private Optional<Reached> reach(String written, String operand, ResolutionScope scope,
                                     PointerResolver.Site site) {
-        DataResult<Pointer> parsed = Pointer.parse(written, scope.document().imports(),
-                site.location());
-        if (parsed.error().isPresent()) {
-            return fail(parsed.error().get().message());
+        Optional<Pointer> parsed = Pointer.parse(written, scope.document().imports(), site.location())
+                .reportInto(diagnostics);
+        if (parsed.isEmpty()) {
+            failed = true;
+            return Optional.empty();
         }
-        Pointer pointer = parsed.result().orElseThrow();
-        DataResult<PointerResolver.Addressed> addressed =
-                PointerResolver.address(pointer, written, operand, scope, site);
-        if (addressed.error().isPresent()) {
-            return fail(addressed.error().get().message());
+        Pointer pointer = parsed.orElseThrow();
+        Optional<PointerResolver.Addressed> addressed =
+                PointerResolver.address(pointer, written, operand, scope, site)
+                        .reportInto(diagnostics);
+        if (addressed.isEmpty()) {
+            failed = true;
+            return Optional.empty();
         }
-        PointerResolver.Addressed entry = addressed.result().orElseThrow();
+        PointerResolver.Addressed entry = addressed.orElseThrow();
         Optional<RawNode> value = entry(entry.key(), entry.node(), entry.scope(),
                 site.through(Pointer.describe(written, pointer)));
         if (value.isEmpty()) {
@@ -312,9 +325,8 @@ public final class NodeResolver {
         if (at.error().isPresent()) {
             // The path names nothing, which is REF.045 whichever operand asked: DIAG.037 is for a
             // pointer that names something other than a list, and this one names nothing at all.
-            return fail(Diag.DIAG_034.message(site.location(),
-                    Pointer.describe(written, pointer), at.error().get().message(),
-                    "The entry exists; the path into it does not."));
+            return fail(Diag.DIAG_034, site.location(), Pointer.describe(written, pointer),
+                    at.error().get().message(), "The entry exists; the path into it does not.");
         }
         return Optional.of(new Reached(pointer, written, entry.path(),
                 at.result().orElseThrow()));
@@ -355,11 +367,13 @@ public final class NodeResolver {
             Optional<RawNode> value =
                     node(choice.node(), scope, site.inside(position + " " + index));
             if (value.isEmpty()) {
-                return Optional.empty();
+                // Collected, not returned: two broken pointers in one list are two mistakes.
+                ok = false;
+                continue;
             }
             resolvedChoices.add(new RawChoice(value.get(), choice.size(), choice.when()));
         }
-        return Optional.of(List.copyOf(resolvedChoices));
+        return ok ? Optional.of(List.copyOf(resolvedChoices)) : Optional.empty();
     }
 
     /** The list a {@code $spread} names, or empty with {@code DIAG.037} when it names something else. */
@@ -375,8 +389,7 @@ public final class NodeResolver {
         }
         // REF.071. The <kind> slot holds what the pointer did name, because that is the sentence that
         // tells the author whether to move the pointer or to change the node it lands on.
-        return fail(Diag.DIAG_037.message(site.location(), found.describe(),
-                describe(found.target())));
+        return fail(Diag.DIAG_037, site.location(), found.describe(), describe(found.target()));
     }
 
     /**
@@ -391,7 +404,7 @@ public final class NodeResolver {
      * @param from the pointer this node was reached through, which {@code DIAG.011} names as the
      *             definition that "declares only traits"
      */
-    private Optional<ResolvedNode> complete(RawNode node, Optional<String> from,
+    private Optional<ResolvedNode> complete(RawNode node, Origin origin,
                                             PointerResolver.Site site) {
         Kind kind = node.kind().orElse(Kind.BLOCK);   // MODEL.011
         if (!coherent(node, kind, site)) {
@@ -400,14 +413,14 @@ public final class NodeResolver {
         return switch (kind) {
             case BLOCK -> node.block()
                     .map(block -> built(kind, new ResolvedNode.Source.Block(block), node))
-                    .orElseGet(() -> noBlockSource(node, kind, "block", from, site));
+                    .orElseGet(() -> noBlockSource(node, kind, "block", origin, site));
             case TAG -> node.tag()
                     .map(tag -> built(kind, new ResolvedNode.Source.Tag(tag), node))
-                    .orElseGet(() -> noBlockSource(node, kind, "tag", from, site));
+                    .orElseGet(() -> noBlockSource(node, kind, "tag", origin, site));
             case ALIAS -> node.aliasOf()
                     .map(of -> built(kind, new ResolvedNode.Source.Alias(of), node))
-                    .orElseGet(() -> noBlockSource(node, kind, "of", from, site));
-            case WEIGHTED -> weighted(node, from, site);
+                    .orElseGet(() -> noBlockSource(node, kind, "of", origin, site));
+            case WEIGHTED -> weighted(node, origin, site);
             case LIGHT_SOCKET -> socket(node, site);
         };
     }
@@ -419,34 +432,73 @@ public final class NodeResolver {
     /**
      * {@code MODEL.081}: this node is in a position that needs a block source and has none.
      * <p>
-     * {@code DIAG.011}'s second argument says <em>what</em> is missing, which is why it is a slot and no
-     * longer the fixed words "declares only traits". Three phrasings, one per shape the failure has:
-     * a node that declared a kind is missing that kind's required key; a node that declared no kind and
-     * carries traits is the partial definition {@code REF.020} is about; and a node that declared neither
-     * is simply empty. Saying "declares only traits" of any of the other two would be false, and the
-     * false version is what made this class raise {@code DIAG.007} for a weighted node with no
-     * {@code choices} - naming the wrong rule to avoid printing the wrong sentence.
+     * <b>Every phrasing below is true of the file it describes,</b> which took two goes. The first
+     * version said "{@code <def>} declares only traits" always, which is false of a node that declared a
+     * kind; the second added the kind case and still attributed the absence to the {@code $ref} as
+     * written, which is false whenever a filter is what dropped it - {@code $without: ["block"]} against
+     * a definition that <em>does</em> declare {@code block} said "'d' declares no 'block'". So the
+     * subject is chosen by what can be proved from the {@link Origin}, in this order:
+     * <ol>
+     *   <li>a filter was written: it kept no block-placing key, which is necessarily true - the merged
+     *       node has no block source, and a node's own keys only override, never remove, so nothing the
+     *       filter kept placed a block;</li>
+     *   <li>the marker declared the kind itself: the sentence is about the marker, not about a definition
+     *       that may never have mentioned a kind at all;</li>
+     *   <li>everything came from a {@code $ref} unfiltered: absence in the merged node implies absence in
+     *       the target, so the definition is the right subject and the fix is in its file;</li>
+     *   <li>no provenance at all - a list element, whose pointer belongs to the entry - so the subject is
+     *       the resolved node, read off the node itself and therefore true of it.</li>
+     * </ol>
      *
      * @param required the key this kind needs and does not have
-     * @param from     the {@code $ref} it was reached through, which {@code DIAG.011} names as
-     *                 {@code <def>}. Empty inside a list, where the pointer belongs to the entry rather
-     *                 than to this element - see the task report
      */
     private Optional<ResolvedNode> noBlockSource(RawNode node, Kind kind, String required,
-                                                 Optional<String> from,
-                                                 PointerResolver.Site site) {
-        String missing;
-        if (node.kind().isPresent()) {
-            missing = "declares kind " + kind.key() + " and no '" + required + "'";
+                                                 Origin origin, PointerResolver.Site site) {
+        String key = "'" + required + "'";
+        String def = origin.ref().map(pointer -> "'" + pointer + "'").orElse("it");
+        String clause;
+        if (origin.filter().isPresent() && origin.ref().isPresent()) {
+            clause = origin.filter().orElseThrow() + " kept no key of " + def
+                    + " that places a block";
+        } else if (origin.ownKind()) {
+            clause = "this marker declares kind " + kind.key() + " and no " + key;
+        } else if (node.kind().isPresent()) {
+            clause = def + " declares kind " + kind.key() + " and no " + key;
         } else if (!node.traits().isEmpty()) {
-            missing = "declares only traits";
+            clause = def + " declares only traits";
         } else {
-            missing = "declares no '" + required + "'";
+            clause = def + " declares no " + key;
         }
-        diagnostics.error(Diag.DIAG_011, site.location(),
-                from.map(pointer -> "'" + pointer + "'").orElse("it"), missing);
+        diagnostics.error(Diag.DIAG_011, site.location(), clause);
         failed = true;
         return Optional.empty();
+    }
+
+    /**
+     * Where a node's keys came from, as far as {@code DIAG.011} needs to attribute their absence.
+     * <p>
+     * Read off the node <em>as written</em>, before its {@code $ref} was applied, because that is the only
+     * place the answer survives: the merged node cannot say whether its missing {@code block} was never in
+     * the target or was dropped by a {@code $without}.
+     *
+     * @param ref     the {@code $ref} this node was reached through, which {@code DIAG.011} names as
+     *                {@code <def>}
+     * @param filter  {@code '$only'} or {@code '$without'} when one was written
+     * @param ownKind whether the node declared its own {@code kind}, rather than taking one from its target
+     */
+    private record Origin(Optional<String> ref, Optional<String> filter, boolean ownKind) {
+
+        static Origin of(RawNode written) {
+            Optional<String> filter = written.only().isPresent()
+                    ? Optional.of("'$only'")
+                    : written.without().map(ignored -> "'$without'");
+            return new Origin(written.ref(), filter, written.kind().isPresent());
+        }
+
+        /** A node whose provenance this pass did not keep - an element of a resolved list. */
+        static Origin unknown() {
+            return new Origin(Optional.empty(), Optional.empty(), false);
+        }
     }
 
     /** Fails without a word, because whatever failed underneath has already said so. */
@@ -494,10 +546,10 @@ public final class NodeResolver {
      * this task, because {@code DIAG.011} could then only say "declares only traits" - the code named the
      * wrong rule to avoid printing a false sentence, which is the wrong way round.
      */
-    private Optional<ResolvedNode> weighted(RawNode node, Optional<String> from,
+    private Optional<ResolvedNode> weighted(RawNode node, Origin origin,
                                             PointerResolver.Site site) {
         if (node.choices().isEmpty()) {
-            return noBlockSource(node, Kind.WEIGHTED, "choices", from, site);
+            return noBlockSource(node, Kind.WEIGHTED, "choices", origin, site);
         }
         List<RawChoice> choices = node.choices().orElseThrow();
         if (choices.isEmpty()) {
@@ -526,14 +578,19 @@ public final class NodeResolver {
     private Optional<ResolvedNode> socket(RawNode node, PointerResolver.Site site) {
         Map<Kind.Placement, List<ResolvedNode.Choice>> placements = new LinkedHashMap<>();
         boolean any = false;
+        boolean ok = true;
         for (Map.Entry<Kind.Placement, List<RawChoice>> placement : node.placements().entrySet()) {
             List<ResolvedNode.Choice> candidates = alternatives(placement.getValue(),
                     site.inside("'" + placement.getKey().key() + "'"), "candidate");
             if (candidates == null) {
-                return silently();
+                ok = false;   // DIAG.903: every list of this socket is checked before it fails
+                continue;
             }
             placements.put(placement.getKey(), candidates);
             any |= !candidates.isEmpty();
+        }
+        if (!ok) {
+            return silently();
         }
         if (!any) {
             diagnostics.error(Diag.DIAG_010, site.location());   // MODEL.072, likewise
@@ -549,7 +606,7 @@ public final class NodeResolver {
         boolean ok = true;
         for (int index = 0; index < choices.size(); index++) {
             RawChoice choice = choices.get(index);
-            Optional<ResolvedNode> value = complete(choice.node(), Optional.empty(),
+            Optional<ResolvedNode> value = complete(choice.node(), Origin.unknown(),
                     site.inside(position + " " + index));
             if (value.isEmpty()) {
                 ok = false;
@@ -560,9 +617,17 @@ public final class NodeResolver {
         return ok ? List.copyOf(resolvedChoices) : null;
     }
 
-    /** Records a message that is already a formatted diagnostic, and fails this resolution. */
-    private <T> Optional<T> fail(String message) {
-        diagnostics.nested(message);
+    /**
+     * Records {@code diag} and fails this resolution.
+     * <p>
+     * Through {@link Diagnostics#error} rather than {@link Diagnostics#nested}, so that the row travels
+     * with the message: {@code nested} is for a failure that <em>has</em> no catalogue row - a message a
+     * deeper codec produced, or a DFU type error - and five of resolution's rows went through it until
+     * this round, which quietly made {@link Diagnostics#all()} not the list of every catalogue diagnostic
+     * recorded. {@link Outcome} carries the row for the steps that find their failure elsewhere.
+     */
+    private <T> Optional<T> fail(Diag diag, Object... args) {
+        diagnostics.error(diag, args);
         failed = true;
         return Optional.empty();
     }
@@ -596,7 +661,8 @@ public final class NodeResolver {
         }
 
         RawNode node() {
-            return new RawNode(kind, block, choices, tag, aliasOf, Map.copyOf(placements),
+            return new RawNode(kind, block, choices, tag, aliasOf,
+                    Kind.Placement.ordered(placements),
                     Map.copyOf(traits), Optional.empty(), Optional.empty(), Optional.empty(),
                     Optional.empty());
         }

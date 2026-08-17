@@ -10,7 +10,9 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A namespaced statement about a node beyond which block it is ({@code TRAIT.001}, {@code TRAIT.002}).
@@ -56,7 +58,15 @@ public record Trait(Identifier id, Tag data) {
                     Trait::fromPayloads, Trait::toPayloads);
 
     /**
-     * Whether this trait's payload writes a {@code $ref} anywhere inside it ({@code VER.016}).
+     * The operands {@code REF.050} closes the set of, in the order that rule lists them.
+     * <p>
+     * Ordered so that a payload carrying two of them names the same one every run, for the reason
+     * {@code RawChoice.OWN_KEYS_IN_ORDER} states: a message that shuffles cannot be pinned by a test.
+     */
+    private static final List<String> OPERANDS = List.of("$ref", "$only", "$without", "$spread");
+
+    /**
+     * The first operand this trait's payload writes anywhere inside it, if any ({@code VER.016}).
      * <p>
      * A scan for a key rather than a reading of the payload, and that is the point: {@code TRAIT.009}
      * makes a block-valued trait field a node and {@code MODEL.032} lets a node carry {@code $ref}, so a
@@ -69,25 +79,30 @@ public record Trait(Identifier id, Tag data) {
      * or unlit form is silently air. {@code REF.022}'s case - a {@code $ref} on the trait object itself -
      * is caught by the same scan, for its own narrower reason, until it gets its own check.
      * <p>
+     * <b>All four operands, not {@code $ref} alone.</b> The first version of this check named
+     * {@code $ref} and let the other three through, so a {@code $spread} inside a satellite's
+     * {@code choices} survived into the resolved palette as NBT nothing would ever expand - the same
+     * silence, in the operand an author is more likely to reach for when extending an inherited list.
+     * <p>
      * At any depth, because a satellite may be a weighted node whose choices are nodes: the {@code $ref}
      * in {@code {"into": {"kind": "weighted", "choices": [{"weight": 1, "$ref": "rubble"}]}}} is three
      * levels down and is exactly as unresolved as one at the top.
      */
-    public boolean holdsReference() {
-        return holdsReference(data);
+    public Optional<String> operandHeld() {
+        return OPERANDS.stream().filter(operand -> holds(data, operand)).findFirst();
     }
 
-    private static boolean holdsReference(Tag tag) {
+    private static boolean holds(Tag tag, String operand) {
         if (tag instanceof CompoundTag compound) {
-            if (compound.keySet().contains("$ref")) {
+            if (compound.keySet().contains(operand)) {
                 return true;
             }
             return compound.keySet().stream()
                     .map(compound::get)
-                    .anyMatch(value -> value != null && holdsReference(value));
+                    .anyMatch(value -> value != null && holds(value, operand));
         }
         if (tag instanceof ListTag list) {
-            return list.stream().anyMatch(Trait::holdsReference);
+            return list.stream().anyMatch(element -> holds(element, operand));
         }
         return false;
     }

@@ -1,7 +1,7 @@
 package dev.krona.urbex.format.palette;
 
-import com.mojang.serialization.DataResult;
 import dev.krona.urbex.format.Diag;
+import dev.krona.urbex.format.Outcome;
 import dev.krona.urbex.format.Rule;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -20,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * What {@link Pointer#parse} reads out of the text a file wrote.
  * <p>
  * Parsing is separated from resolving, so these are the rules that need no other asset:
- * {@code REF.040}'s three forms, {@code REF.081}'s textual alias expansion, {@code REF.082}'s built-in,
+ * {@code REF.040}'s four forms, {@code REF.081}'s textual alias expansion, {@code REF.082}'s built-in,
  * {@code REF.083}'s refusal of an undeclared one, and {@code REF.084}'s domain for a bare name. What a
  * parsed pointer then <em>finds</em> is {@link NodeResolverTest}'s.
  */
@@ -34,7 +35,7 @@ class PointerTest {
         Bootstrap.bootStrap();
     }
 
-    // ---- The three forms -----------------------------------------------------------------------
+    // ---- The four forms ------------------------------------------------------------------------
 
     @Test
     @Rule("REF.040")
@@ -104,14 +105,14 @@ class PointerTest {
      * {@code REF.081}: expansion is textual, and nothing is inserted at the join - so an alias may
      * stand for a whole asset id, or for an asset and a fragment.
      * <p>
-     * The third thing {@code REF.081}'s {@code > Why} claims an alias can stand for, "any prefix of a
-     * path", is <em>not</em> asserted here, and cannot be: nothing in the rule says where the alias name
-     * ends, this reads it as ending at the first {@code /} or {@code #}, and so {@code $half} followed by
-     * {@code able} is one alias named {@code halfable}. The alternative reading - the longest declared
-     * alias that prefixes the text - is what would reach that case, and it costs {@code REF.083}: with
-     * it, a file declaring {@code mat} and writing {@code $matt} silently expands to the {@code mat}
-     * prefix followed by a stray {@code t} instead of naming the misspelt import, which is the failure
-     * {@code REF.083} exists to prevent. Recorded in the task report as an ambiguity in the rule.
+     * An alias name ends at the first {@code /} or {@code #}, which is what {@code REF.081}'s second
+     * {@code > Why} states. So {@code $half} followed by {@code able} is one alias named
+     * {@code halfable} rather than the {@code half} prefix and a suffix - the case that {@code > Why}
+     * used to claim for aliases ("any prefix of a path") and, since ruling 7 of this task's review, no
+     * longer does. Reaching it would need longest-match expansion, and that costs {@code REF.083}: a file
+     * declaring {@code mat} and writing {@code $matt} would expand to the {@code mat} prefix followed by
+     * a stray {@code t} instead of naming the misspelt import, which is the failure {@code REF.083}
+     * exists to prevent.
      */
     @Test
     @Rule("REF.081")
@@ -163,23 +164,24 @@ class PointerTest {
     @Test
     @Rule("REF.083")
     void anUnknownAliasIsRefusedRatherThanReadAsALocalName() {
-        DataResult<Pointer> parsed = Pointer.parse("$mats/Damageable",
-                Map.of("mat", "urbex:common#/$defs"), WHERE);
-        String message = parsed.error().orElseThrow().message();
+        String message = refuse("$mats/Damageable", Map.of("mat", "urbex:common#/$defs"));
         assertTrue(Diag.DIAG_039.matches(message), message);
         assertTrue(message.contains("'$mats'"), message);
-        assertTrue(parsed.result().isEmpty(), () -> "expected no pointer, got " + parsed.result());
+        // DIAG.039's row offers the nearest declared alias, and this is the typo it is for.
+        assertTrue(message.contains("the closest declared is '$mat'"), message);
     }
 
     /** {@code REF.084}: no local name can be mistaken for an alias, because it may not begin with one. */
     @Test
     @Rule("REF.084")
     void aBareNameMayNotContainASlashOrBeginWithADollar() {
-        String slashed = Pointer.parse("mat/Damageable", WHERE).error().orElseThrow().message();
+        String slashed = refuse("mat/Damageable", Map.of());
         assertTrue(Diag.DIAG_034.matches(slashed), slashed);
 
-        String dollared = Pointer.parse("$nosuch", WHERE).error().orElseThrow().message();
+        String dollared = refuse("$nosuch", Map.of());
         assertTrue(Diag.DIAG_039.matches(dollared), dollared);
+        // Nothing is declared, so there is no closest alias to offer and the clause is absent.
+        assertFalse(dollared.contains("closest"), dollared);
     }
 
     /**
@@ -216,8 +218,7 @@ class PointerTest {
                         parse("urbex:common#/a~1b/c~0d")).path());
         assertEquals("urbex:common#/a~1b/c~0d", parse("urbex:common#/a~1b/c~0d").expanded());
 
-        String missingSlash =
-                Pointer.parse("urbex:common#$defs", WHERE).error().orElseThrow().message();
+        String missingSlash = refuse("urbex:common#$defs", Map.of());
         assertTrue(Diag.DIAG_034.matches(missingSlash), missingSlash);
     }
 
@@ -228,8 +229,15 @@ class PointerTest {
     }
 
     private static Pointer parse(String written, Map<String, String> imports) {
-        DataResult<Pointer> parsed = Pointer.parse(written, imports, WHERE);
+        Outcome<Pointer> parsed = Pointer.parse(written, imports, WHERE);
         return parsed.result().orElseThrow(() -> new AssertionError(
-                written + " should parse, got " + parsed.error().orElseThrow().message()));
+                written + " should parse, got " + parsed));
+    }
+
+    /** The message a pointer that must not parse is refused with. */
+    private static String refuse(String written, Map<String, String> imports) {
+        Outcome<Pointer> parsed = Pointer.parse(written, imports, WHERE);
+        assertTrue(parsed.result().isEmpty(), () -> written + " should not parse");
+        return ((Outcome.Failed<Pointer>) parsed).message();
     }
 }

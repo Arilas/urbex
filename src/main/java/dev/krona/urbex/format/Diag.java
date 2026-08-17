@@ -76,17 +76,23 @@ public enum Diag {
             + " Give it at least one."),
 
     /**
-     * {@code MODEL.081}: args are the location, the definition it was reached through, and what that
-     * definition is missing.
+     * {@code MODEL.081}: args are the location and one clause saying what is missing and whose fault it
+     * is.
      * <p>
-     * The third argument is a slot rather than the fixed words "declares only traits" because
-     * {@code MODEL.081} covers every missing required key, not only the partial-definition case: a node
-     * that arrived at {@code kind: weighted} through a {@code $ref} and has no {@code choices} is the
-     * same rule and a different sentence. The fixed wording made this class raise {@code DIAG.007}
-     * there instead, to avoid printing something false - a diagnostic that forces the code to name the
-     * wrong rule is worse than a slightly vaguer one.
+     * <b>One slot for the whole clause, not two.</b> The clause has to name a different subject in
+     * different cases, and getting that wrong prints something false about a real file. The row's five
+     * alternatives are the five cases: the definition declares only traits (the partial-definition case
+     * {@code REF.020} is about); the definition declares a kind and not its key; the definition declares
+     * neither; a {@code $only} or {@code $without} dropped the key the definition <em>did</em> declare;
+     * and the marker itself declared the kind. The two that were missing until this round are the last
+     * two, and both were reported as the definition's fault - {@code $without: ["block"]} against a
+     * definition that declares {@code block} said "declares no 'block'", which is false of it.
+     * <p>
+     * The fixed wording "declares only traits" also made this class raise {@code DIAG.007} for a weighted
+     * node with no {@code choices}, to avoid printing something false. A diagnostic that forces the code
+     * to name the wrong rule is worse than a slightly vaguer one.
      */
-    DIAG_011("%s: resolves to no block. %s %s;"
+    DIAG_011("%s: resolves to no block. %s;"
             + " give this marker a 'block', 'choices', 'tag' or 'alias' as well."),
 
     /** {@code MODEL.051}: args are the location and the tag as written. */
@@ -165,8 +171,15 @@ public enum Diag {
     DIAG_038("%s (version %s) extends %s (version %s)."
             + " An extends chain cannot cross format versions; convert one of them."),
 
-    /** {@code REF.083}: args are the location and the undeclared alias. */
-    DIAG_039("%s: '$%s' is not an import of this file."
+    /**
+     * {@code REF.083}: args are the location, the undeclared alias, and the nearest declared one.
+     * <p>
+     * The third slot is the row's {@code <, and the closest declared is '$<near>'>} clause, which went
+     * unimplemented while nothing raised this row - Task 3 is where an alias is first parsed, and where
+     * the clause becomes reachable. It is the same hint {@link #DIAG_072} carries for a misspelt filter
+     * key, computed the same way, and it is empty when no declared alias is close.
+     */
+    DIAG_039("%s: '$%s' is not an import of this file%s."
             + " Declare it in '$imports', or write the pointer in full."),
 
     // ---- Weights (040-049) ---------------------------------------------------------------------
@@ -260,13 +273,13 @@ public enum Diag {
             + " until version 2 compilation lands."),
 
     /**
-     * {@code VER.016}: args are the location and the trait id.
+     * {@code VER.016}: args are the location, the trait id, and the operand found inside it.
      * <p>
      * Retired with {@code VER.016} when a trait registry can say which of a trait's fields hold nodes,
      * at which point {@code TRAIT.009} resolves them and {@code REF.022} needs a check of its own. Its
      * number stays retired, by {@code DIAG.910}.
      */
-    DIAG_064("%s: trait %s holds a '$ref', and this Urbex cannot yet resolve a reference inside a"
+    DIAG_064("%s: trait %s holds %s, and this Urbex cannot yet resolve an operand inside a"
             + " trait. Write the block, or the weighted list, in full."),
 
     // ---- References and merging, continued (070-079; 030-039 is full) ---------------------------
@@ -286,7 +299,19 @@ public enum Diag {
      */
     DIAG_072("%s: %s names %s, which is not a key of a node%s."
             + " The keys a filter may name are kind, block, choices, tag, of, floor, wall, ceiling,"
-            + " free and traits.");
+            + " free and traits."),
+
+    /**
+     * {@code REF.056}: args are the location and the operand written without a {@code $ref}.
+     * <p>
+     * A row of its own rather than a sixth alternative on {@link #DIAG_072}, although both refuse a
+     * filter that cannot do anything. A shared row would have had to put the whole message in
+     * placeholders - the two halves have different remedies, and {@code 08-errors.md} §2 requires the
+     * remedy - which would leave {@link #matches(String)} almost no literal text to identify the row by,
+     * and {@code DiagCatalogueTest} proves no two templates match each other's messages.
+     */
+    DIAG_073("%s: %s is written with no '$ref', so there is nothing for it to filter."
+            + " Remove it, or name the definition whose keys it selects.");
 
     private static final Map<String, Diag> BY_ID = byId();
 

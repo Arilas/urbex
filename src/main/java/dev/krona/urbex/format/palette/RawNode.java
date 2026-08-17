@@ -13,6 +13,7 @@ import dev.krona.urbex.format.StrictKeys;
 import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -71,6 +72,16 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
 
     /** Every key any node may carry - the set to check against when the kind is not yet knowable. */
     public static final Set<String> ANY_KIND_KEYS = union(COMMON_KEYS, Kind.allKindSpecificKeys());
+
+    /**
+     * The keys {@code $only} and {@code $without} may name ({@code REF.055}).
+     * <p>
+     * A node's own keys and not {@link #COMMON_KEYS}: an operand is not a key a reference contributes.
+     * {@code $ref} is resolved before the filter is applied, so naming it would filter something that no
+     * longer exists, and `$only`/`$without` on the target are the target's business, not the referrer's.
+     */
+    public static final Set<String> FILTERABLE_KEYS =
+            union(Set.of("kind", "traits"), Kind.allKindSpecificKeys());
 
     /**
      * The node codec, recursive because a node contains nodes.
@@ -307,7 +318,7 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
         wall.ifPresent(list -> byPlacement.put(Kind.Placement.WALL, list));
         ceiling.ifPresent(list -> byPlacement.put(Kind.Placement.CEILING, list));
         free.ifPresent(list -> byPlacement.put(Kind.Placement.FREE, list));
-        return Map.copyOf(byPlacement);
+        return Kind.Placement.ordered(byPlacement);
     }
 
     /**
@@ -334,13 +345,24 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
         node.only().ifPresent(keys -> filterKeys(keys, "'$only'", diagnostics));
         node.without().ifPresent(keys -> filterKeys(keys, "'$without'", diagnostics));
 
-        // VER.016: a $ref inside a trait payload is refused until references inside traits resolve.
+        // REF.056: a filter selects the keys a reference contributes, so one with no reference selects
+        // from nothing - the node means exactly what it would have meant without it, and nothing says so.
+        if (node.ref().isEmpty()) {
+            if (node.only().isPresent()) {
+                diagnostics.error(Diag.DIAG_073, Diagnostics.DECODING_LOCATION, "'$only'");
+            }
+            if (node.without().isPresent()) {
+                diagnostics.error(Diag.DIAG_073, Diagnostics.DECODING_LOCATION, "'$without'");
+            }
+        }
+
+        // VER.016: an operand inside a trait payload is refused until operands inside traits resolve.
         // Ordered by trait id so a node carrying two of them reports the same way every run.
         node.traits().values().stream()
-                .filter(Trait::holdsReference)
-                .sorted(java.util.Comparator.comparing(trait -> trait.id().toString()))
-                .forEach(trait -> diagnostics.error(Diag.DIAG_064, Diagnostics.DECODING_LOCATION,
-                        "'" + trait.id() + "'"));
+                .sorted(Comparator.comparing(trait -> trait.id().toString()))
+                .forEach(trait -> trait.operandHeld().ifPresent(operand ->
+                        diagnostics.error(Diag.DIAG_064, Diagnostics.DECODING_LOCATION,
+                                "'" + trait.id() + "'", "'" + operand + "'")));
 
         // REF.072: a $spread element carries no other key. To change what it spreads, point somewhere
         // else - so a sibling key is a key of a thing this element is not.
@@ -380,16 +402,6 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
         }
         return DataResult.success(node);
     }
-
-    /**
-     * The keys {@code $only} and {@code $without} may name ({@code REF.055}).
-     * <p>
-     * A node's own keys and not {@link #COMMON_KEYS}: an operand is not a key a reference contributes.
-     * {@code $ref} is resolved before the filter is applied, so naming it would filter something that no
-     * longer exists, and `$only`/`$without` on the target are the target's business, not the referrer's.
-     */
-    public static final Set<String> FILTERABLE_KEYS =
-            union(Set.of("kind", "traits"), Kind.allKindSpecificKeys());
 
     /**
      * {@code REF.055}: reports every key of a filter that is not a key of a node.

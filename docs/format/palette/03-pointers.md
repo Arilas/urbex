@@ -115,6 +115,20 @@ compiled palette.
   "palette": { "X": { "$ref": "d", "$only": ["trait"], "block": "minecraft:stone" } } }
 ```
 
+> **REF.056** · `REJECT` (`DIAG.073`) — A `$only` or `$without` written on a node that carries no
+> `$ref` is refused.
+
+> > **Why** — a filter selects the keys a *reference* contributes, so one with no reference has nothing
+> > to select from and nothing about the node says so: the keys the author wrote are kept, the filter is
+> > discarded, and the node means what it would have meant without it. It is the same failure as a
+> > misspelt filter key one step earlier, and the same one [MODEL.004](00-model.md#1-the-file) removes
+> > for keys the format does not define — a key that is accepted and then does nothing.
+
+```json fixture:REF.056 reject=DIAG.073
+{ "version": 2,
+  "palette": { "X": { "$only": ["traits"], "block": "minecraft:stone" } } }
+```
+
 > > **Why** — `$ref` without a filter is all-or-nothing, which makes one common intent
 > > inexpressible: taking a node's traits while supplying a different block. Written plainly it
 > > produces an incoherent node — the target's `kind: weighted` arrives, the sibling `block` is

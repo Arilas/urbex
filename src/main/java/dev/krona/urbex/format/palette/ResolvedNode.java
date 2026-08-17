@@ -88,7 +88,8 @@ public record ResolvedNode(Kind kind, Source source, Map<Identifier, Trait> trai
                 Map<Kind.Placement, List<Choice>> copy = new LinkedHashMap<>();
                 placements.forEach((placement, candidates) ->
                         copy.put(placement, List.copyOf(candidates)));
-                this.placements = Map.copyOf(copy);
+                // Ordered by Kind.Placement, not by Map.copyOf, whose iteration order is per-JVM salt.
+                this.placements = Kind.Placement.ordered(copy);
             }
         }
     }

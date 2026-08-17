@@ -185,9 +185,9 @@ public record DefinitionAssetDefinition(Optional<Identifier> extendsId, Map<Stri
      */
     private Optional<String> unqualifiedReference() {
         for (String written : node.pointersWritten()) {
-            DataResult<Pointer> parsed =
-                    Pointer.parse(written, imports, Diagnostics.DECODING_LOCATION);
-            if (parsed.result().orElse(null) instanceof Pointer.Local local) {
+            Optional<Pointer> parsed =
+                    Pointer.parse(written, imports, Diagnostics.DECODING_LOCATION).result();
+            if (parsed.orElse(null) instanceof Pointer.Local local) {
                 return Optional.of(local.name());
             }
         }
