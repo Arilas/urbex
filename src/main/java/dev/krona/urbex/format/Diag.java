@@ -1,0 +1,328 @@
+package dev.krona.urbex.format;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+/**
+ * The diagnostic catalogue of {@code docs/format/palette/08-errors.md} §4, as code.
+ * <p>
+ * One constant per catalogue row, carrying that row's message with its {@code <…>} placeholders
+ * turned into {@code %s}. The catalogue is the normative text and this enum is a copy of it, so the
+ * copy is drift-guarded rather than trusted: {@code DiagCatalogueTest} fails if the two sets of
+ * identifiers differ (the promise {@code DIAG.910} makes about identifier permanence) and if a
+ * template uses a word its catalogue row does not. That is the same shape of check
+ * {@code PresetSchemaTest} already runs for {@code docs/schema/preset.schema.json} - the reason it
+ * exists is measured, and is the whole of {@code docs/format/README.md} §1: version 1's claims each
+ * lived in exactly one place, so nothing could disagree with them out loud.
+ * <p>
+ * <b>Why the templates are hand-written rather than parsed out of the document.</b> Eight rows carry
+ * alternative clauses ({@code <a / b / c>}) and five carry a clause that appears only sometimes, and
+ * a parser that turned those into format strings would have to understand English brackets. The
+ * direction that is mechanical is the one this class takes: hand-write the message, and check every
+ * word of it against the row.
+ * <p>
+ * <b>The leading placeholder is the location, not just the asset.</b> {@code 08-errors.md} §2 gives
+ * the shape {@code <asset> [marker '<m>'] [via <chain>]: …}, where the bracketed parts appear only
+ * when they apply. Rather than give each template three leading placeholders and pass empty strings
+ * for the absent ones, every template here begins with one placeholder holding whichever of the
+ * three apply, assembled by the caller. That is what makes a template's remaining literal text
+ * <em>always</em> present in a produced message, which is what {@link #matches(String)} relies on.
+ */
+public enum Diag {
+
+    // ---- File and shape (001-019) ---------------------------------------------------------------
+
+    /** {@code MODEL.002}: args are the location and the version found. */
+    DIAG_001("%s: declares version %s, which this Urbex does not know."
+            + " Write \"version\": 2, or omit it for the version 1 format."),
+
+    /** {@code MERGE.007}: the argument is the location. */
+    DIAG_002("%s: declares no 'palette', and neither does anything it extends."
+            + " Add one, or extend a palette that has one."),
+
+    /** {@code MODEL.004}: args are the location, the offending key, and the context it appeared in. */
+    DIAG_003("%s: '%s' is not a key of %s."
+            + " Version 2 palettes refuse keys they do not define; check the spelling against the schema."),
+
+    /** {@code MODEL.012}: args are the location and the kind found. */
+    DIAG_004("%s: kind %s does not exist."
+            + " The kinds are block, weighted, tag, alias and light_socket."),
+
+    /** {@code MODEL.033}: args are the location and the trait field the satellite stands in. */
+    DIAG_005("%s: a %s replacement cannot be a light_socket, because it is written at a position"
+            + " already chosen. Name a block, or a weighted list of them."),
+
+    /** {@code MODEL.043}: args are the location and the block expression. */
+    DIAG_006("%s: %s names a block this game has, with a property it does not have."
+            + " Installing a mod will not fix this; correct the property expression."),
+
+    /** {@code MODEL.045}: the argument is the location. */
+    DIAG_007("%s: a weighted node declares no choices. Give it at least one."),
+
+    /** {@code MODEL.053}: args are the location and the tag. */
+    DIAG_008("%s: tag %s contains no blocks."
+            + " An empty tag has nothing to place; name a tag with members, or name blocks directly."),
+
+    /** {@code MODEL.062}: args are the location and the alias target. */
+    DIAG_009("%s: aliases '%s', which no palette in this context defines."
+            + " Alias a marker that exists, or give this one a block of its own."),
+
+    /** {@code MODEL.072}: the argument is the location. */
+    DIAG_010("%s: a light_socket declares no candidate in floor, wall, ceiling or free."
+            + " Give it at least one."),
+
+    /** {@code MODEL.081}: args are the location and the definition that carries only traits. */
+    DIAG_011("%s: resolves to no block. %s declares only traits;"
+            + " give this marker a 'block', 'choices', 'tag' or 'alias' as well."),
+
+    // ---- Traits (020-029) ----------------------------------------------------------------------
+
+    /** {@code TRAIT.003}: args are the location and the trait id. */
+    DIAG_020("%s: no trait %s is registered. Check the id, or the mod that provides it."),
+
+    /** {@code TRAIT.021}, {@code TRAIT.031}: args are the location, the trait, and the pool. */
+    DIAG_021("%s: %s names pool %s, which is not a loaded conditions asset."
+            + " Generation dereferences it, so it must exist."),
+
+    /** {@code TRAIT.041}: args are the location and the block. */
+    DIAG_022("%s: %s has no block entity, so its 'urbex:block_entity' nbt would never be written."
+            + " Remove the trait, or name a block that has one."),
+
+    /** {@code TRAIT.052}: the argument is the location. */
+    DIAG_023("%s: declares 'urbex:light', but none of the blocks it resolves to emit light."
+            + " It would roll a density and place the same dark block either way."),
+
+    /** {@code TRAIT.053}: the argument is the location. */
+    DIAG_024("%s: an unlit replacement emits light."
+            + " Name a block that does not, so the marker looks different when the light is off."),
+
+    /** {@code TRAIT.064}: the argument is the location. */
+    DIAG_025("%s: carries both 'urbex:light' and 'urbex:optional'."
+            + " A marker rolls one density; 'urbex:light' is the lighting one."),
+
+    // ---- References and merging (030-039) ------------------------------------------------------
+
+    /** {@code REF.013}: args are the location, the name, and the tier searched. */
+    DIAG_030("%s: '$ref' %s names no %s definition."
+            + " A name with a colon is looked up in the definitions registry;"
+            + " one without, in this file's $defs and those it inherits."),
+
+    /** {@code MERGE.009}: args are the owner, the id it named, and the owner again. */
+    DIAG_031("%s: the inline palette declares 'extends' %s, but an inline palette is not a registry"
+            + " entry and nothing can resolve that. Use 'refpalette', or put 'extends' on %s itself."),
+
+    /** {@code REF.032}: args are the location and the cycle, in declaration order. */
+    DIAG_032("%s: reference cycle %s. One of these must not reference the next."),
+
+    /** {@code REF.015}: args are the location and the unqualified name. */
+    DIAG_033("%s: a definitions asset references %s, which has no namespace."
+            + " A registry definition has no file to resolve local names against; qualify it."),
+
+    /** {@code REF.045}: args are the location, the pointer, which half failed, and the explanation. */
+    DIAG_034("%s: pointer %s names %s. %s"),
+
+    /** {@code REF.053}: the argument is the location. */
+    DIAG_035("%s: carries both '$only' and '$without'."
+            + " Name the keys to keep, or the keys to drop, not both."),
+
+    /** {@code REF.062}: args are the location and what it inherits nothing from. */
+    DIAG_036("%s: '$super' names what this entry inherits, and %s."
+            + " Remove '$super', or extend something that defines it."),
+
+    /** {@code REF.071}: args are the location, the pointer, and what it named instead of a list. */
+    DIAG_037("%s: '$spread' %s names a %s, not a list."
+            + " A spread element can only be replaced by list elements."),
+
+    /**
+     * {@code MERGE.010}, {@code VER.005}: args are the asset, its version, the id it extends, and
+     * that asset's version.
+     */
+    DIAG_038("%s (version %s) extends %s (version %s)."
+            + " An extends chain cannot cross format versions; convert one of them."),
+
+    /** {@code REF.083}: args are the location and the undeclared alias. */
+    DIAG_039("%s: '$%s' is not an import of this file."
+            + " Declare it in '$imports', or write the pointer in full."),
+
+    // ---- Weights (040-049) ---------------------------------------------------------------------
+
+    /**
+     * {@code WEIGHT.002}: args are the location, the choice index, and what was found - one of the
+     * three alternatives the catalogue row lists, since a choice states its size in one of three
+     * spellings and each is wrong in its own way.
+     */
+    DIAG_040("%s choice %s: %s. Each choice states its size exactly once."),
+
+    /** {@code WEIGHT.013}: args are the location and what was found. */
+    DIAG_041("%s: %s. 'rest' is the single choice that takes what the shares leave;"
+            + " weighted choices already divide that between them."),
+
+    /**
+     * Retired in draft; see {@code 08-errors.md}'s tombstone. It is here, holding the row's own
+     * {@code —}, for one reason: {@code DIAG.910} makes an identifier permanent, and the only way to
+     * prove this number is not silently reused is for the enum and the catalogue to be provably the
+     * same set of identifiers. Nothing raises it, and nothing may: the over-allocation case that
+     * survives is {@link #DIAG_045}.
+     */
+    DIAG_042("—"),
+
+    /** {@code WEIGHT.024}, {@code WEIGHT.032}: args are the location, the when count, the absent count. */
+    DIAG_043("%s: every choice was excluded - %s by 'when', %s by absent blocks."
+            + " The marker would generate as air; give it a choice that always applies."),
+
+    /** {@code WEIGHT.063}: args are the location and the choice count. */
+    DIAG_044("%s: %s choices exceed the 128 slots available, so some would be dropped."
+            + " Reduce the list, or nest the rare choices under one weighted choice."),
+
+    /**
+     * {@code WEIGHT.014}, {@code WEIGHT.019}: args are the location, the total, and which of the two
+     * requirements was broken - a list with a {@code weight} or {@code rest} must leave something
+     * for it, and a list without one must total exactly 1.
+     */
+    DIAG_045("%s: shares total %s. %s."),
+
+    // ---- Characters (050-059) ------------------------------------------------------------------
+
+    /** {@code CHAR.003}: args are the location, the marker as written, and its codepoint count. */
+    DIAG_050("%s: marker %s is %s codepoints. A marker is exactly one."),
+
+    /** {@code CHAR.004}: args are the location and the codepoint, in hex. */
+    DIAG_051("%s: marker U+%s is not an assigned Unicode codepoint."
+            + " It was most likely produced by an exporter walking codepoints in sequence; reassign it."),
+
+    /**
+     * {@code CHAR.005}: args are the location, the codepoint in hex, the category, and why that
+     * category cannot be a marker.
+     */
+    DIAG_052("%s: marker U+%s is %s, which cannot be a marker. %s"),
+
+    /** {@code CHAR.011}: args are the part, the slice, the row, the count found, the declared width. */
+    DIAG_053("%s slice %s row %s: %s codepoints, but the part declares a width of %s."),
+
+    /** {@code CHAR.022}: args are the command, the markers needed, and the alphabet size. */
+    DIAG_054("%s: this part needs %s markers and the assignment alphabet holds %s."
+            + " Split the part, or reuse markers already in its palette."),
+
+    // ---- Versioning (060-069) ------------------------------------------------------------------
+
+    /** {@code VER.010}: args are the location, the retired key, and the key that replaced it. */
+    DIAG_060("%s: '%s' was retired in version 2. Write '%s' instead."),
+
+    /** {@code VER.011}: args are the location, the deleted key, and what to do instead. */
+    DIAG_061("%s: '%s' was deleted, not renamed. %s");
+
+    private static final Map<String, Diag> BY_ID = byId();
+
+    private final String template;
+
+    Diag(String template) {
+        this.template = template;
+    }
+
+    /** The catalogue identifier, e.g. {@code "DIAG.003"}. */
+    public String id() {
+        return name().replace('_', '.');
+    }
+
+    /** This row's message, with its {@code %s} placeholders left as they are. */
+    public String template() {
+        return template;
+    }
+
+    /**
+     * The message, with the placeholders filled in order.
+     * <p>
+     * Fails loudly on the wrong number of arguments rather than producing
+     * {@code MissingFormatArgumentException} out of a decode: a diagnostic that cannot be formatted
+     * is a bug in the caller, and it must not be reported as a malformed datapack.
+     */
+    public String message(Object... args) {
+        int placeholders = placeholderCount(template);
+        if (args.length != placeholders) {
+            throw new IllegalArgumentException(id() + " takes " + placeholders + " arguments, got "
+                    + args.length + ": " + Arrays.toString(args));
+        }
+        return String.format(Locale.ROOT, template, args);
+    }
+
+    /**
+     * Whether {@code produced} is a message of this diagnostic.
+     * <p>
+     * {@code docs/format/README.md} §4.1 requires a {@code reject=} fixture's message to be checked
+     * "against the catalogue entry […] not against a literal in the test", so this is how a test
+     * decides <em>which</em> diagnostic a decode produced. It looks for this template's literal
+     * segments, in order, in the produced message - the placeholders match whatever stands in their
+     * place, and text before and after is ignored, because DFU concatenates and prefixes the errors
+     * of nested codecs and a decode may report several diagnostics at once ({@code DIAG.903}).
+     * <p>
+     * Not a whole-string equality and not an id embedded in the message: §2 fixes the message shape
+     * and it has no room for an identifier, so the prose <em>is</em> the identification.
+     */
+    public boolean matches(String produced) {
+        String haystack = normalise(produced);
+        int at = 0;
+        for (String segment : literalSegments(template)) {
+            String needle = normalise(segment);
+            if (needle.isEmpty()) {
+                continue;
+            }
+            int found = haystack.indexOf(needle, at);
+            if (found < 0) {
+                return false;
+            }
+            at = found + needle.length();
+        }
+        return true;
+    }
+
+    /** The catalogue row with this identifier. */
+    public static Diag of(String id) {
+        Diag diag = BY_ID.get(id);
+        if (diag == null) {
+            throw new IllegalArgumentException("no diagnostic " + id + " in the catalogue");
+        }
+        return diag;
+    }
+
+    /**
+     * A message's fixed text, with the quoting the catalogue spells in Markdown and this enum spells
+     * in single quotes removed, and runs of whitespace collapsed.
+     * <p>
+     * The two spellings are the reason this exists. A catalogue row writes a key as
+     * <code>`&lt;key&gt;`</code>, in backticks, because it is Markdown; a message printed to a log
+     * writes it as {@code 'key'}, because the surrounding text is prose and the house style quotes
+     * keys that way ({@code RetiredKeys} already does). Comparing either against the other without
+     * dropping both quotings compares typography, not wording.
+     */
+    static String normalise(String text) {
+        return text.replace("`", "").replace("*", "").replace("'", "")
+                .replaceAll("\\s+", " ").trim();
+    }
+
+    /** A template split on its placeholders: the text a produced message must contain. */
+    static List<String> literalSegments(String template) {
+        return List.of(template.split("%s", -1));
+    }
+
+    private static int placeholderCount(String template) {
+        return literalSegments(template).size() - 1;
+    }
+
+    private static Map<String, Diag> byId() {
+        Map<String, Diag> byId = new LinkedHashMap<>();
+        List<String> duplicates = new ArrayList<>();
+        for (Diag diag : values()) {
+            if (byId.put(diag.id(), diag) != null) {
+                duplicates.add(diag.id());
+            }
+        }
+        if (!duplicates.isEmpty()) {
+            throw new IllegalStateException("duplicate diagnostic identifiers: " + duplicates);
+        }
+        return Map.copyOf(byId);
+    }
+}

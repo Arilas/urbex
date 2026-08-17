@@ -12,12 +12,23 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A palette of materials as used by building parts.
+ * A palette of materials as used by building parts - the version 1 format.
  * <p>
  * {@code palette} is optional here rather than required, because requiredness is checked after the
  * {@code extends} chain is resolved, in {@link dev.krona.urbex.worldgen.lost.cityassets.Palette}.
+ * <p>
+ * <b>Deprecated in fact, not in annotation.</b> Version 1 is what every shipped pack is written in, so
+ * it must keep loading unchanged ({@code VER.001}), and it must not become stricter ({@code VER.004}) -
+ * refusing unknown keys here would break packs retroactively, which this project has never done.
+ * Nothing new should be built on it, and nothing here is shared with
+ * {@link dev.krona.urbex.format.palette.PaletteV2Definition}: the two formats meet only at
+ * {@link PaletteAssetDefinition}, which is the version and the {@code extends} link and nothing else.
+ * <p>
+ * The one thing that changed here is that it names {@link PaletteAssetDefinition} instead of
+ * {@link Extendable} - the interface that supersedes it also carries the format version - and gained
+ * {@link #formatVersion()}. Nothing else about this class moved.
  */
-public class PaletteDefinition implements Extendable {
+public class PaletteDefinition implements PaletteAssetDefinition {
 
     private static final Codec<PaletteDefinition> RAW = RecordCodecBuilder.create(instance ->
             instance.group(
@@ -45,6 +56,12 @@ public class PaletteDefinition implements Extendable {
     @Override
     public Optional<Identifier> getExtends() {
         return extendsId;
+    }
+
+    /** {@code VER.001}: a palette file with no {@code version} is this format. */
+    @Override
+    public int formatVersion() {
+        return 1;
     }
 
 

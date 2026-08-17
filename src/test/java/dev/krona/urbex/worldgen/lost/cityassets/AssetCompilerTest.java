@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
@@ -253,7 +254,7 @@ class AssetCompilerTest {
                         Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block))))));
     }
 
-    private static Entry<PaletteDefinition> paletteNamingVariant(String path, char marker, String variant) {
+    private static Entry<PaletteAssetDefinition> paletteNamingVariant(String path, char marker, String variant) {
         PaletteEntry entry = new PaletteEntry(Character.toString(marker), Optional.empty(),
                 Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),

@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelection;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
@@ -111,7 +112,9 @@ public final class AssetCompiler {
         AssetIndex<Variant> variants = AssetStage.compileAll(access,
                 CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(id, blockLookup, chain), diagnostics);
         AssetIndex<Palette> palettes = AssetStage.compileAll(access,
-                CustomRegistries.PALETTE_REGISTRY_KEY, (id, chain) -> new Palette(id, blockLookup, variants, chain), diagnostics);
+                CustomRegistries.PALETTE_REGISTRY_KEY,
+                (id, chain) -> new Palette(id, blockLookup, variants,
+                        PaletteAssetDefinition.version1Only(id, chain)), diagnostics);
         AssetIndex<Condition> conditions = AssetStage.compileAll(access,
                 CustomRegistries.CONDITIONS_REGISTRY_KEY, (id, chain) -> new Condition(id, chain), diagnostics);
         AssetIndex<Style> styles = AssetStage.compileAll(access,

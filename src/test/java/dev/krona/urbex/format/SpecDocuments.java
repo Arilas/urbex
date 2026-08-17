@@ -472,7 +472,13 @@ public final class SpecDocuments {
             out.append("| `").append(id).append("` | ").append(rules.get(id).noFixtureReason().orElseThrow())
                     .append(" |\n");
         }
-        out.append("\n**Tests:** none yet. Every row below shows `—` in the Tests column until the harness lands;\n");
+        // Was a flat "none yet" until Task 2 wrote the first citing tests, at which point the index
+        // was asserting something about itself that had stopped being true. A count is the version of
+        // that sentence which cannot go stale.
+        long cited = order.stream().filter(id -> !citingTests.getOrDefault(id, List.of()).isEmpty())
+                .count();
+        out.append("\n**Tests:** ").append(cited).append(" of ").append(rules.size())
+                .append(" identifiers have at least one citing test; the rest show `—` below.\n");
         out.append("`ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.\n\n");
     }
 

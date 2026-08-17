@@ -86,16 +86,24 @@ a test.
 ### 3.2 Classes
 
 A rule's class states **how it is falsifiable**, which is what makes the test writable without
-rereading the prose. Six classes, and every rule has exactly one:
+rereading the prose. Seven classes, and every rule has exactly one:
 
 | Class | The rule says | A test proves it by |
 |---|---|---|
 | `MUST` | a conforming loader does this | exercising it and asserting the observable result |
+| `MUST NOT` | a conforming loader never does this | exercising the situation the rule forbids and asserting the behaviour does not occur — the negative of `MUST`, and no weaker: the situation has to be reachable, or the test asserts nothing |
 | `REJECT` | this input is refused at load | feeding the input and asserting the load fails with the cited `DIAG` |
 | `ACCEPT` | this input is *not* refused | feeding the input and asserting the load succeeds |
 | `DEFAULT` | an absent field takes this value | comparing the compiled output of the absent and explicit forms |
 | `EQUIV` | two spellings compile identically | compiling both and asserting the compiled forms are equal |
 | `INVARIANT` | a property holds of every compiled palette | asserting it over the shipped corpus and over generated inputs |
+
+`MUST NOT` is not `REJECT`. A `REJECT` rule refuses a document and names the diagnostic that refuses
+it; a `MUST NOT` rule says a behaviour never happens, and the input that would provoke it is usually
+accepted. `MODEL.021` — a string is never a reference — accepts the string and asserts it did not
+resolve; `VER.004` — version 1 does not become stricter — accepts a version 1 file with an unknown key
+and asserts it still loads. Neither has a diagnostic, because neither is a rejection, which is why
+`MUST NOT` carries no `DIAG` and the fixture-completeness check in §4.2 does not reach it.
 
 `REJECT` rules always cite a `DIAG` identifier. A rejection whose message is not specified is a
 rejection that cannot be tested without pinning an implementation detail.
@@ -273,13 +281,18 @@ renumbered — the permanence guarantee in §3.1 begins when the document leaves
 
 Recorded here rather than discovered later. Each of these is a known hole, not an oversight.
 
-**Nothing is implemented.** No codec, no loader, no command reads any of this. The rules describe a
-format that does not exist yet, and the classes in §3.2 were chosen so that writing the tests is
-mechanical when it does.
+**Only decoding is implemented.** A version 2 palette file decodes to a raw node tree or is refused
+with the diagnostic the catalogue names. Nothing resolves a `$ref`, merges an `extends` chain, reads a
+trait, expands a tag or compiles a palette, so every rule about those is written and unenforced. The
+[conformance index](palette/conformance.md) is the list of which.
 
-**No tests exist.** Every row of the [conformance index](palette/conformance.md) shows `—` in its
-Tests column. The six `[NO-FIXTURE]` rules are the ones that cannot be covered any other way, so
-they are the first that must be written.
+**Fewer than half the fixtures run.** `FormatFixtureTest` runs every fixture whose outcome decoding
+alone decides; the rest are listed in that class, each with what it is waiting for, and the list is
+checked so that a fixture cannot fall out of coverage or stay listed after it becomes runnable.
+
+**No `[NO-FIXTURE]` rule has a citing test yet.** All thirteen need something a decoder does not have -
+a second asset, a resolved chain, a part file, a command invocation, a generated input - and
+`ConformanceIndexTest` carries the enumerated exemptions until they do.
 
 **`docs/schema/palette.v2.schema.json` does not exist.** §7 names it as the machine-readable shape
 and as the thing `PaletteSchemaTest` drift-guards against the codec's key sets. Until it is written,

@@ -12,7 +12,13 @@ public class CustomRegistries {
 
     public static final ResourceKey<Registry<BuildingDefinition>> BUILDING_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "buildings"));
 
-    public static final ResourceKey<Registry<PaletteDefinition>> PALETTE_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "palettes"));
+    /**
+     * The one registry whose entries may be written in either format version. Its value type is the
+     * sealed {@link PaletteAssetDefinition}, not {@link dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition},
+     * because the codec registered below has to be the version dispatcher - {@code VER.003} requires the
+     * version to be read before the document is decoded, and a registry takes one codec.
+     */
+    public static final ResourceKey<Registry<PaletteAssetDefinition>> PALETTE_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "palettes"));
 
     public static final ResourceKey<Registry<BuildingPartDefinition>> PART_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "parts"));
 
@@ -41,7 +47,7 @@ public class CustomRegistries {
         // (not synced to clients), matching the NeoForge DataPackRegistryEvent behavior
         // (no network codec was provided there either).
         DynamicRegistries.register(BUILDING_REGISTRY_KEY, BuildingDefinition.CODEC);
-        DynamicRegistries.register(PALETTE_REGISTRY_KEY, PaletteDefinition.CODEC);
+        DynamicRegistries.register(PALETTE_REGISTRY_KEY, PaletteAssetDefinition.CODEC);
         DynamicRegistries.register(PART_REGISTRY_KEY, BuildingPartDefinition.CODEC);
         DynamicRegistries.register(STYLE_REGISTRY_KEY, StyleDefinition.CODEC);
         DynamicRegistries.register(CONDITIONS_REGISTRY_KEY, ConditionDefinition.CODEC);

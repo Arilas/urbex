@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -42,7 +43,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * someone has to remember to extend: {@link #everyRegisteredCodecRejectsBothRetiredKeys} reflects
  * the {@code CODEC} field off every {@code *Definition} class in the registry package and requires each to
  * reject, and {@link #everyDynamicRegistryIsCovered} cross-checks that set against the registry keys
- * {@code CustomRegistries} actually registers, so a fourteenth registry cannot be added uncovered.
+ * {@code CustomRegistries} actually registers, so a registry cannot be added uncovered.
+ * <p>
+ * <b>Palettes are now two codecs behind one registry key, and both have to reject.</b> The
+ * {@code palettes} registry takes {@link dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition#CODEC},
+ * a dispatcher that reads {@code version} and delegates - so "the registered codec rejects
+ * {@code inherit}" is a claim about whichever branch the document selects, and a document selects the
+ * version 1 branch by declaring no {@code version} at all. The sweep below therefore counts fourteen
+ * {@code *Definition} classes against thirteen registry keys, and the extra one is not slack: it is
+ * {@code PaletteDefinition}, still reachable as a branch of the dispatcher rather than as a registered
+ * codec, and {@link #bothBranchesOfThePaletteDispatcherRejectBothRetiredKeys} walks the branches
+ * explicitly. The contract the count pins is unchanged in strength - every dynamic registry key has
+ * exactly one registered codec, and every codec that can read a datapack file refuses both keys - and it
+ * is now stated over the registry keys, which are what actually create registries, rather than over a
+ * class-name glob.
  */
 class RetiredKeysRejectedTest {
 
@@ -80,46 +94,103 @@ class RetiredKeysRejectedTest {
     @Test
     void everyRegisteredCodecRejectsBothRetiredKeys() throws Exception {
         Map<String, Codec<?>> codecs = registryCodecs();
-        assertEquals(13, codecs.size(),
-                "expected the thirteen registry entry codecs, found " + codecs.keySet());
+        assertEquals(14, codecs.size(),
+                "expected the fourteen definition codecs - thirteen registries plus the version 1"
+                        + " palette branch behind the palette dispatcher - found " + codecs.keySet());
 
         List<String> problems = new ArrayList<>();
         for (Map.Entry<String, Codec<?>> entry : codecs.entrySet()) {
-            for (String retired : List.of("inherit", "parent")) {
-                JsonElement json = JsonParser.parseString("{\"" + retired + "\":\"urbex:whatever\"}");
-                DataResult<?> result = entry.getValue().parse(JsonOps.INSTANCE, json);
-                Optional<DataResult.Error<?>> error = result.error().map(e -> (DataResult.Error<?>) e);
-                if (error.isEmpty()) {
-                    problems.add(entry.getKey() + ": accepted '" + retired + "' instead of failing");
-                    continue;
-                }
-                String message = error.get().message();
-                // The two things the spec promises the author is told.
-                if (!message.contains("'" + retired + "'")) {
-                    problems.add(entry.getKey() + " / " + retired
-                            + ": error does not name the offending key: " + message);
-                }
-                if (!message.contains("'extends'")) {
-                    problems.add(entry.getKey() + " / " + retired
-                            + ": error does not name the replacement key: " + message);
-                }
-            }
+            problems.addAll(rejectionsOf(entry.getKey(), entry.getValue(), ""));
         }
         assertTrue(problems.isEmpty(), () -> String.join("\n", problems));
     }
 
     /**
-     * The reflective sweep above is only a coverage proof if the classes it finds are the classes
-     * that get registered. This pins that: {@code CustomRegistries.init()} registers one codec per
-     * registry key, and there are as many registry keys as there are {@code *Definition} classes.
+     * Both branches of the palette dispatcher refuse both keys.
+     * <p>
+     * The version 1 branch is reached by declaring no {@code version} - which is what
+     * {@link #everyRegisteredCodecRejectsBothRetiredKeys} already exercises through the dispatcher - and
+     * the version 2 branch by declaring {@code "version": 2}, where the refusal comes from the version 2
+     * retired-key table rather than from {@code RetiredKeys}. Both are asserted here because they are two
+     * pieces of code, and a registry that refuses a retired key on only the branch nobody's pack uses
+     * refuses nothing: every shipped pack is version 1 today, and every converted pack will be version 2.
+     */
+    @Test
+    void bothBranchesOfThePaletteDispatcherRejectBothRetiredKeys() {
+        List<String> problems = new ArrayList<>(rejectionsOf("palettes (version 1 branch)",
+                dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition.CODEC, ""));
+        problems.addAll(rejectionsOf("palettes (version 2 branch)",
+                dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition.CODEC,
+                "\"version\":2,"));
+        assertTrue(problems.isEmpty(), () -> String.join("\n", problems));
+    }
+
+    /** What {@code codec} fails to say about each retired key, given a document prefix. */
+    private static List<String> rejectionsOf(String name, Codec<?> codec, String prefix) {
+        List<String> problems = new ArrayList<>();
+        for (String retired : List.of("inherit", "parent")) {
+            JsonElement json = JsonParser.parseString(
+                    "{" + prefix + "\"" + retired + "\":\"urbex:whatever\"}");
+            DataResult<?> result = codec.parse(JsonOps.INSTANCE, json);
+            Optional<DataResult.Error<?>> error = result.error().map(e -> (DataResult.Error<?>) e);
+            if (error.isEmpty()) {
+                problems.add(name + ": accepted '" + retired + "' instead of failing");
+                continue;
+            }
+            String message = error.get().message();
+            // The two things the spec promises the author is told.
+            if (!message.contains("'" + retired + "'")) {
+                problems.add(name + " / " + retired
+                        + ": error does not name the offending key: " + message);
+            }
+            if (!message.contains("'extends'")) {
+                problems.add(name + " / " + retired
+                        + ": error does not name the replacement key: " + message);
+            }
+        }
+        return problems;
+    }
+
+    /**
+     * Every dynamic registry key has exactly one registered codec, and that codec is one this test
+     * swept.
+     * <p>
+     * Derived from the {@code _REGISTRY_KEY} fields rather than from a count, and from each field's own
+     * type argument rather than from its name: a {@code ResourceKey<Registry<X>>} names the type
+     * {@code DynamicRegistries.register} will demand a {@code Codec<X>} for, so reading {@code X} off the
+     * field and requiring {@code X.CODEC} to exist and to have been swept is the same claim the registry
+     * itself makes. That is what closes the hole a count alone would leave open now that one registry's
+     * value type is not a {@code *Definition} class of its own: a fourteenth registry still cannot be
+     * added without retired-key rejection, because its key field is what this reads.
      */
     @Test
     void everyDynamicRegistryIsCovered() throws Exception {
-        long registryKeys = Stream.of(CustomRegistries.class.getDeclaredFields())
+        Map<String, Codec<?>> swept = registryCodecs();
+        List<Field> keyFields = Stream.of(CustomRegistries.class.getDeclaredFields())
                 .filter(f -> Modifier.isStatic(f.getModifiers()) && f.getName().endsWith("_REGISTRY_KEY"))
-                .count();
-        assertEquals(registryCodecs().size(), registryKeys,
-                "every dynamic registry key should have exactly one *Definition class whose CODEC this test sweeps");
+                .toList();
+        assertEquals(13, keyFields.size(), "the thirteen dynamic registries");
+
+        List<String> problems = new ArrayList<>();
+        for (Field keyField : keyFields) {
+            Class<?> valueType = registryValueType(keyField);
+            if (!swept.containsKey(valueType.getSimpleName())) {
+                problems.add(keyField.getName() + " holds entries of " + valueType.getSimpleName()
+                        + ", whose CODEC this test does not sweep");
+                continue;
+            }
+            Field codec = valueType.getDeclaredField("CODEC");
+            assertTrue(Modifier.isPublic(codec.getModifiers()) && Modifier.isStatic(codec.getModifiers()),
+                    valueType.getSimpleName() + ".CODEC should be public static");
+        }
+        assertTrue(problems.isEmpty(), () -> String.join("\n", problems));
+    }
+
+    /** {@code X} out of a {@code ResourceKey<Registry<X>>} field. */
+    private static Class<?> registryValueType(Field keyField) {
+        ParameterizedType resourceKey = (ParameterizedType) keyField.getGenericType();
+        ParameterizedType registry = (ParameterizedType) resourceKey.getActualTypeArguments()[0];
+        return (Class<?>) registry.getActualTypeArguments()[0];
     }
 
     /** A valid file is untouched: the wrapper is a pre-check, not a new required field. */
