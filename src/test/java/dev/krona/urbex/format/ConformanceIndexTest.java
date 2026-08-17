@@ -8,10 +8,16 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -116,6 +122,58 @@ class ConformanceIndexTest {
     }
 
     /**
+     * {@code README.md} §3.2's table is the definition of the rule classes, and both the count it states
+     * and the classes the documents use agree with it.
+     * <p>
+     * <b>Why this exists at all.</b> §3.2's opening sentence carries the number of classes in words
+     * ("Eight classes, and every rule has exactly one"), and two javadoc comments in {@link
+     * SpecDocuments} carried it as well. When the seventh class was added they said six, and stayed
+     * saying six until the eighth arrived - so a count that was wrong for a whole round was corrected by
+     * a change that had nothing to do with it. A number in prose is a claim about the tree like any
+     * other, and the only counts that cannot drift are the ones nothing states twice: the comments now
+     * name the section instead of counting it, and the one place the count survives - the sentence that
+     * introduces the table - is checked against the table.
+     * <p>
+     * The second half is the more useful one: a rule whose class is not in the table is a class nobody
+     * defined. That was reachable, since the class is parsed as {@code [A-Z ]+} and nothing compared it
+     * to anything.
+     */
+    @Test
+    void everyRuleClassIsOneTheReadmeDefinesAndTheCountItStatesIsRight() throws IOException {
+        String readme = Files.readString(SpecDocuments.repoRoot().resolve("docs/format/README.md"));
+        String classes = readme.substring(readme.indexOf("### 3.2 Classes"),
+                readme.indexOf("### 3.3"));
+        Set<String> defined = new LinkedHashSet<>();
+        Matcher row = Pattern.compile("(?m)^\\| `([A-Z ]+)` \\|").matcher(classes);
+        while (row.find()) {
+            defined.add(row.group(1));
+        }
+        assertFalse(defined.isEmpty(), "§3.2's class table did not parse");
+
+        Matcher stated = Pattern.compile("([A-Za-z]+) classes, and every rule has exactly one")
+                .matcher(classes);
+        assertTrue(stated.find(), "§3.2 no longer states how many classes there are");
+        assertEquals(NUMBER_WORDS.indexOf(stated.group(1).toLowerCase(Locale.ROOT)), defined.size(),
+                () -> "§3.2 says '" + stated.group(1) + " classes' and its table has " + defined.size()
+                        + ": " + defined);
+
+        List<String> failures = new ArrayList<>();
+        for (SpecDocuments.SpecRule rule : SpecDocuments.load().rules().values()) {
+            if (rule.cls().equals("DIAG") || rule.cls().equals("RETIRED")
+                    || defined.contains(rule.cls())) {
+                continue;
+            }
+            failures.add(rule.file() + ": " + rule.id() + " has class '" + rule.cls()
+                    + "', which README.md §3.2 does not define");
+        }
+        assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
+    }
+
+    /** Index is the number: {@code NUMBER_WORDS.indexOf("eight") == 8}. */
+    private static final List<String> NUMBER_WORDS = List.of("zero", "one", "two", "three", "four",
+            "five", "six", "seven", "eight", "nine", "ten");
+
+    /**
      * {@code README.md} §3.2: "A {@code REJECT} or {@code WARN} rule always cites a {@code DIAG}
      * identifier."
      * <p>
@@ -176,7 +234,7 @@ class ConformanceIndexTest {
      * {@code MUST} or {@code INVARIANT} rule with neither a fixture nor a citing test is just as
      * much an unenforced claim as an {@code ACCEPT} rule would be, so this checks every rule, not
      * only the four classes a fixture alone can discharge. The one exclusion is a diagnostic
-     * catalogue row (cls {@code DIAG}) - not a rule under §3.2's own eight classes, only a
+     * catalogue row (cls {@code DIAG}) - not a rule under any of §3.2's own classes, only a
      * bookkeeping entry this parser stores alongside rules; {@code DIAG.001} is exercised through
      * the {@code REJECT} rule that cites it, not by a test of its own.
      * <p>

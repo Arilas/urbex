@@ -247,6 +247,17 @@ class DiagCatalogueTest {
      * ({@code DIAG.030}'s closing sentence is the only such row today). "Writes it out" is a verbatim
      * substring and not a word overlap, and it needs three words to count, so a single-word group like
      * {@code <n>} cannot be spuriously matched by the letter {@code n} appearing somewhere.
+     * <p>
+     * <b>What this check can and cannot get wrong.</b> The three-word threshold can only produce a false
+     * <em>positive</em> - a template that genuinely spells a clause out in one or two words is accused of
+     * dropping it - which fails loudly and is fixed by giving the clause a slot. The residual false
+     * <em>negative</em> is a different shape, and it is the one a reader should know about: the substring
+     * test cannot tell a clause served <em>in place</em> from the same words appearing somewhere else, so
+     * a template that drops clause A while coincidentally containing A's three-or-more-word normalised
+     * text elsewhere in the message passes. Nothing in the catalogue has that shape. Closing it would
+     * mean matching each row clause to a particular {@code %s} positionally, which the rows do not
+     * currently support - a row's clauses and a template's placeholders are in the same order today only
+     * by convention - and that is not worth building for a coincidence no row exhibits.
      */
     @Test
     @Rule("DIAG.910")
