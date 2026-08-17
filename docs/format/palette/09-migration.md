@@ -82,7 +82,7 @@ formats at once; see VER.005.
 | `[{ "char": "X", … }]` | `{ "X": { … } }` | `palette` becomes an object; `char` disappears |
 | `"block": "<id>"` | `"<id>"` or `{ "block": "<id>" }` | [MODEL.020](00-model.md#21-string-shorthand) |
 | `"blocks": [{ "random": n, "block": b }]` | `{ "kind": "weighted", "choices": [{ "weight": n, "block": b }] }` | `random` → `weight` |
-| trailing weight ≥ what remains | `{ "rest": true, … }` | its clipped value, restated as a size; [WEIGHT.012](05-weights.md#2-share-weight-and-rest) |
+| trailing weight ≥ what remains | `"weight": <what remained>` | its clipped value, restated as a size — not a `rest`; see below |
 | the other weights of such a list | `"weight": <slots it received>` | v1 weights were slot counts, so the converter emits the counts it computed |
 | `"variant": "<id>"` | `{ "$ref": "<id>" }` | the `variants` registry becomes `definitions` |
 | `"frompalette": "c"` | `{ "kind": "alias", "of": "c" }` | only the first character was read before |
@@ -95,7 +95,24 @@ formats at once; see VER.005.
 | `"lightSource": { "unlitBlocks": [ … ] }` | `"traits": { "urbex:light": { "unlit": { "kind": "weighted", … } } }` | one field, not two |
 | `"lightSource": { "floor": [ … ], … }` | `{ "kind": "light_socket", "floor": [ … ] }` | |
 | candidate `"unlit"` | candidate `"traits": { "urbex:light": { "unlit": … } }` | [TRAIT.055](01-traits.md#45-urbexlight) |
+| a socket's own `"unlit"` | the socket's `"traits": { "urbex:light": { "unlit": … } }` | inherited by every candidate that declares none, by [TRAIT.005](01-traits.md#2-inheritance) and [TRAIT.006](01-traits.md#2-inheritance) |
 | membership of the `rotatable` tag | absent `urbex:rotatable`, which defaults true | [TRAIT.071](01-traits.md#47-urbexrotatable) |
+
+**Why the trailing sentinel is a `weight` and not a `rest`.** The row above it makes every other choice
+of such a list a `weight`, and [WEIGHT.013](05-weights.md#2-share-weight-and-rest) refuses a `rest` in a
+list that also carries one — so the two rows together used to specify a file version 2 rejects. `rest`
+is the spelling for a list stated in *shares*, which no version 1 list is. The shipped workstation list
+is the worked example: version 1 wrote `25, 20, 7, 6, 5, 2, 1000` and apportioned
+`25, 20, 7, 6, 5, 2, 63`, which is exactly [WEIGHT.011](05-weights.md#2-share-weight-and-rest)'s own
+`accept` fixture for it, sentinel and all.
+
+**Why a socket's own `unlit` needs no mechanism.** Version 1 carried "this candidate names no
+replacement, so use the socket's" forward to placement time (`LightSource.unlitFor`). In version 2 a
+candidate is an [alternative](00-model.md#3-alternatives-and-satellites), so it inherits the socket's
+traits, and one declaring its own `urbex:light` replaces the inherited one whole — which is the same two
+branches, performed by inheritance before anything looks at a candidate. This row is the socket-level
+half of the `candidate "unlit"` row above it, and both are [TRAIT.055](01-traits.md#45-urbexlight)'s
+`> Why this needs no mechanism of its own` read from the migration side.
 
 > **VER.009** · `MUST` — A version 1 entry declaring more than one block source translates to the
 > source the version 1 ladder would have selected, and the converter emits a warning naming the keys
