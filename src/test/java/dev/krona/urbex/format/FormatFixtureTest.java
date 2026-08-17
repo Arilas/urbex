@@ -4,13 +4,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
-import dev.krona.urbex.format.palette.Apportion;
+import dev.krona.urbex.format.palette.CompiledV2Palette;
 import dev.krona.urbex.format.palette.Exclusion;
-import dev.krona.urbex.format.palette.Marker;
 import dev.krona.urbex.format.palette.NodeResolver;
-import dev.krona.urbex.format.palette.PointerResolver;
-import dev.krona.urbex.format.palette.ResolvedNode;
+import dev.krona.urbex.format.palette.TraitContext;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.format.palette.Pointer;
 import dev.krona.urbex.format.palette.RawNode;
@@ -23,6 +22,10 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -94,28 +97,6 @@ class FormatFixtureTest {
         pending.put("MODEL.062#1", "an alias is answered by the merged palette a part is generated with"
                 + " (MODEL.062, MODEL.064), so an unresolvable one is only knowable where a style's"
                 + " palette groups are merged - LOAD.013's stage (Task 7)");
-
-        // Task 6 - traits, characters, and the compiled palette.
-        pending.put("MODEL.033#1", "the satellite is a node inside a trait payload, which stays opaque"
-                + " until the trait registry exists (Task 6)");
-        pending.put("MODEL.043#1", "whether a property expression applies to a block needs the block"
-                + " registry (Task 6)");
-        pending.put("MODEL.053#1", "whether a tag expands to no blocks needs the tag registry (Task 6)");
-        pending.put("TRAIT.003#1", "an unregistered trait id needs the trait registry (Task 6)");
-        pending.put("TRAIT.021#1", "a pool naming no conditions asset needs that registry (Task 6)");
-        pending.put("TRAIT.031#1", "a pool naming no conditions asset needs that registry (Task 6)");
-        pending.put("TRAIT.041#1", "whether a block has a block entity needs the block registry (Task 6)");
-        pending.put("TRAIT.051#1", "an absent 'unlit' defaults to air inside a trait, which is decoded"
-                + " in Task 6");
-        pending.put("TRAIT.051#2", "the other half of the same equiv group");
-        pending.put("TRAIT.052#1", "whether a block emits light needs the block registry (Task 6)");
-        pending.put("TRAIT.053#1", "whether an unlit replacement emits light needs the block registry"
-                + " (Task 6)");
-        pending.put("TRAIT.062#1", "an absent 'replacement' defaults to air inside a trait, which is"
-                + " decoded in Task 6");
-        pending.put("TRAIT.062#2", "the other half of the same equiv group");
-        pending.put("TRAIT.064#1", "two traits on one node conflict, which needs the trait registry"
-                + " (Task 6)");
 
         // Insertion order kept: this list is read as a diff and its failure messages have to come out
         // in the order the entries are written, not in whatever order hashing produced.
@@ -272,18 +253,18 @@ class FormatFixtureTest {
      * @param decoded stage 1 of {@code LOAD.001}
      * @param linked  stage 3, or empty when this document reaches outside itself - see
      *                {@link #selfContained}
-     * @param sized   stage 4 - sizes, exclusion and the 128 slots - or empty when stage 3 was, or when
-     *                stage 3 refused the document and there is nothing to size
+     * @param compiled stages 4 to 8 - sizes, exclusion, tags, traits, blocks and the 128 slots - or
+     *                 empty when stage 3 was, or when stage 3 refused the document
      */
     private record Loaded(DataResult<?> decoded,
                           Optional<DataResult<NodeResolver.ResolvedPalette>> linked,
-                          Optional<Optional<String>> sized) {
+                          Optional<Optional<String>> compiled) {
 
         /** The first stage that refused the document, if any did. */
         Optional<String> error() {
             return decoded.error().map(DataResult.Error::message)
                     .or(() -> linked.flatMap(DataResult::error).map(DataResult.Error::message))
-                    .or(() -> sized.flatMap(refusal -> refusal));
+                    .or(() -> compiled.flatMap(refusal -> refusal));
         }
 
         /**
@@ -291,8 +272,8 @@ class FormatFixtureTest {
          * <p>
          * Deliberately still the linked palette rather than the materialised slots: {@code MODEL.011}'s
          * and {@code MODEL.020}'s groups are claims about what two spellings <em>mean</em>, and a slot
-         * array of 128 repeated nodes compares two distributions instead. Stage 4 contributes its
-         * refusals to {@link #error()} and nothing to the comparison.
+         * array of 128 repeated nodes compares two distributions instead. Stages 4 to 8 contribute
+         * their refusals to {@link #error()} and nothing to the comparison.
          */
         Object value() {
             return linked.flatMap(DataResult::result)
@@ -302,49 +283,96 @@ class FormatFixtureTest {
 
         /** What the dynamic test's name claims was asserted. */
         String strength() {
-            if (sized.isPresent()) {
-                return "decode, link and size";
+            if (compiled.isPresent()) {
+                return "decode, link and compile";
             }
             return linked.isPresent() ? "decode and link" : "decode";
         }
     }
 
     /**
-     * Stage 4 over every marker of a linked palette: sizes, then exclusion, then the 128 slots.
+     * Stages 4 to 8 over a linked palette: everything {@link CompiledV2Palette} does.
      * <p>
-     * The order is {@code 05-weights.md}'s and not an implementation convenience - {@code WEIGHT.013},
-     * {@code WEIGHT.014} and {@code WEIGHT.019} on the expanded list, then {@code when} and absent blocks
-     * ({@code WEIGHT.020}, {@code WEIGHT.030}), then one materialisation at the root
-     * ({@code WEIGHT.052}). It is what makes {@code WEIGHT.024}'s and {@code WEIGHT.032}'s fixtures
-     * decidable here at all: both are documents that decode and link cleanly and are refused by what the
-     * game they load into does or does not have.
+     * The harness stops being a decoder here. Sizes, exclusion, tag expansion, trait validation, block
+     * resolution and the 128 slots all run, against the registries a bootstrapped test JVM has - so a
+     * fixture naming {@code create} is excluded because {@code create} is genuinely not installed, a
+     * fixture asking whether {@code minecraft:lantern} emits light is answered by the block registry,
+     * and {@code TRAIT.021}'s pool is checked against the {@code conditions} assets this mod ships.
      * <p>
-     * The presence is the real one, so a fixture naming {@code create} is excluded because {@code create}
-     * is genuinely not installed rather than because a stub said so.
+     * <b>Two things the JVM has to be told, and why they are told rather than stubbed.</b> Vanilla
+     * block tags are datapack content and a bootstrapped registry has none bound, so {@link #TAGS}
+     * binds exactly the two a fixture names; and the {@code conditions} registry is not loaded at all,
+     * so {@link #CONDITIONS} is read from this mod's own resource directory rather than listed by hand.
+     * Both are the compiling world's answer standing in for a world, which is what {@code LOAD.003}
+     * makes the caller's job.
      *
-     * @return the refusal, or empty when every marker survived
+     * @return the refusal, or empty when every marker compiled
      */
-    private static Optional<String> size(NodeResolver.ResolvedPalette resolved) {
+    private static Optional<String> compile(NodeResolver.ResolvedPalette resolved) {
         Diagnostics diagnostics = new Diagnostics();
         Exclusion.Presence presence =
                 Exclusion.installed(BuiltInRegistries.BLOCK, Set.of("urbex", "minecraft"));
-        for (Map.Entry<Marker, ResolvedNode> marker : resolved.palette().entrySet()) {
-            PointerResolver.Site site = new PointerResolver.Site(Diagnostics.DECODING_LOCATION,
-                    "marker " + marker.getKey(), List.of());
-            if (!Apportion.checkSizes(marker.getValue(), site, diagnostics)) {
-                continue;
-            }
-            Optional<ResolvedNode> pruned =
-                    Exclusion.prune(marker.getValue(), presence, site, diagnostics);
-            if (pruned.isEmpty()) {
-                continue;
-            }
-            if (pruned.get().source() instanceof ResolvedNode.Source.Weighted weighted) {
-                Apportion.materialise(weighted.choices(), site, diagnostics);
-            }
-        }
+        TraitContext context = TraitContext.withConditions(BuiltInRegistries.BLOCK, CONDITIONS)
+                .withTags(tag -> TAGS.getOrDefault(tag, List.of()));
+        CompiledV2Palette.compile(resolved, presence, context, Diagnostics.DECODING_LOCATION,
+                diagnostics);
         return diagnostics.asError();
     }
+
+    /**
+     * The {@code urbex:conditions} assets this mod ships, read from the resource tree.
+     * <p>
+     * Read rather than listed, because a listed set is a second copy of a fact the repository already
+     * states - the failure {@code docs/format/README.md} §1 is entirely about. {@code TRAIT.004}'s
+     * fixture names {@code urbex:easymobs} and expects to be accepted; {@code TRAIT.021}'s names
+     * {@code urbex:no_such_condition} and expects {@code DIAG.021}. Both are answered by what is on
+     * disk.
+     */
+    private static final Set<Identifier> CONDITIONS = conditions();
+
+    private static Set<Identifier> conditions() {
+        Set<Identifier> ids = new LinkedHashSet<>();
+        Path data = Path.of("src", "main", "resources", "data");
+        if (!Files.isDirectory(data)) {
+            return Set.of();
+        }
+        try (Stream<Path> namespaces = Files.list(data)) {
+            for (Path pack : namespaces.sorted().toList()) {
+                Path conditions = pack.resolve("urbex").resolve("conditions");
+                if (!Files.isDirectory(conditions)) {
+                    continue;
+                }
+                try (Stream<Path> files = Files.list(conditions)) {
+                    files.filter(file -> file.toString().endsWith(".json")).sorted()
+                            .forEach(file -> ids.add(Identifier.fromNamespaceAndPath("urbex",
+                                    file.getFileName().toString().replace(".json", ""))));
+                }
+            }
+        } catch (IOException unreadable) {
+            throw new UncheckedIOException(unreadable);
+        }
+        return Set.copyOf(ids);
+    }
+
+    /**
+     * The tag epoch a fixture is compiled under ({@code MODEL.052}).
+     * <p>
+     * {@code MODEL.050}'s fixture draws from {@code #minecraft:planks} and {@code MODEL.053}'s from
+     * {@code #urbex:empty_for_test}, and a bootstrapped registry binds neither - vanilla tags are
+     * datapack content, and the second tag exists nowhere on purpose. So the harness supplies the epoch
+     * instead of the block registry supplying it, which is exactly the seam
+     * {@link TraitContext.TagEpoch} exists for. Without it {@code MODEL.050}'s accepted fixture would be
+     * refused by {@code MODEL.053}, which would be the harness reporting its own emptiness as the
+     * pack's.
+     * <p>
+     * A map rather than a mutation of {@code BuiltInRegistries.BLOCK}: a test that binds tags into the
+     * static registry changes what every other test in the JVM sees, and the version 1 suite reads that
+     * registry's tag bindings in {@code TagSnapshot}.
+     */
+    private static final Map<Identifier, List<String>> TAGS = Map.of(
+            Identifier.parse("minecraft:planks"),
+            List.of("minecraft:oak_planks", "minecraft:spruce_planks", "minecraft:birch_planks"),
+            Identifier.parse("urbex:empty_for_test"), List.of());
 
     /**
      * Decodes a fixture and, when it is self-contained, links it too.
@@ -378,7 +406,7 @@ class FormatFixtureTest {
                 .map(DataResult::success)
                 .orElseGet(() -> DataResult.error(() -> diagnostics.asError()
                         .orElse("the link stage refused the document and said nothing")));
-        return new Loaded(decoded, Optional.of(linked), resolved.map(FormatFixtureTest::size));
+        return new Loaded(decoded, Optional.of(linked), resolved.map(FormatFixtureTest::compile));
     }
 
     /**

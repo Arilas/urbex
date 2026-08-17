@@ -131,7 +131,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.061` | [VER.011](09-migration.md#3-retired-keys) | *`<asset>`: `<key>` was deleted, not renamed. `<explanation>`* |
 | `DIAG.062` | *retired — see tombstones* | — |
 | `DIAG.063` | [VER.015](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>`: resolves through an entry written in palette format version `<n>`, which this Urbex decodes but does not yet compile. Write it in the version 1 format, or omit `version`, until version 2 compilation lands.* |
-| `DIAG.064` | [VER.016](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>` marker `'<m>'`: trait `<id>` holds `<operand>`, and this Urbex cannot yet resolve an operand inside a trait. Write the block, or the weighted list, in full.* |
+| `DIAG.064` | *retired — see tombstones* | — |
 
 ## 5. Retired identifiers
 
@@ -155,4 +155,12 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 > replaced by `share`/`weight`/`rest`
 > ([WEIGHT.010](05-weights.md#2-share-weight-and-rest)), which has no total to exceed. The
 > over-allocation case that survives is shares totalling 1 or more, which is `DIAG.045`, a different
+> message with a different remedy. The number stays retired.
+
+> **DIAG.064** — *retired in draft.* Raised when an operand — `$ref`, `$only`, `$without` or
+> `$spread` — was written anywhere inside a `traits` value, under
+> [VER.016](09-migration.md#tombstones), which is retired with it. A trait now declares which of its
+> fields hold nodes ([TRAIT.090](01-traits.md#5-defining-a-trait)), so a satellite is resolved like any
+> other node and there is nothing left to refuse. The refusal that survives beside it is `DIAG.003` —
+> an operand on the trait *object*, which is a key no trait's schema defines — which is a different
 > message with a different remedy. The number stays retired.

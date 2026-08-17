@@ -67,10 +67,14 @@ class NodeResolverTest {
                 resolved.palette().get(new Marker('u')).traits().keySet());
     }
 
-    /** {@code REF.004}: traits beside a {@code $ref} merge into the target's by id, replacing whole. */
+    /**
+     * {@code REF.004} and {@code TRAIT.008}: traits beside a {@code $ref} are applied over the
+     * referenced node's by id, replacing whole.
+     */
     @Test
     @Rule("REF.004")
     @Rule("TRAIT.006")
+    @Rule("TRAIT.008")
     void traitsBesideARefMergeByIdAndReplaceWhole() {
         NodeResolver.ResolvedPalette resolved = resolve("""
                 { "version": 2,
@@ -80,11 +84,12 @@ class NodeResolverTest {
                   "palette": { "X": { "$ref": "base", "traits": {
                       "urbex:damaged": { "into": "minecraft:cobweb" } } } } }
                 """);
-        Map<Identifier, Trait> traits = resolved.palette().get(new Marker('X')).traits();
+        Map<Identifier, ResolvedTrait> traits = resolved.palette().get(new Marker('X')).traits();
         assertEquals(Set.of(Identifier.parse("urbex:damaged"), Identifier.parse("urbex:rotatable")),
                 traits.keySet());
-        assertTrue(traits.get(Identifier.parse("urbex:damaged")).data().toString()
-                .contains("cobweb"), "the child's whole trait object replaces the parent's");
+        ResolvedNode into = traits.get(Identifier.parse("urbex:damaged")).satellites().get("into");
+        assertEquals("minecraft:cobweb", ((ResolvedNode.Source.Block) into.source()).block(),
+                "the child's whole trait object replaces the parent's");
     }
 
     /**
@@ -700,80 +705,37 @@ class NodeResolverTest {
     }
 
     /**
-     * {@code MODEL.031}: realising a node never realises its satellites, so a satellite is not completed
-     * as an alternative would be - and {@code VER.016}: one that references a definition is refused
-     * rather than left unresolved.
+     * {@code MODEL.031}: realising a node never realises its satellites.
      * <p>
-     * The two halves are the same seam from either side. A trait payload holding a node with no block
-     * would be {@code MODEL.081} if it were an alternative; it is a satellite, so nothing here completes
-     * it, and that is correct — {@code MODEL.031} says realising a node never realises its satellites,
-     * and each trait decides when its own is written. But a satellite carrying {@code $ref} <em>would</em>
-     * need resolving and nothing yet resolves it, so {@code VER.016} refuses it: leaving it would give
-     * the marker's damaged form no block at all, silently.
+     * The marker resolves to its own block and to nothing else. Its {@code urbex:damaged.into} is a
+     * node, and since this task it is a <em>resolved</em> node - it went through the same
+     * {@code $ref} expansion and the same completeness check an alternative does - but it is not an
+     * alternative of the marker: nothing draws it, and the trait decides when it is written.
+     * {@code MODEL.030} is the other half of the same sentence, and this asserts it by counting: one
+     * alternative, not two.
+     * <p>
+     * The satellite here names a definition, which {@code VER.016} refused outright until traits
+     * stopped being opaque. It now resolves, which is {@code TRAIT.009} - and the assertion that it
+     * resolved is the assertion that the rule retired cleanly rather than being dropped.
      */
     @Test
     @Rule("MODEL.031")
-    @Rule("VER.016")
-    void aSatellitesNodeIsNotCompletedAsAnAlternative() {
+    @Rule("TRAIT.009")
+    void aSatellitesNodeIsResolvedAndIsStillNotAnAlternativeOfItsOwner() {
         NodeResolver.ResolvedPalette resolved = resolve("""
-                { "version": 2, "palette": { "X": { "block": "minecraft:stone_bricks",
-                    "traits": { "urbex:damaged": { "into": { "traits": {} } } } } } }
+                { "version": 2, "$defs": { "rubble": "minecraft:iron_bars" },
+                  "palette": { "X": { "block": "minecraft:stone_bricks", "traits": {
+                      "urbex:damaged": { "into": { "$ref": "rubble" } } } } } }
                 """);
-        assertEquals("minecraft:stone_bricks", blockOf(resolved, 'X'));
+        ResolvedNode marker = resolved.palette().get(new Marker('X'));
+        assertEquals(Kind.BLOCK, marker.kind());
+        assertEquals("minecraft:stone_bricks",
+                ((ResolvedNode.Source.Block) marker.source()).block());
 
-        DataResult<PaletteV2Definition> referencing = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
-                JsonParser.parseString("""
-                        { "version": 2, "$defs": { "rubble": "minecraft:iron_bars" },
-                          "palette": { "X": { "block": "minecraft:stone_bricks", "traits": {
-                              "urbex:damaged": { "into": { "$ref": "rubble" } } } } } }
-                        """));
-        String message = referencing.error().orElseThrow().message();
-        assertTrue(Diag.DIAG_064.matches(message), message);
-        assertTrue(message.contains("'urbex:damaged'"), message);
-    }
-
-    /**
-     * {@code VER.016}: every operand, at any depth, and on the trait object itself.
-     * <p>
-     * At any depth because a satellite may be a weighted node whose choices are nodes, and an operand
-     * three levels down is exactly as unresolved as one at the top. Every operand because the first
-     * version of this check named {@code $ref} alone: a {@code $spread} inside a satellite's
-     * {@code choices} then loaded and survived into the resolved palette as a list element that places
-     * nothing - the same silence, in the operand an author reaches for when extending an inherited list.
-     * On the trait object itself because {@code REF.022} forbids that permanently and has no check of its
-     * own yet; this one catches it meanwhile, for its own narrower reason.
-     */
-    @Test
-    @Rule("VER.016")
-    @Rule("REF.022")
-    void anyOperandAnywhereInsideATraitIsRefused() {
-        for (String payload : List.of(
-                "{ \"$ref\": \"rubble\" }",
-                "{ \"into\": { \"$ref\": \"rubble\" } }",
-                "{ \"into\": { \"kind\": \"weighted\", \"choices\": ["
-                        + " { \"weight\": 1, \"$ref\": \"rubble\" } ] } }",
-                "{ \"into\": { \"kind\": \"weighted\", \"choices\": ["
-                        + " { \"$spread\": \"rubble#/choices\" } ] } }",
-                "{ \"into\": { \"$ref\": \"rubble\", \"$only\": [\"block\"] } }",
-                "{ \"into\": { \"$without\": [\"traits\"] } }")) {
-            DataResult<PaletteV2Definition> decoded = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
-                    JsonParser.parseString("""
-                            { "version": 2, "$defs": { "rubble": "minecraft:iron_bars" },
-                              "palette": { "X": { "block": "minecraft:stone_bricks",
-                                  "traits": { "urbex:damaged": %s } } } }
-                            """.formatted(payload)));
-            String message = decoded.error()
-                    .orElseThrow(() -> new AssertionError(payload + " was accepted"))
-                    .message();
-            assertTrue(Diag.DIAG_064.matches(message), () -> payload + ": " + message);
-        }
-
-        // A trait that holds no reference is untouched: the scan is for a key, not a shape.
-        assertEquals("minecraft:stone_bricks", blockOf(resolve("""
-                { "version": 2, "palette": { "X": { "block": "minecraft:stone_bricks", "traits": {
-                    "urbex:damaged": { "into": { "kind": "weighted", "choices": [
-                        { "weight": 1, "block": "minecraft:iron_bars" } ] } } } } } }
-                """), 'X'));
+        ResolvedTrait damaged = marker.traits()
+                .get(Identifier.fromNamespaceAndPath("urbex", "damaged"));
+        ResolvedNode into = damaged.satellites().get("into");
+        assertEquals("minecraft:iron_bars", ((ResolvedNode.Source.Block) into.source()).block());
     }
 
     // ---- The definitions registry --------------------------------------------------------------

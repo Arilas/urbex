@@ -292,18 +292,21 @@ renumbered — the permanence guarantee in §3.1 begins when the document leaves
 
 Recorded here rather than discovered later. Each of these is a known hole, not an oversight.
 
-**Only decoding is implemented.** A version 2 palette file decodes to a raw node tree or is refused
-with the diagnostic the catalogue names. Nothing resolves a `$ref`, merges an `extends` chain, reads a
-trait, expands a tag or compiles a palette, so every rule about those is written and unenforced. The
-[conformance index](palette/conformance.md) is the list of which.
+**The pipeline is implemented and has no production caller.** A version 2 palette decodes, merges its
+`extends` chain, resolves every pointer, is sized, excluded, expanded, apportioned and compiled to
+per-slot states and traits — all of [LOAD.001](palette/07-compilation.md#1-the-pipeline). What is
+missing is the wiring: [VER.015](palette/09-migration.md#11-what-version-2-does-not-reach-yet) still
+refuses a version 2 palette where it is compiled, so the whole pipeline runs from tests and from the
+fixture harness and never from a world load. The [conformance index](palette/conformance.md) is the
+list of which rules that leaves unenforced.
 
 **Not every fixture runs.** `FormatFixtureTest` runs every fixture whose outcome decoding alone
 decides; the rest are listed in that class, each naming the task it waits for, and the list is checked
 so that a fixture cannot fall out of coverage or stay listed after it becomes runnable.
 
-**No `[NO-FIXTURE]` rule has a citing test yet.** All thirteen need something a decoder does not have -
-a second asset, a resolved chain, a part file, a command invocation, a generated input - and
-`ConformanceIndexTest` carries the enumerated exemptions until they do.
+**Four `[NO-FIXTURE]` rules have no citing test yet.** The rest gained one as the stages landed; the
+four that remain need a style with several palette groups, a part file's slice rows, or a command
+invocation, and `ConformanceIndexTest` carries the enumerated exemptions until they do.
 
 **`docs/schema/palette.v2.schema.json` does not exist.** §7 names it as the machine-readable shape
 and as the thing `PaletteSchemaTest` drift-guards against the codec's key sets. Until it is written,

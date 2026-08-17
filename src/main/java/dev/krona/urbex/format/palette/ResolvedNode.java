@@ -2,6 +2,7 @@ package dev.krona.urbex.format.palette;
 
 import net.minecraft.resources.Identifier;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,14 +32,21 @@ import java.util.Optional;
  *
  * @param kind   which block source this node has ({@code MODEL.011}'s default already applied)
  * @param source that source, with the keys the kind requires
- * @param traits the traits that apply, merged by id ({@code TRAIT.006}) and still opaque payloads
+ * @param traits every trait that applies to this node - the ones it declared and the ones it inherited
+ *               from the node it is an alternative of ({@code TRAIT.005}), merged by id
+ *               ({@code TRAIT.006}), each carrying which of the two it was
+ *               ({@link ResolvedTrait.Provenance})
  */
-public record ResolvedNode(Kind kind, Source source, Map<Identifier, Trait> traits) {
+public record ResolvedNode(Kind kind, Source source, Map<Identifier, ResolvedTrait> traits) {
 
-    public ResolvedNode(Kind kind, Source source, Map<Identifier, Trait> traits) {
+    public ResolvedNode(Kind kind, Source source, Map<Identifier, ResolvedTrait> traits) {
         this.kind = kind;
         this.source = source;
-        this.traits = Map.copyOf(traits);
+        // Insertion-ordered rather than Map.copyOf, whose iteration order is perturbed by a per-JVM
+        // salt. This map is iterated by trait validation, by TRAIT.005's inheritance, by the
+        // resolution report and by the interning that builds a TraitSet, and three of those four reach
+        // something a reader compares between runs. The same defect Kind.Placement.ordered fixed.
+        this.traits = Collections.unmodifiableMap(new LinkedHashMap<>(traits));
     }
 
     /**

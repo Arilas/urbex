@@ -326,14 +326,19 @@ public enum Diag {
             + " until version 2 compilation lands."),
 
     /**
-     * {@code VER.016}: args are the location, the trait id, and the operand found inside it.
+     * Retired in draft with {@code VER.016}; see {@code 08-errors.md}'s tombstone.
      * <p>
-     * Retired with {@code VER.016} when a trait registry can say which of a trait's fields hold nodes,
-     * at which point {@code TRAIT.009} resolves them and {@code REF.022} needs a check of its own. Its
-     * number stays retired, by {@code DIAG.910}.
+     * It refused any of the four operands written inside a {@code traits} value, while a trait payload
+     * was opaque and nothing could say which of a trait's fields hold nodes. {@code TRAIT.090} makes a
+     * registered trait declare exactly that, so {@code TRAIT.009}'s satellites resolve like any other
+     * node and there is nothing left to refuse. The half that was never transitional - {@code REF.022},
+     * an operand on the trait <em>object</em> - is {@link #DIAG_003} against the trait's declared key
+     * set. The constant stays, holding the row's own {@code —}, for the reason {@link #DIAG_042}
+     * records: a number is permanent by {@code DIAG.910}, and the only way to prove it is not silently
+     * reused is for this enum and the catalogue to be provably the same set of identifiers. Nothing
+     * raises it, and nothing may.
      */
-    DIAG_064("%s: trait %s holds %s, and this Urbex cannot yet resolve an operand inside a"
-            + " trait. Write the block, or the weighted list, in full."),
+    DIAG_064("—"),
 
     // ---- References and merging, continued (070-079; 030-039 is full) ---------------------------
 

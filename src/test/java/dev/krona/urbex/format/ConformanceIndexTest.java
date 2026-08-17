@@ -46,16 +46,18 @@ class ConformanceIndexTest {
      * replaces: it must have a citing test, and unlike the general check that requirement is never
      * suspended by draft. That is the right rule and this list does not weaken it - it records that
      * <em>today</em> none of the entries below is coverable, because each needs something no stage that
-     * exists has: a style with several palette groups, a conditions asset, a part file's slice rows, or a
-     * command invocation. The three a second asset was enough for - {@code REF.043}, {@code REF.045} and
-     * {@code REF.062} - went when the resolver landed and could be handed one, and the two a generated
-     * list was enough for - {@code WEIGHT.019} and {@code WEIGHT.063} - went when stage 4 landed.
+     * exists has: a style with several palette groups, a part file's slice rows, or a command
+     * invocation. The three a second asset was enough for - {@code REF.043}, {@code REF.045} and
+     * {@code REF.062} - went when the resolver landed and could be handed one; the two a generated list
+     * was enough for - {@code WEIGHT.019} and {@code WEIGHT.063} - went when stage 4 landed; and
+     * {@code VER.013} went when the trait registry made a version 2 palette able to name a
+     * {@code conditions} asset at all.
      * <p>
      * <b>Why a list and not a disabled test.</b> Until Task 2 this whole test was {@code @Disabled},
      * which checked nothing at all - including the twelve other assertions in it and the five hundred
      * other rules. This is strictly stronger: every branch of the check now runs, the exemptions are
      * enumerated and diffable, and {@link #everyExemptNoFixtureRuleIsStillWaiting} deletes them for you
-     * by failing when one gains a citing test. It shrinks to nothing as Tasks 3 to 6 land, and the
+     * by failing when one gains a citing test. It shrinks to nothing as the tasks land, and the
      * intent is that the field goes with it.
      */
     private static final Map<String, String> NO_FIXTURE_RULES_AWAITING_A_CITING_TEST =
@@ -65,7 +67,6 @@ class ConformanceIndexTest {
         Map<String, String> awaiting = new LinkedHashMap<>();
         awaiting.put("LOAD.013", "a style with several palette groups; Task 7");
         awaiting.put("VER.006", "a style drawing both versions into one merge; Task 7");
-        awaiting.put("VER.013", "a version 2 palette referencing a conditions asset; Task 6");
         awaiting.put("CHAR.011", "a part file's slice rows; Task 6");
         awaiting.put("CHAR.022", "a marker-assigning command; Task 6");
         return Collections.unmodifiableMap(awaiting);

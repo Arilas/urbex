@@ -90,6 +90,16 @@ public final class NodeResolver {
     /** The entries currently being resolved, outermost first - {@code REF.032}'s cycle, when it bites. */
     private final List<String> stack = new ArrayList<>();
 
+    /**
+     * A declared trait to its completed form, or to empty when a satellite of it failed.
+     * <p>
+     * Keyed by the trait value, which has record equality all the way down to its satellite
+     * {@link RawNode}s, so two markers that reference one definition carrying one bad satellite report
+     * it once. Discarded with the pass, like {@link #resolved} and for the same reason
+     * ({@code LOAD.031}).
+     */
+    private final Map<Trait, Optional<ResolvedTrait>> traits = new LinkedHashMap<>();
+
     private boolean failed;
 
     private NodeResolver(ResolutionScope fileScope, Diagnostics diagnostics) {
@@ -152,7 +162,7 @@ public final class NodeResolver {
         NodeResolver resolver = new NodeResolver(scope, diagnostics);
         PointerResolver.Site site = PointerResolver.Site.wholeAsset(scope);
         return resolver.node(node, scope, site)
-                .flatMap(flat -> resolver.complete(flat, Origin.of(node),
+                .flatMap(flat -> resolver.complete(flat, Map.of(), Origin.of(node),
                         reached(site, node.ref())));
     }
 
@@ -186,7 +196,9 @@ public final class NodeResolver {
             RawNode node = marker.getValue().node();
             Origin origin = Origin.of(node);
             entry(fileScope.document().markerKey(marker.getKey()), node, scope, site)
-                    .flatMap(flat -> complete(flat, origin, reached(site, origin.ref())))
+                    // A marker inherits nothing: it is nobody's alternative, so TRAIT.005 has no
+                    // parent to draw from.
+                    .flatMap(flat -> complete(flat, Map.of(), origin, reached(site, origin.ref())))
                     .ifPresent(value -> palette.put(marker.getKey(), value));
         }
         return failed ? Optional.empty() : Optional.of(new ResolvedPalette(defs, palette));
@@ -260,16 +272,65 @@ public final class NodeResolver {
             }
             placements.put(placement.getKey(), candidates.get());
         }
+        // TRAIT.009: a block-valued trait field holds a node, so a satellite's own $ref, $spread and
+        // filters are expanded here exactly as a choice's are. This is what VER.016 refused outright
+        // while a trait payload was opaque and nothing could say which of its fields were nodes.
+        Map<Identifier, Trait> traits = new LinkedHashMap<>();
+        for (Map.Entry<Identifier, Trait> declared : node.traits().entrySet()) {
+            Optional<Trait> resolvedTrait = satellitesOf(declared.getValue(), scope, site);
+            if (resolvedTrait.isEmpty()) {
+                ok = false;   // DIAG.903: every trait of this node is walked before it fails
+                continue;
+            }
+            traits.put(declared.getKey(), resolvedTrait.get());
+        }
         if (!ok) {
             return Optional.empty();
         }
 
         Fields own = new Fields(node.kind(), node.block(), choices, node.tag(), node.aliasOf(),
-                placements, node.traits());
+                placements, traits);
         if (node.ref().isEmpty()) {
             return Optional.of(own.node());
         }
         return referenced(node, own, scope, site);
+    }
+
+    /**
+     * One trait with the operands inside its satellites expanded ({@code TRAIT.009}).
+     * <p>
+     * Which fields hold nodes is {@link TraitType#blockValuedFields()}'s answer and not a guess, which is
+     * the whole reason {@code TRAIT.090} requires the declaration: a trait that declares a block-valued
+     * field gets its satellite resolved, and one that forgets gets a satellite with an unexpanded
+     * {@code $ref} that fails loudly at completion rather than a silently blank one.
+     * <p>
+     * The site names the trait and the field, so a broken pointer inside {@code urbex:damaged.into}
+     * reads as such rather than as a failure of the marker.
+     */
+    private Optional<Trait> satellitesOf(Trait trait, ResolutionScope scope,
+                                         PointerResolver.Site site) {
+        Map<String, RawNode> written = trait.satellites();
+        if (written.isEmpty()) {
+            return Optional.of(trait);
+        }
+        Map<String, RawNode> expanded = new LinkedHashMap<>();
+        boolean ok = true;
+        for (Map.Entry<String, RawNode> field : written.entrySet()) {
+            Optional<RawNode> value = node(field.getValue(), scope,
+                    satelliteSite(site, trait, field.getKey()));
+            if (value.isEmpty()) {
+                ok = false;
+                continue;
+            }
+            expanded.put(field.getKey(), value.get());
+        }
+        return ok ? Optional.of(trait.withSatellites(expanded)) : Optional.empty();
+    }
+
+    /** Where a satellite's diagnostics are reported: the owning node, the trait, and the field. */
+    private static PointerResolver.Site satelliteSite(PointerResolver.Site site, Trait trait,
+                                                      String field) {
+        return site.inside("trait '" + trait.id() + "' '" + field + "'");
     }
 
     /**
@@ -424,32 +485,126 @@ public final class NodeResolver {
      * a trait payload are not completed here, and by {@code TRAIT.007} they inherit nothing to complete
      * them with either.
      *
-     * @param from the pointer this node was reached through, which {@code DIAG.011} names as the
-     *             definition that "declares only traits"
+     * @param inherited the traits of the node this one is an alternative of ({@code TRAIT.005}), empty
+     *                  for a marker, for a {@code $defs} entry used directly and - by
+     *                  {@code TRAIT.007} - for every satellite
+     * @param origin    where this node's keys came from, for {@code DIAG.011}'s subject
      */
-    private Optional<ResolvedNode> complete(RawNode node, Origin origin,
-                                            PointerResolver.Site site) {
+    private Optional<ResolvedNode> complete(RawNode node, Map<Identifier, ResolvedTrait> inherited,
+                                            Origin origin, PointerResolver.Site site) {
         Kind kind = node.kind().orElse(Kind.BLOCK);   // MODEL.011
         if (!coherent(node, kind, site)) {
             return Optional.empty();
         }
+        Map<Identifier, ResolvedTrait> traits = effective(node.traits(), inherited, site);
+        if (traits == null) {
+            return silently();
+        }
         return switch (kind) {
             case BLOCK -> node.block()
-                    .map(block -> built(kind, new ResolvedNode.Source.Block(block), node))
+                    .map(block -> built(kind, new ResolvedNode.Source.Block(block), traits))
                     .orElseGet(() -> noBlockSource(node, kind, "block", origin, site));
             case TAG -> node.tag()
-                    .map(tag -> built(kind, new ResolvedNode.Source.Tag(tag), node))
+                    .map(tag -> built(kind, new ResolvedNode.Source.Tag(tag), traits))
                     .orElseGet(() -> noBlockSource(node, kind, "tag", origin, site));
             case ALIAS -> node.aliasOf()
-                    .map(of -> built(kind, new ResolvedNode.Source.Alias(of), node))
+                    .map(of -> built(kind, new ResolvedNode.Source.Alias(of), traits))
                     .orElseGet(() -> noBlockSource(node, kind, "of", origin, site));
-            case WEIGHTED -> weighted(node, origin, site);
-            case LIGHT_SOCKET -> socket(node, site);
+            case WEIGHTED -> weighted(node, traits, origin, site);
+            case LIGHT_SOCKET -> socket(node, traits, site);
         };
     }
 
-    private Optional<ResolvedNode> built(Kind kind, ResolvedNode.Source source, RawNode node) {
-        return Optional.of(new ResolvedNode(kind, source, node.traits()));
+    /**
+     * {@code TRAIT.005} and {@code TRAIT.006}: what a node inherits, then what it declares.
+     * <p>
+     * The inherited set is copied through {@link ResolvedTrait.Provenance#inheritedForm()} rather than
+     * reused, because a trait's provenance is what tells the two apart afterwards - the resolution
+     * report prints "the node it was inherited from" ({@code LOAD.050}) and {@code TRAIT.052} is asked
+     * of the node that <em>declared</em> the trait rather than of every alternative that inherited it.
+     * <p>
+     * A declared trait replaces the inherited one <b>whole</b>, by id ({@code TRAIT.006}): "Trait objects
+     * are never deep-merged. […] A keyed replace has one answer to 'what survived'; a deep merge has one
+     * answer per field, and the reader has to know the shape of the trait to predict it." That is also
+     * the whole of {@code TRAIT.055} - a socket candidate's own {@code urbex:light.unlit} beats the
+     * socket's because it replaced the socket's trait, not because sockets are special.
+     *
+     * @return the merged set, or {@code null} when a declared trait's satellite could not be resolved
+     */
+    private Map<Identifier, ResolvedTrait> effective(Map<Identifier, Trait> declared,
+                                                     Map<Identifier, ResolvedTrait> inherited,
+                                                     PointerResolver.Site site) {
+        if (declared.isEmpty() && inherited.isEmpty()) {
+            return Map.of();
+        }
+        Map<Identifier, ResolvedTrait> traits = new LinkedHashMap<>();
+        inherited.forEach((id, trait) -> traits.put(id, new ResolvedTrait(trait.type(),
+                trait.value(), trait.satellites(), trait.provenance().inheritedForm())));
+        boolean ok = true;
+        for (Map.Entry<Identifier, Trait> own : declared.entrySet()) {
+            Optional<ResolvedTrait> resolvedTrait = trait(own.getValue(), site);
+            if (resolvedTrait.isEmpty()) {
+                ok = false;
+                continue;
+            }
+            traits.put(own.getKey(), resolvedTrait.get());
+        }
+        return ok ? traits : null;
+    }
+
+    /**
+     * One declared trait, with its satellites completed ({@code TRAIT.009}) and checked
+     * ({@code MODEL.033}).
+     * <p>
+     * <b>A satellite inherits nothing</b> ({@code TRAIT.007}), which is why {@link #complete} is called
+     * with an empty inherited set here and is the one place in this class where that is a rule rather
+     * than an absence of a parent. Without it "an {@code unlit} satellite would inherit
+     * {@code urbex:light} from the node it replaces, and so be an optional light whose own replacement
+     * is an optional light, without termination".
+     * <p>
+     * Memoised by trait value, so a definition carrying a broken satellite that two markers reference is
+     * one diagnostic rather than two - the same reason {@link #resolved} memoises a failed entry. The
+     * site recorded is the first one that asked, which is also the first one an author would edit.
+     */
+    private Optional<ResolvedTrait> trait(Trait trait, PointerResolver.Site site) {
+        Optional<ResolvedTrait> memoised = traits.get(trait);
+        if (memoised != null) {
+            return memoised;
+        }
+        Map<String, ResolvedNode> satellites = new LinkedHashMap<>();
+        boolean ok = true;
+        for (Map.Entry<String, RawNode> field : trait.satellites().entrySet()) {
+            PointerResolver.Site at = satelliteSite(site, trait, field.getKey());
+            Optional<ResolvedNode> completed =
+                    // Origin.unknown: the satellite reaching here has already had its own $ref applied
+                    // by satellitesOf, so the node in hand cannot say which key came from where and
+                    // DIAG.011 must read its subject off the node itself rather than guess.
+                    complete(field.getValue(), Map.of(), Origin.unknown(), at);
+            if (completed.isEmpty()) {
+                ok = false;
+                continue;
+            }
+            if (completed.get().kind() == Kind.LIGHT_SOCKET) {
+                // MODEL.033: a socket defers placement so it can search for a support, and a satellite
+                // is written at a position already decided.
+                diagnostics.error(Diag.DIAG_005, at.location(), "'" + field.getKey() + "'");
+                failed = true;
+                ok = false;
+                continue;
+            }
+            satellites.put(field.getKey(), completed.get());
+        }
+        Optional<ResolvedTrait> value = ok
+                ? Optional.of(new ResolvedTrait(trait.type(), trait.value(), satellites,
+                        new ResolvedTrait.Provenance(site.location(), site.via(), false)))
+                : Optional.empty();
+        traits.put(trait, value);
+        return value;
+    }
+
+    private Optional<ResolvedNode> built(Kind kind, ResolvedNode.Source source,
+                                         Map<Identifier, ResolvedTrait> traits) {
+        return Optional.of(new ResolvedNode(kind, source, traits));
     }
 
     /**
@@ -569,8 +724,8 @@ public final class NodeResolver {
      * this task, because {@code DIAG.011} could then only say "declares only traits" - the code named the
      * wrong rule to avoid printing a false sentence, which is the wrong way round.
      */
-    private Optional<ResolvedNode> weighted(RawNode node, Origin origin,
-                                            PointerResolver.Site site) {
+    private Optional<ResolvedNode> weighted(RawNode node, Map<Identifier, ResolvedTrait> traits,
+                                            Origin origin, PointerResolver.Site site) {
         if (node.choices().isEmpty()) {
             return noBlockSource(node, Kind.WEIGHTED, "choices", origin, site);
         }
@@ -581,10 +736,10 @@ public final class NodeResolver {
             diagnostics.error(Diag.DIAG_007, site.location());
             return silently();
         }
-        List<ResolvedNode.Choice> resolved = alternatives(choices, site, "choice");
+        List<ResolvedNode.Choice> resolved = alternatives(choices, traits, site, "choice");
         return resolved == null
                 ? silently()
-                : built(Kind.WEIGHTED, new ResolvedNode.Source.Weighted(resolved), node);
+                : built(Kind.WEIGHTED, new ResolvedNode.Source.Weighted(resolved), traits);
     }
 
     /**
@@ -598,12 +753,13 @@ public final class NodeResolver {
      * four. A socket reaches here with no list at all only when its kind arrived through a {@code $ref},
      * since a written one is refused at decode.
      */
-    private Optional<ResolvedNode> socket(RawNode node, PointerResolver.Site site) {
+    private Optional<ResolvedNode> socket(RawNode node, Map<Identifier, ResolvedTrait> traits,
+                                          PointerResolver.Site site) {
         Map<Kind.Placement, List<ResolvedNode.Choice>> placements = new LinkedHashMap<>();
         boolean any = false;
         boolean ok = true;
         for (Map.Entry<Kind.Placement, List<RawChoice>> placement : node.placements().entrySet()) {
-            List<ResolvedNode.Choice> candidates = alternatives(placement.getValue(),
+            List<ResolvedNode.Choice> candidates = alternatives(placement.getValue(), traits,
                     site.inside("'" + placement.getKey().key() + "'"), "candidate");
             if (candidates == null) {
                 ok = false;   // DIAG.903: every list of this socket is checked before it fails
@@ -619,17 +775,25 @@ public final class NodeResolver {
             diagnostics.error(Diag.DIAG_010, site.location());   // MODEL.072, likewise
             return silently();
         }
-        return built(Kind.LIGHT_SOCKET, new ResolvedNode.Source.Socket(placements), node);
+        return built(Kind.LIGHT_SOCKET, new ResolvedNode.Source.Socket(placements), traits);
     }
 
-    /** Every alternative of a list, completed, or {@code null} when one of them was refused. */
+    /**
+     * Every alternative of a list, completed, or {@code null} when one of them was refused.
+     *
+     * @param inherited this list's owner's traits, which every element of it inherits
+     *                  ({@code TRAIT.005}). A {@code choices} entry and a socket candidate are both
+     *                  <em>alternatives</em> by {@code MODEL.030}, which is exactly the set of positions
+     *                  that rule names, and is why one method serves both
+     */
     private List<ResolvedNode.Choice> alternatives(List<RawChoice> choices,
+                                                   Map<Identifier, ResolvedTrait> inherited,
                                                    PointerResolver.Site site, String position) {
         List<ResolvedNode.Choice> resolvedChoices = new ArrayList<>();
         boolean ok = true;
         for (int index = 0; index < choices.size(); index++) {
             RawChoice choice = choices.get(index);
-            Optional<ResolvedNode> value = complete(choice.node(), Origin.unknown(),
+            Optional<ResolvedNode> value = complete(choice.node(), inherited, Origin.unknown(),
                     site.inside(position + " " + index));
             if (value.isEmpty()) {
                 ok = false;

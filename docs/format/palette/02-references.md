@@ -160,6 +160,15 @@ A partial definition is how a trait is shared without a second mechanism for sha
 > > anything in the corpus. A satellite node inside a trait *may* carry `$ref`; it is a node, and
 > > [TRAIT.009](01-traits.md#3-block-valued-fields) already says so.
 
+> > **Where it is enforced** — by [MODEL.004](00-model.md#1-the-file), against the key set
+> > [TRAIT.090](01-traits.md#5-defining-a-trait) makes every registered trait declare. `$ref` is not a
+> > key any trait's schema defines, so it is refused inside a trait object as `DIAG.003` at every level,
+> > exactly as a misspelt key is. This rule carries no diagnostic of its own because it needs none: it
+> > is a statement that the operand set does not reach this level, not a rejection with a remedy of its
+> > own. It was covered by VER.016's blanket scan until traits stopped being opaque; that rule is
+> > retired, and the check that survives it is narrower — it refuses an operand on the trait *object*
+> > and says nothing about a satellite, which may carry one.
+
 In the shipped Urbex palettes `damaged` has exactly one distinct value across all sixty uses. A
 single `rubble` definition replaces every one of them.
 

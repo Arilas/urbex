@@ -179,6 +179,20 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
         };
     }
 
+    /**
+     * A node declaring nothing at all, for a field whose value has been compiled and must not survive.
+     * <p>
+     * {@code LOAD.024} - "No compiled palette holds a reference to the parsed JSON […] or to any string
+     * used only during compilation" - is why this exists rather than a compiled trait simply keeping
+     * the satellite it was built from. A trait payload is one record holding both the fields generation
+     * reads and the nodes it does not, and there is no way to keep half of a record; so
+     * {@link TraitType#strippedOf} writes this in place of each satellite, and one shared immutable
+     * constant is what the compiled form retains instead of a subtree of block strings.
+     */
+    public static final RawNode ABSENT = new RawNode(Optional.empty(), Optional.empty(),
+            Optional.empty(), Optional.empty(), Optional.empty(), Map.of(), Map.of(),
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+
     /** The node {@code MODEL.020} says a bare string is. */
     public static RawNode ofBlock(String block) {
         return new RawNode(Optional.of(Kind.BLOCK), Optional.of(block), Optional.empty(),
@@ -356,14 +370,6 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
             }
         }
 
-        // VER.016: an operand inside a trait payload is refused until operands inside traits resolve.
-        // Ordered by trait id so a node carrying two of them reports the same way every run.
-        node.traits().values().stream()
-                .sorted(Comparator.comparing(trait -> trait.id().toString()))
-                .forEach(trait -> trait.operandHeld().ifPresent(operand ->
-                        diagnostics.error(Diag.DIAG_064, Diagnostics.DECODING_LOCATION,
-                                "'" + trait.id() + "'", "'" + operand + "'")));
-
         // REF.072: a $spread element carries no other key. To change what it spreads, point somewhere
         // else - so a sibling key is a key of a thing this element is not.
         if (node.spread().isPresent()) {
@@ -428,12 +434,20 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
     }
 
     /**
-     * This node and every node beneath it - a choice, a placement candidate, and their own children.
+     * This node and every node beneath it - a choice, a placement candidate, a satellite, and their own
+     * children.
      * <p>
-     * Stops at {@code traits}, because a trait payload is a {@link Trait} and stays opaque until a trait
-     * registry exists. That is not only an implementation limit: {@code MODEL.031} says realising a node
-     * never realises its satellites, so a node inside a trait is not an alternative of this one and does
-     * not belong in a walk over this node's alternatives.
+     * <b>Satellites are in the walk now that they are nodes.</b> They were not while a trait payload was
+     * opaque NBT; {@code TRAIT.009} makes a block-valued trait field a node and {@link TraitType} says
+     * which fields those are, so a {@code $ref} inside one is a pointer this document writes and every
+     * caller of this method wants it. All three ask a question about the document rather than about what
+     * it realises - which pointers it writes ({@code REF.015}), whether it reaches outside itself, and
+     * whether any operand survived resolution ({@code REF.034}) - and a satellite answers all three the
+     * same way an alternative does.
+     * <p>
+     * It is <em>not</em> a walk over this node's alternatives, and nothing may use it as one:
+     * {@code MODEL.031} says realising a node never realises its satellites, and {@code MODEL.081}'s
+     * completeness walk in {@code NodeResolver} therefore recurses on its own.
      * <p>
      * Here rather than in each caller because three of them wanted it - {@code REF.015}'s check that no
      * pointer in a definitions asset names an unqualified definition, the fixture harness's test for
@@ -452,6 +466,8 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
         choices.ifPresent(list -> list.forEach(choice -> choice.node().collectInto(nodes)));
         placements.values().forEach(candidates ->
                 candidates.forEach(candidate -> candidate.node().collectInto(nodes)));
+        traits.values().forEach(trait ->
+                trait.satellites().values().forEach(satellite -> satellite.collectInto(nodes)));
     }
 
     /** Every {@code $ref} and {@code $spread} in this node's tree, as written. */

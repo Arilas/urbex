@@ -304,7 +304,8 @@ class ExclusionTest {
                 { "version": 2, "palette": { "c": { "kind": "weighted", "choices": [
                     { "weight": 1, "block": "minecraft:stone", "when": { "mod": "create" } },
                     { "weight": 1, "block": "minecraft:cobweb", "traits": {
-                        "urbex:optional": { "replacement": "minecraft:air" } } } ] } } }
+                        "urbex:optional": { "density": "stuff",
+                            "replacement": "minecraft:air" } } } ] } } }
                 """, presence(Set.of(), Set.of("minecraft")));
         assertEquals(List.of("minecraft:cobweb"), blocks(kept));
         assertEquals(List.of(Fraction.ONE),

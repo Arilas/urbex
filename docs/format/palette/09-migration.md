@@ -71,10 +71,10 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 
 ### 1.1 What version 2 does not reach yet
 
-Two rules in this section are transitional: each refuses something this specification allows, because
-the loader does not implement it yet, and each names the rule that retires it. They exist rather than
-the behaviour being absent because the alternative to refusing is accepting and then not acting, which
-is the failure [VER.012](#3-retired-keys) forbids for a key and this section forbids for a whole file.
+One rule in this section is transitional: it refuses something this specification allows, because the
+loader does not implement it yet, and it names the rule that retires it. It exists rather than the
+behaviour being absent because the alternative to refusing is accepting and then not acting, which is
+the failure [VER.012](#3-retired-keys) forbids for a key and this section forbids for a whole file.
 
 > **VER.015** · `REJECT` (`DIAG.063`) `[NO-FIXTURE: an entry that must be compiled, not a document]` `[DEPRECATED → VER.002]` — A version 2 palette is refused where it is compiled, naming the
 > asset, until version 2 compilation lands. Both kinds: a registry entry, and a palette written inline
@@ -94,43 +94,6 @@ is the failure [VER.012](#3-retired-keys) forbids for a key and this section for
 > > building it is written in. This rule said "a *registered* version 2 palette" while MERGE.011 was
 > > unimplemented and there was no other kind; the word is gone rather than an inline clause added,
 > > because when this rule retires both cases retire together.
-
-> **VER.016** · `REJECT` (`DIAG.064`) `[DEPRECATED → TRAIT.009]` — Any of the four
-> [operands](03-pointers.md#2-operands) — `$ref`, `$only`, `$without` or `$spread` — written anywhere
-> inside a `traits` value is refused, at any depth, until operands inside traits are resolved.
-
-> > **Why** — [TRAIT.009](01-traits.md#3-block-valued-fields) makes a block-valued trait field a node and
-> > [MODEL.032](00-model.md#3-alternatives-and-satellites) lets a node carry `$ref`, so a satellite
-> > naming a definition is something this specification allows and nothing yet resolves. Both ways of
-> > leaving it are worse than refusing it: expanding it needs the per-trait schemas that say which fields
-> > hold nodes, and *not* expanding it silently gives the satellite no block — a marker whose damaged
-> > form or unlit form is air, with no message, which is the exact class of silence version 2 exists to
-> > remove. Refusing costs an author who wrote one a rewrite in full and tells them why.
-
-> > **Why all four and not `$ref` alone** — every operand inside a trait is unresolved for the same
-> > reason, and each fails silently in its own way. A `$spread` in a satellite's `choices` survives into
-> > the compiled palette as a list element that places nothing; a `$only` or `$without` with nothing to
-> > filter is simply dropped. Naming one operand and leaving three would refuse the case an author is
-> > least likely to write and accept the three they might.
-
-> > **Why it also covers REF.022** — [REF.022](02-references.md#4-partial-definitions) forbids `$ref` on a
-> > trait *object* permanently, for a different reason: sharing a trait is done with a partial definition,
-> > and a second mechanism for it is not wanted. That rule has no enforcement of its own yet either, and
-> > one check over the whole `traits` value catches both cases. When this rule retires, REF.022 needs its
-> > own check, narrower than this one and stated for its own reason.
-
-```json fixture:VER.016 reject=DIAG.064
-{
-  "version": 2,
-  "$defs": { "rubble": { "block": "minecraft:iron_bars" } },
-  "palette": {
-    "X": {
-      "block": "minecraft:stone_bricks",
-      "traits": { "urbex:damaged": { "into": { "$ref": "rubble" } } }
-    }
-  }
-}
-```
 
 ## 2. What every version 1 construct becomes
 
@@ -266,6 +229,18 @@ The retired set, and what each becomes:
 > > each one separately is how the format grew four spellings of one idea in the first place.
 
 ## Tombstones
+
+> **VER.016** — *retired in draft.* Refused any of the four operands — `$ref`, `$only`, `$without`,
+> `$spread` — written anywhere inside a `traits` value, at any depth, while a trait payload was opaque
+> and nothing could say which of a trait's fields hold nodes. Superseded by
+> [TRAIT.009](01-traits.md#3-block-valued-fields) together with
+> [TRAIT.090](01-traits.md#5-defining-a-trait): a registered trait now declares its block-valued
+> fields, so a satellite is a node the loader resolves like any other and an operand inside one is no
+> longer unresolved. Its diagnostic `DIAG.064` is retired with it, with its own tombstone; the tests
+> citing VER.016 were deleted. The half of it that was never transitional —
+> [REF.022](02-references.md#4-partial-definitions), `$ref` on the trait *object* — is now refused by
+> [MODEL.004](00-model.md#1-the-file) against the trait's declared key set, which is narrower and is
+> stated on REF.022 itself. No replacement identifier.
 
 > **VER.014** — *retired in draft.* Refused a palette written inline in a part or building that
 > declared a `version` other than 1, while nothing could read one: the version 1 codec ignores keys it
