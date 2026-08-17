@@ -204,7 +204,7 @@ class DatapackGuideExamplesTest {
         // A palette entry that resolves to nothing at all.
         PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, null, List.of(
                 new PaletteDefinition(Optional.empty(), Optional.of(List.of(empty))))));
 

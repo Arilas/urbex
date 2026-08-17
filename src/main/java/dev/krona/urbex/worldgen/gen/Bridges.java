@@ -48,8 +48,9 @@ public class Bridges {
                     BlockState b = ctx.paletteHere(compiledPalette, c);
                     Palette.Info inf = compiledPalette.getInfo(c);
                     if (inf != null) {
-                        if (inf.light() != null || inf.isTorch()) {
-                            b = Parts.handleLightMarker(ctx, feature, inf, driver.getCurrentCopy());
+                        if (inf.lightSource() != null) {
+                            b = Parts.handleLightSource(ctx, feature, inf.lightSource(), b,
+                                    driver.getCurrentCopy());
                         }
                     }
                     driver.add(b);

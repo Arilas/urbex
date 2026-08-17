@@ -4,8 +4,9 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
@@ -36,7 +37,7 @@ class LightPoolTest {
 
     @Test
     void codecPreservesAllFourPlacementGroups() {
-        LightSettings settings = decodeSettings("""
+        LightSourceSettings settings = decodeSettings("""
                 {
                   "floor":[{"weight":1,"block":"minecraft:torch"}],
                   "wall":[{"weight":2,"block":"minecraft:wall_torch"}],
@@ -54,9 +55,9 @@ class LightPoolTest {
     }
 
     @Test
-    void paletteCompilationRejectsPoolWithoutCandidatesWithResourceAndMarkerContext() {
+    void paletteCompilationRejectsALightSourceWithNothingToPlace() {
         PaletteDefinition palette = decodePalette("""
-                {"palette":[{"char":"L","light":{
+                {"palette":[{"char":"L","lightSource":{
                   "floor":[],"wall":[],"ceiling":[],"free":[]
                 }}]}
                 """);
@@ -64,15 +65,105 @@ class LightPoolTest {
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
-        assertTrue(error.getMessage().contains("marker 'L'"));
+        assertTrue(error.getMessage().contains("entry 'L'"));
         assertTrue(error.getMessage().contains("floor, wall, ceiling, or free"));
+    }
+
+    @Test
+    void paletteCompilationRejectsABareLightSourceOnAnEntryWithNoBlock() {
+        PaletteDefinition palette = decodePalette("""
+                {"palette":[{"char":"L","lightSource":true}]}
+                """);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
+        assertTrue(error.getMessage().contains("entry 'L'"));
+        assertTrue(error.getMessage().contains("names nothing to place"));
+    }
+
+    @Test
+    void paletteCompilationRejectsALightSourceOnBlocksThatEmitNothing() {
+        PaletteDefinition palette = decodePalette("""
+                {"palette":[{"char":"L","block":"minecraft:stone","lightSource":true}]}
+                """);
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
+        assertTrue(error.getMessage().contains("entry 'L'"));
+        assertTrue(error.getMessage().contains("emit any light"));
+    }
+
+    @Test
+    void anInPlaceSourceKeepsItsOwnBlockAndCompilesItsReplacement() {
+        PaletteDefinition palette = decodePalette("""
+                {"palette":[{
+                  "char":"L",
+                  "block":"minecraft:lantern[hanging=true]",
+                  "lightSource":{"unlit":"minecraft:iron_chain[axis=y]"}
+                }]}
+                """);
+
+        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette))
+                .getPalette().get('L');
+        BlockState lit = assertInstanceOf(BlockState.class, entry.blocks());
+        assertEquals(Blocks.LANTERN, lit.getBlock());
+        assertNull(entry.info().lightSource().pool());
+        assertEquals(Blocks.IRON_CHAIN,
+                ((BlockChoice.One) entry.info().lightSource().unlit()).state().getBlock());
+    }
+
+    @Test
+    void aWeightedReplacementDrawsFromThePositionAndNothingElse() {
+        PaletteDefinition palette = decodePalette("""
+                {"palette":[{
+                  "char":"L",
+                  "block":"minecraft:lantern[hanging=true]",
+                  "lightSource":{"unlitBlocks":[
+                    {"random":64,"block":"minecraft:iron_chain[axis=y]"},
+                    {"random":64,"block":"minecraft:air"}
+                  ]}
+                }]}
+                """);
+
+        LightSource source = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette))
+                .getPalette().get('L').info().lightSource();
+        assertInstanceOf(BlockChoice.Weighted.class, source.unlit());
+        BlockPos pos = new BlockPos(11, 71, -4);
+        assertEquals(source.unlitAt(9001L, pos), source.unlitAt(9001L, pos));
+    }
+
+    @Test
+    void declaringBothReplacementSpellingsIsADecodeError() {
+        DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE,
+                JsonParser.parseString("""
+                        {"palette":[{
+                          "char":"L",
+                          "block":"minecraft:lantern",
+                          "lightSource":{
+                            "unlit":"minecraft:air",
+                            "unlitBlocks":[{"random":1,"block":"minecraft:air"}]
+                          }
+                        }]}
+                        """));
+        assertTrue(result.error().isPresent());
+        assertTrue(result.error().orElseThrow().message().contains("one replacement"));
+    }
+
+    @Test
+    void lightSourceFalseIsADecodeErrorRatherThanASilentNothing() {
+        DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE,
+                JsonParser.parseString("""
+                        {"palette":[{"char":"L","block":"minecraft:lantern","lightSource":false}]}
+                        """));
+        assertTrue(result.error().isPresent());
+        assertTrue(result.error().orElseThrow().message().contains("omit the field"));
     }
 
     @Test
     void paletteCompilationRejectsNonpositiveWeightWithFullCandidateContext() {
         for (int weight : List.of(0, -3)) {
             PaletteDefinition palette = decodePalette("""
-                    {"palette":[{"char":"L","light":{
+                    {"palette":[{"char":"L","lightSource":{
                       "floor":[{"weight":%d,"block":"minecraft:torch"}]
                     }}]}
                     """.formatted(weight));
@@ -89,7 +180,7 @@ class LightPoolTest {
 
     @Test
     void compileRejectsBlockThatEmitsNoLight() {
-        LightSettings settings = decodeSettings("""
+        LightSourceSettings settings = decodeSettings("""
                 {"floor":[{"weight":1,"block":"minecraft:stone"}]}
                 """);
 
@@ -103,7 +194,7 @@ class LightPoolTest {
 
     @Test
     void compileAcceptsWeakNonzeroCustomLight() {
-        LightSettings settings = decodeSettings("""
+        LightSourceSettings settings = decodeSettings("""
                 {"floor":[{"weight":1,"block":"minecraft:redstone_torch[lit=true]"}]}
                 """);
 
@@ -115,14 +206,14 @@ class LightPoolTest {
     @Test
     void compileRejectsHorizontalOnlyStateInVerticalPlacement() {
         for (LightPool.Placement placement : List.of(LightPool.Placement.FLOOR, LightPool.Placement.CEILING)) {
-            LightSettings settings = placement == LightPool.Placement.FLOOR
-                    ? new LightSettings(
-                    List.of(new LightSettings.Entry(1, "minecraft:wall_torch[facing=north]")),
-                    List.of(), List.of(), List.of())
-                    : new LightSettings(
+            LightSourceSettings settings = placement == LightPool.Placement.FLOOR
+                    ? new LightSourceSettings(
+                    List.of(new LightSourceSettings.Entry(1, "minecraft:wall_torch[facing=north]")),
+                    List.of(), List.of(), List.of(), null, null)
+                    : new LightSourceSettings(
                     List.of(), List.of(),
-                    List.of(new LightSettings.Entry(1, "minecraft:wall_torch[facing=north]")),
-                    List.of());
+                    List.of(new LightSourceSettings.Entry(1, "minecraft:wall_torch[facing=north]")),
+                    List.of(), null, null);
 
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                     () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
@@ -133,10 +224,10 @@ class LightPoolTest {
 
     @Test
     void compileRejectsHangingOnlyStateInWallPlacement() {
-        LightSettings settings = new LightSettings(
+        LightSourceSettings settings = new LightSourceSettings(
                 List.of(),
-                List.of(new LightSettings.Entry(1, "minecraft:lantern[hanging=false]")),
-                List.of(), List.of());
+                List.of(new LightSourceSettings.Entry(1, "minecraft:lantern[hanging=false]")),
+                List.of(), List.of(), null, null);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
@@ -147,7 +238,7 @@ class LightPoolTest {
     @Test
     void malformedStateReportsFullCandidateContext() {
         String malformed = "minecraft:torch[not_a_property=true]";
-        LightSettings settings = decodeSettings("""
+        LightSourceSettings settings = decodeSettings("""
                 {"ceiling":[{"weight":1,"block":"minecraft:torch[not_a_property=true]"}]}
                 """);
 
@@ -161,7 +252,7 @@ class LightPoolTest {
 
     @Test
     void representativeUsesFirstCandidateOfFirstNonemptyGroup() {
-        LightSettings settings = decodeSettings("""
+        LightSourceSettings settings = decodeSettings("""
                 {
                   "wall":[
                     {"weight":1,"block":"minecraft:soul_wall_torch"},
@@ -179,7 +270,7 @@ class LightPoolTest {
 
     @Test
     void weightedOrderPutsWinnerFirstThenWrapsJsonOrder() {
-        LightSettings settings = decodeSettings("""
+        LightSourceSettings settings = decodeSettings("""
                 {"floor":[
                   {"weight":1,"block":"minecraft:lantern[hanging=false]"},
                   {"weight":1,"block":"minecraft:soul_lantern[hanging=false]"},
@@ -205,11 +296,11 @@ class LightPoolTest {
 
     @Test
     void compileRejectsWeightSumOverflowWithCandidateContext() {
-        LightSettings settings = new LightSettings(
+        LightSourceSettings settings = new LightSourceSettings(
                 List.of(
-                        new LightSettings.Entry(Integer.MAX_VALUE, "minecraft:torch"),
-                        new LightSettings.Entry(1, "minecraft:soul_torch")),
-                List.of(), List.of(), List.of());
+                        new LightSourceSettings.Entry(Integer.MAX_VALUE, "minecraft:torch"),
+                        new LightSourceSettings.Entry(1, "minecraft:soul_torch")),
+                List.of(), List.of(), List.of(), null, null);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
@@ -221,9 +312,9 @@ class LightPoolTest {
 
     @Test
     void compileRejectsProgrammaticNonpositiveWeight() {
-        LightSettings settings = new LightSettings(
-                List.of(new LightSettings.Entry(0, "minecraft:lantern")),
-                List.of(), List.of(), List.of());
+        LightSourceSettings settings = new LightSourceSettings(
+                List.of(new LightSourceSettings.Entry(0, "minecraft:lantern")),
+                List.of(), List.of(), List.of(), null, null);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
@@ -234,7 +325,7 @@ class LightPoolTest {
     }
 
     @Test
-    void completeLegacyTorchEntryStillCompilesWithoutTypedPool() {
+    void removedTorchSpellingFailsTheLoadNamingWhatToWriteInstead() {
         DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
                 {"palette":[{
                   "char":"L",
@@ -245,10 +336,28 @@ class LightPoolTest {
         assertTrue(result.result().isPresent());
         PaletteDefinition paletteDefinition = result.result().orElseThrow();
 
-        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)).getPalette().get('L');
-        assertInstanceOf(BlockState.class, entry.blocks());
-        assertTrue(entry.info().isTorch());
-        assertNull(entry.info().light());
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)));
+        assertTrue(error.getMessage().contains("'torch'"));
+        assertTrue(error.getMessage().contains("lightSource"));
+        assertTrue(error.getMessage().contains("urbex:test_lights"));
+    }
+
+    @Test
+    void removedLightSpellingFailsTheLoadNamingTheRename() {
+        DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
+                {"palette":[{
+                  "char":"L",
+                  "light":{"floor":[{"weight":1,"block":"minecraft:torch"}]}
+                }]}
+                """));
+        assertTrue(result.result().isPresent());
+        PaletteDefinition paletteDefinition = result.result().orElseThrow();
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)));
+        assertTrue(error.getMessage().contains("'light'"));
+        assertTrue(error.getMessage().contains("lightSource"));
     }
 
     @Test
@@ -256,7 +365,7 @@ class LightPoolTest {
         DataResult<PaletteDefinition> result = PaletteDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
                 {"palette":[{
                   "char":"L",
-                  "light":{"wall":[
+                  "lightSource":{"wall":[
                     {"weight":2,"block":"minecraft:soul_wall_torch[facing=north]"},
                     {"weight":1,"block":"minecraft:wall_torch[facing=south]"}
                   ]}
@@ -269,31 +378,17 @@ class LightPoolTest {
         BlockState representative = assertInstanceOf(BlockState.class, entry.blocks());
         assertEquals(Blocks.SOUL_WALL_TORCH, representative.getBlock());
         assertTrue(entry.info().isSpecial());
-        assertEquals(2, entry.info().light().allCandidates().size());
+        assertEquals(2, entry.info().lightSource().pool().allCandidates().size());
     }
 
-    @Test
-    void legacyTorchPoolContainsOnlyImmutableFloorAndWallCandidates() {
-        LightPool pool = LightPool.legacyTorch();
-
-        assertEquals(Blocks.TORCH, pool.weightedOrder(LightPool.Placement.FLOOR, RandomSource.create(1L))
-                .getFirst().state().getBlock());
-        assertEquals(Blocks.WALL_TORCH, pool.weightedOrder(LightPool.Placement.WALL, RandomSource.create(1L))
-                .getFirst().state().getBlock());
-        assertTrue(pool.weightedOrder(LightPool.Placement.CEILING, RandomSource.create(1L)).isEmpty());
-        assertTrue(pool.weightedOrder(LightPool.Placement.FREE, RandomSource.create(1L)).isEmpty());
-        assertEquals(2, pool.allCandidates().size());
-        assertThrows(UnsupportedOperationException.class, pool.allCandidates()::clear);
-    }
-
-    private static LightSettings decodeSettings(String json) {
-        DataResult<LightSettings> result = parseSettings(json);
+    private static LightSourceSettings decodeSettings(String json) {
+        DataResult<LightSourceSettings> result = parseSettings(json);
         assertTrue(result.result().isPresent(), () -> result.error().map(Object::toString).orElse("unknown decode error"));
         return result.result().orElseThrow();
     }
 
-    private static DataResult<LightSettings> parseSettings(String json) {
-        return LightSettings.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
+    private static DataResult<LightSourceSettings> parseSettings(String json) {
+        return LightSourceSettings.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
     }
 
     private static PaletteDefinition decodePalette(String json) {

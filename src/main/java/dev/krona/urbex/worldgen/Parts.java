@@ -129,8 +129,8 @@ public class Parts {
                                         break;
                                 }
                             } else if (inf != null) {
-                                if (inf.light() != null || inf.isTorch()) {
-                                    b = handleLightMarker(ctx, feature, inf, driver.getCurrentCopy());
+                                if (inf.lightSource() != null) {
+                                    b = handleLightSource(ctx, feature, inf.lightSource(), b, driver.getCurrentCopy());
                                 } else if (inf.loot() != null && !inf.loot().isEmpty()) {
                                     handleLoot(ctx, feature, info, part, b, inf);
                                 } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
@@ -150,10 +150,17 @@ public class Parts {
                                     }
                                 });
                                 b = Blocks.DIRT.defaultBlockState();
-                            } else if (ctx.tags.needsLightingUpdate(b)) {
-                                CityGenerator.updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             } else if (ctx.tags.needsTodo(b)) {
                                 b = handleTodo(ctx, feature, info, oy, ctx.region, rx, rz, y, b);
+                            }
+                            // Asked of the state that is actually about to be written, not of a tag,
+                            // and after the branch that decided it rather than as one more arm of
+                            // the chain. As an arm it was unreachable for every block with palette
+                            // metadata, so a light placed from an entry carrying a light source, a
+                            // mob or a tag never told the client to relight around it - and
+                            // urbex:lights had to enumerate by hand what the state already knows.
+                            if (b.getLightEmission() > 0) {
+                                CityGenerator.updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             }
                             driver.add(b);
                         } else {
@@ -166,11 +173,31 @@ public class Parts {
         return oy + part.getSliceCount();
     }
 
-    public static BlockState handleLightMarker(ChunkGenContext ctx, CityGenerator feature, Palette.Info marker, BlockPos pos) {
-        if (DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity())) {
-            ctx.addLightTodo(pos, marker.light());
+    /**
+     * What a {@code lightSource} marker writes: the light, or the replacement it named.
+     * <p>
+     * Nothing is filtered out of the output here, which is the whole of the change. A rejected
+     * marker used to become air whatever the author had written at it, so the only lights lighting
+     * density could reach were the ones authored as light markers in the first place - and a pack
+     * that authored its lanterns as ordinary blocks, as ModernTweaks does for all 826 of its
+     * lantern positions, had a setting that did nothing at all. Now the entry says it is a light,
+     * says what stands there when it is off, and the density decides between the two.
+     *
+     * @param lit the state the palette already resolved for this character, used by an in-place
+     *            source. A socket ignores it: its pool is its block source.
+     */
+    public static BlockState handleLightSource(ChunkGenContext ctx, CityGenerator feature,
+                                               LightSource source, BlockState lit, BlockPos pos) {
+        if (!DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity())) {
+            return source.unlitAt(ctx.seed, pos);
         }
-        return feature.air;
+        if (source.isSocket()) {
+            // Deferred: a socket has to see the finished chunk to find its support and orient
+            // itself, so the marker holds air until placeOptionalLights runs.
+            ctx.addLightTodo(pos, source);
+            return feature.air;
+        }
+        return lit;
     }
 
     /**

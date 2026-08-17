@@ -56,8 +56,8 @@ public class ServerEventHandlers {
         // TagEpoch, which the next chunk to start reads and a chunk already generating does not.
         //
         // What it no longer does is rebuild anything else. It used to republish every loaded
-        // level's runtime, because CityGenerator's constructor expanded urbex:lights and
-        // urbex:needspoi into BlockState sets, so a fresh generator was the only way to see an
+        // level's runtime, because CityGenerator's constructor expanded urbex:needspoi and
+        // urbex:foliage into BlockState sets, so a fresh generator was the only way to see an
         // edited tag - and a fresh generator brought a fresh road field, fresh heightmaps and an
         // empty plan cache with it, none of which a tag can affect (issue #128). Nor does it reset
         // the asset registries: they cannot change on a reload (see above), and clearing them from

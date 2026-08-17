@@ -12,7 +12,7 @@
     },
     {
       "char": "T",
-      "light": {
+      "lightSource": {
         "floor": [
           {
             "weight": 6,
@@ -51,7 +51,7 @@
     },
     {
       "char": "h",
-      "light": {
+      "lightSource": {
         "free": [
           {
             "weight": 6,

@@ -256,13 +256,14 @@ class PaletteCharacterCheckTest {
     private static PaletteEntry entry(char marker, String block) {
         return new PaletteEntry(Character.toString(marker), Optional.of(block),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty());
     }
 
     private static PaletteEntry fromPalette(char marker, char target) {
         return new PaletteEntry(Character.toString(marker), Optional.empty(),
                 Optional.empty(), Optional.of(Character.toString(target)), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty());
     }
 }

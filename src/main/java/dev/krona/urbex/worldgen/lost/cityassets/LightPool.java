@@ -1,12 +1,11 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
@@ -57,7 +56,7 @@ public final class LightPool {
      */
     @Nullable
     public static LightPool compile(HolderLookup<Block> blockLookup, Identifier paletteId, char marker,
-                                    LightSettings settings) {
+                                    LightSourceSettings settings) {
         EnumMap<Placement, List<Candidate>> candidates = new EnumMap<>(Placement.class);
         EnumMap<Placement, Integer> totalWeights = new EnumMap<>(Placement.class);
         boolean[] dropped = new boolean[1];
@@ -72,20 +71,6 @@ public final class LightPool {
             throw new IllegalArgumentException("Invalid light pool in palette '" + paletteId + "', marker '" + marker
                     + "': expected at least one candidate in floor, wall, ceiling, or free");
         }
-        return new LightPool(candidates, totalWeights);
-    }
-
-    public static LightPool legacyTorch() {
-        EnumMap<Placement, List<Candidate>> candidates = new EnumMap<>(Placement.class);
-        EnumMap<Placement, Integer> totalWeights = new EnumMap<>(Placement.class);
-        candidates.put(Placement.FLOOR, List.of(new Candidate(1, Blocks.TORCH.defaultBlockState())));
-        candidates.put(Placement.WALL, List.of(new Candidate(1, Blocks.WALL_TORCH.defaultBlockState())));
-        candidates.put(Placement.CEILING, List.of());
-        candidates.put(Placement.FREE, List.of());
-        totalWeights.put(Placement.FLOOR, 1);
-        totalWeights.put(Placement.WALL, 1);
-        totalWeights.put(Placement.CEILING, 0);
-        totalWeights.put(Placement.FREE, 0);
         return new LightPool(candidates, totalWeights);
     }
 
@@ -125,14 +110,14 @@ public final class LightPool {
 
     private static void compileGroup(HolderLookup<Block> blockLookup, Identifier paletteId,
                                      char marker, Placement placement,
-                                     List<LightSettings.Entry> entries,
+                                     List<LightSourceSettings.Entry> entries,
                                      Map<Placement, List<Candidate>> candidates,
                                      Map<Placement, Integer> totalWeights,
                                      boolean[] dropped) {
         List<Candidate> compiled = new ArrayList<>(entries.size());
         int totalWeight = 0;
         for (int candidateIndex = 0; candidateIndex < entries.size(); candidateIndex++) {
-            LightSettings.Entry entry = entries.get(candidateIndex);
+            LightSourceSettings.Entry entry = entries.get(candidateIndex);
             if (entry.weight() <= 0) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "weight must be positive", null);

@@ -95,7 +95,14 @@ public final class Rng {
         // belongs by subject. A purpose's ordinal feeds the hash, so a constant added anywhere but
         // the end reseeds every stream below it and rewrites every world that ever generated. Added
         // here, nothing that existed before it moves.
-        SPAWNER_DENSITY
+        SPAWNER_DENSITY,
+        // Which replacement an unlit light source writes, when it names a weighted list of them.
+        //
+        // Separate from LIGHTING_VARIANT because one position can consume both: a socket the
+        // density roll accepted, whose every placement opportunity then failed, draws a candidate
+        // and falls through to its replacement. Derived from one hash they would be the same
+        // address twice, tying which replacement appears to which candidate was tried.
+        LIGHTING_UNLIT
     }
 
     /**

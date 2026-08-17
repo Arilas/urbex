@@ -21,9 +21,6 @@ public class UrbexTags {
     public static final Identifier NOT_BREAKABLE = Identifier.fromNamespaceAndPath(Urbex.MODID, "notbreakable");
     public static final TagKey<Block> NOT_BREAKABLE_TAG = TagKey.create(Registries.BLOCK, NOT_BREAKABLE);
 
-    public static final Identifier LIGHTS = Identifier.fromNamespaceAndPath(Urbex.MODID, "lights");
-    public static final TagKey<Block> LIGHTS_TAG = TagKey.create(Registries.BLOCK, LIGHTS);
-
     public static final Identifier NEEDSPOI = Identifier.fromNamespaceAndPath(Urbex.MODID, "needspoi");
     public static final TagKey<Block> NEEDSPOI_TAG = TagKey.create(Registries.BLOCK, NEEDSPOI);
 

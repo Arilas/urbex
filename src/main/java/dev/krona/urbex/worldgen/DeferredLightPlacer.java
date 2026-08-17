@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
+import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
 import dev.krona.urbex.worldgen.lost.cityassets.OptionalLightPlacer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -12,6 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -56,15 +58,33 @@ final class DeferredLightPlacer {
         List<Planned> planned = new ArrayList<>();
         for (LightTodoQueue.Todo todo : todos) {
             BlockPos marker = todo.pos();
-            LightPool pool = todo.pool() == null ? LightPool.legacyTorch() : todo.pool();
-            RandomSource random = Rng.atPos(seed, marker.getX(), marker.getY(), marker.getZ(),
-                    Rng.Purpose.LIGHTING_VARIANT);
-            OptionalLightPlacer.select(pool, random,
-                            (placement, supportDirection) -> supportDirection == null
-                                    || (belongsTo(ownerChunkX, ownerChunkZ, marker.relative(supportDirection))
-                                    && anchorSupport.isPresent(marker, supportDirection, snapshotStateAt)),
-                            attempt -> survival.canPlace(marker, attempt, snapshotStateAt))
-                    .ifPresent(attempt -> planned.add(new Planned(marker, attempt.state())));
+            LightSource source = todo.source();
+            LightPool pool = source.pool();
+            Optional<OptionalLightPlacer.Attempt> attempt;
+            if (pool == null) {
+                // Every candidate this socket declared named a block absent from this game (issue
+                // #91). There is nothing to try, and the replacement is the honest answer.
+                attempt = Optional.empty();
+            } else {
+                RandomSource random = Rng.atPos(seed, marker.getX(), marker.getY(), marker.getZ(),
+                        Rng.Purpose.LIGHTING_VARIANT);
+                attempt = OptionalLightPlacer.select(pool, random,
+                        (placement, supportDirection) -> supportDirection == null
+                                || (belongsTo(ownerChunkX, ownerChunkZ, marker.relative(supportDirection))
+                                && anchorSupport.isPresent(marker, supportDirection, snapshotStateAt)),
+                        att -> survival.canPlace(marker, att, snapshotStateAt));
+            }
+            if (attempt.isPresent()) {
+                planned.add(new Planned(marker, attempt.get().state()));
+                continue;
+            }
+            // Nowhere to hang it: damaged surroundings, no sturdy face, or a pool with nothing left
+            // in it. Air is skipped rather than planned - the marker already holds air, and writing
+            // it again would put a driver write where there was none before.
+            BlockState unlit = source.unlitAt(seed, marker);
+            if (!unlit.isAir()) {
+                planned.add(new Planned(marker, unlit));
+            }
         }
         return List.copyOf(planned);
     }

@@ -1,6 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
-import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -188,7 +188,7 @@ class OptionalLightPlacerTest {
 
     @Test
     void unsupportedOpportunityDoesNotConsumeVariantRandomness() {
-        List<LightSettings.Entry> wall = List.of(
+        List<LightSourceSettings.Entry> wall = List.of(
                 entry("minecraft:wall_torch[facing=north]"),
                 entry("minecraft:end_rod[facing=north]"));
         LightPool withUnsupportedFloor = pool(
@@ -213,8 +213,8 @@ class OptionalLightPlacerTest {
     }
 
     @Test
-    void legacyTorchCanPlaceOnFloor() {
-        OptionalLightPlacer.Attempt selected = select(LightPool.legacyTorch(),
+    void torchPoolCanPlaceOnFloor() {
+        OptionalLightPlacer.Attempt selected = select(torchPool(),
                 attempt -> attempt.placement() == LightPool.Placement.FLOOR).orElseThrow();
 
         assertEquals(Blocks.TORCH, selected.state().getBlock());
@@ -222,9 +222,9 @@ class OptionalLightPlacerTest {
     }
 
     @Test
-    void legacyTorchCanPlaceAgainstEveryWallDirection() {
+    void torchPoolCanPlaceAgainstEveryWallDirection() {
         for (Direction direction : List.of(Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH)) {
-            OptionalLightPlacer.Attempt selected = select(LightPool.legacyTorch(),
+            OptionalLightPlacer.Attempt selected = select(torchPool(),
                     attempt -> attempt.supportDirection() == direction).orElseThrow();
 
             assertEquals(Blocks.WALL_TORCH, selected.state().getBlock());
@@ -233,10 +233,10 @@ class OptionalLightPlacerTest {
     }
 
     @Test
-    void legacyTorchNeverAttemptsCeilingOrFreePlacement() {
+    void aFloorAndWallOnlyPoolNeverAttemptsCeilingOrFreePlacement() {
         List<OptionalLightPlacer.Attempt> attempts = new ArrayList<>();
 
-        Optional<OptionalLightPlacer.Attempt> selected = select(LightPool.legacyTorch(), attempt -> {
+        Optional<OptionalLightPlacer.Attempt> selected = select(torchPool(), attempt -> {
             attempts.add(attempt);
             return false;
         });
@@ -253,20 +253,30 @@ class OptionalLightPlacerTest {
                         || attempt.placement() == LightPool.Placement.FREE));
     }
 
+    /**
+     * Floor and wall torches only: the pool the removed {@code torch} boolean used to stand for,
+     * and still the smallest one that exercises every anchored opportunity but the ceiling.
+     */
+    private static LightPool torchPool() {
+        return pool(List.of(entry("minecraft:torch")),
+                List.of(entry("minecraft:wall_torch")),
+                List.of(), List.of());
+    }
+
     private static Optional<OptionalLightPlacer.Attempt> select(LightPool pool,
                                                                  OptionalLightPlacer.Survival survival) {
         return OptionalLightPlacer.select(pool, RandomSource.create(17L), survival);
     }
 
-    private static LightPool pool(List<LightSettings.Entry> floor,
-                                  List<LightSettings.Entry> wall,
-                                  List<LightSettings.Entry> ceiling,
-                                  List<LightSettings.Entry> free) {
-        return LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', new LightSettings(floor, wall, ceiling, free));
+    private static LightPool pool(List<LightSourceSettings.Entry> floor,
+                                  List<LightSourceSettings.Entry> wall,
+                                  List<LightSourceSettings.Entry> ceiling,
+                                  List<LightSourceSettings.Entry> free) {
+        return LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', new LightSourceSettings(floor, wall, ceiling, free, null, null));
     }
 
-    private static LightSettings.Entry entry(String block) {
-        return new LightSettings.Entry(1, block);
+    private static LightSourceSettings.Entry entry(String block) {
+        return new LightSourceSettings.Entry(1, block);
     }
 
     private static long seedWhoseFirstTwoBinaryDrawsDiffer() {

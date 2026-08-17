@@ -23,7 +23,7 @@ import java.util.Set;
  * <p>Block tags are the one piece of Urbex's compiled state that a {@code /reload} genuinely
  * changes. The thirteen asset registries are Fabric dynamic registries, loaded with the world and
  * frozen (issue #61), so an edited building or palette needs the world reopened whatever a reload
- * does - but {@code urbex:lights}, {@code urbex:needspoi}, {@code urbex:rotatable} and the rest come
+ * does - but {@code urbex:needspoi}, {@code urbex:foliage}, {@code urbex:rotatable} and the rest come
  * back with every one. That single difference used to cost a whole {@link DimensionRuntime} per
  * loaded level: {@code CityGenerator} expanded those tags into {@code BlockState} sets in its
  * constructor, so refreshing them meant rebuilding the generator, the road field, the world-style
@@ -51,7 +51,6 @@ public final class TagSnapshot {
             TagKey.create(Registries.BLOCK, Identifier.withDefaultNamespace("saplings"));
 
     private final Set<BlockState> statesNeedingTodo;
-    private final Set<BlockState> statesNeedingLightingUpdate;
     private final Set<BlockState> statesNeedingPoiUpdate;
     private final Set<Block> foliage;
     private final Set<Block> notBreakable;
@@ -64,14 +63,12 @@ public final class TagSnapshot {
     private final Map<TagKey<Block>, Set<Block>> rotatable;
 
     private TagSnapshot(Set<BlockState> statesNeedingTodo,
-                        Set<BlockState> statesNeedingLightingUpdate,
                         Set<BlockState> statesNeedingPoiUpdate,
                         Set<Block> foliage,
                         Set<Block> notBreakable,
                         Set<Block> easyBreakable,
                         Map<TagKey<Block>, Set<Block>> rotatable) {
         this.statesNeedingTodo = Set.copyOf(statesNeedingTodo);
-        this.statesNeedingLightingUpdate = Set.copyOf(statesNeedingLightingUpdate);
         this.statesNeedingPoiUpdate = Set.copyOf(statesNeedingPoiUpdate);
         this.foliage = Set.copyOf(foliage);
         this.notBreakable = Set.copyOf(notBreakable);
@@ -102,7 +99,6 @@ public final class TagSnapshot {
 
         return new TagSnapshot(
                 needingTodo,
-                statesIn(UrbexTags.LIGHTS_TAG),
                 statesIn(UrbexTags.NEEDSPOI_TAG),
                 blocksIn(UrbexTags.FOLIAGE_TAG),
                 blocksIn(UrbexTags.NOT_BREAKABLE_TAG),
@@ -113,11 +109,6 @@ public final class TagSnapshot {
     /** Whether {@code state} carries POI data, so its write has to be deferred past generation. */
     public boolean needsPoiUpdate(BlockState state) {
         return statesNeedingPoiUpdate.contains(state);
-    }
-
-    /** Whether placing {@code state} has to tell the client to relight around it. */
-    public boolean needsLightingUpdate(BlockState state) {
-        return statesNeedingLightingUpdate.contains(state);
     }
 
     /** Whether {@code state} is one of the plants that only survives being placed after the fact. */

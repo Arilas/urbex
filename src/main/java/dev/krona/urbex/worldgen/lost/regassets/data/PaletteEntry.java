@@ -24,8 +24,9 @@ public class PaletteEntry {
                     Codec.STRING.optionalFieldOf("damaged").forGetter(l -> Optional.ofNullable(l.getDamaged())),
                     Codec.STRING.optionalFieldOf("mob").forGetter(l -> Optional.ofNullable(l.getMob())),
                     Codec.STRING.optionalFieldOf("loot").forGetter(l -> Optional.ofNullable(l.getLoot())),
-                    Codec.BOOL.optionalFieldOf("torch").forGetter(l -> Optional.ofNullable(l.getTorch())),
-                    LightSettings.CODEC.optionalFieldOf("light").forGetter(entry -> Optional.ofNullable(entry.getLight())),
+                    Codec.BOOL.optionalFieldOf("torch").forGetter(l -> l.legacyTorch ? Optional.of(true) : Optional.empty()),
+                    Codec.PASSTHROUGH.optionalFieldOf("light").forGetter(l -> Optional.empty()),
+                    LightSourceSettings.CODEC.optionalFieldOf("lightSource").forGetter(entry -> Optional.ofNullable(entry.getLightSource())),
                     CompoundTag.CODEC.optionalFieldOf("tag").forGetter(l -> Optional.ofNullable(l.getTag()))
             ).apply(instance, PaletteEntry::new));
 
@@ -59,8 +60,16 @@ public class PaletteEntry {
     private String damaged;
     private String mob;
     private String loot;
-    private Boolean torch;
-    private LightSettings light;
+    /**
+     * The two spellings {@code lightSource} replaced. Kept in the codec so that a pack still using
+     * one fails at load with a message naming what to write instead. Dropping them from the codec
+     * would make an unknown key, which a palette silently ignores - so an old pack would keep
+     * placing a permanent wall torch while its author believed lighting density still applied to
+     * it.
+     */
+    private boolean legacyTorch;
+    private boolean legacyLight;
+    private LightSourceSettings lightSource;
     private CompoundTag tag;
 
     public PaletteEntry() {
@@ -69,6 +78,13 @@ public class PaletteEntry {
     public static PaletteEntry block(String block) {
         PaletteEntry entry = new PaletteEntry();
         entry.block = block;
+        return entry;
+    }
+
+    /** A character mapped to one block, for the palette {@code /exportpart} writes out. */
+    public static PaletteEntry block(char chr, String block) {
+        PaletteEntry entry = block(block);
+        entry.chr = Character.toString(chr).intern();
         return entry;
     }
 
@@ -116,12 +132,18 @@ public class PaletteEntry {
         return loot;
     }
 
-    public Boolean getTorch() {
-        return torch;
+    /** Whether this entry names the removed {@code torch} boolean. */
+    public boolean isLegacyTorch() {
+        return legacyTorch;
     }
 
-    public LightSettings getLight() {
-        return light;
+    /** Whether this entry names the removed {@code light} object. */
+    public boolean isLegacyLight() {
+        return legacyLight;
+    }
+
+    public LightSourceSettings getLightSource() {
+        return lightSource;
     }
 
     public CompoundTag getTag() {
@@ -149,7 +171,8 @@ public class PaletteEntry {
     public PaletteEntry(String chr, Optional<String> block, Optional<String> variant, Optional<String> frompalette,
                         Optional<List<BlockEntry>> blocks, Optional<String> damaged,
                         Optional<String> mob, Optional<String> loot, Optional<Boolean> torch,
-                        Optional<LightSettings> light,
+                        Optional<com.mojang.serialization.Dynamic<?>> light,
+                        Optional<LightSourceSettings> lightSource,
                         Optional<CompoundTag> tag) {
         this.chr = chr.intern();
         this.block = block.map(String::intern).orElse(null);
@@ -159,8 +182,9 @@ public class PaletteEntry {
         this.damaged = damaged.map(String::intern).orElse(null);
         this.mob = mob.map(String::intern).orElse(null);
         this.loot = loot.map(String::intern).orElse(null);
-        this.torch = torch.orElse(null);
-        this.light = light.orElse(null);
+        this.legacyTorch = torch.orElse(false);
+        this.legacyLight = light.isPresent();
+        this.lightSource = lightSource.orElse(null);
         this.tag = deduplicateTag(tag.orElse(null));
     }
 
@@ -175,8 +199,9 @@ public class PaletteEntry {
                 ", damaged='" + damaged + '\'' +
                 ", mob='" + mob + '\'' +
                 ", loot='" + loot + '\'' +
-                ", torch=" + torch +
-                ", light=" + light +
+                ", legacyTorch=" + legacyTorch +
+                ", legacyLight=" + legacyLight +
+                ", lightSource=" + lightSource +
                 ", tag=" + tag +
                 '}';
     }
