@@ -240,8 +240,11 @@ class PaletteCharacterCheckTest {
 
         assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
         assertTrue(diagnostics.hasFatal(), "no selection can resolve it, so the world must not load");
-        assertTrue(diagnostics.problems().getFirst().message().contains("'@' -> 'a'"),
-                () -> diagnostics.format(""));
+        String message = diagnostics.problems().getFirst().message();
+        assertTrue(dev.krona.urbex.format.Diag.DIAG_009.matches(message),
+                () -> "MODEL.062 cites DIAG.009, so the message is the catalogue's: " + message);
+        assertTrue(message.contains("'@'") && message.contains("'a'"),
+                () -> "and it names the alias and its target: " + message);
     }
 
     @Rule("LOAD.013")

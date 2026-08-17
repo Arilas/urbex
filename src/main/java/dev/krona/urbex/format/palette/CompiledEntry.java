@@ -34,21 +34,37 @@ import java.util.Map;
  * @param placements a socket's four candidate lists, each compiled as an entry of its own
  *                   ({@code MODEL.071}), in {@code MODEL.073}'s search order; empty for every other kind
  */
-public record CompiledEntry(Resolved[] slots, Map<Kind.Placement, CompiledEntry> placements) {
+public record CompiledEntry(Resolved[] slots, Map<Kind.Placement, CompiledEntry> placements,
+                            TraitSet ownTraits) {
 
-    public CompiledEntry(Resolved[] slots, Map<Kind.Placement, CompiledEntry> placements) {
+    public CompiledEntry(Resolved[] slots, Map<Kind.Placement, CompiledEntry> placements,
+                         TraitSet ownTraits) {
         this.slots = slots.clone();
         this.placements = Kind.Placement.ordered(placements);
+        this.ownTraits = ownTraits;
     }
 
-    /** A marker with a block source of its own. */
+    /** A marker with a block source of its own; its traits live on its slots. */
     public static CompiledEntry of(Resolved[] slots) {
-        return new CompiledEntry(slots, Map.of());
+        return new CompiledEntry(slots, Map.of(), TraitSet.EMPTY);
     }
 
-    /** A {@code light_socket}: no slots, and one compiled entry per placement list that survived. */
-    public static CompiledEntry socket(Map<Kind.Placement, CompiledEntry> placements) {
-        return new CompiledEntry(new Resolved[0], placements);
+    /**
+     * A {@code light_socket}: no slots, one compiled entry per placement list that survived, and the
+     * socket node's <b>own</b> traits.
+     * <p>
+     * <b>The third component exists because a socket has no slots to carry traits on.</b> Every other
+     * kind keeps its traits per slot ({@code LOAD.021}), which is where {@code TRAIT.005} leaves them
+     * after inheritance. A socket's block source is its candidates ({@code MODEL.070}) so it has an
+     * empty slot array, and without this its own {@code traits} object were compiled and then dropped:
+     * {@code TRAIT.055}'s socket-level {@code urbex:light.unlit} became air whatever the file wrote, and
+     * an {@code urbex:loot}, {@code urbex:spawner} or {@code urbex:block_entity} on a socket vanished
+     * with no diagnostic. The candidates inherit these traits too, by {@code TRAIT.005}; what the
+     * candidates cannot answer is what applies to the marker when the placer finds nowhere to put a
+     * light at all.
+     */
+    public static CompiledEntry socket(Map<Kind.Placement, CompiledEntry> placements, TraitSet own) {
+        return new CompiledEntry(new Resolved[0], placements, own);
     }
 
     /** How many slots this entry addresses - what {@code Rng.paletteSlotAt} is handed. */

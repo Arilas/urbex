@@ -45,8 +45,11 @@ public class Bridges {
                 int l = 0;
                 while (l < bt.getSliceCount()) {
                     Character c = orientation == Orientation.X ? bt.getPaletteChar(x, l, z) : bt.getPaletteChar(z, l, x); // @todo general rotation system?
-                    BlockState b = ctx.paletteHere(compiledPalette, c);
-                    Palette.Info inf = compiledPalette.getInfo(c);
+                    // One lookup (LOAD.022). getInfo answers null for every version 2 marker, so
+                    // asking it here lost a version 2 bridge light silently.
+                    CompiledPalette.Placed placed = ctx.placedHere(compiledPalette, c);
+                    BlockState b = placed == null ? null : placed.state();
+                    Palette.Info inf = placed == null ? null : placed.info();
                     if (inf != null) {
                         if (inf.lightSource() != null) {
                             b = Parts.handleLightSource(ctx, feature, inf.lightSource(), b,

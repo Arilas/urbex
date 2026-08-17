@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.format.Diag;
 import net.minecraft.resources.Identifier;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -150,31 +151,30 @@ final class PaletteCharacterCheck {
             return;
         }
 
-        SortedSet<String> never = new TreeSet<>();
-        SortedSet<String> sometimes = new TreeSet<>();
         List<CompiledPalette> witnesses = null;
         for (Map.Entry<Character, Character> alias : aliases.entrySet()) {
+            // DIAG.009 verbatim from the catalogue, one per alias. Hand-writing the sentence here
+            // would make Diag.matches false for the very row MODEL.062 cites, and would put a test
+            // in the position of asserting a literal - which is the one thing every task in this
+            // stack has been held to. The <asset> slot names the style and the marker, which is
+            // 08-errors.md section 2's shape for a diagnostic about a marker of a named asset.
+            String location = "'" + style.getName() + "' marker '" + alias.getKey() + "'";
             if (!everything.isDefined(alias.getValue())) {
-                never.add("'" + alias.getKey() + "' -> '" + alias.getValue() + "'");
+                diagnostics.record("urbex:styles", style.getId(),
+                        Diag.DIAG_009.message(location, alias.getValue()));
                 continue;
             }
             if (witnesses == null) {
                 witnesses = witnesses(groups, null, null);
             }
             if (hasFailingSelection(alias.getValue(), witnesses)) {
-                sometimes.add("'" + alias.getKey() + "' -> '" + alias.getValue() + "'");
+                // LOAD.012's second half: present in the everything-merge, missing from a witness, so
+                // some draw fails. A warning rather than DIAG.009, because the pack generates
+                // correctly for the draws that do define it.
+                diagnostics.warn("urbex:styles", style.getId(), "aliases '" + alias.getKey()
+                        + "' to '" + alias.getValue() + "', which only some 'randompalettes' choices "
+                        + "define, so whether it resolves depends on the draw");
             }
-        }
-
-        if (!never.isEmpty()) {
-            diagnostics.record("urbex:styles", style.getId(), "declares alias(es) "
-                    + String.join(", ", never) + " whose target no palette of any 'randompalettes' "
-                    + "draw defines. Alias a marker that exists, or give this one a block of its own");
-        }
-        if (!sometimes.isEmpty()) {
-            diagnostics.warn("urbex:styles", style.getId(), "declares alias(es) "
-                    + String.join(", ", sometimes) + " whose target only some 'randompalettes' choices "
-                    + "define, so whether it resolves depends on the draw");
         }
     }
 

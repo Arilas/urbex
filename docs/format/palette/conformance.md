@@ -142,8 +142,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.090` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.094` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.091` | `MUST` |  |  | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
-| `TRAIT.095` | `MUST` |  |  | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitPhaseTest.aDecorationTraitBesideASelectionTraitIsNotRefusedForBeingBesideIt`, `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration` |
-| `TRAIT.096` | `MUST` |  |  | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt` |
+| `TRAIT.095` | `MUST` |  |  | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitPhaseTest.aDecorationTraitBesideASelectionTraitIsNotRefusedForBeingBesideIt`, `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem`, `MarkerTraitsComposeTest.selectionIsAppliedBeforeDecorationSoNbtIsQueuedAgainstTheBlockThatSurvives` |
+| `TRAIT.096` | `MUST` |  |  | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `MarkerTraitsComposeTest.selectionIsAppliedBeforeDecorationSoNbtIsQueuedAgainstTheBlockThatSurvives` |
 | `TRAIT.092` | `MUST NOT` |  |  | `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
 | `TRAIT.093` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
 

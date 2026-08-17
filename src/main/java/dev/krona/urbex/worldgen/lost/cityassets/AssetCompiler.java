@@ -126,9 +126,9 @@ public final class AssetCompiler {
         AssetIndex<Style> styles = AssetStage.compileAll(access,
                 CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(id, palettes, chain), diagnostics);
         AssetIndex<BuildingPart> parts = AssetStage.compileAll(access,
-                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(id, blockLookup, variants, palettes, chain), diagnostics);
+                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(id, blockLookup, variants, palettes, chain, v2Context), diagnostics);
         AssetIndex<Building> buildings = AssetStage.compileAll(access,
-                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(id, blockLookup, variants, palettes, chain), diagnostics);
+                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(id, blockLookup, variants, palettes, chain, v2Context), diagnostics);
         AssetIndex<MultiBuilding> multiBuildings = AssetStage.compileAll(access,
                 CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, (id, chain) -> new MultiBuilding(id, chain), diagnostics);
         AssetIndex<ScatteredBuilding> scattered = AssetStage.compileAll(access,

@@ -8,9 +8,13 @@ import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.MarkerTrait;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import dev.krona.urbex.format.palette.traits.OptionalTrait;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -177,18 +181,38 @@ class V2PackGoldenTest {
                 "'n' nests a weighted node inside a weighted node: andesite, diorite, granite");
         assertEquals(3, merged.getAll('p').size(),
                 "'p' is a tag source, expanded to its three members at load by MODEL.052");
-        assertEquals(merged.getAll('s'), merged.getAll('@'),
+        // '@' aliases 'w', which is three states. Replacing the alias with any literal block leaves one
+        // state, so this cannot be satisfied by a coincidence the way aliasing a plain block could.
+        assertEquals(merged.getAll('w'), merged.getAll('@'),
                 "'@' is an alias and resolves to exactly what its target resolves to");
-        assertEquals(2, merged.getAll('e').size(),
-                "'e' has three choices and one names a mod this installation does not have, so "
-                        + "WEIGHT.020's 'when' excluded it and two survive");
+        assertEquals(3, merged.getAll('@').size(),
+                "and its target is weighted, so a literal block written here would not pass");
 
-        assertNotNull(merged.placedAt('L', 1L, 0, 64, 0).info().lightSource(),
-                "'L' carries urbex:light, whose unlit satellite is a compiled entry");
+        // 'e' names three blocks this game HAS, one of them behind a `when` for a mod it does not.
+        // Naming an absent block instead would make the count identical whether the `when` is there or
+        // not, which is exactly what made the first version of this assertion vacuous.
+        assertEquals(2, merged.getAll('e').size(),
+                "WEIGHT.020's 'when' excluded the choice whose mod is absent, and two survive; all "
+                        + "three blocks exist, so removing the 'when' would make this three");
+
+        assertEquals(Blocks.IRON_BARS.defaultBlockState(),
+                merged.placedAt('L', 1L, 0, 64, 0).info().lightSource()
+                        .unlitAt(1L, BlockPos.ZERO),
+                "'L' carries urbex:light whose unlit satellite is a compiled entry - asserted as the "
+                        + "block the file named, because a satellite that had been dropped would leave "
+                        + "TRAIT.051's air default and still be non-null");
         assertTrue(merged.placedAt('T', 1L, 0, 64, 0).info().lightSource().isSocket(),
                 "'T' is a light_socket and became a LightPool");
-        assertNotNull(merged.canBeDamagedToIronBars(merged.placedAt('d', 1L, 0, 64, 0).state()),
+        assertEquals(Blocks.IRON_BARS.defaultBlockState(),
+                merged.canBeDamagedToIronBars(merged.placedAt('d', 1L, 0, 64, 0).state()),
                 "'d' reaches a satellite through a $ref into $defs");
+
+        // The two traits that never cross the seam, so the digest cannot see them.
+        CompiledEntry optional = compiled().entry('o');
+        assertTrue(optional.slot(0).traits().has(OptionalTrait.TYPE),
+                "'o' carries urbex:optional, which the decoration pass reads off the trait set");
+        assertFalse(compiled().entry('F').slot(0).traits().rotatable(),
+                "'F' opts out of rotation with TRAIT.071's false, which the part transform reads");
     }
 
     /** Everything the pack resolves to, hashed: marker, position, state, and what it carries. */
@@ -206,8 +230,30 @@ class V2PackGoldenTest {
                             .append(placed == null ? "-" : describe(placed)).append('\n');
                 }
             }
+            sink.append(marker).append(" damaged=")
+                    .append(damagedFor(merged, marker)).append('\n');
         }
         return sha256(sink.toString());
+    }
+
+    /**
+     * A marker's {@code urbex:damaged} form, appended so the golden can see it.
+     *
+     * <p>{@code urbex:damaged} is applied by the damage pass off a state-keyed map, so it never reaches
+     * {@link Palette.Info} and was invisible to the digest — deleting it from the pack changed nothing
+     * and the golden would have pinned its absence. A digest that cannot see a construct is not evidence
+     * about it, which is the whole reason this line exists.</p>
+     *
+     * <p>{@code urbex:optional} and {@code urbex:rotatable} are not here and cannot be: neither reaches
+     * this side of the seam at all — the first is read by the decoration pass off the compiled trait set
+     * and the second by the part transform — so they are asserted directly in
+     * {@link #everyConstructThePackClaimsToExerciseIsInTheCompiledPalette} instead, where a mutation
+     * does fail.</p>
+     */
+    private static String damagedFor(CompiledPalette merged, char marker) {
+        BlockState from = merged.getRepresentative(marker);
+        BlockState damaged = from == null ? null : merged.canBeDamagedToIronBars(from);
+        return damaged == null ? "-" : damaged.toString();
     }
 
     /** A slot's state and every trait that applies to it, in a form a diff can be read from. */
@@ -241,6 +287,12 @@ class V2PackGoldenTest {
      * stage no world reaches.</p>
      */
     private static CompiledPalette merged() {
+        return new CompiledPalette(Palette.version2(
+                Identifier.parse("urbex:every_kind_and_trait"), compiled()));
+    }
+
+    /** The compiled version 2 palette itself, for the traits that never cross the seam. */
+    private static CompiledV2Palette compiled() {
         Diagnostics diagnostics = new Diagnostics();
         PaletteV2Definition file = PaletteV2Definition.CODEC
                 .parse(JsonOps.INSTANCE, JsonParser.parseString(read()))
@@ -253,8 +305,7 @@ class V2PackGoldenTest {
                         "'urbex:every_kind_and_trait'", diagnostics))
                 .orElseThrow(() -> new AssertionError(
                         "the pack did not compile: " + diagnostics.asError().orElse("?")));
-        return new CompiledPalette(Palette.version2(
-                Identifier.parse("urbex:every_kind_and_trait"), compiled));
+        return compiled;
     }
 
     private static String read() {

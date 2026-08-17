@@ -141,6 +141,11 @@ public final class ChunkGenContext {
         return p.getAt(c, seed, driver.getX(), driver.getY(), driver.getZ());
     }
 
+    /** {@link #placedAt}, at the driver's current position. */
+    public CompiledPalette.Placed placedHere(CompiledPalette p, char c) {
+        return p.placedAt(c, seed, driver.getX(), driver.getY(), driver.getZ());
+    }
+
     /** Resolve a weighted palette character at a chunk-local position. */
     public net.minecraft.world.level.block.state.BlockState paletteAt(CompiledPalette p, char c, int x, int y, int z) {
         return p.getAt(c, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);

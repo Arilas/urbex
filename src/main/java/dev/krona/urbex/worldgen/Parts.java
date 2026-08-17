@@ -140,11 +140,17 @@ public class Parts {
                                 // a marker declaring both a light and a mob placed the light and lost
                                 // the spawner - silently, on every block it wrote. Traits compose
                                 // (TRAIT.004), and a list the palette computed once is what makes
-                                // composing them free here. See MarkerTrait for why this order is
-                                // 01-traits.md §4's, and for the specification defect that order
-                                // exposes rather than settles.
-                                for (MarkerTrait trait : inf.applied()) {
-                                    switch (trait) {
+                                // composing them free here. The order is TRAIT.095's phases -
+                                // selection, then decoration - so the light chooses the block before
+                                // anything attaches data to it; see MarkerTrait for what reversing
+                                // them breaks.
+                                // Indexed, not enhanced-for: this runs for every block carrying
+                                // metadata and an enhanced-for allocates an iterator per position -
+                                // in a loop whose whole reason for taking a precomputed list is that
+                                // it must not allocate here.
+                                List<MarkerTrait> traits = inf.applied();
+                                for (int t = 0; t < traits.size(); t++) {
+                                    switch (traits.get(t)) {
                                         case LOOT -> handleLoot(ctx, feature, info, part, b, inf);
                                         // ctx.region, not feature.provider.getWorld(): these write block
                                         // entity NBT into a chunk, which only the generating region has.

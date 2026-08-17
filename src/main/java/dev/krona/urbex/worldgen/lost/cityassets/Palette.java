@@ -479,7 +479,8 @@ public class Palette {
                        List<MarkerTrait> applied) {
 
         /**
-         * The traits these four fields amount to, in {@link MarkerTrait} order.
+         * The traits these four fields amount to, in {@link MarkerTrait} order - which is
+         * {@code TRAIT.095}'s phase order, selection before decoration.
          * <p>
          * The emptiness guards on {@code loot} and {@code mobId} are version 1's, kept exactly: the
          * {@code else if} chain this replaces tested {@code != null && !isEmpty()} for both and bare
@@ -491,6 +492,11 @@ public class Palette {
          */
         public static Info of(String mobId, String loot, LightSource lightSource, CompoundTag tag) {
             List<MarkerTrait> applied = new ArrayList<>(4);
+            // TRAIT.095's phase order: selection first, then the decorators. A decorator queued before
+            // the light would attach its data to the lit block that the light then replaces.
+            if (lightSource != null) {
+                applied.add(MarkerTrait.LIGHT);
+            }
             if (loot != null && !loot.isEmpty()) {
                 applied.add(MarkerTrait.LOOT);
             }
@@ -499,9 +505,6 @@ public class Palette {
             }
             if (tag != null) {
                 applied.add(MarkerTrait.BLOCK_ENTITY);
-            }
-            if (lightSource != null) {
-                applied.add(MarkerTrait.LIGHT);
             }
             return new Info(mobId, loot, lightSource, tag, List.copyOf(applied));
         }

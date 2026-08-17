@@ -23,11 +23,19 @@ public class CompiledPalette {
     /**
      * What a palette character resolves to.
      *
-     * <p>Two cases, and they were an {@code Object} recovered by {@code instanceof} at twelve
-     * lookups. That is exactly how {@code isSimple} rotted: it tested {@code instanceof Character},
-     * which matched neither case, so the bulk-fill fast path behind it was dead for as long as
-     * anyone had been reading the code (issue #33). A sealed type cannot be wrong about which cases
-     * exist, and the compiler checks each site instead of a reader doing it (issue #53).</p>
+     * <p>The cases were once an {@code Object} recovered by {@code instanceof} at twelve lookups. That
+     * is exactly how {@code isSimple} rotted: it tested {@code instanceof Character}, which matched
+     * neither case, so the bulk-fill fast path behind it was dead for as long as anyone had been
+     * reading the code (issue #33).</p>
+     *
+     * <p><b>What a sealed type actually buys, stated precisely, because the imprecise version cost a
+     * second recurrence.</b> It makes an <em>exhaustive switch</em> checkable: add a case and every
+     * {@code switch} over the type becomes a compile error until it is handled. It does <b>nothing</b>
+     * for an {@code instanceof} against one case, which keeps compiling and quietly answers
+     * {@code false} for the case that was added. {@code isSimple} was written as such an
+     * {@code instanceof}, and when {@link Entry.V2} arrived it silently excluded the whole of version 2
+     * from the fast path. Same method, same failure, ten months apart. Prefer a {@code switch} here
+     * even where one arm would do.</p>
      */
     public sealed interface Entry {
 
@@ -293,6 +301,17 @@ public class CompiledPalette {
         }
 
         for (Palette p : palettes) {
+            // Version 2's damage mapping is recorded here, in the same pass and the same palette order
+            // as version 1's, so that a later palette of a draw wins whichever format it is written in.
+            // Recording it in the first pass instead - which is where it was - made a version 1 mapping
+            // beat a version 2 one for the same state regardless of draw order, which is a precedence
+            // the merge does not have anywhere else.
+            if (p != null && p.v2() != null) {
+                for (Marker marker : p.v2().markers()) {
+                    recordDamage(p.v2().entry(marker.codepoint()));
+                }
+                continue;
+            }
             if (p != null) {
                 for (Map.Entry<BlockState, BlockState> entry : p.getDamaged().entrySet()) {
                     BlockState c = entry.getKey();
@@ -328,7 +347,6 @@ public class CompiledPalette {
             CompiledEntry entry = compiled.entry(marker.codepoint());
             define(c, new Entry.V2(entry, slotsOf(entry)));
             information.remove(c);
-            recordDamage(entry);
         }
         // The aliases this palette could not answer are answered by the merge, once every palette of it
         // has contributed - MODEL.064. Recorded now and resolved in the pass below, so that an alias
@@ -346,7 +364,9 @@ public class CompiledPalette {
      */
     private static Placed[] slotsOf(CompiledEntry entry) {
         if (entry.isSocket()) {
-            Palette.Info info = V2Traits.infoOf(TraitSet.EMPTY, entry);
+            // The socket's own traits, not an empty set: TRAIT.055's socket-level unlit lives there,
+            // and so does any decoration trait written on the socket node.
+            Palette.Info info = V2Traits.infoOf(entry.ownTraits(), entry);
             LightSource source = info == null ? null : info.lightSource();
             BlockState representative = source == null || source.pool() == null
                     ? Blocks.AIR.defaultBlockState() : source.pool().representative();

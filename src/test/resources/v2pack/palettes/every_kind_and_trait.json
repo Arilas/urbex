@@ -40,7 +40,7 @@
 
     "p": { "kind": "tag", "tag": "#minecraft:planks" },
 
-    "@": { "kind": "alias", "of": "s" },
+    "@": { "kind": "alias", "of": "w" },
 
     "d": { "$ref": "damageable", "block": "minecraft:bricks" },
 
@@ -48,7 +48,7 @@
       "kind": "weighted",
       "choices": [
         { "weight": 1, "block": "minecraft:cracked_stone_bricks" },
-        { "weight": 1, "block": "create:andesite_casing", "when": { "mod": "create" } },
+        { "weight": 1, "block": "minecraft:polished_andesite", "when": { "mod": "create" } },
         { "weight": 1, "block": "minecraft:chiseled_stone_bricks",
           "when": { "pack": "urbex" } }
       ]

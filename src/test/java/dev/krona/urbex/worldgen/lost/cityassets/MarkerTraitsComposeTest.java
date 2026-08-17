@@ -28,22 +28,61 @@ class MarkerTraitsComposeTest {
     void aMarkerCarryingBothALightAndAMobAppliesBothRatherThanOnlyTheFirstOne() {
         Palette.Info both = Palette.Info.of("urbex:easymobs", null, inPlaceLight(), null);
 
-        assertEquals(List.of(MarkerTrait.SPAWNER, MarkerTrait.LIGHT), both.applied(),
+        assertEquals(List.of(MarkerTrait.LIGHT, MarkerTrait.SPAWNER), both.applied(),
                 "a spawner beside a light must apply both traits; the else-if chain this replaces "
                         + "applied the light and lost the mob");
     }
 
     @Rule("TRAIT.004")
+    @Rule("TRAIT.095")
     @Test
     void aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem() {
         Palette.Info everything =
                 Palette.Info.of("urbex:easymobs", "urbex:chest", inPlaceLight(), NBT);
 
         assertEquals(
-                List.of(MarkerTrait.LOOT, MarkerTrait.SPAWNER, MarkerTrait.BLOCK_ENTITY,
-                        MarkerTrait.LIGHT),
+                List.of(MarkerTrait.LIGHT, MarkerTrait.LOOT, MarkerTrait.SPAWNER,
+                        MarkerTrait.BLOCK_ENTITY),
                 everything.applied(),
-                "the order is 01-traits.md §4's, read off the specification rather than chosen");
+                "TRAIT.095's phase order: selection first, then the three decorators");
+    }
+
+    /**
+     * {@code TRAIT.095} and {@code TRAIT.096}, asserted over the list rather than over a world.
+     *
+     * <p>This is the assertion the phase order needs and a golden cannot give it. No marker in the
+     * shipped pack carries two of the four traits, so inverting the order moves nothing measurable -
+     * and the order <em>was</em> inverted for the length of this task, because this enum was written in
+     * {@code 01-traits.md} §4's section order before {@code TRAIT.095} existed and was not brought into
+     * line when it did.</p>
+     *
+     * <p>What inverting it costs, concretely: {@code Parts.handleBlockEntity} derives the block entity
+     * type from the block it is handed and queues NBT for it. Run before the light, it queues against
+     * the <em>lit</em> block, the light then swaps in its {@code unlit} replacement, and
+     * {@code Parts.forgetBlockEntities} discards the orphaned data - silently. That would make
+     * {@code TRAIT.044}'s accept case, a campfire whose unlit replacement is a barrel, a promise the
+     * loader checks and the generator breaks.</p>
+     */
+    @Rule("TRAIT.095")
+    @Rule("TRAIT.096")
+    @Test
+    void selectionIsAppliedBeforeDecorationSoNbtIsQueuedAgainstTheBlockThatSurvives() {
+        Palette.Info info = Palette.Info.of(null, null, inPlaceLight(), NBT);
+
+        assertEquals(List.of(MarkerTrait.LIGHT, MarkerTrait.BLOCK_ENTITY), info.applied());
+        assertTrue(info.applied().indexOf(MarkerTrait.LIGHT)
+                        < info.applied().indexOf(MarkerTrait.BLOCK_ENTITY),
+                "TRAIT.096: a decoration trait applies to the state selection produced, so the light "
+                        + "must have chosen the block before the NBT is attached to it");
+    }
+
+    @Test
+    void everySelectionTraitPrecedesEveryDecorationTraitWhateverTheMarkerCarries() {
+        List<MarkerTrait> all = Palette.Info.of("urbex:easymobs", "urbex:chest", inPlaceLight(), NBT)
+                .applied();
+
+        assertEquals(0, all.indexOf(MarkerTrait.LIGHT),
+                "the only selection trait leads, and TRAIT.095 forbids anything preceding it: " + all);
     }
 
     @Test

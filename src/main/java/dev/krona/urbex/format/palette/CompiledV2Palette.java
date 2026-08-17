@@ -102,7 +102,11 @@ public final class CompiledV2Palette {
             Map<Kind.Placement, CompiledEntry> placements = new LinkedHashMap<>();
             base.placements().forEach((placement, entry) ->
                     placements.put(placement, CompiledEntry.of(overlaid(entry, own, interned))));
-            return CompiledEntry.socket(placements);
+            Map<Identifier, CompiledTrait> merged = new LinkedHashMap<>(base.ownTraits().traits());
+            merged.putAll(own.traits());
+            TraitSet built = TraitSet.of(merged);
+            return CompiledEntry.socket(placements,
+                    interned.computeIfAbsent(built, java.util.function.Function.identity()));
         }
         return CompiledEntry.of(overlaid(base, own, interned));
     }
@@ -438,7 +442,11 @@ public final class CompiledV2Palette {
                         }
                         placements.put(list.getKey(), CompiledEntry.of(slots.get()));
                     }
-                    yield ok ? Optional.of(CompiledEntry.socket(placements)) : Optional.empty();
+                    // The socket's own traits, compiled once, because it has no slots to keep them on.
+                    yield ok
+                            ? traitSet(node.traits(), site).map(own ->
+                                    CompiledEntry.socket(placements, own))
+                            : Optional.empty();
                 }
                 case ResolvedNode.Source.Weighted weighted ->
                         weightedSlots(weighted.choices(), site).map(CompiledEntry::of);
