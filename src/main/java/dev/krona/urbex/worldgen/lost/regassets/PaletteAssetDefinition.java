@@ -1,10 +1,7 @@
 package dev.krona.urbex.worldgen.lost.regassets;
 
-import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
-import com.mojang.serialization.Dynamic;
-import com.mojang.serialization.DynamicOps;
 import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.format.Versioned;
@@ -14,7 +11,6 @@ import net.minecraft.resources.Identifier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * A registered palette, in whichever format version its file declares.
@@ -59,58 +55,48 @@ public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
             PaletteV2Definition.FORMAT_VERSION, PaletteV2Definition.CODEC));
 
     /**
-     * The codec for a palette written inline in a part or building: version 1, and loudly nothing else.
+     * The codec for a palette written inline in a part or building: the same dispatcher, plus the one
+     * thing an inline palette may not do.
      * <p>
-     * {@code VER.014}. {@code MERGE.011} says an inline palette is read by the rules of the version it
-     * declares, and nothing reads an inline version 2 palette yet - the registry is where the dispatcher
-     * lives. The two answers available in the meantime were to refuse a declared {@code version} by name
-     * or to leave the field on {@code PaletteDefinition.CODEC}, which ignores keys it does not know: an
-     * inline version 2 palette would then have decoded to a palette holding none of the markers its
-     * author wrote, with no message. That is the silent misreading {@code VER.003} removes at the
-     * registry level, and it would have survived here until inline version 2 support landed.
+     * {@code MERGE.011} is what this is: "A palette written inline in a part or building declares
+     * {@code version}, and is read by the rules of the version it declares." So it is {@link #CODEC},
+     * and an inline version 2 palette gets the version 2 codec - which is what makes {@code MERGE.012}
+     * true as well, since {@code $imports} and {@code $defs} are that codec's keys and there is nothing
+     * here to withhold them. Until this task the field was the version 1 codec with a refusal in front
+     * of it ({@code VER.014}, now retired with a tombstone): version 2 could be named and not read, and
+     * naming it by name was better than handing it to a codec that ignores keys it does not know.
      * <p>
-     * {@code "version": 1} is accepted, because it is true and is honoured - version 1 is exactly what
-     * this codec reads. Only a version it cannot read is refused. This whole field goes away with
-     * {@code VER.014}, which is marked {@code [DEPRECATED → MERGE.011]} for that reason.
+     * {@code MERGE.009} is the addition: {@code extends} inside an inline palette is refused, because
+     * "an inline palette is not a registry entry, so nothing can resolve the link". Refused here for a
+     * version 2 palette and at compile time for a version 1 one - see
+     * {@link dev.krona.urbex.worldgen.lost.cityassets.Palette#inline}, which has refused it since long
+     * before this catalogue existed. Both raise {@code DIAG.031}; they differ only in when, and the
+     * reason they differ is {@code VER.004}: version 1 does not become stricter, and moving its refusal
+     * from compile to decode would refuse one file that loads today - a part whose inline palette
+     * declares {@code extends} and whose descendant replaces it with {@code refpalette}, where the
+     * inherited inline block is dropped before anything compiles it.
      */
-    Codec<PaletteDefinition> INLINE_CODEC = new Codec<>() {
-        @Override
-        public <T> DataResult<Pair<PaletteDefinition, T>> decode(DynamicOps<T> ops, T input) {
-            Optional<Dynamic<T>> version = new Dynamic<>(ops, input).get("version").result();
-            if (version.isPresent() && !isVersionOne(version.get())) {
-                Object written = version.get().getValue();
-                return DataResult.error(() -> Diag.DIAG_062.message(
-                        Diagnostics.INLINE_OWNER_LOCATION, written));
-            }
-            return PaletteDefinition.CODEC.decode(ops, input);
-        }
-
-        @Override
-        public <T> DataResult<T> encode(PaletteDefinition input, DynamicOps<T> ops, T prefix) {
-            return PaletteDefinition.CODEC.encode(input, ops, prefix);
-        }
-
-        @Override
-        public String toString() {
-            return PaletteDefinition.CODEC + "[inline, version 1 only]";
-        }
-    };
-
-    /** A declared {@code version} this codec can honour, which is 1 and nothing else. */
-    private static boolean isVersionOne(Dynamic<?> version) {
-        return version.asNumber().result().filter(number -> number.intValue() == 1
-                && number.doubleValue() == number.intValue()).isPresent();
-    }
+    Codec<PaletteAssetDefinition> INLINE_CODEC = CODEC.validate(palette ->
+            palette.formatVersion() == 1 || palette.getExtends().isEmpty()
+                    ? DataResult.success(palette)
+                    : DataResult.error(() -> Diag.DIAG_031.message(
+                            Diagnostics.INLINE_OWNER_LOCATION,
+                            "'" + palette.getExtends().orElseThrow() + "'",
+                            Diagnostics.INLINE_OWNER_LOCATION)));
 
     /**
      * One {@code extends} chain, as version 1 entries, refusing the chain if any link is version 2.
      * <p>
      * {@code VER.015}, and it is a catalogued refusal ({@code DIAG.063}) rather than a bare exception
      * because this is the <em>likely</em> path, not an edge: an author adopting version 2 today writes a
-     * registry palette, and the registry palette is the one that reaches here. It is the same
-     * transitional gap {@code VER.014} covers for an inline palette, and it gets the same treatment,
-     * with one thing {@code DIAG.062} cannot manage - the message names the asset id, because this runs
-     * where the id is known rather than inside a codec that is handed only a document.
+     * registry palette, and the registry palette is the one that reaches here. The message names the
+     * asset id, because this runs where the id is known rather than inside a codec that is handed only a
+     * document.
+     * <p>
+     * It reaches an <b>inline</b> palette too, since {@code MERGE.011} let one declare version 2:
+     * {@link dev.krona.urbex.worldgen.lost.cityassets.Palette#inline} calls this with the owner's id, so
+     * a part carrying a version 2 palette decodes - which is what the rule asks for - and then says why
+     * it cannot yet be compiled, rather than being read as a palette with no markers.
      * <p>
      * A version 2 palette decodes as of this task and compiles as of a later one. Between the two,
      * dropping the entry would give the pack a palette with no markers and casting would give a

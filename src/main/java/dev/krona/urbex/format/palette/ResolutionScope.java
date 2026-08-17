@@ -4,6 +4,8 @@ import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import net.minecraft.resources.Identifier;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -22,7 +24,7 @@ import java.util.Optional;
  * <p>
  * {@code inherited} is the one component that is per-entry rather than per-document, because
  * {@code REF.061} says so: "{@code $super} is scoped to the entry it appears in". The file-level pass
- * builds one scope per entry with {@link #withInherited}.
+ * builds one scope per entry with {@link #forEntry}.
  *
  * @param document  the document the node being resolved was written in
  * @param registry  the {@code definitions} registry ({@code REF.010})
@@ -30,13 +32,13 @@ import java.util.Optional;
  *                  {@code LOAD.025} is why this is a map of decoded documents and not a loader
  *                  callback: "stage 2 runs for every palette before stage 3 runs for any"
  * @param inherited what this entry inherited through {@code extends}, which {@code $super} names
- *                  ({@code REF.060}). Always empty until the {@code extends} chain is merged - a file
- *                  that declares no {@code extends} inherits nothing, and {@code REF.062} refuses
- *                  {@code $super} in it
+ *                  ({@code REF.060}). Empty for an entry no earlier file of the chain declared, and
+ *                  for every entry of a file that declares no {@code extends} - the two cases
+ *                  {@code REF.062} refuses and {@code DIAG.036} tells apart
  */
 public record ResolutionScope(Document document, DefinitionIndex registry,
                               Map<Identifier, PaletteV2Definition> palettes,
-                              Optional<RawNode> inherited) {
+                              Optional<MergedEntry> inherited) {
 
     /**
      * The three things {@code REF.086} and {@code REF.011} make file-local, plus the file's identity.
@@ -47,29 +49,66 @@ public record ResolutionScope(Document document, DefinitionIndex registry,
      * @param extendsId {@code extends}, needed only to tell {@code DIAG.036}'s two cases apart: a file
      *                  that declares no {@code extends} inherits nothing at all, and a file that
      *                  declares one may still inherit nothing for this particular entry
-     * @param imports   {@code $imports}, alias name to prefix ({@code REF.080}), file-local by
-     *                  {@code REF.086}
-     * @param defs      {@code $defs}, as decoded ({@code REF.001})
+     * @param imports   {@code $imports} of the file at the end of this document's chain, alias name to
+     *                  prefix ({@code REF.080}). File-local by {@code REF.086}, which is why an entry
+     *                  declared further up the chain overrides it with its own through
+     *                  {@link #withImports}
+     * @param defs      {@code $defs}, merged along the chain ({@code MERGE.003}) and each entry
+     *                  carrying the file that wrote it ({@code REF.001}, {@code REF.011})
      */
     public record Document(Optional<Identifier> id, Optional<Identifier> extendsId,
-                           Map<String, String> imports, Map<String, RawNode> defs) {
+                           Map<String, String> imports, Map<String, MergedEntry> defs) {
 
         public Document(Optional<Identifier> id, Optional<Identifier> extendsId,
-                        Map<String, String> imports, Map<String, RawNode> defs) {
+                        Map<String, String> imports, Map<String, MergedEntry> defs) {
             this.id = id;
             this.extendsId = extendsId;
             this.imports = Map.copyOf(imports);
-            this.defs = Map.copyOf(defs);
+            // Insertion order, not Map.copyOf: REF.032 names a cycle "in declaration order, beginning
+            // with the node the loader reached first", and the pass that finds one walks these entries
+            // in the order this map yields them. Map.copyOf's order is salted once per JVM, so the same
+            // palette would name its cycle starting from a different definition on a different run -
+            // the same defect Kind.Placement.ordered fixed for a node's placement lists.
+            this.defs = Collections.unmodifiableMap(new LinkedHashMap<>(defs));
         }
 
         /** The palette file being loaded, whose id nothing at this stage knows. */
         public static Document of(PaletteV2Definition file) {
-            return new Document(Optional.empty(), file.extendsId(), file.imports(), file.defs());
+            return new Document(Optional.empty(), file.extendsId(), file.imports(),
+                    entries(file));
         }
 
         /** A palette a pointer reached into, which does have an id. */
         public static Document of(Identifier id, PaletteV2Definition file) {
-            return new Document(Optional.of(id), file.extendsId(), file.imports(), file.defs());
+            return new Document(Optional.of(id), file.extendsId(), file.imports(), entries(file));
+        }
+
+        /**
+         * One file's {@code $defs}, as entries of a chain of one.
+         * <p>
+         * A pointer into another palette reads that palette as decoded, so its definitions inherit
+         * nothing here. {@code REF.044} says a fragment resolves against the target's document "after
+         * its own {@code extends} chain is applied", which this does not yet do: nothing merges the
+         * chain of an asset that is only <em>pointed at</em>, because the map of decoded palettes a
+         * pointer reaches into holds documents rather than chains. Recorded here rather than silently
+         * approximated; it is the loader stage's to close, with {@code LOAD.025}.
+         */
+        private static Map<String, MergedEntry> entries(PaletteV2Definition file) {
+            Map<String, MergedEntry> defs = new LinkedHashMap<>();
+            file.defs().forEach((name, node) ->
+                    defs.put(name, MergedEntry.of(node, file.imports())));
+            return defs;
+        }
+
+        /**
+         * The same document, reading an entry whose file declared {@code imports} ({@code REF.086}).
+         * <p>
+         * The document's identity does not change with it, and that is the point: the merged palette is
+         * one document with one set of names, and only alias expansion is per-file. Giving an ancestor's
+         * entry its own document would give one {@code $defs} name two keys in {@code REF.032}'s graph.
+         */
+        public Document withImports(Map<String, String> imports) {
+            return new Document(id, extendsId, imports, defs);
         }
 
         /**
@@ -121,13 +160,27 @@ public record ResolutionScope(Document document, DefinitionIndex registry,
     }
 
     /** The same document, resolving {@code $super} against {@code inherited} ({@code REF.061}). */
-    public ResolutionScope withInherited(Optional<RawNode> inherited) {
+    public ResolutionScope withInherited(Optional<MergedEntry> inherited) {
         return new ResolutionScope(document, registry, palettes, inherited);
+    }
+
+    /**
+     * The scope one entry of this document resolves in.
+     * <p>
+     * The two things a merged palette keeps per entry, applied together: the {@code $imports} of the
+     * file that wrote it ({@code REF.086}) and the layer it replaced, which its {@code $super} names
+     * ({@code REF.060}, {@code REF.061}). Every caller that reaches an entry - the file-level pass, a
+     * bare-name pointer, {@code $super} itself - goes through here, so the two cannot be applied in one
+     * place and forgotten in another.
+     */
+    public ResolutionScope forEntry(MergedEntry entry) {
+        return new ResolutionScope(document.withImports(entry.imports()), registry, palettes,
+                entry.inherited());
     }
 
     public ResolutionScope(Document document, DefinitionIndex registry,
                            Map<Identifier, PaletteV2Definition> palettes,
-                           Optional<RawNode> inherited) {
+                           Optional<MergedEntry> inherited) {
         this.document = document;
         this.registry = registry;
         this.palettes = Map.copyOf(palettes);

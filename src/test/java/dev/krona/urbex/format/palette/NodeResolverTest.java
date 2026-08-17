@@ -494,9 +494,11 @@ class NodeResolverTest {
      * {@code REF.060}: {@code $super} names the inherited value, once there is one.
      * <p>
      * Driven through {@link ResolutionScope#withInherited} rather than through an {@code extends} chain,
-     * because the chain is Task 4's and this is the seam it fills. What is asserted is the half this task
-     * owns: given an inherited node, {@code $super} resolves to it, and a key beside the {@code $ref}
-     * still replaces its own key by {@code REF.003} - which is {@code MERGE.005}'s whole mechanism.
+     * which is what the single-node entry point can do: given an inherited value, {@code $super} resolves
+     * to it, and a key beside the {@code $ref} still replaces its own key by {@code REF.003} - which is
+     * {@code MERGE.005}'s whole mechanism. The chain that <em>produces</em> that value, and
+     * {@code MERGE.005}'s own fixture over it, are {@code V2ChainTest}'s; this pins the seam itself, so a
+     * caller holding one node and one inherited value keeps working whether or not a chain built them.
      */
     @Test
     @Rule("REF.060")
@@ -508,7 +510,8 @@ class NodeResolverTest {
                 """);
         RawNode inherited = RawNode.CODEC.parse(JsonOps.INSTANCE,
                 JsonParser.parseString("\"minecraft:oak_door[facing=north]\"")).getOrThrow();
-        ResolutionScope scope = ResolutionScope.of(file).withInherited(Optional.of(inherited));
+        ResolutionScope scope = ResolutionScope.of(file)
+                .withInherited(Optional.of(MergedEntry.of(inherited)));
 
         Diagnostics diagnostics = new Diagnostics();
         ResolvedNode resolved = NodeResolver.resolve(
@@ -943,8 +946,9 @@ class NodeResolverTest {
      * {@code DIAG.034}, {@code DIAG.036}, {@code DIAG.037} and {@code DIAG.039} - reached it through
      * {@code nested(String)} instead, whose whole meaning is a failure that <em>has</em> no row, so
      * {@code all()} was quietly not what it said. Swept rather than asserted one at a time, because the
-     * failure mode is a new row added down the same path: Task 4 puts {@code DIAG.031} and
-     * {@code DIAG.038} there.
+     * failure mode is a new row added down the same path: {@code DIAG.002} arrived that way with the
+     * {@code extends} merge, and is in the sweep below. {@code DIAG.031} and {@code DIAG.038} did not -
+     * one is a codec's refusal and the other a chain's, and neither holds a {@link Diagnostics}.
      */
     @Test
     @Rule("DIAG.903")
@@ -975,6 +979,11 @@ class NodeResolverTest {
         byRow.put(Diag.DIAG_011, """
                 { "version": 2, "$defs": { "d": { "traits": {} } },
                   "palette": { "X": { "$ref": "d" } } }
+                """);
+        // MERGE.007, raised by the merge this resolution now goes through: a file with no 'palette' is
+        // a chain of one that declares none anywhere.
+        byRow.put(Diag.DIAG_002, """
+                { "version": 2, "$defs": { "d": { "block": "minecraft:stone" } } }
                 """);
 
         byRow.forEach((expected, json) -> {

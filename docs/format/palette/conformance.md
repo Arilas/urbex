@@ -18,12 +18,12 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
 | `DIAG` | 54 | 0 |
-| `VER` | 24 | 4 |
-| **total** | **303** | **75** |
+| `VER` | 24 | 3 |
+| **total** | **303** | **74** |
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (109):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.070`, `MODEL.073`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.033`, `REF.035`, `REF.063`, `REF.074`, `REF.075`, `MERGE.001`, `MERGE.002`, `MERGE.003`, `MERGE.004`, `MERGE.008`, `MERGE.011`, `WEIGHT.012`, `WEIGHT.015`, `WEIGHT.016`, `WEIGHT.018`, `WEIGHT.022`, `WEIGHT.023`, `WEIGHT.025`, `WEIGHT.031`, `WEIGHT.040`, `WEIGHT.041`, `WEIGHT.042`, `WEIGHT.043`, `WEIGHT.050`, `WEIGHT.051`, `WEIGHT.052`, `WEIGHT.053`, `WEIGHT.060`, `WEIGHT.061`, `WEIGHT.062`, `WEIGHT.064`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (101):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.070`, `MODEL.073`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `WEIGHT.012`, `WEIGHT.015`, `WEIGHT.016`, `WEIGHT.018`, `WEIGHT.022`, `WEIGHT.023`, `WEIGHT.025`, `WEIGHT.031`, `WEIGHT.040`, `WEIGHT.041`, `WEIGHT.042`, `WEIGHT.043`, `WEIGHT.050`, `WEIGHT.051`, `WEIGHT.052`, `WEIGHT.053`, `WEIGHT.060`, `WEIGHT.061`, `WEIGHT.062`, `WEIGHT.064`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 96 of 303 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 109 of 303 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -166,8 +166,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.022` | `MUST NOT` |  |  | `NodeResolverTest.anyOperandAnywhereInsideATraitIsRefused` |
 | `REF.030` | `MUST` |  |  | `NodeResolverTest.noResolvedNodeHoldsAPointerOrADefinitionName` |
 | `REF.031` | `MUST` |  |  | `NodeResolverTest.aChainResolvesWhateverOrderItsLinksAreDeclaredIn` |
-| `REF.032` | `REJECT` | `DIAG.032` | `reject=DIAG.032` | `NodeResolverTest.aReferenceCycleIsRefusedNamingEveryNodeInIt`, `NodeResolverTest.aSelfReferenceIsACycleOfOne` |
-| `REF.033` | `MUST` |  |  | — |
+| `REF.032` | `REJECT` | `DIAG.032` | `reject=DIAG.032` | `NodeResolverTest.aReferenceCycleIsRefusedNamingEveryNodeInIt`, `NodeResolverTest.aSelfReferenceIsACycleOfOne`, `V2ChainTest.aCycleThroughRefAndExtendsTogetherIsOneCycle` |
+| `REF.033` | `MUST` |  |  | `V2ChainTest.aCycleThroughRefAndExtendsTogetherIsOneCycle` |
 | `REF.034` | `INVARIANT` |  |  | `NodeResolverTest.noResolvedNodeHoldsAPointerOrADefinitionName` |
 | `REF.035` | `INVARIANT` |  |  | — |
 
@@ -189,11 +189,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.054` | `MUST NOT` |  |  | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem` |
 | `REF.055` | `REJECT` | `DIAG.072` | `reject=DIAG.072` | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem`, `NodeResolverTest.aFilterKeyThatNamesNoKeyOfANodeIsRefused` |
 | `REF.056` | `REJECT` | `DIAG.073` | `reject=DIAG.073` | `NodeResolverTest.aFilterWithNoReferenceIsRefused` |
-| `REF.060` | `MUST` |  |  | `NodeResolverTest.superResolvesToTheInheritedValue` |
-| `REF.061` | `MUST` |  |  | `PointerTest.superMayCarryAFragmentAfterIt` |
-| `REF.062` | `REJECT` | `DIAG.036` | *n/a* | `NodeResolverTest.superInAnEntryThatInheritsNothingIsRefused` |
-| `REF.063` | `MUST NOT` |  |  | — |
-| `REF.070` | `MUST` |  | `accept` | `NodeResolverTest.aSpreadIsReplacedByTheElementsOfTheListItNames` |
+| `REF.060` | `MUST` |  |  | `NodeResolverTest.superResolvesToTheInheritedValue`, `V2ChainTest.anEntryReplacesWhatItInheritsUnlessItNamesItWithSuper` |
+| `REF.061` | `MUST` |  |  | `PointerTest.superMayCarryAFragmentAfterIt`, `V2ChainTest.superIsUsableAsTheBaseOfAFragment`, `V2ChainTest.superFollowsADeepChainOneLayerAtATime` |
+| `REF.062` | `REJECT` | `DIAG.036` | *n/a* | `NodeResolverTest.superInAnEntryThatInheritsNothingIsRefused`, `V2ChainTest.superInAnEntryNoAncestorDeclaresIsRefused` |
+| `REF.063` | `MUST NOT` |  |  | `V2ChainTest.superNamesWhatIsInheritedRatherThanANamedAncestor` |
+| `REF.070` | `MUST` |  | `accept` | `NodeResolverTest.aSpreadIsReplacedByTheElementsOfTheListItNames`, `V2ChainTest.superIsUsableAsTheBaseOfAFragment` |
 | `REF.071` | `REJECT` | `DIAG.037` | `reject=DIAG.037` | `NodeResolverTest.aSpreadNamingSomethingOtherThanAListIsRefused` |
 | `REF.072` | `MUST` |  |  | `NodeResolverTest.aSpreadElementCarriesNoOtherKey`, `PaletteV2DecodeTest.aSpreadElementCarriesNoOtherKey` |
 | `REF.073` | `MUST` |  |  | `NodeResolverTest.elementsBeforeAndAfterASpreadKeepTheirPlaces` |
@@ -205,24 +205,24 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.083` | `REJECT` | `DIAG.039` | `reject=DIAG.039` | `PointerTest.anUnknownAliasIsRefusedRatherThanReadAsALocalName` |
 | `REF.084` | `MUST NOT` |  |  | `PointerTest.aBareNameMayNotContainASlashOrBeginWithADollar` |
 | `REF.085` | `MUST` |  |  | `PointerTest.aDiagnosticAboutAnExpandedPointerShowsTheExpansionAndTheWrittenForm` |
-| `REF.086` | `MUST` |  |  | `ImportsTest.anAliasIsNotLentToTheFileAPointerReachesInto`, `NodeResolverTest.aPointedAtNodeResolvesItsOwnDocumentsNamesAndImports` |
+| `REF.086` | `MUST` |  |  | `ImportsTest.anAliasIsNotLentToTheFileAPointerReachesInto`, `NodeResolverTest.aPointedAtNodeResolvesItsOwnDocumentsNamesAndImports`, `V2ChainTest.importsAreNotInheritedThoughAnAncestorsOwnPointersStillResolve` |
 
 ### `palette/04-merging.md`
 
 | Rule | Class | Diagnostic | Fixtures | Tests |
 |---|---|---|---|---|
-| `MERGE.001` | `MUST` |  |  | — |
-| `MERGE.002` | `MUST` |  |  | — |
-| `MERGE.003` | `MUST` |  |  | — |
-| `MERGE.004` | `MUST` |  |  | — |
-| `MERGE.005` | `MUST` |  | `accept` | `NodeResolverTest.superResolvesToTheInheritedValue` |
-| `MERGE.006` | `MUST` |  | `accept` | — |
-| `MERGE.007` | `REJECT` | `DIAG.002` | `reject=DIAG.002` | — |
-| `MERGE.008` | `MUST` |  |  | — |
-| `MERGE.011` | `MUST` |  |  | — |
-| `MERGE.012` | `ACCEPT` |  | *n/a* | — |
-| `MERGE.009` | `REJECT` | `DIAG.031` | `reject=DIAG.031` | — |
-| `MERGE.010` | `ACCEPT` |  | *n/a* | — |
+| `MERGE.001` | `MUST` |  |  | `V2ChainTest.aChildRepaintsTheMarkersItDeclaresAndLeavesTheRestAlone`, `V2ChainTest.superFollowsADeepChainOneLayerAtATime` |
+| `MERGE.002` | `MUST` |  |  | `V2ChainTest.aChildRepaintsTheMarkersItDeclaresAndLeavesTheRestAlone` |
+| `MERGE.003` | `MUST` |  |  | `V2ChainTest.definitionsMergeByNameTheSameWayMarkersDo` |
+| `MERGE.004` | `MUST` |  |  | `V2ChainTest.anOverriddenMarkerTakesItsTraitsWithIt` |
+| `MERGE.005` | `MUST` |  | `accept` | `NodeResolverTest.superResolvesToTheInheritedValue`, `V2ChainTest.anEntryReplacesWhatItInheritsUnlessItNamesItWithSuper` |
+| `MERGE.006` | `MUST` |  | `accept` | `V2ChainTest.redefiningADefinitionRepaintsEveryMarkerThatReferencesIt` |
+| `MERGE.007` | `REJECT` | `DIAG.002` | `reject=DIAG.002` | `V2ChainTest.aPaletteIsRequiredSomewhereInTheChainAndNotInEveryFile` |
+| `MERGE.008` | `MUST` |  |  | `V2ChainTest.anOverriddenMarkerTakesItsTraitsWithIt` |
+| `MERGE.011` | `MUST` |  |  | `VersionDispatchTest.anInlinePaletteIsReadByTheVersionItDeclares` |
+| `MERGE.012` | `ACCEPT` |  | *n/a* | `VersionDispatchTest.anInlinePaletteMayCarryImportsAndDefs` |
+| `MERGE.009` | `REJECT` | `DIAG.031` | `reject=DIAG.031` | `VersionDispatchTest.extendsInsideAnInlineVersionTwoPaletteIsRefused` |
+| `MERGE.010` | `ACCEPT` |  | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
 
 ### `palette/05-weights.md`
 
@@ -381,11 +381,10 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.002` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `VersionDispatchTest.versionTwoSelectsTheVersionTwoRulesInFull` |
 | `VER.003` | `MUST` |  |  | `VersionDispatchTest.aVersionTwoDocumentIsNeverHandedToTheVersionOneCodec` |
 | `VER.004` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt` |
-| `VER.005` | `REJECT` | `DIAG.038` | *n/a* | — |
+| `VER.005` | `REJECT` | `DIAG.038` | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
 | `VER.006` | `ACCEPT` |  | *n/a* | — |
 | `VER.007` | `MUST` |  |  | — |
 | `VER.013` | `ACCEPT` |  | *n/a* | — |
-| `VER.014` | `REJECT` | `DIAG.062` | `reject=DIAG.062` | `VersionDispatchTest.anInlinePaletteDeclaringVersionTwoIsRefusedRatherThanReadAsVersionOne` |
 | `VER.015` | `REJECT` | `DIAG.063` | *n/a* | `VersionDispatchTest.aRegisteredVersionTwoPaletteIsRefusedWhereItIsCompiled` |
 | `VER.016` | `REJECT` | `DIAG.064` | `reject=DIAG.064` | `NodeResolverTest.aSatellitesNodeIsNotCompletedAsAnAlternative`, `NodeResolverTest.anyOperandAnywhereInsideATraitIsRefused` |
 | `VER.008` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind` |
@@ -401,4 +400,5 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.031` | `MUST` |  |  | — |
 | `VER.040` | `MUST` |  |  | `VersionDispatchTest.theVersionMechanismIsRegistryAgnostic` |
 | `VER.041` | `MUST` |  |  | — |
+| `VER.014` | `RETIRED` |  |  | — |
 

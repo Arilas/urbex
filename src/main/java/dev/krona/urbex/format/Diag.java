@@ -251,15 +251,17 @@ public enum Diag {
     DIAG_061("%s: '%s' was deleted, not renamed. %s"),
 
     /**
-     * {@code VER.014}: args are the owner and the version the inline palette declared.
+     * Retired in draft with {@code VER.014}; see {@code 08-errors.md}'s tombstone.
      * <p>
-     * Retired with {@code VER.014} when {@code MERGE.011} is implemented, at which point an inline
-     * palette is read by the version it declares and there is nothing left to refuse. Its number stays
-     * retired, by {@code DIAG.910}.
+     * It refused an inline palette declaring a version other than 1, while nothing could read one.
+     * {@code MERGE.011} now reads an inline palette by the version it declares, so there is nothing left
+     * to refuse: a version 2 one decodes through the same dispatcher a registered palette does. The
+     * constant stays, holding the row's own {@code —}, for the reason {@link #DIAG_042} records - a
+     * number is permanent by {@code DIAG.910}, and the only way to prove it is not silently reused is
+     * for this enum and the catalogue to be provably the same set of identifiers. Nothing raises it, and
+     * nothing may.
      */
-    DIAG_062("%s: the inline palette declares version %s, which this Urbex cannot yet read inline."
-            + " Write it in the version 1 format, or move it to the 'palettes' registry and name it"
-            + " with 'refpalette'."),
+    DIAG_062("—"),
 
     /**
      * {@code VER.015}: args are the asset and the version the entry declared.

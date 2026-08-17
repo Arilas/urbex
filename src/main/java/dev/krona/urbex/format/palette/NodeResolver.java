@@ -105,6 +105,11 @@ public final class NodeResolver {
 
     /**
      * Resolves {@code file} against the assets a pointer in it may reach.
+     * <p>
+     * A file on its own is a chain of one, folded by {@link V2Chain} like any other, so that a file with
+     * no {@code extends} and a file at the end of a chain of four go through the same code. That is also
+     * where {@code MERGE.007} refuses a chain declaring no {@code palette}, which is why this can now
+     * refuse a document that decoded cleanly.
      *
      * @param registry the {@code definitions} registry ({@code REF.010})
      * @param palettes every other decoded version 2 palette, by id ({@code LOAD.025})
@@ -114,9 +119,24 @@ public final class NodeResolver {
                                                     DefinitionIndex registry,
                                                     Map<Identifier, PaletteV2Definition> palettes,
                                                     Diagnostics diagnostics) {
-        NodeResolver resolver =
-                new NodeResolver(ResolutionScope.of(file, registry, palettes), diagnostics);
-        return resolver.file(file);
+        return V2Chain.merge(file, diagnostics)
+                .flatMap(merged -> resolve(merged, registry, palettes, diagnostics));
+    }
+
+    /**
+     * Resolves a merged {@code extends} chain - stage 3 over what stage 2 produced.
+     *
+     * @param merged the folded chain ({@code MERGE.001}), whose document is what every pointer in it is
+     *               answered against
+     */
+    public static Optional<ResolvedPalette> resolve(V2Chain.MergedPalette merged,
+                                                    DefinitionIndex registry,
+                                                    Map<Identifier, PaletteV2Definition> palettes,
+                                                    Diagnostics diagnostics) {
+        NodeResolver resolver = new NodeResolver(
+                new ResolutionScope(merged.document(), registry, palettes, Optional.empty()),
+                diagnostics);
+        return resolver.file(merged);
     }
 
     /**
@@ -149,23 +169,23 @@ public final class NodeResolver {
         return from.map(pointer -> site.through("'" + pointer + "'")).orElse(site);
     }
 
-    private Optional<ResolvedPalette> file(PaletteV2Definition file) {
+    private Optional<ResolvedPalette> file(V2Chain.MergedPalette merged) {
         Map<String, RawNode> defs = new LinkedHashMap<>();
         // Declaration order, so that DIAG.032 begins its cycle at the node the loader reached first.
-        for (Map.Entry<String, RawNode> def : file.defs().entrySet()) {
-            ResolutionScope scope = entryScope();
-            entry(fileScope.document().defKey(def.getKey()), def.getValue(), scope,
+        for (Map.Entry<String, MergedEntry> def : merged.defs().entrySet()) {
+            ResolutionScope scope = entryScope(def.getValue());
+            entry(fileScope.document().defKey(def.getKey()), def.getValue().node(), scope,
                     PointerResolver.Site.definition(scope, def.getKey()))
                     .ifPresent(value -> defs.put(def.getKey(), value));
         }
 
         Map<Marker, ResolvedNode> palette = new LinkedHashMap<>();
-        for (Map.Entry<Marker, RawNode> marker
-                : file.palette().orElse(Map.of()).entrySet()) {
-            ResolutionScope scope = entryScope();
+        for (Map.Entry<Marker, MergedEntry> marker : merged.palette().entrySet()) {
+            ResolutionScope scope = entryScope(marker.getValue());
             PointerResolver.Site site = PointerResolver.Site.marker(scope, marker.getKey());
-            Origin origin = Origin.of(marker.getValue());
-            entry(fileScope.document().markerKey(marker.getKey()), marker.getValue(), scope, site)
+            RawNode node = marker.getValue().node();
+            Origin origin = Origin.of(node);
+            entry(fileScope.document().markerKey(marker.getKey()), node, scope, site)
                     .flatMap(flat -> complete(flat, origin, reached(site, origin.ref())))
                     .ifPresent(value -> palette.put(marker.getKey(), value));
         }
@@ -173,18 +193,16 @@ public final class NodeResolver {
     }
 
     /**
-     * The scope one entry resolves in: the file's, plus what that entry inherited.
+     * The scope one entry resolves in: the document's, plus the two things the merge keeps per entry.
      * <p>
-     * Always nothing, in this task, which is why it takes no argument yet. {@code REF.060} makes
-     * {@code $super} name "what would have stood at this marker or definition name had this file not
-     * declared it" - a value the {@code extends} merge produces, and no chain is merged yet. So every
-     * entry of every file inherits nothing and {@code REF.062} refuses a {@code $super} written in one,
-     * which is the correct answer for a file declaring no {@code extends} and the only kind of file that
-     * exists until {@code MERGE.001} is implemented. This method is the seam that merge fills, and it is
-     * per-entry rather than per-file because {@code REF.061} scopes {@code $super} to its entry.
+     * Per-entry rather than per-file because {@code REF.061} scopes {@code $super} to the entry it
+     * appears in, and because {@code REF.086} scopes an alias to the file that wrote the entry rather
+     * than to the file at the end of the chain. Both live on {@link MergedEntry}; this is the seam
+     * {@code MERGE.001} fills, and it returned a scope inheriting nothing until there was a chain to
+     * fill it with.
      */
-    private ResolutionScope entryScope() {
-        return fileScope.withInherited(Optional.empty());
+    private ResolutionScope entryScope(MergedEntry entry) {
+        return fileScope.forEntry(entry);
     }
 
     /**

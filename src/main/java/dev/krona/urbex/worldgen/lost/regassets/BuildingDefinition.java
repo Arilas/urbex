@@ -61,14 +61,14 @@ public class BuildingDefinition implements Extendable {
     private final Character rubbleBlock;   // Block used for destroyed building rubble
     private final Float prefersLonely;  // The chance this this building is alone. If 1.0f this building wants to be alone all the time
 
-    private PaletteDefinition localPalette = null;
+    private PaletteAssetDefinition localPalette = null;
     private final String refPaletteName;
 
     private final Mergeable<PartRef> parts;
     private final Mergeable<PartRef> parts2;
 
     public BuildingDefinition(Optional<Identifier> extendsId,
-                      Optional<String> refpalette, Optional<PaletteDefinition> locpalette, Optional<Character> filler, Optional<Character> rubble,
+                      Optional<String> refpalette, Optional<PaletteAssetDefinition> locpalette, Optional<Character> filler, Optional<Character> rubble,
                       Optional<Integer> minCellars, Optional<Integer> minFloors, Optional<Integer> maxCellars, Optional<Integer> maxFloors,
                       Optional<Boolean> allowDoors, Optional<Boolean> allowFillers, Optional<Boolean> overrideFloors,
                       Optional<Float> prefersLonely, Optional<Mergeable<PartRef>> partRefs, Optional<Mergeable<PartRef>> partRefs2) {
@@ -146,7 +146,7 @@ public class BuildingDefinition implements Extendable {
         return prefersLonely;
     }
 
-    public PaletteDefinition getLocalPalette() {
+    public PaletteAssetDefinition getLocalPalette() {
         return localPalette;
     }
 

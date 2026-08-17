@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
@@ -244,7 +245,7 @@ class BuildingPartExtendsTest {
         private Optional<Integer> zSize = Optional.empty();
         private Optional<List<List<String>>> slices = Optional.empty();
         private Optional<String> refpalette = Optional.empty();
-        private Optional<PaletteDefinition> inlinePalette = Optional.empty();
+        private Optional<PaletteAssetDefinition> inlinePalette = Optional.empty();
         private Optional<Mergeable<PartMeta>> meta = Optional.empty();
 
         Builder extendsId(String id) {
@@ -277,7 +278,8 @@ class BuildingPartExtendsTest {
         }
 
         Builder inlinePalette(Optional<Identifier> paletteExtends, PaletteEntry... entries) {
-            this.inlinePalette = Optional.of(new PaletteDefinition(paletteExtends, Optional.of(List.of(entries))));
+            this.inlinePalette = Optional.of(
+                    new PaletteDefinition(paletteExtends, Optional.of(List.of(entries))));
             return this;
         }
 

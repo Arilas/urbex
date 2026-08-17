@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
@@ -205,7 +206,7 @@ class PaletteCharacterCheckTest {
     }
 
     private static BuildingPart partWithPalette(String path, String slice, PaletteEntry... entries) {
-        return buildPart(path, slice, Optional.of(
+        return buildPart(path, slice, Optional.<PaletteAssetDefinition>of(
                 new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries)))));
     }
 
@@ -213,7 +214,8 @@ class PaletteCharacterCheckTest {
      * A 1x1 part one level tall per character, so the slice string is exactly the character list
      * under test - any length, rather than the two the shape of this fixture used to fix it at.
      */
-    private static BuildingPart buildPart(String path, String slice, Optional<PaletteDefinition> local) {
+    private static BuildingPart buildPart(String path, String slice,
+                                          Optional<PaletteAssetDefinition> local) {
         Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
         List<List<String>> levels = new ArrayList<>(slice.length());
         for (char c : slice.toCharArray()) {

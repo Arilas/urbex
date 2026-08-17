@@ -1,10 +1,17 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
+import dev.krona.urbex.format.Diag;
+import dev.krona.urbex.format.Rule;
+import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
@@ -17,6 +24,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
@@ -43,6 +51,8 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Two-entry-chain coverage for the registries where a wrong fold is silent rather than loud.
@@ -408,6 +418,67 @@ class RegistryChainResolutionTest {
 
         assertEquals(-1, resolved.getMinFloors(),
                 "-1 means 'take the level's limit', which a child must be able to ask for");
+    }
+
+    // ------------------------------------------------- palettes across versions
+
+    /**
+     * {@code VER.005}, {@code MERGE.010}: an {@code extends} chain may not cross format versions, in
+     * either direction.
+     * <p>
+     * Both rules carry {@code [NO-FIXTURE: a version 1 and a version 2 file]} - the chain is two
+     * documents and a fixture is one - so this is their coverage. Both directions are asserted because
+     * the rule states both and they are separately gettable wrong: a version 2 palette extending a
+     * version 1 one is the migration an author reaches for first, and the reverse is what an author does
+     * when they convert the base and leave the leaf.
+     * <p>
+     * What the refusal buys is {@code VER.005}'s own reasoning: the alternative was an invariant that a
+     * version 1 palette and its version 2 translation compile to identical forms, kept for every
+     * construct forever, which would hold version 2 to what version 1 could already express. A style's
+     * {@code randompalettes} drawing one of each stays legal ({@code VER.006}) because that composition
+     * operates on compiled palettes rather than on {@code extends}.
+     * <p>
+     * Driven through {@link AssetStage#refuseCrossVersionChain} rather than through a compile, because
+     * {@code AssetStage.compileAll} needs a loaded world's {@code RegistryAccess}; in production it runs
+     * on every chain of every registry, which is the third assertion below.
+     */
+    @Test
+    @Rule("VER.005")
+    @Rule("MERGE.010")
+    void aPaletteChainMayNotCrossFormatVersions() {
+        Identifier leaf = Identifier.parse("urbex:bricks_mossy");
+        PaletteAssetDefinition version1 = new PaletteDefinition(Optional.empty(),
+                Optional.of(List.of(new PaletteEntry("X", Optional.of("minecraft:stone_bricks"),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty(), Optional.empty()))));
+        PaletteAssetDefinition version1Child = new PaletteDefinition(
+                Optional.of(Identifier.parse("urbex:bricks_standard")), Optional.empty());
+        PaletteAssetDefinition version2 = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
+                JsonParser.parseString("""
+                        { "version": 2, "extends": "urbex:bricks_standard",
+                          "palette": { "X": "minecraft:mossy_stone_bricks" } }
+                        """)).getOrThrow();
+
+        IllegalStateException upwards = assertThrows(IllegalStateException.class,
+                () -> AssetStage.refuseCrossVersionChain(leaf, List.of(version1, version2)),
+                "a version 2 palette extending a version 1 one");
+        assertTrue(Diag.DIAG_038.matches(upwards.getMessage()), upwards::getMessage);
+        assertTrue(upwards.getMessage().contains(leaf.toString())
+                        && upwards.getMessage().contains("urbex:bricks_standard"),
+                () -> "the diagnostic names both links: " + upwards.getMessage());
+
+        IllegalStateException downwards = assertThrows(IllegalStateException.class,
+                () -> AssetStage.refuseCrossVersionChain(leaf, List.of(version2, version1Child)),
+                "and a version 1 palette extending a version 2 one");
+        assertTrue(Diag.DIAG_038.matches(downwards.getMessage()), downwards::getMessage);
+
+        AssetStage.refuseCrossVersionChain(leaf, List.of(version1, version1Child));
+        AssetStage.refuseCrossVersionChain(leaf, List.of(version2));
+        // And the twelve registries whose entries have no format version at all are untouched by the
+        // guard that runs on all thirteen chains: nothing here declares a version, so nothing crosses one.
+        AssetStage.refuseCrossVersionChain(leaf, List.of(
+                stuff("torches").build(), stuff("torches_rare").build()));
     }
 
     // -------------------------------------------------------------- helpers

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -154,51 +155,102 @@ class VersionDispatchTest {
     }
 
     /**
-     * {@code VER.014}: an inline palette declaring a version other than 1 is refused by name.
+     * {@code MERGE.011}: an inline palette is read by the rules of the version it declares.
      * <p>
-     * The alternative was the one thing this format exists to remove. Nothing reads an inline version 2
-     * palette yet - the dispatcher lives on the registry - so leaving the field on the version 1 codec
-     * would have had it discard {@code version} and every version 2 key beside it, and load a part whose
-     * palette maps nothing. The part would have generated, as air.
+     * This is issue #214, and until this task the answer was {@code VER.014}: the inline field was the
+     * version 1 codec, and an inline {@code "version": 2} palette was refused by name because the only
+     * other option was to hand it to a codec that ignores keys it does not know - which would have
+     * decoded a palette holding none of the markers its author wrote, and generated the part as air.
+     * The rule is retired with a tombstone and this test replaces the one that cited it.
      * <p>
-     * This rule is marked {@code [DEPRECATED → MERGE.011]} and is retired when an inline palette is read
-     * by the version it declares; the test goes with it. {@code "version": 1} is accepted, because
-     * version 1 is exactly what the inline path reads.
+     * Three spellings, because the rule is about all three: an absent {@code version} is version 1
+     * ({@code VER.001}) and keeps the version 1 shape, a declared 1 is the same thing said out loud, and
+     * a declared 2 now decodes as a version 2 document - marker keys, node objects and all.
      */
     @Test
-    @Rule("VER.014")
-    void anInlinePaletteDeclaringVersionTwoIsRefusedRatherThanReadAsVersionOne() {
-        String part = """
-                { "xsize": 16, "zsize": 16,
-                  "palette": { "version": 2, "palette": { "b": "minecraft:grass_block" } },
-                  "slices": [] }
-                """;
-        DataResult<BuildingPartDefinition> refused = BuildingPartDefinition.CODEC.parse(
-                JsonOps.INSTANCE, JsonParser.parseString(part));
-        assertTrue(refused.error().isPresent(),
-                () -> "a silently mis-read inline palette is the failure this refuses; got " + refused);
-        assertTrue(Diag.DIAG_062.matches(refused.error().orElseThrow().message()),
-                refused.error().orElseThrow().message());
+    @Rule("MERGE.011")
+    void anInlinePaletteIsReadByTheVersionItDeclares() {
+        assertInstanceOf(PaletteDefinition.class, inlinePaletteOf("""
+                { "palette": [ { "char": "b", "block": "minecraft:grass_block" } ] }
+                """), "an inline palette with no version is version 1, by VER.001");
+        assertInstanceOf(PaletteDefinition.class, inlinePaletteOf("""
+                { "version": 1, "palette": [ { "char": "b", "block": "minecraft:grass_block" } ] }
+                """), "declaring version 1 says the same thing out loud");
 
-        DataResult<BuildingPartDefinition> version1 = BuildingPartDefinition.CODEC.parse(
+        PaletteV2Definition version2 = assertInstanceOf(PaletteV2Definition.class, inlinePaletteOf("""
+                { "version": 2, "palette": { "b": "minecraft:grass_block" } }
+                """), "an inline palette declaring version 2 is read by the version 2 rules");
+        assertEquals(Set.of(new Marker('b')), version2.palette().orElseThrow().keySet());
+    }
+
+    /**
+     * {@code MERGE.012}: an inline palette may carry {@code $imports} and {@code $defs}.
+     * <p>
+     * Nothing here withholds them - they are the version 2 codec's keys and the inline field is now that
+     * codec - so what this pins is that the rule's reason survives the wiring: "it is a palette.
+     * Withholding the two keys that shorten repetition from the one place repetition is worst would be
+     * perverse", measured at 6,527 inline entries of which 1,242 are distinct. The rule is marked
+     * {@code [NO-FIXTURE: a part carrying an inline palette]} because the fixture harness reads palette
+     * documents, so this citing test is its only coverage.
+     */
+    @Test
+    @Rule("MERGE.012")
+    void anInlinePaletteMayCarryImportsAndDefs() {
+        PaletteV2Definition inline = assertInstanceOf(PaletteV2Definition.class, inlinePaletteOf("""
+                { "version": 2,
+                  "$imports": { "mat": "urbex:common#/$defs" },
+                  "$defs": { "wall": { "block": "minecraft:stone_bricks" } },
+                  "palette": { "X": { "$ref": "wall" }, "}": { "$ref": "$mat/rubble" } } }
+                """));
+        assertEquals(Map.of("mat", "urbex:common#/$defs"), inline.imports());
+        assertEquals(Set.of("wall"), inline.defs().keySet());
+    }
+
+    /**
+     * {@code MERGE.009}: {@code extends} inside an inline palette is refused rather than ignored.
+     * <p>
+     * "An inline palette is not a registry entry, so nothing can resolve the link. Accepting a key and
+     * ignoring it is how a pack ends up meaning something other than what it says." Refused at decode
+     * here, which is where a version 2 inline palette can be refused at all; the version 1 half of the
+     * same rule fires later, in {@code Palette.inline}, and {@code BuildingPartExtendsTest} covers it.
+     * Both raise {@code DIAG.031}, and {@code VER.004} is why they fire at different times.
+     */
+    @Test
+    @Rule("MERGE.009")
+    void extendsInsideAnInlineVersionTwoPaletteIsRefused() {
+        DataResult<BuildingPartDefinition> refused = BuildingPartDefinition.CODEC.parse(
                 JsonOps.INSTANCE, JsonParser.parseString("""
                 { "xsize": 16, "zsize": 16,
-                  "palette": { "version": 1, "palette": [ { "char": "b", "block": "minecraft:grass_block" } ] },
+                  "palette": { "version": 2, "extends": "urbex:common",
+                               "palette": { "b": "minecraft:grass_block" } },
                   "slices": [] }
                 """));
-        assertTrue(version1.result().isPresent(),
-                () -> "version 1 is what the inline path reads, so declaring it is true; got " + version1);
+        assertTrue(refused.error().isPresent(),
+                () -> "an inline 'extends' that nothing can resolve must not be accepted; got " + refused);
+        String message = refused.error().orElseThrow().message();
+        assertTrue(Diag.DIAG_031.matches(message), message);
+        assertTrue(message.contains("urbex:common"),
+                () -> "the diagnostic names the link it cannot resolve: " + message);
+    }
+
+    /** The inline palette of a part document that is otherwise the smallest one that decodes. */
+    private static PaletteAssetDefinition inlinePaletteOf(String inlinePalette) {
+        String part = "{ \"xsize\": 16, \"zsize\": 16, \"slices\": [], \"palette\": "
+                + inlinePalette + " }";
+        DataResult<BuildingPartDefinition> decoded = BuildingPartDefinition.CODEC.parse(
+                JsonOps.INSTANCE, JsonParser.parseString(part));
+        return decoded.getOrThrow().getLocalPalette();
     }
 
     /**
      * {@code VER.015}: a registered version 2 palette is refused where it is compiled, naming the asset.
      * <p>
-     * The transitional twin of {@code VER.014}, and the more likely of the two to be hit: an author
-     * adopting version 2 writes a registry palette, and a registry palette is what reaches the compiler.
-     * It used to throw an uncatalogued {@link IllegalStateException} while the inline author got a
-     * catalogue message, which is the wrong way round. {@code DIAG.063} names the asset id, which
-     * {@code DIAG.062} cannot - this runs where the id is known rather than inside a codec handed only a
-     * document.
+     * The last transitional rule of its section now that {@code VER.014} is retired, and the one most
+     * likely to be hit: an author adopting version 2 writes a registry palette, and a registry palette is
+     * what reaches the compiler. It used to throw an uncatalogued {@link IllegalStateException};
+     * {@code DIAG.063} names the asset id, which it can because this runs where the id is known rather
+     * than inside a codec handed only a document. Since {@code MERGE.011} it is also what an
+     * <em>inline</em> version 2 palette meets, one stage later, through {@code Palette.inline}.
      * <p>
      * The chain is passed directly rather than driven through {@code AssetCompiler}, which needs a loaded
      * world's {@code RegistryAccess}. {@code AssetStage} records a thrown exception against the asset it

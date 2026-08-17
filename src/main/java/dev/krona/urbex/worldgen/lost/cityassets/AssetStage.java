@@ -1,5 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.format.Diag;
+import dev.krona.urbex.format.Versioned;
 import dev.krona.urbex.worldgen.lost.regassets.Extendable;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
@@ -62,8 +64,52 @@ final class AssetStage {
      */
     private static <R> List<R> chainOf(Registry<R> registry, ResourceKey<Registry<R>> registryKey,
                                        Identifier id) {
-        return ExtendsChain.resolve(id,
+        List<R> chain = ExtendsChain.resolve(id,
                 key -> registry.getValue(ResourceKey.create(registryKey, key)),
                 entry -> entry instanceof Extendable ext ? ext.getExtends() : Optional.empty());
+        refuseCrossVersionChain(id, chain);
+        return chain;
+    }
+
+    /**
+     * {@code VER.005}, {@code MERGE.010}: an {@code extends} chain may not cross format versions, in
+     * either direction.
+     * <p>
+     * <b>Guarded on the entry type, not on the registry.</b> This method runs for all thirteen
+     * registries because {@link #chainOf} is shared, and it does nothing for twelve of them: only an
+     * entry that declares which format version it was written in - a {@link Versioned.Asset}, which
+     * today is the {@code palettes} registry alone - can cross one. That is also what {@code VER.040}
+     * asks for from the next registry to adopt a version 2: "a registry adopting version 2 follows
+     * VER.001 through VER.004 unchanged", and the rule that keeps its chains from crossing should not
+     * have to be written again with a different registry key in it.
+     * <p>
+     * <b>Why the two formats may not meet in one chain</b> is {@code VER.005}'s own {@code > Why}: the
+     * alternative was an invariant that a version 1 palette and its version 2 translation compile to
+     * identical forms, maintained forever, which would constrain version 2 to what version 1 could
+     * already express. A style's {@code randompalettes} drawing one of each is a different mechanism and
+     * stays legal ({@code VER.006}), because that composition operates on compiled palettes.
+     * <p>
+     * Thrown rather than returned, like every other failure of a chain: {@link #compileAll} records it
+     * against the asset it was compiling and carries on with the rest of the registry, so a pack with
+     * two such chains reports both.
+     *
+     * @param id    the leaf, which is the only link whose id the chain itself does not carry
+     * @param chain the chain root-first, as {@link ExtendsChain} returned it
+     */
+    static <R> void refuseCrossVersionChain(Identifier id, List<R> chain) {
+        Identifier childId = id;
+        for (int i = chain.size() - 1; i > 0; i--) {
+            if (!(chain.get(i) instanceof Versioned.Asset child)
+                    || !(chain.get(i - 1) instanceof Versioned.Asset parent)) {
+                return;
+            }
+            // The link's own id is what its child's 'extends' names; ExtendsChain walked exactly that.
+            Identifier parentId = ((Extendable) child).getExtends().orElseThrow();
+            if (child.formatVersion() != parent.formatVersion()) {
+                throw new IllegalStateException(Diag.DIAG_038.message("'" + childId + "'",
+                        child.formatVersion(), "'" + parentId + "'", parent.formatVersion()));
+            }
+            childId = parentId;
+        }
     }
 }

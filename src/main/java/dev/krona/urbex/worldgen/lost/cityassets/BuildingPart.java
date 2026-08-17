@@ -2,7 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartMeta;
 import net.minecraft.core.HolderLookup;
@@ -69,7 +69,7 @@ public class BuildingPart implements IBuildingPart {
         Integer declaredXSize = null;
         Integer declaredZSize = null;
         String[] declaredSlices = null;
-        List<PaletteDefinition> inlinePalettes = new ArrayList<>();
+        List<PaletteAssetDefinition> inlinePalettes = new ArrayList<>();
         String refPalette = null;
         List<PartMeta> meta = new ArrayList<>();
         for (BuildingPartDefinition re : chainRootFirst) {

@@ -56,9 +56,6 @@ class ConformanceIndexTest {
 
     private static Map<String, String> noFixtureRulesAwaitingACitingTest() {
         Map<String, String> awaiting = new LinkedHashMap<>();
-        awaiting.put("MERGE.010", "a version 1 palette extended by a version 2 one; Task 4");
-        awaiting.put("MERGE.012", "a part carrying an inline palette; Task 4");
-        awaiting.put("VER.005", "an extends chain across the two versions; Task 4");
         awaiting.put("WEIGHT.019", "a parent palette to spread shares from; Task 5");
         awaiting.put("WEIGHT.063", "a generated 129-choice list; Task 5");
         awaiting.put("LOAD.013", "a style with several palette groups; Task 7");
@@ -200,7 +197,8 @@ class ConformanceIndexTest {
 
         List<String> failures = new ArrayList<>();
         for (SpecDocuments.SpecRule rule : spec.rules().values()) {
-            if (SpecDocuments.CATALOGUE_ROW_CLASS.equals(rule.cls())) {
+            if (SpecDocuments.CATALOGUE_ROW_CLASS.equals(rule.cls())
+                    || SpecDocuments.TOMBSTONE_CLASS.equals(rule.cls())) {
                 continue;
             }
             boolean hasFixture = !fixturesByRule.getOrDefault(rule.id(), List.of()).isEmpty();

@@ -64,6 +64,23 @@ public final class SpecDocuments {
     static final String CATALOGUE_ROW_CLASS = "DIAG";
 
     /**
+     * The class given to an identifier that exists only as a tombstone ({@code README.md} §3.4).
+     * <p>
+     * A retired rule's definition line is gone and its number is permanent, so something still has to
+     * <em>define</em> the identifier: without this, the tombstone that {@code README.md} §3.4 requires
+     * would itself be a citation of a rule no document defines, and {@code everyCitedRuleIdentifierIsDefined}
+     * would fail on the very line the convention asks for. A retired diagnostic already had this by
+     * accident - its catalogue row survives, holding {@code —}, which registers the id - and the first
+     * retired <em>rule</em> ({@code VER.014}) is what showed that a rule had no equivalent.
+     * <p>
+     * It is not one of {@code README.md} §3.2's six classes, and it is excluded wherever a check means
+     * "every rule", for the same reason {@link #CATALOGUE_ROW_CLASS} is: a tombstone states no
+     * requirement, so it can have no fixture and needs no citing test - §3.4 says outright that "tests
+     * citing DEMO.007 were deleted".
+     */
+    static final String TOMBSTONE_CLASS = "RETIRED";
+
+    /**
      * The five keys {@code MODEL.001} names for the top level of a palette file: {@code version},
      * {@code extends}, {@code $imports}, {@code $defs} and {@code palette}, and no others. Hand-copied
      * rather than parsed from the rule's prose - the prose is English, not data, and parsing it back
@@ -79,6 +96,14 @@ public final class SpecDocuments {
             "^>\\s*\\*\\*([A-Z]+\\.\\d{3})\\*\\*\\s*·\\s*`([A-Z ]+)`"
                     + "(?:\\s*\\(`(DIAG\\.\\d{3})`\\))?"
                     + "(?:\\s*`\\[NO-FIXTURE: ([^\\]]+)\\]`)?");
+
+    /**
+     * A tombstone line ({@code README.md} §3.4), e.g.
+     * {@code > **VER.014** — *retired in draft.* …}. The em dash and the italicised {@code retired} are
+     * what separate it from a rule definition line, which carries {@code ·} and a class instead.
+     */
+    private static final Pattern TOMBSTONE = Pattern.compile(
+            "^>\\s*\\*\\*([A-Z]+\\.\\d{3})\\*\\*\\s*—\\s*\\*retired\\b");
 
     /** A row of the diagnostic catalogue table in {@code palette/08-errors.md}: id, raised-by, message. */
     private static final Pattern DIAG_ROW =
@@ -188,6 +213,18 @@ public final class SpecDocuments {
                             order.add(id);
                         }
                         rules.put(id, rule);
+                    }
+                }
+
+                Matcher tombstone = TOMBSTONE.matcher(line);
+                if (tombstone.lookingAt()) {
+                    String id = tombstone.group(1);
+                    // Never over an existing definition: a retired diagnostic keeps its catalogue row,
+                    // and that row is the more informative of the two.
+                    if (!id.startsWith(RESERVED_AREA + ".") && !rules.containsKey(id)) {
+                        order.add(id);
+                        rules.put(id, new SpecRule(id, file, TOMBSTONE_CLASS, Optional.empty(),
+                                Optional.empty(), lineNumber));
                     }
                 }
 
@@ -445,8 +482,10 @@ public final class SpecDocuments {
             // four classes §4.2 rule 4 can discharge with a fixture alone. A [NO-FIXTURE] rule is
             // still excluded here: it is tracked in the table below instead, and its citing-test
             // requirement (§4.3) is not subject to the draft suspension this list is named for.
-            // Catalogue rows (cls DIAG) are excluded too - they are not rules under §3.2 at all.
-            if (CATALOGUE_ROW_CLASS.equals(rule.cls()) || rule.noFixtureReason().isPresent()) {
+            // Catalogue rows (cls DIAG) are excluded too - they are not rules under §3.2 at all, and
+            // so are tombstones (cls RETIRED), which state no requirement to cover.
+            if (CATALOGUE_ROW_CLASS.equals(rule.cls()) || TOMBSTONE_CLASS.equals(rule.cls())
+                    || rule.noFixtureReason().isPresent()) {
                 continue;
             }
             boolean hasFixture = fixturesByRule.containsKey(id) && !fixturesByRule.get(id).isEmpty();

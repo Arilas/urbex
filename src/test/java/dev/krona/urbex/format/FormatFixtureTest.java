@@ -1,5 +1,6 @@
 package dev.krona.urbex.format;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
@@ -7,6 +8,7 @@ import dev.krona.urbex.format.palette.NodeResolver;
 import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.format.palette.Pointer;
 import dev.krona.urbex.format.palette.RawNode;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
@@ -76,12 +78,16 @@ class FormatFixtureTest {
     private static Map<String, String> pending() {
         Map<String, String> pending = new LinkedHashMap<>();
 
-        // Task 4 - merging.
-        pending.put("MODEL.062#1", "an alias names a marker answered by the merged palette (Task 4)");
-        pending.put("MERGE.007#1", "palette is required somewhere in the extends chain, which needs the"
-                + " chain (Task 4)");
-        pending.put("MERGE.009#1", "the fixture is a part file, and an inline palette is decoded by the"
-                + " part codec, which is still version 1 only (Task 4)");
+        // MODEL.062 was listed for Task 4 and is not decidable there, or by any check over one palette
+        // chain. MODEL.060 resolves an alias "in the same merged palette" and MODEL.064 says which merge
+        // that is: "the merged palette the part is generated with - including markers contributed by
+        // palettes this file never mentions". The shipped pack relies on exactly that
+        // (urbex:glass_side_variant_glass maps '@' to 'a' and declares nothing else), so an alias whose
+        // target its own chain does not declare is not yet wrong. It becomes decidable where a style's
+        // palette groups are merged, which is LOAD.013's stage.
+        pending.put("MODEL.062#1", "an alias is answered by the merged palette a part is generated with"
+                + " (MODEL.064), so an unresolvable one is only knowable where a style's palette groups"
+                + " are merged (Task 7)");
 
         // Task 5 - sizes and selection.
         pending.put("WEIGHT.024#1", "exclusion by 'when' is evaluated against the loaded mods (Task 5)");
@@ -109,13 +115,6 @@ class FormatFixtureTest {
         pending.put("TRAIT.062#2", "the other half of the same equiv group");
         pending.put("TRAIT.064#1", "two traits on one node conflict, which needs the trait registry"
                 + " (Task 6)");
-
-        // VER.014's fixture is a part file, like MERGE.009's, and for the same reason it cannot run
-        // here: this harness decodes every fixture as a palette file. The rule itself is covered by a
-        // citing test that drives the real part codec, so it is not relying on this fixture.
-        pending.put("VER.014#1", "the fixture is a part file, and this harness decodes fixtures as"
-                + " palette files; the rule is covered by a citing test on the part codec (Task 4"
-                + " retires the rule outright, by MERGE.011)");
 
         // Insertion order kept: this list is read as a diff and its failure messages have to come out
         // in the order the entries are written, not in whatever order hashing produced.
@@ -273,7 +272,7 @@ class FormatFixtureTest {
      * @param linked  stage 3, or empty when this document reaches outside itself - see
      *                {@link #selfContained}
      */
-    private record Loaded(DataResult<PaletteAssetDefinition> decoded,
+    private record Loaded(DataResult<?> decoded,
                           Optional<DataResult<NodeResolver.ResolvedPalette>> linked) {
 
         /** The first stage that refused the document, if either did. */
@@ -298,11 +297,21 @@ class FormatFixtureTest {
     /**
      * Decodes a fixture and, when it is self-contained, links it too.
      * <p>
-     * Every fixture decodes through the registry's codec, so version dispatch is part of every run.
+     * Every palette fixture decodes through the registry's codec, so version dispatch is part of every
+     * run. A fixture whose top level is a <em>part</em> - {@code MERGE.009}'s, which is about a palette
+     * written inside one - goes through the part codec instead, because that is the codec the rule it
+     * demonstrates lives in. Detected by {@code slices}, which every part has and no palette of either
+     * version does; the alternative, listing the part fixtures by address, would be a second place to
+     * update when one is added.
      */
     private static Loaded load(String json) {
+        JsonElement document = JsonParser.parseString(json);
+        if (document.isJsonObject() && document.getAsJsonObject().has("slices")) {
+            return new Loaded(BuildingPartDefinition.CODEC.parse(JsonOps.INSTANCE, document),
+                    Optional.empty());
+        }
         DataResult<PaletteAssetDefinition> decoded =
-                PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
+                PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, document);
         Optional<PaletteV2Definition> file = decoded.result()
                 .filter(PaletteV2Definition.class::isInstance)
                 .map(PaletteV2Definition.class::cast)
@@ -330,7 +339,11 @@ class FormatFixtureTest {
      * strength and its dynamic test says which strength it asserted, rather than being listed as pending
      * for a shortcoming of the harness rather than of the loader.
      * <p>
-     * {@code extends} is the same case one level up: a chain is stage 2, which is Task 4's.
+     * {@code extends} is the same case one level up, and it stays the same case now that the merge
+     * exists: {@link dev.krona.urbex.format.palette.V2Chain} folds a chain it is handed, and the parent
+     * a fixture names is not in the fixture. {@code MERGE.005}'s and {@code MERGE.006}'s fixtures are
+     * therefore asserted at decode strength here and written out again over their parent in
+     * {@code V2ChainTest}, which is what a chain needs and a fixture cannot carry.
      * <p>
      * A pointer that fails to <em>parse</em> is not a reach outside the document - it is a local mistake,
      * and {@code REF.083}'s fixture is exactly one - so it does not disqualify a fixture from linking.

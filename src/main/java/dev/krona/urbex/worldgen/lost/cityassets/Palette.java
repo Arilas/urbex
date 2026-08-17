@@ -1,7 +1,9 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.varia.Tools;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
@@ -68,27 +70,34 @@ public class Palette {
      * markers keeps the rest of its ancestor's. Replacing wholesale here would reproduce, one level
      * down, the very failure {@link #mergeByCharacter} exists to prevent.
      *
+     * <p>{@code MERGE.009} is the first check below and {@code DIAG.031} is its message. The version 1
+     * codec accepts {@code extends} wherever a {@link PaletteDefinition} is embedded, and an inline
+     * palette is not a registry entry, so nothing can resolve it; silently dropping a key the codec
+     * accepted is how a datapack quietly means something other than what it says. A version <em>2</em>
+     * inline palette is refused for the same rule one stage earlier, by
+     * {@link PaletteAssetDefinition#INLINE_CODEC}, so this loop is version 1's half of it - see that
+     * field for why the two halves fire at different times.</p>
+     *
+     * <p>{@code VER.015} is the second: an inline palette may declare version 2 as of {@code MERGE.011},
+     * and nothing compiles a version 2 palette yet, so {@link PaletteAssetDefinition#version1Only} says
+     * so by name rather than this method casting and failing from a worker thread.</p>
+     *
      * @param blockLookup    the block registry the inline entries resolve against
      * @param owner          the part or building the block is written in, for error messages and
      *                       for the synthetic palette name
      * @param chainRootFirst the inline blocks along the owner's chain, root first
      */
     public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                                 Identifier owner, List<PaletteDefinition> chainRootFirst) {
-        for (PaletteDefinition re : chainRootFirst) {
-            // The codec accepts 'extends' wherever a PaletteDefinition is embedded, but an inline block is
-            // not a registry entry, so nothing can resolve it. Rejecting is the honest option:
-            // silently dropping a key the codec accepted is how a datapack quietly means something
-            // other than what it says.
+                                 Identifier owner, List<PaletteAssetDefinition> chainRootFirst) {
+        for (PaletteAssetDefinition re : chainRootFirst) {
             if (re.getExtends().isPresent()) {
-                throw new IllegalStateException("The inline palette in '" + owner + "' declares "
-                        + "extends '" + re.getExtends().get() + "', but an inline palette is not a "
-                        + "registry entry and nothing can resolve that. Use 'refpalette' to build "
-                        + "on a registered palette, or put 'extends' on '" + owner + "' itself.");
+                throw new IllegalStateException(Diag.DIAG_031.message("'" + owner + "'",
+                        "'" + re.getExtends().orElseThrow() + "'", "'" + owner + "'"));
             }
         }
+        List<PaletteDefinition> version1 = PaletteAssetDefinition.version1Only(owner, chainRootFirst);
         Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(blockLookup, variants, mergeByCharacter(chainRootFirst, owner));
+        palette.compile(blockLookup, variants, mergeByCharacter(version1, owner));
         return palette;
     }
 

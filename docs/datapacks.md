@@ -513,9 +513,9 @@ nothing can resolve the link, and silently ignoring a key the format accepted is
 datapack ends up meaning something other than what it says:
 
 ```
-The inline palette in 'urbexmt:tower' declares extends 'urbex:common', but an inline palette is not
-a registry entry and nothing can resolve that. Use 'refpalette' to build on a registered palette, or
-put 'extends' on 'urbexmt:tower' itself.
+'urbexmt:tower': the inline palette declares 'extends' 'urbex:common', but an inline palette is not
+a registry entry and nothing can resolve that. Use 'refpalette', or put 'extends' on 'urbexmt:tower'
+itself.
 ```
 
 Those two suggestions are the whole answer. To share a palette, register it and name it with
@@ -885,7 +885,7 @@ Three details about that warning:
 | `'urbexmt:x' declares no 'streetblocks.largeparts.connector', ...` | The primary-road family was partly declared | Declare all eight components, or none at all and inherit `parts` |
 | `Part 'urbexmt:tower' declares no slices, and neither does anything it extends` | A part with no geometry anywhere in its chain | Add `slices`, or `extends` a part that has them |
 | `Part 'urbexmt:tower' declares xsize 8 and zsize 16 but its slices are 16 wide (...)` | A size was redeclared without the matching slices | Declare both together, or neither |
-| `The inline palette in 'urbexmt:tower' declares extends '...'` | `extends` inside an inline `palette` block | Use `refpalette`, or put `extends` on the owning asset |
+| `'urbexmt:tower': the inline palette declares 'extends' '...'` | `extends` inside an inline `palette` block | Use `refpalette`, or put `extends` on the owning asset |
 | `Illegal palette urbex:x!` | A palette entry names no `block`, `variant`, `blocks` or `frompalette` | Give the character something to resolve to |
 | `Palette 'urbex:x' entry 'T' declares 'lightSource' but names nothing to place. Give the entry a block, blocks, variant or frompalette to light, or give the light source at least one candidate in floor, wall, ceiling, or free.` | A `lightSource` with neither a block of its own nor any candidate | Do one or the other |
 | `Palette 'urbex:x' entry 'L' declares 'lightSource', but none of the blocks it resolves to emit any light. Either name candidates under floor/wall/ceiling/free, or drop 'lightSource' from this entry.` | A light source on a block that is not a light | Drop `lightSource`, or name candidates |

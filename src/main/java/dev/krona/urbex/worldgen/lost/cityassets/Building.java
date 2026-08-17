@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import net.minecraft.core.HolderLookup;
@@ -72,7 +72,7 @@ public class Building {
         List<PartRef> partRefs = new ArrayList<>();
         boolean anyParts = false;
         List<PartRef> partRefs2 = new ArrayList<>();
-        List<PaletteDefinition> inlinePalettes = new ArrayList<>();
+        List<PaletteAssetDefinition> inlinePalettes = new ArrayList<>();
         String refPalette = null;
         Character filler = null;
         for (BuildingDefinition object : chainRootFirst) {

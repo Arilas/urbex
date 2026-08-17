@@ -128,7 +128,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 |---|---|---|
 | `DIAG.060` | [VER.010](09-migration.md#3-retired-keys) | *`<asset>` marker `'<m>'`: `<key>` was retired in version 2. Write `<replacement>` instead.* |
 | `DIAG.061` | [VER.011](09-migration.md#3-retired-keys) | *`<asset>`: `<key>` was deleted, not renamed. `<explanation>`* |
-| `DIAG.062` | [VER.014](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<owner>`: the inline palette declares version `<n>`, which this Urbex cannot yet read inline. Write it in the version 1 format, or move it to the `palettes` registry and name it with `refpalette`.* |
+| `DIAG.062` | *retired — see tombstones* | — |
 | `DIAG.063` | [VER.015](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>`: resolves through an entry written in palette format version `<n>`, which this Urbex decodes but does not yet compile. Write it in the version 1 format, or omit `version`, until version 2 compilation lands.* |
 | `DIAG.064` | [VER.016](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>` marker `'<m>'`: trait `<id>` holds `<operand>`, and this Urbex cannot yet resolve an operand inside a trait. Write the block, or the weighted list, in full.* |
 
@@ -141,6 +141,13 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 > > and a reused number makes an old report describe a new problem.
 
 ## Tombstones
+
+> **DIAG.062** — *retired in draft.* Raised when a palette written inline in a part or building
+> declared a `version` other than 1, under [VER.014](09-migration.md#tombstones), which is retired with
+> it. [MERGE.011](04-merging.md#1-extends) now reads an inline palette by the version it declares, so
+> the case this named is no longer a rejection at all. The refusal that survives beside it is
+> `DIAG.031` — `extends` inside an inline palette — which is a different message with a different
+> remedy. The number stays retired.
 
 > **DIAG.042** — *retired in draft.* Raised when a list's explicit weights reached 128 before its
 > `rest`, under the model where weights carried a `rest` were absolute counts. That model was

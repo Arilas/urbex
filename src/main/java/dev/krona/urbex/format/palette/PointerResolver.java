@@ -193,14 +193,17 @@ public final class PointerResolver {
      */
     private static Outcome<Addressed> local(Pointer.Local local, String written, String operand,
                                             ResolutionScope scope, String location) {
-        RawNode node = scope.document().defs().get(local.name());
-        if (node == null) {
+        MergedEntry def = scope.document().defs().get(local.name());
+        if (def == null) {
             // REF.013, and the diagnostic names the operand that failed and the tier that was searched.
             return Outcome.failed(Diag.DIAG_030, location, operand,
                     Pointer.describe(written, local), "'$defs'");
         }
-        return Outcome.ok(new Addressed(scope.document().defKey(local.name()), node, scope,
-                local.path()));
+        // The definition's own scope, not the referring entry's: a definition an ancestor of this chain
+        // wrote expands its aliases against that file's $imports (REF.086) and answers $super with what
+        // that file's declaration replaced (REF.060), whoever points at it.
+        return Outcome.ok(new Addressed(scope.document().defKey(local.name()), def.node(),
+                scope.forEntry(def), local.path()));
     }
 
     /** {@code REF.010} and {@code REF.041}: a name with a colon is a {@code definitions} asset. */
@@ -287,21 +290,46 @@ public final class PointerResolver {
      * declares this entry. Both are the same absence to this code and different sentences to the author,
      * which is why {@link ResolutionScope.Document} carries {@code extends} at all.
      * <p>
-     * The inherited node needs no graph key: it is not a named entry of any document, it is a value the
-     * {@code extends} merge already produced, so it arrives resolved. {@code REF.033}'s cycle "through
-     * both" is a cycle in that merge, found where the chain is built.
+     * <b>The inherited layer is a graph node of its own,</b> keyed by the entry it belongs to. It is not
+     * a named entry of any document - no pointer but this one can reach it - but it is a node that
+     * resolves, and giving it a key is what makes {@code REF.033} true: "a cycle through {@code $ref} and
+     * {@code extends} together is one cycle". An inherited node that references the entry that replaced
+     * it is exactly such a cycle, and without a key the walk would follow it until the stack ran out
+     * rather than naming it ({@code DIAG.032}).
+     * <p>
+     * It resolves in the layer's <em>own</em> scope: the {@code $imports} of the file that wrote it
+     * ({@code REF.086}) and, under it, whatever <em>that</em> declaration replaced - so {@code $super}
+     * inside an inherited node names the layer below it, in a chain of any depth.
      */
     private static Outcome<Addressed> inherited(Pointer.Super pointer, String written,
                                                 ResolutionScope scope, Site site) {
-        Optional<RawNode> value = scope.inherited();
+        Optional<MergedEntry> value = scope.inherited();
         if (value.isEmpty()) {
             String reason = scope.document().extendsId().isPresent()
                     ? "nothing in its extends chain declares " + site.entryName()
                     : "this file declares no extends";
             return Outcome.failed(Diag.DIAG_036, site.location(), reason);
         }
-        return Outcome.ok(new Addressed("$" + Pointer.SUPER + " of " + site.entryName(),
-                value.get(), scope, pointer.path()));
+        MergedEntry layer = value.orElseThrow();
+        return Outcome.ok(new Addressed(superKey(layer, site), layer.node(),
+                scope.forEntry(layer), pointer.path()));
+    }
+
+    /**
+     * The graph key of one inherited layer, which two layers of the same entry may not share.
+     * <p>
+     * They can be two: in a chain of three where all three files declare {@code 'X'}, the leaf's
+     * {@code $super} is the middle file's node and the middle's is the root's. Keyed on the entry name
+     * alone both would be the same node of the reference graph, and the second hop would be reported as
+     * a cycle that the file does not have.
+     * <p>
+     * The number counts layers <em>from the root</em> ({@link MergedEntry#depth()}), so the common case -
+     * a chain of two, one layer to inherit - carries no number at all, and lengthening a chain adds a
+     * number at the top rather than renumbering the layers already there.
+     */
+    private static String superKey(MergedEntry layer, Site site) {
+        String key = "$" + Pointer.SUPER + " of " + site.entryName();
+        return layer.depth() == 0 ? key : key + " (layer " + layer.depth() + ")";
     }
 
     /**
