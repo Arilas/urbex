@@ -31,8 +31,17 @@ import java.util.Set;
  */
 public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) {
 
-    /** The keys a choice adds to the node keys it shares its object with. */
-    public static final Set<String> OWN_KEYS = Set.of("share", "weight", "rest", "when");
+    /**
+     * The keys a choice adds to the node keys it shares its object with, in a fixed order.
+     * <p>
+     * Ordered because a diagnostic naming several of them at once must name them the same way every run:
+     * a map's or a set's iteration order is not something a datapack author can see, and a message that
+     * shuffles between runs cannot be pinned by a test or quoted in a bug report.
+     */
+    private static final List<String> OWN_KEYS_IN_ORDER = List.of("share", "weight", "rest", "when");
+
+    /** {@link #OWN_KEYS_IN_ORDER} as a set, for membership. */
+    public static final Set<String> OWN_KEYS = Set.copyOf(OWN_KEYS_IN_ORDER);
 
     /**
      * A list of choices, with every size rule that can be decided without resolving anything.
@@ -131,6 +140,20 @@ public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) 
             return Optional.empty();
         }
         RawNode value = decodedNode.result().orElseThrow();
+        if (value.spread().isPresent()) {
+            // REF.072: "A $spread element carries no other key. To change what it spreads, point
+            // somewhere else." RawNode.validate enforces that for the node's own keys; a choice's keys
+            // are siblings of them in the file, and they are the half that would otherwise be accepted
+            // and then dropped - a spread is replaced by elements that state their own size, so a size
+            // written on the spread element itself has nothing to apply to. Silently ignoring it is
+            // what VER.012's doctrine forbids for a key that means nothing where it stands.
+            for (String key : OWN_KEYS_IN_ORDER) {
+                if (element.get(key).result().isPresent()) {
+                    diagnostics.error(Diag.DIAG_003, Diagnostics.DECODING_LOCATION, key,
+                            "a '$spread' element");
+                }
+            }
+        }
         Optional<Size> size = readSize(element, index, value.spread().isPresent(), diagnostics);
         if (reported(diagnostics) > before) {
             return Optional.empty();

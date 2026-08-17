@@ -367,8 +367,54 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
         return DataResult.success(node);
     }
 
-    /** The keys this node declares besides {@code $spread}, in a stable order, for {@code REF.072}. */
-    private List<String> presentKeysOtherThanSpread() {
+    /**
+     * This node and every node beneath it - a choice, a placement candidate, and their own children.
+     * <p>
+     * Stops at {@code traits}, because a trait payload is a {@link Trait} and stays opaque until a trait
+     * registry exists. That is not only an implementation limit: {@code MODEL.031} says realising a node
+     * never realises its satellites, so a node inside a trait is not an alternative of this one and does
+     * not belong in a walk over this node's alternatives.
+     * <p>
+     * Here rather than in each caller because three of them wanted it - {@code REF.015}'s check that no
+     * pointer in a definitions asset names an unqualified definition, the fixture harness's test for
+     * whether a document reaches outside itself, and {@code REF.034}'s assertion that no operand
+     * survived - and three hand-written recursions over the same shape is three places to forget the
+     * placement lists.
+     */
+    public List<RawNode> selfAndDescendants() {
+        List<RawNode> nodes = new ArrayList<>();
+        collectInto(nodes);
+        return List.copyOf(nodes);
+    }
+
+    private void collectInto(List<RawNode> nodes) {
+        nodes.add(this);
+        choices.ifPresent(list -> list.forEach(choice -> choice.node().collectInto(nodes)));
+        placements.values().forEach(candidates ->
+                candidates.forEach(candidate -> candidate.node().collectInto(nodes)));
+    }
+
+    /** Every {@code $ref} and {@code $spread} in this node's tree, as written. */
+    public List<String> pointersWritten() {
+        List<String> written = new ArrayList<>();
+        for (RawNode node : selfAndDescendants()) {
+            node.ref().ifPresent(written::add);
+            node.spread().ifPresent(written::add);
+        }
+        return List.copyOf(written);
+    }
+
+    /**
+     * The keys this node declares that are not operands, in a stable order.
+     * <p>
+     * Public because {@code MODEL.013} is checked twice, and the second time is not here.
+     * {@link #allowedKeys} lets a node carrying {@code $ref} write any kind's keys, because its kind
+     * arrives from the node it references and is not knowable at decode; once the reference is resolved
+     * the kind <em>is</em> known, and the same check runs again over the merged node - which is the
+     * reading {@code REF.054}'s {@code > Why} states outright: "the target's {@code kind: weighted}
+     * arrives, the sibling {@code block} is declared, and MODEL.013 refuses the result".
+     */
+    public List<String> presentNodeKeys() {
         List<String> keys = new ArrayList<>();
         kind.ifPresent(value -> keys.add("kind"));
         block.ifPresent(value -> keys.add("block"));
@@ -379,6 +425,12 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
         if (!traits.isEmpty()) {
             keys.add("traits");
         }
+        return keys;
+    }
+
+    /** The keys this node declares besides {@code $spread}, in a stable order, for {@code REF.072}. */
+    private List<String> presentKeysOtherThanSpread() {
+        List<String> keys = new ArrayList<>(presentNodeKeys());
         ref.ifPresent(value -> keys.add("$ref"));
         only.ifPresent(value -> keys.add("$only"));
         without.ifPresent(value -> keys.add("$without"));

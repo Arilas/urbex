@@ -49,14 +49,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code palettes} registry takes {@link dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition#CODEC},
  * a dispatcher that reads {@code version} and delegates - so "the registered codec rejects
  * {@code inherit}" is a claim about whichever branch the document selects, and a document selects the
- * version 1 branch by declaring no {@code version} at all. The sweep below therefore counts fourteen
- * {@code *Definition} classes against thirteen registry keys, and the extra one is not slack: it is
+ * version 1 branch by declaring no {@code version} at all. The sweep below therefore counts fifteen
+ * {@code *Definition} classes against fourteen registry keys, and the extra one is not slack: it is
  * {@code PaletteDefinition}, still reachable as a branch of the dispatcher rather than as a registered
  * codec, and {@link #bothBranchesOfThePaletteDispatcherRejectBothRetiredKeys} walks the branches
  * explicitly. The contract the count pins is unchanged in strength - every dynamic registry key has
  * exactly one registered codec, and every codec that can read a datapack file refuses both keys - and it
  * is now stated over the registry keys, which are what actually create registries, rather than over a
  * class-name glob.
+ * <p>
+ * <b>The {@code definitions} registry has no version 1 branch and is still swept.</b> Its codec reads the
+ * document as a node <em>before</em> it checks {@code version}, which is what lets the sweep reach its
+ * retired-key rejection with the same key-only document it hands every other codec. That ordering is
+ * deliberate rather than convenient: {@code VER.010} through {@code VER.012} require a version 1 key to be
+ * refused by name with its replacement, and telling an author who wrote {@code blocks} to declare a
+ * version instead would be the less useful of the two true sentences.
  */
 class RetiredKeysRejectedTest {
 
@@ -94,8 +101,8 @@ class RetiredKeysRejectedTest {
     @Test
     void everyRegisteredCodecRejectsBothRetiredKeys() throws Exception {
         Map<String, Codec<?>> codecs = registryCodecs();
-        assertEquals(14, codecs.size(),
-                "expected the fourteen definition codecs - thirteen registries plus the version 1"
+        assertEquals(15, codecs.size(),
+                "expected the fifteen definition codecs - fourteen registries plus the version 1"
                         + " palette branch behind the palette dispatcher - found " + codecs.keySet());
 
         List<String> problems = new ArrayList<>();
@@ -169,7 +176,7 @@ class RetiredKeysRejectedTest {
         List<Field> keyFields = Stream.of(CustomRegistries.class.getDeclaredFields())
                 .filter(f -> Modifier.isStatic(f.getModifiers()) && f.getName().endsWith("_REGISTRY_KEY"))
                 .toList();
-        assertEquals(13, keyFields.size(), "the thirteen dynamic registries");
+        assertEquals(14, keyFields.size(), "the fourteen dynamic registries");
 
         List<String> problems = new ArrayList<>();
         for (Field keyField : keyFields) {

@@ -1,9 +1,12 @@
 package dev.krona.urbex.format;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
+import dev.krona.urbex.format.palette.NodeResolver;
+import dev.krona.urbex.format.palette.PaletteV2Definition;
+import dev.krona.urbex.format.palette.Pointer;
+import dev.krona.urbex.format.palette.RawNode;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
@@ -33,19 +36,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * no fixture - need no decoder and are already {@code ConformanceIndexTest}'s. This is the fourth:
  * "runs each fixture against its declared outcome".
  * <p>
- * <b>Decode is not the whole load.</b> Most of what the specification refuses needs something this
- * task does not have: a resolution pass over the reference graph, a merged {@code extends} chain, a
- * trait registry, the block and tag registries of the world being loaded. A fixture whose outcome
- * depends on one of those is listed in {@link #PENDING} with the reason, and the list is not a comment:
- * {@link #theSetOfFixturesNotYetRunnableIsExactlyTheDocumentedOne} runs every pending fixture too and
- * fails if one of them has started behaving as the specification says. So an entry cannot outlive the
- * task that makes it runnable, and the count can only go down.
+ * <b>Decode is not the whole load.</b> Each fixture is taken as far through {@code LOAD.001}'s pipeline
+ * as the stages that exist: stage 1, decode, always, and stage 3, link, whenever the document is
+ * {@link #selfContained self-contained}. Most of what remains needs something no stage here has: a
+ * merged {@code extends} chain, a trait registry, the block and tag registries of the world being
+ * loaded. A fixture whose outcome depends on one of those is listed in {@link #PENDING} with the reason,
+ * and the list is not a comment: {@link #theSetOfFixturesNotYetRunnableIsExactlyTheDocumentedOne} runs
+ * every pending fixture too and fails if one of them has started behaving as the specification says. So
+ * an entry cannot outlive the task that makes it runnable, and the count can only go down.
  * <p>
- * An {@code accept} fixture is asserted at decode strength: the document decodes. That is a necessary
- * condition of the fixture's claim and not the whole of it - a later stage may still refuse a document
- * that decoded - so those fixtures are run here <em>and</em> get stronger as the later stages land,
- * without moving in or out of any list. The display name of each dynamic test says which strength it
- * asserted, so a passing run is readable rather than merely green.
+ * An {@code accept} fixture is asserted at whichever strength it reached, which is a necessary condition
+ * of the fixture's claim and not the whole of it - a later stage may still refuse a document that got
+ * this far - so those fixtures are run here <em>and</em> get stronger as the later stages land, without
+ * moving in or out of any list. The display name of each dynamic test says which strength it asserted,
+ * so a passing run is readable rather than merely green.
  */
 class FormatFixtureTest {
 
@@ -71,19 +75,6 @@ class FormatFixtureTest {
 
     private static Map<String, String> pending() {
         Map<String, String> pending = new LinkedHashMap<>();
-
-        // Task 3 - pointers, operands, and resolution.
-        pending.put("MODEL.011#1", "MODEL.011's kind default is applied after reference resolution:"
-                + " a node carrying $ref takes its kind from its target, so the two spellings are only"
-                + " comparable once $ref is resolved (Task 3)");
-        pending.put("MODEL.011#2", "the other half of the same equiv group");
-        pending.put("MODEL.081#1", "MODEL.081 is completeness, checked where a definition is used and"
-                + " therefore after $ref is resolved (Task 3)");
-        pending.put("REF.013#1", "a $ref that names no definition is a resolution failure (Task 3)");
-        pending.put("REF.032#1", "a reference cycle is found by the topological pass (Task 3)");
-        pending.put("REF.071#1", "whether a $spread's pointer names a list is a property of the node it"
-                + " points at (Task 3)");
-        pending.put("REF.083#1", "an $imports alias is expanded where a pointer is parsed (Task 3)");
 
         // Task 4 - merging.
         pending.put("MODEL.062#1", "an alias names a marker answered by the merged palette (Task 4)");
@@ -132,21 +123,23 @@ class FormatFixtureTest {
     }
 
     @TestFactory
-    Stream<DynamicTest> everyDecodeTimeFixtureBehavesAsTheSpecificationSays() {
+    Stream<DynamicTest> everyRunnableFixtureBehavesAsTheSpecificationSays() {
         List<Addressed> fixtures = addressed();
         List<DynamicTest> tests = new ArrayList<>();
         for (Addressed fixture : fixtures) {
             if (PENDING.containsKey(fixture.address()) || fixture.isEquiv()) {
                 continue;
             }
-            tests.add(DynamicTest.dynamicTest(name(fixture), () -> assertBehaves(fixture)));
+            Loaded loaded = load(fixture.fixture().json());
+            tests.add(DynamicTest.dynamicTest(name(fixture, loaded),
+                    () -> assertBehaves(fixture, loaded)));
         }
         for (Map.Entry<String, List<Addressed>> group : equivGroups(fixtures).entrySet()) {
             if (group.getValue().stream().anyMatch(fx -> PENDING.containsKey(fx.address()))) {
                 continue;
             }
             tests.add(DynamicTest.dynamicTest(
-                    "equiv=" + group.getKey() + " — every spelling decodes to the same node tree",
+                    "equiv=" + group.getKey() + " — every spelling means the same thing",
                     () -> assertAllEqual(group.getKey(), group.getValue())));
         }
         return tests.stream();
@@ -201,17 +194,17 @@ class FormatFixtureTest {
 
     // ----------------------------------------------------------------------------------------------
 
-    private static void assertBehaves(Addressed fixture) {
-        DataResult<PaletteAssetDefinition> decoded = decode(fixture.fixture().json());
+    private static void assertBehaves(Addressed fixture, Loaded loaded) {
         switch (fixture.fixture().outcome()) {
-            case ACCEPT -> assertTrue(decoded.result().isPresent(),
-                    () -> fixture.where() + ": expected the document to decode, got "
-                            + decoded.error().map(DataResult.Error::message).orElse("?"));
+            case ACCEPT -> assertTrue(loaded.error().isEmpty(),
+                    () -> fixture.where() + ": expected the document to " + loaded.strength()
+                            + ", got " + loaded.error().orElse("?"));
             case REJECT -> {
                 String expected = fixture.fixture().diag().orElseThrow();
-                assertTrue(decoded.error().isPresent(),
-                        () -> fixture.where() + ": expected " + expected + ", but the document decoded");
-                String message = decoded.error().orElseThrow().message();
+                assertTrue(loaded.error().isPresent(),
+                        () -> fixture.where() + ": expected " + expected + ", but the document "
+                                + loaded.strength());
+                String message = loaded.error().orElseThrow();
                 assertTrue(Diag.of(expected).matches(message),
                         () -> fixture.where() + ": expected " + expected + " ("
                                 + Diag.of(expected).template() + ") but got: " + message);
@@ -235,48 +228,129 @@ class FormatFixtureTest {
     }
 
     private static void assertAllEqual(String slug, List<Addressed> group) {
-        List<PaletteAssetDefinition> decoded = new ArrayList<>();
+        List<Object> loaded = new ArrayList<>();
         for (Addressed fixture : group) {
-            DataResult<PaletteAssetDefinition> result = decode(fixture.fixture().json());
-            assertTrue(result.result().isPresent(), () -> fixture.where()
-                    + ": an equiv fixture must decode, got "
-                    + result.error().map(DataResult.Error::message).orElse("?"));
-            decoded.add(result.result().orElseThrow());
+            Loaded result = load(fixture.fixture().json());
+            assertTrue(result.error().isEmpty(), () -> fixture.where()
+                    + ": an equiv fixture must " + result.strength() + ", got "
+                    + result.error().orElse("?"));
+            loaded.add(result.value());
         }
-        for (int i = 1; i < decoded.size(); i++) {
-            assertEquals(decoded.get(0), decoded.get(i),
+        for (int i = 1; i < loaded.size(); i++) {
+            assertEquals(loaded.get(0), loaded.get(i),
                     "equiv=" + slug + ": " + group.get(0).where() + " and " + group.get(i).where()
-                            + " must decode to the same thing");
+                            + " must mean the same thing");
         }
     }
 
     private static boolean behavesAsDeclared(Addressed fixture) {
-        DataResult<PaletteAssetDefinition> decoded = decode(fixture.fixture().json());
+        Loaded loaded = load(fixture.fixture().json());
         return switch (fixture.fixture().outcome()) {
-            case ACCEPT -> decoded.result().isPresent();
-            case REJECT -> decoded.error().isPresent()
+            case ACCEPT -> loaded.error().isEmpty();
+            case REJECT -> loaded.error().isPresent()
                     && Diag.of(fixture.fixture().diag().orElseThrow())
-                            .matches(decoded.error().orElseThrow().message());
+                            .matches(loaded.error().orElseThrow());
             case EQUIV, FRAGMENT -> false;
         };
     }
 
     private static boolean allEqual(List<Addressed> group) {
-        List<PaletteAssetDefinition> decoded = new ArrayList<>();
+        List<Object> loaded = new ArrayList<>();
         for (Addressed fixture : group) {
-            Optional<PaletteAssetDefinition> result = decode(fixture.fixture().json()).result();
-            if (result.isEmpty()) {
+            Loaded result = load(fixture.fixture().json());
+            if (result.error().isPresent()) {
                 return false;
             }
-            decoded.add(result.get());
+            loaded.add(result.value());
         }
-        return decoded.stream().distinct().count() == 1;
+        return loaded.stream().distinct().count() == 1;
     }
 
-    /** Every fixture decodes through the registry's codec, so version dispatch is part of every run. */
-    private static DataResult<PaletteAssetDefinition> decode(String json) {
-        JsonElement parsed = JsonParser.parseString(json);
-        return PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, parsed);
+    /**
+     * One fixture, taken as far through the pipeline as a harness holding a single document can.
+     *
+     * @param decoded stage 1 of {@code LOAD.001}
+     * @param linked  stage 3, or empty when this document reaches outside itself - see
+     *                {@link #selfContained}
+     */
+    private record Loaded(DataResult<PaletteAssetDefinition> decoded,
+                          Optional<DataResult<NodeResolver.ResolvedPalette>> linked) {
+
+        /** The first stage that refused the document, if either did. */
+        Optional<String> error() {
+            return decoded.error().map(DataResult.Error::message)
+                    .or(() -> linked.flatMap(DataResult::error).map(DataResult.Error::message));
+        }
+
+        /** The strongest form this fixture reached, which is what an {@code equiv} group compares. */
+        Object value() {
+            return linked.flatMap(DataResult::result)
+                    .map(Object.class::cast)
+                    .orElseGet(() -> decoded.result().orElseThrow());
+        }
+
+        /** What the dynamic test's name claims was asserted. */
+        String strength() {
+            return linked.isPresent() ? "decode and link" : "decode";
+        }
+    }
+
+    /**
+     * Decodes a fixture and, when it is self-contained, links it too.
+     * <p>
+     * Every fixture decodes through the registry's codec, so version dispatch is part of every run.
+     */
+    private static Loaded load(String json) {
+        DataResult<PaletteAssetDefinition> decoded =
+                PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));
+        Optional<PaletteV2Definition> file = decoded.result()
+                .filter(PaletteV2Definition.class::isInstance)
+                .map(PaletteV2Definition.class::cast)
+                .filter(FormatFixtureTest::selfContained);
+        if (file.isEmpty()) {
+            return new Loaded(decoded, Optional.empty());
+        }
+        Diagnostics diagnostics = new Diagnostics();
+        Optional<NodeResolver.ResolvedPalette> resolved =
+                NodeResolver.resolve(file.orElseThrow(), diagnostics);
+        DataResult<NodeResolver.ResolvedPalette> linked = resolved
+                .map(DataResult::success)
+                .orElseGet(() -> DataResult.error(() -> diagnostics.asError()
+                        .orElse("the link stage refused the document and said nothing")));
+        return new Loaded(decoded, Optional.of(linked));
+    }
+
+    /**
+     * Whether this document can be linked by a harness that holds one document.
+     * <p>
+     * A fixture that writes a pointer at another asset cannot be: nothing here loads
+     * {@code urbex:common}, and {@code LOAD.025} makes stage 3 need every other palette's stage 2. That
+     * is the same limitation the specification itself records, as the {@code [NO-FIXTURE: a second
+     * asset]} marker on {@code REF.043} and {@code REF.045} - so such a fixture is asserted at decode
+     * strength and its dynamic test says which strength it asserted, rather than being listed as pending
+     * for a shortcoming of the harness rather than of the loader.
+     * <p>
+     * {@code extends} is the same case one level up: a chain is stage 2, which is Task 4's.
+     * <p>
+     * A pointer that fails to <em>parse</em> is not a reach outside the document - it is a local mistake,
+     * and {@code REF.083}'s fixture is exactly one - so it does not disqualify a fixture from linking.
+     */
+    private static boolean selfContained(PaletteV2Definition file) {
+        if (file.extendsId().isPresent()) {
+            return false;
+        }
+        List<RawNode> entries = new ArrayList<>(file.defs().values());
+        entries.addAll(file.palette().orElse(Map.of()).values());
+        for (RawNode entry : entries) {
+            for (String written : entry.pointersWritten()) {
+                Pointer pointer = Pointer.parse(written, file.imports(), "a fixture")
+                        .result().orElse(null);
+                if (pointer instanceof Pointer.Registry || pointer instanceof Pointer.Fragment) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static List<Addressed> addressed() {
@@ -298,9 +372,9 @@ class FormatFixtureTest {
         return groups;
     }
 
-    private static String name(Addressed fixture) {
+    private static String name(Addressed fixture, Loaded loaded) {
         String claim = switch (fixture.fixture().outcome()) {
-            case ACCEPT -> "decodes";
+            case ACCEPT -> "survives " + loaded.strength();
             case REJECT -> "is refused with " + fixture.fixture().diag().orElseThrow();
             case EQUIV -> "equiv";
             case FRAGMENT -> "fragment";

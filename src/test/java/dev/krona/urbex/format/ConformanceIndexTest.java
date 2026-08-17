@@ -39,9 +39,10 @@ class ConformanceIndexTest {
      * §4.3 gives a {@code [NO-FIXTURE]} rule a stricter requirement than the fixture-completeness one it
      * replaces: it must have a citing test, and unlike the general check that requirement is never
      * suspended by draft. That is the right rule and this list does not weaken it - it records that
-     * <em>today</em> none of the thirteen is coverable, because a decoder is all that exists and every
-     * one of them needs something else: a second asset, a resolved {@code extends} chain, a part file, a
-     * command invocation, or a generated 129-choice list.
+     * <em>today</em> none of the entries below is coverable, because each needs something no stage that
+     * exists has: a resolved {@code extends} chain, a part file, a command invocation, or a generated
+     * 129-choice list. The three a second asset was enough for - {@code REF.043}, {@code REF.045} and
+     * {@code REF.062} - went when the resolver landed and could be handed one.
      * <p>
      * <b>Why a list and not a disabled test.</b> Until Task 2 this whole test was {@code @Disabled},
      * which checked nothing at all - including the twelve other assertions in it and the five hundred
@@ -55,9 +56,6 @@ class ConformanceIndexTest {
 
     private static Map<String, String> noFixtureRulesAwaitingACitingTest() {
         Map<String, String> awaiting = new LinkedHashMap<>();
-        awaiting.put("REF.043", "a pointer into a second registry; Task 3");
-        awaiting.put("REF.045", "a pointer at a second asset; Task 3");
-        awaiting.put("REF.062", "$super in an entry that inherits nothing; Task 4");
         awaiting.put("MERGE.010", "a version 1 palette extended by a version 2 one; Task 4");
         awaiting.put("MERGE.012", "a part carrying an inline palette; Task 4");
         awaiting.put("VER.005", "an extends chain across the two versions; Task 4");
@@ -188,9 +186,8 @@ class ConformanceIndexTest {
      * as its document stays draft, which is exactly the loophole §4.3 exists to close.
      * <p>
      * Enabled as of Task 2, the first task to write a citing test. The {@code [NO-FIXTURE]} branch
-     * consults {@link #NO_FIXTURE_RULES_AWAITING_A_CITING_TEST}, because not one of the thirteen
-     * {@code [NO-FIXTURE]} rules is coverable by a decoder: each needs a second asset, a resolved
-     * chain, a part file, a command or a generated input. That list is a weaker promise than
+     * consults {@link #NO_FIXTURE_RULES_AWAITING_A_CITING_TEST}, whose remaining entries each need a
+     * resolved chain, a part file, a command or a generated input. That list is a weaker promise than
      * §4.3's, and a far stronger one than the {@code @Disabled} it replaces - see its own javadoc.
      */
     @Test
