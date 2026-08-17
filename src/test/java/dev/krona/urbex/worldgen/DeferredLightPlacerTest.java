@@ -47,8 +47,8 @@ class DeferredLightPlacerTest {
         BlockPos first = pos(1, 70, 1);
         BlockPos second = pos(2, 70, 1);
         LightTodoQueue queue = new LightTodoQueue(OWNER_X, OWNER_Z);
-        queue.add(first, free);
-        queue.add(second, free);
+        queue.add(first, free, true);
+        queue.add(second, free, true);
 
         List<DeferredLightPlacer.Planned> planned = plan(
                 queue.closeAndDrain(), (candidate, fallback) -> fallback);
@@ -65,7 +65,7 @@ class DeferredLightPlacerTest {
         BlockPos marker = pos(5, 70, 5);
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, lantern)),
+                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, lantern, true)),
                 candidate -> Blocks.AIR.defaultBlockState(),
                 (unusedMarker, supportDirection, stateAt) -> false,
                 (unusedMarker, attempt, stateAt) -> true);
@@ -80,7 +80,7 @@ class DeferredLightPlacerTest {
         BlockPos marker = pos(5, 70, 5);
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, bare)),
+                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, bare, true)),
                 candidate -> Blocks.AIR.defaultBlockState(),
                 (unusedMarker, supportDirection, stateAt) -> false,
                 (unusedMarker, attempt, stateAt) -> true);
@@ -99,8 +99,8 @@ class DeferredLightPlacerTest {
                 eastBorder.west(), Blocks.STONE.defaultBlockState(),
                 eastBorder.east(), Blocks.STONE.defaultBlockState());
         List<LightTodoQueue.Todo> todos = List.of(
-                new LightTodoQueue.Todo(westBorder, source(wall)),
-                new LightTodoQueue.Todo(eastBorder, source(wall)));
+                new LightTodoQueue.Todo(westBorder, source(wall), true),
+                new LightTodoQueue.Todo(eastBorder, source(wall), true));
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
                 OWNER_X, OWNER_Z, 19L, todos,
@@ -131,8 +131,8 @@ class DeferredLightPlacerTest {
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
                 OWNER_X, OWNER_Z, 19L,
-                List.of(new LightTodoQueue.Todo(westBorder, source(wall)),
-                        new LightTodoQueue.Todo(eastBorder, source(wall))),
+                List.of(new LightTodoQueue.Todo(westBorder, source(wall), true),
+                        new LightTodoQueue.Todo(eastBorder, source(wall), true)),
                 candidate -> surroundings.getOrDefault(candidate, Blocks.AIR.defaultBlockState()),
                 (marker, supportDirection, stateAt) ->
                         !stateAt.apply(marker.relative(supportDirection)).isAir(),
@@ -149,8 +149,8 @@ class DeferredLightPlacerTest {
                 List.of(entry(1, "minecraft:glowstone")));
         LightPool wall = wallPool();
         List<LightTodoQueue.Todo> forward = List.of(
-                new LightTodoQueue.Todo(freeMarker, source(free)),
-                new LightTodoQueue.Todo(wallMarker, source(wall)));
+                new LightTodoQueue.Todo(freeMarker, source(free), true),
+                new LightTodoQueue.Todo(wallMarker, source(wall), true));
         List<LightTodoQueue.Todo> reverse = new ArrayList<>(forward);
         Collections.reverse(reverse);
         Function<BlockPos, BlockState> overwrittenMarkerState = candidate ->
@@ -179,7 +179,7 @@ class DeferredLightPlacerTest {
                 entry(1, "minecraft:sea_lantern")));
         List<LightTodoQueue.Todo> all = IntStream.range(0, 64)
                 .mapToObj(y -> new BlockPos((OWNER_X << 4) + 7, y, (OWNER_Z << 4) + 7))
-                .map(marker -> new LightTodoQueue.Todo(marker, source(free)))
+                .map(marker -> new LightTodoQueue.Todo(marker, source(free), true))
                 .toList();
         List<LightTodoQueue.Todo> low = all.stream()
                 .filter(todo -> DensitySelector.lighting(seed, todo.pos(), 0.25f))

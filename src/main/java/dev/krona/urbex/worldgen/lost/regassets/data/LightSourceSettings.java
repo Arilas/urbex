@@ -83,11 +83,24 @@ public record LightSourceSettings(List<Entry> floor, List<Entry> wall, List<Entr
         return settings.equals(OWN_BLOCK) ? Either.left(true) : Either.right(settings);
     }
 
-    /** One weighted candidate of a socket's {@code floor}, {@code wall}, {@code ceiling} or {@code free}. */
-    public record Entry(int weight, String block) {
+    /**
+     * One weighted candidate of a socket's {@code floor}, {@code wall}, {@code ceiling} or
+     * {@code free}, and what stands in its place when the light is off.
+     * <p>
+     * The replacement belongs to the candidate rather than to the socket because a socket's
+     * candidates are not interchangeable: a floor torch and a wall torch go dark as two different
+     * blocks, and only the candidate knows which. One replacement for the whole socket could be
+     * right for at most one of its placements.
+     */
+    public record Entry(int weight, String block, @Nullable String unlit) {
         public static final Codec<Entry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
                 Codec.INT.fieldOf("weight").forGetter(Entry::weight),
-                Codec.STRING.fieldOf("block").forGetter(Entry::block)
-        ).apply(instance, Entry::new));
+                Codec.STRING.fieldOf("block").forGetter(Entry::block),
+                Codec.STRING.optionalFieldOf("unlit").forGetter(entry -> Optional.ofNullable(entry.unlit()))
+        ).apply(instance, (weight, block, unlit) -> new Entry(weight, block, unlit.orElse(null))));
+
+        public Entry(int weight, String block) {
+            this(weight, block, null);
+        }
     }
 }

@@ -188,16 +188,16 @@ public class Parts {
      */
     public static BlockState handleLightSource(ChunkGenContext ctx, CityGenerator feature,
                                                LightSource source, BlockState lit, BlockPos pos) {
-        if (!DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity())) {
-            return source.unlitAt(ctx.seed, pos);
-        }
+        boolean on = DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity());
         if (source.isSocket()) {
-            // Deferred: a socket has to see the finished chunk to find its support and orient
-            // itself, so the marker holds air until placeOptionalLights runs.
-            ctx.addLightTodo(pos, source);
+            // Deferred either way. A socket has to see the finished chunk to find its support and
+            // orient itself, and that is as true of an unlit wall torch as of a lit one - it is the
+            // support search that decides whether this marker holds a floor fixture or a wall one.
+            // So the marker holds air until placeOptionalLights runs, and the roll rides along.
+            ctx.addLightTodo(pos, source, on);
             return feature.air;
         }
-        return lit;
+        return on ? lit : source.unlitAt(ctx.seed, pos);
     }
 
     /**

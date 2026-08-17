@@ -22,6 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,13 +57,15 @@ class CommonPaletteLightingTest {
         assertEquals(new LightSourceSettings(
                 List.of(
                         new LightSourceSettings.Entry(6, "minecraft:lantern[hanging=false]"),
-                        new LightSourceSettings.Entry(3, "minecraft:torch"),
+                        new LightSourceSettings.Entry(3, "minecraft:torch",
+                                "minecraft:candle[candles=1,lit=false]"),
                         new LightSourceSettings.Entry(1, "minecraft:end_rod[facing=up]")),
                 List.of(
                         new LightSourceSettings.Entry(8, "minecraft:wall_torch[facing=north]"),
                         new LightSourceSettings.Entry(2, "minecraft:end_rod[facing=north]")),
                 List.of(
-                        new LightSourceSettings.Entry(8, "minecraft:lantern[hanging=true]"),
+                        new LightSourceSettings.Entry(8, "minecraft:lantern[hanging=true]",
+                                "minecraft:iron_chain[axis=y]"),
                         new LightSourceSettings.Entry(2, "minecraft:end_rod[facing=down]")),
                 List.of(), null, null), torchMarker.getLightSource());
 
@@ -86,10 +89,18 @@ class CommonPaletteLightingTest {
         assertNotNull(freePool);
         assertSame(Blocks.TORCH, torchPool.allCandidates().stream().toList().get(1).state().getBlock());
 
-        // Both keep air as their replacement, which is what a rejected marker has always left
-        // behind. That is what makes this rename a rename: the built-in pack generates as it did.
+        // Neither socket names a replacement of its own, so a candidate that names none - every
+        // end rod, the floor lantern - leaves air behind exactly as a rejected marker always has.
         assertEquals(BlockChoice.AIR, compiled.getPalette().get('T').info().lightSource().unlit());
         assertEquals(BlockChoice.AIR, compiled.getPalette().get('h').info().lightSource().unlit());
+
+        // The two fixtures that do have an inert stand-in keep it, and it emits nothing: a torch
+        // that is off is a spent candle, and a lantern that is off is the chain it hung from.
+        assertEquals(Blocks.CANDLE, unlitOf(torchPool, Blocks.TORCH).getBlock());
+        assertEquals(Blocks.IRON_CHAIN, unlitOf(torchPool, Blocks.LANTERN).getBlock());
+        torchPool.allCandidates().stream().map(LightPool.Candidate::unlit).filter(Objects::nonNull)
+                .forEach(unlit -> assertEquals(0, unlit.getLightEmission(),
+                        () -> "An unlit replacement emits light: " + unlit));
 
         Stream.concat(torchPool.allCandidates().stream(), freePool.allCandidates().stream())
                 .forEach(candidate -> {
@@ -127,6 +138,20 @@ class CommonPaletteLightingTest {
                         () -> path + ": " + decoded.error().map(Object::toString).orElse("unknown decode error"));
             }
         }
+    }
+
+    /**
+     * The replacement of the candidate that places {@code lit} and names one. The floor lantern and
+     * the ceiling lantern are both {@code minecraft:lantern} and only the hanging one has a chain to
+     * leave behind, so the filter is on the replacement, not on the lit block alone.
+     */
+    private static net.minecraft.world.level.block.state.BlockState unlitOf(LightPool pool,
+                                                                           net.minecraft.world.level.block.Block lit) {
+        return pool.allCandidates().stream()
+                .filter(candidate -> candidate.state().getBlock() == lit && candidate.unlit() != null)
+                .map(LightPool.Candidate::unlit)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No candidate placing " + lit + " names a replacement"));
     }
 
     private static PaletteDefinition decodeClasspathPalette(String resource) throws IOException {

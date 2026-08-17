@@ -90,11 +90,11 @@ public final class ChunkGenContext {
         this.lightTodo = new LightTodoQueue(coord.chunkX(), coord.chunkZ());
     }
 
-    void addLightTodo(BlockPos pos, LightSource source) {
+    void addLightTodo(BlockPos pos, LightSource source, boolean lit) {
         if (!window.contains(pos)) {
             return;
         }
-        lightTodo.add(pos, source);
+        lightTodo.add(pos, source, lit);
     }
 
     List<LightTodoQueue.Todo> drainLightTodo() {

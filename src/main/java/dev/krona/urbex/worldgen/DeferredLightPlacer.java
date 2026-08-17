@@ -60,30 +60,33 @@ final class DeferredLightPlacer {
             BlockPos marker = todo.pos();
             LightSource source = todo.source();
             LightPool pool = source.pool();
-            Optional<OptionalLightPlacer.Attempt> attempt;
-            if (pool == null) {
-                // Every candidate this socket declared named a block absent from this game (issue
-                // #91). There is nothing to try, and the replacement is the honest answer.
-                attempt = Optional.empty();
-            } else {
+            Optional<OptionalLightPlacer.Attempt> attempt = Optional.empty();
+            if (pool != null) {
+                // Both passes draw from one stream at one address, so the candidate a marker would
+                // light is the candidate whose replacement stands there while it is dark. Raising
+                // lighting density lights the fixture already in place rather than moving it.
                 RandomSource random = Rng.atPos(seed, marker.getX(), marker.getY(), marker.getZ(),
                         Rng.Purpose.LIGHTING_VARIANT);
                 attempt = OptionalLightPlacer.select(pool, random,
                         (placement, supportDirection) -> supportDirection == null
                                 || (belongsTo(ownerChunkX, ownerChunkZ, marker.relative(supportDirection))
                                 && anchorSupport.isPresent(marker, supportDirection, snapshotStateAt)),
-                        att -> survival.canPlace(marker, att, snapshotStateAt));
+                        att -> survival.canPlace(marker, att, snapshotStateAt),
+                        todo.lit() ? LightPool.Candidate::state
+                                : candidate -> source.unlitFor(candidate, seed, marker),
+                        todo.lit());
             }
             if (attempt.isPresent()) {
                 planned.add(new Planned(marker, attempt.get().state()));
-                continue;
-            }
-            // Nowhere to hang it: damaged surroundings, no sturdy face, or a pool with nothing left
-            // in it. Air is skipped rather than planned - the marker already holds air, and writing
-            // it again would put a driver write where there was none before.
-            BlockState unlit = source.unlitAt(seed, marker);
-            if (!unlit.isAir()) {
-                planned.add(new Planned(marker, unlit));
+            } else if (todo.lit()) {
+                // Nowhere to hang it: damaged surroundings, no sturdy face, or a pool with nothing
+                // left in it. The source's own replacement is the last answer, and air is skipped
+                // rather than planned - the marker already holds air, and writing it again would put
+                // a driver write where there was none before.
+                BlockState unlit = source.unlitAt(seed, marker);
+                if (!unlit.isAir()) {
+                    planned.add(new Planned(marker, unlit));
+                }
             }
         }
         return List.copyOf(planned);

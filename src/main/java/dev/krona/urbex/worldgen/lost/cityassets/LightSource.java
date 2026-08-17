@@ -29,4 +29,12 @@ public record LightSource(@Nullable LightPool pool, BlockChoice unlit) {
     public BlockState unlitAt(long seed, BlockPos pos) {
         return unlit.at(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LIGHTING_UNLIT);
     }
+
+    /**
+     * What {@code candidate} leaves behind when this socket is off: the replacement the candidate
+     * named, or this source's own when it named none.
+     */
+    public BlockState unlitFor(LightPool.Candidate candidate, long seed, BlockPos pos) {
+        return candidate.unlit() != null ? candidate.unlit() : unlitAt(seed, pos);
+    }
 }

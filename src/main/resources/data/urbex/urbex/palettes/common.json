@@ -20,7 +20,8 @@
           },
           {
             "weight": 3,
-            "block": "minecraft:torch"
+            "block": "minecraft:torch",
+            "unlit": "minecraft:candle[candles=1,lit=false]"
           },
           {
             "weight": 1,
@@ -40,7 +41,8 @@
         "ceiling": [
           {
             "weight": 8,
-            "block": "minecraft:lantern[hanging=true]"
+            "block": "minecraft:lantern[hanging=true]",
+            "unlit": "minecraft:iron_chain[axis=y]"
           },
           {
             "weight": 2,

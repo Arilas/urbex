@@ -22,7 +22,12 @@ public final class LightPool {
 
     public enum Placement { FLOOR, WALL, CEILING, FREE }
 
-    public record Candidate(int weight, BlockState state) { }
+    /**
+     * One compiled candidate: the lit state, and the state that stands in its place when this
+     * socket's light is off. {@code unlit} is null when the candidate names none, in which case the
+     * source's own replacement is used.
+     */
+    public record Candidate(int weight, BlockState state, @Nullable BlockState unlit) { }
 
     private final Map<Placement, List<Candidate>> candidates;
     private final Map<Placement, Integer> totalWeights;
@@ -143,13 +148,32 @@ public final class LightPool {
                         "block state emits no light", null);
             }
             validatePlacement(paletteId, marker, placement, candidateIndex, entry.block(), state);
+            // Dropped like any other absent block (issue #91): the candidate keeps its lit state and
+            // falls back to the source's own replacement, rather than the whole candidate vanishing
+            // because a mod that supplied only its unlit form is not installed.
+            BlockState unlit = null;
+            if (entry.unlit() != null) {
+                try {
+                    unlit = Tools.resolveState(entry.unlit(), blockLookup, paletteId);
+                } catch (RuntimeException e) {
+                    throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.unlit(),
+                            "cannot parse block state", e);
+                }
+                if (unlit != null && unlit.getLightEmission() > 0) {
+                    throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.unlit(),
+                            "an unlit replacement must emit no light", null);
+                }
+                if (unlit != null) {
+                    validatePlacement(paletteId, marker, placement, candidateIndex, entry.unlit(), unlit);
+                }
+            }
             try {
                 totalWeight = Math.addExact(totalWeight, entry.weight());
             } catch (ArithmeticException e) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "total weight exceeds integer range", e);
             }
-            compiled.add(new Candidate(entry.weight(), state));
+            compiled.add(new Candidate(entry.weight(), state, unlit));
         }
         candidates.put(placement, List.copyOf(compiled));
         totalWeights.put(placement, totalWeight);
