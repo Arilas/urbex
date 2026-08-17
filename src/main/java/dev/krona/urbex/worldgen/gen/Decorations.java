@@ -5,8 +5,11 @@ import dev.krona.urbex.varia.NoiseGeneratorPerlin;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
+import dev.krona.urbex.worldgen.Parts;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import dev.krona.urbex.worldgen.lost.cityassets.Palette;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -342,6 +345,63 @@ public final class Decorations {
                     b = grass;
                 }
                 driver.current(x, height, z).block(b);
+            }
+        }
+        placeParkLamps(ctx, feature, info, height, compiledPalette);
+    }
+
+    /**
+     * Stand this style's park lamps on the grass, on a world-aligned grid.
+     *
+     * <p>A park surface is generated here rather than assembled from a part, so until this existed
+     * there was no slice for a datapack to write a light into and no lighting density that could
+     * change it: a city's parks were the one place guaranteed to be dark and full of mobs, whatever
+     * the pack or the settings said. A style now names a character and this puts it on the grass.</p>
+     *
+     * <p>The grid is keyed on world coordinates, not chunk-local ones, so lamps line up across a
+     * park that spans several chunks instead of restarting at every seam. Nothing is placed on the
+     * border ring - that is the paved verge or the park's edge, and a lamp there would sit half in
+     * the street - nor where the surface is not this park's own grass.</p>
+     *
+     * <p>The character goes through {@link Parts#handleLightSource} exactly as a marker in a part
+     * would, so a lamp declared with {@code lightSource} obeys lighting density, and one declared
+     * without it is an ordinary block that is always placed. Neither is special-cased here.</p>
+     */
+    private void placeParkLamps(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info,
+                                int height, CompiledPalette compiledPalette) {
+        Character lamp = info.getCityStyle().getParkLampBlock();
+        if (lamp == null) {
+            return;
+        }
+        int spacing = info.getCityStyle().getParkLampSpacing();
+        ChunkDriver driver = ctx.driver;
+        int baseX = info.coord.chunkX() << 4;
+        int baseZ = info.coord.chunkZ() << 4;
+        for (int x = 1; x < 15; ++x) {
+            if (Math.floorMod(baseX + x, spacing) != 0) {
+                continue;
+            }
+            for (int z = 1; z < 15; ++z) {
+                if (Math.floorMod(baseZ + z, spacing) != 0) {
+                    continue;
+                }
+                int y = height + 1;
+                driver.current(x, y, z);
+                BlockPos pos = driver.getCurrentCopy();
+                BlockState lit = ctx.paletteAt(compiledPalette, lamp, x, y, z);
+                if (lit == null) {
+                    // A style naming a character its palette does not map is a datapack error, and
+                    // one that would otherwise show up as a park that is dark for no visible reason.
+                    throw new RuntimeException("Park lamp character '" + lamp + "' is not in the "
+                            + "palette for city style '" + info.getCityStyle().getName() + "'");
+                }
+                Palette.Info paletteInfo = compiledPalette.getInfo(lamp);
+                BlockState b = (paletteInfo != null && paletteInfo.lightSource() != null)
+                        ? Parts.handleLightSource(ctx, feature, paletteInfo.lightSource(), lit, pos)
+                        : lit;
+                if (b != feature.air) {
+                    driver.current(x, y, z).block(b);
+                }
             }
         }
     }
