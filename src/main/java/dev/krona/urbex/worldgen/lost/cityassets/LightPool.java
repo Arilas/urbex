@@ -79,6 +79,31 @@ public final class LightPool {
         return new LightPool(candidates, totalWeights);
     }
 
+    /**
+     * A pool from candidates that are already compiled, totalling their weights here.
+     * <p>
+     * {@link #compile} is version 1's entry point: it takes {@link LightSourceSettings}, resolves block
+     * strings and keeps its own running totals. A version 2 socket arrives with its blocks already
+     * resolved and its weights already apportioned, so it needs the constructor and not the compiler -
+     * and the totals are derived rather than passed, because a total that disagrees with its candidates
+     * is a bug {@link #weightedOrder} would express as a silently biased draw.
+     */
+    public static LightPool of(Map<Placement, List<Candidate>> candidates) {
+        EnumMap<Placement, Integer> totals = new EnumMap<>(Placement.class);
+        for (Placement placement : Placement.values()) {
+            int total = 0;
+            for (Candidate candidate : candidates.getOrDefault(placement, List.of())) {
+                if (candidate.weight() <= 0) {
+                    throw new IllegalArgumentException("a light pool candidate weighs "
+                            + candidate.weight() + ", and weightedOrder draws a ticket below the total");
+                }
+                total += candidate.weight();
+            }
+            totals.put(placement, total);
+        }
+        return new LightPool(candidates, totals);
+    }
+
     public List<Candidate> weightedOrder(Placement placement, RandomSource random) {
         List<Candidate> group = candidates.get(placement);
         if (group.isEmpty()) {

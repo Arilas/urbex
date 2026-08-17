@@ -23,7 +23,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (43):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.061`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.010`, `LOAD.012`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (42):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.061`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.012`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 197 of 312 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 199 of 312 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -86,9 +86,9 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.063` | `MUST` |  |  | `PendingAliasTest.aPendingAliasCarriesItsOwnTraitsSoTheMergeCanApplyThemOverWhateverItResolves`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
 | `MODEL.064` | `MUST` |  |  | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesNotDefineIsCarriedOutRatherThanDropped` |
 | `MODEL.070` | `MUST` |  |  | `ExclusionTest.aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade` |
-| `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists` |
+| `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists`, `V2SocketsTest.eachPlacementListBecomesItsOwnCandidateGroupAndAnEmptyOneStaysEmpty` |
 | `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
-| `MODEL.073` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap` |
+| `MODEL.073` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `V2SocketsTest.theCandidateOrderComesFromTheSlotsAndNotFromAHashSoItIsTheSameEveryRun` |
 | `MODEL.074` | `MUST` |  |  | — |
 | `MODEL.075` | `MUST` |  |  | — |
 | `MODEL.076` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
@@ -104,7 +104,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.002` | `MUST` |  |  | `PaletteV2DecodeTest.aTraitIdIsNamespacedAndAnUnqualifiedOneIsRefused` |
 | `TRAIT.003` | `REJECT` | `DIAG.020` | `reject=DIAG.020` | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
 | `TRAIT.004` | `MUST` |  | `accept` | `MarkerTraitsComposeTest.aMarkerCarryingBothALightAndAMobAppliesBothRatherThanOnlyTheFirstOne`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem` |
-| `TRAIT.005` | `MUST` |  | `accept` | `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne` |
+| `TRAIT.005` | `MUST` |  | `accept` | `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
 | `TRAIT.006` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole`, `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField` |
 | `TRAIT.007` | `MUST NOT` |  |  | `TraitTest.aSatelliteInheritsNothingSoAnUnlitReplacementIsNotItselfAnOptionalLight` |
 | `TRAIT.008` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole` |
@@ -124,11 +124,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
 | `TRAIT.044` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `accept` | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `TraitPhaseTest.aBlockEntityBesideALightIsAcceptedWhenTheUnlitReplacementCanHoldTheNbtToo`, `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitPhaseTest.aBlockEntityWithNoSelectionTraitIsUnaffectedSoNothingThatCompilesTodayStopsCompiling`, `TraitPhaseTest.anAbsentReplacementIsAirAndAirIsRefusedBecauseAirHoldsNoBlockEntityEither` |
 | `TRAIT.050` | `MUST` |  |  | — |
-| `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | — |
+| `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | `V2SocketsTest.aCandidateCarryingTheLightTraitWithNoUnlitGetsAirRatherThanTheSockets` |
 | `TRAIT.052` | `REJECT` | `DIAG.023` | `reject=DIAG.023` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
 | `TRAIT.053` | `REJECT` | `DIAG.024` | `reject=DIAG.024` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd` |
 | `TRAIT.054` | `MUST` |  |  | — |
-| `TRAIT.055` | `MUST` |  |  | `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField` |
+| `TRAIT.055` | `MUST` |  |  | `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
 | `TRAIT.060` | `MUST` |  |  | — |
 | `TRAIT.061` | `MUST` |  |  | — |
 | `TRAIT.062` | `DEFAULT` |  | `equiv=absent-replacement`, `equiv=absent-replacement` | — |
@@ -257,8 +257,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.025` | `MUST NOT` |  |  | `ExclusionTest.aChoiceCarryingATraitKeepsItsSizeWhereAChoiceCarryingAWhenLeavesTheList` |
 | `WEIGHT.030` | `ACCEPT` |  | `accept` | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
 | `WEIGHT.031` | `MUST` |  |  | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed` |
-| `WEIGHT.032` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay`, `ExclusionTest.aNestedNodeWithNothingLeftIsRemovedFromItsParentRatherThanRefused` |
-| `WEIGHT.040` | `MUST` |  |  | `ApportionTest.aWeightedNodeCompilesToExactlyOneHundredAndTwentyEightSlots` |
+| `WEIGHT.032` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay`, `ExclusionTest.aNestedNodeWithNothingLeftIsRemovedFromItsParentRatherThanRefused`, `V2SocketsTest.aSocketWhoseEveryCandidateNamesAnAbsentBlockNeverReachesThisMappingAtAll`, `V2SocketsTest.oneEmptyPlacementListIsFineBecauseOnlyAllFourAtOnceIsRefused` |
+| `WEIGHT.040` | `MUST` |  |  | `ApportionTest.aWeightedNodeCompilesToExactlyOneHundredAndTwentyEightSlots`, `V2SocketsTest.candidateWeightsAreTheApportionedSlotCountsAndNotTheAuthoredWeights` |
 | `WEIGHT.041` | `MUST` |  |  | `ApportionTest.twoMarkersPlaceTheirMinorityChoicesAtDifferentOffsets` |
 | `WEIGHT.042` | `INVARIANT` |  |  | `ApportionTest.selectionIsAddressedSoResolutionOrderCannotChangeIt` |
 | `WEIGHT.043` | `MUST` |  |  | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition` |
@@ -299,7 +299,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.002` | `MUST` |  |  | — |
 | `LOAD.003` | `MUST` |  |  | `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
 | `LOAD.004` | `MUST` |  |  | `NodeResolverTest.everyFailureInOneNodeIsCollectedRatherThanTheFirst` |
-| `LOAD.010` | `MUST` |  |  | — |
+| `LOAD.010` | `MUST` |  |  | `V2SocketsTest.aSocketWhoseEveryCandidateNamesAnAbsentBlockNeverReachesThisMappingAtAll` |
 | `LOAD.011` | `INVARIANT` |  |  | `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
 | `LOAD.012` | `MUST` |  |  | — |
 | `LOAD.013` | `ACCEPT` |  | *n/a* | — |

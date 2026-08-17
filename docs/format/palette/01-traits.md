@@ -248,6 +248,13 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > > per marker, so the NBT was dropped before it could be written to a replacement at all. The rule
 > > arrives with the loop that made the position reachable.
 
+> > **Why both fixtures name a campfire** — the case this rule covers is only reachable on a block that
+> > satisfies [TRAIT.052](#45-urbexlight) as well. A marker carrying `urbex:light` over a block that emits
+> > nothing is refused before this check is ever asked, so an example built on a chest — which holds a
+> > block entity perfectly well and emits no light — demonstrates TRAIT.052 and never reaches TRAIT.044.
+> > A block that both holds a block entity and emits is what the rule needs, and there are few:
+> > `minecraft:campfire` is the readable one.
+
 ```json fixture:TRAIT.044 reject=DIAG.022
 {
   "version": 2,
