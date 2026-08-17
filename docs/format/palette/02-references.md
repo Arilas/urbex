@@ -179,6 +179,20 @@ single `rubble` definition replaces every one of them.
 > **REF.033** · `MUST` — Cycle detection covers `$ref` and `extends` together; a cycle through both
 > is one cycle.
 
+A cycle *through* both is the case this rule is about, and it is the one the resolver finds: two files
+that are each acyclic can reference each other's entries once [MERGE.003](04-merging.md#1-extends) has
+made their `$defs` one map, and an inherited value can reference the entry that replaced it. Both are
+named by REF.032's diagnostic.
+
+A cycle in the **chain's own shape** — `a` extends `b` extends `a` — is refused earlier, before any of
+those files is decoded, by the shared chain walker every registry uses. It says so in prose rather than
+as `DIAG.032`, and it is left that way deliberately: the walker is generic over all thirteen registries
+and is handed no registry identity, so it cannot know whether this palette's catalogue applies; it runs
+before a document exists, so there is no diagnostic collector to record into and the two refusals are not
+interchangeable; and its message is already deterministic and names every link. Stating it here so the
+gap is findable: when the loader stage owns chain resolution for version 2 palettes, that refusal should
+become `DIAG.032` for this registry and stay prose for the other twelve.
+
 ```json fixture:REF.032 reject=DIAG.032
 {
   "version": 2,

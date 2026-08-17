@@ -9,10 +9,12 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.Versioned;
+import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
@@ -243,14 +245,21 @@ class VersionDispatchTest {
     }
 
     /**
-     * {@code VER.015}: a registered version 2 palette is refused where it is compiled, naming the asset.
+     * {@code VER.015}: a version 2 palette is refused where it is compiled, naming the asset — a
+     * registry entry, and a palette written inline in a part or building.
      * <p>
      * The last transitional rule of its section now that {@code VER.014} is retired, and the one most
      * likely to be hit: an author adopting version 2 writes a registry palette, and a registry palette is
      * what reaches the compiler. It used to throw an uncatalogued {@link IllegalStateException};
      * {@code DIAG.063} names the asset id, which it can because this runs where the id is known rather
-     * than inside a codec handed only a document. Since {@code MERGE.011} it is also what an
-     * <em>inline</em> version 2 palette meets, one stage later, through {@code Palette.inline}.
+     * than inside a codec handed only a document.
+     * <p>
+     * <b>Both kinds are asserted, because the rule now says both.</b> {@code MERGE.011} made an inline
+     * palette able to declare version 2, so it reaches compilation by the same two bad roads — a palette
+     * with no markers, or a {@link ClassCastException} from a worker thread naming no file — and
+     * {@code Palette.inline} sends it through the same refusal, naming the part or building it is written
+     * in. The rule's sentence said "a <em>registered</em> version 2 palette" until the widening was
+     * adjudicated; it says both now, and this is what keeps the two in step until they retire together.
      * <p>
      * The chain is passed directly rather than driven through {@code AssetCompiler}, which needs a loaded
      * world's {@code RegistryAccess}. {@code AssetStage} records a thrown exception against the asset it
@@ -258,7 +267,7 @@ class VersionDispatchTest {
      */
     @Test
     @Rule("VER.015")
-    void aRegisteredVersionTwoPaletteIsRefusedWhereItIsCompiled() {
+    void aVersionTwoPaletteIsRefusedWhereItIsCompiledRegisteredOrInline() {
         Identifier id = Identifier.parse("urbex:bricks_standard");
         PaletteAssetDefinition version2 = decoded("""
                 { "version": 2, "palette": { "X": "minecraft:stone_bricks" } }
@@ -269,6 +278,13 @@ class VersionDispatchTest {
         assertTrue(Diag.DIAG_063.matches(refused.getMessage()), refused.getMessage());
         assertTrue(refused.getMessage().contains(id.toString()),
                 () -> "the diagnostic names the asset: " + refused.getMessage());
+
+        Identifier owner = Identifier.parse("urbex:tower");
+        IllegalStateException inline = assertThrows(IllegalStateException.class,
+                () -> Palette.inline(BuiltInRegistries.BLOCK, null, owner, List.of(version2)));
+        assertTrue(Diag.DIAG_063.matches(inline.getMessage()), inline.getMessage());
+        assertTrue(inline.getMessage().contains(owner.toString()),
+                () -> "and names the part it is written in: " + inline.getMessage());
 
         PaletteAssetDefinition version1 = decoded("""
                 { "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }

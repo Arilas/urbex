@@ -48,11 +48,14 @@ public record ResolutionScope(Document document, DefinitionIndex registry,
      *                  told by its caller. See {@code DIAG.902} and the gap {@link Diagnostics} records
      * @param extendsId {@code extends}, needed only to tell {@code DIAG.036}'s two cases apart: a file
      *                  that declares no {@code extends} inherits nothing at all, and a file that
-     *                  declares one may still inherit nothing for this particular entry
+     *                  declares one may still inherit nothing for this particular entry. Per-file like
+     *                  {@code imports}, and for the same reason - the entry may have been written
+     *                  further up the chain than the leaf, and the sentence has to be true of the file
+     *                  that wrote it
      * @param imports   {@code $imports} of the file at the end of this document's chain, alias name to
      *                  prefix ({@code REF.080}). File-local by {@code REF.086}, which is why an entry
-     *                  declared further up the chain overrides it with its own through
-     *                  {@link #withImports}
+     *                  declared further up the chain reads this document through {@link #asWrittenBy}
+     *                  instead
      * @param defs      {@code $defs}, merged along the chain ({@code MERGE.003}) and each entry
      *                  carrying the file that wrote it ({@code REF.001}, {@code REF.011})
      */
@@ -95,20 +98,21 @@ public record ResolutionScope(Document document, DefinitionIndex registry,
          */
         private static Map<String, MergedEntry> entries(PaletteV2Definition file) {
             Map<String, MergedEntry> defs = new LinkedHashMap<>();
-            file.defs().forEach((name, node) ->
-                    defs.put(name, MergedEntry.of(node, file.imports())));
+            file.defs().forEach((name, node) -> defs.put(name, MergedEntry.of(node, file)));
             return defs;
         }
 
         /**
-         * The same document, reading an entry whose file declared {@code imports} ({@code REF.086}).
+         * The same document, read as the file that wrote {@code entry} wrote it.
          * <p>
-         * The document's identity does not change with it, and that is the point: the merged palette is
-         * one document with one set of names, and only alias expansion is per-file. Giving an ancestor's
-         * entry its own document would give one {@code $defs} name two keys in {@code REF.032}'s graph.
+         * Two components change and two do not. {@code $imports} and {@code extends} are facts of the
+         * file that wrote the entry ({@code REF.086}, and {@code DIAG.036}'s choice of sentence); the
+         * identity and the merged {@code $defs} are facts of the chain, and must not. The merged palette
+         * is one document with one set of names, and giving an ancestor's entry its own document would
+         * give one {@code $defs} name two keys in {@code REF.032}'s graph.
          */
-        public Document withImports(Map<String, String> imports) {
-            return new Document(id, extendsId, imports, defs);
+        public Document asWrittenBy(MergedEntry entry) {
+            return new Document(id, entry.extendsId(), entry.imports(), defs);
         }
 
         /**
@@ -167,14 +171,14 @@ public record ResolutionScope(Document document, DefinitionIndex registry,
     /**
      * The scope one entry of this document resolves in.
      * <p>
-     * The two things a merged palette keeps per entry, applied together: the {@code $imports} of the
-     * file that wrote it ({@code REF.086}) and the layer it replaced, which its {@code $super} names
-     * ({@code REF.060}, {@code REF.061}). Every caller that reaches an entry - the file-level pass, a
-     * bare-name pointer, {@code $super} itself - goes through here, so the two cannot be applied in one
-     * place and forgotten in another.
+     * Everything a merged palette keeps per entry, applied together: the {@code $imports} and the
+     * {@code extends} of the file that wrote it ({@code REF.086}, and {@code DIAG.036}'s two sentences)
+     * and the layer it replaced, which its {@code $super} names ({@code REF.060}, {@code REF.061}). Every
+     * caller that reaches an entry - the file-level pass, a bare-name pointer, {@code $super} itself -
+     * goes through here, so they cannot be applied in one place and forgotten in another.
      */
     public ResolutionScope forEntry(MergedEntry entry) {
-        return new ResolutionScope(document.withImports(entry.imports()), registry, palettes,
+        return new ResolutionScope(document.asWrittenBy(entry), registry, palettes,
                 entry.inherited());
     }
 

@@ -54,9 +54,10 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > palettes and this chain is a chain of parts.
 
 > > **Why it is stated and not yet checked** — until [VER.015](#11-what-version-2-does-not-reach-yet)
-> > retires, an inline version 2 palette is refused where it is compiled, so no mixed stack survives long
-> > enough to be merged and nothing enforces this rule on its own. When VER.015 goes, this needs a check
-> > and a diagnostic of its own. The rule used to read "a version 2 palette may not carry an inline
+> > retires, an inline version 2 palette is refused where it is compiled — that rule covers an inline
+> > palette as well as a registered one — so no mixed stack survives long enough to be merged and nothing
+> > enforces this rule on its own. When VER.015 goes, this needs a check and a diagnostic of its own. The
+> > rule used to read "a version 2 palette may not carry an inline
 > > version 1 palette, and the reverse, by VER.005", which named a construct that does not exist: a
 > > palette carries no inline palette, a part or a building does.
 
@@ -75,8 +76,9 @@ the loader does not implement it yet, and each names the rule that retires it. T
 the behaviour being absent because the alternative to refusing is accepting and then not acting, which
 is the failure [VER.012](#3-retired-keys) forbids for a key and this section forbids for a whole file.
 
-> **VER.015** · `REJECT` (`DIAG.063`) `[NO-FIXTURE: an entry that must be compiled, not a document]` `[DEPRECATED → VER.002]` — A registered version 2 palette is refused where it is compiled, naming
-> the asset, until version 2 compilation lands.
+> **VER.015** · `REJECT` (`DIAG.063`) `[NO-FIXTURE: an entry that must be compiled, not a document]` `[DEPRECATED → VER.002]` — A version 2 palette is refused where it is compiled, naming the
+> asset, until version 2 compilation lands. Both kinds: a registry entry, and a palette written inline
+> in a part or building.
 
 > > **Why** — a version 2 palette decodes before it compiles, and between the two the loader holds an
 > > entry it can read and cannot use. Dropping it gives the pack a palette with no markers; casting it
@@ -85,6 +87,13 @@ is the failure [VER.012](#3-retired-keys) forbids for a key and this section for
 > > retired, with a tombstone, when it does. It carries no fixture because its input is not a document:
 > > the file it refuses is a *valid* version 2 palette, and no fixture can be both accepted as a
 > > document and refused as an entry.
+
+> > **Why both kinds** — [MERGE.011](04-merging.md#1-extends) made an inline palette declare its own
+> > version, so an inline version 2 palette is now a thing an author can write and the loader can read.
+> > It reaches compilation by the same two bad roads and gets the same refusal, naming the part or
+> > building it is written in. This rule said "a *registered* version 2 palette" while MERGE.011 was
+> > unimplemented and there was no other kind; the word is gone rather than an inline clause added,
+> > because when this rule retires both cases retire together.
 
 > **VER.016** · `REJECT` (`DIAG.064`) `[DEPRECATED → TRAIT.009]` — Any of the four
 > [operands](03-pointers.md#2-operands) — `$ref`, `$only`, `$without` or `$spread` — written anywhere

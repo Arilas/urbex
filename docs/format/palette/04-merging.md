@@ -72,15 +72,6 @@ everything it inherited and adds one trait. Both are legible without opening the
 > **MERGE.008** · `MUST` — An overridden marker takes its traits with it. A marker a child repaints
 > does not keep its ancestor's `urbex:damaged`.
 
-> **MERGE.011** · `MUST` — A palette written inline in a part or building declares `version`, and is
-> read by the rules of the version it declares.
-
-> **MERGE.012** · `ACCEPT` `[NO-FIXTURE: a part carrying an inline palette]` — An inline palette may carry `$imports` and `$defs`.
-
-> > **Why** — it is a palette. Withholding the two keys that shorten repetition from the one place
-> > repetition is worst would be perverse: the shipped inline palettes hold 6,527 entries of which
-> > 1,242 are distinct.
-
 > **MERGE.009** · `REJECT` (`DIAG.031`) — `extends` inside a palette written inline in a part or
 > building is refused.
 
@@ -102,6 +93,15 @@ everything it inherited and adds one trait. Both are legible without opening the
 > > That operates on compiled palettes rather than on JSON, so it needs no correspondence between the two
 > > formats; forbidding it as well would mean a pack could only migrate every palette at once, and the
 > > packs this has to work for hold 30 and 98 palette files.
+
+> **MERGE.011** · `MUST` — A palette written inline in a part or building declares `version`, and is
+> read by the rules of the version it declares.
+
+> **MERGE.012** · `ACCEPT` `[NO-FIXTURE: a part carrying an inline palette]` — An inline palette may carry `$imports` and `$defs`.
+
+> > **Why** — it is a palette. Withholding the two keys that shorten repetition from the one place
+> > repetition is worst would be perverse: the shipped inline palettes hold 6,527 entries of which
+> > 1,242 are distinct.
 
 ```json fixture:MERGE.009 reject=DIAG.031 name=inline-extends
 {

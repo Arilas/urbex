@@ -1,5 +1,7 @@
 package dev.krona.urbex.format.palette;
 
+import net.minecraft.resources.Identifier;
+
 import java.util.Map;
 import java.util.Optional;
 
@@ -21,32 +23,43 @@ import java.util.Optional;
  *       which is not necessarily the file at the end of the chain. A merged palette whose entries all
  *       expanded aliases against the leaf's {@code $imports} would refuse an ancestor's own pointer
  *       ({@code DIAG.039}) for a file the author never edited.</li>
+ *   <li><b>{@code extendsId}</b> - the same shape, one scalar rather than a map, and it exists because a
+ *       message was false without it: {@code DIAG.036} chooses between "this file declares no extends"
+ *       and "nothing in its extends chain declares it" by asking whether the file declared one, and read
+ *       off the merged document the answer was always the leaf's.</li>
  * </ul>
  * <p>
- * {@code $defs} carries the same pair for the same two reasons, which is why this is the value type of
+ * {@code $defs} carries the same three for the same reasons, which is why this is the value type of
  * {@link ResolutionScope.Document#defs()} as well as of {@link V2Chain.MergedPalette#palette()}: a
  * definition declared by the root and pointed at by the leaf resolves its own aliases and its own
  * {@code $super}.
  * <p>
- * Deliberately <em>not</em> carrying which file each layer came from. The merged palette is one
- * document - {@code MERGE.002} merges by marker and the result is a palette, not a list of palettes -
- * and a per-layer identity would give one entry two names in the reference graph, where
- * {@code REF.032}'s cycle needs exactly one per entry. What a diagnostic needs about the ancestor is
- * {@code DIAG.902}'s business, and that slot is unfilled at this stage for the leaf too.
+ * What it carries is the file's <em>facts</em>, deliberately not the file's <em>identity</em>. The merged
+ * palette is one document - {@code MERGE.002} merges by marker and the result is a palette, not a list of
+ * palettes - and a per-layer document identity would give one entry two names in the reference graph,
+ * where {@code REF.032}'s cycle needs exactly one per entry. Naming the ancestor a diagnostic came from
+ * is {@code DIAG.902}'s business, and that slot is unfilled at this stage for the leaf too.
  *
  * @param node      the declaration that won, exactly as its file wrote it
  * @param imports   the {@code $imports} of the file that wrote {@code node} ({@code REF.086})
+ * @param extendsId the {@code extends} of the file that wrote {@code node}, which is <em>not</em>
+ *                  necessarily the leaf's. {@code DIAG.036} has two sentences and picks between them by
+ *                  this: "this file declares no extends" is true of an entry the root wrote and false of
+ *                  one the leaf wrote, and read off the merged document it was the leaf's answer for
+ *                  both. A diagnostic derived from a value is only true if the value is the one the file
+ *                  wrote - the same shape as {@code imports} above, one scalar instead of a map
  * @param inherited the layer this one replaced, which {@code $super} names ({@code REF.060}), or empty
  *                  when no earlier file in the chain declared this key - the case {@code REF.062}
  *                  refuses
  */
 public record MergedEntry(RawNode node, Map<String, String> imports,
-                          Optional<MergedEntry> inherited) {
+                          Optional<Identifier> extendsId, Optional<MergedEntry> inherited) {
 
-    public MergedEntry(RawNode node, Map<String, String> imports,
+    public MergedEntry(RawNode node, Map<String, String> imports, Optional<Identifier> extendsId,
                        Optional<MergedEntry> inherited) {
         this.node = node;
         this.imports = Map.copyOf(imports);
+        this.extendsId = extendsId;
         this.inherited = inherited;
     }
 
@@ -63,19 +76,19 @@ public record MergedEntry(RawNode node, Map<String, String> imports,
         return inherited.map(under -> under.depth() + 1).orElse(0);
     }
 
-    /** A node from a file that declares no {@code $imports} and inherits nothing - a chain of one. */
+    /** A node from a file that declares no {@code $imports} and no {@code extends}, inheriting nothing. */
     public static MergedEntry of(RawNode node) {
-        return new MergedEntry(node, Map.of(), Optional.empty());
+        return new MergedEntry(node, Map.of(), Optional.empty(), Optional.empty());
     }
 
-    /** A node from a file whose {@code $imports} are {@code imports}, inheriting nothing. */
-    public static MergedEntry of(RawNode node, Map<String, String> imports) {
-        return new MergedEntry(node, imports, Optional.empty());
+    /** A node from one decoded file, as an entry of a chain of one. */
+    public static MergedEntry of(RawNode node, PaletteV2Definition file) {
+        return new MergedEntry(node, file.imports(), file.extendsId(), Optional.empty());
     }
 
-    /** This node, declared over {@code inherited} by a file whose imports are {@code imports}. */
-    static MergedEntry over(RawNode node, Map<String, String> imports,
+    /** This node, declared by {@code file} over what {@code inherited} holds. */
+    static MergedEntry over(RawNode node, PaletteV2Definition file,
                             Optional<MergedEntry> inherited) {
-        return new MergedEntry(node, imports, inherited);
+        return new MergedEntry(node, file.imports(), file.extendsId(), inherited);
     }
 }

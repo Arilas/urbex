@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -302,6 +303,44 @@ class V2ChainTest {
         assertTrue(Diag.DIAG_036.matches(message), message);
         assertTrue(message.contains("nothing in its extends chain declares"),
                 () -> "the file does extend something, so the other sentence would be false: " + message);
+    }
+
+    /**
+     * {@code DIAG.036} picks its sentence by the file that <em>wrote</em> the entry, not by the leaf.
+     * <p>
+     * The row has two alternatives — "this file declares no extends" and "nothing in its extends chain
+     * declares `&lt;m&gt;`" — and after the merge every entry is read out of one document whose
+     * {@code extends} is the leaf's. So a marker the <em>root</em> wrote, in a root that extends nothing,
+     * was told its extends chain declares nothing, which is a sentence about a chain that file does not
+     * have. {@code DIAG.900} is what makes this a defect rather than a wording preference: a diagnostic
+     * names "what was found", and a diagnostic derived from a value is only true if the value is the one
+     * the file wrote. This is the fifth time that shape has come up in this stack, so it is asserted from
+     * both ends: the same `$super`, once in the leaf and once in the root, produces the two different
+     * sentences.
+     */
+    @Test
+    @Rule("REF.062")
+    @Rule("DIAG.900")
+    void theTwoSentencesOfDiag036AreChosenByTheFileThatWroteTheEntry() {
+        String fromTheLeaf = refusalOf("""
+                { "version": 2, "palette": { "X": "minecraft:stone_bricks" } }
+                """, """
+                { "version": 2, "extends": "urbex:bricks_standard",
+                  "palette": { "Y": { "$ref": "$super" } } }
+                """);
+        assertTrue(fromTheLeaf.contains("nothing in its extends chain declares"), fromTheLeaf);
+
+        String fromTheRoot = refusalOf("""
+                { "version": 2, "palette": { "Y": { "$ref": "$super" } } }
+                """, """
+                { "version": 2, "extends": "urbex:bricks_standard",
+                  "palette": { "X": "minecraft:deepslate_bricks" } }
+                """);
+        assertTrue(Diag.DIAG_036.matches(fromTheRoot), fromTheRoot);
+        assertTrue(fromTheRoot.contains("declares no extends"),
+                () -> "the root wrote this entry and the root extends nothing: " + fromTheRoot);
+        assertFalse(fromTheRoot.contains("nothing in its extends chain"),
+                () -> "and it has no extends chain for the other sentence to be about: " + fromTheRoot);
     }
 
     /**

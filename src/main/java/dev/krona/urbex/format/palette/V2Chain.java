@@ -139,6 +139,6 @@ public final class V2Chain {
      * {@code $super}.
      */
     private static MergedEntry layer(MergedEntry inherited, RawNode node, PaletteV2Definition file) {
-        return MergedEntry.over(node, file.imports(), Optional.ofNullable(inherited));
+        return MergedEntry.over(node, file, Optional.ofNullable(inherited));
     }
 }

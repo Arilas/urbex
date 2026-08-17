@@ -99,15 +99,25 @@ final class AssetStage {
     static <R> void refuseCrossVersionChain(Identifier id, List<R> chain) {
         Identifier childId = id;
         for (int i = chain.size() - 1; i > 0; i--) {
-            if (!(chain.get(i) instanceof Versioned.Asset child)
-                    || !(chain.get(i - 1) instanceof Versioned.Asset parent)) {
+            R child = chain.get(i);
+            // Every link but the root declares an 'extends', because that is what ExtendsChain followed
+            // to reach the next one - so this stops rather than guessing, and never casts blindly. A
+            // link whose id cannot be read is a link this cannot name, and DIAG.900 requires the message
+            // to name both assets; a ClassCastException recorded against the asset would name neither.
+            if (!(child instanceof Extendable extendable) || extendable.getExtends().isEmpty()) {
                 return;
             }
-            // The link's own id is what its child's 'extends' names; ExtendsChain walked exactly that.
-            Identifier parentId = ((Extendable) child).getExtends().orElseThrow();
-            if (child.formatVersion() != parent.formatVersion()) {
+            Identifier parentId = extendable.getExtends().orElseThrow();
+            // 'continue', not 'return': an unversioned link is a pair this rule has nothing to say
+            // about, not the end of the chain. Unreachable while palettes are the only versioned
+            // registry, and the javadoc above promises this guard to the next one - a registry midway
+            // through adopting a version would otherwise stop being checked at its first old entry.
+            if (child instanceof Versioned.Asset childVersion
+                    && chain.get(i - 1) instanceof Versioned.Asset parentVersion
+                    && childVersion.formatVersion() != parentVersion.formatVersion()) {
                 throw new IllegalStateException(Diag.DIAG_038.message("'" + childId + "'",
-                        child.formatVersion(), "'" + parentId + "'", parent.formatVersion()));
+                        childVersion.formatVersion(), "'" + parentId + "'",
+                        parentVersion.formatVersion()));
             }
             childId = parentId;
         }
