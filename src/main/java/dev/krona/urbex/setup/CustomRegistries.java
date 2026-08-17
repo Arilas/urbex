@@ -13,8 +13,8 @@ public class CustomRegistries {
     public static final ResourceKey<Registry<BuildingDefinition>> BUILDING_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "buildings"));
 
     /**
-     * The one registry whose entries may be written in either format version. Its value type is the
-     * sealed {@link PaletteAssetDefinition}, not {@link dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition},
+     * The one registry whose entries may be written in either format version. Its value type is
+     * {@link PaletteAssetDefinition}, not {@link dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition},
      * because the codec registered below has to be the version dispatcher - {@code VER.003} requires the
      * version to be read before the document is decoded, and a registry takes one codec.
      */

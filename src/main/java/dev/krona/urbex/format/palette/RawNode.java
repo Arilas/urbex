@@ -82,7 +82,46 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
 
     private static Codec<RawNode> build(Codec<RawNode> self) {
         Codec<List<RawChoice>> choices = RawChoice.listCodec(self);
-        return stringOrObject(keyChecked(fields(choices).codec()).validate(RawNode::validate));
+        return stringOrObject(validatedWhenComplete(keyChecked(fields(choices).codec())));
+    }
+
+    /**
+     * Runs {@link #validate} only on a node that decoded completely.
+     * <p>
+     * Not {@link Codec#validate}, which runs on a <em>partial</em> decode too. {@code RecordCodecBuilder}
+     * accumulates field failures: a field whose value fails to decode contributes an empty
+     * {@link Optional} and its error, and the record is still assembled from what is left. Validating
+     * that assembly means describing a node the file does not contain. The case that found it was a
+     * socket whose one floor candidate declared no size - the author got the correct {@code DIAG.040}
+     * <em>and</em> {@code DIAG.010}, "a light_socket declares no candidate in floor, wall, ceiling or
+     * free", which was false: the candidate was right there, and it was the reason the field was empty.
+     * <p>
+     * The general rule this encodes: a diagnostic derived from a value is only true if the value is the
+     * one the file wrote. When a field failed, the field's own diagnostic is the whole story.
+     */
+    private static Codec<RawNode> validatedWhenComplete(Codec<RawNode> base) {
+        return new Codec<>() {
+            @Override
+            public <T> DataResult<Pair<RawNode, T>> decode(DynamicOps<T> ops, T input) {
+                DataResult<Pair<RawNode, T>> decoded = base.decode(ops, input);
+                if (decoded.error().isPresent()) {
+                    return decoded;
+                }
+                Pair<RawNode, T> pair = decoded.result().orElseThrow();
+                return RawNode.validate(pair.getFirst())
+                        .map(node -> Pair.of(node, pair.getSecond()));
+            }
+
+            @Override
+            public <T> DataResult<T> encode(RawNode input, DynamicOps<T> ops, T prefix) {
+                return RawNode.validate(input).flatMap(node -> base.encode(node, ops, prefix));
+            }
+
+            @Override
+            public String toString() {
+                return base.toString();
+            }
+        };
     }
 
     /**

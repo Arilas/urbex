@@ -170,7 +170,7 @@ public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) 
                 + (rest.isPresent() ? 1 : 0);
         if (declared > 1) {
             diagnostics.error(Diag.DIAG_040, Diagnostics.DECODING_LOCATION, index,
-                    "declares both of 'weight', 'share' and 'rest'");
+                    "declares both 'weight', 'share' and 'rest'");
             return Optional.empty();
         }
 
@@ -187,7 +187,7 @@ public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) 
             }
         } else if (weight.isPresent()) {
             DataResult<Number> value = weight.get().asNumber();
-            if (value.error().isPresent() || value.result().orElseThrow().intValue() <= 0) {
+            if (value.error().isPresent() || !isPositiveInteger(value.result().orElseThrow())) {
                 diagnostics.error(Diag.DIAG_040, Diagnostics.DECODING_LOCATION, index,
                         "weight " + weight.get().getValue() + " is not a positive integer");
                 return Optional.empty();
@@ -209,6 +209,22 @@ public record RawChoice(RawNode node, Optional<Size> size, Optional<When> when) 
                     "declares none of 'weight', 'share' and 'rest'");
         }
         return size;
+    }
+
+    /**
+     * {@code WEIGHT.004}: "{@code weight} is a positive integer", both halves.
+     * <p>
+     * The whole-number half is checked here rather than left to {@link Number#intValue()}, which
+     * truncates. {@code "weight": 2.7} used to decode to a weight of 2 - a datapack meaning something
+     * other than what it says, which is the failure this format exists to remove, and which
+     * {@code Versioned} already refuses for {@code version} for the same reason. Only fractions below 1
+     * were caught, because truncating those reaches 0 and 0 was already refused.
+     * <p>
+     * A whole number written with a decimal point ({@code 2.0}) is accepted: JSON has one number type,
+     * and a value equal to its own integer part is an integer however it was spelled.
+     */
+    private static boolean isPositiveInteger(Number value) {
+        return value.intValue() > 0 && value.doubleValue() == value.intValue();
     }
 
     /**

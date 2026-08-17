@@ -13,15 +13,18 @@ import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import net.minecraft.SharedConstants;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -185,6 +188,41 @@ class VersionDispatchTest {
                 """));
         assertTrue(version1.result().isPresent(),
                 () -> "version 1 is what the inline path reads, so declaring it is true; got " + version1);
+    }
+
+    /**
+     * {@code VER.015}: a registered version 2 palette is refused where it is compiled, naming the asset.
+     * <p>
+     * The transitional twin of {@code VER.014}, and the more likely of the two to be hit: an author
+     * adopting version 2 writes a registry palette, and a registry palette is what reaches the compiler.
+     * It used to throw an uncatalogued {@link IllegalStateException} while the inline author got a
+     * catalogue message, which is the wrong way round. {@code DIAG.063} names the asset id, which
+     * {@code DIAG.062} cannot - this runs where the id is known rather than inside a codec handed only a
+     * document.
+     * <p>
+     * The chain is passed directly rather than driven through {@code AssetCompiler}, which needs a loaded
+     * world's {@code RegistryAccess}. {@code AssetStage} records a thrown exception against the asset it
+     * was compiling and carries on, so this surfaces as one named palette failing to load.
+     */
+    @Test
+    @Rule("VER.015")
+    void aRegisteredVersionTwoPaletteIsRefusedWhereItIsCompiled() {
+        Identifier id = Identifier.parse("urbex:bricks_standard");
+        PaletteAssetDefinition version2 = decoded("""
+                { "version": 2, "palette": { "X": "minecraft:stone_bricks" } }
+                """);
+
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> PaletteAssetDefinition.version1Only(id, List.of(version2)));
+        assertTrue(Diag.DIAG_063.matches(refused.getMessage()), refused.getMessage());
+        assertTrue(refused.getMessage().contains(id.toString()),
+                () -> "the diagnostic names the asset: " + refused.getMessage());
+
+        PaletteAssetDefinition version1 = decoded("""
+                { "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }
+                """);
+        assertEquals(1, PaletteAssetDefinition.version1Only(id, List.of(version1)).size(),
+                "a version 1 chain passes through untouched");
     }
 
     /**

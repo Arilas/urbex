@@ -289,19 +289,6 @@ class PaletteV2DecodeTest {
                 """);
     }
 
-    /** {@code REF.082}: {@code $super} is built in and may not be declared in {@code $imports}. */
-    @Test
-    @Rule("REF.082")
-    void superIsBuiltInAndCannotBeDeclaredAsAnImport() {
-        DataResult<PaletteAssetDefinition> result = decode("""
-                { "version": 2, "$imports": { "super": "urbex:common#/palette" },
-                  "palette": { "X": "minecraft:stone" } }
-                """);
-        assertTrue(result.error().isPresent(), () -> "expected a refusal, got " + result);
-        assertTrue(result.error().orElseThrow().message().contains("built-in alias"),
-                result.error().orElseThrow().message());
-    }
-
     // ---- Sizes ---------------------------------------------------------------------------------
 
     /**
@@ -338,6 +325,72 @@ class PaletteV2DecodeTest {
         assertRefused(Diag.DIAG_040, """
                 { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
                     { "share": 1.5, "block": "minecraft:stone" } ] } } }
+                """);
+    }
+
+    /**
+     * {@code WEIGHT.004}: "{@code weight} is a positive integer" - and a fraction is refused rather than
+     * truncated to one.
+     * <p>
+     * {@code "weight": 2.7} used to decode to a weight of 2. Only fractions below 1 were caught, because
+     * truncating those reaches 0 and 0 was already refused, so the guard looked complete and was not.
+     * A datapack meaning something other than what it says is the failure this format exists to remove,
+     * and {@code Versioned} already refuses a fractional {@code version} for the same reason, so the
+     * codebase disagreed with itself. Eight tasks build on {@link Size}.
+     * <p>
+     * A whole number spelled with a decimal point is accepted: JSON has one number type.
+     */
+    @Test
+    @Rule("WEIGHT.004")
+    void aFractionalWeightIsRefusedRatherThanTruncatedToAnInteger() {
+        for (String weight : new String[]{"2.7", "0.4", "1.0001", "-3", "0"}) {
+            assertRefusedNaming(Diag.DIAG_040, "positive integer",
+                    "{ \"version\": 2, \"palette\": { \"#\": { \"kind\": \"weighted\", \"choices\": ["
+                            + " { \"weight\": " + weight + ", \"block\": \"minecraft:stone\" } ] } } }");
+        }
+
+        RawChoice choice = marker(v2("""
+                { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
+                    { "weight": 3.0, "block": "minecraft:stone" } ] } } }
+                """), '#').choices().orElseThrow().getFirst();
+        assertEquals(Optional.of(new Size.Weight(3)), choice.size());
+    }
+
+    /**
+     * A socket whose one candidate is malformed is told about the candidate, and is <em>not</em> told it
+     * declared no candidate.
+     * <p>
+     * {@code MODEL.072} is "a light_socket declaring no candidate in any of the four lists is refused",
+     * and the document below declares one. It used to draw both {@code DIAG.040} (true - the candidate
+     * states no size) and {@code DIAG.010} (false - the candidate is right there), because
+     * {@code RecordCodecBuilder} assembles a record from the fields that survived and validation then
+     * described that assembly rather than the file. Telling an author to add something they have already
+     * written is worse than saying nothing.
+     */
+    @Test
+    @Rule("MODEL.072")
+    void aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate() {
+        DataResult<PaletteAssetDefinition> result = decode("""
+                { "version": 2, "palette": { "T": { "kind": "light_socket",
+                    "floor": [ { "block": "minecraft:torch" } ] } } }
+                """);
+        String message = result.error().orElseThrow().message();
+        assertTrue(Diag.DIAG_040.matches(message), message);
+        assertFalse(Diag.DIAG_010.matches(message),
+                () -> "the socket declares a floor candidate, so this is false: " + message);
+    }
+
+    /** {@code REF.082}: and the refusal is the catalogue's, not a literal in this test. */
+    @Test
+    @Rule("REF.082")
+    void superCannotBeDeclaredAsAnImport() {
+        assertRefused(Diag.DIAG_070, """
+                { "version": 2, "$imports": { "super": "urbex:common#/palette" },
+                  "palette": { "X": "minecraft:stone" } }
+                """);
+        assertAccepted("""
+                { "version": 2, "$imports": { "mat": "urbex:common#/$defs" },
+                  "palette": { "X": "minecraft:stone" } }
                 """);
     }
 

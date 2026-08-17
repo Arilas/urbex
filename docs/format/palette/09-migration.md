@@ -54,6 +54,50 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > registry that palette touches, at once, across every pack. The palette registry is the first to
 > > be specified this way precisely so the others can follow one at a time.
 
+### 1.1 What version 2 does not reach yet
+
+Two rules in this section are transitional: each refuses something this specification allows, because
+the loader does not implement it yet, and each names the rule that retires it. They exist rather than
+the behaviour being absent because the alternative to refusing is accepting and then not acting, which
+is the failure [VER.012](#3-retired-keys) forbids for a key and this section forbids for a whole file.
+
+> **VER.014** · `REJECT` (`DIAG.062`) `[DEPRECATED → MERGE.011]` — A palette written inline in a part
+> or building may not declare a `version` other than 1, until inline palettes are read by the version
+> they declare.
+
+> > **Why** — [MERGE.011](04-merging.md#1-extends) says an inline palette is read by the rules of the
+> > version it declares, and nothing reads an inline version 2 palette yet. The two answers available
+> > in the meantime are to refuse it by name or to hand it to the version 1 codec, which ignores keys
+> > it does not know and would load a palette with none of the markers the author wrote — the silent
+> > misreading VER.003 exists to remove, one level down. This rule is retired, with a tombstone, when
+> > MERGE.011 is implemented.
+
+> > **Why** — this does make the version 1 inline path refuse a key it used to ignore, which VER.004
+> > says version 1 does not do. The tension is real and is answered by measurement rather than by
+> > argument: no shipped or reference pack writes `version` inside an inline palette, because version 1
+> > has never had the key, so the set of existing files this refuses is empty. VER.004 protects packs
+> > that load today; this refuses only a file that could not have been written for a loader that
+> > existed.
+
+```json fixture:VER.014 reject=DIAG.062
+{
+  "xsize": 16, "zsize": 16,
+  "palette": { "version": 2, "palette": { "b": "minecraft:grass_block" } },
+  "slices": []
+}
+```
+
+> **VER.015** · `REJECT` (`DIAG.063`) `[NO-FIXTURE: an entry that must be compiled, not a document]` `[DEPRECATED → VER.002]` — A registered version 2 palette is refused where it is compiled, naming
+> the asset, until version 2 compilation lands.
+
+> > **Why** — a version 2 palette decodes before it compiles, and between the two the loader holds an
+> > entry it can read and cannot use. Dropping it gives the pack a palette with no markers; casting it
+> > gives a `ClassCastException` from a worker thread, naming no file. VER.002 says `"version": 2`
+> > selects this specification in full, and this rule is the admission that it does not yet — so it is
+> > retired, with a tombstone, when it does. It carries no fixture because its input is not a document:
+> > the file it refuses is a *valid* version 2 palette, and no fixture can be both accepted as a
+> > document and refused as an entry.
+
 ## 2. What every version 1 construct becomes
 
 This table is the converter's specification, not a compatibility promise. Nothing loads both
@@ -133,25 +177,6 @@ The retired set, and what each becomes:
 | `unlitBlocks` | deleted | `unlit`, which is now a node |
 | `inherit`, `parent` | deleted in v1 already | `extends` |
 | `torch`, `light` | deleted in v1 already | `urbex:light` |
-
-> **VER.014** · `REJECT` (`DIAG.062`) `[DEPRECATED → MERGE.011]` — A palette written inline in a part
-> or building may not declare a `version` other than 1, until inline palettes are read by the version
-> they declare.
-
-> > **Why** — [MERGE.011](04-merging.md#1-extends) says an inline palette is read by the rules of the
-> > version it declares, and nothing reads an inline version 2 palette yet. The two answers available
-> > in the meantime are to refuse it by name or to hand it to the version 1 codec, which ignores keys
-> > it does not know and would load a palette with none of the markers the author wrote — the silent
-> > misreading [VER.003](#1-versioning) exists to remove, one level down. This rule is retired, with a
-> > tombstone, when MERGE.011 is implemented.
-
-```json fixture:VER.014 reject=DIAG.062
-{
-  "xsize": 16, "zsize": 16,
-  "palette": { "version": 2, "palette": { "b": "minecraft:grass_block" } },
-  "slices": []
-}
-```
 
 ## 4. The migration tool
 

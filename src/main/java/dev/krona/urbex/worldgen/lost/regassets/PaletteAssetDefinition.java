@@ -105,11 +105,18 @@ public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
     /**
      * One {@code extends} chain, as version 1 entries, refusing the chain if any link is version 2.
      * <p>
-     * A version 2 palette decodes as of this task and compiles as of a later one. Between the two, a
-     * pack that declares {@code "version": 2} has to fail by name: dropping the entry would give it a
-     * palette with no markers, and casting would give it a {@link ClassCastException} out of a worker
-     * thread naming no file. This is the same reasoning as {@code VER.012}'s - a thing the format
-     * accepted and then did not act on is how a pack ends up meaning something other than what it says.
+     * {@code VER.015}, and it is a catalogued refusal ({@code DIAG.063}) rather than a bare exception
+     * because this is the <em>likely</em> path, not an edge: an author adopting version 2 today writes a
+     * registry palette, and the registry palette is the one that reaches here. It is the same
+     * transitional gap {@code VER.014} covers for an inline palette, and it gets the same treatment,
+     * with one thing {@code DIAG.062} cannot manage - the message names the asset id, because this runs
+     * where the id is known rather than inside a codec that is handed only a document.
+     * <p>
+     * A version 2 palette decodes as of this task and compiles as of a later one. Between the two,
+     * dropping the entry would give the pack a palette with no markers and casting would give a
+     * {@link ClassCastException} out of a worker thread naming no file. Same reasoning as
+     * {@code VER.012}'s: a thing the format accepted and then did not act on is how a pack ends up
+     * meaning something other than what it says.
      * <p>
      * Thrown rather than returned, because {@code AssetStage} records a thrown exception against the
      * asset it was compiling and carries on with the rest of the registry, which is the reporting this
@@ -122,10 +129,8 @@ public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
                 version1.add(definition);
                 continue;
             }
-            throw new IllegalStateException("The palette '" + id + "' resolves through an entry"
-                    + " written in palette format version " + link.formatVersion() + ", which this"
-                    + " Urbex decodes but does not yet compile. Write it in the version 1 format, or"
-                    + " omit 'version', until version 2 compilation lands.");
+            throw new IllegalStateException(
+                    Diag.DIAG_063.message("'" + id + "'", link.formatVersion()));
         }
         return version1;
     }

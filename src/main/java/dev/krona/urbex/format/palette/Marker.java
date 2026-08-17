@@ -21,9 +21,11 @@ import java.util.Set;
  * The domain is narrower than "any character", and {@link #CODEC} is where that is enforced
  * ({@code CHAR.003}-{@code CHAR.005}). The reason is measured: Zombie Apocalypse Essentials ships 244
  * distinct markers, 162 of them non-ASCII, because {@code /exportpart} assigned them by walking
- * codepoints in sequence - and that sweep produced seven codepoints Unicode has never assigned, which
- * are unstable under editors and normalisation, and one modifier letter, whose rendering in a slice
- * depends on what precedes it.
+ * codepoints in sequence - and that sweep produced eight codepoints Unicode has never assigned, which
+ * are unstable under editors and normalisation. The sweep also picked up U+037A GREEK YPOGEGRAMMENI and
+ * two spacing accents, and those are <em>legal</em>: each is assigned, visible in the file and one
+ * column wide, which is all {@code CHAR.004} and {@code CHAR.005} ask. What is excluded is the
+ * character that occupies no column of its own and the character that cannot be seen at all.
  */
 public record Marker(int codepoint) {
 

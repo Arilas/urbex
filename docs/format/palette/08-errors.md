@@ -47,7 +47,8 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | 040-049 | weights |
 | 050-059 | characters |
 | 060-069 | versioning |
-| 070-899 | unallocated |
+| 070-079 | references and merging, continued — 030-039 is full |
+| 080-899 | unallocated |
 | 900-999 | rules about diagnostics themselves |
 
 ## 4. The catalogue
@@ -95,6 +96,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.037` | [REF.071](03-pointers.md#23-spread) | *`<asset>` marker `'<m>'`: `$spread` `<p>` names a `<kind>`, not a list. A spread element can only be replaced by list elements.* |
 | `DIAG.039` | [REF.083](03-pointers.md#3-imports) | *`<asset>` marker `'<m>'`: `$<alias>` is not an import of this file`<, and the closest declared is '$<near>'>`. Declare it in `$imports`, or write the pointer in full.* |
 | `DIAG.038` | [MERGE.010](04-merging.md#1-extends), [VER.005](09-migration.md#1-versioning) | *`<asset>` (version `<n>`) extends `<id>` (version `<m>`). An extends chain cannot cross format versions; convert one of them.* |
+| `DIAG.070` | [REF.082](03-pointers.md#3-imports) | *`<asset>`: `$imports` declares `super`, which is a built-in alias naming what this entry inherits and cannot be redeclared. Remove it, or choose another alias name.* |
 
 ### Weights
 
@@ -123,7 +125,8 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 |---|---|---|
 | `DIAG.060` | [VER.010](09-migration.md#3-retired-keys) | *`<asset>` marker `'<m>'`: `<key>` was retired in version 2. Write `<replacement>` instead.* |
 | `DIAG.061` | [VER.011](09-migration.md#3-retired-keys) | *`<asset>`: `<key>` was deleted, not renamed. `<explanation>`* |
-| `DIAG.062` | [VER.014](09-migration.md#3-retired-keys) | *`<owner>`: the inline palette declares version `<n>`, which this Urbex cannot yet read inline. Write it in the version 1 format, or move it to the `palettes` registry and name it with `refpalette`.* |
+| `DIAG.062` | [VER.014](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<owner>`: the inline palette declares version `<n>`, which this Urbex cannot yet read inline. Write it in the version 1 format, or move it to the `palettes` registry and name it with `refpalette`.* |
+| `DIAG.063` | [VER.015](09-migration.md#11-what-version-2-does-not-reach-yet) | *`<asset>`: resolves through an entry written in palette format version `<n>`, which this Urbex decodes but does not yet compile. Write it in the version 1 format, or omit `version`, until version 2 compilation lands.* |
 
 ## 5. Retired identifiers
 

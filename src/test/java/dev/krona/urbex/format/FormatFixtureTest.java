@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -214,6 +215,18 @@ class FormatFixtureTest {
                 assertTrue(Diag.of(expected).matches(message),
                         () -> fixture.where() + ": expected " + expected + " ("
                                 + Diag.of(expected).template() + ") but got: " + message);
+                // And nothing else. A fixture that only checks its own diagnostic is present passes
+                // while the loader says something false beside it - which is how a socket with one
+                // malformed candidate came to be told it had no candidate. A refusal names one thing
+                // wrong with a document that has one thing wrong with it.
+                List<String> alsoMatched = Arrays.stream(Diag.values())
+                        .filter(diag -> !diag.id().equals(expected))
+                        .filter(diag -> !diag.template().equals("—"))
+                        .filter(diag -> diag.matches(message))
+                        .map(Diag::id)
+                        .toList();
+                assertTrue(alsoMatched.isEmpty(), () -> fixture.where() + ": expected " + expected
+                        + " alone, but the message also reads as " + alsoMatched + ": " + message);
             }
             case EQUIV -> throw new IllegalStateException("equiv fixtures are run as a group");
             case FRAGMENT -> throw new IllegalStateException(fixture.where()

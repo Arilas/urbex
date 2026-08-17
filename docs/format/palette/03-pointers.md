@@ -202,6 +202,11 @@ it. `$imports` names prefixes once.
 > > prefix, usable with a fragment after it. Making imports the general mechanism and `$super` its one
 > > built-in means there is one notation to learn rather than two that look alike.
 
+```json fixture:REF.082 reject=DIAG.070
+{ "version": 2, "$imports": { "super": "urbex:common#/palette" },
+  "palette": { "X": "minecraft:stone" } }
+```
+
 > **REF.083** · `REJECT` (`DIAG.039`) — A pointer beginning with `$` whose alias is neither `$super`
 > nor declared in `$imports` is refused.
 

@@ -71,6 +71,39 @@ class DiagCatalogueTest {
     }
 
     /**
+     * The other direction: every word a catalogue row states <em>outside</em> a placeholder appears in
+     * the template.
+     * <p>
+     * The subset check above runs enum→row, so a template that <em>drops</em> row text passes it. That is
+     * how ruling 4 of this task's review landed in {@code 08-errors.md} and not in {@link Diag}:
+     * {@code DIAG.053} gained "Correct the row, or the declared width, so the two agree." in the document
+     * while the enum kept the single sentence, and every check was still green. A remedy that exists only
+     * in the specification is the doc/code divergence {@code docs/format/README.md} §1 describes as
+     * version 1's whole failure mode, arrived at from the other side.
+     * <p>
+     * Text inside a {@code <…>} placeholder is excluded, because that is text the row delegates: an
+     * alternative clause the caller picks between, or a clause that appears only when it applies. Only
+     * what the row states unconditionally is required of the template. The location prefix - everything
+     * up to the first {@code ": "} - is excluded too, because every template folds it into one leading
+     * placeholder (see {@link Diag}), so the row's literal "marker" is not a word a template carries.
+     */
+    @Test
+    @Rule("DIAG.910")
+    void everyWordACatalogueRowStatesOutrightAppearsInItsTemplate() {
+        Map<String, String> catalogue = SpecDocuments.load().diagnostics();
+        List<String> failures = new ArrayList<>();
+        for (Diag diag : Diag.values()) {
+            Set<String> required = words(outsidePlaceholders(afterLocation(catalogue.get(diag.id()))));
+            required.removeAll(words(afterLocation(diag.template())));
+            if (!required.isEmpty()) {
+                failures.add(diag.id() + " drops words its catalogue row states outright: " + required
+                        + "\n  row:  " + catalogue.get(diag.id()) + "\n  enum: " + diag.template());
+            }
+        }
+        assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
+    }
+
+    /**
      * {@code DIAG.900} and §2's message shape: a diagnostic names the thing it is about, and then says
      * what to write instead.
      * <p>
@@ -79,6 +112,14 @@ class DiagCatalogueTest {
      * however carefully the enum copies it. The two halves of §2 that are mechanically checkable are the
      * leading placeholder (the asset, and whatever else of the location applies) and the second
      * sentence, which §2 calls required.
+     * <p>
+     * <b>Which half of {@code DIAG.900} this proves.</b> The rule is about a produced diagnostic; this
+     * asserts over the catalogue rows the diagnostics are formatted from, so it proves the messages are
+     * <em>specified</em> to name the asset and the remedy, not that a produced one names the marker. The
+     * marker clause needs the loader stage that {@code LOAD.051} describes - a codec is handed a document
+     * and knows neither the asset id nor which marker it is inside - so it is disclosed as a gap in this
+     * task's report alongside {@code DIAG.901} and {@code DIAG.902}, and the annotation stays here
+     * because this is the half that is checkable today.
      */
     @Test
     @Rule("DIAG.900")
@@ -196,6 +237,36 @@ class DiagCatalogueTest {
      * stay part of a word, because {@code urbex:damaged} and {@code $imports} are single words that a
      * reader would notice changing.
      */
+    /** Everything after the location prefix - the first {@code ": "} - or all of it if there is none. */
+    private static String afterLocation(String message) {
+        String normalised = Diag.normalise(message);
+        int colon = normalised.indexOf(": ");
+        return colon < 0 ? normalised : normalised.substring(colon + 2);
+    }
+
+    /**
+     * The text a message states unconditionally, with every {@code <…>} placeholder removed.
+     * <p>
+     * Depth-counted rather than regex-stripped: the rows nest placeholders inside placeholders -
+     * {@code DIAG.040}'s alternation holds {@code <w>}, {@code <f>} and {@code <none of|both>} inside one
+     * outer {@code <…>} - and a non-greedy regex would close the outer group at the first inner
+     * {@code >}, leaving half an alternative behind as if the row had stated it.
+     */
+    private static String outsidePlaceholders(String message) {
+        StringBuilder outside = new StringBuilder();
+        int depth = 0;
+        for (char character : message.toCharArray()) {
+            if (character == '<') {
+                depth++;
+            } else if (character == '>') {
+                depth = Math.max(0, depth - 1);
+            } else if (depth == 0) {
+                outside.append(character);
+            }
+        }
+        return outside.toString();
+    }
+
     private static Set<String> words(String text) {
         Set<String> words = new LinkedHashSet<>();
         for (String word : Diag.normalise(text).split("[^\\p{Alnum}$:_]+")) {

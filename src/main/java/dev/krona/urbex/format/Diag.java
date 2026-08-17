@@ -205,7 +205,8 @@ public enum Diag {
     DIAG_052("%s: marker U+%s is %s, which cannot be a marker. %s"),
 
     /** {@code CHAR.011}: args are the part, the slice, the row, the count found, the declared width. */
-    DIAG_053("%s slice %s row %s: %s codepoints, but the part declares a width of %s."),
+    DIAG_053("%s slice %s row %s: %s codepoints, but the part declares a width of %s."
+            + " Correct the row, or the declared width, so the two agree."),
 
     /** {@code CHAR.022}: args are the command, the markers needed, and the alphabet size. */
     DIAG_054("%s: this part needs %s markers and the assignment alphabet holds %s."
@@ -228,7 +229,24 @@ public enum Diag {
      */
     DIAG_062("%s: the inline palette declares version %s, which this Urbex cannot yet read inline."
             + " Write it in the version 1 format, or move it to the 'palettes' registry and name it"
-            + " with 'refpalette'.");
+            + " with 'refpalette'."),
+
+    /**
+     * {@code VER.015}: args are the asset and the version the entry declared.
+     * <p>
+     * Retired with {@code VER.015} when version 2 palettes compile, at which point {@code VER.002} -
+     * "{@code \"version\": 2} selects this specification in full" - is simply true and there is nothing
+     * left to refuse. Its number stays retired, by {@code DIAG.910}.
+     */
+    DIAG_063("%s: resolves through an entry written in palette format version %s, which this Urbex"
+            + " decodes but does not yet compile. Write it in the version 1 format, or omit 'version',"
+            + " until version 2 compilation lands."),
+
+    // ---- References and merging, continued (070-079; 030-039 is full) ---------------------------
+
+    /** {@code REF.082}: the argument is the location. */
+    DIAG_070("%s: '$imports' declares 'super', which is a built-in alias naming what this entry"
+            + " inherits and cannot be redeclared. Remove it, or choose another alias name.");
 
     private static final Map<String, Diag> BY_ID = byId();
 

@@ -3,6 +3,8 @@ package dev.krona.urbex.format.palette;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+import dev.krona.urbex.format.Diag;
+import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.format.StrictKeys;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
@@ -53,11 +55,9 @@ public record PaletteV2Definition(Optional<Identifier> extendsId, Map<String, St
      * {@code REF.082}: {@code $super} is a built-in alias, available in every file, and may not be
      * declared in {@code $imports}.
      * <p>
-     * Refused rather than shadowed or ignored. An {@code $imports} entry named {@code super} would
-     * either silently lose to the built-in - a declaration the file makes and nothing honours - or
-     * silently win, and change what {@code $super} means in one file out of a pack. The rule has no
-     * {@code DIAG} of its own, which is a gap in the catalogue recorded in this task's report; the
-     * message below says the same thing the rule does until the catalogue has a row for it.
+     * Refused rather than shadowed or ignored, with {@code DIAG.070}. An {@code $imports} entry named
+     * {@code super} would either silently lose to the built-in - a declaration the file makes and
+     * nothing honours - or silently win, and change what {@code $super} means in one file out of a pack.
      */
     private static final String RESERVED_ALIAS = "super";
 
@@ -121,9 +121,7 @@ public record PaletteV2Definition(Optional<Identifier> extendsId, Map<String, St
 
     private static DataResult<PaletteV2Definition> validate(PaletteV2Definition definition) {
         if (definition.imports().containsKey(RESERVED_ALIAS)) {
-            return DataResult.error(() -> "'$imports' declares '" + RESERVED_ALIAS + "', which is a"
-                    + " built-in alias naming what this entry inherits and cannot be redefined."
-                    + " Remove it, or choose another alias name.");
+            return DataResult.error(() -> Diag.DIAG_070.message(Diagnostics.DECODING_LOCATION));
         }
         return DataResult.success(definition);
     }
