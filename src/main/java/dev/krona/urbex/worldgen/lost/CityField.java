@@ -5,6 +5,7 @@ import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.PlanningContext;
+import dev.krona.urbex.worldgen.SiteBinding;
 
 /**
  * Where a city is, and how high it sits.
@@ -32,6 +33,18 @@ public final class CityField {
      * Don't use the cache as we're busy building the cache.
      */
     public static boolean isCityRaw(ChunkCoord coord, PlanningContext provider, Preset profile) {
+        SiteBinding site = provider.site();
+        if (site != null) {
+            // The caller's field replaces the city mask outright - not intersected with it, not
+            // consulted alongside it. A mod asking Urbex to fill a cavity it carved is naming the
+            // place; whether Urbex's own noise would have put a city there is a question about a
+            // different world, and answering it would leave the caller with bunkers wherever the
+            // two happened to agree.
+            //
+            // Ahead of the void check as well, which is about a floating dimension having no island
+            // at a coordinate. A site is not on the islands.
+            return site.covers(coord.chunkX(), coord.chunkZ());
+        }
         if (isVoidChunk(coord, provider)) {
             // If we have a void chunk then no city here
             return false;
@@ -55,6 +68,12 @@ public final class CityField {
      * This function uses its own cache.
      */
     public static int getCityLevel(ChunkCoord key, PlanningContext provider) {
+        SiteBinding boundSite = provider.site();
+        if (boundSite != null) {
+            // Uncached, and ahead of the cache lookup: it is a floorDiv of a field call, which is
+            // cheaper than the map lookup that would memoise it.
+            return boundSite.cityLevelAt(key.chunkX(), key.chunkZ());
+        }
         // Unconditional. This used to be gated on provider.getWorld() != null, "In LC preview we
         // don't want to use the cache as the config isn't loaded yet" - a guard from when the
         // preview shared the dimension's caches. It has held its own DimensionCaches, built from
@@ -80,6 +99,10 @@ public final class CityField {
     }
 
     public static int cityLevelUncached(ChunkCoord key, PlanningContext provider) {
+        SiteBinding boundSite = provider.site();
+        if (boundSite != null) {
+            return boundSite.cityLevelAt(key.chunkX(), key.chunkZ());
+        }
         int result;
         if (provider.preset().isFloating()) {
             result = getCityLevelFloating(key, provider);

@@ -110,6 +110,7 @@ public class Preset {
     private final boolean MULTI_USE_CORNER;
     private final MultiBuildingStreetConflict MULTI_BUILDING_STREET_CONFLICT;
     private final boolean GENERATE_SPAWNERS;
+    private final float SPAWNER_DENSITY;
     private final int PRIMARY_ROAD_SPACING_X;
     private final int PRIMARY_ROAD_SPACING_Z;
     private final float PRIMARY_ROAD_OPTIONAL_CHANCE;
@@ -241,6 +242,7 @@ public class Preset {
         this.MULTI_USE_CORNER = draft.MULTI_USE_CORNER;
         this.MULTI_BUILDING_STREET_CONFLICT = draft.MULTI_BUILDING_STREET_CONFLICT;
         this.GENERATE_SPAWNERS = draft.GENERATE_SPAWNERS;
+        this.SPAWNER_DENSITY = draft.SPAWNER_DENSITY;
         this.PRIMARY_ROAD_SPACING_X = draft.PRIMARY_ROAD_SPACING_X;
         this.PRIMARY_ROAD_SPACING_Z = draft.PRIMARY_ROAD_SPACING_Z;
         this.PRIMARY_ROAD_OPTIONAL_CHANCE = draft.PRIMARY_ROAD_OPTIONAL_CHANCE;
@@ -378,6 +380,7 @@ public class Preset {
         draft.MULTI_USE_CORNER = MULTI_USE_CORNER;
         draft.MULTI_BUILDING_STREET_CONFLICT = MULTI_BUILDING_STREET_CONFLICT;
         draft.GENERATE_SPAWNERS = GENERATE_SPAWNERS;
+        draft.SPAWNER_DENSITY = SPAWNER_DENSITY;
         draft.PRIMARY_ROAD_SPACING_X = PRIMARY_ROAD_SPACING_X;
         draft.PRIMARY_ROAD_SPACING_Z = PRIMARY_ROAD_SPACING_Z;
         draft.PRIMARY_ROAD_OPTIONAL_CHANCE = PRIMARY_ROAD_OPTIONAL_CHANCE;
@@ -597,7 +600,8 @@ public class Preset {
                 Optional.of(BUILDING_FRONTCHANCE),
                 Optional.of(MULTI_USE_CORNER),
                 Optional.of(MULTI_BUILDING_STREET_CONFLICT),
-                Optional.of(GENERATE_SPAWNERS));
+                Optional.of(GENERATE_SPAWNERS),
+                Optional.of(SPAWNER_DENSITY));
         RoadSettings roads =
                 new RoadSettings(
                 Optional.of(PRIMARY_ROAD_SPACING_X),
@@ -899,6 +903,20 @@ public class Preset {
 
     public boolean generateSpawners() {
         return GENERATE_SPAWNERS;
+    }
+
+    /**
+     * How many of the spawner positions a building's parts mark actually keep a spawner, 0..1.
+     *
+     * <p>The middle setting {@link #generateSpawners} does not have. That one is a switch, which is
+     * the right shape for "this world has no spawners at all" and the wrong one for "fewer" - and
+     * "fewer" is what somewhere a player is meant to survive in usually wants.</p>
+     *
+     * <p>Position-addressed like {@code lootDensity}, so which markers survive is a property of the
+     * seed and the coordinate rather than of the order parts were generated in.</p>
+     */
+    public float spawnerDensity() {
+        return SPAWNER_DENSITY;
     }
 
     public int primaryRoadSpacingX() {

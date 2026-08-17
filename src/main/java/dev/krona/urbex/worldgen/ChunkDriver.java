@@ -232,14 +232,27 @@ public class ChunkDriver {
     private int cx;
     private int cz;
 
+    /** Drives {@code primer} with no vertical restriction beyond the level's own. */
     public void setPrimer(LevelAccessor region, ChunkAccess primer) {
+        setPrimer(region, primer, Integer.MIN_VALUE, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Drives {@code primer}, refusing every write outside {@code [writeMinY, writeMaxY]}.
+     *
+     * <p>The window is intersected with the level's bounds, so the two unbounded sentinels above
+     * mean "the whole level" rather than an arithmetic accident. See {@link ChunkBuffer} for why
+     * the refusal lives there and not at the passes that write.</p>
+     */
+    public void setPrimer(LevelAccessor region, ChunkAccess primer, int writeMinY, int writeMaxY) {
         this.region = region;
         this.seed = region instanceof WorldGenLevel level ? level.getSeed() : 0L;
         this.primer = primer;
         if (primer != null) {
             buffer = new ChunkBuffer(this::wrote, region::getBlockState,
                     region.getMinY(), region.getMaxY() + 1,
-                    primer.getPos().x() << 4, primer.getPos().z() << 4);
+                    primer.getPos().x() << 4, primer.getPos().z() << 4,
+                    writeMinY, writeMaxY);
             this.cx = primer.getPos().x();
             this.cz = primer.getPos().z();
             shaper = new BlockShaper(chunkView, region, seed);

@@ -10,6 +10,7 @@ import dev.krona.urbex.setup.Config;
 import dev.krona.urbex.varia.*;
 import dev.krona.urbex.worldgen.ChunkHeightmap;
 import dev.krona.urbex.worldgen.PlanningContext;
+import dev.krona.urbex.worldgen.SiteBinding;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.cityassets.*;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
@@ -425,9 +426,22 @@ public class ChunkPlan {
                 candidate.buildingType().getName());
         hasBuilding = override != null || content.hasBuilding();
 
-        groundLevel = override != null ? override.groundLevel() : profile.groundLevel();
+        // A site's base, not its ground: the per-chunk height travels in cityLevel above, because
+        // that is the number every height comparison in Urbex is written against. See
+        // SiteBinding.cityLevelAt for what putting it here instead did to doors. The editing
+        // override still wins over both - it is a command naming a height, for either kind of
+        // context.
+        SiteBinding site = provider.site();
+        int plannedGround = site != null ? site.minY() : profile.groundLevel();
+        groundLevel = override != null ? override.groundLevel() : plannedGround;
+        // A site's water is the caller's, not the preset's. A preset names one absolute sea level for
+        // a whole dimension, and a site three hundred blocks under that dimension's sea is not
+        // underwater - but every rule that fills below the water line would think it was, and a
+        // bunker built with urbex:cavern (sea level 32) comes out flooded to the ceiling. The site's
+        // LevelShape carries what SiteSpec.waterY asked for, which is "below everything here" unless
+        // the caller said otherwise.
         int wl = profile.seaLevel();
-        waterLevel = wl == -1 ? provider.shape().seaLevel() : wl;
+        waterLevel = site != null || wl == -1 ? provider.shape().seaLevel() : wl;
         WorldSettings.RailwayAvoidance avoidance = provider.worldStyles().primary().getWorldSettings().railwayAvoidance();
 
         // In a multi building we copy all information from the top-left chunk
@@ -601,7 +615,12 @@ public class ChunkPlan {
             zBridge = rand.nextFloat() < profile.bridgeChance();
         }
 
-        if (rand.nextFloat() < profile.railwayDungeonChance()) {
+        // The draw happens either way, so the layout stream does not depend on whether this is a
+        // site - only whether the part is kept. A rail dungeon is a room off the railway, drawn at
+        // groundLevel + RAILWAY_LEVEL_OFFSET * 6 like the rails themselves, and a site has neither
+        // the railway nor a groundLevel that means what that formula assumes.
+        boolean keepRailDungeon = rand.nextFloat() < profile.railwayDungeonChance() && site == null;
+        if (keepRailDungeon) {
             if (!hasBuilding || (Railway.RAILWAY_LEVEL_OFFSET < (cityLevel - cellars))) {
                 railDungeon = provider.assets().parts().getOrWarn(getCityStyle().getRandomRailDungeon(rand, this.coord));
             } else {
@@ -620,7 +639,12 @@ public class ChunkPlan {
     }
 
     private int getMaxcellars(CityStyle cs) {
-        int maxcellars = profile.buildingMaxCellars() + cityLevel;
+        // The + cityLevel term is "how much room there is under this chunk's ground before the
+        // datum", which for a dimension is how far the city has climbed above its ground level. For
+        // a site the datum is the bottom of the caller's window, so the same term reads as "dig as
+        // deep as the window allows" - and a caller who wrote buildingMaxCellars: 2 got up to ten.
+        // A site's number means what it says.
+        int maxcellars = profile.buildingMaxCellars() + (provider.site() != null ? 0 : cityLevel);
         if (buildingType.getMaxCellars() != -1 && buildingType.getOverrideFloors()) {
             maxcellars = buildingType.getMaxCellars();
             return maxcellars;

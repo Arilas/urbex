@@ -5,6 +5,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.PlanningContext;
+import dev.krona.urbex.worldgen.SiteSpawnClaims;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity;
@@ -40,7 +41,27 @@ import java.util.function.Predicate;
  */
 public class SpawnPlacement {
 
-    private static final Map<ResourceKey<Level>, BlockPos> spawnPositions = new HashMap<>();
+    private static final Map<ResourceKey<Level>, Pending> spawnPositions = new HashMap<>();
+
+    /**
+     * A spawn this class chose, waiting for the first player to arrive.
+     *
+     * @param pos    where the player should end up
+     * @param forced whether to put them there even if the world spawn already says so.
+     *               <p>
+     *               The difference is vanilla's {@code fudgeSpawnLocation}, which does not use the
+     *               world spawn as given: with sky light it searches around it on the
+     *               {@code MOTION_BLOCKING} heightmap for somewhere to stand. For a city on the
+     *               surface that lands on the same street and nobody notices. For a spawn forty
+     *               blocks underground it finds the roof of the world instead, so the world spawn is
+     *               correct, the log says so, and the player is standing in daylight.
+     *               <p>
+     *               So a site's spawn is forced: the fudge is precisely what has to be undone. The
+     *               unforced case is the older one this map was built for - a single-player world
+     *               whose {@code level.dat} did not exist when the spawn was chosen, where the world
+     *               spawn is wrong and correcting it is the whole job.
+     */
+    private record Pending(BlockPos pos, boolean forced) {}
 
     static void reset() {
         spawnPositions.clear();
@@ -50,22 +71,33 @@ public class SpawnPlacement {
         ServerLevel level = serverPlayer.level();
         ResourceKey<Level> dimKey = level.dimension();
 
-        if (spawnPositions.containsKey(dimKey)) {
-            BlockPos correctPos = spawnPositions.get(dimKey);
-            LevelData.RespawnData rd = level.getRespawnData();
-            BlockPos currentWorldSpawn = rd.pos();
+        Pending pending = spawnPositions.get(dimKey);
+        if (pending == null) {
+            return;
+        }
+        BlockPos correctPos = pending.pos();
+        LevelData.RespawnData rd = level.getRespawnData();
+        BlockPos currentWorldSpawn = rd.pos();
 
-            if (!currentWorldSpawn.equals(correctPos)) {
-                LevelData.RespawnData newd = new LevelData.RespawnData(new GlobalPos(level.dimension(), correctPos), 0.0f, 0.0f);
-                level.setRespawnData(newd);
-
-                if (level.getLevelData() instanceof ServerLevelData data) {
-                    data.setSpawn(newd);
-                }
-                serverPlayer.teleportTo(level, correctPos.getX() + 0.5, correctPos.getY(), correctPos.getZ() + 0.5, Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot(), true);
-                spawnPositions.remove(dimKey);
+        if (!pending.forced() && currentWorldSpawn.equals(correctPos)) {
+            return;
+        }
+        LevelData.RespawnData newd = new LevelData.RespawnData(new GlobalPos(level.dimension(), correctPos), 0.0f, 0.0f);
+        if (!currentWorldSpawn.equals(correctPos)) {
+            level.setRespawnData(newd);
+            if (level.getLevelData() instanceof ServerLevelData data) {
+                data.setSpawn(newd);
             }
         }
+        serverPlayer.teleportTo(level, correctPos.getX() + 0.5, correctPos.getY(), correctPos.getZ() + 0.5, Collections.emptySet(), serverPlayer.getYRot(), serverPlayer.getXRot(), true);
+        if (pending.forced()) {
+            // Their personal respawn point too, as though they had slept there. Without it the first
+            // death undoes the whole thing: respawning goes back through the world spawn and the
+            // same fudge, and a player who woke up sealed underground finds themselves on the
+            // surface for good the first time something kills them.
+            serverPlayer.setRespawnPosition(new ServerPlayer.RespawnConfig(newd, true), false);
+        }
+        spawnPositions.remove(dimKey);
     }
 
     /**
@@ -74,6 +106,13 @@ public class SpawnPlacement {
      */
     public static boolean onCreateSpawnPoint(ServerLevel serverLevel, ServerLevelData settings) {
         LevelAccessor world = serverLevel;
+        // Ahead of everything below, including the "does Urbex generate here at all" check. A site
+        // claim is a mod saying something more specific than a preset's spawn rules can, and it has
+        // to work in a level that has no preset - a vanilla overworld with bunkers under it, which
+        // is exactly the configuration the site API exists to allow.
+        if (applySiteSpawn(serverLevel, settings)) {
+            return true;
+        }
         {
             PlanningContext dimensionInfo = GenerationSession.planningFor(serverLevel);
             if (dimensionInfo == null) {
@@ -151,7 +190,7 @@ public class SpawnPlacement {
                     LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
                     serverLevel.setRespawnData(data);
                     settings.setSpawn(data);
-                    spawnPositions.put(serverLevel.dimension(), pos);
+                    spawnPositions.put(serverLevel.dimension(), new Pending(pos, false));
                     return true;
                 }
             } else {
@@ -159,10 +198,53 @@ public class SpawnPlacement {
                 LevelData.RespawnData data = new LevelData.RespawnData(new GlobalPos(serverLevel.dimension(), pos), 0.0f, 0.0f);
                 serverLevel.setRespawnData(data);
                 settings.setSpawn(data);
-                spawnPositions.put(serverLevel.dimension(), pos);
+                spawnPositions.put(serverLevel.dimension(), new Pending(pos, false));
                 return true;
             }
         }
+        return false;
+    }
+
+    /**
+     * Places the spawn inside a claimed site, if a mod asked for one and the search found somewhere.
+     *
+     * <p>The anchor a claim yields is the plan's ground floor at a chunk's centre - a Y that is
+     * correct about the layout and says nothing about what block is actually there. So this walks up
+     * from it looking for somewhere to stand, exactly as {@code findSafeSpawnPoint} does for the
+     * dimension's own rules, and reading those blocks is what forces the one chunk to generate.</p>
+     *
+     * <p>Eight blocks of headroom searched, not the whole column: the floor of a street is where the
+     * plan says it is, and a position further up than that is inside whatever was built above, not a
+     * better spot on the same street.</p>
+     */
+    private static boolean applySiteSpawn(ServerLevel serverLevel, ServerLevelData settings) {
+        if (SiteSpawnClaims.isEmpty()) {
+            return false;
+        }
+        SiteSpawnClaims.Anchor anchor = SiteSpawnClaims.findAnchor(serverLevel);
+        if (anchor == null) {
+            return false;
+        }
+        for (int dy = 0; dy <= 8; dy++) {
+            BlockPos candidate = anchor.pos().above(dy);
+            if (!isValidStandingPosition(serverLevel, candidate)) {
+                continue;
+            }
+            BlockPos spawn = candidate.above();
+            LevelData.RespawnData data = new LevelData.RespawnData(
+                    new GlobalPos(serverLevel.dimension(), spawn), 0.0f, 0.0f);
+            serverLevel.setRespawnData(data);
+            settings.setSpawn(data);
+            // Forced, because the player still has to be moved even though the world spawn is now
+            // right: vanilla fudges the arrival position onto the surface heightmap. See Pending.
+            spawnPositions.put(serverLevel.dimension(), new Pending(spawn, true));
+            Urbex.getLogger().info("Urbex site '{}' placed this world's spawn at {}, {}, {}.",
+                    anchor.site(), spawn.getX(), spawn.getY(), spawn.getZ());
+            return true;
+        }
+        Urbex.getLogger().warn("Urbex site '{}' offered a spawn at {}, {}, {}, but there was nowhere "
+                        + "to stand within eight blocks of it. The world keeps its own spawn.",
+                anchor.site(), anchor.pos().getX(), anchor.pos().getY(), anchor.pos().getZ());
         return false;
     }
 

@@ -42,7 +42,11 @@
       "properties": {
         "landscapeType": {
           "type": "string",
-          "enum": ["default", "floating", "cavern"],
+          "enum": [
+            "default",
+            "floating",
+            "cavern"
+          ],
           "description": "Type of landscape."
         },
         "groundLevel": {
@@ -111,7 +115,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "cities": {
       "type": "object",
@@ -255,7 +261,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "buildings": {
       "type": "object",
@@ -321,16 +329,28 @@
         },
         "multiBuildingStreetConflict": {
           "type": "string",
-          "enum": ["block_all", "override_minor", "override_all"],
+          "enum": [
+            "block_all",
+            "override_minor",
+            "override_all"
+          ],
           "description": "How an accepted multi-building resolves against a planned road under its footprint. block_all: any planned road rejects the candidate. override_minor: only a primary road rejects (a secondary/tertiary road is cut). override_all: no road rejects; every covered road is cut."
         },
         "generateSpawners": {
           "type": "boolean",
           "description": "If true then buildings will be full of spawners."
+        },
+        "spawnerDensity": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Chance that a marked spawner position keeps its spawner. Thins them rather than switching them off, which generateSpawners already does; defaults to 1, so a preset that says nothing about it keeps every marker."
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "roads": {
       "type": "object",
@@ -470,7 +490,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "highways": {
       "type": "object",
@@ -516,7 +538,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "railways": {
       "type": "object",
@@ -546,7 +570,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "destruction": {
       "type": "object",
@@ -658,7 +684,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "decoration": {
       "type": "object",
@@ -694,7 +722,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "spawn": {
       "type": "object",
@@ -718,12 +748,16 @@
         },
         "forceSpawnBuildings": {
           "type": "array",
-          "items": { "$ref": "#/$defs/qualifiedIdentifier" },
+          "items": {
+            "$ref": "#/$defs/qualifiedIdentifier"
+          },
           "description": "Buildings the player may spawn in when forceSpawnInBuilding is true, each fully qualified. Empty means any building. Can be combined with forceSpawnParts."
         },
         "forceSpawnParts": {
           "type": "array",
-          "items": { "$ref": "#/$defs/qualifiedIdentifier" },
+          "items": {
+            "$ref": "#/$defs/qualifiedIdentifier"
+          },
           "description": "Parts the player may spawn in when forceSpawnInBuilding is true, each fully qualified. Empty means any part. Can be combined with forceSpawnBuildings."
         },
         "spawnCheckRadius": {
@@ -746,7 +780,9 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     },
     "misc": {
       "type": "object",
@@ -762,9 +798,13 @@
         }
       },
       "additionalProperties": false,
-      "patternProperties": { "^_": {} }
+      "patternProperties": {
+        "^_": {}
+      }
     }
   },
   "additionalProperties": false,
-  "patternProperties": { "^_": {} }
+  "patternProperties": {
+    "^_": {}
+  }
 }

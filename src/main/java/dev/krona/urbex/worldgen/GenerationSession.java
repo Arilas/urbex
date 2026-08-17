@@ -68,6 +68,12 @@ public final class GenerationSession {
     private final Object owner;
     private final RuntimeRepository<ServerLevel, DimensionRuntime> dimensions = new RuntimeRepository<>();
     /**
+     * The sites other mods have asked for. Owned here so they die with the world, for the same
+     * reason every runtime does: a site holds a seed, compiled assets and a set of caches, and a
+     * second world in the same JVM must not inherit the first world's.
+     */
+    private final SiteRuntimes sites = new SiteRuntimes();
+    /**
      * Everything this world compiled, or null until the first level load compiles it. One field
      * rather than two, because the two halves are captured together and neither is usable without
      * the other: the tag epoch is expanded <em>from</em> the assets, so a reader that could see one
@@ -240,8 +246,14 @@ public final class GenerationSession {
         return world == null ? null : world.tags();
     }
 
+    /** The sites another mod has asked for in this world; see {@link SiteRuntimes}. */
+    public SiteRuntimes sites() {
+        return sites;
+    }
+
     /** Retires a level's runtime. Chunks already generating keep the runtime they captured. */
     public void unload(ServerLevel level) {
+        sites.unload(level);
         DimensionRuntime retired = dimensions.retire(level);
         if (retired != null) {
             reportUnfinishedWork(level, retired);

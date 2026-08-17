@@ -66,6 +66,9 @@ public final class ChunkGenContext {
     /** The world seed, for the position-addressed picks that resolve palette characters. */
     public final long seed;
 
+    /** The band of Y this generation may write in; see {@link WriteWindow}. */
+    private final WriteWindow window;
+
     public ChunkGenContext(WorldGenRegion region, ChunkAccess chunk, ChunkCoord coord,
                            PlanningContext provider, Preset profile, ChunkPlan info,
                            LevelTaskQueue levelTasks, TagSnapshot tags) {
@@ -79,14 +82,18 @@ public final class ChunkGenContext {
         this.info = info;
         this.palette = info.getCompiledPalette();
         this.street = info.getCityStyle().getStreetBlock();
+        this.window = WriteWindow.of(provider.site(), region.getMinY(), region.getMaxY());
         this.driver = new ChunkDriver();
-        this.driver.setPrimer(region, chunk);
+        this.driver.setPrimer(region, chunk, window.minY(), window.maxY());
         this.buffers = new NoiseBuffers();
         this.seed = provider.seed();
         this.lightTodo = new LightTodoQueue(coord.chunkX(), coord.chunkZ());
     }
 
     void addLightTodo(BlockPos pos, @Nullable LightPool pool) {
+        if (!window.contains(pos)) {
+            return;
+        }
         lightTodo.add(pos, pool);
     }
 
@@ -99,6 +106,9 @@ public final class ChunkGenContext {
      * todo at the same position replaces the first.
      */
     void addPostTodo(BlockPos pos, Consumer<WorldGenLevel> todo) {
+        if (!window.contains(pos)) {
+            return;
+        }
         postTodo.add(pos, todo);
     }
 
@@ -115,6 +125,9 @@ public final class ChunkGenContext {
      * be run against the next world with the same dimension id.
      */
     public void addLevelTask(BlockPos pos, LevelTaskQueue.Task task) {
+        if (!window.contains(pos)) {
+            return;
+        }
         levelTasks.add(pos, task);
     }
 

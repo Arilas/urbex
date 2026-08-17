@@ -278,6 +278,8 @@ public final class Settings {
         r.section("spawners");
         r.toggle("GENERATE_SPAWNERS", SettingCategory.BUILDINGS,
                 p -> p.generateSpawners(), (p, v) -> p.GENERATE_SPAWNERS = (Boolean) v);
+        r.slider("SPAWNER_DENSITY", SettingCategory.BUILDINGS, 0.0, 1.0, 0.01,
+                p -> (double) p.spawnerDensity(), (p, v) -> p.SPAWNER_DENSITY = ((Double) v).floatValue());
 
         // ==== DAMAGE =========================================================
         // Explosion radii/heights and debris overflow. (Explosion chances live in GENERAL.)

@@ -19,6 +19,22 @@ import static dev.krona.urbex.worldgen.lost.Railway.RailDirection.*;
 
 public class Railway {
 
+    /**
+     * How far below {@code groundLevel} the network runs, in storeys.
+     *
+     * <p>Below {@code groundLevel}, and not below the chunk's own city ground - which is what makes
+     * a railway a <em>network</em>: it holds one height across hundreds of chunks while the cities
+     * it joins ride up and down on the terrain above it.</p>
+     *
+     * <p><strong>That is also why a site never has one.</strong> A site's {@code groundLevel} is the
+     * bottom of its window, with the per-chunk height carried in {@code cityLevel} instead, so this
+     * offset would put the rails eighteen blocks <em>below the window</em> - out of the world
+     * entirely for a bunker at y=-60, which is where the station staircases were seen descending to.
+     * Re-datuming them onto the chunk's city ground would land them somewhere legal but no better:
+     * a network needs two ends, and a site is a pocket a few dozen chunks across with nothing to
+     * join. Connecting a site's stations to the surface, or to a real network above it, is a
+     * feature; putting rails at a plausible height inside a sealed bunker is not.</p>
+     */
     public static final int RAILWAY_LEVEL_OFFSET = -3;
 
     /*
@@ -317,6 +333,10 @@ public class Railway {
     }
 
     public static RailChunkInfo getRailChunkType(ChunkCoord coord, PlanningContext provider, Preset profile) {
+        if (provider.site() != null) {
+            // A site has no railway, and cannot: see the note on this class's site handling below.
+            return RailChunkInfo.NOTHING;
+        }
         TimedCache<ChunkCoord, RailChunkInfo> cache = provider.caches().railInfo;
         RailChunkInfo known = cache.get(coord);
         if (known != null) {

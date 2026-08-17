@@ -261,9 +261,11 @@ public class Parts {
     }
 
     private static BlockState handleSpawner(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
-        if (SpecialMarkerPolicy.generateSpawner(info.profile)) {
+        // Hoisted above the admission check, which is now addressed by position - the marker's
+        // world coordinate is what decides whether this one keeps its spawner.
+        BlockPos pos = info.getRelativePos(rx, oy + y, rz);
+        if (SpecialMarkerPolicy.generateSpawner(ctx.seed, pos, info.profile)) {
             String mobid = inf.mobId();
-            BlockPos pos = info.getRelativePos(rx, oy + y, rz);
             CompoundTag tag = new CompoundTag();
             tag.putInt("x", pos.getX());
             tag.putInt("y", pos.getY());
@@ -388,7 +390,7 @@ public class Parts {
     public static Identifier getRandomSpawnerMob(Level world, RandomSource random, PlanningContext diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();
         Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
-        int level = (pos.getY() - diminfo.preset().groundLevel()) / CityGenerator.FLOORHEIGHT;
+        int level = (pos.getY() - diminfo.baseGroundLevel()) / CityGenerator.FLOORHEIGHT;
         int floor = (pos.getY() - info.getCityGroundLevel()) / CityGenerator.FLOORHEIGHT;
         String belowFloor = ConditionContext.NO_PART;
         ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
@@ -423,7 +425,7 @@ public class Parts {
         if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
             if (todo != null) {
                 String lootTable = todo.getCondition();
-                int level = (pos.getY() - diminfo.preset().groundLevel()) / CityGenerator.FLOORHEIGHT;
+                int level = (pos.getY() - diminfo.baseGroundLevel()) / CityGenerator.FLOORHEIGHT;
                 int floor = (pos.getY() - info.getCityGroundLevel()) / CityGenerator.FLOORHEIGHT;
                 ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
                         todo.getPart(), ConditionContext.NO_PART, todo.getBuilding(), info.coord) {

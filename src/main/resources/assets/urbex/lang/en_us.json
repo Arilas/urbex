@@ -200,6 +200,8 @@
   "urbex.setting.GENERATE_NETHER.tooltip": "If true then generate a cavern type world in the Nether",
   "urbex.setting.GENERATE_SPAWNERS": "Generate Spawners",
   "urbex.setting.GENERATE_SPAWNERS.tooltip": "If true then the buildings will be full of spawners",
+  "urbex.setting.SPAWNER_DENSITY": "Spawner Density",
+  "urbex.setting.SPAWNER_DENSITY.tooltip": "How many of the marked spawner positions actually keep a spawner. 1 keeps every one; lower thins them out. Turn Generate Spawners off for none at all.",
   "urbex.setting.LIGHTING_DENSITY": "Lighting Density",
   "urbex.setting.LIGHTING_DENSITY.tooltip": "Chance that an optional decorative-light marker places a light",
   "urbex.setting.LOOT_DENSITY": "Loot Density",

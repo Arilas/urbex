@@ -201,9 +201,35 @@ public class CityGenerator {
 
         boolean doCity = info.isCity;
 
+        // A site's field settles this on its own, and neither probe below applies to one. Each of the
+        // three guards says why where it stands.
+        boolean isSite = provider.site() != null;
+
+        if (isSite && !doCity) {
+            // A site is sparse, and this is what makes it so: where the caller's field says there is
+            // nothing, the chunk is left exactly as it was found - no ground cover, no terrain
+            // correction, no scattered building, no bridge scan, no rails, no debris. The driver has
+            // nothing buffered and is never flushed.
+            //
+            // That is the difference between a site and a dimension. Outside a dimension's cities is
+            // still somewhere Urbex has an opinion about, so a non-city chunk is rendered rather
+            // than skipped; outside a site is somebody else's world. A bunker layer that ran
+            // doNormalChunk would repaint it - a mod asking for one cavern filled would find its
+            // surface grass replaced, three hundred blocks up, by a pass reading a heightmap that
+            // says the ground is in the cavern.
+            GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.PROBE, phaseNanos, phaseAlloc);
+            return;
+        }
+
         // Check if there is no village or other structure here. We don't do this for multibuildings because otherwise part of the multibuilding might be cut off
+        //
+        // Nor for a site. Avoidance exists to stop Urbex's own city noise bulldozing a village it
+        // happened to roll on top of; a caller naming a place has already decided. A site suppressed
+        // by a structure forty blocks overhead is a bunker missing from the middle of itself, with a
+        // street running into the gap from either side - and the plan its neighbours built still says
+        // the middle is there. It saves a region read per chunk, too.
         AvoidChunk avoidChunk = AvoidChunk.NO;
-        if (!info.multiBuildingPos.isMulti()) {
+        if (!isSite && !info.multiBuildingPos.isMulti()) {
             avoidChunk = hasBlacklistedStructure(region, chunkX, chunkZ);
             if (avoidChunk != AvoidChunk.NO) {
                 // Only this chunk's rendering. The cached ChunkPlan and ChunkCandidate used
@@ -224,7 +250,11 @@ public class CityGenerator {
         // If this chunk has a building or street but we're in a floating profile and
         // we happen to have a void chunk we detect that here and go back to normal chunk generation
         // anyway
-        if (doCity && provider.preset().cityAvoidVoid() && provider.preset().isFloating()) {
+        //
+        // Not for a site: this asks whether a floating dimension has an island at this coordinate,
+        // and a site is not on the islands - CityField.isCityRaw answers for one without consulting
+        // them at all, so asking here would contradict the verdict that got us this far.
+        if (!isSite && doCity && provider.preset().cityAvoidVoid() && provider.preset().isFloating()) {
             boolean v = isVoid(ctx, 2, 2) || isVoid(ctx, 2, 14) || isVoid(ctx, 14, 2) || isVoid(ctx, 14, 14) || isVoid(ctx, 8, 8);
             doCity = !v;
         }
