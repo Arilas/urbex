@@ -68,6 +68,13 @@ public class CityStyle {
     private Character borderBlock;
     private Character wallBlock;
 
+    /**
+     * Eight blocks between park lamps. A lantern is light 15 and sits a block above the grass, so it
+     * still reads as 1 on the ground about eleven blocks out; eight leaves no gap between one lamp
+     * and the next and lines up across chunk seams, which a park spanning several chunks needs.
+     */
+    public static final int DEFAULT_PARK_LAMP_SPACING = 8;
+
     // Park settings
     private Boolean avoidFoliage;
     private Boolean parkBorder;
@@ -75,6 +82,8 @@ public class CityStyle {
     private Integer parkStreetThreshold;
     private Character parkElevationBlock;
     private Character grassBlock;
+    private Character parkLampBlock;
+    private Integer parkLampSpacing;
 
     // Corridor settings
     private Float corridorChance;
@@ -191,6 +200,12 @@ public class CityStyle {
             }
             if (s.getParkElevationBlock() != null) {
                 parkElevationBlock = s.getParkElevationBlock();
+            }
+            if (s.getLampBlock() != null) {
+                parkLampBlock = s.getLampBlock();
+            }
+            if (s.getLampSpacing() != null) {
+                parkLampSpacing = s.getLampSpacing();
             }
         });
         object.getStreetSettings().ifPresent(s -> {
@@ -358,6 +373,16 @@ public class CityStyle {
 
     public Character getGrassBlock() {
         return grassBlock;
+    }
+
+    /** The character a park section stands lamps on, or null for a park with none. */
+    public Character getParkLampBlock() {
+        return parkLampBlock;
+    }
+
+    /** Blocks between park lamps; {@link #DEFAULT_PARK_LAMP_SPACING} when the style names none. */
+    public int getParkLampSpacing() {
+        return parkLampSpacing == null ? DEFAULT_PARK_LAMP_SPACING : parkLampSpacing;
     }
 
     public Character getIronbarsBlock() {

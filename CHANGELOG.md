@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `parkblocks.lamp` and `parkblocks.lampspacing`: a city style can now stand lamps on its
+  park sections. Park surfaces are generated rather than assembled from parts, so no datapack
+  could put a light on one and no lighting density could change it - parks were the one place in
+  a city guaranteed to be dark. The character is placed on a world-aligned grid above the grass
+  and goes through the same `lightSource` path as any other marker, so it obeys lighting density
+  when it declares one.
+
 - **Lighting density now reaches the lights a pack actually places.** A light used to be a separate
   *kind* of palette entry — one carrying `torch: true` or a typed `light` pool — so any emitting
   block a pack authored as an ordinary entry was placed unconditionally at every density. That is

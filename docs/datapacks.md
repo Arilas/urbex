@@ -611,6 +611,33 @@ torch wired into a door, a brewing stand on a workstation, glow lichen on a wall
 was authored `lit=false` are all ordinary blocks, and `lightingDensity` cannot add, remove or reroll
 them. That was the point of removing `urbex:lights` — a tag cannot tell a lamp from a lit thing.
 
+### Parks: a lamp on generated ground
+
+A park section is not a part. Urbex generates that surface itself, so there are no slices to write a
+light into and, until `lamp`, no lighting density that could reach one — a city's parks were dark at
+every setting, whatever the pack said.
+
+<!-- example: citystyles -->
+```json
+{
+  "parkblocks": {
+    "grass": "g",
+    "lamp": "T",
+    "lampspacing": 8
+  }
+}
+```
+
+`lamp` names a character in the style's palette; it is placed one block above the grass on a grid of
+`lampspacing` blocks (default 8, range 1-16). The grid is keyed on world coordinates, so lamps line
+up across a park spanning several chunks rather than restarting at each seam, and nothing is placed
+on the border ring, where a lamp would sit half in the street.
+
+The character goes through the same path as a marker in a part: give it `lightSource` and the park
+lamps obey `lightingDensity` like every other light, leaving their `unlit` replacement behind when
+the roll rejects them. Name a plain block instead and it is simply always placed. A `lamp` character
+the palette does not map is a load-time error rather than a park that is dark for no visible reason.
+
 ## Parts: geometry inherited, paint overridden
 
 `refpalette` says what a part is *painted with*. `extends` says what a part *is*. They compose, and
