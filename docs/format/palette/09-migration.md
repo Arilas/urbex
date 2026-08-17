@@ -111,7 +111,12 @@ formats at once; see VER.005.
 ```
 
 ```json fixture:VER.010 reject=DIAG.060
-{ "version": 2, "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }
+{
+  "version": 2,
+  "palette": {
+    "#": { "kind": "weighted", "choices": [ { "random": 4, "block": "minecraft:stone_bricks" } ] }
+  }
+}
 ```
 
 The retired set, and what each becomes:
@@ -128,6 +133,25 @@ The retired set, and what each becomes:
 | `unlitBlocks` | deleted | `unlit`, which is now a node |
 | `inherit`, `parent` | deleted in v1 already | `extends` |
 | `torch`, `light` | deleted in v1 already | `urbex:light` |
+
+> **VER.014** · `REJECT` (`DIAG.062`) `[DEPRECATED → MERGE.011]` — A palette written inline in a part
+> or building may not declare a `version` other than 1, until inline palettes are read by the version
+> they declare.
+
+> > **Why** — [MERGE.011](04-merging.md#1-extends) says an inline palette is read by the rules of the
+> > version it declares, and nothing reads an inline version 2 palette yet. The two answers available
+> > in the meantime are to refuse it by name or to hand it to the version 1 codec, which ignores keys
+> > it does not know and would load a palette with none of the markers the author wrote — the silent
+> > misreading [VER.003](#1-versioning) exists to remove, one level down. This rule is retired, with a
+> > tombstone, when MERGE.011 is implemented.
+
+```json fixture:VER.014 reject=DIAG.062
+{
+  "xsize": 16, "zsize": 16,
+  "palette": { "version": 2, "palette": { "b": "minecraft:grass_block" } },
+  "slices": []
+}
+```
 
 ## 4. The migration tool
 

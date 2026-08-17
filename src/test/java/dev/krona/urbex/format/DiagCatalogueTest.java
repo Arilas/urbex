@@ -32,18 +32,6 @@ class DiagCatalogueTest {
      */
     private static final String RETIRED_ROW_MESSAGE = "—";
 
-    /**
-     * Catalogue rows that do not yet have the second sentence §2 requires.
-     * <p>
-     * <b>{@code DIAG.053} is a specification defect, not an exemption this test is granting.</b> Its row
-     * reads "{@code <part> slice <i> row <j>: <n> codepoints, but the part declares a width of <w>.}" -
-     * one sentence, which names the problem and no remedy, and §2 says in as many words that such a
-     * diagnostic is incomplete. It is listed rather than fixed here because fixing it means editing
-     * {@code 08-errors.md}, and this task's licence to edit the specification covers exactly one thing
-     * (§3.2's missing rule class). It is written up in the task report; the entry goes away with the row.
-     */
-    private static final Set<String> ROWS_WITHOUT_A_REMEDY_SENTENCE = Set.of("DIAG.053");
-
     @Test
     @Rule("DIAG.910")
     void theDiagEnumCoversExactlyTheCatalogue() {
@@ -110,15 +98,10 @@ class DiagCatalogueTest {
             String afterFirstSentence = message.contains(". ")
                     ? message.substring(message.indexOf(". ") + 2)
                     : "";
-            boolean hasRemedy = !afterFirstSentence.isBlank();
-            if (!hasRemedy && !ROWS_WITHOUT_A_REMEDY_SENTENCE.contains(row.getKey())) {
+            if (afterFirstSentence.isBlank()) {
                 failures.add(row.getKey() + " has no second sentence, which section 2 requires - a"
                         + " diagnostic that names a problem without naming a remedy is incomplete: "
                         + message);
-            }
-            if (hasRemedy && ROWS_WITHOUT_A_REMEDY_SENTENCE.contains(row.getKey())) {
-                failures.add(row.getKey() + " now has a remedy sentence; delete it from"
-                        + " ROWS_WITHOUT_A_REMEDY_SENTENCE");
             }
         }
         assertTrue(failures.isEmpty(), () -> String.join("\n", failures));

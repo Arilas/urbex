@@ -31,6 +31,11 @@ class ConformanceIndexTest {
     /**
      * The {@code [NO-FIXTURE]} rules that do not have a citing test yet, and what each is waiting for.
      * <p>
+     * <b>This field is temporary and deletes itself.</b> Every entry names the task that will cover its
+     * rule; {@link #everyExemptNoFixtureRuleIsStillWaiting} fails the moment one of them gains a citing
+     * test, so an entry cannot outlive the work it is waiting for. When the last one goes, so does the
+     * field and the branch below that reads it.
+     * <p>
      * §4.3 gives a {@code [NO-FIXTURE]} rule a stricter requirement than the fixture-completeness one it
      * replaces: it must have a citing test, and unlike the general check that requirement is never
      * suspended by draft. That is the right rule and this list does not weaken it - it records that

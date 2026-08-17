@@ -17,9 +17,9 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT` | 37 | 11 |
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
-| `DIAG` | 46 | 0 |
-| `VER` | 21 | 2 |
-| **total** | **289** | **70** |
+| `DIAG` | 48 | 0 |
+| `VER` | 22 | 3 |
+| **total** | **292** | **71** |
 
 ## Outstanding
 
@@ -43,7 +43,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.006` | a style and two palettes |
 | `VER.013` | a palette and a conditions asset |
 
-**Tests:** 37 of 289 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 39 of 292 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -76,7 +76,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.046` | `MUST` |  |  | `PaletteV2DecodeTest.aChoiceIsANodeWithASizeBesideIt` |
 | `MODEL.047` | `ACCEPT` |  | `accept` | — |
 | `MODEL.050` | `MUST` |  | `accept` | — |
-| `MODEL.051` | `MUST` |  | `reject=DIAG.003` | — |
+| `MODEL.051` | `MUST` |  | `reject=DIAG.012` | `PaletteV2DecodeTest.aTagWithoutItsLeadingHashIsRefused` |
 | `MODEL.052` | `MUST` |  |  | — |
 | `MODEL.053` | `REJECT` | `DIAG.008` | `reject=DIAG.008` | — |
 | `MODEL.060` | `MUST` |  |  | — |
@@ -330,6 +330,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.009` | `DIAG` |  |  | — |
 | `DIAG.010` | `DIAG` |  |  | — |
 | `DIAG.011` | `DIAG` |  |  | — |
+| `DIAG.012` | `DIAG` |  |  | — |
 | `DIAG.020` | `DIAG` |  |  | — |
 | `DIAG.021` | `DIAG` |  |  | — |
 | `DIAG.022` | `DIAG` |  |  | — |
@@ -359,6 +360,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.054` | `DIAG` |  |  | — |
 | `DIAG.060` | `DIAG` |  |  | — |
 | `DIAG.061` | `DIAG` |  |  | — |
+| `DIAG.062` | `DIAG` |  |  | — |
 | `DIAG.910` | `MUST` |  |  | `DiagCatalogueTest.theDiagEnumCoversExactlyTheCatalogue`, `DiagCatalogueTest.everyDiagTemplateIsWordedAsItsCatalogueRowIs`, `DiagCatalogueTest.aFormattedMessageIsRecognisedAsItsOwnDiagnostic`, `DiagCatalogueTest.everyCatalogueIdentifierIsLookedUpByItsId` |
 
 ### `palette/09-migration.md`
@@ -378,6 +380,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.010` | `REJECT` | `DIAG.060` | `reject=DIAG.060` | `PaletteV2DecodeTest.aRenamedVersionOneKeyIsRefusedNamingTheKeyThatReplacedIt` |
 | `VER.011` | `REJECT` | `DIAG.061` | `reject=DIAG.061` | `PaletteV2DecodeTest.aDeletedVersionOneKeyIsRefusedSayingWhatToWriteInstead` |
 | `VER.012` | `MUST NOT` |  |  | `PaletteV2DecodeTest.noRetiredKeyIsSilentlyAcceptedOrSilentlyIgnored` |
+| `VER.014` | `REJECT` | `DIAG.062` | `reject=DIAG.062` | `VersionDispatchTest.anInlinePaletteDeclaringVersionTwoIsRefusedRatherThanReadAsVersionOne` |
 | `VER.020` | `MUST` |  |  | — |
 | `VER.021` | `MUST` |  |  | — |
 | `VER.022` | `MUST` |  |  | — |

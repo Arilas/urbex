@@ -61,11 +61,10 @@ class FormatFixtureTest {
      * fixture is addressed: by rule and ordinal. A {@code file:line} key would move every time a
      * document is edited above it, and this list has to be diffable.
      * <p>
-     * Three entries are not waiting on a later task at all - they are defects in the specification,
-     * and are marked {@code SPEC DEFECT}. They are recorded here rather than worked around because
-     * {@code README.md} §7 says a conflict between the specification and the implementation is a bug in
-     * whichever the design record says is wrong, and choosing quietly would make this implementation
-     * the record.
+     * Every entry names a later task. Three earlier entries did not - they were specification defects
+     * this task surfaced, in {@code CHAR.005}'s, {@code MODEL.051}'s and {@code VER.010}'s fixtures -
+     * and all three were adjudicated and fixed in the documents rather than accommodated here, which is
+     * why the list holds only work now.
      */
     static final Map<String, String> PENDING = pending();
 
@@ -119,20 +118,12 @@ class FormatFixtureTest {
         pending.put("TRAIT.064#1", "two traits on one node conflict, which needs the trait registry"
                 + " (Task 6)");
 
-        // SPEC DEFECTS. Each is reported in this task's report; none is worked around here.
-        pending.put("CHAR.005#1", "SPEC DEFECT: the fixture's marker U+037A GREEK YPOGEGRAMMENI is"
-                + " general category Lm, and CHAR.005 excludes Mn, Mc, Me, Cc, Cf, Cs and Co, which"
-                + " does not include Lm. Either CHAR.005 must name the category the document's own §1"
-                + " argues about - a modifier letter - or the fixture must use a codepoint CHAR.005"
-                + " actually excludes");
-        pending.put("MODEL.051#1", "SPEC DEFECT: the fixture expects DIAG.003, whose message is"
-                + " '<key> is not a key of <context>', for a 'tag' whose *value* lacks the leading '#'."
-                + " No catalogue row covers a malformed tag reference, so there is nothing to raise");
-        pending.put("VER.010#1", "SPEC DEFECT: the fixture demonstrates 'char', which §3's retired-key"
-                + " table lists as deleted rather than renamed - so VER.011 and DIAG.061 govern it, not"
-                + " VER.010 and DIAG.060. Its 'palette' is also a JSON array, so the node-level key"
-                + " check never reaches the key. VER.010 is proven instead by a citing test using one of"
-                + " the three keys the table actually calls renamed");
+        // VER.014's fixture is a part file, like MERGE.009's, and for the same reason it cannot run
+        // here: this harness decodes every fixture as a palette file. The rule itself is covered by a
+        // citing test that drives the real part codec, so it is not relying on this fixture.
+        pending.put("VER.014#1", "the fixture is a part file, and this harness decodes fixtures as"
+                + " palette files; the rule is covered by a citing test on the part codec (Task 4"
+                + " retires the rule outright, by MERGE.011)");
 
         // Insertion order kept: this list is read as a diff and its failure messages have to come out
         // in the order the entries are written, not in whatever order hashing produced.

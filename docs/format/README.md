@@ -286,9 +286,9 @@ with the diagnostic the catalogue names. Nothing resolves a `$ref`, merges an `e
 trait, expands a tag or compiles a palette, so every rule about those is written and unenforced. The
 [conformance index](palette/conformance.md) is the list of which.
 
-**Fewer than half the fixtures run.** `FormatFixtureTest` runs every fixture whose outcome decoding
-alone decides; the rest are listed in that class, each with what it is waiting for, and the list is
-checked so that a fixture cannot fall out of coverage or stay listed after it becomes runnable.
+**Not every fixture runs.** `FormatFixtureTest` runs every fixture whose outcome decoding alone
+decides; the rest are listed in that class, each naming the task it waits for, and the list is checked
+so that a fixture cannot fall out of coverage or stay listed after it becomes runnable.
 
 **No `[NO-FIXTURE]` rule has a citing test yet.** All thirteen need something a decoder does not have -
 a second asset, a resolved chain, a part file, a command invocation, a generated input - and

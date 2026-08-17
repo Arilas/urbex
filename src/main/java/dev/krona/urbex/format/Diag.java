@@ -79,6 +79,10 @@ public enum Diag {
     DIAG_011("%s: resolves to no block. %s declares only traits;"
             + " give this marker a 'block', 'choices', 'tag' or 'alias' as well."),
 
+    /** {@code MODEL.051}: args are the location and the tag as written. */
+    DIAG_012("%s: tag %s has no leading '#'."
+            + " A block tag reference is written '#namespace:path'."),
+
     // ---- Traits (020-029) ----------------------------------------------------------------------
 
     /** {@code TRAIT.003}: args are the location and the trait id. */
@@ -213,7 +217,18 @@ public enum Diag {
     DIAG_060("%s: '%s' was retired in version 2. Write '%s' instead."),
 
     /** {@code VER.011}: args are the location, the deleted key, and what to do instead. */
-    DIAG_061("%s: '%s' was deleted, not renamed. %s");
+    DIAG_061("%s: '%s' was deleted, not renamed. %s"),
+
+    /**
+     * {@code VER.014}: args are the owner and the version the inline palette declared.
+     * <p>
+     * Retired with {@code VER.014} when {@code MERGE.011} is implemented, at which point an inline
+     * palette is read by the version it declares and there is nothing left to refuse. Its number stays
+     * retired, by {@code DIAG.910}.
+     */
+    DIAG_062("%s: the inline palette declares version %s, which this Urbex cannot yet read inline."
+            + " Write it in the version 1 format, or move it to the 'palettes' registry and name it"
+            + " with 'refpalette'.");
 
     private static final Map<String, Diag> BY_ID = byId();
 

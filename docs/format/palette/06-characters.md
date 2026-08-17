@@ -18,14 +18,19 @@ Measured over the shipped packs:
 | Zombie Apocalypse Essentials | 244 | 162 |
 
 Zombie Apocalypse Essentials sweeps contiguously through the Greek, Coptic and Cyrillic blocks,
-because `/exportpart` assigns markers by walking codepoints in sequence. That sweep includes seven
+because `/exportpart` assigns markers by walking codepoints in sequence. That sweep includes eight
 codepoints Unicode has never assigned — U+0378, U+0379, U+0380, U+0381, U+0382, U+0383, U+038B and
-U+03A2 — two spacing accents, and U+037A `GREEK YPOGEGRAMMENI`, a modifier letter.
+U+03A2.
 
-Three costs follow. Unassigned codepoints are unstable under editors and normalisation; a modifier
-letter in a slice string is a marker whose rendering depends on what precedes it; and every one of
+Two costs follow. Unassigned codepoints are unstable under editors and normalisation, and every one of
 those 162 markers misses the ASCII fast path used to resolve a marker to a block, falling back to a
 hashed lookup on the per-block generation path.
+
+The sweep also picked up U+037A `GREEK YPOGEGRAMMENI`, a *spacing* modifier letter, and the two
+spacing accents U+0384 and U+0385. Those are legal markers and stay legal: each is assigned, visible in
+the file, and occupies one column of a slice, which is everything CHAR.004 and CHAR.005 exist to
+require. What CHAR.005 excludes is the character that occupies **no** column — a combining mark — and
+the character that cannot be seen at all.
 
 ## 2. The domain
 
@@ -68,7 +73,7 @@ hashed lookup on the per-block generation path.
 ```
 
 ```json fixture:CHAR.005 reject=DIAG.052
-{ "version": 2, "palette": { "\u037a": "minecraft:stone" } }
+{ "version": 2, "palette": { "\u0301": "minecraft:stone" } }
 ```
 
 ```json fixture:CHAR.004 reject=DIAG.051

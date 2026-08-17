@@ -285,7 +285,7 @@ same structure by two spellings. A named weighted node in the
 { "version": 2, "palette": { "p": { "kind": "tag", "tag": "#minecraft:planks" } } }
 ```
 
-```json fixture:MODEL.051 reject=DIAG.003
+```json fixture:MODEL.051 reject=DIAG.012
 { "version": 2, "palette": { "p": { "kind": "tag", "tag": "minecraft:planks" } } }
 ```
 

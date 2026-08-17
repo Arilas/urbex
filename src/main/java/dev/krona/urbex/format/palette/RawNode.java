@@ -304,6 +304,15 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
             diagnostics.error(Diag.DIAG_007, Diagnostics.DECODING_LOCATION);
         }
 
+        // MODEL.051's leading '#'. The namespace half of that rule is not checked here: an unqualified
+        // tag is a reference that resolves against the tag registry, and that is where every other
+        // unqualified reference in the format is reported. The '#' is checkable from the text alone,
+        // and it is the half that would otherwise decode cleanly and match nothing.
+        if (node.tag().filter(tag -> !tag.startsWith("#")).isPresent()) {
+            diagnostics.error(Diag.DIAG_012, Diagnostics.DECODING_LOCATION,
+                    "'" + node.tag().orElseThrow() + "'");
+        }
+
         // MODEL.072. Only when the kind is declared here and nothing is referenced: a socket that
         // takes its lists from a $ref has candidates this node cannot see.
         if (node.kind().equals(Optional.of(Kind.LIGHT_SOCKET)) && node.ref().isEmpty()

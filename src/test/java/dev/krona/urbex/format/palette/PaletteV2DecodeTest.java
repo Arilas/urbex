@@ -189,6 +189,25 @@ class PaletteV2DecodeTest {
     }
 
     /**
+     * {@code MODEL.051}: a {@code tag} names a block tag with a leading {@code #}, and one without is
+     * refused with {@code DIAG.012} rather than decoding cleanly and matching nothing.
+     * <p>
+     * The namespace half of the rule is deliberately not checked at decode: an unqualified tag is a
+     * reference, and every other unqualified reference in this format is reported where references
+     * resolve. The {@code #} is checkable from the text alone.
+     */
+    @Test
+    @Rule("MODEL.051")
+    void aTagWithoutItsLeadingHashIsRefused() {
+        assertRefusedNaming(Diag.DIAG_012, "minecraft:planks", """
+                { "version": 2, "palette": { "p": { "kind": "tag", "tag": "minecraft:planks" } } }
+                """);
+        assertAccepted("""
+                { "version": 2, "palette": { "p": { "kind": "tag", "tag": "#minecraft:planks" } } }
+                """);
+    }
+
+    /**
      * {@code MODEL.020} and {@code MODEL.021} together: a string is the node with kind {@code block} and
      * that string as its block, and it is <em>never</em> a reference.
      * <p>
@@ -415,9 +434,11 @@ class PaletteV2DecodeTest {
      * {@code CHAR.005}: a marker in general category {@code Mn}, {@code Mc}, {@code Me}, {@code Cc},
      * {@code Cf}, {@code Cs} or {@code Co} is refused.
      * <p>
-     * The document's own fixture for this rule uses U+037A, whose category is {@code Lm} and which the
-     * rule therefore does not exclude - see {@code FormatFixtureTest.PENDING} and this task's report.
-     * These are codepoints the rule does name.
+     * One codepoint per excluded category, where the rule's own fixture demonstrates one. The fixture
+     * used to write U+037A GREEK YPOGEGRAMMENI, which is category {@code Lm} and is <em>not</em>
+     * excluded - it is a spacing modifier letter, so it is assigned, visible, and occupies one column of
+     * a slice, which is everything {@code CHAR.004} and {@code CHAR.005} ask of a marker. It now writes
+     * U+0301, a combining mark, which is the case the rule's {@code > Why} is about.
      */
     @Test
     @Rule("CHAR.005")
@@ -461,9 +482,11 @@ class PaletteV2DecodeTest {
      * {@code VER.010}: a version 1 key that version 2 <em>renamed</em> is refused with
      * {@code DIAG.060}, naming the replacement.
      * <p>
-     * The three keys §3's table calls renamed, rather than the {@code char} the rule's own fixture uses
-     * - {@code char} is listed as deleted, so {@code VER.011} governs it. That mismatch is a
-     * specification defect, recorded in {@code FormatFixtureTest.PENDING} and in this task's report.
+     * All three keys §3's table calls renamed, by enumeration, where the rule's fixture demonstrates one.
+     * The fixture used to demonstrate {@code char}, which that table lists as <em>deleted</em> - so
+     * {@code VER.011} and {@code DIAG.061} govern it, and {@link
+     * #aDeletedVersionOneKeyIsRefusedSayingWhatToWriteInstead} is where it belongs. It now demonstrates
+     * {@code random}, which {@code weight} replaced.
      */
     @Test
     @Rule("VER.010")

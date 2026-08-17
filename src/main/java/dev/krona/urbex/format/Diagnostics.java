@@ -32,6 +32,13 @@ public final class Diagnostics {
      */
     public static final String DECODING_LOCATION = "this palette";
 
+    /**
+     * {@link #DECODING_LOCATION}'s counterpart for a diagnostic whose subject is the asset the palette
+     * is written <em>inside</em> - {@code 08-errors.md} spells that slot {@code <owner>} rather than
+     * {@code <asset>} ({@code DIAG.031}, {@code DIAG.062}). Same limitation, same reason.
+     */
+    public static final String INLINE_OWNER_LOCATION = "this part or building";
+
     /** {@code DIAG.904}: an error refuses the world, a warning does not, and there is no third. */
     public enum Level {
         ERROR, WARN

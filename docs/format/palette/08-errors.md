@@ -67,6 +67,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.009` | [MODEL.062](00-model.md#44-alias) | *`<asset>` marker `'<m>'`: aliases `'<t>'`, which no palette in this context defines. Alias a marker that exists, or give this one a block of its own.* |
 | `DIAG.010` | [MODEL.072](00-model.md#45-light_socket) | *`<asset>` marker `'<m>'`: a light_socket declares no candidate in floor, wall, ceiling or free. Give it at least one.* |
 | `DIAG.011` | [MODEL.081](00-model.md#5-completeness) | *`<asset>` marker `'<m>'` `<via>`: resolves to no block. `<def>` declares only traits; give this marker a `block`, `choices`, `tag` or `alias` as well.* |
+| `DIAG.012` | [MODEL.051](00-model.md#43-tag) | *`<asset>` marker `'<m>'`: tag `<tag>` has no leading `#`. A block tag reference is written `#namespace:path`.* |
 
 ### Traits
 
@@ -113,7 +114,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.050` | [CHAR.003](06-characters.md#2-the-domain) | *`<asset>`: marker `<s>` is `<n>` codepoints. A marker is exactly one.* |
 | `DIAG.051` | [CHAR.004](06-characters.md#2-the-domain) | *`<asset>`: marker U+`<hhhh>` is not an assigned Unicode codepoint. It was most likely produced by an exporter walking codepoints in sequence; reassign it.* |
 | `DIAG.052` | [CHAR.005](06-characters.md#2-the-domain) | *`<asset>`: marker U+`<hhhh>` is `<category>`, which cannot be a marker. `<A combining mark occupies no position of its own in a slice.>`* |
-| `DIAG.053` | [CHAR.011](06-characters.md#3-slices) | *`<part>` slice `<i>` row `<j>`: `<n>` codepoints, but the part declares a width of `<w>`.* |
+| `DIAG.053` | [CHAR.011](06-characters.md#3-slices) | *`<part>` slice `<i>` row `<j>`: `<n>` codepoints, but the part declares a width of `<w>`. Correct the row, or the declared width, so the two agree.* |
 | `DIAG.054` | [CHAR.022](06-characters.md#4-assignment) | *`<command>`: this part needs `<n>` markers and the assignment alphabet holds `<m>`. Split the part, or reuse markers already in its palette.* |
 
 ### Versioning
@@ -122,6 +123,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 |---|---|---|
 | `DIAG.060` | [VER.010](09-migration.md#3-retired-keys) | *`<asset>` marker `'<m>'`: `<key>` was retired in version 2. Write `<replacement>` instead.* |
 | `DIAG.061` | [VER.011](09-migration.md#3-retired-keys) | *`<asset>`: `<key>` was deleted, not renamed. `<explanation>`* |
+| `DIAG.062` | [VER.014](09-migration.md#3-retired-keys) | *`<owner>`: the inline palette declares version `<n>`, which this Urbex cannot yet read inline. Write it in the version 1 format, or move it to the `palettes` registry and name it with `refpalette`.* |
 
 ## 5. Retired identifiers
 

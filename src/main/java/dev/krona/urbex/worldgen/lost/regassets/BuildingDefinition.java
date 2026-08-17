@@ -27,7 +27,7 @@ public class BuildingDefinition implements Extendable {
             instance.group(
                     DataTools.STRICT_IDENTIFIER_CODEC.optionalFieldOf("extends").forGetter(l -> l.extendsId),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
-                    PaletteDefinition.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
+                    PaletteAssetDefinition.INLINE_CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
                     DataTools.PALETTE_CHAR.optionalFieldOf("filler").forGetter(l -> Optional.ofNullable(l.fillerBlock)),
                     DataTools.PALETTE_CHAR.optionalFieldOf("rubble").forGetter(l -> Optional.ofNullable(l.rubbleBlock)),
                     Codec.INT.optionalFieldOf("mincellars").forGetter(l -> Optional.ofNullable(l.minCellars)),

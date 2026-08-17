@@ -19,12 +19,11 @@ import java.util.Map;
  * trait registry, which this task does not build. Decoding the payload into a shape now would mean
  * guessing at that registry's contract and then rewriting both.
  * <p>
- * <b>Why a {@link Tag} and not a {@code CompoundTag}.</b> {@code TRAIT.001} says {@code traits} maps a
- * trait id "to that trait's object", but {@code TRAIT.071}'s own fixture writes
- * {@code "urbex:rotatable": false} - a boolean, not an object - and an {@code accept} fixture is a
- * direct claim that the document loads. A compound-only payload would refuse it. This is recorded as a
- * specification defect in the task report rather than resolved here: the two statements cannot both be
- * right, and picking one silently is how a format grows a rule nobody wrote down.
+ * <b>Why a {@link Tag} and not a {@code CompoundTag}.</b> {@code TRAIT.001} maps a trait id to that
+ * trait's <em>value</em>, "which is an object unless that trait's schema defines a scalar shorthand" -
+ * and {@code urbex:rotatable} is that case, written {@code "urbex:rotatable": false}. A compound-only
+ * payload could not hold it. The rule said "object" flatly until this task; the fixture for
+ * {@code TRAIT.071} disagreed with it, and the rule was the half that was wrong.
  * <p>
  * The id goes through {@link DataTools#STRICT_IDENTIFIER_CODEC} rather than {@code Identifier.CODEC},
  * which enforces {@code TRAIT.002}'s namespace: {@code Identifier.CODEC} would resolve a bare

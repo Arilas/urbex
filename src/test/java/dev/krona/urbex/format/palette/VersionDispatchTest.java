@@ -9,6 +9,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.Versioned;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import net.minecraft.SharedConstants;
@@ -147,6 +148,43 @@ class VersionDispatchTest {
             assertTrue(Diag.DIAG_001.matches(result.error().orElseThrow().message()),
                     () -> result.error().orElseThrow().message());
         }
+    }
+
+    /**
+     * {@code VER.014}: an inline palette declaring a version other than 1 is refused by name.
+     * <p>
+     * The alternative was the one thing this format exists to remove. Nothing reads an inline version 2
+     * palette yet - the dispatcher lives on the registry - so leaving the field on the version 1 codec
+     * would have had it discard {@code version} and every version 2 key beside it, and load a part whose
+     * palette maps nothing. The part would have generated, as air.
+     * <p>
+     * This rule is marked {@code [DEPRECATED → MERGE.011]} and is retired when an inline palette is read
+     * by the version it declares; the test goes with it. {@code "version": 1} is accepted, because
+     * version 1 is exactly what the inline path reads.
+     */
+    @Test
+    @Rule("VER.014")
+    void anInlinePaletteDeclaringVersionTwoIsRefusedRatherThanReadAsVersionOne() {
+        String part = """
+                { "xsize": 16, "zsize": 16,
+                  "palette": { "version": 2, "palette": { "b": "minecraft:grass_block" } },
+                  "slices": [] }
+                """;
+        DataResult<BuildingPartDefinition> refused = BuildingPartDefinition.CODEC.parse(
+                JsonOps.INSTANCE, JsonParser.parseString(part));
+        assertTrue(refused.error().isPresent(),
+                () -> "a silently mis-read inline palette is the failure this refuses; got " + refused);
+        assertTrue(Diag.DIAG_062.matches(refused.error().orElseThrow().message()),
+                refused.error().orElseThrow().message());
+
+        DataResult<BuildingPartDefinition> version1 = BuildingPartDefinition.CODEC.parse(
+                JsonOps.INSTANCE, JsonParser.parseString("""
+                { "xsize": 16, "zsize": 16,
+                  "palette": { "version": 1, "palette": [ { "char": "b", "block": "minecraft:grass_block" } ] },
+                  "slices": [] }
+                """));
+        assertTrue(version1.result().isPresent(),
+                () -> "version 1 is what the inline path reads, so declaring it is true; got " + version1);
     }
 
     /**

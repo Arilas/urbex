@@ -9,7 +9,13 @@ else is true about that block. Kinds are exclusive; traits compose.
 
 ## 1. The mechanism
 
-> **TRAIT.001** · `MUST` — `traits` is an object mapping a trait id to that trait's object.
+> **TRAIT.001** · `MUST` — `traits` is an object mapping a trait id to that trait's value, which is an
+> object unless that trait's schema defines a scalar shorthand.
+
+> > **Why** — [`urbex:rotatable`](#47-urbexrotatable) is the case in point: its whole content is one
+> > boolean, and `"urbex:rotatable": false` is what an author writes. Version 1 had the same shorthand
+> > for the same reason — `lightSource: true` — and it existed because the common case had nothing else
+> > to say. A trait that defines one is declaring, through its schema, that it never will.
 
 > **TRAIT.002** · `MUST` — A trait id is namespaced: `<namespace>:<name>`.
 

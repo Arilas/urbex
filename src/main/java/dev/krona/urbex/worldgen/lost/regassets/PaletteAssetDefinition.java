@@ -1,10 +1,20 @@
 package dev.krona.urbex.worldgen.lost.regassets;
 
+import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
+import com.mojang.serialization.Dynamic;
+import com.mojang.serialization.DynamicOps;
+import dev.krona.urbex.format.Diag;
+import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.format.Versioned;
 import dev.krona.urbex.format.palette.PaletteV2Definition;
+import net.minecraft.resources.Identifier;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A registered palette, in whichever format version its file declares.
@@ -49,6 +59,50 @@ public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
             PaletteV2Definition.FORMAT_VERSION, PaletteV2Definition.CODEC));
 
     /**
+     * The codec for a palette written inline in a part or building: version 1, and loudly nothing else.
+     * <p>
+     * {@code VER.014}. {@code MERGE.011} says an inline palette is read by the rules of the version it
+     * declares, and nothing reads an inline version 2 palette yet - the registry is where the dispatcher
+     * lives. The two answers available in the meantime were to refuse a declared {@code version} by name
+     * or to leave the field on {@code PaletteDefinition.CODEC}, which ignores keys it does not know: an
+     * inline version 2 palette would then have decoded to a palette holding none of the markers its
+     * author wrote, with no message. That is the silent misreading {@code VER.003} removes at the
+     * registry level, and it would have survived here until inline version 2 support landed.
+     * <p>
+     * {@code "version": 1} is accepted, because it is true and is honoured - version 1 is exactly what
+     * this codec reads. Only a version it cannot read is refused. This whole field goes away with
+     * {@code VER.014}, which is marked {@code [DEPRECATED → MERGE.011]} for that reason.
+     */
+    Codec<PaletteDefinition> INLINE_CODEC = new Codec<>() {
+        @Override
+        public <T> DataResult<Pair<PaletteDefinition, T>> decode(DynamicOps<T> ops, T input) {
+            Optional<Dynamic<T>> version = new Dynamic<>(ops, input).get("version").result();
+            if (version.isPresent() && !isVersionOne(version.get())) {
+                Object written = version.get().getValue();
+                return DataResult.error(() -> Diag.DIAG_062.message(
+                        Diagnostics.INLINE_OWNER_LOCATION, written));
+            }
+            return PaletteDefinition.CODEC.decode(ops, input);
+        }
+
+        @Override
+        public <T> DataResult<T> encode(PaletteDefinition input, DynamicOps<T> ops, T prefix) {
+            return PaletteDefinition.CODEC.encode(input, ops, prefix);
+        }
+
+        @Override
+        public String toString() {
+            return PaletteDefinition.CODEC + "[inline, version 1 only]";
+        }
+    };
+
+    /** A declared {@code version} this codec can honour, which is 1 and nothing else. */
+    private static boolean isVersionOne(Dynamic<?> version) {
+        return version.asNumber().result().filter(number -> number.intValue() == 1
+                && number.doubleValue() == number.intValue()).isPresent();
+    }
+
+    /**
      * One {@code extends} chain, as version 1 entries, refusing the chain if any link is version 2.
      * <p>
      * A version 2 palette decodes as of this task and compiles as of a later one. Between the two, a
@@ -61,9 +115,8 @@ public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
      * asset it was compiling and carries on with the rest of the registry, which is the reporting this
      * needs: one named palette failed, and the load error says which.
      */
-    static java.util.List<PaletteDefinition> version1Only(net.minecraft.resources.Identifier id,
-                                                          java.util.List<PaletteAssetDefinition> chain) {
-        java.util.List<PaletteDefinition> version1 = new java.util.ArrayList<>(chain.size());
+    static List<PaletteDefinition> version1Only(Identifier id, List<PaletteAssetDefinition> chain) {
+        List<PaletteDefinition> version1 = new ArrayList<>(chain.size());
         for (PaletteAssetDefinition link : chain) {
             if (link instanceof PaletteDefinition definition) {
                 version1.add(definition);

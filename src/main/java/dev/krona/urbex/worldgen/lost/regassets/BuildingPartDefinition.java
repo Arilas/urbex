@@ -30,7 +30,7 @@ public class BuildingPartDefinition implements Extendable {
                     Codec.INT.optionalFieldOf("zsize").forGetter(l -> Optional.ofNullable(l.zSize)),
                     Codec.list(Codec.list(Codec.STRING)).optionalFieldOf("slices").forGetter(BuildingPartDefinition::createSlices),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
-                    PaletteDefinition.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
+                    PaletteAssetDefinition.INLINE_CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
                     Mergeable.codec(PartMeta.CODEC).optionalFieldOf("meta").forGetter(l -> Optional.ofNullable(l.metadata))
             ).apply(instance, BuildingPartDefinition::new));
 
