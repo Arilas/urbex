@@ -57,6 +57,13 @@ public class Highway {
     }
 
     private static int getHighwayLevel(PlanningContext provider, Preset profile, TimedCache<ChunkCoord, Integer> cache, Function<ChunkCoord, Boolean> hasHighway, Orientation orientation, ChunkCoord cp) {
+        if (provider.site() != null) {
+            // No highway through a site, for the reason spelled out on Railway.RAILWAY_LEVEL_OFFSET:
+            // a highway is a road between cities held at one height across hundreds of chunks, and a
+            // site is a pocket with nothing on the other side of it. Its height would be measured
+            // from the site's window bottom, too.
+            return -1;
+        }
         Integer known = cache.get(cp);
         if (known != null) {
             return known;

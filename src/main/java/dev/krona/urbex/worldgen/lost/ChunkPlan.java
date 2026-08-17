@@ -615,7 +615,12 @@ public class ChunkPlan {
             zBridge = rand.nextFloat() < profile.bridgeChance();
         }
 
-        if (rand.nextFloat() < profile.railwayDungeonChance()) {
+        // The draw happens either way, so the layout stream does not depend on whether this is a
+        // site - only whether the part is kept. A rail dungeon is a room off the railway, drawn at
+        // groundLevel + RAILWAY_LEVEL_OFFSET * 6 like the rails themselves, and a site has neither
+        // the railway nor a groundLevel that means what that formula assumes.
+        boolean keepRailDungeon = rand.nextFloat() < profile.railwayDungeonChance() && site == null;
+        if (keepRailDungeon) {
             if (!hasBuilding || (Railway.RAILWAY_LEVEL_OFFSET < (cityLevel - cellars))) {
                 railDungeon = provider.assets().parts().getOrWarn(getCityStyle().getRandomRailDungeon(rand, this.coord));
             } else {
@@ -634,7 +639,12 @@ public class ChunkPlan {
     }
 
     private int getMaxcellars(CityStyle cs) {
-        int maxcellars = profile.buildingMaxCellars() + cityLevel;
+        // The + cityLevel term is "how much room there is under this chunk's ground before the
+        // datum", which for a dimension is how far the city has climbed above its ground level. For
+        // a site the datum is the bottom of the caller's window, so the same term reads as "dig as
+        // deep as the window allows" - and a caller who wrote buildingMaxCellars: 2 got up to ten.
+        // A site's number means what it says.
+        int maxcellars = profile.buildingMaxCellars() + (provider.site() != null ? 0 : cityLevel);
         if (buildingType.getMaxCellars() != -1 && buildingType.getOverrideFloors()) {
             maxcellars = buildingType.getMaxCellars();
             return maxcellars;

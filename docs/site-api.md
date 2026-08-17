@@ -122,6 +122,36 @@ Return multiples of six above `minY` and nothing is lost. Return anything else a
 because two parts of a site whose grounds differ by less than a storey have no way to say so to each
 other.
 
+## What a site does not get: highways and railways
+
+Neither generates in a site, and this is not a setting.
+
+Both are *networks*. Their height is measured from `groundLevel` rather than from a chunk's own city
+ground, which is exactly what makes them networks: they hold one height across hundreds of chunks
+while the cities they join ride up and down the terrain above them. A site's `groundLevel` is the
+bottom of its window, with the per-chunk height carried in `cityLevel` instead — so the same offset
+puts a railway eighteen blocks *below the window*, which for a bunker at y=−60 is outside the world.
+That is what station staircases descending into the bedrock were.
+
+Re-datuming them onto the chunk's city ground would land them somewhere legal and no better: a
+network needs two ends, and a site is a pocket a few dozen chunks across with nothing to join.
+
+Note that `railwayStationsEnabled` is a separate preset flag from `railwaysEnabled`, so a preset that
+turns railways off — `urbex:cavern` does — still generates stations. That is a surprise on the
+surface too; for a site it no longer matters, because neither reaches one.
+
+**Connecting a site to the surface, or to a real network above it, is a feature and not this
+exclusion.** A bunker with a staircase up to a ruined station would be worth having. It needs the
+site to know where the surface is, which nothing here currently tells it.
+
+## Cellars
+
+`buildingMaxCellars` means what it says in a site. In a dimension the effective cap is
+`buildingMaxCellars + cityLevel` — "how much room is there under this chunk before the datum", where
+the datum is the preset's ground level and `cityLevel` is how far the city has climbed above it. A
+site's datum is the bottom of your window, so the same term reads as *dig as deep as the window
+allows*: a caller asking for 2 cellars at `cityLevel` 8 got up to 10. The term is dropped for sites.
+
 ## Water
 
 A site is dry unless you say otherwise, and it ignores its preset's sea level to stay that way.
@@ -159,6 +189,9 @@ the first.
 | A non-city chunk | rendered: ground cover, terrain fix, scattered buildings | **untouched** |
 | Structure avoidance | a village suppresses the city here | not applied; you named the place |
 | Water | the preset's sea level, else the dimension's | `waterY`, and dry by default |
+| Highways and railways | planned across the world | never generated |
+| Cellar cap | `buildingMaxCellars + cityLevel` | `buildingMaxCellars` |
+| Building height cap | the dimension's build limit | the window top — **one number for the whole site** |
 
 The "untouched" row is what makes a site sparse, and it is the difference that matters most. Outside
 a dimension's cities is still somewhere Urbex has an opinion about; outside a site is somebody else's
