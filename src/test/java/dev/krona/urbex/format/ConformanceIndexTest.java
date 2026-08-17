@@ -92,17 +92,32 @@ class ConformanceIndexTest {
     }
 
     /**
-     * §4.2 rule 4: a rule of class {@code ACCEPT}, {@code REJECT}, {@code DEFAULT} or {@code EQUIV}
-     * needs a fixture, unless its document is {@code [DRAFT]} (rule-writing still in progress) or the
-     * rule itself is marked {@code [NO-FIXTURE]}. §4.3 tightens the second exemption: a
-     * {@code [NO-FIXTURE]} rule is not simply excused, it moves the whole burden onto a citing test,
-     * so it must have at least one.
+     * {@code docs/format/README.md} §5: "any rule has no citing test and no fixture" is the actual
+     * completeness promise the conformance index makes - broader than §4.2 rule 4, which only
+     * requires a fixture for {@code ACCEPT}/{@code REJECT}/{@code DEFAULT}/{@code EQUIV} rules. A
+     * {@code MUST} or {@code INVARIANT} rule with neither a fixture nor a citing test is just as
+     * much an unenforced claim as an {@code ACCEPT} rule would be, so this checks every rule, not
+     * only the four classes a fixture alone can discharge. The one exclusion is a diagnostic
+     * catalogue row (cls {@code DIAG}) - not a rule under §3.2's own six classes, only a
+     * bookkeeping entry this parser stores alongside rules; {@code DIAG.001} is exercised through
+     * the {@code REJECT} rule that cites it, not by a test of its own.
      * <p>
-     * That second half fails today for all thirteen {@code [NO-FIXTURE]} rules, because nothing cites
-     * anything yet - {@link SpecDocuments#citingTests()} scans {@code @Rule} annotations, and Task 2
-     * is the first task to write any. Disabled until then rather than weakened, so the moment a
-     * citing test lands for one of the thirteen, re-enabling this test is the way to find out whether
-     * it actually covers the rule it claims to.
+     * The general check above is suspended for a {@code [DRAFT]} document, exactly as §4.2 rule 4
+     * already was - that suspension is what keeps this test from failing on ~175 {@code MUST} and
+     * {@code INVARIANT} rules while every specification document is still draft. It is <em>not</em>
+     * the same suspension a {@code [NO-FIXTURE]} rule gets, though: §4.3 says a
+     * {@code [NO-FIXTURE]} rule's citing-test requirement is "a stricter requirement than the one
+     * it replaces" - stricter specifically because it is never suspended by draft. So although a
+     * {@code [NO-FIXTURE]} rule looks like it could fall out of the general check as a special case
+     * (it was already required to have a citing test), it stays a separate branch: merging it into
+     * the draft-suspended branch would silently exempt every {@code [NO-FIXTURE]} rule for as long
+     * as its document stays draft, which is exactly the loophole §4.3 exists to close.
+     * <p>
+     * Disabled for the same reason as before: nothing cites anything yet -
+     * {@link SpecDocuments#citingTests()} scans {@code @Rule} annotations, and Task 2 is the first
+     * task to write any. That alone is enough to fail the {@code [NO-FIXTURE]} branch today, since
+     * it is never draft-suspended; re-enabling this test is how Task 2 finds out whether its first
+     * citing tests actually cover the rules they claim to.
      */
     @Test
     @Disabled("no citing tests until Task 2")
@@ -115,18 +130,21 @@ class ConformanceIndexTest {
 
         List<String> failures = new ArrayList<>();
         for (SpecDocuments.SpecRule rule : spec.rules().values()) {
+            if (SpecDocuments.CATALOGUE_ROW_CLASS.equals(rule.cls())) {
+                continue;
+            }
+            boolean hasFixture = !fixturesByRule.getOrDefault(rule.id(), List.of()).isEmpty();
+            boolean hasCitingTest = !spec.citingTests().getOrDefault(rule.id(), List.of()).isEmpty();
+
             if (rule.noFixtureReason().isPresent()) {
-                if (spec.citingTests().getOrDefault(rule.id(), List.of()).isEmpty()) {
+                if (!hasCitingTest) {
                     failures.add(rule.file() + ": " + rule.id() + " is [NO-FIXTURE] but has no citing test");
                 }
                 continue;
             }
-            boolean needsFixture = SpecDocuments.NEEDS_FIXTURE.contains(rule.cls());
-            boolean hasFixture = !fixturesByRule.getOrDefault(rule.id(), List.of()).isEmpty();
             boolean draft = spec.draftFiles().contains(rule.file());
-            if (needsFixture && !hasFixture && !draft) {
-                failures.add(rule.file() + ": " + rule.id() + " is " + rule.cls()
-                        + " with no fixture and no [NO-FIXTURE]");
+            if (!hasFixture && !hasCitingTest && !draft) {
+                failures.add(rule.file() + ": " + rule.id() + " has no fixture and no citing test");
             }
         }
         assertTrue(failures.isEmpty(), () -> String.join("\n", failures));

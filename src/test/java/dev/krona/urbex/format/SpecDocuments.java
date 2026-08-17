@@ -55,6 +55,15 @@ public final class SpecDocuments {
     private static final String INDEX_RELATIVE_PATH = "palette/conformance.md";
 
     /**
+     * The class assigned to a diagnostic-catalogue row (a table row in {@code palette/08-errors.md}
+     * §4, not a rule definition line). It is not one of the six rule classes {@code README.md} §3.2
+     * defines - a catalogue row is data (an id and a message), not a normative statement - so it is
+     * excluded wherever a check means "every rule": {@code DIAG.001} is exercised through the
+     * {@code REJECT} rule that cites it, not by a test or fixture of its own.
+     */
+    static final String CATALOGUE_ROW_CLASS = "DIAG";
+
+    /**
      * The five keys {@code MODEL.001} names for the top level of a palette file: {@code version},
      * {@code extends}, {@code $imports}, {@code $defs} and {@code palette}, and no others. Hand-copied
      * rather than parsed from the rule's prose - the prose is English, not data, and parsing it back
@@ -187,7 +196,8 @@ public final class SpecDocuments {
                     String id = diagRow.group(1);
                     if (!rules.containsKey(id)) {
                         order.add(id);
-                        rules.put(id, new SpecRule(id, file, "DIAG", Optional.empty(), Optional.empty(), lineNumber));
+                        rules.put(id, new SpecRule(id, file, CATALOGUE_ROW_CLASS, Optional.empty(),
+                                Optional.empty(), lineNumber));
                     }
                     diagnostics.put(id, diagRow.group(3).trim());
                 }
@@ -276,8 +286,23 @@ public final class SpecDocuments {
         }
     }
 
-    /** Block comments ({@code /* ... *}{@code /}, including javadoc) and line comments ({@code //...}). */
-    private static final Pattern COMMENT = Pattern.compile("/\\*.*?\\*/|//.*", Pattern.DOTALL);
+    /**
+     * A block comment ({@code /* ... *}{@code /}, including javadoc). {@link Pattern#DOTALL} is
+     * confined to this pattern alone - it must span newlines, since a javadoc comment routinely does.
+     */
+    private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
+
+    /**
+     * A line comment ({@code //...}), deliberately without {@link Pattern#DOTALL}. Stripping this
+     * used to share one alternation with {@link #BLOCK_COMMENT} under a single {@code DOTALL} flag,
+     * which applies to the whole alternation, not just the branch that needs it - the greedy
+     * {@code .*} in {@code //.*} then matched past the end of the line, into every line that
+     * followed. A test source line containing {@code //} that is not a comment at all - a URL inside
+     * a string literal, e.g. {@code "https://example.com"} - silently deleted the remainder of the
+     * file, including any {@code @Rule} citation after it. See
+     * {@code CitingTestScannerTest#aUrlBeforeACitationDoesNotSwallowIt}, which pins this.
+     */
+    private static final Pattern LINE_COMMENT = Pattern.compile("//.*");
 
     /**
      * Finds every {@code @Rule("ID")} citation in {@code src/test/java} by scanning source text, not
@@ -315,7 +340,12 @@ public final class SpecDocuments {
         return citingTests;
     }
 
-    private static void scanCitingTestsInFile(Path file, Map<String, List<String>> citingTests) {
+    /**
+     * Package-visible so {@code CitingTestScannerTest} can exercise it directly against a synthetic
+     * file, rather than having to plant a fixture inside the real {@code src/test/java} tree that
+     * {@link #scanCitingTests} walks.
+     */
+    static void scanCitingTestsInFile(Path file, Map<String, List<String>> citingTests) {
         String className = file.getFileName().toString().replaceFirst("\\.java$", "");
         String source;
         try {
@@ -323,9 +353,12 @@ public final class SpecDocuments {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-        String withoutComments = COMMENT.matcher(source).replaceAll("");
+        // Block comments first, since they may span lines; line comments second, one line at a time,
+        // so a "//" that is not a comment - a URL in a string literal - cannot eat lines after it.
+        String withoutBlockComments = BLOCK_COMMENT.matcher(source).replaceAll("");
         List<String> pending = new ArrayList<>();
-        for (String line : withoutComments.split("\n", -1)) {
+        for (String rawLine : withoutBlockComments.split("\n", -1)) {
+            String line = LINE_COMMENT.matcher(rawLine).replaceAll("");
             Matcher annotation = RULE_ANNOTATION.matcher(line);
             while (annotation.find()) {
                 pending.add(annotation.group(1));
@@ -381,7 +414,7 @@ public final class SpecDocuments {
         out.append("[the specification system](../README.md#5-the-conformance-index) for what this file is for.\n\n");
 
         renderTotals(out, rules, ruleSet.fixtures);
-        renderOutstanding(out, ruleSet.order, rules, fixturesByRule);
+        renderOutstanding(out, ruleSet.order, rules, fixturesByRule, ruleSet.citingTests);
         renderRules(out, ruleSet.files, ruleSet.order, rules, fixturesByRule, ruleSet.citingTests);
 
         return out.toString();
@@ -400,7 +433,7 @@ public final class SpecDocuments {
     }
 
     private static void renderOutstanding(StringBuilder out, List<String> order, Map<String, SpecRule> rules,
-            Map<String, List<Fixture>> fixturesByRule) {
+            Map<String, List<Fixture>> fixturesByRule, Map<String, List<String>> citingTests) {
         List<String> gaps = new ArrayList<>();
         List<String> noFixture = new ArrayList<>();
         for (String id : order) {
@@ -408,8 +441,17 @@ public final class SpecDocuments {
             if (rule.noFixtureReason().isPresent()) {
                 noFixture.add(id);
             }
+            // README.md §5: "any rule has no citing test and no fixture" - every rule, not only the
+            // four classes §4.2 rule 4 can discharge with a fixture alone. A [NO-FIXTURE] rule is
+            // still excluded here: it is tracked in the table below instead, and its citing-test
+            // requirement (§4.3) is not subject to the draft suspension this list is named for.
+            // Catalogue rows (cls DIAG) are excluded too - they are not rules under §3.2 at all.
+            if (CATALOGUE_ROW_CLASS.equals(rule.cls()) || rule.noFixtureReason().isPresent()) {
+                continue;
+            }
             boolean hasFixture = fixturesByRule.containsKey(id) && !fixturesByRule.get(id).isEmpty();
-            if (NEEDS_FIXTURE.contains(rule.cls()) && rule.noFixtureReason().isEmpty() && !hasFixture) {
+            boolean hasCitingTest = citingTests.containsKey(id) && !citingTests.get(id).isEmpty();
+            if (!hasFixture && !hasCitingTest) {
                 gaps.add(id);
             }
         }
