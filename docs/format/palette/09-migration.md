@@ -27,14 +27,14 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > **Why** — making version 1 refuse unknown keys would break packs retroactively, which this
 > > project has never done. Strictness is a reason to migrate, not a penalty for not having.
 
-> **VER.005** · `REJECT` (`DIAG.038`) `[NO-FIXTURE: a version 1 and a version 2 file]` — An `extends` chain may not cross versions, in either
-> direction.
+> **VER.005** · `REJECT` (`DIAG.038`) `[NO-FIXTURE: a version 1 and a version 2 file]` — A format version is chosen per chain, not per file:
+> every link of one `extends` chain declares the same version. What that refuses, and what refusing it
+> costs, is [MERGE.010](04-merging.md#1-extends), which states the rule once.
 
-> > **Why** — the alternative was an invariant that a version 1 palette and its version 2
-> > translation compile to identical forms, maintained for every construct, forever. It is a heavy
-> > promise bought for one convenience, and it constrains version 2 to whatever version 1 could
-> > already express: per-slot traits, `$super` and pointers all have no version 1 counterpart to be
-> > equal to. The two formats are developed independently, and neither is a dialect of the other.
+> > **Why** — the two formats are developed independently and neither is a dialect of the other, so
+> > there is no correspondence between them for a merge to preserve. VER.001 through VER.004 make the
+> > *file* the unit of version selection; this is the one place where that unit is larger, because a
+> > chain produces a single palette and a palette is written in one format.
 
 > **VER.006** · `ACCEPT` `[NO-FIXTURE: a style and two palettes]` — A style's `randompalettes` may draw a version 1 palette and a version 2
 > palette into the same merge.
@@ -43,8 +43,22 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > correspondence between the two formats. Forbidding it as well would mean a pack could only
 > > migrate every palette at once — and the packs this has to work for hold 30 and 98 palette files.
 
-> **VER.007** · `MUST` — A version 2 palette may not carry an inline version 1 palette, and the
-> reverse, by VER.005.
+> **VER.007** · `MUST NOT` — The palettes written inline along one part's or building's `extends`
+> chain are all of one format version. A part whose ancestor writes a version 1 inline palette may not
+> write a version 2 one, or the reverse.
+
+> > **Why** — an inline palette is a palette ([MERGE.011](04-merging.md#1-extends)), and the inline
+> > blocks an owner's chain declares are merged by marker exactly as a registry chain is. So this is
+> > [MERGE.010](04-merging.md#1-extends)'s constraint arriving through the *owner's* `extends` rather
+> > than through the palette's, and it needs saying separately because VER.005 is about a chain of
+> > palettes and this chain is a chain of parts.
+
+> > **Why it is stated and not yet checked** — until [VER.015](#11-what-version-2-does-not-reach-yet)
+> > retires, an inline version 2 palette is refused where it is compiled, so no mixed stack survives long
+> > enough to be merged and nothing enforces this rule on its own. When VER.015 goes, this needs a check
+> > and a diagnostic of its own. The rule used to read "a version 2 palette may not carry an inline
+> > version 1 palette, and the reverse, by VER.005", which named a construct that does not exist: a
+> > palette carries no inline palette, a part or a building does.
 
 > **VER.013** · `ACCEPT` `[NO-FIXTURE: a palette and a conditions asset]` — VER.005 governs `extends` between palettes and nothing else. A version 2
 > palette references `conditions`, `variants`, block tags and every other registry exactly as a

@@ -87,8 +87,21 @@ everything it inherited and adds one trait. Both are legible without opening the
 > > **Why** — an inline palette is not a registry entry, so nothing can resolve the link. Accepting
 > > a key and ignoring it is how a pack ends up meaning something other than what it says.
 
-> **MERGE.010** · `ACCEPT` `[NO-FIXTURE: a version 1 and a version 2 file]` — A version 2 palette may `extends` a version 1 palette. The two are
-> merged after compilation, not as JSON; see [VER.005](09-migration.md).
+> **MERGE.010** · `REJECT` (`DIAG.038`) `[NO-FIXTURE: a version 1 and a version 2 file]` — An `extends` chain may not cross format versions, in
+> either direction: a version 2 palette may not `extends` a version 1 palette, and a version 1 palette
+> may not `extends` a version 2 one. The diagnostic names both assets and both versions.
+
+> > **Why** — the alternative was an invariant that a version 1 palette and its version 2 translation
+> > compile to identical forms, maintained for every construct, forever. It is a heavy promise bought
+> > for one convenience, and it caps version 2 at whatever version 1 could already express: per-slot
+> > traits, `$super` and pointers have no version 1 counterpart to be equal to. The two formats are
+> > developed independently, and neither is a dialect of the other.
+
+> > **Why a merge is the thing refused, and not a composition** — a style's `randompalettes` may still
+> > draw a version 1 palette and a version 2 palette into one selection ([VER.006](09-migration.md#1-versioning)).
+> > That operates on compiled palettes rather than on JSON, so it needs no correspondence between the two
+> > formats; forbidding it as well would mean a pack could only migrate every palette at once, and the
+> > packs this has to work for hold 30 and 98 palette files.
 
 ```json fixture:MERGE.009 reject=DIAG.031 name=inline-extends
 {
@@ -116,8 +129,11 @@ document restates it.
 | 3 | the same marker in a later file of the `extends` chain | MERGE.002 |
 | 4 | the same marker in an earlier file of the chain | MERGE.001 |
 
-Traits are not in this table: they merge by id at each step rather than replacing the set, by
-TRAIT.006.
+Traits are not in this table, and they do not behave alike at every step of it. Over a `$ref` — rows 1
+and 2 — `traits` merge by id rather than replacing the set (REF.004, TRAIT.006). Down the `extends`
+chain — rows 3 and 4 — they do not: a marker a later file declares replaces the earlier one whole and
+takes its traits with it (MERGE.008). To keep what an entry inherits, name it with `$super`, which turns
+the chain step into a `$ref` and so into the first behaviour.
 
 
 ## Tombstones

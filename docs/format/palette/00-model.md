@@ -296,12 +296,20 @@ same structure by two spellings. A named weighted node in the
 
 > **MODEL.061** · `MUST` — `of` is exactly one character, subject to [CHAR.001](06-characters.md).
 
-> **MODEL.062** · `REJECT` (`DIAG.009`) — An `alias` whose target is not defined by any palette in
-> the merge is refused.
+> **MODEL.062** · `REJECT` (`DIAG.009`) — An `alias` whose target is defined by no palette of the
+> merge a part is generated with is refused. It is decided there, and not against one palette's
+> `extends` chain: by [MODEL.064](#44-alias) that merge includes markers contributed by palettes this
+> file never mentions, so a chain on its own cannot say whether an alias resolves.
 
 > > **Why** — version 1's `frompalette` read only the first character of its value, so `"ab"`
 > > silently meant `"a"`; it could not override a marker already defined, so its effect depended on
 > > merge order; and an unresolvable one left the marker undefined with no diagnostic at all.
+
+> > **Why it is not checked one palette at a time** — because that refuses files that are correct.
+> > A palette naming one alias and nothing else is the shipped idiom — `urbex:glass_side_variant_glass`
+> > maps `@` to `a` and declares no marker of its own — and an earlier validator that read one palette at
+> > a time reported 45 problems in a pack that generates correctly. Over-rejection costs a pack author
+> > exactly what under-rejection does, which is why `ACCEPT` is a rule class here at all.
 
 > **MODEL.063** · `MUST` — An `alias` carries the traits of its target, then its own, by
 > [TRAIT.006](01-traits.md#2-inheritance).

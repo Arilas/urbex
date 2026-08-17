@@ -83,7 +83,7 @@ final class AssetStage {
      * VER.001 through VER.004 unchanged", and the rule that keeps its chains from crossing should not
      * have to be written again with a different registry key in it.
      * <p>
-     * <b>Why the two formats may not meet in one chain</b> is {@code VER.005}'s own {@code > Why}: the
+     * <b>Why the two formats may not meet in one chain</b> is {@code MERGE.010}'s own {@code > Why}: the
      * alternative was an invariant that a version 1 palette and its version 2 translation compile to
      * identical forms, maintained forever, which would constrain version 2 to what version 1 could
      * already express. A style's {@code randompalettes} drawing one of each is a different mechanism and

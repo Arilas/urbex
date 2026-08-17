@@ -427,12 +427,14 @@ class RegistryChainResolutionTest {
      * either direction.
      * <p>
      * Both rules carry {@code [NO-FIXTURE: a version 1 and a version 2 file]} - the chain is two
-     * documents and a fixture is one - so this is their coverage. Both directions are asserted because
+     * documents and a fixture is one - so this is their coverage. {@code MERGE.010} states the refusal
+     * and what it costs; {@code VER.005} states the versioning half, that a format version is chosen per
+     * chain rather than per file, and points at it. Both directions are asserted because
      * the rule states both and they are separately gettable wrong: a version 2 palette extending a
      * version 1 one is the migration an author reaches for first, and the reverse is what an author does
      * when they convert the base and leave the leaf.
      * <p>
-     * What the refusal buys is {@code VER.005}'s own reasoning: the alternative was an invariant that a
+     * What the refusal buys is {@code MERGE.010}'s own reasoning: the alternative was an invariant that a
      * version 1 palette and its version 2 translation compile to identical forms, kept for every
      * construct forever, which would hold version 2 to what version 1 could already express. A style's
      * {@code randompalettes} drawing one of each stays legal ({@code VER.006}) because that composition

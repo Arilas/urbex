@@ -79,15 +79,15 @@ class FormatFixtureTest {
         Map<String, String> pending = new LinkedHashMap<>();
 
         // MODEL.062 was listed for Task 4 and is not decidable there, or by any check over one palette
-        // chain. MODEL.060 resolves an alias "in the same merged palette" and MODEL.064 says which merge
-        // that is: "the merged palette the part is generated with - including markers contributed by
-        // palettes this file never mentions". The shipped pack relies on exactly that
-        // (urbex:glass_side_variant_glass maps '@' to 'a' and declares nothing else), so an alias whose
-        // target its own chain does not declare is not yet wrong. It becomes decidable where a style's
+        // chain. The rule now says so itself - "decided there, and not against one palette's extends
+        // chain" - because MODEL.064 makes the answer include "markers contributed by palettes this file
+        // never mentions". The shipped pack relies on exactly that: urbex:glass_side_variant_glass maps
+        // '@' to 'a' and declares no marker of its own, and the validator that read one palette at a time
+        // reported 45 problems in a pack that generates correctly. It becomes decidable where a style's
         // palette groups are merged, which is LOAD.013's stage.
         pending.put("MODEL.062#1", "an alias is answered by the merged palette a part is generated with"
-                + " (MODEL.064), so an unresolvable one is only knowable where a style's palette groups"
-                + " are merged (Task 7)");
+                + " (MODEL.062, MODEL.064), so an unresolvable one is only knowable where a style's"
+                + " palette groups are merged - LOAD.013's stage (Task 7)");
 
         // Task 5 - sizes and selection.
         pending.put("WEIGHT.024#1", "exclusion by 'when' is evaluated against the loaded mods (Task 5)");

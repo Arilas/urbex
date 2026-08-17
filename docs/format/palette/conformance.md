@@ -222,7 +222,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MERGE.011` | `MUST` |  |  | `VersionDispatchTest.anInlinePaletteIsReadByTheVersionItDeclares` |
 | `MERGE.012` | `ACCEPT` |  | *n/a* | `VersionDispatchTest.anInlinePaletteMayCarryImportsAndDefs` |
 | `MERGE.009` | `REJECT` | `DIAG.031` | `reject=DIAG.031` | `VersionDispatchTest.extendsInsideAnInlineVersionTwoPaletteIsRefused` |
-| `MERGE.010` | `ACCEPT` |  | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
+| `MERGE.010` | `REJECT` | `DIAG.038` | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
 
 ### `palette/05-weights.md`
 
@@ -383,7 +383,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.004` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt` |
 | `VER.005` | `REJECT` | `DIAG.038` | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
 | `VER.006` | `ACCEPT` |  | *n/a* | — |
-| `VER.007` | `MUST` |  |  | — |
+| `VER.007` | `MUST NOT` |  |  | — |
 | `VER.013` | `ACCEPT` |  | *n/a* | — |
 | `VER.015` | `REJECT` | `DIAG.063` | *n/a* | `VersionDispatchTest.aRegisteredVersionTwoPaletteIsRefusedWhereItIsCompiled` |
 | `VER.016` | `REJECT` | `DIAG.064` | `reject=DIAG.064` | `NodeResolverTest.aSatellitesNodeIsNotCompletedAsAnAlternative`, `NodeResolverTest.anyOperandAnywhereInsideATraitIsRefused` |
