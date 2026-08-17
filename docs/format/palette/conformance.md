@@ -12,18 +12,18 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 |---|---:|---:|
 | `MODEL` | 42 | 22 |
 | `TRAIT` | 41 | 16 |
-| `REF` | 52 | 12 |
+| `REF` | 54 | 13 |
 | `MERGE` | 12 | 4 |
 | `WEIGHT` | 37 | 11 |
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
-| `DIAG` | 50 | 0 |
-| `VER` | 23 | 3 |
-| **total** | **295** | **72** |
+| `DIAG` | 53 | 0 |
+| `VER` | 24 | 4 |
+| **total** | **301** | **74** |
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (111):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.070`, `MODEL.073`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.022`, `REF.033`, `REF.035`, `REF.063`, `REF.074`, `REF.075`, `MERGE.001`, `MERGE.002`, `MERGE.003`, `MERGE.004`, `MERGE.008`, `MERGE.011`, `WEIGHT.012`, `WEIGHT.015`, `WEIGHT.016`, `WEIGHT.018`, `WEIGHT.022`, `WEIGHT.023`, `WEIGHT.025`, `WEIGHT.031`, `WEIGHT.040`, `WEIGHT.041`, `WEIGHT.042`, `WEIGHT.043`, `WEIGHT.050`, `WEIGHT.051`, `WEIGHT.052`, `WEIGHT.053`, `WEIGHT.060`, `WEIGHT.061`, `WEIGHT.062`, `WEIGHT.064`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.004`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (110):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.070`, `MODEL.073`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.033`, `REF.035`, `REF.063`, `REF.074`, `REF.075`, `MERGE.001`, `MERGE.002`, `MERGE.003`, `MERGE.004`, `MERGE.008`, `MERGE.011`, `WEIGHT.012`, `WEIGHT.015`, `WEIGHT.016`, `WEIGHT.018`, `WEIGHT.022`, `WEIGHT.023`, `WEIGHT.025`, `WEIGHT.031`, `WEIGHT.040`, `WEIGHT.041`, `WEIGHT.042`, `WEIGHT.043`, `WEIGHT.050`, `WEIGHT.051`, `WEIGHT.052`, `WEIGHT.053`, `WEIGHT.060`, `WEIGHT.061`, `WEIGHT.062`, `WEIGHT.064`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.004`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 90 of 295 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 94 of 301 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -73,7 +73,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.042` | `ACCEPT` |  | `accept` | — |
 | `MODEL.043` | `REJECT` | `DIAG.006` | `reject=DIAG.006` | — |
 | `MODEL.044` | `MUST` |  | `accept` | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind` |
-| `MODEL.045` | `REJECT` | `DIAG.007` | `reject=DIAG.007` | `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByThatListsRule`, `NodeResolverTest.aWeightedNodeWhoseChoicesSpreadToNothingIsRefused` |
+| `MODEL.045` | `REJECT` | `DIAG.007` | `reject=DIAG.007` | `NodeResolverTest.aWeightedNodeWhoseChoicesSpreadToNothingIsRefused` |
 | `MODEL.046` | `MUST` |  |  | `PaletteV2DecodeTest.aChoiceIsANodeWithASizeBesideIt` |
 | `MODEL.047` | `ACCEPT` |  | `accept` | — |
 | `MODEL.050` | `MUST` |  | `accept` | — |
@@ -87,13 +87,13 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.064` | `MUST` |  |  | — |
 | `MODEL.070` | `MUST` |  |  | — |
 | `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists` |
-| `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByThatListsRule`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
+| `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
 | `MODEL.073` | `MUST` |  |  | — |
 | `MODEL.074` | `MUST` |  |  | — |
 | `MODEL.075` | `MUST` |  |  | — |
 | `MODEL.076` | `MUST` |  |  | `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
 | `MODEL.080` | `MUST` |  |  | — |
-| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom` |
+| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList` |
 | `MODEL.082` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 
 ### `palette/01-traits.md`
@@ -160,9 +160,10 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.016` | `MUST` |  |  | `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset` |
 | `REF.017` | `MUST` |  |  | — |
 | `REF.018` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetCarriesImportsAndNotDefs` |
+| `REF.019` | `REJECT` | `DIAG.071` | *—* | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse` |
 | `REF.020` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 | `REF.021` | `MUST` |  |  | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
-| `REF.022` | `MUST NOT` |  |  | — |
+| `REF.022` | `MUST NOT` |  |  | `NodeResolverTest.aReferenceAnywhereInsideATraitIsRefused` |
 | `REF.030` | `MUST` |  |  | `NodeResolverTest.noResolvedNodeHoldsAPointerOrADefinitionName` |
 | `REF.031` | `MUST` |  |  | `NodeResolverTest.aChainResolvesWhateverOrderItsLinksAreDeclaredIn` |
 | `REF.032` | `REJECT` | `DIAG.032` | `reject=DIAG.032` | `NodeResolverTest.aReferenceCycleIsRefusedNamingEveryNodeInIt`, `NodeResolverTest.aSelfReferenceIsACycleOfOne` |
@@ -186,6 +187,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.052` | `MUST` |  |  | `NodeResolverTest.withoutContributesEveryKeyOfTheTargetExceptThoseNamed` |
 | `REF.053` | `REJECT` | `DIAG.035` | `reject=DIAG.035` | `NodeResolverTest.onlyAndWithoutTogetherAreRefused` |
 | `REF.054` | `MUST NOT` |  |  | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem` |
+| `REF.055` | `REJECT` | `DIAG.072` | `reject=DIAG.072` | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem`, `NodeResolverTest.aFilterKeyThatNamesNoKeyOfANodeIsRefused` |
 | `REF.060` | `MUST` |  |  | `NodeResolverTest.superResolvesToTheInheritedValue` |
 | `REF.061` | `MUST` |  |  | `PointerTest.superMayCarryAFragmentAfterIt` |
 | `REF.062` | `REJECT` | `DIAG.036` | *n/a* | `NodeResolverTest.superInAnEntryThatInheritsNothingIsRefused` |
@@ -349,6 +351,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.039` | `DIAG` |  |  | — |
 | `DIAG.038` | `DIAG` |  |  | — |
 | `DIAG.070` | `DIAG` |  |  | — |
+| `DIAG.071` | `DIAG` |  |  | — |
+| `DIAG.072` | `DIAG` |  |  | — |
 | `DIAG.040` | `DIAG` |  |  | — |
 | `DIAG.041` | `DIAG` |  |  | — |
 | `DIAG.045` | `DIAG` |  |  | — |
@@ -364,6 +368,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.061` | `DIAG` |  |  | — |
 | `DIAG.062` | `DIAG` |  |  | — |
 | `DIAG.063` | `DIAG` |  |  | — |
+| `DIAG.064` | `DIAG` |  |  | — |
 | `DIAG.910` | `MUST` |  |  | `DiagCatalogueTest.theDiagEnumCoversExactlyTheCatalogue`, `DiagCatalogueTest.everyDiagTemplateIsWordedAsItsCatalogueRowIs`, `DiagCatalogueTest.everyWordACatalogueRowStatesOutrightAppearsInItsTemplate`, `DiagCatalogueTest.aFormattedMessageIsRecognisedAsItsOwnDiagnostic`, `DiagCatalogueTest.everyCatalogueIdentifierIsLookedUpByItsId` |
 
 ### `palette/09-migration.md`
@@ -380,6 +385,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | `ACCEPT` |  | *n/a* | — |
 | `VER.014` | `REJECT` | `DIAG.062` | `reject=DIAG.062` | `VersionDispatchTest.anInlinePaletteDeclaringVersionTwoIsRefusedRatherThanReadAsVersionOne` |
 | `VER.015` | `REJECT` | `DIAG.063` | *n/a* | `VersionDispatchTest.aRegisteredVersionTwoPaletteIsRefusedWhereItIsCompiled` |
+| `VER.016` | `REJECT` | `DIAG.064` | `reject=DIAG.064` | `NodeResolverTest.aSatellitesNodeIsNotCompletedAsAnAlternative`, `NodeResolverTest.aReferenceAnywhereInsideATraitIsRefused` |
 | `VER.008` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind` |
 | `VER.009` | `MUST` |  |  | — |
 | `VER.010` | `REJECT` | `DIAG.060` | `reject=DIAG.060` | `PaletteV2DecodeTest.aRenamedVersionOneKeyIsRefusedNamingTheKeyThatReplacedIt` |

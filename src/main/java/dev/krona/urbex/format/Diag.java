@@ -75,8 +75,18 @@ public enum Diag {
     DIAG_010("%s: a light_socket declares no candidate in floor, wall, ceiling or free."
             + " Give it at least one."),
 
-    /** {@code MODEL.081}: args are the location and the definition that carries only traits. */
-    DIAG_011("%s: resolves to no block. %s declares only traits;"
+    /**
+     * {@code MODEL.081}: args are the location, the definition it was reached through, and what that
+     * definition is missing.
+     * <p>
+     * The third argument is a slot rather than the fixed words "declares only traits" because
+     * {@code MODEL.081} covers every missing required key, not only the partial-definition case: a node
+     * that arrived at {@code kind: weighted} through a {@code $ref} and has no {@code choices} is the
+     * same rule and a different sentence. The fixed wording made this class raise {@code DIAG.007}
+     * there instead, to avoid printing something false - a diagnostic that forces the code to name the
+     * wrong rule is worse than a slightly vaguer one.
+     */
+    DIAG_011("%s: resolves to no block. %s %s;"
             + " give this marker a 'block', 'choices', 'tag' or 'alias' as well."),
 
     /** {@code MODEL.051}: args are the location and the tag as written. */
@@ -110,8 +120,15 @@ public enum Diag {
 
     // ---- References and merging (030-039) ------------------------------------------------------
 
-    /** {@code REF.013}: args are the location, the name, and the tier searched. */
-    DIAG_030("%s: '$ref' %s names no %s definition."
+    /**
+     * {@code REF.013}: args are the location, the operand, the name, and the tier searched.
+     * <p>
+     * The operand is a slot because a pointer is "the value of {@code $ref}, of {@code $spread}, and of
+     * any future operand that has to say which node" ({@code 03-pointers.md} §1), and all of them fail
+     * in this tier the same way. The template named {@code $ref} outright until this task, so a
+     * {@code $spread} whose bare name named nothing was reported as a {@code $ref}.
+     */
+    DIAG_030("%s: %s %s names no %s definition."
             + " A name with a colon is looked up in the definitions registry;"
             + " one without, in this file's $defs and those it inherits."),
 
@@ -242,11 +259,34 @@ public enum Diag {
             + " decodes but does not yet compile. Write it in the version 1 format, or omit 'version',"
             + " until version 2 compilation lands."),
 
+    /**
+     * {@code VER.016}: args are the location and the trait id.
+     * <p>
+     * Retired with {@code VER.016} when a trait registry can say which of a trait's fields hold nodes,
+     * at which point {@code TRAIT.009} resolves them and {@code REF.022} needs a check of its own. Its
+     * number stays retired, by {@code DIAG.910}.
+     */
+    DIAG_064("%s: trait %s holds a '$ref', and this Urbex cannot yet resolve a reference inside a"
+            + " trait. Write the block, or the weighted list, in full."),
+
     // ---- References and merging, continued (070-079; 030-039 is full) ---------------------------
 
     /** {@code REF.082}: the argument is the location. */
     DIAG_070("%s: '$imports' declares 'super', which is a built-in alias naming what this entry"
-            + " inherits and cannot be redeclared. Remove it, or choose another alias name.");
+            + " inherits and cannot be redeclared. Remove it, or choose another alias name."),
+
+    /** {@code REF.019}: args are the location and what the document declared instead of version 2. */
+    DIAG_071("%s: a definitions asset %s. The definitions registry is new in palette format version 2"
+            + " and has no version 1 form, so an absent 'version' is not one;"
+            + " write \"version\": 2."),
+
+    /**
+     * {@code REF.055}: args are the location, the operand, the offending key, and the nearest real key
+     * if there is one.
+     */
+    DIAG_072("%s: %s names %s, which is not a key of a node%s."
+            + " The keys a filter may name are kind, block, choices, tag, of, floor, wall, ceiling,"
+            + " free and traits.");
 
     private static final Map<String, Diag> BY_ID = byId();
 

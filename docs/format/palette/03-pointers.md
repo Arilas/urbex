@@ -13,25 +13,41 @@ build on.
 A **pointer** names a node. It is the value of `$ref`, of `$spread`, and of any future operand that
 has to say *which node*.
 
-> **REF.040** · `MUST` — A pointer takes one of three forms.
+> **REF.040** · `MUST` — A pointer takes one of four forms, once any [alias](#3-imports) in it has been
+> expanded.
 
 | Form | Example | Names |
 |---|---|---|
 | bare name | `rubble` | a definition in this file's `$defs`, or one inherited through `extends` |
+| bare name with fragment | `rubble#/traits` | a node or a list inside such a definition |
+| registry asset | `urbex:rubble` | an asset of the `definitions` registry |
 | asset with fragment | `urbex:common#/$defs/rubble` | a node inside another asset |
-| alias | `$mat/Damageable`, `$super#/choices` | an [imported prefix](#3-imports), expanded before parsing |
+
+`$super` is the fifth spelling and not a fifth form: it stands where a name stands, with or without a
+fragment, and [§2.2](#22-super) defines what it resolves against. An alias is not a form either —
+`$mat/Damageable` is replaced by its prefix *before* the pointer is parsed ([REF.081](#3-imports)), and
+what remains is one of the four above.
 
 > **REF.041** · `MUST` — A pointer containing `:` and no `#` names an asset in the `definitions`
 > registry, and resolves to that asset's node. This is the form [REF.010](02-references.md#2-where-a-name-resolves)
 > defines.
 
-> **REF.042** · `MUST` — A pointer containing `#` is an asset id, then `#`, then an
-> [RFC 6901 JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into that asset's decoded
-> document.
+> **REF.042** · `MUST` — A pointer containing `#` is a base, then `#`, then an
+> [RFC 6901 JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into what that base names. The base
+> is an asset id when it contains `:` and a definition name of this file when it does not, by the same
+> colon rule [REF.012](02-references.md#2-where-a-name-resolves) states — and it may also be `$super`.
 
 > > **Why** — an asset id may itself contain `/`, so `urbex:bricks/standard` is a real palette and a
 > > slash cannot separate the id from the path into it. `#` cannot appear in a resource path at all,
 > > so it is the one delimiter that never needs escaping or a lookahead rule.
+
+> > **Why a local base** — a fragment is the only way into a key of a node, because
+> > [REF.054](#21-only-and-without) restricts `$only` and `$without` to top-level keys and says so
+> > outright: "to reach inside a key, point at it with a fragment". Without a local base that route
+> > exists only for a node in another asset, so a file could reach into `urbex:common`'s `choices` and
+> > not into its own — and a palette written inline in a part
+> > ([MERGE.012](04-merging.md#1-extends)) has no asset id to write at all, which would leave it no
+> > route anywhere.
 
 > **REF.043** · `DEFAULT` `[NO-FIXTURE: a second asset]` — An asset id in a fragment pointer names a `palettes` entry. To point
 > into another registry, prefix the registry name and a slash: `definitions/urbex:rubble#/traits`.
@@ -84,6 +100,20 @@ compiled palette.
 
 > **REF.054** · `MUST NOT` — `$only` and `$without` name top-level keys of the target node only.
 > They are not paths; to reach inside a key, point at it with a fragment.
+
+> **REF.055** · `REJECT` (`DIAG.072`) — A `$only` or `$without` naming something that is not a key of a
+> node is refused, and the diagnostic names it.
+
+> > **Why** — a filter key the format does not define contributes nothing, and nothing about the result
+> > says why: `$only: ["trait"]` takes none of its target's traits and the marker then fails as
+> > [MODEL.081](00-model.md#5-completeness), naming a completeness problem the author did not have. This
+> > is the same silence [MODEL.004](00-model.md#1-the-file) removes one level up, in the one place a key
+> > name appears as a *value* and so escapes it.
+
+```json fixture:REF.055 reject=DIAG.072
+{ "version": 2, "$defs": { "d": { "traits": {} } },
+  "palette": { "X": { "$ref": "d", "$only": ["trait"], "block": "minecraft:stone" } } }
+```
 
 > > **Why** — `$ref` without a filter is all-or-nothing, which makes one common intent
 > > inexpressible: taking a node's traits while supplying a different block. Written plainly it
@@ -191,9 +221,16 @@ it. `$imports` names prefixes once.
 > **REF.081** · `MUST` — An alias is used as `$<name>`, and expansion is textual: `$<name>` is
 > replaced by its prefix before the pointer is parsed. Nothing is inserted at the join.
 
-> > **Why** — textual expansion means an alias needs no rules of its own. It can stand for an asset
-> > id, an asset and a fragment, or any prefix of a path, and what follows it is read by the pointer
-> > grammar that was going to read it anyway.
+> > **Why** — textual expansion means an alias needs no rules of its own. It can stand for an asset id,
+> > or for an asset and a fragment, and what follows it is read by the pointer grammar that was going to
+> > read it anyway.
+
+> > **Why the name ends where it does** — an alias name runs to the first `/` or `#`, which are the two
+> > characters the pointer grammar already uses as delimiters. The alternative is to match the longest
+> > declared alias, which would let an alias stand for any prefix of a path — and would cost REF.083:
+> > with it, a file declaring `mat` and writing `$matt` expands to the `mat` prefix followed by a stray
+> > `t` instead of naming the misspelt import. Reporting an unknown alias as one is worth more than
+> > aliasing an arbitrary prefix.
 
 > **REF.082** · `MUST` — `$super` is a built-in alias, available in every file, and may not be
 > declared in `$imports`.

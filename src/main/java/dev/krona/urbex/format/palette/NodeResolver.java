@@ -251,7 +251,7 @@ public final class NodeResolver {
     private Optional<RawNode> referenced(RawNode node, Fields own, ResolutionScope scope,
                                          PointerResolver.Site site) {
         String written = node.ref().orElseThrow();
-        Optional<Reached> reached = reach(written, scope, site);
+        Optional<Reached> reached = reach(written, "'$ref'", scope, site);
         if (reached.isEmpty()) {
             return Optional.empty();
         }
@@ -286,7 +286,7 @@ public final class NodeResolver {
      * differs - {@code $ref} needs a node, {@code $spread} needs a list - and that is the one decision
      * left to them.
      */
-    private Optional<Reached> reach(String written, ResolutionScope scope,
+    private Optional<Reached> reach(String written, String operand, ResolutionScope scope,
                                     PointerResolver.Site site) {
         DataResult<Pointer> parsed = Pointer.parse(written, scope.document().imports(),
                 site.location());
@@ -295,7 +295,7 @@ public final class NodeResolver {
         }
         Pointer pointer = parsed.result().orElseThrow();
         DataResult<PointerResolver.Addressed> addressed =
-                PointerResolver.address(pointer, written, scope, site);
+                PointerResolver.address(pointer, written, operand, scope, site);
         if (addressed.error().isPresent()) {
             return fail(addressed.error().get().message());
         }
@@ -365,7 +365,7 @@ public final class NodeResolver {
     /** The list a {@code $spread} names, or empty with {@code DIAG.037} when it names something else. */
     private Optional<List<RawChoice>> spread(String written, ResolutionScope scope,
                                              PointerResolver.Site site) {
-        Optional<Reached> reached = reach(written, scope, site);
+        Optional<Reached> reached = reach(written, "'$spread'", scope, site);
         if (reached.isEmpty()) {
             return Optional.empty();
         }
@@ -400,17 +400,14 @@ public final class NodeResolver {
         return switch (kind) {
             case BLOCK -> node.block()
                     .map(block -> built(kind, new ResolvedNode.Source.Block(block), node))
-                    .orElseGet(() -> noBlockSource(from, site));
+                    .orElseGet(() -> noBlockSource(node, kind, "block", from, site));
             case TAG -> node.tag()
                     .map(tag -> built(kind, new ResolvedNode.Source.Tag(tag), node))
-                    .orElseGet(() -> noBlockSource(from, site));
+                    .orElseGet(() -> noBlockSource(node, kind, "tag", from, site));
             case ALIAS -> node.aliasOf()
                     .map(of -> built(kind, new ResolvedNode.Source.Alias(of), node))
-                    .orElseGet(() -> noBlockSource(from, site));
-            // Neither takes `from`: a node that declared a kind and lacks its list is DIAG.007 or
-            // DIAG.010, whose sentences are about the list rather than about the definition it came
-            // through, and neither is DIAG.011.
-            case WEIGHTED -> weighted(node, site);
+                    .orElseGet(() -> noBlockSource(node, kind, "of", from, site));
+            case WEIGHTED -> weighted(node, from, site);
             case LIGHT_SOCKET -> socket(node, site);
         };
     }
@@ -421,15 +418,33 @@ public final class NodeResolver {
 
     /**
      * {@code MODEL.081}: this node is in a position that needs a block source and has none.
+     * <p>
+     * {@code DIAG.011}'s second argument says <em>what</em> is missing, which is why it is a slot and no
+     * longer the fixed words "declares only traits". Three phrasings, one per shape the failure has:
+     * a node that declared a kind is missing that kind's required key; a node that declared no kind and
+     * carries traits is the partial definition {@code REF.020} is about; and a node that declared neither
+     * is simply empty. Saying "declares only traits" of any of the other two would be false, and the
+     * false version is what made this class raise {@code DIAG.007} for a weighted node with no
+     * {@code choices} - naming the wrong rule to avoid printing the wrong sentence.
      *
-     * @param from the {@code $ref} it was reached through, which is what {@code DIAG.011} means by
-     *             "{@code <def>} declares only traits". Empty inside a list, where the pointer belongs to
-     *             the entry rather than to this element - see the task report, which records that as the
-     *             one place the message is less specific than the catalogue row implies
+     * @param required the key this kind needs and does not have
+     * @param from     the {@code $ref} it was reached through, which {@code DIAG.011} names as
+     *                 {@code <def>}. Empty inside a list, where the pointer belongs to the entry rather
+     *                 than to this element - see the task report
      */
-    private Optional<ResolvedNode> noBlockSource(Optional<String> from, PointerResolver.Site site) {
+    private Optional<ResolvedNode> noBlockSource(RawNode node, Kind kind, String required,
+                                                 Optional<String> from,
+                                                 PointerResolver.Site site) {
+        String missing;
+        if (node.kind().isPresent()) {
+            missing = "declares kind " + kind.key() + " and no '" + required + "'";
+        } else if (!node.traits().isEmpty()) {
+            missing = "declares only traits";
+        } else {
+            missing = "declares no '" + required + "'";
+        }
         diagnostics.error(Diag.DIAG_011, site.location(),
-                from.map(pointer -> "'" + pointer + "'").orElse("it"));
+                from.map(pointer -> "'" + pointer + "'").orElse("it"), missing);
         failed = true;
         return Optional.empty();
     }
@@ -472,18 +487,22 @@ public final class NodeResolver {
     /**
      * A {@code weighted} node's source, or the reason it has none.
      * <p>
-     * An absent {@code choices} and one written empty are the same refusal here, {@code DIAG.007}, and
-     * deliberately not {@code DIAG.011}: {@code MODEL.045}'s message names the remedy this node actually
-     * needs - "a weighted node declares no choices. Give it at least one" - where {@code DIAG.011} would
-     * say the node "declares only traits", which is false of a node that declared a kind. Both are
-     * {@code MODEL.081} failures; only one of the two sentences is true.
+     * The two ways of having none are two different rules, and each gets its own. A node with <em>no</em>
+     * {@code choices} lacks a required key of its kind, which is {@code MODEL.081}/{@code DIAG.011}; a
+     * node whose {@code choices} is present and empty is {@code MODEL.045}/{@code DIAG.007}, whose own
+     * words are "a weighted node declares no choices". Both were {@code DIAG.007} until the review of
+     * this task, because {@code DIAG.011} could then only say "declares only traits" - the code named the
+     * wrong rule to avoid printing a false sentence, which is the wrong way round.
      */
-    private Optional<ResolvedNode> weighted(RawNode node, PointerResolver.Site site) {
-        List<RawChoice> choices = node.choices().orElse(List.of());
+    private Optional<ResolvedNode> weighted(RawNode node, Optional<String> from,
+                                            PointerResolver.Site site) {
+        if (node.choices().isEmpty()) {
+            return noBlockSource(node, Kind.WEIGHTED, "choices", from, site);
+        }
+        List<RawChoice> choices = node.choices().orElseThrow();
         if (choices.isEmpty()) {
-            // MODEL.045. Reachable here as well as at decode: a kind arriving from a $ref makes a node
-            // weighted after its keys were checked, and a list of nothing but a $spread of an empty
-            // list is empty only once the spread has been expanded.
+            // MODEL.045, and reachable here as well as at decode: a list of nothing but a $spread of an
+            // empty list is empty only once the spread has been expanded.
             diagnostics.error(Diag.DIAG_007, site.location());
             return silently();
         }
@@ -496,10 +515,13 @@ public final class NodeResolver {
     /**
      * A {@code light_socket}'s source, or the reason it has none.
      * <p>
-     * As with {@link #weighted}, a socket with no candidate anywhere is {@code DIAG.010} and not
-     * {@code DIAG.011} - {@code MODEL.072}'s sentence is the true one. A socket reaches here with no
-     * placement list at all only when its kind arrived from a {@code $ref}, because a written one is
-     * refused at decode.
+     * <b>Unlike {@link #weighted}, a socket with no list at all is still {@code DIAG.010},</b> and that
+     * is the rule speaking rather than the message: {@code MODEL.072} refuses "a {@code light_socket}
+     * declaring no candidate in any of the four lists", and a socket that declares no list declares no
+     * candidate in any of them. There is no separate missing-required-key case to route to
+     * {@code MODEL.081}, because a socket's required key is not one key but a candidate somewhere among
+     * four. A socket reaches here with no list at all only when its kind arrived through a {@code $ref},
+     * since a written one is refused at decode.
      */
     private Optional<ResolvedNode> socket(RawNode node, PointerResolver.Site site) {
         Map<Kind.Placement, List<ResolvedNode.Choice>> placements = new LinkedHashMap<>();

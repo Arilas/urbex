@@ -212,14 +212,17 @@ class ImportsTest {
     }
 
     /**
-     * A definitions asset declares {@code "version": 2} and there is no other form of one.
+     * {@code REF.019}: a definitions asset declares {@code "version": 2}, and an absent {@code version}
+     * is refused rather than read as version 1.
      * <p>
-     * The refusal carries no catalogue row, which is a disclosed gap rather than a decision:
-     * {@code DIAG.001}'s remedy offers "or omit it for the version 1 format", and this registry has never
-     * had a version 1 form, so saying that to an author would send them looking for a format that does
-     * not exist. Recorded in the task report.
+     * An absent one is the case the rule exists for. {@code VER.001} makes it mean version 1 in a palette
+     * file, because every existing pack has one and none of them keeps loading otherwise; this registry
+     * is new in version 2 and has no version 1 form, so there is nothing for the absence to select.
+     * {@code DIAG.071} says that, where {@code DIAG.001}'s "or omit it for the version 1 format" would
+     * send the author looking for a format that has never existed.
      */
     @Test
+    @Rule("REF.019")
     @Rule("VER.002")
     void aDefinitionsAssetDeclaresVersionTwoAndNothingElse() {
         for (String version : List.of("", "\"version\": 1,", "\"version\": 3,",
@@ -229,8 +232,9 @@ class ImportsTest {
                             "{" + version + "\"block\": \"minecraft:stone\"}"));
             assertTrue(decoded.error().isPresent(),
                     () -> "expected [" + version + "] to be refused, got " + decoded.result());
-            assertTrue(decoded.error().orElseThrow().message().contains("\"version\": 2"),
-                    decoded.error().orElseThrow().message());
+            String message = decoded.error().orElseThrow().message();
+            assertTrue(Diag.DIAG_071.matches(message), () -> "[" + version + "] " + message);
+            assertTrue(message.contains("\"version\": 2"), message);
         }
         assertEquals(Optional.of(Kind.BLOCK), definition("""
                 { "version": 2, "kind": "block", "block": "minecraft:stone" }

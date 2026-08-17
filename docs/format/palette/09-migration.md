@@ -56,7 +56,7 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 
 ### 1.1 What version 2 does not reach yet
 
-Two rules in this section are transitional: each refuses something this specification allows, because
+Three rules in this section are transitional: each refuses something this specification allows, because
 the loader does not implement it yet, and each names the rule that retires it. They exist rather than
 the behaviour being absent because the alternative to refusing is accepting and then not acting, which
 is the failure [VER.012](#3-retired-keys) forbids for a key and this section forbids for a whole file.
@@ -97,6 +97,36 @@ is the failure [VER.012](#3-retired-keys) forbids for a key and this section for
 > > retired, with a tombstone, when it does. It carries no fixture because its input is not a document:
 > > the file it refuses is a *valid* version 2 palette, and no fixture can be both accepted as a
 > > document and refused as an entry.
+
+> **VER.016** · `REJECT` (`DIAG.064`) `[DEPRECATED → TRAIT.009]` — A `$ref` written anywhere inside a
+> `traits` value is refused, at any depth, until references inside traits are resolved.
+
+> > **Why** — [TRAIT.009](01-traits.md#3-block-valued-fields) makes a block-valued trait field a node and
+> > [MODEL.032](00-model.md#3-alternatives-and-satellites) lets a node carry `$ref`, so a satellite
+> > naming a definition is something this specification allows and nothing yet resolves. Both ways of
+> > leaving it are worse than refusing it: expanding it needs the per-trait schemas that say which fields
+> > hold nodes, and *not* expanding it silently gives the satellite no block — a marker whose damaged
+> > form or unlit form is air, with no message, which is the exact class of silence version 2 exists to
+> > remove. Refusing costs an author who wrote one a rewrite in full and tells them why.
+
+> > **Why it also covers REF.022** — [REF.022](02-references.md#4-partial-definitions) forbids `$ref` on a
+> > trait *object* permanently, for a different reason: sharing a trait is done with a partial definition,
+> > and a second mechanism for it is not wanted. That rule has no enforcement of its own yet either, and
+> > one check over the whole `traits` value catches both cases. When this rule retires, REF.022 needs its
+> > own check, narrower than this one and stated for its own reason.
+
+```json fixture:VER.016 reject=DIAG.064
+{
+  "version": 2,
+  "$defs": { "rubble": { "block": "minecraft:iron_bars" } },
+  "palette": {
+    "X": {
+      "block": "minecraft:stone_bricks",
+      "traits": { "urbex:damaged": { "into": { "$ref": "rubble" } } }
+    }
+  }
+}
+```
 
 ## 2. What every version 1 construct becomes
 

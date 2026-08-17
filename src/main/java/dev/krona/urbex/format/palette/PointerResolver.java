@@ -149,13 +149,16 @@ public final class PointerResolver {
      *
      * @param written the pointer as the file wrote it, which the diagnostic quotes alongside the
      *                expansion ({@code REF.085})
+     * @param operand the key whose value this pointer is - {@code '$ref'} or {@code '$spread'} - which
+     *                {@code DIAG.030} names, because both fail in a tier the same way and only the
+     *                caller knows which one asked
      */
-    public static DataResult<Addressed> address(Pointer pointer, String written,
+    public static DataResult<Addressed> address(Pointer pointer, String written, String operand,
                                                ResolutionScope scope, Site site) {
         String location = site.location();
         return switch (pointer) {
-            case Pointer.Local local -> local(local, written, scope, location);
-            case Pointer.Registry registry -> registry(registry, written, scope, location);
+            case Pointer.Local local -> local(local, written, operand, scope, location);
+            case Pointer.Registry registry -> registry(registry, written, operand, scope, location);
             case Pointer.Fragment fragment -> fragment(fragment, written, scope, location);
             case Pointer.Super inherited -> inherited(inherited, written, scope, site);
         };
@@ -172,7 +175,7 @@ public final class PointerResolver {
      */
     public static Optional<RawNode> resolve(Pointer pointer, ResolutionScope scope) {
         Site site = new Site(scope.document().describe(), "", List.of());
-        return address(pointer, pointer.expanded(), scope, site).result()
+        return address(pointer, pointer.expanded(), "'$ref'", scope, site).result()
                 .flatMap(addressed -> walk(addressed.node(), addressed.path()).result())
                 .flatMap(target -> target instanceof Target.Node node
                         ? Optional.of(node.node())
@@ -187,12 +190,12 @@ public final class PointerResolver {
      * is not retried in the other." Its {@code > Why} says what a search order would cost - "would make
      * {@code \"rubble\"} resolve differently depending on what else happened to be loaded".
      */
-    private static DataResult<Addressed> local(Pointer.Local local, String written,
+    private static DataResult<Addressed> local(Pointer.Local local, String written, String operand,
                                                ResolutionScope scope, String location) {
         RawNode node = scope.document().defs().get(local.name());
         if (node == null) {
-            // REF.013, and the diagnostic names the tier that was searched.
-            return DataResult.error(() -> Diag.DIAG_030.message(location,
+            // REF.013, and the diagnostic names the operand that failed and the tier that was searched.
+            return DataResult.error(() -> Diag.DIAG_030.message(location, operand,
                     Pointer.describe(written, local), "'$defs'"));
         }
         return DataResult.success(new Addressed(scope.document().defKey(local.name()), node, scope,
@@ -201,10 +204,11 @@ public final class PointerResolver {
 
     /** {@code REF.010} and {@code REF.041}: a name with a colon is a {@code definitions} asset. */
     private static DataResult<Addressed> registry(Pointer.Registry pointer, String written,
-                                                 ResolutionScope scope, String location) {
+                                                 String operand, ResolutionScope scope,
+                                                 String location) {
         Optional<DefinitionAssetDefinition> asset = scope.registry().get(pointer.asset());
         if (asset.isEmpty()) {
-            return DataResult.error(() -> Diag.DIAG_030.message(location,
+            return DataResult.error(() -> Diag.DIAG_030.message(location, operand,
                     Pointer.describe(written, pointer), "registry"));
         }
         return DataResult.success(definitionsEntry(pointer.asset(), asset.get(), scope, List.of()));

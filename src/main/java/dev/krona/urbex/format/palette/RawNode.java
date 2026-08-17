@@ -328,6 +328,20 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
             diagnostics.error(Diag.DIAG_035, Diagnostics.DECODING_LOCATION);
         }
 
+        // REF.055: a filter key that names no key of a node contributes nothing, and nothing about the
+        // result says why - the marker then fails as MODEL.081, naming a completeness problem the author
+        // did not have. This is the one place a key name appears as a value, and so escapes MODEL.004.
+        node.only().ifPresent(keys -> filterKeys(keys, "'$only'", diagnostics));
+        node.without().ifPresent(keys -> filterKeys(keys, "'$without'", diagnostics));
+
+        // VER.016: a $ref inside a trait payload is refused until references inside traits resolve.
+        // Ordered by trait id so a node carrying two of them reports the same way every run.
+        node.traits().values().stream()
+                .filter(Trait::holdsReference)
+                .sorted(java.util.Comparator.comparing(trait -> trait.id().toString()))
+                .forEach(trait -> diagnostics.error(Diag.DIAG_064, Diagnostics.DECODING_LOCATION,
+                        "'" + trait.id() + "'"));
+
         // REF.072: a $spread element carries no other key. To change what it spreads, point somewhere
         // else - so a sibling key is a key of a thing this element is not.
         if (node.spread().isPresent()) {
@@ -365,6 +379,40 @@ public record RawNode(Optional<Kind> kind, Optional<String> block, Optional<List
             return DataResult.error(() -> message);
         }
         return DataResult.success(node);
+    }
+
+    /**
+     * The keys {@code $only} and {@code $without} may name ({@code REF.055}).
+     * <p>
+     * A node's own keys and not {@link #COMMON_KEYS}: an operand is not a key a reference contributes.
+     * {@code $ref} is resolved before the filter is applied, so naming it would filter something that no
+     * longer exists, and `$only`/`$without` on the target are the target's business, not the referrer's.
+     */
+    public static final Set<String> FILTERABLE_KEYS =
+            union(Set.of("kind", "traits"), Kind.allKindSpecificKeys());
+
+    /**
+     * {@code REF.055}: reports every key of a filter that is not a key of a node.
+     * <p>
+     * The "closest" hint is a prefix test in either direction rather than an edit distance, because the
+     * typo this rule exists for is a plural: {@code trait} for {@code traits}, {@code blocks} for
+     * {@code block}. A hint that fires only on the case it is sure about is worth more than one that
+     * guesses at every misspelling, and the message names the whole legal set either way.
+     */
+    private static void filterKeys(List<String> keys, String operand, Diagnostics diagnostics) {
+        for (String key : keys) {
+            if (FILTERABLE_KEYS.contains(key)) {
+                continue;
+            }
+            String closest = FILTERABLE_KEYS.stream()
+                    .filter(candidate -> candidate.startsWith(key) || key.startsWith(candidate))
+                    .sorted()
+                    .findFirst()
+                    .map(candidate -> ", and the closest is '" + candidate + "'")
+                    .orElse("");
+            diagnostics.error(Diag.DIAG_072, Diagnostics.DECODING_LOCATION, operand,
+                    "'" + key + "'", closest);
+        }
     }
 
     /**

@@ -273,24 +273,75 @@ class NodeResolverTest {
 
     /**
      * {@code REF.054}: the filters name top-level keys only, so {@code traits} keeps or drops the whole
-     * map.
+     * map and a trait id is not addressable at all.
      * <p>
-     * A trait id is not addressable in a filter, and this is the assertion that says so: {@code $only}
-     * naming the trait id contributes nothing at all, rather than that one trait.
+     * Two halves. {@code traits} names the whole map, so filtering it in keeps every trait the target
+     * had rather than some of them; and a trait id names nothing, which {@code REF.055} refuses. Until
+     * that rule existed a filter naming one contributed nothing silently, and the marker then failed as
+     * {@code MODEL.081} — a completeness problem the author did not have.
      */
     @Test
     @Rule("REF.054")
+    @Rule("REF.055")
     void aFilterNamesTopLevelKeysAndNotPathsIntoThem() {
         NodeResolver.ResolvedPalette resolved = resolve("""
                 { "version": 2,
                   "$defs": { "both": { "block": "minecraft:stone", "traits": {
                       "urbex:damaged": { "into": "minecraft:iron_bars" },
                       "urbex:rotatable": false } } },
-                  "palette": { "X": { "$ref": "both", "$only": ["urbex:damaged"],
+                  "palette": { "X": { "$ref": "both", "$only": ["traits"],
                                       "block": "minecraft:cobblestone" } } }
                 """);
-        assertTrue(resolved.palette().get(new Marker('X')).traits().isEmpty(),
-                "a trait id is not a top-level key, so $only naming one contributes nothing");
+        assertEquals(Set.of(Identifier.parse("urbex:damaged"), Identifier.parse("urbex:rotatable")),
+                resolved.palette().get(new Marker('X')).traits().keySet(),
+                "'traits' names the whole map, not one trait in it");
+
+        DataResult<PaletteV2Definition> byTraitId = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
+                JsonParser.parseString("""
+                        { "version": 2, "$defs": { "both": { "traits": {} } },
+                          "palette": { "X": { "$ref": "both", "$only": ["urbex:damaged"],
+                                              "block": "minecraft:cobblestone" } } }
+                        """));
+        String message = byTraitId.error().orElseThrow().message();
+        assertTrue(Diag.DIAG_072.matches(message), message);
+        assertTrue(message.contains("'urbex:damaged'"), message);
+    }
+
+    /**
+     * {@code REF.055}: a filter key that is not a key of a node is refused, with the nearest real one
+     * when there is one.
+     * <p>
+     * The typo this rule exists for is a plural — {@code trait} for {@code traits}, {@code blocks} for
+     * {@code block} — and it is the shape that hurts most, because the wrong spelling is a legal-looking
+     * word and the failure it produces names a different rule entirely.
+     */
+    @Test
+    @Rule("REF.055")
+    void aFilterKeyThatNamesNoKeyOfANodeIsRefused() {
+        for (String[] typo : new String[][]{{"trait", "traits"}, {"blocks", "block"},
+                {"choice", "choices"}}) {
+            DataResult<PaletteV2Definition> decoded = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
+                    JsonParser.parseString("""
+                            { "version": 2, "$defs": { "d": { "traits": {} } },
+                              "palette": { "X": { "$ref": "d", "$without": ["%s"],
+                                                  "block": "minecraft:stone" } } }
+                            """.formatted(typo[0])));
+            String message = decoded.error()
+                    .orElseThrow(() -> new AssertionError(typo[0] + " was accepted as a filter key"))
+                    .message();
+            assertTrue(Diag.DIAG_072.matches(message), message);
+            assertTrue(message.contains("'" + typo[1] + "'"),
+                    () -> "expected the closest key '" + typo[1] + "' to be named: " + message);
+        }
+
+        // Every key a node may actually carry is accepted, so the check is a domain and not a habit.
+        for (String key : RawNode.FILTERABLE_KEYS) {
+            assertTrue(PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString("""
+                    { "version": 2, "$defs": { "d": { "block": "minecraft:stone" } },
+                      "palette": { "X": { "$ref": "d", "$without": ["%s"],
+                                          "block": "minecraft:stone" } } }
+                    """.formatted(key))).result().isPresent(), key);
+        }
     }
 
     // ---- Spread --------------------------------------------------------------------------------
@@ -579,25 +630,39 @@ class NodeResolverTest {
     }
 
     /**
-     * A kind that arrives through a {@code $ref} without its required list is refused by the rule about
-     * that list, not by {@code MODEL.081}'s message about traits.
+     * A kind that arrives through a {@code $ref} without its required list is refused by the rule that
+     * owns that list, and the diagnostic says what is missing.
      * <p>
-     * Both are {@code MODEL.081} failures - the node has a kind and not that kind's required keys - and
-     * only one of the two available sentences is true of them. {@code DIAG.011} says
-     * "{@code <def>} declares only traits", which is false of a node that declared {@code kind:
-     * weighted}; {@code DIAG.007} and {@code DIAG.010} name the missing list and the remedy. Neither
-     * document is reachable at decode: the kind is not knowable there, so the node's own key check let
-     * it through.
+     * Neither document is reachable at decode: a node carrying {@code $ref} is checked against the union
+     * of every kind's keys, because its kind is not knowable there, so both decode clean.
+     * <p>
+     * The two halves go to different rules, and both are the rule speaking rather than the message.
+     * A weighted node with no {@code choices} lacks a required key of its kind, which is
+     * {@code MODEL.081} — and {@code DIAG.011} can now say so, where before it could only say "declares
+     * only traits" and this case was routed to {@code DIAG.007} to avoid printing that. A socket with no
+     * list at all is still {@code MODEL.072}, whose own words are "declaring no candidate in any of the
+     * four lists": there is no single required key to be missing, so there is nothing for
+     * {@code MODEL.081} to be about.
      */
     @Test
-    @Rule("MODEL.045")
+    @Rule("MODEL.081")
     @Rule("MODEL.072")
-    void aKindArrivingWithoutItsRequiredListIsRefusedByThatListsRule() {
-        assertRefused(Diag.DIAG_007, """
+    void aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList() {
+        assertRefused(Diag.DIAG_011, """
                 { "version": 2,
                   "$defs": { "weightedNoChoices": { "kind": "weighted" } },
                   "palette": { "#": { "$ref": "weightedNoChoices" } } }
                 """);
+        // And the sentence names the kind and the key, rather than claiming it declares only traits.
+        Diagnostics diagnostics = new Diagnostics();
+        NodeResolver.resolve(decode("""
+                { "version": 2,
+                  "$defs": { "weightedNoChoices": { "kind": "weighted" } },
+                  "palette": { "#": { "$ref": "weightedNoChoices" } } }
+                """), diagnostics);
+        assertTrue(diagnostics.asError().orElseThrow()
+                        .contains("declares kind weighted and no 'choices'"),
+                diagnostics.asError().orElseThrow());
         // A socket declaring no list at all is already refused at decode, so the only way to reach the
         // resolver with one is to take a real socket's kind and leave its candidates behind - which is
         // $only, used wrongly, and is exactly the incoherent node REF.054's > Why is about.
@@ -624,17 +689,74 @@ class NodeResolverTest {
                 """);
     }
 
-    /** {@code MODEL.031}: realising a node never realises its satellites, so traits stay unresolved. */
+    /**
+     * {@code MODEL.031}: realising a node never realises its satellites, so a satellite is not completed
+     * as an alternative would be - and {@code VER.016}: one that references a definition is refused
+     * rather than left unresolved.
+     * <p>
+     * The two halves are the same seam from either side. A trait payload holding a node with no block
+     * would be {@code MODEL.081} if it were an alternative; it is a satellite, so nothing here completes
+     * it, and that is correct — {@code MODEL.031} says realising a node never realises its satellites,
+     * and each trait decides when its own is written. But a satellite carrying {@code $ref} <em>would</em>
+     * need resolving and nothing yet resolves it, so {@code VER.016} refuses it: leaving it would give
+     * the marker's damaged form no block at all, silently.
+     */
     @Test
     @Rule("MODEL.031")
+    @Rule("VER.016")
     void aSatellitesNodeIsNotCompletedAsAnAlternative() {
-        // A trait payload holding a node with no block would be MODEL.081 if it were an alternative.
-        // It is a satellite, so it is neither completed nor refused here - it is opaque until Task 6.
         NodeResolver.ResolvedPalette resolved = resolve("""
                 { "version": 2, "palette": { "X": { "block": "minecraft:stone_bricks",
                     "traits": { "urbex:damaged": { "into": { "traits": {} } } } } } }
                 """);
         assertEquals("minecraft:stone_bricks", blockOf(resolved, 'X'));
+
+        DataResult<PaletteV2Definition> referencing = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
+                JsonParser.parseString("""
+                        { "version": 2, "$defs": { "rubble": "minecraft:iron_bars" },
+                          "palette": { "X": { "block": "minecraft:stone_bricks", "traits": {
+                              "urbex:damaged": { "into": { "$ref": "rubble" } } } } } }
+                        """));
+        String message = referencing.error().orElseThrow().message();
+        assertTrue(Diag.DIAG_064.matches(message), message);
+        assertTrue(message.contains("'urbex:damaged'"), message);
+    }
+
+    /**
+     * {@code VER.016}: at any depth, and on the trait object itself.
+     * <p>
+     * At any depth because a satellite may be a weighted node whose choices are nodes, and a
+     * {@code $ref} three levels down is exactly as unresolved as one at the top. On the trait object
+     * itself because {@code REF.022} forbids that permanently and has no check of its own yet - this one
+     * catches it meanwhile, for its own narrower reason.
+     */
+    @Test
+    @Rule("VER.016")
+    @Rule("REF.022")
+    void aReferenceAnywhereInsideATraitIsRefused() {
+        for (String payload : List.of(
+                "{ \"$ref\": \"rubble\" }",
+                "{ \"into\": { \"$ref\": \"rubble\" } }",
+                "{ \"into\": { \"kind\": \"weighted\", \"choices\": ["
+                        + " { \"weight\": 1, \"$ref\": \"rubble\" } ] } }")) {
+            DataResult<PaletteV2Definition> decoded = PaletteV2Definition.CODEC.parse(JsonOps.INSTANCE,
+                    JsonParser.parseString("""
+                            { "version": 2, "$defs": { "rubble": "minecraft:iron_bars" },
+                              "palette": { "X": { "block": "minecraft:stone_bricks",
+                                  "traits": { "urbex:damaged": %s } } } }
+                            """.formatted(payload)));
+            String message = decoded.error()
+                    .orElseThrow(() -> new AssertionError(payload + " was accepted"))
+                    .message();
+            assertTrue(Diag.DIAG_064.matches(message), () -> payload + ": " + message);
+        }
+
+        // A trait that holds no reference is untouched: the scan is for a key, not a shape.
+        assertEquals("minecraft:stone_bricks", blockOf(resolve("""
+                { "version": 2, "palette": { "X": { "block": "minecraft:stone_bricks", "traits": {
+                    "urbex:damaged": { "into": { "kind": "weighted", "choices": [
+                        { "weight": 1, "block": "minecraft:iron_bars" } ] } } } } } }
+                """), 'X'));
     }
 
     // ---- The definitions registry --------------------------------------------------------------

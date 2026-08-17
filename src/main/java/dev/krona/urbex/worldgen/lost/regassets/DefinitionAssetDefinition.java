@@ -37,12 +37,11 @@ import java.util.Optional;
  * registry is what a {@code variant} was", and a definitions asset can be any of the five kinds and can
  * carry traits, which a {@code variant} could not.
  * <p>
- * <b>There is no version 1 form of this registry,</b> so {@code version} is required and must be 2.
+ * <b>There is no version 1 form of this registry,</b> so {@code version} is required and must be 2 -
+ * which is {@code REF.019}, refusing an absent {@code version} rather than reading it as version 1.
  * {@link Versioned#dispatch} is deliberately not used: it reads an absent {@code version} as 1 by
  * {@code VER.001}, and {@code DIAG.001}'s remedy - "or omit it for the version 1 format" - would then
- * offer an author a format this registry has never had. The refusal below carries no catalogue row for
- * that reason; see the task report, which records it as a gap rather than filling it by inventing a
- * diagnostic.
+ * offer an author a format this registry has never had. {@code DIAG.071} says the true thing instead.
  *
  * @param extendsId {@code extends} - one definitions asset this one builds on ({@code MERGE.001})
  * @param imports   {@code $imports} - alias name to pointer prefix ({@code REF.080}, {@code REF.018})
@@ -120,19 +119,15 @@ public record DefinitionAssetDefinition(Optional<Identifier> extendsId, Map<Stri
     private static <T> DataResult<DefinitionAssetDefinition> fields(Dynamic<T> document, RawNode node) {
         Optional<Dynamic<T>> version = document.get("version").result();
         if (version.isEmpty()) {
-            return DataResult.error(() -> Diagnostics.DECODING_LOCATION + ": a definitions asset"
-                    + " declares no 'version'. The definitions registry is new in palette format"
-                    + " version 2 and has no version 1 form; write \"version\": " + FORMAT_VERSION
-                    + ".");
+            return DataResult.error(() -> Diag.DIAG_071.message(Diagnostics.DECODING_LOCATION,
+                    "declares no 'version'"));
         }
         Optional<Number> declared = version.get().asNumber().result();
         if (declared.isEmpty() || declared.get().intValue() != FORMAT_VERSION
                 || declared.get().doubleValue() != declared.get().intValue()) {
             Object written = version.get().getValue();
-            return DataResult.error(() -> Diagnostics.DECODING_LOCATION + ": a definitions asset"
-                    + " declares version " + written + ". The definitions registry is new in palette"
-                    + " format version 2 and has no other form; write \"version\": " + FORMAT_VERSION
-                    + ".");
+            return DataResult.error(() -> Diag.DIAG_071.message(Diagnostics.DECODING_LOCATION,
+                    "declares version " + written));
         }
 
         Optional<Identifier> extendsId = Optional.empty();

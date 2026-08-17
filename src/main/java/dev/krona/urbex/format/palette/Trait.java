@@ -3,6 +3,8 @@ package dev.krona.urbex.format.palette;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.Dynamic;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
@@ -52,6 +54,43 @@ public record Trait(Identifier id, Tag data) {
     public static final Codec<Map<Identifier, Trait>> MAP_CODEC =
             Codec.unboundedMap(DataTools.STRICT_IDENTIFIER_CODEC, PAYLOAD_CODEC).xmap(
                     Trait::fromPayloads, Trait::toPayloads);
+
+    /**
+     * Whether this trait's payload writes a {@code $ref} anywhere inside it ({@code VER.016}).
+     * <p>
+     * A scan for a key rather than a reading of the payload, and that is the point: {@code TRAIT.009}
+     * makes a block-valued trait field a node and {@code MODEL.032} lets a node carry {@code $ref}, so a
+     * satellite naming a definition is something the format allows and nothing yet resolves - resolving
+     * it needs the per-trait schemas that say which fields hold nodes, which is what this class stays
+     * opaque until. Seeing the key needs none of that.
+     * <p>
+     * Both ways of leaving it alone are worse than refusing it. Expanding it here would mean guessing
+     * which fields are nodes; not expanding it gives the satellite no block, so a marker's damaged form
+     * or unlit form is silently air. {@code REF.022}'s case - a {@code $ref} on the trait object itself -
+     * is caught by the same scan, for its own narrower reason, until it gets its own check.
+     * <p>
+     * At any depth, because a satellite may be a weighted node whose choices are nodes: the {@code $ref}
+     * in {@code {"into": {"kind": "weighted", "choices": [{"weight": 1, "$ref": "rubble"}]}}} is three
+     * levels down and is exactly as unresolved as one at the top.
+     */
+    public boolean holdsReference() {
+        return holdsReference(data);
+    }
+
+    private static boolean holdsReference(Tag tag) {
+        if (tag instanceof CompoundTag compound) {
+            if (compound.keySet().contains("$ref")) {
+                return true;
+            }
+            return compound.keySet().stream()
+                    .map(compound::get)
+                    .anyMatch(value -> value != null && holdsReference(value));
+        }
+        if (tag instanceof ListTag list) {
+            return list.stream().anyMatch(Trait::holdsReference);
+        }
+        return false;
+    }
 
     private static Map<Identifier, Trait> fromPayloads(Map<Identifier, Tag> payloads) {
         Map<Identifier, Trait> traits = new LinkedHashMap<>();
