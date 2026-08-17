@@ -521,6 +521,96 @@ put 'extends' on 'urbexmt:tower' itself.
 Those two suggestions are the whole answer. To share a palette, register it and name it with
 `refpalette`; to build on one asset's palette, put `extends` on the asset.
 
+
+## Lighting: `lightSource`
+
+A light is a property you state about a block, not a separate kind of palette entry. Any entry can
+carry `lightSource`, and doing so puts that entry under the preset's `lightingDensity`: the roll
+happens once per marker position, and the marker writes either its light or the **replacement** the
+entry names. Nothing is ever filtered out of the output.
+
+This is what makes the setting reach a pack's real lighting. A pack that authors its street lamps as
+ordinary lantern entries — which is how most packs author them — used to have every one of them
+placed unconditionally, so moving the slider changed nothing visible.
+
+### In place: this block is a light
+
+<!-- example: palettes -->
+```json
+{
+  "palette": [
+    { "char": "e", "block": "minecraft:lantern[hanging=false]", "lightSource": true }
+  ]
+}
+```
+
+<!-- example: palettes -->
+```json
+{
+  "palette": [
+    {
+      "char": "E",
+      "block": "minecraft:lantern[hanging=true]",
+      "lightSource": { "unlit": "minecraft:iron_chain[axis=y]" }
+    }
+  ]
+}
+```
+
+The entry's own `block`, `blocks`, `variant` or `frompalette` is the lit block, written exactly where
+and as you wrote it — no support search, no reorientation. When the roll rejects it, `unlit` is
+written instead; `unlitBlocks` takes a weighted list in the same shape as `blocks`. Name neither and
+the replacement is air, which is what an unlit marker has always left behind.
+
+`"lightSource": true` is shorthand for `{}`. `"lightSource": false` is a load error: omitting the
+field is how you say "not a light", and a field that can be present and mean nothing is how a pack
+ends up meaning something other than what its author read.
+
+### A socket: let Urbex pick and orient one
+
+<!-- example: palettes -->
+```json
+{
+  "palette": [
+    {
+      "char": "T",
+      "lightSource": {
+        "floor": [
+          { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
+          { "weight": 3, "block": "minecraft:torch", "unlit": "minecraft:candle[candles=1,lit=false]" }
+        ],
+        "wall":    [ { "weight": 8, "block": "minecraft:wall_torch[facing=north]" } ],
+        "ceiling": [ { "weight": 8, "block": "minecraft:lantern[hanging=true]",
+                       "unlit": "minecraft:iron_chain[axis=y]" } ],
+        "free":    [ { "weight": 1, "block": "minecraft:sea_lantern" } ]
+      }
+    }
+  ]
+}
+```
+
+Declaring any of `floor`, `wall`, `ceiling` or `free` makes the entry a socket: the pool is its block
+source, so it needs no block of its own. Placement is deferred until the chunk is assembled, and the
+opportunities are tried in one fixed order — floor, then west, east, north and south wall, then
+ceiling, then `free`, which needs no anchor at all. The chosen candidate is oriented toward its
+support, so one `wall_torch[facing=north]` covers all four walls.
+
+A candidate's `unlit` is its own, because an unlit torch on a wall and an unlit torch on a floor are
+two different blocks — one replacement for the whole socket could be right for at most one of its
+placements. A candidate that names none falls back to the source's `unlit`, then to air. An `unlit`
+that emits light is a load error.
+
+Both passes draw from one stream at one position, so the fixture a marker would light is the fixture
+standing there while it is dark: raising `lightingDensity` lights the candle that was already on that
+floor rather than moving the light somewhere else.
+
+### What is not a light
+
+Nothing is a light unless its entry says so. There is no tag, and no list of block ids: a redstone
+torch wired into a door, a brewing stand on a workstation, glow lichen on a wall and a campfire that
+was authored `lit=false` are all ordinary blocks, and `lightingDensity` cannot add, remove or reroll
+them. That was the point of removing `urbex:lights` — a tag cannot tell a lamp from a lit thing.
+
 ## Parts: geometry inherited, paint overridden
 
 `refpalette` says what a part is *painted with*. `extends` says what a part *is*. They compose, and
@@ -769,7 +859,12 @@ Three details about that warning:
 | `Part 'urbexmt:tower' declares no slices, and neither does anything it extends` | A part with no geometry anywhere in its chain | Add `slices`, or `extends` a part that has them |
 | `Part 'urbexmt:tower' declares xsize 8 and zsize 16 but its slices are 16 wide (...)` | A size was redeclared without the matching slices | Declare both together, or neither |
 | `The inline palette in 'urbexmt:tower' declares extends '...'` | `extends` inside an inline `palette` block | Use `refpalette`, or put `extends` on the owning asset |
-| `Illegal palette urbex:x!` | A palette entry names no `block`, `variant`, `blocks`, `frompalette` or `light` | Give the character something to resolve to |
+| `Illegal palette urbex:x!` | A palette entry names no `block`, `variant`, `blocks` or `frompalette` | Give the character something to resolve to |
+| `Palette 'urbex:x' entry 'T' declares 'lightSource' but names nothing to place. Give the entry a block, blocks, variant or frompalette to light, or give the light source at least one candidate in floor, wall, ceiling, or free.` | A `lightSource` with neither a block of its own nor any candidate | Do one or the other |
+| `Palette 'urbex:x' entry 'L' declares 'lightSource', but none of the blocks it resolves to emit any light. Either name candidates under floor/wall/ceiling/free, or drop 'lightSource' from this entry.` | A light source on a block that is not a light | Drop `lightSource`, or name candidates |
+| `Palette 'urbex:x' entry 'T' declares 'torch', which no longer exists. Write "lightSource" instead: either "lightSource": true to make this entry's own block an optional light, or a "lightSource" object with floor/wall/ceiling/free candidates to let Urbex pick and orient one.` | The removed `torch` boolean | Follow the message; see the lighting section above |
+| `Palette 'urbex:x' entry 'T' declares 'light', which was renamed. Write the same object under "lightSource", and add "unlit" to it if this marker should leave something behind when the light is off.` | The removed `light` object | Rename the key |
+| `Invalid light candidate in palette 'urbex:x', marker 'T', placement 'wall', candidate #1 'minecraft:glowstone': an unlit replacement must emit no light` | A candidate's `unlit` is itself a light | Name a dark block, or omit `unlit` |
 | `Palette marker 'ab' must be exactly one character, but is 2 characters long` | A `char`, `filler` or `rubble` that is not one character | Write one character. `""` used to throw with no file named, and `"ab"` quietly meant `"a"` |
 | `Style 'urbexmt:downtown' declares a 'randompalettes' group whose factors total 0.0; no palette could ever be drawn from it. At least one palette in each group needs a factor above zero.` | Every palette in one group has a factor of zero or less | Give at least one of them a positive factor |
 | `Stuff 'urbexmt:downtown' resolves to mincount 5 above maxcount 2; no count could be drawn between them` | The two came from different links of the chain and contradict | Declare them together, or fix the one that is wrong |

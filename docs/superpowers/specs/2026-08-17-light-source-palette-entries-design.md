@@ -79,6 +79,17 @@ Fields of the object, all optional:
 | `unlit` | One block string written when the source is off or unplaceable. |
 | `unlitBlocks` | A weighted `blocks` list written instead of `unlit`. Same shape as a palette entry's `blocks`. |
 
+Each socket candidate may also carry its own `unlit` block string:
+
+```json
+{ "weight": 3, "block": "minecraft:torch", "unlit": "minecraft:candle[candles=1,lit=false]" }
+```
+
+The replacement belongs to the candidate because a socket's candidates are not interchangeable: an
+unlit torch on a wall and an unlit torch on a floor are two different blocks, and one replacement
+per socket could be right for at most one of its placements. A candidate naming none falls back to
+the source's `unlit`, then to air. A candidate's `unlit` that emits light is a load error.
+
 `unlit` and `unlitBlocks` are mutually exclusive; declaring both is a load error. Neither declared
 means the replacement is air, which is what today's rejected light marker leaves behind.
 
@@ -162,16 +173,24 @@ entry has and nothing else `CompiledPalette.Entry` carries.
 and `Bridges.generateBridge`, with the already-resolved state in hand:
 
 1. Roll `DensitySelector.lighting(seed, pos, profile.lightingDensity())`.
-2. Rejected → write `unlit` resolved at `pos`. Done; nothing is deferred.
-3. Accepted, socket form → queue the todo carrying the whole `LightSource`, and write air for now.
-4. Accepted, in-place form → write the resolved lit state.
+2. Socket form → queue the todo carrying the `LightSource` and the roll, and write air for now.
+   Deferred either way: it is the support search that decides whether this marker holds a floor
+   fixture or a wall one, and that is as true of an unlit wall torch as of a lit one.
+3. In-place form → write the lit state, or the `unlit` resolved at `pos`.
 
 ### 5.3 In the deferred pass
 
-`DeferredLightPlacer` is unchanged in how it selects — support discovery, weighted draw, orientation,
-survival, wrap-once fallback across opportunities. Its one new behaviour: when no opportunity yields
-a survivable candidate, it plans the todo's `unlit` state instead of planning nothing. A pool with no
-lit candidates left after issue-#91 dropping goes straight there.
+`DeferredLightPlacer` keeps its selection — support discovery, weighted draw, orientation, survival —
+and runs it twice over, once per roll outcome. Lit, the state tried at each candidate is its light and
+a candidate the world refuses hands over to the next in the list. Unlit, the state tried is the
+candidate's replacement and the first drawn candidate is the answer even when that replacement is
+air, because falling through would put *another* candidate's replacement at a position that candidate
+never won. Both passes address one stream at the marker, so the fixture a position would light is the
+fixture standing there while it is dark.
+
+When no opportunity yields anything, a lit marker falls back to the source's own `unlit`; air is
+skipped rather than planned, since the marker already holds air and writing it again would add a
+driver write where there was none.
 
 `CityGenerator.placeOptionalLights` writes what was planned and schedules its update, as now.
 
@@ -188,9 +207,12 @@ never rerolls a source that was already accepted.
 
 ## 6. Bundled datapack
 
-`common.json` `T` and `h` keep their pools verbatim under the new field name, with the default air
-replacement. Their generated output is therefore byte-identical, and the digest goldens must not
-move on account of the built-in pack.
+`common.json` `T` and `h` keep their pools under the new field name. Two `T` candidates gain an inert
+stand-in — `minecraft:torch` → `minecraft:candle[candles=1,lit=false]`, `minecraft:lantern[hanging=true]`
+→ `minecraft:iron_chain[axis=y]` — so a dark room still shows where its light was. Vanilla has no
+unlit torch block and the obvious substitute, `redstone_torch[lit=false]`, relights itself on the next
+block update, so the stand-ins are blocks that stay dark. Every other candidate names none and leaves
+air, exactly as a rejected marker always has.
 
 `oilrig.json` gains two in-place sources:
 
@@ -203,8 +225,8 @@ move on account of the built-in pack.
 previous spec put it deliberately outside lighting density as functional rather than decorative, and
 nothing here changes that judgement.
 
-These two oilrig entries do move the digest goldens. That is the only intended built-in behaviour
-change, and it is reported as such.
+The oilrig entries and the two `T` stand-ins move the digest goldens. Those are the intended built-in
+behaviour changes, and they are reported as such.
 
 ## 7. ModernTweaks
 
@@ -260,7 +282,8 @@ Automated:
 - In-place form on a non-emitting entry is a load error; on an all-absent entry it is not.
 - `torch` and `light` produce a migration error naming the new spelling.
 - A rejected density roll writes the replacement, not air, for both forms.
-- A socket whose every opportunity fails survival writes the replacement.
+- A socket whose every opportunity fails survival writes the source's replacement.
+- A socket candidate's own replacement wins over the source's, and an `unlit` that emits is refused.
 - An in-place source is written at the authored position with the authored state.
 - Raising lighting density stays monotonic and does not reroll accepted positions.
 - Every emitting block written schedules exactly one lighting update; no `urbex:lights` reference
@@ -269,10 +292,10 @@ Automated:
 
 Digest goldens, per project rule: `runDigestCheck`, `runDigestCheckShuffled`,
 `runDigestCheckFeatures`, `runDigestCheckAvoid` and variants, `runDigestCheckAvoidModes`,
-`runDigestCheckRail`/`RailShuffled`, at the default worker count and at
-`-Dmax.bg.threads=2`. Expected: unchanged except for the two `oilrig.json` entries in section 6;
-any other movement is a defect, not a re-pin. A deliberate re-pin deletes the golden and runs twice
-for agreement.
+`runDigestCheckRail`/`RailShuffled`, at the default worker count and at `-Dmax.bg.threads=2`. The
+rename alone moved nothing — all ten suites reproduced the old hashes — which is what establishes
+that `T` and `h` still generate what they did. The five goldens then moved on the `T` stand-ins, and
+were re-pinned by deleting them and running twice for agreement, never by editing a value to match.
 
 ## 11. Out of scope
 

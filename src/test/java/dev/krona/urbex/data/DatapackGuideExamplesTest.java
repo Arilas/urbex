@@ -208,6 +208,23 @@ class DatapackGuideExamplesTest {
         expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, null, List.of(
                 new PaletteDefinition(Optional.empty(), Optional.of(List.of(empty))))));
 
+        // The four ways a 'lightSource' can be wrong, and the two removed spellings it replaced.
+        // Every one of them names the palette and the character, so a pack author who has copied a
+        // light onto the wrong entry is told which entry.
+        Identifier x = Identifier.fromNamespaceAndPath("urbex", "x");
+        expect(guide, missing, () -> compilePalette(x, """
+                {"palette":[{"char":"T","lightSource":true}]}"""));
+        expect(guide, missing, () -> compilePalette(x, """
+                {"palette":[{"char":"L","block":"minecraft:stone","lightSource":true}]}"""));
+        expect(guide, missing, () -> compilePalette(x, """
+                {"palette":[{"char":"T","block":"minecraft:torch","torch":true}]}"""));
+        expect(guide, missing, () -> compilePalette(x, """
+                {"palette":[{"char":"T","light":{"floor":[{"weight":1,"block":"minecraft:torch"}]}}]}"""));
+        expect(guide, missing, () -> compilePalette(x, """
+                {"palette":[{"char":"T","lightSource":{"wall":[
+                  {"weight":1,"block":"minecraft:wall_torch[facing=north]","unlit":"minecraft:glowstone"}
+                ]}}]}"""));
+
         // A 'randompalettes' group nothing could ever be drawn from, and a stuff entry whose two
         // count bounds contradict. Both are checked at the chain fold rather than per field.
         expect(guide, missing, () -> new Style(Identifier.fromNamespaceAndPath("urbexmt", "downtown"), NO_PALETTES, List.of(
@@ -235,6 +252,15 @@ class DatapackGuideExamplesTest {
         assertTrue(missing.isEmpty(),
                 () -> missing.size() + " quoted message(s) the guide does not contain verbatim:\n"
                         + String.join("\n", missing));
+    }
+
+    /** Compiles one palette document, so a guide-quoted compile error can be provoked from JSON. */
+    private static Palette compilePalette(Identifier id, String json) {
+        PaletteDefinition definition = PaletteDefinition.CODEC
+                .parse(JsonOps.INSTANCE, JsonParser.parseString(json))
+                .result()
+                .orElseThrow(() -> new AssertionError("fixture does not decode: " + json));
+        return new Palette(id, BuiltInRegistries.BLOCK, null, List.of(definition));
     }
 
     /** A stuff entry declaring everything required, with the two count bounds the caller names. */
