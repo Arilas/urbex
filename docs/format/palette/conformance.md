@@ -23,7 +23,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (46):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.010`, `LOAD.012`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (43):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.061`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.010`, `LOAD.012`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 190 of 309 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 194 of 309 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -80,11 +80,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.051` | `MUST` |  | `reject=DIAG.012` | `PaletteV2DecodeTest.aTagWithoutItsLeadingHashIsRefused` |
 | `MODEL.052` | `MUST` |  |  | `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag` |
 | `MODEL.053` | `REJECT` | `DIAG.008` | `reject=DIAG.008` | — |
-| `MODEL.060` | `MUST` |  |  | — |
+| `MODEL.060` | `MUST` |  |  | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesDefineIsAnsweredHereAndLeavesNothingPending` |
 | `MODEL.061` | `MUST` |  |  | — |
-| `MODEL.062` | `REJECT` | `DIAG.009` | `reject=DIAG.009` | — |
-| `MODEL.063` | `MUST` |  |  | — |
-| `MODEL.064` | `MUST` |  |  | — |
+| `MODEL.062` | `REJECT` | `DIAG.009` | `reject=DIAG.009` | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesNotDefineIsCarriedOutRatherThanDropped`, `PendingAliasTest.aCycleOfAliasesWithinOnePaletteBecomesAPendingQuestionRatherThanRecursing` |
+| `MODEL.063` | `MUST` |  |  | `PendingAliasTest.aPendingAliasCarriesItsOwnTraitsSoTheMergeCanApplyThemOverWhateverItResolves`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
+| `MODEL.064` | `MUST` |  |  | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesNotDefineIsCarriedOutRatherThanDropped` |
 | `MODEL.070` | `MUST` |  |  | `ExclusionTest.aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade` |
 | `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists` |
 | `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
@@ -304,7 +304,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.020` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
 | `LOAD.021` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
 | `LOAD.022` | `INVARIANT` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
-| `LOAD.023` | `MUST` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject` |
+| `LOAD.023` | `MUST` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
 | `LOAD.024` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred` |
 | `LOAD.025` | `MUST` |  |  | — |
 | `LOAD.030` | `INVARIANT` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject` |

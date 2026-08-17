@@ -36,20 +36,95 @@ import java.util.Set;
  * materialisation, because {@code TRAIT.052} asks about "the blocks it resolves to" and an excluded
  * alternative is not one of them.
  * <p>
- * <b>What this does not do yet.</b> {@code MODEL.062} - an {@code alias} whose target no palette
- * defines - is decided where a style's palette groups are merged and not here, because by
+ * <b>What this deliberately does not decide.</b> {@code MODEL.062} - an {@code alias} whose target no
+ * palette defines - is decided where a style's palette groups are merged and not here, because by
  * {@code MODEL.064} that merge "includes markers contributed by palettes this file never mentions". An
- * alias whose target this palette defines is compiled; one whose target it does not is left out,
- * without a diagnostic, for that stage to answer.
+ * alias whose target this palette defines is compiled here; one whose target it does not is carried out
+ * as a {@link Pending} for the merge to answer, rather than dropped. Dropping it was this class's first
+ * shape and it made the question unanswerable: a marker that is silently absent cannot be reported as
+ * unresolvable by a later stage, because that stage cannot tell it from a marker the file never wrote.
  */
 public final class CompiledV2Palette {
 
     private final MarkerIndex markers;
     private final CompiledEntry[] entries;
+    private final Map<Marker, Pending> pending;
 
-    private CompiledV2Palette(MarkerIndex markers, CompiledEntry[] entries) {
+    private CompiledV2Palette(MarkerIndex markers, CompiledEntry[] entries,
+                              Map<Marker, Pending> pending) {
         this.markers = markers;
         this.entries = entries;
+        this.pending = Collections.unmodifiableMap(new LinkedHashMap<>(pending));
+    }
+
+    /**
+     * An {@code alias} this palette could not answer on its own, handed to the merge that can.
+     * <p>
+     * {@code MODEL.064}: "An {@code alias} names a marker and is answered by the merged palette the part
+     * is generated with - including markers contributed by palettes this file never mentions." So the
+     * target is a {@link Marker} and not an entry, and the traits are this alias's own, already compiled
+     * and ready to go over whatever the merge resolves the target to ({@code MODEL.063},
+     * {@code TRAIT.006}). A chain of aliases inside one palette has already been walked, so
+     * {@link #target} is the first marker this palette does not define and {@link #own} carries every
+     * link's traits folded in nearest-first.
+     *
+     * @param target the marker this alias resolves to, which some palette of the merge must define
+     * @param own    the traits to apply over the target's, per slot
+     */
+    public record Pending(Marker target, TraitSet own) {
+    }
+
+    /**
+     * The aliases this palette left for the merge ({@code MODEL.062}, {@code MODEL.064}).
+     * <p>
+     * Empty for every palette whose aliases all name markers it defines itself, which is every palette
+     * that is not the shipped side-glass idiom.
+     */
+    public Map<Marker, Pending> pendingAliases() {
+        return pending;
+    }
+
+    /**
+     * {@code MODEL.063}: {@code base}'s slots with {@code own}'s traits applied over each of them.
+     * <p>
+     * Public because a {@link Pending} is resolved by the merge rather than here, and the overlay it
+     * needs is the same one an in-palette alias got - one implementation, so an alias answered by
+     * another palette cannot come out differently from an alias answered by its own.
+     *
+     * @param interned the merge's interning pool, so {@code LOAD.023} holds across the merged palette
+     *                 and not only within each palette that fed it
+     */
+    public static CompiledEntry overlay(CompiledEntry base, TraitSet own,
+                                        Map<TraitSet, TraitSet> interned) {
+        if (own.isEmpty()) {
+            return base;
+        }
+        if (base.isSocket()) {
+            Map<Kind.Placement, CompiledEntry> placements = new LinkedHashMap<>();
+            base.placements().forEach((placement, entry) ->
+                    placements.put(placement, CompiledEntry.of(overlaid(entry, own, interned))));
+            return CompiledEntry.socket(placements);
+        }
+        return CompiledEntry.of(overlaid(base, own, interned));
+    }
+
+    /** {@link #overlay}'s per-slot half, shared with the in-palette case. */
+    private static CompiledEntry.Resolved[] overlaid(CompiledEntry base, TraitSet own,
+                                                     Map<TraitSet, TraitSet> interned) {
+        CompiledEntry.Resolved[] slots = new CompiledEntry.Resolved[base.slotCount()];
+        Map<CompiledEntry.Resolved, CompiledEntry.Resolved> perSlot = new LinkedHashMap<>();
+        for (int slot = 0; slot < slots.length; slot++) {
+            CompiledEntry.Resolved from = base.slot(slot);
+            slots[slot] = perSlot.computeIfAbsent(from, source -> {
+                Map<Identifier, CompiledTrait> merged =
+                        new LinkedHashMap<>(source.traits().traits());
+                merged.putAll(own.traits());
+                TraitSet built = TraitSet.of(merged);
+                return new CompiledEntry.Resolved(source.state(),
+                        interned.computeIfAbsent(built, java.util.function.Function.identity()));
+            });
+        }
+        return slots;
     }
 
     // ---- Generation ----------------------------------------------------------------------------
@@ -199,9 +274,18 @@ public final class CompiledV2Palette {
             // alias reads the same as a backward one - MODEL.005 makes the order markers are declared
             // in a property of the file, and an alias that worked only when it was written second
             // would make it a rule.
+            Map<Marker, Pending> pending = new LinkedHashMap<>();
             for (Map.Entry<Marker, ResolvedNode> alias : aliases.entrySet()) {
-                aliased(alias.getKey(), alias.getValue(), compiled, pruned)
-                        .ifPresent(entry -> compiled.put(alias.getKey(), entry));
+                Optional<Aliased> answer = aliased(alias.getKey(), alias.getValue(), compiled, pruned);
+                if (answer.isEmpty()) {
+                    ok = false;
+                    continue;
+                }
+                switch (answer.get()) {
+                    case Aliased.Here here -> compiled.put(alias.getKey(), here.entry());
+                    case Aliased.Elsewhere elsewhere ->
+                            pending.put(alias.getKey(), elsewhere.pending());
+                }
             }
 
             if (!ok || diagnostics.hasFatal()) {
@@ -210,7 +294,24 @@ public final class CompiledV2Palette {
             MarkerIndex index = MarkerIndex.of(compiled.keySet());
             CompiledEntry[] entries = new CompiledEntry[index.size()];
             compiled.forEach((marker, entry) -> entries[index.index(marker.codepoint())] = entry);
-            return Optional.of(new CompiledV2Palette(index, entries));
+            return Optional.of(new CompiledV2Palette(index, entries, pending));
+        }
+
+        /**
+         * What one {@code alias} resolved to: an entry this palette can build, or a target only the
+         * merge can answer.
+         * <p>
+         * A sealed pair rather than a nullable entry, because the two outcomes are not "success" and
+         * "failure" - {@link Elsewhere} is the shipped idiom, and {@code urbex:glass_side_variant_glass}
+         * maps {@code '@'} to {@code 'a'} and declares nothing else at all.
+         */
+        private sealed interface Aliased {
+
+            /** The target is a marker this palette defines, so the entry is built here. */
+            record Here(CompiledEntry entry) implements Aliased {}
+
+            /** The target is not defined here; {@code MODEL.062} is decided at the merge. */
+            record Elsewhere(Pending pending) implements Aliased {}
         }
 
         /**
@@ -467,22 +568,39 @@ public final class CompiledV2Palette {
          * <p>
          * A chain of aliases is followed, and a cycle among them stops rather than recursing: a cycle
          * through {@code $ref} is {@code REF.032}'s and is refused at stage 3, but an {@code alias}
-         * names a marker rather than a node and so cannot be seen by that graph. Left unresolved rather
-         * than refused, for the same reason an alias naming no marker of this palette is - by
-         * {@code MODEL.062} the question belongs to the merge a part is generated with.
+         * names a marker rather than a node and so cannot be seen by that graph.
+         * <p>
+         * <b>A target this palette does not define is not a failure here.</b> It comes back as
+         * {@link Aliased.Elsewhere} carrying the marker to look up and the traits to apply, because by
+         * {@code MODEL.062} the question belongs to the merge a part is generated with and by
+         * {@code MODEL.064} that merge holds "markers contributed by palettes this file never
+         * mentions". The empty return is reserved for the one case that really is this palette's fault:
+         * a trait of the alias that did not compile.
+         *
+         * @return empty only when a diagnostic was recorded
          */
-        private Optional<CompiledEntry> aliased(Marker marker, ResolvedNode alias,
-                                                Map<Marker, CompiledEntry> compiled,
-                                                Map<Marker, ResolvedNode> pruned) {
+        private Optional<Aliased> aliased(Marker marker, ResolvedNode alias,
+                                          Map<Marker, CompiledEntry> compiled,
+                                          Map<Marker, ResolvedNode> pruned) {
             Set<Marker> seen = new LinkedHashSet<>();
             seen.add(marker);
             Map<Identifier, ResolvedTrait> traits = new LinkedHashMap<>(alias.traits());
             Marker target = ((ResolvedNode.Source.Alias) alias.source()).of();
+            boolean here = true;
             while (!compiled.containsKey(target)) {
                 ResolvedNode next = pruned.get(target);
-                if (next == null || !seen.add(target)
-                        || !(next.source() instanceof ResolvedNode.Source.Alias further)) {
-                    return Optional.empty();
+                if (next == null || !(next.source() instanceof ResolvedNode.Source.Alias further)) {
+                    // Not a marker of this palette at all, or one that is not an alias and did not
+                    // compile. Either way the chain leaves here, and the merge is asked.
+                    here = false;
+                    break;
+                }
+                if (!seen.add(target)) {
+                    // A cycle of aliases within one palette. It resolves to nothing anywhere, so it
+                    // goes to the merge as a target the merge will not find either - which is where
+                    // MODEL.062 reports it, once, with the rest.
+                    here = false;
+                    break;
                 }
                 // The nearer alias's traits win over the further one's, by TRAIT.006 applied down the
                 // chain: putIfAbsent keeps what is already here, which is what this marker declared.
@@ -494,31 +612,11 @@ public final class CompiledV2Palette {
             if (own.isEmpty()) {
                 return Optional.empty();
             }
-            CompiledEntry base = compiled.get(target);
-            if (base.isSocket()) {
-                Map<Kind.Placement, CompiledEntry> placements = new LinkedHashMap<>();
-                base.placements().forEach((placement, entry) ->
-                        placements.put(placement, CompiledEntry.of(overlaid(entry, own.get()))));
-                return Optional.of(CompiledEntry.socket(placements));
+            if (!here) {
+                return Optional.of(new Aliased.Elsewhere(new Pending(target, own.get())));
             }
-            return Optional.of(CompiledEntry.of(overlaid(base, own.get())));
-        }
-
-        private CompiledEntry.Resolved[] overlaid(CompiledEntry base, TraitSet own) {
-            CompiledEntry.Resolved[] slots = new CompiledEntry.Resolved[base.slotCount()];
-            Map<CompiledEntry.Resolved, CompiledEntry.Resolved> perSlot = new LinkedHashMap<>();
-            for (int slot = 0; slot < slots.length; slot++) {
-                CompiledEntry.Resolved from = base.slot(slot);
-                slots[slot] = perSlot.computeIfAbsent(from, source -> {
-                    Map<Identifier, CompiledTrait> merged =
-                            new LinkedHashMap<>(source.traits().traits());
-                    merged.putAll(own.traits());
-                    TraitSet built = TraitSet.of(merged);
-                    return new CompiledEntry.Resolved(source.state(),
-                            traitSets.computeIfAbsent(built, java.util.function.Function.identity()));
-                });
-            }
-            return slots;
+            return Optional.of(new Aliased.Here(
+                    overlay(compiled.get(target), own.get(), traitSets)));
         }
 
         /**
