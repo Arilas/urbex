@@ -14,6 +14,10 @@ public final class DensitySelector {
         return admit(worldSeed, pos, density, Rng.Purpose.LOOT_DENSITY);
     }
 
+    public static boolean spawner(long worldSeed, BlockPos pos, float density) {
+        return admit(worldSeed, pos, density, Rng.Purpose.SPAWNER_DENSITY);
+    }
+
     private static boolean admit(long worldSeed, BlockPos pos, float density, Rng.Purpose purpose) {
         if (density <= 0.0f) {
             return false;

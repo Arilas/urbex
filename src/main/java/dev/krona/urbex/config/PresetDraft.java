@@ -86,6 +86,7 @@ public final class PresetDraft {
     public float BUILDING_FRONTCHANCE = .2f;
     public boolean MULTI_USE_CORNER = false;
     public MultiBuildingStreetConflict MULTI_BUILDING_STREET_CONFLICT = MultiBuildingStreetConflict.OVERRIDE_MINOR;
+    public float SPAWNER_DENSITY = 1.0f;
     public boolean GENERATE_SPAWNERS = true;
     public int PRIMARY_ROAD_SPACING_X = 8;
     public int PRIMARY_ROAD_SPACING_Z = 8;
@@ -227,6 +228,7 @@ public final class PresetDraft {
         draft.MULTI_USE_CORNER = MULTI_USE_CORNER;
         draft.MULTI_BUILDING_STREET_CONFLICT = MULTI_BUILDING_STREET_CONFLICT;
         draft.GENERATE_SPAWNERS = GENERATE_SPAWNERS;
+        draft.SPAWNER_DENSITY = SPAWNER_DENSITY;
         draft.PRIMARY_ROAD_SPACING_X = PRIMARY_ROAD_SPACING_X;
         draft.PRIMARY_ROAD_SPACING_Z = PRIMARY_ROAD_SPACING_Z;
         draft.PRIMARY_ROAD_OPTIONAL_CHANCE = PRIMARY_ROAD_OPTIONAL_CHANCE;
@@ -536,6 +538,10 @@ public final class PresetDraft {
 
     public boolean generateSpawners() {
         return GENERATE_SPAWNERS;
+    }
+
+    public float spawnerDensity() {
+        return SPAWNER_DENSITY;
     }
 
     public int primaryRoadSpacingX() {

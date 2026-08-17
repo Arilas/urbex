@@ -20,9 +20,10 @@ public record BuildingSettings(
         Optional<Float> buildingFrontChance,
         Optional<Boolean> multiUseCorner,
         Optional<MultiBuildingStreetConflict> multiBuildingStreetConflict,
-        Optional<Boolean> generateSpawners) {
+        Optional<Boolean> generateSpawners,
+        Optional<Float> spawnerDensity) {
 
-    public static final Set<String> KEYS = Set.of("buildingChance", "buildingMinFloors", "buildingMaxFloors", "buildingMinFloorsChance", "buildingMaxFloorsChance", "buildingMinCellars", "buildingMaxCellars", "buildingDoorwayChance", "buildingFrontChance", "multiUseCorner", "multiBuildingStreetConflict", "generateSpawners");
+    public static final Set<String> KEYS = Set.of("buildingChance", "buildingMinFloors", "buildingMaxFloors", "buildingMinFloorsChance", "buildingMaxFloorsChance", "buildingMinCellars", "buildingMaxCellars", "buildingDoorwayChance", "buildingFrontChance", "multiUseCorner", "multiBuildingStreetConflict", "generateSpawners", "spawnerDensity");
 
     private static final Codec<MultiBuildingStreetConflict> MULTI_BUILDING_STREET_CONFLICT_CODEC = Codec.STRING.comapFlatMap(
             s -> {
@@ -47,7 +48,8 @@ public record BuildingSettings(
                     Codec.floatRange(0.0f, 1.0f).optionalFieldOf("buildingFrontChance").forGetter(BuildingSettings::buildingFrontChance),
                     Codec.BOOL.optionalFieldOf("multiUseCorner").forGetter(BuildingSettings::multiUseCorner),
                     MULTI_BUILDING_STREET_CONFLICT_CODEC.optionalFieldOf("multiBuildingStreetConflict").forGetter(BuildingSettings::multiBuildingStreetConflict),
-                    Codec.BOOL.optionalFieldOf("generateSpawners").forGetter(BuildingSettings::generateSpawners)
+                    Codec.BOOL.optionalFieldOf("generateSpawners").forGetter(BuildingSettings::generateSpawners),
+                    Codec.floatRange(0.0f, 1.0f).optionalFieldOf("spawnerDensity").forGetter(BuildingSettings::spawnerDensity)
             ).apply(i, BuildingSettings::new));
     public static final Codec<BuildingSettings> CODEC = UnknownKeys.warning(RAW, KEYS, "buildings");
 
@@ -64,5 +66,6 @@ public record BuildingSettings(
         multiUseCorner.ifPresent(v -> p.MULTI_USE_CORNER = v);
         multiBuildingStreetConflict.ifPresent(v -> p.MULTI_BUILDING_STREET_CONFLICT = v);
         generateSpawners.ifPresent(v -> p.GENERATE_SPAWNERS = v);
+        spawnerDensity.ifPresent(v -> p.SPAWNER_DENSITY = v);
     }
 }

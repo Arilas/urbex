@@ -88,7 +88,14 @@ public final class Rng {
         // Only reached when the mix has more than one entry: a world created with a single style
         // never draws here at all, which is what keeps its generation identical to what it was
         // before mixing existed.
-        WORLD_STYLE
+        WORLD_STYLE,
+        // Whether a marked spawner position keeps its spawner.
+        //
+        // Last, and that is the whole of why it is here rather than beside LOOT_DENSITY where it
+        // belongs by subject. A purpose's ordinal feeds the hash, so a constant added anywhere but
+        // the end reseeds every stream below it and rewrites every world that ever generated. Added
+        // here, nothing that existed before it moves.
+        SPAWNER_DENSITY
     }
 
     /**

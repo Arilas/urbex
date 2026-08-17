@@ -261,9 +261,11 @@ public class Parts {
     }
 
     private static BlockState handleSpawner(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
-        if (SpecialMarkerPolicy.generateSpawner(info.profile)) {
+        // Hoisted above the admission check, which is now addressed by position - the marker's
+        // world coordinate is what decides whether this one keeps its spawner.
+        BlockPos pos = info.getRelativePos(rx, oy + y, rz);
+        if (SpecialMarkerPolicy.generateSpawner(ctx.seed, pos, info.profile)) {
             String mobid = inf.mobId();
-            BlockPos pos = info.getRelativePos(rx, oy + y, rz);
             CompoundTag tag = new CompoundTag();
             tag.putInt("x", pos.getX());
             tag.putInt("y", pos.getY());

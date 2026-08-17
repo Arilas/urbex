@@ -169,6 +169,32 @@ If nothing is found — no site within 512 chunks of the origin, or no chunk mat
 world keeps the spawn it would have had and a warning names the site. Two mods claiming one world's
 spawn is a modpack conflict: first registered wins, and the clash is logged.
 
+## Spawners
+
+`buildings.generateSpawners` is a switch — a world that wants none has none. `buildings.spawnerDensity`
+(0–1) is the dial beside it: it thins what survives, position-addressed like `lootDensity`, so which
+markers keep their spawner is a property of the seed and the coordinate rather than of the order
+parts were generated in. Both must pass, and the density defaults to 1, so a preset that says nothing
+about it keeps every marker.
+
+The dial is the useful one for somewhere a player has to survive: "fewer" is not something a switch
+can say.
+
+## Two sites, one world
+
+Nothing stops a mod registering several sites in one level, and it is how "this place is different
+from that place" is expressed — a site carries one preset and one world style, so two kinds of place
+is two sites.
+
+Give them different ids (separate memo keys, separate caches, and separate road-grid addresses) and
+**complementary fields**, so no chunk belongs to both. `Urbex-Bunkers` does this for its starter
+bunker: one field view covers the bunker nearest the origin, the other covers every other, and
+between them they cover exactly what the undivided field covered.
+
+Two things to know. A site's id feeds its road field, so moving a bunker from one site to the other
+changes its street layout. And `groundY` must stay the *whole* field's answer in both views — a chunk
+on the edge of one reads neighbours belonging to the other, and the contract still says total.
+
 ## Cellars
 
 `buildingMaxCellars` means what it says in a site. In a dimension the effective cap is
