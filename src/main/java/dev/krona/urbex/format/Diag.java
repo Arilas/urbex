@@ -114,16 +114,38 @@ public enum Diag {
      */
     DIAG_020("%s: no trait %s is registered%s. Check the id, or the mod that provides it."),
 
-    /** {@code TRAIT.021}, {@code TRAIT.031}: args are the location, the trait, and the pool. */
-    DIAG_021("%s: %s names pool %s, which is not a loaded conditions asset."
+    /**
+     * {@code TRAIT.021}, {@code TRAIT.031}: args are the location, the trait, the field, the id and
+     * the registry that does not hold it.
+     * <p>
+     * <b>The field and the registry are slots because {@code TRAIT.090} makes them values.</b> A trait
+     * declares "which of its fields are references into which registry", so a row that hardcoded
+     * {@code pool} and {@code conditions} was true only of the two traits this repository happens to
+     * ship. The first addon trait naming, say, a {@code styles} asset from a field called {@code table}
+     * would have been refused with a message naming neither - which is the shape {@code DIAG.030} had
+     * before Task 3 gave it the operand, and the shape this catalogue keeps producing wherever a
+     * mechanism is generic and its message is not.
+     */
+    DIAG_021("%s: %s.%s names %s, which is not a loaded %s asset."
             + " Generation dereferences it, so it must exist."),
 
     /** {@code TRAIT.041}: args are the location and the block. */
     DIAG_022("%s: %s has no block entity, so its 'urbex:block_entity' nbt would never be written."
             + " Remove the trait, or name a block that has one."),
 
-    /** {@code TRAIT.052}: the argument is the location. */
-    DIAG_023("%s: declares 'urbex:light', but none of the blocks it resolves to emit light."
+    /**
+     * {@code TRAIT.052}: args are the location of the node that <em>declared</em> the trait, and which
+     * of the row's two clauses applies.
+     * <p>
+     * <b>Two clauses because the rule is evaluated per slot and reported per declaration.</b>
+     * {@code TRAIT.052} refuses {@code urbex:light} on any node carrying it that cannot light, which by
+     * {@code TRAIT.005} includes an alternative that inherited it - and {@code LOAD.021} is why: traits
+     * are a property of the slot, so a marker declaring a light over a lantern and a stone block has a
+     * stone slot that is exactly what the rule forbids. But the location stays the declaring node's,
+     * because the author wrote that line and did not write the slot; the second clause is what makes
+     * the sentence true there, by naming the alternative rather than claiming the marker never lights.
+     */
+    DIAG_023("%s: declares 'urbex:light', but %s."
             + " It would roll a density and place the same dark block either way."),
 
     /** {@code TRAIT.053}: the argument is the location. */
@@ -133,6 +155,19 @@ public enum Diag {
     /** {@code TRAIT.064}: the argument is the location. */
     DIAG_025("%s: carries both 'urbex:light' and 'urbex:optional'."
             + " A marker rolls one density; 'urbex:light' is the lighting one."),
+
+    /**
+     * {@code TRAIT.042}: args are the location and the loader-supplied keys the file wrote.
+     * <p>
+     * <b>The catalogue's second warning, and the first one that is about a silence rather than a
+     * shape.</b> {@code DIAG.046} reports a structural change a condition made; this reports something
+     * the loader <em>discards</em>. The four keys cannot be honoured - the loader knows the position
+     * and the type and the file does not - so refusing would refuse a pack whose block entities are
+     * written correctly, and dropping them without a word is the version 1 behaviour {@code MODEL.004}
+     * exists to remove. {@code DIAG.904} allows exactly one level between those two.
+     */
+    DIAG_026("%s: 'urbex:block_entity' nbt declares %s, which the loader supplies and this drops."
+            + " Remove them; the position and the type are not the file's to choose."),
 
     // ---- References and merging (030-039) ------------------------------------------------------
 
@@ -369,7 +404,27 @@ public enum Diag {
      * and {@code DiagCatalogueTest} proves no two templates match each other's messages.
      */
     DIAG_073("%s: %s is written with no '$ref', so there is nothing for it to filter."
-            + " Remove it, or name the definition whose keys it selects.");
+            + " Remove it, or name the definition whose keys it selects."),
+
+    /**
+     * {@code REF.022}: args are the location, the trait id, and the operand written on its object.
+     * <p>
+     * <b>A row of its own rather than {@link #DIAG_003}, and the remedy is the whole reason.</b> The
+     * refusal is reachable from {@code MODEL.004} alone, because no trait's declared key set
+     * ({@code TRAIT.090}) contains an operand - but {@code DIAG.003} says "check the spelling against
+     * the schema", and nothing here is misspelt. The author wanted to share something, and there are
+     * two ways to do that: put the reference on a block-valued field of the trait, which is a node and
+     * may carry one ({@code TRAIT.009}), or share the whole trait with a partial definition
+     * ({@code REF.020}). A rejection whose remedy names neither costs the author the search this
+     * specification exists to remove.
+     * <p>
+     * It is the narrow half of the retired {@code VER.016}, and it was written before that rule was
+     * deleted - the wide scan was the only thing enforcing {@code REF.022}, so deleting it first would
+     * have reopened a silent misreading rather than a loud one.
+     */
+    DIAG_074("%s: trait %s carries %s, and a trait's value is data rather than a node."
+            + " Put the reference on a block-valued field of the trait,"
+            + " or share the whole trait with a partial definition.");
 
     private static final Map<String, Diag> BY_ID = byId();
 

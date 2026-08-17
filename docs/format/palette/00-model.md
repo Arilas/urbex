@@ -363,8 +363,15 @@ same structure by two spellings. A named weighted node in the
 > **MODEL.080** · `MUST` — A node **resolves to a block source** when, after
 > [reference resolution](02-references.md), it has a `kind` and that kind's required keys.
 
-> **MODEL.081** · `REJECT` (`DIAG.011`) — A node in a marker position, a `choices` entry or a socket
-> candidate that does not resolve to a block source is refused.
+> **MODEL.081** · `REJECT` (`DIAG.011`) — A node in a marker position, a `choices` entry, a socket
+> candidate or a [block-valued trait field](01-traits.md#3-block-valued-fields) that does not resolve to
+> a block source is refused.
+
+> > **Why a satellite is in this list** — it is written at a position, exactly as an alternative is;
+> > the only difference is which condition puts it there ([MODEL.031](#3-alternatives-and-satellites)).
+> > A satellite with no block leaves a marker whose damaged form, or unlit form, is silently nothing —
+> > and by [MODEL.032](#3-alternatives-and-satellites) a satellite may carry `$ref`, so the failure
+> > arrives through the same indirection every other completeness failure does.
 
 > **MODEL.082** · `ACCEPT` — A node in `$defs` need not resolve to a block source; see
 > [REF.020](02-references.md#4-partial-definitions).

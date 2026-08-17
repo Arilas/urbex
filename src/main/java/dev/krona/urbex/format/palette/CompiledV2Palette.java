@@ -567,38 +567,73 @@ public final class CompiledV2Palette {
                 ok = false;
             }
             for (ResolvedTrait trait : node.traits().values()) {
-                if (trait.provenance().inherited()) {
-                    // Validated where it was declared. TRAIT.052 asks about "a node none of whose
-                    // resolved states emit light", and the node the rule means is the one that wrote
-                    // the trait - a weighted node of a torch and a stone block is a light, and asking
-                    // its stone alternative on its own would refuse a file that is correct.
-                    continue;
-                }
-                ok &= references(trait, site);
-                Diagnostics own = new Diagnostics();
-                trait.type().validateValue(trait.value(), node, context, site, own);
-                report(own);
-                ok &= !own.hasFatal();
-                if (trait.type() == Light.TYPE) {
-                    // TRAIT.053 is asked of the satellite, which MODEL.031 keeps out of the node's own
-                    // states. The site names the field, so the message points at the block to change.
-                    ResolvedNode unlit = trait.satellites().get(Light.UNLIT);
-                    if (unlit != null) {
-                        Diagnostics satellite = new Diagnostics();
-                        Light.checkUnlit(unlit, context, site.through("'urbex:light.unlit'"),
-                                satellite);
-                        report(satellite);
-                        ok &= !satellite.hasFatal();
+                boolean declaredHere = !trait.provenance().inherited();
+                if (declaredHere) {
+                    // The payload's own rules, asked once, where the payload was written. A reference
+                    // and a block entity are facts about the trait and about the node it was written
+                    // on; asking them again of every alternative that inherited it would report one
+                    // mistake once per slot.
+                    ok &= references(trait, site);
+                    Diagnostics own = new Diagnostics();
+                    trait.type().validateValue(trait.value(), node, context, site, own);
+                    report(own);
+                    ok &= !own.hasFatal();
+                    if (trait.type() == Light.TYPE) {
+                        // TRAIT.053 is asked of the satellite, which MODEL.031 keeps out of the node's
+                        // own states. The site names the field, so the message points at the block to
+                        // change.
+                        ResolvedNode unlit = trait.satellites().get(Light.UNLIT);
+                        if (unlit != null) {
+                            Diagnostics satellite = new Diagnostics();
+                            Light.checkUnlit(unlit, context, site.through("'urbex:light.unlit'"),
+                                    satellite);
+                            report(satellite);
+                            ok &= !satellite.hasFatal();
+                        }
                     }
+                }
+                // TRAIT.052 is the one rule here that is asked per slot rather than per declaration,
+                // and LOAD.021 is why: traits are a property of the slot, so a marker declaring a light
+                // over a lantern and a stone block has a stone slot that can never look different. Only
+                // a leaf is a slot - a weighted node is the thing slots are drawn from, and asking it
+                // would answer for the list rather than for the alternative.
+                if (trait.type() == Light.TYPE && isSlot(node)) {
+                    Diagnostics emission = new Diagnostics();
+                    Light.checkEmission(node, context, trait.provenance().declaredAt(), declaredHere,
+                            emission);
+                    report(emission);
+                    ok &= !emission.hasFatal();
                 }
             }
             return ok;
         }
 
+        /**
+         * Whether this node <em>is</em> a slot rather than a list slots are drawn from.
+         * <p>
+         * By the time trait validation runs, a {@code tag} has become a weighted list and every leaf is
+         * a {@code block} or an {@code alias}. An alias counts, and contributes nothing: by
+         * {@code MODEL.064} its target is answered by the merge a part is generated with, so
+         * {@code TraitContext.statesOf} returns nothing for it and every check reads an unanswerable
+         * question as "do not refuse".
+         */
+        private static boolean isSlot(ResolvedNode node) {
+            return !(node.source() instanceof ResolvedNode.Source.Weighted)
+                    && !(node.source() instanceof ResolvedNode.Source.Socket);
+        }
+
+        /**
+         * Folds another collector's entries into this one, at the level each was recorded at.
+         * <p>
+         * Through the {@code AlreadyFormatted} pair rather than {@link Diagnostics#warn} and
+         * {@link Diagnostics#error}, which would re-format a finished message against its own template
+         * and throw for any row whose arity is not one. {@code DIAG.026} is arity two, so the warning
+         * half of this was a latent crash until the second {@code WARN} rule made it reachable.
+         */
         private void report(Diagnostics from) {
             from.all().forEach(entry -> {
                 if (entry.level() == Diagnostics.Level.WARN) {
-                    diagnostics.warn(entry.diag(), entry.message());
+                    diagnostics.warnAlreadyFormatted(entry.diag(), entry.message());
                 } else {
                     diagnostics.errorAlreadyFormatted(entry.diag(), entry.message());
                 }
@@ -620,8 +655,13 @@ public final class CompiledV2Palette {
                     if (context.holds(named.getKey().registry(), id)) {
                         continue;
                     }
-                    diagnostics.error(Diag.DIAG_021, site.location(), "'" + trait.id() + "'",
-                            "'" + id + "'");
+                    // DIAG.021 takes the field and the registry as slots, because TRAIT.090 makes
+                    // both of them values: a trait declares which of its fields are references into
+                    // which registry, and a message naming 'pool' and 'conditions' outright would be
+                    // true only of the two traits this repository happens to ship.
+                    diagnostics.error(Diag.DIAG_021, site.location(), trait.id(),
+                            named.getKey().field(), "'" + id + "'",
+                            named.getKey().registry().identifier());
                     ok = false;
                 }
             }

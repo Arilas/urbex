@@ -11,15 +11,15 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | Area | Rules | Fixtures |
 |---|---:|---:|
 | `MODEL` | 42 | 22 |
-| `TRAIT` | 41 | 16 |
-| `REF` | 55 | 14 |
+| `TRAIT` | 42 | 17 |
+| `REF` | 55 | 15 |
 | `MERGE` | 12 | 4 |
 | `WEIGHT` | 38 | 11 |
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
-| `DIAG` | 55 | 0 |
+| `DIAG` | 57 | 0 |
 | `VER` | 24 | 2 |
-| **total** | **305** | **73** |
+| **total** | **308** | **75** |
 
 ## Outstanding
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 187 of 305 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 188 of 308 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -56,7 +56,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.001` | `MUST` |  | `accept` | `PaletteV2DecodeTest.aPaletteFileAcceptsTheFiveKeysAndNoOthers`, `PaletteV2DecodeTest.aDecodedPaletteEncodesBackToADocumentThatDecodesToTheSameThing` |
 | `MODEL.002` | `REJECT` | `DIAG.001` | `reject=DIAG.001` | `VersionDispatchTest.aVersionThatIsNotOneOrTwoIsRefusedAndSoIsOneThatIsNotANumber` |
 | `MODEL.003` | `MUST` |  |  | `PaletteV2DecodeTest.aFileMayDeclareNoPaletteBecauseTheChainIsWhatRequiresOne` |
-| `MODEL.004` | `REJECT` | `DIAG.003` | `reject=DIAG.003` | `TraitTest.aKeyNoTraitDefinesIsRefusedInsideThePayloadAndSoIsAnOperandOnTheTraitObject` |
+| `MODEL.004` | `REJECT` | `DIAG.003` | `reject=DIAG.003` | `TraitTest.aKeyNoTraitDefinesIsRefusedInsideThePayload` |
 | `MODEL.005` | `MUST` |  |  | `PaletteV2DecodeTest.aMarkerCannotBeDeclaredTwiceBecausePaletteIsAnObject` |
 | `MODEL.010` | `MUST` |  |  | `PaletteV2DecodeTest.oneNodeTypeStandsInEveryPositionThatHoldsANode` |
 | `MODEL.011` | `DEFAULT` |  | `equiv=default-kind`, `equiv=default-kind` | `NodeResolverTest.aNodeWithNoKindTakesItsKindFromItsReferenceAndOnlyThenTheDefault` |
@@ -120,10 +120,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.032` | `MUST` |  |  | — |
 | `TRAIT.040` | `MUST` |  |  | — |
 | `TRAIT.041` | `REJECT` | `DIAG.022` | `reject=DIAG.022` | `TraitTest.blockEntityNbtOnABlockWithNoBlockEntityIsRefusedAndNamesTheBlock` |
-| `TRAIT.042` | `MUST NOT` |  |  | `TraitTest.theFourPositionalKeysAreDroppedBecauseTheLoaderSuppliesThem` |
+| `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
+| `TRAIT.042` | `WARN` | `DIAG.026` |  | `TraitTest.theFourPositionalKeysAreDroppedAndTheDropIsReported` |
 | `TRAIT.050` | `MUST` |  |  | — |
 | `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | — |
-| `TRAIT.052` | `REJECT` | `DIAG.023` | `reject=DIAG.023` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd` |
+| `TRAIT.052` | `REJECT` | `DIAG.023` | `reject=DIAG.023` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
 | `TRAIT.053` | `REJECT` | `DIAG.024` | `reject=DIAG.024` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd` |
 | `TRAIT.054` | `MUST` |  |  | — |
 | `TRAIT.055` | `MUST` |  |  | `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField` |
@@ -163,7 +164,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.019` | `REJECT` | `DIAG.071` | *—* | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse` |
 | `REF.020` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 | `REF.021` | `MUST` |  |  | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
-| `REF.022` | `MUST NOT` |  |  | `TraitTest.aKeyNoTraitDefinesIsRefusedInsideThePayloadAndSoIsAnOperandOnTheTraitObject` |
+| `REF.022` | `REJECT` | `DIAG.074` | `reject=DIAG.074` | `TraitTest.anOperandOnATraitObjectIsRefusedWithARemedyAndASatelliteMayCarryOne` |
 | `REF.030` | `MUST` |  |  | `NodeResolverTest.noResolvedNodeHoldsAPointerOrADefinitionName` |
 | `REF.031` | `MUST` |  |  | `NodeResolverTest.aChainResolvesWhateverOrderItsLinksAreDeclaredIn` |
 | `REF.032` | `REJECT` | `DIAG.032` | `reject=DIAG.032` | `NodeResolverTest.aReferenceCycleIsRefusedNamingEveryNodeInIt`, `NodeResolverTest.aSelfReferenceIsACycleOfOne`, `V2ChainTest.aCycleThroughRefAndExtendsTogetherIsOneCycle` |
@@ -300,7 +301,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.013` | `ACCEPT` |  | *n/a* | — |
 | `LOAD.014` | `INVARIANT` |  |  | — |
 | `LOAD.020` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
-| `LOAD.021` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
+| `LOAD.021` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
 | `LOAD.022` | `INVARIANT` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
 | `LOAD.023` | `MUST` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject` |
 | `LOAD.024` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred` |
@@ -342,6 +343,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.023` | `DIAG` |  |  | — |
 | `DIAG.024` | `DIAG` |  |  | — |
 | `DIAG.025` | `DIAG` |  |  | — |
+| `DIAG.026` | `DIAG` |  |  | — |
 | `DIAG.030` | `DIAG` |  |  | — |
 | `DIAG.031` | `DIAG` |  |  | — |
 | `DIAG.032` | `DIAG` |  |  | — |
@@ -356,6 +358,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.071` | `DIAG` |  |  | — |
 | `DIAG.072` | `DIAG` |  |  | — |
 | `DIAG.073` | `DIAG` |  |  | — |
+| `DIAG.074` | `DIAG` |  |  | — |
 | `DIAG.040` | `DIAG` |  |  | — |
 | `DIAG.041` | `DIAG` |  |  | — |
 | `DIAG.045` | `DIAG` |  |  | — |

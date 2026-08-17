@@ -108,21 +108,54 @@ public final class Light implements TraitType<Light.Value> {
     }
 
     /**
-     * {@code TRAIT.052} and {@code TRAIT.053}, in that order.
+     * Nothing: this trait's two refusals are both about a node other than the one holding the payload.
      * <p>
-     * <b>Both are conditioned on there being a state to ask about,</b> and that is {@code MODEL.042}
-     * rather than caution: a marker naming a cross-mod lamp this installation does not have resolves to
-     * no state at all, and refusing it would refuse a pack that is working exactly as written on the
-     * installs that have the mod. So "none of its states emits light" is asked only of a node that has
-     * states, and an unanswerable question is not an answer of "no".
+     * {@code TRAIT.052} is asked per <em>slot</em> and reported at the node that declared the trait, so
+     * it needs to know which of the two a given node is - and this method is handed neither. It is
+     * {@link #checkEmission}. {@code TRAIT.053} is asked of the satellite, which {@code MODEL.031} keeps
+     * out of the owner's states entirely; it is {@link #checkUnlit}.
      */
     @Override
     public void validate(Value value, ResolvedNode owner, TraitContext context,
                          PointerResolver.Site site, Diagnostics diagnostics) {
-        List<BlockState> lit = context.statesOf(owner);
-        if (!lit.isEmpty() && lit.stream().noneMatch(Light::emits)) {
-            diagnostics.error(Diag.DIAG_023, site.location());
+    }
+
+    /**
+     * {@code TRAIT.052}: a node carrying {@code urbex:light} that cannot light is refused.
+     * <p>
+     * <b>Asked of a slot and reported at a declaration,</b> which are two different nodes whenever a
+     * trait was inherited. {@code LOAD.021} makes traits a property of the slot because two
+     * alternatives of one marker can differ, so a marker declaring a light over a lantern and a stone
+     * block has a stone slot that is precisely what this rule forbids - and asking only the declaring
+     * node would let it through. The message stays at the declaring node because that is the line the
+     * author wrote; the clause is what makes the sentence true there, by naming the alternative that
+     * cannot light rather than claiming the marker never lights.
+     * <p>
+     * <b>Conditioned on there being a state to ask about,</b> and that is {@code MODEL.042} rather than
+     * caution: a marker naming a cross-mod lamp this installation does not have resolves to no state at
+     * all, and refusing it would refuse a pack working exactly as written on the installs that have the
+     * mod. An unanswerable question is not an answer of "no".
+     *
+     * @param slot         the node whose states are asked about - a leaf, since that is what a slot is
+     * @param declaredAt   the location of the node that wrote the trait ({@code LOAD.050}'s provenance)
+     * @param declaredHere whether {@code slot} is that node, which decides which clause is true
+     */
+    public static void checkEmission(ResolvedNode slot, TraitContext context, String declaredAt,
+                                     boolean declaredHere, Diagnostics diagnostics) {
+        List<BlockState> lit = context.statesOf(slot);
+        if (lit.isEmpty() || lit.stream().anyMatch(Light::emits)) {
+            return;
         }
+        String clause = declaredHere
+                ? "none of the blocks it resolves to emit light"
+                : "the alternative " + named(context, slot) + " it applies to does not emit light";
+        diagnostics.error(Diag.DIAG_023, declaredAt, clause);
+    }
+
+    /** The alternative, as the file wrote it - see {@code TraitContext.writtenBlocks}. */
+    private static String named(TraitContext context, ResolvedNode slot) {
+        List<String> written = context.writtenBlocks(slot);
+        return written.isEmpty() ? "it" : "'" + written.get(0) + "'";
     }
 
     /**

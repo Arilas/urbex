@@ -152,22 +152,37 @@ A partial definition is how a trait is shared without a second mechanism for sha
 }
 ```
 
-> **REF.022** · `MUST NOT` — A trait object may not carry `$ref`. Sharing a trait is done with a
-> partial definition.
+> **REF.022** · `REJECT` (`DIAG.074`) — An [operand](03-pointers.md#2-operands) written on a trait
+> object is refused: a trait's value is data, not a node.
 
 > > **Why** — a `$ref` inside a trait object would be a second way to share the same thing, and the
 > > only case it uniquely serves — one trait value under two different trait ids — is not wanted by
 > > anything in the corpus. A satellite node inside a trait *may* carry `$ref`; it is a node, and
 > > [TRAIT.009](01-traits.md#3-block-valued-fields) already says so.
 
-> > **Where it is enforced** — by [MODEL.004](00-model.md#1-the-file), against the key set
-> > [TRAIT.090](01-traits.md#5-defining-a-trait) makes every registered trait declare. `$ref` is not a
-> > key any trait's schema defines, so it is refused inside a trait object as `DIAG.003` at every level,
-> > exactly as a misspelt key is. This rule carries no diagnostic of its own because it needs none: it
-> > is a statement that the operand set does not reach this level, not a rejection with a remedy of its
-> > own. It was covered by VER.016's blanket scan until traits stopped being opaque; that rule is
-> > retired, and the check that survives it is narrower — it refuses an operand on the trait *object*
-> > and says nothing about a satellite, which may carry one.
+> > **Why a row of its own** — the refusal is reachable from
+> > [MODEL.004](00-model.md#1-the-file) alone, because no trait's declared key set
+> > ([TRAIT.090](01-traits.md#5-defining-a-trait)) contains an operand — but `DIAG.003`'s remedy is
+> > "check the spelling against the schema", which is the wrong advice here. Nothing is misspelt; the
+> > author wanted to share something, and the two ways to do that are to put the reference on a
+> > block-valued field of the trait, or to share the whole trait with a partial definition and `$ref`
+> > that. A rejection whose remedy names neither costs the author the search this specification exists
+> > to remove.
+
+> > **What it replaced** — [VER.016](09-migration.md#tombstones) refused every operand anywhere inside
+> > a `traits` value while a trait payload was opaque. This is the half that was never transitional, and
+> > it is narrower in exactly the way the two rules differ: it refuses an operand on the trait *object*
+> > and says nothing about a satellite, which is a node and may carry one.
+
+```json fixture:REF.022 reject=DIAG.074
+{
+  "version": 2,
+  "$defs": { "rubble": { "block": "minecraft:iron_bars" } },
+  "palette": {
+    "X": { "block": "minecraft:stone_bricks", "traits": { "urbex:damaged": { "$ref": "rubble" } } }
+  }
+}
+```
 
 In the shipped Urbex palettes `damaged` has exactly one distinct value across all sixty uses. A
 single `rubble` definition replaces every one of them.

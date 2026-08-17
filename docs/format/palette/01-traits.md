@@ -208,14 +208,32 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.040** · `MUST` — `urbex:block_entity` supplies the NBT a block entity is initialised with.
 > Its required field is `nbt`.
 
-> **TRAIT.041** · `REJECT` (`DIAG.022`) — `urbex:block_entity` on a node whose block has no block
-> entity is refused.
+> **TRAIT.041** · `REJECT` (`DIAG.022`) — `urbex:block_entity` on a node **none** of whose resolved
+> states has a block entity is refused.
 
 > > **Why** — version 1 accepted it, scanned the block-entity registry for a type accepting the
 > > state, found none, and wrote nothing. The NBT the author supplied simply never appeared.
 
-> **TRAIT.042** · `MUST NOT` — `nbt` may not carry the positional keys `x`, `y`, `z` or the type key
-> `id`; the loader supplies all four.
+> > **Why none rather than any** — a node resolves to as many states as it has alternatives, and a
+> > weighted marker of a chest, a barrel and one decorative block is a real shape. Refusing it because
+> > one of the three cannot hold the NBT is the over-rejection [`ACCEPT`](../README.md#32-classes)
+> > exists as a class to prevent; refusing only when *nothing* can hold it keeps the version 1 silence
+> > closed without inventing a new noise.
+
+> **TRAIT.043** · `ACCEPT` — Where only some of a node's resolved states have a block entity, the `nbt`
+> is written to those that do and the load succeeds.
+
+> **TRAIT.042** · `WARN` (`DIAG.026`) — `nbt` carrying the positional keys `x`, `y`, `z` or the type key
+> `id` is accepted, those keys are dropped, and the drop is reported; the loader supplies all four.
+
+> > **Why it is reported rather than refused, and rather than silent** — the four keys cannot be
+> > honoured, because the loader knows the position and the type and the file does not. Dropping them
+> > silently is the class of failure this format version exists to remove —
+> > [MODEL.004](00-model.md#1-the-file)'s `> Why` measures what silence costs, and *"(no message at
+> > all)"* was version 1's documented symptom. Refusing is the other overcorrection: the pack works, the
+> > block entity is written correctly, and the author has written something redundant rather than
+> > something wrong. That is the middle [DIAG.904](08-errors.md#1-what-a-diagnostic-must-contain)
+> > allows, and the only one it allows.
 
 ```json fixture:TRAIT.041 reject=DIAG.022
 {
@@ -223,6 +241,22 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
   "palette": {
     "X": { "block": "minecraft:stone_bricks",
            "traits": { "urbex:block_entity": { "nbt": { "Items": [] } } } }
+  }
+}
+```
+
+```json fixture:TRAIT.043 accept
+{
+  "version": 2,
+  "palette": {
+    "C": {
+      "kind": "weighted",
+      "traits": { "urbex:block_entity": { "nbt": { "Items": [] } } },
+      "choices": [
+        { "weight": 1, "block": "minecraft:chest[facing=north]" },
+        { "weight": 1, "block": "minecraft:stone_bricks" }
+      ]
+    }
   }
 }
 ```
@@ -235,11 +269,22 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 
 > **TRAIT.051** · `DEFAULT` — An absent `unlit` is air.
 
-> **TRAIT.052** · `REJECT` (`DIAG.023`) — `urbex:light` on a node none of whose resolved states emit
-> light is refused.
+> **TRAIT.052** · `REJECT` (`DIAG.023`) — `urbex:light` is refused on any node that carries it and
+> none of whose resolved states emits light, whether that node declared the trait or inherited it by
+> TRAIT.005.
 
 > > **Why** — the marker would roll a density and then place the same dark block either way, so the
 > > author has marked something optional that can never look different.
+
+> > **Why per slot, and not only where the trait is written** — traits are a property of the slot by
+> > [LOAD.021](07-compilation.md#3-the-compiled-shape), because two alternatives of one marker can
+> > differ. A marker declaring `urbex:light` over choices of a lantern and a stone block passes any
+> > check asked only of the declaring node, and the stone slot is then precisely what this rule forbids:
+> > an optional light that can never look different. The mixed case is already sayable, and TRAIT.005's
+> > own fixture is how — it declares `urbex:damaged` for every choice and adds `urbex:light` only to
+> > the one that lights. Declaring it over a mixed list is an authoring mistake rather than a pattern to
+> > protect. `DIAG.023` still names the node that *declared* the trait, and the alternative that cannot
+> > light, so the author is pointed at the line they wrote rather than at a slot they did not.
 
 > **TRAIT.053** · `REJECT` (`DIAG.024`) — An `unlit` satellite that emits light is refused.
 
@@ -366,8 +411,18 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 Traits are the format's extension point. A mod may register its own.
 
 > **TRAIT.090** · `MUST` — A registered trait declares its id, its schema, which of its fields are
-> [block-valued](#3-block-valued-fields), and which of its fields are references into which
-> registry.
+> [block-valued](#3-block-valued-fields), and which of its fields are references into which registry;
+> registration happens at mod initialisation, into an immutable trait registry the compiler is handed
+> rather than one it fetches.
+
+> > **Why the registry is handed over** — the same reason
+> > [LOAD.003](07-compilation.md#1-the-pipeline) hands the compiler its block registry, and it is
+> > measured: when a registry was fetched from a static reference, "which registry answered depended on
+> > whether the server field was populated yet". A trait registry mutated after initialisation would put
+> > that timing back, and a *mutable* one is what
+> > [LOAD.031](07-compilation.md#4-sharing-and-identity) forbids outright — its `> Why` is two static
+> > pools "unsynchronised while being written from a decoding worker pool, [that] nothing emptied".
+> > Fixed once, handed down, discarded with nothing.
 
 > **TRAIT.091** · `MUST` — A trait id in a namespace no loaded mod registers is refused by
 > TRAIT.003, and the diagnostic names the namespace.

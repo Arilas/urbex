@@ -75,12 +75,13 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | Id | Raised by | Message |
 |---|---|---|
 | `DIAG.020` | [TRAIT.003](01-traits.md#1-the-mechanism) | *`<asset>` marker `'<m>'`: no trait `<id>` is registered`<, and nothing loaded registers the namespace '<ns>'>`. Check the id, or the mod that provides it.* |
-| `DIAG.021` | [TRAIT.021](01-traits.md#42-urbexloot), [TRAIT.031](01-traits.md#43-urbexspawner) | *`<asset>` marker `'<m>'`: `<trait>` names pool `<id>`, which is not a loaded conditions asset. Generation dereferences it, so it must exist.* |
+| `DIAG.021` | [TRAIT.021](01-traits.md#42-urbexloot), [TRAIT.031](01-traits.md#43-urbexspawner) | *`<asset>` marker `'<m>'`: `<trait>`.`<field>` names `<id>`, which is not a loaded `<registry>` asset. Generation dereferences it, so it must exist.* |
 | `DIAG.022` | [TRAIT.041](01-traits.md#44-urbexblock_entity) | *`<asset>` marker `'<m>'`: `<block>` has no block entity, so its `urbex:block_entity` nbt would never be written. Remove the trait, or name a block that has one.* |
-| `DIAG.023` | [TRAIT.052](01-traits.md#45-urbexlight) | *`<asset>` marker `'<m>'`: declares `urbex:light`, but none of the blocks it resolves to emit light. It would roll a density and place the same dark block either way.* |
+| `DIAG.023` | [TRAIT.052](01-traits.md#45-urbexlight) | *`<asset>` marker `'<m>'`: declares `urbex:light`, but `<none of the blocks it resolves to emit light` / `the alternative `<b>` it applies to does not emit light>`. It would roll a density and place the same dark block either way.* |
 | `DIAG.024` | [TRAIT.053](01-traits.md#45-urbexlight) | *`<asset>` marker `'<m>'` `<via>`: an unlit replacement emits light. Name a block that does not, so the marker looks different when the light is off.* |
 
 | `DIAG.025` | [TRAIT.064](01-traits.md#46-urbexoptional) | *`<asset>` marker `'<m>'`: carries both `urbex:light` and `urbex:optional`. A marker rolls one density; `urbex:light` is the lighting one.* |
+| `DIAG.026` | [TRAIT.042](01-traits.md#44-urbexblock_entity) | *`<asset>` marker `'<m>'`: `urbex:block_entity` nbt declares `<keys>`, which the loader supplies and this drops. Remove them; the position and the type are not the file's to choose.* |
 
 ### References and merging
 
@@ -100,6 +101,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.071` | [REF.019](02-references.md#2-where-a-name-resolves) | *`<asset>`: a definitions asset `<declares no `version`` / `declares version `<n>`>`. The `definitions` registry is new in palette format version 2 and has no version 1 form, so an absent `version` is not one; write `"version": 2`.* |
 | `DIAG.072` | [REF.055](03-pointers.md#21-only-and-without) | *`<asset>` marker `'<m>'`: `<operand>` names `<key>`, which is not a key of a node`<, and the closest is `<near>`>`. The keys a filter may name are kind, block, choices, tag, of, floor, wall, ceiling, free and traits.* |
 | `DIAG.073` | [REF.056](03-pointers.md#21-only-and-without) | *`<asset>` marker `'<m>'`: `<operand>` is written with no `$ref`, so there is nothing for it to filter. Remove it, or name the definition whose keys it selects.* |
+| `DIAG.074` | [REF.022](02-references.md#4-partial-definitions) | *`<asset>` marker `'<m>'`: trait `<id>` carries `<operand>`, and a trait's value is data rather than a node. Put the reference on a block-valued field of the trait, or share the whole trait with a partial definition.* |
 
 ### Weights
 

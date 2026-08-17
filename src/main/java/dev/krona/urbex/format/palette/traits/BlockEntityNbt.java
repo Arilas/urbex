@@ -49,11 +49,13 @@ public final class BlockEntityNbt implements TraitType<BlockEntityNbt.Value> {
     /**
      * {@code TRAIT.042}: the keys the loader supplies, which a file may not decide.
      * <p>
-     * <b>Dropped rather than refused, and the rule is why.</b> {@code TRAIT.042} is a {@code MUST NOT}
-     * and cites no diagnostic, so there is no catalogue row to refuse a file with, and inventing one
-     * here would be inventing behaviour. What the rule <em>does</em> state is the positive half - "the
-     * loader supplies all four" - and that is what this enforces: whatever a file writes under these
-     * keys never reaches a block entity, because {@link #initialNbt} does not carry them.
+     * <b>Dropped and reported, which is what {@code TRAIT.042} now is: a {@code WARN}.</b> The four
+     * keys cannot be honoured - the loader knows the position and the type and the file does not - so
+     * refusing would refuse a pack whose block entities are written correctly, and dropping them
+     * without a word is the version 1 behaviour {@code MODEL.004}'s {@code > Why} measures, whose
+     * documented symptom was <em>"(no message at all)"</em>. {@code DIAG.904} allows exactly one level
+     * between those two and this is it: {@link #initialNbt} does not carry them, and {@code DIAG.026}
+     * says so.
      */
     public static final Set<String> LOADER_SUPPLIED_KEYS = Set.of("x", "y", "z", "id");
 
@@ -115,10 +117,28 @@ public final class BlockEntityNbt implements TraitType<BlockEntityNbt.Value> {
         return Map.of();
     }
 
-    /** {@code TRAIT.041}: refuses the trait on a node none of whose states has a block entity. */
+    /**
+     * {@code TRAIT.041} and {@code TRAIT.042}: the refusal, and the warning beside it.
+     * <p>
+     * Both, and in this order, because they are about different things and only one refuses. The
+     * warning fires whatever the block is - a file that writes {@code x} into a chest's NBT has written
+     * something the loader will drop just as squarely as one that writes it into a stone block's.
+     */
     @Override
     public void validate(Value value, ResolvedNode owner, TraitContext context,
                          PointerResolver.Site site, Diagnostics diagnostics) {
+        // TRAIT.042, and the keys are named in the file's own order rather than the set's, so one file
+        // produces one sentence every run.
+        List<String> supplied = value.nbt().keySet().stream()
+                .filter(LOADER_SUPPLIED_KEYS::contains)
+                .sorted()
+                .map(key -> "'" + key + "'")
+                .toList();
+        if (!supplied.isEmpty()) {
+            diagnostics.warn(Diag.DIAG_026, site.location(), String.join(", ", supplied));
+        }
+
+        // TRAIT.041.
         List<BlockState> states = context.statesOf(owner);
         if (states.isEmpty() || states.stream().anyMatch(BlockState::hasBlockEntity)) {
             return;

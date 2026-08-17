@@ -12,6 +12,7 @@ import net.minecraft.resources.Identifier;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -31,12 +32,13 @@ import java.util.Optional;
  *       stage 3 resolves, which retires {@code VER.016}'s blanket refusal of an operand inside a
  *       trait.</li>
  * </ul>
- * <b>{@code REF.022} is enforced by the second of those and not by a check of its own.</b> "A trait
- * object may not carry {@code $ref}": a trait's key set is declared by {@link TraitType#keys()} and no
- * trait declares an operand, so {@code $ref} inside a trait object is a key the specification does not
- * define at that level and is refused as {@code DIAG.003}. That is narrower than {@code VER.016}'s scan
- * in exactly the way the two rules differ - it refuses an operand on the trait <em>object</em> and says
- * nothing about a satellite node, which may carry one and now does.
+ * <b>{@code REF.022} has a check of its own, and it was written before {@code VER.016} was deleted.</b>
+ * An operand on the trait <em>object</em> would fall out of the key check on its own, since no trait's
+ * declared key set contains one - but {@code DIAG.003}'s remedy is "check the spelling against the
+ * schema" and nothing here is misspelt, so the operand is looked for first and refused with
+ * {@code DIAG.074}, whose remedy names the two things the author can actually do. That is narrower than
+ * {@code VER.016}'s scan in exactly the way the two rules differ: it refuses an operand on the trait
+ * object and says nothing about a satellite node, which is a node and may carry one.
  * <p>
  * <b>Why the id goes through {@link DataTools#STRICT_IDENTIFIER_CODEC}.</b> {@code TRAIT.002} requires a
  * namespace; {@code Identifier.CODEC} would resolve a bare {@code "damaged"} against {@code minecraft}
@@ -104,6 +106,15 @@ public record Trait(TraitType<?> type, TraitValue value) {
             return Optional.empty();
         }
         TraitType<?> found = type.orElseThrow();
+        // REF.022, before the key check that would otherwise catch it: an operand on a trait object is
+        // a key no trait's schema defines, so DIAG.003 would fire - and would send the author looking
+        // for a typo they did not make. DIAG.074 names the two remedies instead.
+        Optional<String> operand = operandOn(payload);
+        if (operand.isPresent()) {
+            diagnostics.error(Diag.DIAG_074, Diagnostics.DECODING_LOCATION, "'" + id + "'",
+                    "'" + operand.orElseThrow() + "'");
+            return Optional.empty();
+        }
         // MODEL.004 inside the payload, before it is decoded: a misspelt key holding a value of the
         // wrong type has to be reported as a misspelling rather than as a type error, which is the same
         // reason RawNode checks its keys before decoding its fields.
@@ -120,6 +131,26 @@ public record Trait(TraitType<?> type, TraitValue value) {
         }
         return Optional.of(new Trait(found, decoded.result().orElseThrow()));
     }
+
+    /**
+     * The first operand this trait object writes as a key of its own ({@code REF.022}).
+     * <p>
+     * The <em>object</em> only, and never inside it: a satellite is a node and may carry every one of
+     * these ({@code TRAIT.009}, {@code MODEL.032}). That single level is the whole difference between
+     * this and the retired {@code VER.016}, which scanned the payload to any depth because nothing
+     * could resolve what it found.
+     * <p>
+     * The order is {@code REF.050}'s, so a payload carrying two of them names the same one every run -
+     * the reason {@code RawChoice.OWN_KEYS_IN_ORDER} states, and the reason this is a list.
+     */
+    private static Optional<String> operandOn(Dynamic<?> payload) {
+        return OPERANDS.stream()
+                .filter(operand -> payload.get(operand).result().isPresent())
+                .findFirst();
+    }
+
+    /** The operands {@code REF.050} closes the set of, in the order that rule lists them. */
+    private static final List<String> OPERANDS = List.of("$ref", "$only", "$without", "$spread");
 
     /**
      * Re-encodes a trait map.

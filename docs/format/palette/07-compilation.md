@@ -70,8 +70,15 @@ implementation detail it happens to have.
 
 ## 3. The compiled shape
 
-> **LOAD.020** · `MUST` — A compiled palette maps each marker to a **compiled entry** holding both
-> the block states it may place and the traits that apply to them.
+> **LOAD.020** · `MUST` — A compiled palette maps each marker to a **compiled entry** holding both the
+> block states it may place and the traits that apply to them, with each trait's
+> [block-valued fields](01-traits.md#3-block-valued-fields) compiled alongside.
+
+> > **Why the satellites are compiled here** — a damaged form and an unlit replacement are written at a
+> > position, so leaving either as the block string the file wrote would make the pass that writes it
+> > resolve a block string during generation. That is LOAD.042 broken, and it is the version 1
+> > behaviour LOAD.002's `> Why` records — block strings resolved "against whichever registry a static
+> > server reference happened to point at".
 
 > **LOAD.021** · `MUST` — Traits are per slot, not per marker.
 

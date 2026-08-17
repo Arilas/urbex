@@ -273,23 +273,45 @@ class TraitTest {
      * {@code MODEL.004} inside a trait payload - the one level strict-key rejection did not reach.
      * <p>
      * The rule says "at every level of a version 2 palette file", and while a payload was opaque NBT it
-     * was not every level: {@code {"urbex:damaged": {"inot": "minecraft:iron_bars"}}} decoded cleanly and
-     * the marker was simply never damaged. That is the exact failure {@code MODEL.004}'s {@code > Why}
-     * measures one level up - "three shipped palettes wrote {@code damaged} inside {@code blocks[]}
-     * elements, where nothing read it, for the lifetime of the pack".
-     * <p>
-     * {@code REF.022} is the same check with a different subject and is asserted here for that reason:
-     * an operand on the trait <em>object</em> is a key no trait's schema defines. That is the narrower
-     * enforcement the retired {@code VER.016} used to provide, and writing it before deleting that rule
-     * is what kept the refusal from silently reopening.
+     * was not every level: {@code {"urbex:damaged": {"inot": "minecraft:iron_bars"}}} decoded cleanly
+     * and the marker was simply never damaged. That is the exact failure {@code MODEL.004}'s
+     * {@code > Why} measures one level up - "three shipped palettes wrote {@code damaged} inside
+     * {@code blocks[]} elements, where nothing read it, for the lifetime of the pack".
      */
     @Test
     @Rule("MODEL.004")
-    @Rule("REF.022")
-    void aKeyNoTraitDefinesIsRefusedInsideThePayloadAndSoIsAnOperandOnTheTraitObject() {
+    void aKeyNoTraitDefinesIsRefusedInsideThePayload() {
         for (String payload : List.of(
                 "{ \"inot\": \"minecraft:iron_bars\" }",
-                "{ \"into\": \"minecraft:iron_bars\", \"unlit\": \"minecraft:air\" }",
+                "{ \"into\": \"minecraft:iron_bars\", \"unlit\": \"minecraft:air\" }")) {
+            String message = refusal("""
+                    { "version": 2, "palette": { "X": { "block": "minecraft:stone_bricks",
+                        "traits": { "urbex:damaged": %s } } } }
+                    """.formatted(payload));
+            assertTrue(Diag.DIAG_003.matches(message), () -> payload + ": " + message);
+            assertTrue(message.contains("'urbex:damaged' trait"),
+                    () -> payload + " should be reported against the trait: " + message);
+        }
+    }
+
+    /**
+     * {@code REF.022}: an operand on a trait <em>object</em> is refused, and a satellite may carry one.
+     * <p>
+     * <b>This check existed before {@code VER.016} was deleted,</b> and the order is the whole point.
+     * That rule's blanket scan was the only thing enforcing {@code REF.022}; deleting it first would
+     * have turned a loud refusal into a silent misreading, where a {@code $ref} on a trait object is
+     * neither expanded nor refused.
+     * <p>
+     * <b>Its own row rather than {@code DIAG.003}.</b> The refusal would fall out of the key check on
+     * its own - no trait's declared key set contains an operand - but {@code DIAG.003} says "check the
+     * spelling against the schema" and nothing here is misspelt. So the assertion is on the remedy as
+     * well as on the row: the message has to name the two things the author can do, or it is a
+     * rejection that leaves them searching.
+     */
+    @Test
+    @Rule("REF.022")
+    void anOperandOnATraitObjectIsRefusedWithARemedyAndASatelliteMayCarryOne() {
+        for (String payload : List.of(
                 "{ \"$ref\": \"rubble\" }",
                 "{ \"$ref\": \"rubble\", \"$only\": [\"traits\"] }",
                 "{ \"into\": \"minecraft:iron_bars\", \"$without\": [\"traits\"] }",
@@ -299,13 +321,16 @@ class TraitTest {
                       "palette": { "X": { "block": "minecraft:stone_bricks",
                           "traits": { "urbex:damaged": %s } } } }
                     """.formatted(payload));
-            assertTrue(Diag.DIAG_003.matches(message), () -> payload + ": " + message);
-            assertTrue(message.contains("'urbex:damaged' trait"),
-                    () -> payload + " should be reported against the trait: " + message);
+            assertTrue(Diag.DIAG_074.matches(message), () -> payload + ": " + message);
+            assertTrue(message.contains("'urbex:damaged'"), () -> payload + ": " + message);
+            assertFalse(Diag.DIAG_003.matches(message),
+                    () -> payload + " must not be reported as a misspelling: " + message);
+            assertTrue(message.contains("block-valued field"),
+                    () -> "the remedy is the reason this row exists: " + message);
         }
 
-        // A satellite may carry every one of those operands, because it is a node (TRAIT.009,
-        // MODEL.032). That is the half REF.022 does not reach and VER.016 used to refuse.
+        // A satellite may carry every one of those, because it is a node (TRAIT.009, MODEL.032). That
+        // is the half REF.022 does not reach and VER.016 used to refuse.
         assertEquals("minecraft:iron_bars", block(resolve("""
                 { "version": 2, "$defs": { "rubble": "minecraft:iron_bars" },
                   "palette": { "X": { "block": "minecraft:stone_bricks", "traits": {
@@ -379,16 +404,49 @@ class TraitTest {
     }
 
     /**
-     * {@code TRAIT.042}: the loader supplies {@code x}, {@code y}, {@code z} and {@code id}, so whatever
-     * a file writes under them never reaches a block entity.
+     * {@code TRAIT.042}: the four keys the loader supplies are dropped, and the drop is reported.
      * <p>
-     * The rule is a {@code MUST NOT} citing no diagnostic, so there is no refusal to assert - see this
-     * task's report. What is assertable is the positive half the rule states in the same sentence, and
-     * it is the half that decides what generation writes.
+     * <b>The catalogue's second {@code WARN}, and the three assertions that class asks for.</b>
+     * {@code README.md} §3.2 says a {@code WARN} rule is proved by "feeding the input, asserting the
+     * load succeeds, and asserting the cited {@code DIAG} is recorded at warning level" - and the
+     * reason it is a class rather than a {@code MUST} with a diagnostic bolted on is that a test
+     * checking only one of those halves passes while the other is broken. All three are here, plus the
+     * behaviour the warning is about: the keys really are gone from what the loader would write.
+     * <p>
+     * <b>What makes it worth having as a warning rather than a refusal or a silence.</b> The four keys
+     * cannot be honoured - the loader knows the position and the type and the file does not - so
+     * refusing would refuse a pack whose block entities are written correctly. Dropping them without a
+     * word is the version 1 behaviour {@code MODEL.004} exists to remove, whose documented symptom was
+     * "(no message at all)".
      */
     @Test
     @Rule("TRAIT.042")
-    void theFourPositionalKeysAreDroppedBecauseTheLoaderSuppliesThem() {
+    void theFourPositionalKeysAreDroppedAndTheDropIsReported() {
+        Diagnostics diagnostics = new Diagnostics();
+        Optional<CompiledV2Palette> compiled = CompiledV2Palette.compile(resolve("""
+                { "version": 2, "palette": { "C": { "block": "minecraft:chest[facing=north]",
+                    "traits": { "urbex:block_entity": { "nbt": {
+                        "id": "minecraft:chest", "x": 4, "y": 5, "z": 6,
+                        "LootTable": "urbex:chest" } } } } } }
+                """), installed(), TraitContext.withConditions(BuiltInRegistries.BLOCK, Set.of()),
+                Diagnostics.DECODING_LOCATION, diagnostics);
+
+        // The load succeeds - a warning refuses nothing (DIAG.904).
+        assertTrue(compiled.isPresent(), () -> diagnostics.asError().orElse("?"));
+        assertFalse(diagnostics.hasFatal());
+        assertTrue(diagnostics.asError().isEmpty(),
+                "a warning must not reach the message a decode fails with");
+
+        // And the cited row is recorded, at warning level, naming the keys.
+        List<Diagnostics.Entry> warnings = diagnostics.all().stream()
+                .filter(entry -> entry.level() == Diagnostics.Level.WARN).toList();
+        assertEquals(1, warnings.size(), () -> diagnostics.all().toString());
+        assertEquals(Diag.DIAG_026, warnings.get(0).diag());
+        assertTrue(Diag.DIAG_026.matches(warnings.get(0).message()), warnings.get(0).message());
+        assertTrue(warnings.get(0).message().contains("'id', 'x', 'y', 'z'"),
+                warnings.get(0).message());
+
+        // And the behaviour the warning is about: the loader writes none of them.
         CompoundTag written = new CompoundTag();
         written.putString("id", "minecraft:chest");
         written.putInt("x", 4);
@@ -398,6 +456,33 @@ class TraitTest {
         CompoundTag initial = new BlockEntityNbt.Value(written).initialNbt();
         assertEquals(Set.of("LootTable"), initial.keySet());
         assertEquals(5, written.getIntOr("y", -1), "the value the file wrote is not mutated");
+
+        // A file that writes none of them is not warned about, so the row cannot become noise.
+        Diagnostics quiet = new Diagnostics();
+        CompiledV2Palette.compile(resolve("""
+                { "version": 2, "palette": { "C": { "block": "minecraft:chest[facing=north]",
+                    "traits": { "urbex:block_entity": { "nbt": { "LootTable": "urbex:chest" } } } } } }
+                """), installed(), TraitContext.withConditions(BuiltInRegistries.BLOCK, Set.of()),
+                Diagnostics.DECODING_LOCATION, quiet);
+        assertEquals(List.of(), quiet.all());
+    }
+
+    /**
+     * {@code TRAIT.043}: where only some of a node's states have a block entity, the load succeeds.
+     * <p>
+     * The neighbouring acceptance {@code TRAIT.041} needs to be readable at all. A weighted marker of a
+     * chest and one decorative block is a real shape, the nbt reaches one of the two, and refusing the
+     * marker over the other is the over-rejection {@code ACCEPT} exists as a class to prevent.
+     */
+    @Test
+    @Rule("TRAIT.043")
+    void aNodeWhereOnlySomeStatesHaveABlockEntityLoads() {
+        assertTrue(compiles("""
+                { "version": 2, "palette": { "C": { "kind": "weighted",
+                    "traits": { "urbex:block_entity": { "nbt": { "Items": [] } } },
+                    "choices": [ { "weight": 1, "block": "minecraft:chest[facing=north]" },
+                                 { "weight": 1, "block": "minecraft:stone_bricks" } ] } } }
+                """, Set.of()));
     }
 
     /**
@@ -429,15 +514,55 @@ class TraitTest {
                 "LOAD.051: the message names the field it was reached through: " + lit);
 
         assertTrue(compiles("""
+                { "version": 2, "palette": { "L": { "block": "create:no_such_lamp",
+                    "traits": { "urbex:light": {} } } } }
+                """, Set.of()), "MODEL.042: an absent block is not a block that fails to emit");
+    }
+
+    /**
+     * {@code TRAIT.052} is evaluated per <b>slot</b>, and reported at the node that declared the trait.
+     * <p>
+     * A marker declaring {@code urbex:light} over a lantern and a stone block passes any check asked
+     * only of the declaring node - one of its states emits - and its stone slot is then exactly what
+     * the rule forbids: an optional light that can never look different. {@code LOAD.021} is why the
+     * slot is the unit: two alternatives of one marker can differ, so a per-marker answer cannot
+     * represent them.
+     * <p>
+     * <b>The message is asserted as carefully as the refusal,</b> because the two nodes are different
+     * and only one of them is a line the author wrote. It names the marker, not the choice; it names
+     * the alternative that cannot light; and it does <em>not</em> say "none of the blocks it resolves
+     * to emit light", which would be false of a marker whose lantern lights. That is the seventh time
+     * this stack has had to check that a diagnostic derived from a value is true of the value.
+     * <p>
+     * The mixed case is already sayable and {@code TRAIT.005}'s own fixture is how - the trait goes on
+     * the choice that lights, not on the list - so the second half asserts that the correct spelling
+     * compiles.
+     */
+    @Test
+    @Rule("TRAIT.052")
+    @Rule("LOAD.021")
+    void aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight() {
+        String message = compileRefusal("""
                 { "version": 2, "palette": { "L": { "kind": "weighted",
                     "traits": { "urbex:light": {} },
                     "choices": [ { "weight": 1, "block": "minecraft:lantern" },
                                  { "weight": 1, "block": "minecraft:stone" } ] } } }
-                """, Set.of()), "one emitting alternative makes the marker an optional light");
+                """);
+        assertTrue(Diag.DIAG_023.matches(message), message);
+        assertTrue(message.contains("the alternative 'minecraft:stone'"),
+                () -> "the message names the alternative that cannot light: " + message);
+        assertFalse(message.contains("choice 1"),
+                () -> "and reports it at the node that declared the trait: " + message);
+        assertFalse(message.contains("none of the blocks"),
+                () -> "the marker does resolve to a block that lights: " + message);
+
+        // TRAIT.005's own spelling of the same intent: the trait goes on the choice that lights.
         assertTrue(compiles("""
-                { "version": 2, "palette": { "L": { "block": "create:no_such_lamp",
-                    "traits": { "urbex:light": {} } } } }
-                """, Set.of()), "MODEL.042: an absent block is not a block that fails to emit");
+                { "version": 2, "palette": { "L": { "kind": "weighted", "choices": [
+                    { "weight": 1, "block": "minecraft:lantern",
+                      "traits": { "urbex:light": {} } },
+                    { "weight": 1, "block": "minecraft:stone" } ] } } }
+                """, Set.of()));
     }
 
     /**

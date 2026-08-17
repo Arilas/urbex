@@ -79,6 +79,20 @@ public final class Diagnostics {
     }
 
     /**
+     * {@link #errorAlreadyFormatted}'s counterpart at warning level.
+     * <p>
+     * For a collector that is folding another collector's entries into itself, which is what a trait's
+     * validation produces: a trait is handed a collector of its own so that the caller can tell whether
+     * it refused anything, and the entries are then copied across at the level they were recorded at.
+     * Copying a warning through {@link #warn} would re-format a finished message against its own
+     * template, which throws for any row whose arity is not one - the same trap
+     * {@link #errorAlreadyFormatted}'s javadoc describes from the other side.
+     */
+    public void warnAlreadyFormatted(Diag diag, String message) {
+        entries.add(new Entry(diag, Level.WARN, message));
+    }
+
+    /**
      * Records a failure that is not a catalogue row.
      * <p>
      * Two kinds reach here. One is a message a nested codec already produced, which may itself be a
