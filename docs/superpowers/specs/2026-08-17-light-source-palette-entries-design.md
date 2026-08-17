@@ -51,7 +51,7 @@ object:
 {
   "char": "E",
   "block": "minecraft:lantern[hanging=true]",
-  "lightSource": { "unlit": "minecraft:chain[axis=y]" }
+  "lightSource": { "unlit": "minecraft:iron_chain[axis=y]" }
 }
 ```
 
@@ -234,7 +234,7 @@ behaviour changes, and they are reported as such.
 
 | Char | Lit | Unlit |
 |---|---|---|
-| `E` | `lantern[hanging=true]` / `soul_lantern[hanging=true]` | `chain[axis=y]` |
+| `E` | `lantern[hanging=true]` / `soul_lantern[hanging=true]` | `iron_chain[axis=y]` |
 | `e` | `lantern[hanging=false]` / `soul_lantern[hanging=false]` | air |
 
 The hanging pair keeps its chain so a dark street still reads as a street with lamps on it, rather
