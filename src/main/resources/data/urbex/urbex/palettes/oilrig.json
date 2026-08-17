@@ -22,7 +22,10 @@
     },
     {
       "char": "J",
-      "block": "minecraft:sea_lantern"
+      "block": "minecraft:sea_lantern",
+      "lightSource": {
+        "unlit": "minecraft:prismarine_bricks"
+      }
     },
     {
       "char": "P",
@@ -130,7 +133,10 @@
     },
     {
       "char": "|",
-      "block": "minecraft:redstone_wall_torch[facing=east,lit=true]"
+      "block": "minecraft:redstone_wall_torch[facing=east,lit=true]",
+      "lightSource": {
+        "unlit": "minecraft:redstone_wall_torch[facing=east,lit=false]"
+      }
     },
     {
       "char": "w",

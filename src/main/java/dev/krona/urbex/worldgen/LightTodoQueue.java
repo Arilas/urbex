@@ -1,9 +1,8 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
+import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
 import net.minecraft.core.BlockPos;
 
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,7 +16,7 @@ import java.util.List;
  */
 final class LightTodoQueue {
 
-    record Todo(BlockPos pos, @Nullable LightPool pool) { }
+    record Todo(BlockPos pos, LightSource source, boolean lit) { }
 
     private final int ownerChunkX;
     private final int ownerChunkZ;
@@ -29,7 +28,7 @@ final class LightTodoQueue {
         this.ownerChunkZ = ownerChunkZ;
     }
 
-    synchronized void add(BlockPos pos, @Nullable LightPool pool) {
+    synchronized void add(BlockPos pos, LightSource source, boolean lit) {
         if (closed) {
             throw new IllegalStateException("Cannot admit a light marker after the generation queue was drained");
         }
@@ -37,7 +36,7 @@ final class LightTodoQueue {
             throw new IllegalArgumentException("Light marker " + pos + " does not belong to owner chunk "
                     + ownerChunkX + "," + ownerChunkZ);
         }
-        pending.add(new Todo(pos, pool));
+        pending.add(new Todo(pos, source, lit));
     }
 
     synchronized List<Todo> closeAndDrain() {

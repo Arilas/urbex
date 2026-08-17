@@ -5,7 +5,7 @@ import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
-import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
+import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.util.RandomSource;
@@ -90,11 +90,11 @@ public final class ChunkGenContext {
         this.lightTodo = new LightTodoQueue(coord.chunkX(), coord.chunkZ());
     }
 
-    void addLightTodo(BlockPos pos, @Nullable LightPool pool) {
+    void addLightTodo(BlockPos pos, LightSource source, boolean lit) {
         if (!window.contains(pos)) {
             return;
         }
-        lightTodo.add(pos, pool);
+        lightTodo.add(pos, source, lit);
     }
 
     List<LightTodoQueue.Todo> drainLightTodo() {

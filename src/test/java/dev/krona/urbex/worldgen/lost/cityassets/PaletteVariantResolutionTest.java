@@ -102,7 +102,7 @@ class PaletteVariantResolutionTest {
     private static PaletteDefinition paletteNamingVariant() {
         PaletteEntry entry = new PaletteEntry("V", Optional.empty(), Optional.of("urbex:rubble"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
         return new PaletteDefinition(Optional.empty(), Optional.of(List.of(entry)));
     }
 

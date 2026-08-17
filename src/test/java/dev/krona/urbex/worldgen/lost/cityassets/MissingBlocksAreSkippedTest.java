@@ -163,24 +163,24 @@ class MissingBlocksAreSkippedTest {
     private static PaletteEntry single(char marker, String block) {
         return new PaletteEntry(Character.toString(marker), Optional.of(block),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private static PaletteEntry damaged(char marker, String block, String damagedBlock) {
         return new PaletteEntry(Character.toString(marker), Optional.of(block),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(damagedBlock),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private static PaletteEntry weighted(char marker, BlockEntry... blocks) {
         return new PaletteEntry(Character.toString(marker), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(List.of(blocks)), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private static PaletteEntry namingVariant(char marker, String variant) {
         return new PaletteEntry(Character.toString(marker), Optional.empty(),
                 Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 }

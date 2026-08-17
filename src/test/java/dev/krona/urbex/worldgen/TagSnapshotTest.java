@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <strong>Not membership.</strong> Block tags are bound by the server's tag manager, so nothing is
  * in any tag without a running server and every snapshot built here is empty. What the tags actually
  * contain is pinned by the digest runs, which generate against a real dedicated server: if
- * {@code urbex:lights}, {@code urbex:needspoi} or a {@code rotatable} tag stopped reaching
+ * {@code urbex:needspoi}, {@code urbex:foliage} or a {@code rotatable} tag stopped reaching
  * generation, the digest would move.
  * <p>
  * What is worth testing here is the coupling that is easy to get wrong instead. {@code rotatable} is

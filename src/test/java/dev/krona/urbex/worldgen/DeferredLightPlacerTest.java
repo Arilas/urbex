@@ -1,8 +1,10 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.varia.DensitySelector;
+import dev.krona.urbex.worldgen.lost.cityassets.BlockChoice;
 import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
-import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
+import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
+import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -39,23 +41,51 @@ class DeferredLightPlacerTest {
     }
 
     @Test
-    void alternateContextQueuePlansTypedAndLegacyMarkers() {
-        LightPool typed = pool(List.of(), List.of(), List.of(),
-                List.of(entry(1, "minecraft:glowstone")));
-        BlockPos typedPos = pos(1, 70, 1);
-        BlockPos legacyPos = pos(2, 70, 1);
-        Map<BlockPos, BlockState> surroundings = Map.of(
-                legacyPos.below(), Blocks.STONE.defaultBlockState());
+    void alternateContextQueuePlansEveryQueuedMarker() {
+        LightSource free = source(pool(List.of(), List.of(), List.of(),
+                List.of(entry(1, "minecraft:glowstone"))));
+        BlockPos first = pos(1, 70, 1);
+        BlockPos second = pos(2, 70, 1);
         LightTodoQueue queue = new LightTodoQueue(OWNER_X, OWNER_Z);
-        queue.add(typedPos, typed);
-        queue.add(legacyPos, null);
+        queue.add(first, free, true);
+        queue.add(second, free, true);
 
         List<DeferredLightPlacer.Planned> planned = plan(
-                queue.closeAndDrain(), surroundings::getOrDefault);
+                queue.closeAndDrain(), (candidate, fallback) -> fallback);
 
         assertEquals(List.of(
-                new DeferredLightPlacer.Planned(typedPos, Blocks.GLOWSTONE.defaultBlockState()),
-                new DeferredLightPlacer.Planned(legacyPos, Blocks.TORCH.defaultBlockState())), planned);
+                new DeferredLightPlacer.Planned(first, Blocks.GLOWSTONE.defaultBlockState()),
+                new DeferredLightPlacer.Planned(second, Blocks.GLOWSTONE.defaultBlockState())), planned);
+    }
+
+    @Test
+    void aSocketWithNowhereToHangItPlansItsReplacement() {
+        LightSource lantern = new LightSource(wallPool(),
+                BlockChoice.of(Blocks.IRON_CHAIN.defaultBlockState()));
+        BlockPos marker = pos(5, 70, 5);
+
+        List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
+                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, lantern, true)),
+                candidate -> Blocks.AIR.defaultBlockState(),
+                (unusedMarker, supportDirection, stateAt) -> false,
+                (unusedMarker, attempt, stateAt) -> true);
+
+        assertEquals(List.of(new DeferredLightPlacer.Planned(marker, Blocks.IRON_CHAIN.defaultBlockState())),
+                planned);
+    }
+
+    @Test
+    void aSocketWithNowhereToHangItAndNoReplacementPlansNothing() {
+        LightSource bare = source(wallPool());
+        BlockPos marker = pos(5, 70, 5);
+
+        List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
+                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, bare, true)),
+                candidate -> Blocks.AIR.defaultBlockState(),
+                (unusedMarker, supportDirection, stateAt) -> false,
+                (unusedMarker, attempt, stateAt) -> true);
+
+        assertTrue(planned.isEmpty());
     }
 
     @Test
@@ -69,8 +99,8 @@ class DeferredLightPlacerTest {
                 eastBorder.west(), Blocks.STONE.defaultBlockState(),
                 eastBorder.east(), Blocks.STONE.defaultBlockState());
         List<LightTodoQueue.Todo> todos = List.of(
-                new LightTodoQueue.Todo(westBorder, wall),
-                new LightTodoQueue.Todo(eastBorder, wall));
+                new LightTodoQueue.Todo(westBorder, source(wall), true),
+                new LightTodoQueue.Todo(eastBorder, source(wall), true));
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
                 OWNER_X, OWNER_Z, 19L, todos,
@@ -101,8 +131,8 @@ class DeferredLightPlacerTest {
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
                 OWNER_X, OWNER_Z, 19L,
-                List.of(new LightTodoQueue.Todo(westBorder, wall),
-                        new LightTodoQueue.Todo(eastBorder, wall)),
+                List.of(new LightTodoQueue.Todo(westBorder, source(wall), true),
+                        new LightTodoQueue.Todo(eastBorder, source(wall), true)),
                 candidate -> surroundings.getOrDefault(candidate, Blocks.AIR.defaultBlockState()),
                 (marker, supportDirection, stateAt) ->
                         !stateAt.apply(marker.relative(supportDirection)).isAir(),
@@ -119,8 +149,8 @@ class DeferredLightPlacerTest {
                 List.of(entry(1, "minecraft:glowstone")));
         LightPool wall = wallPool();
         List<LightTodoQueue.Todo> forward = List.of(
-                new LightTodoQueue.Todo(freeMarker, free),
-                new LightTodoQueue.Todo(wallMarker, wall));
+                new LightTodoQueue.Todo(freeMarker, source(free), true),
+                new LightTodoQueue.Todo(wallMarker, source(wall), true));
         List<LightTodoQueue.Todo> reverse = new ArrayList<>(forward);
         Collections.reverse(reverse);
         Function<BlockPos, BlockState> overwrittenMarkerState = candidate ->
@@ -149,7 +179,7 @@ class DeferredLightPlacerTest {
                 entry(1, "minecraft:sea_lantern")));
         List<LightTodoQueue.Todo> all = IntStream.range(0, 64)
                 .mapToObj(y -> new BlockPos((OWNER_X << 4) + 7, y, (OWNER_Z << 4) + 7))
-                .map(marker -> new LightTodoQueue.Todo(marker, free))
+                .map(marker -> new LightTodoQueue.Todo(marker, source(free), true))
                 .toList();
         List<LightTodoQueue.Todo> low = all.stream()
                 .filter(todo -> DensitySelector.lighting(seed, todo.pos(), 0.25f))
@@ -186,21 +216,26 @@ class DeferredLightPlacerTest {
         return result;
     }
 
+    /** A socket with no replacement: what an entry that names no {@code unlit} compiles to. */
+    private static LightSource source(LightPool pool) {
+        return new LightSource(pool, BlockChoice.AIR);
+    }
+
     private static LightPool wallPool() {
         return pool(List.of(),
                 List.of(entry(1, "minecraft:wall_torch[facing=north]")),
                 List.of(), List.of());
     }
 
-    private static LightPool pool(List<LightSettings.Entry> floor,
-                                  List<LightSettings.Entry> wall,
-                                  List<LightSettings.Entry> ceiling,
-                                  List<LightSettings.Entry> free) {
-        return LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', new LightSettings(floor, wall, ceiling, free));
+    private static LightPool pool(List<LightSourceSettings.Entry> floor,
+                                  List<LightSourceSettings.Entry> wall,
+                                  List<LightSourceSettings.Entry> ceiling,
+                                  List<LightSourceSettings.Entry> free) {
+        return LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', new LightSourceSettings(floor, wall, ceiling, free, null, null));
     }
 
-    private static LightSettings.Entry entry(int weight, String block) {
-        return new LightSettings.Entry(weight, block);
+    private static LightSourceSettings.Entry entry(int weight, String block) {
+        return new LightSourceSettings.Entry(weight, block);
     }
 
     private static BlockPos pos(int localX, int y, int localZ) {

@@ -8,6 +8,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 public final class OptionalLightPlacer {
 
@@ -43,16 +44,44 @@ public final class OptionalLightPlacer {
 
     public static Optional<Attempt> select(LightPool pool, RandomSource random,
                                            OpportunitySupport support, Survival survival) {
+        return select(pool, random, support, survival, LightPool.Candidate::state, true);
+    }
+
+    /**
+     * The first candidate that fits, in opportunity order, with its state read through
+     * {@code stateOf}.
+     *
+     * <p>Off, the same search runs over the same stream with {@code stateOf} reading each
+     * candidate's replacement instead of its light. That is what keeps a fixture in one place: the
+     * marker that would hold a lit wall torch holds that torch's unlit form, and raising lighting
+     * density lights the fixture that was already standing there rather than moving it.</p>
+     *
+     * <p>The one asymmetry is {@code fallThrough}. Lit, a candidate the world will not accept hands
+     * over to the next one in the list - a light is worth another try. Unlit, the first drawn
+     * candidate is the answer even when its replacement is air, because falling through would put
+     * <em>another</em> candidate's replacement at a position that candidate never won.</p>
+     */
+    public static Optional<Attempt> select(LightPool pool, RandomSource random,
+                                           OpportunitySupport support, Survival survival,
+                                           Function<LightPool.Candidate, BlockState> stateOf,
+                                           boolean fallThrough) {
         for (Opportunity opportunity : OPPORTUNITIES) {
             if (!pool.hasCandidates(opportunity.placement())
                     || !support.isPresent(opportunity.placement(), opportunity.supportDirection())) {
                 continue;
             }
             for (LightPool.Candidate candidate : pool.weightedOrder(opportunity.placement(), random)) {
-                BlockState state = orient(candidate.state(), opportunity.supportDirection());
+                BlockState chosen = stateOf.apply(candidate);
+                if (chosen == null || chosen.isAir()) {
+                    return Optional.empty();
+                }
+                BlockState state = orient(chosen, opportunity.supportDirection());
                 Attempt attempt = new Attempt(state, opportunity.placement(), opportunity.supportDirection());
                 if (survival.canPlace(attempt)) {
                     return Optional.of(attempt);
+                }
+                if (!fallThrough) {
+                    return Optional.empty();
                 }
             }
         }

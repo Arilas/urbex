@@ -180,16 +180,16 @@ class RngTest {
             968677072947688043L, 7783050954197339180L, 5127804395627648118L, -7549811660803165866L
     };
 
-    private static final Rng.Purpose LAST_PURPOSE = Rng.Purpose.SPAWNER_DENSITY;
+    private static final Rng.Purpose LAST_PURPOSE = Rng.Purpose.LIGHTING_UNLIT;
 
-    // Regenerated when SPAWNER_DENSITY was appended and became the last purpose. WORLD_STYLE's own
-    // stream is unchanged - the constant went after it, so no ordinal that existed before moved and
-    // no world that ever generated draws differently.
+    // Regenerated when LIGHTING_UNLIT was appended and became the last purpose. SPAWNER_DENSITY's
+    // own stream is unchanged - the constant went after it, so no ordinal that existed before moved
+    // and no world that ever generated draws differently.
     private static final long[] GOLDEN_LAST = {
-            7323855892107149811L, -1773399582171714355L, 7530877591947830040L, 2715313787682340918L
+            7558796984515213366L, -4942667091505927747L, 7332033667757005157L, 8579002919567590727L
     };
 
-    private static final int PURPOSE_COUNT = 43;
+    private static final int PURPOSE_COUNT = 44;
 
     private static final String PURPOSE_ORDER =
             "BUILDING,MULTI,PARTS,RUINS,RUBBLE,LEAVES,DEBRIS,STUFF,SPAWNERS,LOOT,VEGETATION,"
@@ -199,5 +199,5 @@ class RngTest {
                     + "TERRAIN_FIX_UPPER,CITY_STYLE_LOCAL,VEGETATION_GROWTH,BUILDING_FLOORS,BUILDING_LAYOUT,"
                     + "VEGETATION_XMAX,VEGETATION_ZMIN,VEGETATION_ZMAX,EXPLOSION_ACCEPT,EXPLOSION_MINI_ACCEPT,"
                     + "LIGHTING_DENSITY,LIGHTING_VARIANT,LOOT_DENSITY,"
-                    + "LARGE_BRIDGE,WORLD_STYLE,SPAWNER_DENSITY";
+                    + "LARGE_BRIDGE,WORLD_STYLE,SPAWNER_DENSITY,LIGHTING_UNLIT";
 }

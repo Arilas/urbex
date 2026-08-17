@@ -1,12 +1,11 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.varia.Tools;
-import dev.krona.urbex.worldgen.lost.regassets.data.LightSettings;
+import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
@@ -23,7 +22,12 @@ public final class LightPool {
 
     public enum Placement { FLOOR, WALL, CEILING, FREE }
 
-    public record Candidate(int weight, BlockState state) { }
+    /**
+     * One compiled candidate: the lit state, and the state that stands in its place when this
+     * socket's light is off. {@code unlit} is null when the candidate names none, in which case the
+     * source's own replacement is used.
+     */
+    public record Candidate(int weight, BlockState state, @Nullable BlockState unlit) { }
 
     private final Map<Placement, List<Candidate>> candidates;
     private final Map<Placement, Integer> totalWeights;
@@ -57,7 +61,7 @@ public final class LightPool {
      */
     @Nullable
     public static LightPool compile(HolderLookup<Block> blockLookup, Identifier paletteId, char marker,
-                                    LightSettings settings) {
+                                    LightSourceSettings settings) {
         EnumMap<Placement, List<Candidate>> candidates = new EnumMap<>(Placement.class);
         EnumMap<Placement, Integer> totalWeights = new EnumMap<>(Placement.class);
         boolean[] dropped = new boolean[1];
@@ -72,20 +76,6 @@ public final class LightPool {
             throw new IllegalArgumentException("Invalid light pool in palette '" + paletteId + "', marker '" + marker
                     + "': expected at least one candidate in floor, wall, ceiling, or free");
         }
-        return new LightPool(candidates, totalWeights);
-    }
-
-    public static LightPool legacyTorch() {
-        EnumMap<Placement, List<Candidate>> candidates = new EnumMap<>(Placement.class);
-        EnumMap<Placement, Integer> totalWeights = new EnumMap<>(Placement.class);
-        candidates.put(Placement.FLOOR, List.of(new Candidate(1, Blocks.TORCH.defaultBlockState())));
-        candidates.put(Placement.WALL, List.of(new Candidate(1, Blocks.WALL_TORCH.defaultBlockState())));
-        candidates.put(Placement.CEILING, List.of());
-        candidates.put(Placement.FREE, List.of());
-        totalWeights.put(Placement.FLOOR, 1);
-        totalWeights.put(Placement.WALL, 1);
-        totalWeights.put(Placement.CEILING, 0);
-        totalWeights.put(Placement.FREE, 0);
         return new LightPool(candidates, totalWeights);
     }
 
@@ -125,14 +115,14 @@ public final class LightPool {
 
     private static void compileGroup(HolderLookup<Block> blockLookup, Identifier paletteId,
                                      char marker, Placement placement,
-                                     List<LightSettings.Entry> entries,
+                                     List<LightSourceSettings.Entry> entries,
                                      Map<Placement, List<Candidate>> candidates,
                                      Map<Placement, Integer> totalWeights,
                                      boolean[] dropped) {
         List<Candidate> compiled = new ArrayList<>(entries.size());
         int totalWeight = 0;
         for (int candidateIndex = 0; candidateIndex < entries.size(); candidateIndex++) {
-            LightSettings.Entry entry = entries.get(candidateIndex);
+            LightSourceSettings.Entry entry = entries.get(candidateIndex);
             if (entry.weight() <= 0) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "weight must be positive", null);
@@ -158,13 +148,32 @@ public final class LightPool {
                         "block state emits no light", null);
             }
             validatePlacement(paletteId, marker, placement, candidateIndex, entry.block(), state);
+            // Dropped like any other absent block (issue #91): the candidate keeps its lit state and
+            // falls back to the source's own replacement, rather than the whole candidate vanishing
+            // because a mod that supplied only its unlit form is not installed.
+            BlockState unlit = null;
+            if (entry.unlit() != null) {
+                try {
+                    unlit = Tools.resolveState(entry.unlit(), blockLookup, paletteId);
+                } catch (RuntimeException e) {
+                    throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.unlit(),
+                            "cannot parse block state", e);
+                }
+                if (unlit != null && unlit.getLightEmission() > 0) {
+                    throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.unlit(),
+                            "an unlit replacement must emit no light", null);
+                }
+                if (unlit != null) {
+                    validatePlacement(paletteId, marker, placement, candidateIndex, entry.unlit(), unlit);
+                }
+            }
             try {
                 totalWeight = Math.addExact(totalWeight, entry.weight());
             } catch (ArithmeticException e) {
                 throw invalidCandidate(paletteId, marker, placement, candidateIndex, entry.block(),
                         "total weight exceeds integer range", e);
             }
-            compiled.add(new Candidate(entry.weight(), state));
+            compiled.add(new Candidate(entry.weight(), state, unlit));
         }
         candidates.put(placement, List.copyOf(compiled));
         totalWeights.put(placement, totalWeight);

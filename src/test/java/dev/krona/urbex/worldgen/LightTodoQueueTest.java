@@ -19,13 +19,13 @@ class LightTodoQueueTest {
     void closeAndDrainRejectsLateEnqueueInsteadOfSilentlyDroppingIt() {
         LightTodoQueue queue = new LightTodoQueue(3, -2);
         BlockPos admitted = new BlockPos(49, 70, -31);
-        queue.add(admitted, null);
+        queue.add(admitted, null, true);
 
         List<LightTodoQueue.Todo> drained = queue.closeAndDrain();
 
-        assertEquals(List.of(new LightTodoQueue.Todo(admitted, null)), drained);
+        assertEquals(List.of(new LightTodoQueue.Todo(admitted, null, true)), drained);
         assertThrows(IllegalStateException.class,
-                () -> queue.add(new BlockPos(50, 70, -31), null));
+                () -> queue.add(new BlockPos(50, 70, -31), null, true));
     }
 
     @Test
@@ -38,7 +38,7 @@ class LightTodoQueueTest {
                 Future<Boolean> enqueue = executor.submit(() -> {
                     start.await();
                     try {
-                        queue.add(marker, null);
+                        queue.add(marker, null, true);
                         return true;
                     } catch (IllegalStateException e) {
                         return false;
@@ -52,7 +52,7 @@ class LightTodoQueueTest {
                 boolean accepted = enqueue.get();
                 List<LightTodoQueue.Todo> drained = drain.get();
                 if (accepted) {
-                    assertEquals(List.of(new LightTodoQueue.Todo(marker, null)), drained);
+                    assertEquals(List.of(new LightTodoQueue.Todo(marker, null, true)), drained);
                 } else {
                     assertTrue(drained.isEmpty());
                 }
@@ -65,6 +65,6 @@ class LightTodoQueueTest {
         LightTodoQueue queue = new LightTodoQueue(3, -2);
 
         assertThrows(IllegalArgumentException.class,
-                () -> queue.add(new BlockPos(64, 70, -31), null));
+                () -> queue.add(new BlockPos(64, 70, -31), null, true));
     }
 }

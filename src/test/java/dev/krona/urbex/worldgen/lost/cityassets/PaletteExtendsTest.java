@@ -107,12 +107,12 @@ class PaletteExtendsTest {
     private static PaletteEntry entry(char marker, String block) {
         return new PaletteEntry(Character.toString(marker), Optional.of(block),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     private static PaletteEntry damagedEntry(char marker, String block, String damaged) {
         return new PaletteEntry(Character.toString(marker), Optional.of(block),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(damaged),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 }

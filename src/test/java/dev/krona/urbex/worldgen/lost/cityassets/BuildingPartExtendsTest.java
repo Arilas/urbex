@@ -203,7 +203,8 @@ class BuildingPartExtendsTest {
     private static PaletteEntry entry(char marker, String block) {
         return new PaletteEntry(Character.toString(marker), Optional.of(block),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty());
     }
 
     private static PartMeta meta(String key) {

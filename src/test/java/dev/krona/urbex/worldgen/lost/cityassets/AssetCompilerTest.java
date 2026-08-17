@@ -256,7 +256,8 @@ class AssetCompilerTest {
     private static Entry<PaletteDefinition> paletteNamingVariant(String path, char marker, String variant) {
         PaletteEntry entry = new PaletteEntry(Character.toString(marker), Optional.empty(),
                 Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty());
         return new Entry<>(CustomRegistries.PALETTE_REGISTRY_KEY, id(path),
                 new PaletteDefinition(Optional.empty(), Optional.of(List.of(entry))));
     }

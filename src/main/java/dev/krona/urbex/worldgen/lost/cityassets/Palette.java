@@ -4,6 +4,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
+import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -149,17 +150,26 @@ public class Palette {
             // did not make (issue #91).
             BlockState dmg = entry.getDamaged() == null ? null
                     : Tools.resolveState(entry.getDamaged(), blockLookup, name);
+            rejectRemovedLightSpellings(entry, c);
+            LightSourceSettings settings = entry.getLightSource();
             // Also null when every candidate in the pool named an absent block; see
-            // LightPool.compile. An authored-empty pool is still a load error.
-            LightPool light = entry.getLight() == null ? null
-                    : LightPool.compile(blockLookup, name, c, entry.getLight());
-            Info info = new Info(entry.getMob(), entry.getLoot(),
-                    entry.getTorch() != null && entry.getTorch(), light, entry.getTag());
+            // LightPool.compile. An authored-empty pool is still a load error, and an in-place
+            // source has no pool at all - its own block is the light.
+            LightPool light = settings == null || !settings.isSocket() ? null
+                    : LightPool.compile(blockLookup, name, c, settings);
+            LightSource lightSource = settings == null ? null
+                    : new LightSource(light, compileUnlit(blockLookup, settings, c));
+            Info info = new Info(entry.getMob(), entry.getLoot(), lightSource, entry.getTag());
+            // What the character resolves to, for the in-place emission check below. Empty for a
+            // socket, which has no block of its own, and for 'frompalette', whose target is only
+            // known once CompiledPalette has resolved the character it names.
+            List<BlockState> resolved = new ArrayList<>();
 
             if (entry.getBlock() != null) {
                 String block = entry.getBlock();
                 BlockState state = Tools.stringToState(block, blockLookup, name);
                 palette.put(c, new PE(state, info));
+                resolved.add(state);
                 if (dmg != null) {
                     damaged.put(state, dmg);
                 }
@@ -178,8 +188,9 @@ public class Palette {
                 }
                 Variant variant = variants.getOrThrow(variantName);
                 List<Pair<Integer, BlockState>> blocks = variant.getBlocks();
-                if (dmg != null) {
-                    for (Pair<Integer, BlockState> pair : blocks) {
+                for (Pair<Integer, BlockState> pair : blocks) {
+                    resolved.add(pair.getRight());
+                    if (dmg != null) {
                         damaged.put(pair.getRight(), dmg);
                     }
                 }
@@ -202,6 +213,7 @@ public class Palette {
                         continue;
                     }
                     blocks.add(Pair.of(f, state));
+                    resolved.add(state);
                     if (dmg != null) {
                         damaged.put(state, dmg);
                     }
@@ -209,16 +221,110 @@ public class Palette {
                 addMappingViaState(c, blocks, info);
             } else if (light != null) {
                 palette.put(c, new PE(light.representative(), info));
-            } else if (entry.getLight() != null) {
-                // A light-only entry whose whole pool named absent blocks. The marker still has to
-                // map to something - a character with no entry at all throws from the driver, which
-                // is the crash issue #91 is removing - and air is what a light that cannot be placed
-                // leaves behind anyway.
+            } else if (settings != null && settings.isSocket()) {
+                // A socket whose whole pool named absent blocks. The marker still has to map to
+                // something - a character with no entry at all throws from the driver, which is the
+                // crash issue #91 is removing - and its replacement is what it will write anyway.
                 palette.put(c, new PE(Blocks.AIR.defaultBlockState(), info));
+            } else if (settings != null) {
+                // A light source that names nothing to place. Both spellings reach here: an object
+                // whose four placement lists are all empty, and a bare "lightSource": true on an
+                // entry with no block of its own. Neither has an interpretation - there is no state
+                // to light the marker with - and the generic "Illegal palette" this used to raise
+                // named the file but not which of its characters, nor what was missing from it.
+                throw new IllegalArgumentException("Palette '" + name + "' entry '" + c + "' declares "
+                        + "'lightSource' but names nothing to place. Give the entry a block, blocks, "
+                        + "variant or frompalette to light, or give the light source at least one "
+                        + "candidate in floor, wall, ceiling, or free.");
             } else {
                 throw new RuntimeException("Illegal palette " + name + "!");
             }
+
+            if (settings != null && !settings.isSocket()) {
+                requireEmittingInPlaceSource(resolved, c);
+            }
         }
+    }
+
+    /**
+     * Refuses the two spellings {@code lightSource} replaced, by name.
+     * <p>
+     * Both used to mean "this marker is optional decoration": {@code torch: true} placed a vanilla
+     * torch and {@code light} a typed pool. Neither could be said about an ordinary block entry, so
+     * every light a pack authored as a plain block - ModernTweaks' lanterns, most of its lighting -
+     * ignored lighting density entirely. Dropping the keys from the codec instead would make them
+     * unknown keys, which a palette silently ignores: the pack would load, place a permanent torch,
+     * and say nothing.
+     */
+    private void rejectRemovedLightSpellings(PaletteEntry entry, char c) {
+        if (entry.isLegacyTorch()) {
+            throw new IllegalArgumentException("Palette '" + name + "' entry '" + c + "' declares "
+                    + "'torch', which no longer exists. Write \"lightSource\" instead: either "
+                    + "\"lightSource\": true to make this entry's own block an optional light, or a "
+                    + "\"lightSource\" object with floor/wall/ceiling/free candidates to let Urbex "
+                    + "pick and orient one.");
+        }
+        if (entry.isLegacyLight()) {
+            throw new IllegalArgumentException("Palette '" + name + "' entry '" + c + "' declares "
+                    + "'light', which was renamed. Write the same object under \"lightSource\", and "
+                    + "add \"unlit\" to it if this marker should leave something behind when the "
+                    + "light is off.");
+        }
+    }
+
+    /**
+     * A {@code lightSource} on an entry whose blocks emit nothing is a load error.
+     * <p>
+     * There is no reading of it that works: the entry would roll lighting density and then place the
+     * same dark block either way, so the author would have marked something optional that can never
+     * look different. An entry that resolves to no state at all is exempt - that is issue #91's
+     * absent-block case, which is already air and is not the author's mistake.
+     */
+    private void requireEmittingInPlaceSource(List<BlockState> resolved, char c) {
+        if (resolved.isEmpty()) {
+            return;
+        }
+        for (BlockState state : resolved) {
+            if (state.getLightEmission() > 0) {
+                return;
+            }
+        }
+        throw new IllegalArgumentException("Palette '" + name + "' entry '" + c + "' declares "
+                + "'lightSource', but none of the blocks it resolves to emit any light. Either name "
+                + "candidates under floor/wall/ceiling/free, or drop 'lightSource' from this entry.");
+    }
+
+    /**
+     * What this source writes when it is off, or when a socket finds nowhere to put a light.
+     * <p>
+     * Compiled with the same issue-#91 leniency as any other palette block: an absent block is
+     * dropped from a weighted replacement, and a replacement whose every block is absent becomes
+     * air - which is what a rejected light marker has always left behind.
+     */
+    private BlockChoice compileUnlit(HolderLookup<Block> blockLookup, LightSourceSettings settings, char c) {
+        if (settings.unlit() != null) {
+            BlockState state = Tools.resolveState(settings.unlit(), blockLookup, name);
+            return state == null ? BlockChoice.AIR : BlockChoice.of(state);
+        }
+        if (settings.unlitBlocks() == null) {
+            return BlockChoice.AIR;
+        }
+        List<Pair<Integer, BlockState>> weighted = new ArrayList<>();
+        for (BlockEntry ob : settings.unlitBlocks()) {
+            BlockState state = Tools.resolveState(ob.block(), blockLookup, name);
+            if (state != null) {
+                weighted.add(Pair.of(ob.random(), state));
+            }
+        }
+        if (weighted.isEmpty() && !settings.unlitBlocks().isEmpty()) {
+            return BlockChoice.AIR;
+        }
+        if (weighted.isEmpty()) {
+            throw new IllegalArgumentException("Palette '" + name + "' entry '" + c
+                    + "' declares an empty 'unlitBlocks'. Name at least one block, or omit the field "
+                    + "to leave air behind.");
+        }
+        return BlockChoice.of(weighted);
     }
 
     /**
@@ -239,9 +345,9 @@ public class Palette {
         return this;
     }
 
-    public record Info(String mobId, String loot, boolean isTorch, LightPool light, CompoundTag tag) {
+    public record Info(String mobId, String loot, LightSource lightSource, CompoundTag tag) {
         public boolean isSpecial() {
-            return mobId != null || loot != null || isTorch || light != null || tag != null;
+            return mobId != null || loot != null || lightSource != null || tag != null;
         }
     }
 

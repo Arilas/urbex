@@ -458,14 +458,14 @@ class AssetGraphTest {
             PaletteEntry marker = new PaletteEntry("L", Optional.of("minecraft:chest"),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.of(conditionName), Optional.empty(), Optional.empty(),
-                    Optional.empty());
+                    Optional.empty(), Optional.empty());
             // 'a' as well as the loot marker: the road part this city style wires in is built from
             // 'a', and the character check would otherwise fire on the fixture rather than on what
             // the test is about.
             PaletteEntry filler = new PaletteEntry("a", Optional.of("minecraft:stone"),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                    Optional.empty());
+                    Optional.empty(), Optional.empty());
             Palette palette = new Palette(paletteId, BuiltInRegistries.BLOCK, null,
                     List.of(new PaletteDefinition(Optional.empty(), Optional.of(List.of(marker, filler)))));
             Identifier styleId = Identifier.fromNamespaceAndPath("urbex", "style_loot");
@@ -501,7 +501,7 @@ class AssetGraphTest {
         private static PaletteDefinition singleMarkerPaletteDefinition(char marker) {
             PaletteEntry entry = new PaletteEntry(Character.toString(marker), Optional.of("minecraft:stone"),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                    Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
             return new PaletteDefinition(Optional.empty(), Optional.of(List.of(entry)));
         }
 

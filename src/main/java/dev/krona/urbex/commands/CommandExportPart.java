@@ -135,10 +135,7 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         if (!unknowns.isEmpty()) {
             List<PaletteEntry> entries = new ArrayList<>();
             for (Map.Entry<BlockState, Character> entry : unknowns.entrySet()) {
-                entries.add(new PaletteEntry(Character.toString(entry.getValue()), Optional.of(Tools.stateToString(entry.getKey())),
-                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                        Optional.empty(),
-                        Optional.empty()));
+                entries.add(PaletteEntry.block(entry.getValue(), Tools.stateToString(entry.getKey())));
             }
             PaletteDefinition paletteDefinition = new PaletteDefinition(Optional.empty(), Optional.of(entries));
             DataResult<JsonElement> result = PaletteDefinition.CODEC.encodeStart(JsonOps.INSTANCE, paletteDefinition);
