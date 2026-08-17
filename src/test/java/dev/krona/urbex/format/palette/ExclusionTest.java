@@ -142,6 +142,87 @@ class ExclusionTest {
     }
 
     /**
+     * {@code WEIGHT.024}: a <em>nested</em> node with nothing left is removed from its parent rather than
+     * refused, and only a marker's own node left with nothing is a refusal.
+     * <p>
+     * The format would otherwise recommend a shape it rejects. {@code DIAG.044}'s remedy is "nest the
+     * rare choices under one weighted choice", and the rare choices are the ones carrying {@code when} -
+     * so an author following that advice would be refused, on a vanilla install, for doing exactly what
+     * the diagnostic told them to. The cascade is also what makes {@code DIAG.043}'s sentence, "the
+     * marker would generate as air", true wherever it is printed: at a nested node it is false, because
+     * the parent divides the remainder between the choices that are left.
+     * <p>
+     * Both halves are asserted: the nested list disappears and the survivor takes the whole node, and the
+     * cascade reaching the root <em>is</em> refused.
+     */
+    @Test
+    @Rule("WEIGHT.024")
+    @Rule("WEIGHT.032")
+    void aNestedNodeWithNothingLeftIsRemovedFromItsParentRatherThanRefused() {
+        List<ResolvedNode.Choice> kept = prune("""
+                { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
+                    { "weight": 3, "block": "minecraft:stone_bricks" },
+                    { "weight": 1, "kind": "weighted", "choices": [
+                        { "weight": 1, "block": "minecraft:andesite", "when": { "mod": "create" } },
+                        { "weight": 1, "block": "nosuchmod:sky_stone_block" } ] } ] } } }
+                """, presence(Set.of(), Set.of("minecraft")));
+        assertEquals(List.of("minecraft:stone_bricks"), blocks(kept));
+        assertEquals(List.of(Fraction.ONE),
+                Apportion.flatten(kept).stream().map(Apportion.Leaf::share).toList(),
+                "WEIGHT.021 with no new mechanism: the survivor divides what is left, which is all");
+
+        // The same tree with no survivor at the root: the cascade reaches the marker and is refused,
+        // and the counts are of causes across the whole subtree rather than of nodes in one list.
+        Diagnostics diagnostics = new Diagnostics();
+        assertTrue(pruneNode("""
+                { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
+                    { "weight": 1, "kind": "weighted", "choices": [
+                        { "weight": 1, "block": "minecraft:andesite", "when": { "mod": "create" } },
+                        { "weight": 1, "block": "nosuchmod:sky_stone_block" } ] } ] } } }
+                """, presence(Set.of(), Set.of("minecraft")), diagnostics).isEmpty());
+        String message = diagnostics.asError().orElseThrow();
+        assertTrue(Diag.DIAG_043.matches(message), message);
+        assertTrue(message.contains("1 by 'when', 1 by absent blocks"), message);
+        assertEquals(1, diagnostics.all().size(),
+                "one diagnostic, at the marker - a cascade says nothing about the nodes it absorbs");
+    }
+
+    /**
+     * {@code WEIGHT.024} names a {@code light_socket} beside a {@code weighted} node, and a nested one
+     * cascades the same way.
+     * <p>
+     * {@code MODEL.076} makes a placement list a list like any other and {@code MODEL.070} makes its
+     * candidates the socket's only block source, so a socket with none generates as air exactly as an
+     * emptied weighted node does - which is why {@code DIAG.043}'s message is true of it word for word.
+     * {@code MODEL.072} refuses a socket that <em>declares</em> no candidate; this is the same absence
+     * arriving from the installed environment instead.
+     */
+    @Test
+    @Rule("WEIGHT.024")
+    @Rule("MODEL.070")
+    void aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade() {
+        Diagnostics diagnostics = new Diagnostics();
+        assertTrue(pruneNode("""
+                { "version": 2, "palette": { "T": { "kind": "light_socket",
+                    "floor": [ { "weight": 1, "block": "nosuchmod:lamp" } ],
+                    "ceiling": [ { "weight": 1, "block": "minecraft:lantern",
+                                   "when": { "mod": "create" } } ] } } }
+                """, presence(Set.of(), Set.of("minecraft")), diagnostics).isEmpty());
+        String message = diagnostics.asError().orElseThrow();
+        assertTrue(Diag.DIAG_043.matches(message), message);
+        assertTrue(message.contains("1 by 'when', 1 by absent blocks"), message);
+
+        // Nested under a weighted node, the same socket is absorbed rather than refused.
+        List<ResolvedNode.Choice> kept = prune("""
+                { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
+                    { "weight": 1, "block": "minecraft:stone_bricks" },
+                    { "weight": 1, "kind": "light_socket",
+                      "floor": [ { "weight": 1, "block": "nosuchmod:lamp" } ] } ] } } }
+                """, presence(Set.of(), Set.of("minecraft")));
+        assertEquals(List.of("minecraft:stone_bricks"), blocks(kept));
+    }
+
+    /**
      * {@code WEIGHT.022}: {@code when} is evaluated once, so every position sees the same reduced list.
      * <p>
      * Proved as an identity rather than by generating positions: the reduced list is a value produced at

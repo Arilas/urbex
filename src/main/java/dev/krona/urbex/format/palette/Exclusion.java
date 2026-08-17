@@ -99,66 +99,85 @@ public final class Exclusion {
     }
 
     /**
-     * The node with every alternative its conditions exclude removed, or empty when a list was emptied.
+     * A marker's node with every excluded alternative removed, or empty with {@code DIAG.043} when the
+     * marker is left with nothing.
+     * <p>
+     * <b>This is the only place {@code DIAG.043} is raised, and that is {@code WEIGHT.024}'s cascade.</b>
+     * A <em>nested</em> node all of whose alternatives are excluded is removed from the list it is a
+     * choice of rather than refused, upward until either something survives or the marker's own node is
+     * empty. The format would otherwise recommend a shape it rejects: {@code DIAG.044}'s remedy is "nest
+     * the rare choices under one weighted choice", and the rare choices are the ones carrying
+     * {@code when}, so an author following that advice on a vanilla install would be refused for doing
+     * what the diagnostic told them to. Nothing is lost by cascading - the parent divides the remainder
+     * between the choices that are left, which is {@code WEIGHT.021} and not a new mechanism - and it is
+     * what makes {@code DIAG.043}'s sentence, "the marker would generate as air", true wherever it is
+     * printed.
+     * <p>
+     * The two counts are accumulated over the <em>whole</em> subtree for the same reason. A root whose
+     * two choices are one excluded block and one nested list of three absent ones reports three absent
+     * blocks, not one nested node: the message names why each alternative went, and "a node that
+     * cascaded" is not a cause an author can act on.
+     */
+    public static Optional<ResolvedNode> prune(ResolvedNode node, Presence presence,
+                                               PointerResolver.Site site, Diagnostics diagnostics) {
+        Removed removed = new Removed();
+        Optional<ResolvedNode> pruned = exclude(node, presence, site, removed);
+        if (pruned.isEmpty()) {
+            diagnostics.error(Diag.DIAG_043, site.location(), removed.byWhen, removed.byAbsentBlock);
+        }
+        return pruned;
+    }
+
+    /**
+     * One node of the tree, or empty when everything under it went - which is exclusion, not a refusal.
      * <p>
      * Recursive, because {@code MODEL.047} makes nesting unbounded and a {@code when} is a key of a
      * choice at any depth. A node with no list of alternatives - a block, a tag, an alias - comes back
      * unchanged: {@code WEIGHT.030} drops "a choice", and a marker naming an absent block is
      * {@code MODEL.042}, which resolves to air and lets the load succeed.
+     * <p>
+     * Nothing here reports, so there is no path on which a cascade prints a diagnostic about a node the
+     * parent then absorbs. {@link #prune} is the one caller that turns an empty result into
+     * {@code DIAG.043}, and it is only ever the marker's own node.
      */
-    public static Optional<ResolvedNode> prune(ResolvedNode node, Presence presence,
-                                               PointerResolver.Site site, Diagnostics diagnostics) {
+    private static Optional<ResolvedNode> exclude(ResolvedNode node, Presence presence,
+                                                  PointerResolver.Site site, Removed removed) {
         return switch (node.source()) {
             case ResolvedNode.Source.Weighted weighted -> {
-                Optional<List<ResolvedNode.Choice>> kept =
-                        apply(weighted.choices(), presence, site, "choice", diagnostics);
-                yield kept.map(choices -> new ResolvedNode(node.kind(),
-                        new ResolvedNode.Source.Weighted(choices), node.traits()));
+                List<ResolvedNode.Choice> kept =
+                        keep(weighted.choices(), presence, site, "choice", removed);
+                yield kept.isEmpty() ? Optional.empty() : Optional.of(new ResolvedNode(node.kind(),
+                        new ResolvedNode.Source.Weighted(kept), node.traits()));
             }
-            case ResolvedNode.Source.Socket socket -> socket(node, socket, presence, site,
-                    diagnostics);
+            case ResolvedNode.Source.Socket socket -> socket(node, socket, presence, site, removed);
             default -> Optional.of(node);
         };
     }
 
     /**
-     * A socket's four placement lists, pruned, or empty when nothing is left in any of them.
+     * A socket's four placement lists, with their excluded candidates gone.
      * <p>
-     * <b>Refused with {@code DIAG.043}, and no rule says so.</b> {@code WEIGHT.024} and
-     * {@code WEIGHT.032} both name "a {@code weighted} node"; a {@code light_socket} is a different kind
-     * with the same lists, whose candidates {@code MODEL.076} explicitly says accept {@code when}. So the
-     * case is reachable, it is exactly the failure {@code WEIGHT.024}'s {@code > Why} describes - "a
-     * marker that silently becomes air, which is the failure mode a pack notices only by looking at a
-     * chunk" - and {@code DIAG.043}'s message is true of it word for word, since {@code MODEL.070} makes
-     * the candidates a socket's only block source. It is reported in this task's report as a gap in the
-     * two rules rather than worked around here, because the alternative is a marker that places nothing.
+     * {@code WEIGHT.024} names a {@code light_socket} beside a {@code weighted} node because
+     * {@code MODEL.076} makes its placement lists lists like any other and {@code MODEL.070} makes their
+     * candidates its only block source - so a socket with none generates as air exactly as an emptied
+     * weighted node does. {@code MODEL.072} refuses a socket that <em>declares</em> no candidate; this is
+     * the same absence arriving from the installed environment instead.
      * <p>
-     * A list emptied while another survives is <em>not</em> refused: {@code MODEL.072} asks for a
+     * A list emptied while another survives is not an exclusion at all: {@code MODEL.072} asks for a
      * candidate in one of the four, not in all of them, and {@code MODEL.073} tries the opportunities in
      * a fixed order and falls through the ones with nothing to place.
      */
     private static Optional<ResolvedNode> socket(ResolvedNode node,
                                                  ResolvedNode.Source.Socket socket,
                                                  Presence presence, PointerResolver.Site site,
-                                                 Diagnostics diagnostics) {
+                                                 Removed removed) {
         Map<Kind.Placement, List<ResolvedNode.Choice>> kept = new LinkedHashMap<>();
-        Removed removed = new Removed();
-        boolean ok = true;
         for (Map.Entry<Kind.Placement, List<ResolvedNode.Choice>> list : socket.placements()
                 .entrySet()) {
-            PointerResolver.Site inside = site.inside("'" + list.getKey().key() + "'");
-            List<ResolvedNode.Choice> survivors = new ArrayList<>();
-            // DIAG.903: every list of this socket is walked before any of them is acted on, and the
-            // counts DIAG.043 prints are the socket's, not one list's - the message is about the marker.
-            ok &= keep(list.getValue(), presence, inside, "candidate", diagnostics, removed,
-                    survivors);
-            kept.put(list.getKey(), survivors);
-        }
-        if (!ok) {
-            return Optional.empty();
+            kept.put(list.getKey(), keep(list.getValue(), presence,
+                    site.inside("'" + list.getKey().key() + "'"), "candidate", removed));
         }
         if (kept.values().stream().allMatch(List::isEmpty)) {
-            diagnostics.error(Diag.DIAG_043, site.location(), removed.byWhen, removed.byAbsentBlock);
             return Optional.empty();
         }
         return Optional.of(new ResolvedNode(node.kind(),
@@ -170,14 +189,9 @@ public final class Exclusion {
      * {@code WEIGHT.030}), or empty when every one of them went ({@code WEIGHT.024},
      * {@code WEIGHT.032}).
      * <p>
-     * <b>An emptied list is refused at every depth, and that reading needs a ruling.</b>
-     * {@code WEIGHT.024} says "A {@code weighted} node all of whose choices are removed is refused", and
-     * a nested one is a {@code weighted} node - so the sentence covers it and this follows the sentence.
-     * Two things pull the other way and are in this task's report rather than in this code: the rule's
-     * {@code > Why} ("the alternative is a marker that silently becomes air") is not true of a nested
-     * node, whose parent would simply divide the remainder between the choices that are left, and
-     * {@code DIAG.044}'s own remedy tells an author to "nest the rare choices under one weighted choice"
-     * - which is exactly where cross-mod content goes, and so exactly the list this refuses.
+     * The brief's entry point, and the shape a caller holding a bare list wants: it treats that list as a
+     * root, so an emptied one is {@code DIAG.043} rather than a cascade. A list <em>inside</em> a tree
+     * goes through {@link #prune}, which is where the cascade lives.
      */
     public static Optional<List<ResolvedNode.Choice>> apply(List<ResolvedNode.Choice> choices,
                                                             Presence presence,
@@ -185,27 +199,19 @@ public final class Exclusion {
                                                             String position,
                                                             Diagnostics diagnostics) {
         Removed removed = new Removed();
-        List<ResolvedNode.Choice> survivors = new ArrayList<>();
-        if (!keep(choices, presence, site, position, diagnostics, removed, survivors)) {
-            return Optional.empty();
-        }
+        List<ResolvedNode.Choice> survivors = keep(choices, presence, site, position, removed);
         if (survivors.isEmpty()) {
             diagnostics.error(Diag.DIAG_043, site.location(), removed.byWhen, removed.byAbsentBlock);
             return Optional.empty();
         }
-        return Optional.of(List.copyOf(survivors));
+        return Optional.of(survivors);
     }
 
-    /**
-     * Walks one list, appending what survives and counting what did not.
-     *
-     * @return false when a nested node was refused, which has already been reported
-     */
-    private static boolean keep(List<ResolvedNode.Choice> choices, Presence presence,
-                                PointerResolver.Site site, String position,
-                                Diagnostics diagnostics, Removed removed,
-                                List<ResolvedNode.Choice> survivors) {
-        boolean ok = true;
+    /** Walks one list, keeping what survives and counting what did not, by the rule that took it. */
+    private static List<ResolvedNode.Choice> keep(List<ResolvedNode.Choice> choices,
+                                                  Presence presence, PointerResolver.Site site,
+                                                  String position, Removed removed) {
+        List<ResolvedNode.Choice> survivors = new ArrayList<>();
         for (int index = 0; index < choices.size(); index++) {
             ResolvedNode.Choice choice = choices.get(index);
             if (choice.when().isPresent() && !holds(choice.when().get(), presence)) {
@@ -218,16 +224,14 @@ public final class Exclusion {
                 removed.byAbsentBlock++;
                 continue;
             }
-            Optional<ResolvedNode> pruned = prune(choice.node(), presence,
-                    site.inside(position + " " + index), diagnostics);
-            if (pruned.isEmpty()) {
-                ok = false;
-                continue;
-            }
-            survivors.add(new ResolvedNode.Choice(pruned.get(), choice.size(), choice.when(),
-                    choice.spreadFrom()));
+            // Empty means the whole subtree was excluded, so this choice goes with it - WEIGHT.024's
+            // cascade. Its own counts are already in `removed`, which is what keeps DIAG.043's two
+            // numbers a count of causes rather than of nodes.
+            exclude(choice.node(), presence, site.inside(position + " " + index), removed)
+                    .ifPresent(pruned -> survivors.add(new ResolvedNode.Choice(pruned,
+                            choice.size(), choice.when(), choice.spreadFrom())));
         }
-        return ok;
+        return List.copyOf(survivors);
     }
 
     /**

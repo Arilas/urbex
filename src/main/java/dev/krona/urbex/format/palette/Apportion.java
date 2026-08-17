@@ -23,16 +23,17 @@ import java.util.Optional;
  * compiled distribution equals its flattened equivalent's to within one slot per choice.
  * <p>
  * <b>What is checked here and what is checked one stage earlier.</b> {@code WEIGHT.005} says every rule
- * about a list's sizes is evaluated on the list "after {@code $spread} expansion and after exclusion,
- * never on the choices as written". {@code RawChoice} checks {@code WEIGHT.013} and {@code WEIGHT.014} at
- * decode and skips any list holding a {@code $spread} or a {@code when}, precisely so that this can check
- * them again where the list is whole. The exclusion half of that sentence is <em>not</em> followed, and
- * this task's report says why: {@code WEIGHT.021} redistributes a removed {@code share} proportionally
- * among the survivors, and {@code WEIGHT.014} refuses shares that do not total 1 when nothing takes the
- * remainder, so a list of nothing but shares that loses one to a {@code when} satisfies the first rule by
- * breaking the second. {@link #checkSizes} therefore runs after expansion and before exclusion, which is
- * the reading under which both rules hold and which {@code WEIGHT.005}'s own {@code > Why} - entirely
- * about a spread - is arguing for.
+ * about a list's sizes is evaluated on the list "after {@code $spread} expansion, and <b>before</b>
+ * exclusion, never on the choices as written". {@code RawChoice} checks {@code WEIGHT.013} and
+ * {@code WEIGHT.014} at decode and skips any list holding a {@code $spread} or a {@code when}, precisely
+ * so that {@link #checkSizes} can check them again where the list is whole.
+ * <p>
+ * <b>Why before exclusion.</b> The rule used to say "after exclusion", and that made {@code WEIGHT.014}
+ * and {@code WEIGHT.021} contradict each other: a list of three shares totalling 1, one of them carrying
+ * a {@code when} that does not hold, totals 0.9 with nothing to take the remainder - so
+ * {@code WEIGHT.014} refused precisely the list {@code WEIGHT.021} says to scale back up. The rule now
+ * states this order and records the reason: a size rule is about what the author assembled, and
+ * exclusion is a fact about the installed environment which {@code WEIGHT.021} already governs.
  */
 public final class Apportion {
 
@@ -358,13 +359,12 @@ public final class Apportion {
      * The single materialisation {@code WEIGHT.052} allows: the tree is flattened to exact fractions
      * first, and this is the only place a fraction becomes a slot.
      * <p>
-     * <b>{@code WEIGHT.063} is raised against the flattened count.</b> The rule says "A list with more
-     * than 128 choices after exclusion is refused, since {@code WEIGHT.062} cannot be satisfied", and
-     * that is the count that decides whether {@code WEIGHT.062} can be satisfied: a tree of four lists of
-     * fifty leaves 200 alternatives competing for 128 slots, and no list in it has more than 128 choices.
-     * The check subsumes the rule's own wording, since a single list of more than 128 choices flattens to
-     * at least that many leaves. Reported in this task's report as a wording gap rather than as a second
-     * check.
+     * <b>{@code WEIGHT.063} is raised against the flattened count,</b> which is what that rule now says:
+     * "A node whose alternatives, flattened by {@code WEIGHT.052}, number more than 128 after exclusion
+     * is refused". It used to be stated per list, which is not the condition it names after "since" - a
+     * tree of four lists of fifty is 200 alternatives competing for 128 slots with no list in it anywhere
+     * near the limit. The check subsumes the older wording, since a single list of more than 128 choices
+     * flattens to at least that many leaves.
      */
     public static Optional<ResolvedNode[]> materialise(List<ResolvedNode.Choice> choices,
                                                        PointerResolver.Site site,

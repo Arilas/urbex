@@ -237,6 +237,84 @@ class DiagCatalogueTest {
      * stay part of a word, because {@code urbex:damaged} and {@code $imports} are single words that a
      * reader would notice changing.
      */
+    /**
+     * Every clause a catalogue row delegates is either a slot in the template or spelled out in it.
+     * <p>
+     * <b>The hole the two word-subset guards above have, and why it took two rows to find.</b> Both
+     * compare <em>words</em>, and {@link #outsidePlaceholders} deletes everything inside a {@code <…>}
+     * before either of them looks - which is right, since that text is delegated to the caller. The
+     * consequence is that a row's optional or alternative clause contributes no words to compare at all,
+     * so a template can drop one entirely and stay green. That is not hypothetical: {@code DIAG.045}'s
+     * <code>&lt; — &lt;a&gt; written here and &lt;b&gt; spread from '&lt;id&gt;'&gt;</code> was missing
+     * from the enum, which made {@code WEIGHT.019} - a rule whose whole content is "name the incoming and
+     * inherited totals separately" - unsatisfiable whatever a caller passed; and {@code DIAG.020}'s
+     * namespace clause was missing beside it, unnoticed only because nothing raises that row yet.
+     * <p>
+     * This is the check that could not be written as a comparison of words, because there are none: it
+     * compares <em>arity</em>. Each depth-1 {@code <…>} group after the location is a value the row says
+     * the caller supplies, so the template needs a {@code %s} for it - unless the template writes the
+     * clause out, which is legitimate when the row brackets something that has only one possible value
+     * ({@code DIAG.030}'s closing sentence is the only such row today). "Writes it out" is a verbatim
+     * substring and not a word overlap, and it needs three words to count, so a single-word group like
+     * {@code <n>} cannot be spuriously matched by the letter {@code n} appearing somewhere.
+     */
+    @Test
+    @Rule("DIAG.910")
+    void everyClauseACatalogueRowDelegatesIsASlotOrIsSpelledOutInTheTemplate() {
+        Map<String, String> catalogue = SpecDocuments.load().diagnostics();
+        List<String> failures = new ArrayList<>();
+        for (Diag diag : Diag.values()) {
+            if (RETIRED_ROW_MESSAGE.equals(diag.template())) {
+                continue;
+            }
+            String template = afterLocation(diag.template());
+            long slots = Diag.literalSegments(template).size() - 1;
+            List<String> needingASlot = new ArrayList<>();
+            for (String clause : delegatedClauses(afterLocation(catalogue.get(diag.id())))) {
+                String stated = Diag.normalise(outsidePlaceholders(clause));
+                boolean spelledOut = stated.split("\\s+").length >= 3
+                        && template.contains(stated);
+                if (!spelledOut) {
+                    needingASlot.add(clause);
+                }
+            }
+            if (needingASlot.size() != slots) {
+                failures.add(diag.id() + ": the row delegates " + needingASlot.size()
+                        + " value(s) the template does not spell out, and the template has " + slots
+                        + " placeholder(s) for them: " + needingASlot
+                        + "\n  row:  " + catalogue.get(diag.id()) + "\n  enum: " + diag.template());
+            }
+        }
+        assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
+    }
+
+    /**
+     * The top-level {@code <…>} groups of a message - the values it delegates to whoever formats it.
+     * <p>
+     * Depth-counted for the reason {@link #outsidePlaceholders} is: the rows nest placeholders inside
+     * placeholders, and a group that holds three of them is still one value the caller supplies.
+     */
+    private static List<String> delegatedClauses(String message) {
+        List<String> clauses = new ArrayList<>();
+        int depth = 0;
+        int start = 0;
+        for (int at = 0; at < message.length(); at++) {
+            char character = message.charAt(at);
+            if (character == '<') {
+                if (depth == 0) {
+                    start = at + 1;
+                }
+                depth++;
+            } else if (character == '>' && depth > 0) {
+                depth--;
+                if (depth == 0) {
+                    clauses.add(message.substring(start, at));
+                }
+            }
+        }
+        return clauses;
+    }
+
     /** Everything after the location prefix - the first {@code ": "} - or all of it if there is none. */
     private static String afterLocation(String message) {
         String normalised = Diag.normalise(message);

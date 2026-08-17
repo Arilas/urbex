@@ -101,8 +101,18 @@ public enum Diag {
 
     // ---- Traits (020-029) ----------------------------------------------------------------------
 
-    /** {@code TRAIT.003}: args are the location and the trait id. */
-    DIAG_020("%s: no trait %s is registered. Check the id, or the mod that provides it."),
+    /**
+     * {@code TRAIT.003}: args are the location, the trait id, and the row's
+     * {@code <, and nothing loaded registers the namespace '<ns>'>} clause.
+     * <p>
+     * The third slot was missing until this task, exactly as {@link #DIAG_045}'s was: an optional clause
+     * contributes no words for {@code DiagCatalogueTest}'s two word-subset guards to compare, so a
+     * template could drop one and stay green. Nothing raises this row yet - {@code TRAIT.003} needs the
+     * trait registry - so unlike {@code DIAG.045} it never reached a user; it is fixed here rather than
+     * left for Task 6 to inherit, because the guard that now catches the class has to find the catalogue
+     * clean.
+     */
+    DIAG_020("%s: no trait %s is registered%s. Check the id, or the mod that provides it."),
 
     /** {@code TRAIT.021}, {@code TRAIT.031}: args are the location, the trait, and the pool. */
     DIAG_021("%s: %s names pool %s, which is not a loaded conditions asset."

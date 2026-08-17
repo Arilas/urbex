@@ -24,16 +24,36 @@ How a [`weighted`](00-model.md#42-weighted) node and a
 > **WEIGHT.003** · `MUST` — A choice carries exactly one of `weight`, `share` or `rest`.
 
 > **WEIGHT.004** · `MUST` — `share` is a JSON number; `weight` is a positive integer. Neither is a
-> count of anything, and no palette file states a denominator.
+> count of anything, and no palette file states a denominator. A `share`'s exact value is the decimal
+> the file writes, and the [exact arithmetic](#6-nesting) is performed on that.
+
+> > **Why the exact value has to be stated** — WEIGHT.052 requires exact rational arithmetic, and a
+> > JSON number reaches every implementation as a binary floating-point value, so "exact" has to say
+> > exact to *what*. The two available answers differ: `0.2` written in a file is `1/5`, and the
+> > `double` nearest to it is
+> > `0.200000000000000011102230246251565404236316680908203125`. The first is a statement about the
+> > file and the second about IEEE 754, and only the first is a number the author can be held to. In
+> > practice: read the shortest decimal that round-trips to the decoded value, not the value's exact
+> > binary expansion.
 
 > **WEIGHT.005** · `MUST` — Every rule about a list's sizes is evaluated on the list as it stands
-> after [`$spread`](03-pointers.md#23-spread) expansion and after
-> [exclusion](#3-when), never on the choices as written.
+> after [`$spread`](03-pointers.md#23-spread) expansion, and **before**
+> [exclusion](#3-when), never on the choices as written. Exclusion then removes what its conditions
+> exclude and the survivors' sizes follow from WEIGHT.021, with no size rule evaluated a second time.
 
 > > **Why** — a file may write one `share` and take the rest of its list from a spread, so the
 > > written text is not the list. Checking what was written would refuse a correct file whose
 > > remaining size arrives from somewhere else, which is the same class of mistake as reporting 45
 > > warnings about a pack that was right.
+
+> > **Why before exclusion and not after** — this rule used to say "after exclusion", and that made
+> > WEIGHT.014 and WEIGHT.021 contradict each other. A list of three shares totalling 1, one of them
+> > carrying a `when` that does not hold, totals 0.9 once the condition is evaluated and has nothing
+> > to take the remainder — so WEIGHT.014 refuses precisely the list WEIGHT.021 says to scale back up.
+> > The only reading that keeps both alive is this one: a size rule is about what the *author*
+> > assembled, and exclusion is a fact about the installed environment, which WEIGHT.021 already
+> > governs. Validating coherence after exclusion refuses a file that was written correctly, which is
+> > the over-rejection `ACCEPT` exists as a class to prevent.
 
 ```json fixture:WEIGHT.002 reject=DIAG.040
 { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
@@ -190,11 +210,27 @@ a quarter of the result and the inherited choices keep their ratios across the o
 > > **Why** — both already have implementations. Widening this to configuration or dimension makes
 > > "load time" depend on state that can change without a reload, and is deliberately not in scope.
 
-> **WEIGHT.024** · `REJECT` (`DIAG.043`) — A `weighted` node all of whose choices are removed is
-> refused.
+> **WEIGHT.024** · `REJECT` (`DIAG.043`) — A `weighted` node or a `light_socket` all of whose
+> alternatives are removed is *itself* removed from the list it is a choice of, cascading upward; a
+> marker's own node left with nothing is refused.
 
 > > **Why** — the alternative is a marker that silently becomes air, which is the failure mode a
 > > pack notices only by looking at a chunk.
+
+> > **Why a nested node cascades rather than refusing** — because the format otherwise recommends a
+> > shape it rejects. DIAG.044's remedy is "nest the rare choices under one weighted choice", and the
+> > rare choices are the ones carrying `when` — so an author following that advice on a vanilla
+> > install would be refused for doing what the diagnostic told them to. Nothing is lost by
+> > cascading: an emptied nested node has a parent that divides the remainder between the choices
+> > that are left, which is WEIGHT.021 with no new mechanism. The `> Why` above is a statement about
+> > a *root* — only there is there nothing left to take the share — and DIAG.043's message says so in
+> > those words.
+
+> > **Why a `light_socket` is named here** — its placement lists are lists like any other, whose
+> > candidates accept `when` by MODEL.076, and by MODEL.070 the candidates are its only block source.
+> > So a socket with none generates as air exactly as an emptied `weighted` node does, and DIAG.043's
+> > message is true of it word for word. MODEL.072 refuses a socket that *declares* no candidate;
+> > this is the same absence arriving from the installed environment instead.
 
 ```json fixture:WEIGHT.024 reject=DIAG.043
 { "version": 2, "palette": { "c": { "kind": "weighted", "choices": [
@@ -246,8 +282,9 @@ They are near-neighbours and behave completely differently. This table is normat
 > **WEIGHT.031** · `MUST` — Dropping happens after `when` and before the share is computed, so the
 > two compose without ordering surprises.
 
-> **WEIGHT.032** · `REJECT` (`DIAG.043`) — A `weighted` node all of whose choices are dropped is
-> refused, by the same rule as WEIGHT.024.
+> **WEIGHT.032** · `REJECT` (`DIAG.043`) — A `weighted` node or a `light_socket` all of whose
+> alternatives are dropped is removed from its parent, and refused when it is the marker's own node,
+> by the same rule as WEIGHT.024.
 
 > > **Why** — this is the one place the format is deliberately lenient about a missing block, and it
 > > is lenient because a pack naming optional cross-mod content should generate the rest of itself.
@@ -313,8 +350,15 @@ They are near-neighbours and behave completely differently. This table is normat
 > > **Why** — a choice an author wrote and weighted is a choice they want to see. Silently rounding
 > > it out of existence makes a weight of 1 in a long list mean nothing, with no diagnostic.
 
-> **WEIGHT.063** · `REJECT` (`DIAG.044`) `[NO-FIXTURE: a generated 129-choice list]` — A list with
-> more than 128 choices after exclusion is refused, since WEIGHT.062 cannot be satisfied.
+> **WEIGHT.063** · `REJECT` (`DIAG.044`) `[NO-FIXTURE: a generated 129-choice list]` — A node whose
+> alternatives, flattened by WEIGHT.052, number more than 128 after exclusion is refused, since
+> WEIGHT.062 cannot be satisfied.
+
+> > **Why the flattened count and not one list's length** — this rule used to say "a list with more
+> > than 128 choices", which is not the condition it names after "since". WEIGHT.062 owes a slot to
+> > every alternative the tree resolves to, so three nested lists of fifty are 150 claims on 128
+> > slots with no list in the tree anywhere near the limit. The flattened count subsumes the older
+> > wording, because a single list of more than 128 choices flattens to at least that many.
 
 > **WEIGHT.064** · `MUST` — Rounding is the only place declaration order is read, and only to break
 > ties, by WEIGHT.060. It cannot change a choice's share by more than one slot.
