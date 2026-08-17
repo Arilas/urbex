@@ -1,6 +1,8 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.format.palette.CompiledEntry;
+import dev.krona.urbex.format.palette.CompiledTrait;
+import dev.krona.urbex.format.palette.traits.Damaged;
 import dev.krona.urbex.format.palette.CompiledV2Palette;
 import dev.krona.urbex.format.palette.Marker;
 import dev.krona.urbex.format.palette.TraitSet;
@@ -326,6 +328,7 @@ public class CompiledPalette {
             CompiledEntry entry = compiled.entry(marker.codepoint());
             define(c, new Entry.V2(entry, slotsOf(entry)));
             information.remove(c);
+            recordDamage(entry);
         }
         // The aliases this palette could not answer are answered by the merge, once every palette of it
         // has contributed - MODEL.064. Recorded now and resolved in the pass below, so that an alias
@@ -359,6 +362,34 @@ public class CompiledPalette {
                     from -> new Placed(from.state(), V2Traits.infoOf(from.traits(), null)));
         }
         return slots;
+    }
+
+    /**
+     * A version 2 marker's {@code urbex:damaged} satellites, in the state-keyed map the damage pass has.
+     *
+     * <p><b>This is {@code TRAIT.011} not being reached, and it is deliberate rather than overlooked.</b>
+     * That rule keys the mapping by the marker carrying the trait, and the compiled palette does exactly
+     * that — a marker's {@code urbex:damaged} is a satellite of its own entry, per slot. The damage pass
+     * cannot consume it: {@code DamageArea} and {@code Decorations} read blocks back out of the chunk,
+     * where the marker is gone and is not recoverable, which is why version 1 keyed its map by state in
+     * the first place. So a version 2 palette gets version 1's fidelity here — two markers on one block
+     * collapse to the last one compiled — and it gets that rather than nothing at all, which is what it
+     * had before this method existed. The rule carries a {@code [NOT-YET-REACHED]} marker naming
+     * issue #216, which is the per-position marker record that would fix it.</p>
+     */
+    private void recordDamage(CompiledEntry entry) {
+        for (int slot = 0; slot < entry.slotCount(); slot++) {
+            CompiledEntry.Resolved resolved = entry.slot(slot);
+            CompiledTrait damaged = resolved.traits().traits().get(Damaged.TYPE.id());
+            if (damaged == null) {
+                continue;
+            }
+            CompiledEntry into = damaged.satellite(Damaged.INTO);
+            if (into != null && into.slotCount() > 0) {
+                damagedToBlock.put(resolved.state(), into.slot(0).state());
+            }
+        }
+        entry.placements().values().forEach(this::recordDamage);
     }
 
     /**
@@ -513,7 +544,15 @@ public class CompiledPalette {
      * that does not exist.
      */
     public boolean isSimple(char c) {
-        return entry(c) instanceof Entry.Simple;
+        return switch (entry(c)) {
+            case null -> false;
+            case Entry.Simple ignored -> true;
+            case Entry.Weighted ignored -> false;
+            // One slot is one state whatever the position, which is the whole of what this asks.
+            // MODEL.011's > Why is why it is common: "84% of markers in the shipped corpus are one
+            // block with no metadata", and a version 2 block node compiles to exactly one slot.
+            case Entry.V2 v2 -> v2.slots().length == 1;
+        };
     }
 
     /**

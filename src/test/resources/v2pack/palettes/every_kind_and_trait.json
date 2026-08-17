@@ -1,0 +1,114 @@
+{
+  "version": 2,
+  "$defs": {
+    "rubble": {
+      "kind": "weighted",
+      "choices": [
+        { "weight": 3, "block": "minecraft:cobblestone" },
+        { "weight": 1, "block": "minecraft:mossy_cobblestone" }
+      ]
+    },
+    "damageable": {
+      "traits": { "urbex:damaged": { "into": "minecraft:iron_bars" } }
+    }
+  },
+  "palette": {
+    "s": "minecraft:stone_bricks",
+
+    "w": {
+      "kind": "weighted",
+      "choices": [
+        { "share": 0.25, "block": "minecraft:deepslate_bricks" },
+        { "$spread": "rubble#/choices" }
+      ]
+    },
+
+    "n": {
+      "kind": "weighted",
+      "choices": [
+        { "weight": 1, "block": "minecraft:andesite" },
+        {
+          "weight": 1,
+          "kind": "weighted",
+          "choices": [
+            { "weight": 1, "block": "minecraft:diorite" },
+            { "weight": 1, "block": "minecraft:granite" }
+          ]
+        }
+      ]
+    },
+
+    "p": { "kind": "tag", "tag": "#minecraft:planks" },
+
+    "@": { "kind": "alias", "of": "s" },
+
+    "d": { "$ref": "damageable", "block": "minecraft:bricks" },
+
+    "e": {
+      "kind": "weighted",
+      "choices": [
+        { "weight": 1, "block": "minecraft:cracked_stone_bricks" },
+        { "weight": 1, "block": "create:andesite_casing", "when": { "mod": "create" } },
+        { "weight": 1, "block": "minecraft:chiseled_stone_bricks",
+          "when": { "pack": "urbex" } }
+      ]
+    },
+
+    "L": {
+      "block": "minecraft:lantern",
+      "traits": { "urbex:light": { "unlit": "minecraft:iron_bars" } }
+    },
+
+    "T": {
+      "kind": "light_socket",
+      "traits": { "urbex:light": { "unlit": "minecraft:air" } },
+      "floor": [ { "weight": 1, "block": "minecraft:lantern" } ],
+      "wall": [
+        { "weight": 3, "block": "minecraft:wall_torch[facing=north]" },
+        { "weight": 1, "block": "minecraft:soul_wall_torch[facing=north]",
+          "traits": { "urbex:light": { "unlit": "minecraft:cobblestone" } } }
+      ],
+      "ceiling": [ { "weight": 1, "block": "minecraft:lantern[hanging=true]" } ]
+    },
+
+    "C": {
+      "block": "minecraft:chest[facing=north]",
+      "traits": {
+        "urbex:loot": { "pool": "urbex:chest" },
+        "urbex:block_entity": { "nbt": { "Items": [] } }
+      }
+    },
+
+    "S": {
+      "block": "minecraft:spawner",
+      "traits": {
+        "urbex:spawner": { "pool": "urbex:easymobs" },
+        "urbex:block_entity": { "nbt": { "Items": [] } }
+      }
+    },
+
+    "m": {
+      "kind": "weighted",
+      "traits": { "urbex:damaged": { "into": "minecraft:iron_bars" } },
+      "choices": [
+        { "weight": 1, "block": "minecraft:stone" },
+        {
+          "weight": 1,
+          "block": "minecraft:lantern",
+          "traits": { "urbex:light": { "unlit": "minecraft:cobblestone" } }
+        }
+      ]
+    },
+
+    "o": {
+      "block": "minecraft:cobweb",
+      "traits": { "urbex:optional": { "density": "stuff",
+                                      "replacement": "minecraft:air" } }
+    },
+
+    "F": {
+      "block": "minecraft:furnace[facing=north]",
+      "traits": { "urbex:rotatable": false }
+    }
+  }
+}

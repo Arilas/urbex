@@ -103,7 +103,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.001` | `MUST` |  |  | `PaletteV2DecodeTest.aTraitIdIsNamespacedAndAnUnqualifiedOneIsRefused`, `TraitTest.onlyRotatableHasAScalarShorthandAndItsKeySetIsEmpty` |
 | `TRAIT.002` | `MUST` |  |  | `PaletteV2DecodeTest.aTraitIdIsNamespacedAndAnUnqualifiedOneIsRefused` |
 | `TRAIT.003` | `REJECT` | `DIAG.020` | `reject=DIAG.020` | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
-| `TRAIT.004` | `MUST` |  | `accept` | `MarkerTraitsComposeTest.aMarkerCarryingBothALightAndAMobAppliesBothRatherThanOnlyTheFirstOne`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem` |
+| `TRAIT.004` | `MUST` |  | `accept` | `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration`, `MarkerTraitsComposeTest.aMarkerCarryingBothALightAndAMobAppliesBothRatherThanOnlyTheFirstOne`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem` |
 | `TRAIT.005` | `MUST` |  | `accept` | `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
 | `TRAIT.006` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole`, `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField` |
 | `TRAIT.007` | `MUST NOT` |  |  | `TraitTest.aSatelliteInheritsNothingSoAnUnlitReplacementIsNotItselfAnOptionalLight` |
@@ -142,7 +142,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.090` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.094` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.091` | `MUST` |  |  | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
-| `TRAIT.095` | `MUST` |  |  | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitPhaseTest.aDecorationTraitBesideASelectionTraitIsNotRefusedForBeingBesideIt` |
+| `TRAIT.095` | `MUST` |  |  | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitPhaseTest.aDecorationTraitBesideASelectionTraitIsNotRefusedForBeingBesideIt`, `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration` |
 | `TRAIT.096` | `MUST` |  |  | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt` |
 | `TRAIT.092` | `MUST NOT` |  |  | `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
 | `TRAIT.093` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
@@ -295,7 +295,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 | Rule | Class | Diagnostic | Fixtures | Tests |
 |---|---|---|---|---|
-| `LOAD.001` | `MUST` |  |  | `CompiledV2PaletteTest.theStagesRunInTheOrderTheTableGivesAndExclusionPrecedesExpansion` |
+| `LOAD.001` | `MUST` |  |  | `CompiledV2PaletteTest.theStagesRunInTheOrderTheTableGivesAndExclusionPrecedesExpansion`, `V2PackGoldenTest.theVersion2PackResolvesToTheGoldenItWasPinnedAgainst`, `V2PackGoldenTest.everyConstructThePackClaimsToExerciseIsInTheCompiledPalette` |
 | `LOAD.002` | `MUST` |  |  | — |
 | `LOAD.003` | `MUST` |  |  | `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
 | `LOAD.004` | `MUST` |  |  | `NodeResolverTest.everyFailureInOneNodeIsCollectedRatherThanTheFirst` |
@@ -305,7 +305,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.013` | `ACCEPT` |  | *n/a* | `PaletteCharacterCheckTest.aVersion2AliasAnsweredByAnotherGroupsPaletteIsReportedAsNeitherErrorNorWarning` |
 | `LOAD.014` | `INVARIANT` |  |  | — |
 | `LOAD.020` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
-| `LOAD.021` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
+| `LOAD.021` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight`, `V2PackGoldenTest.oneMarkersSlotsCarryDifferentTraitsFromEachOther` |
 | `LOAD.022` | `INVARIANT` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
 | `LOAD.023` | `MUST` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
 | `LOAD.024` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred` |
@@ -315,7 +315,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.040` | `INVARIANT` |  |  | `CompiledV2PaletteTest.resolvingAMarkerAtAPositionAllocatesNothing` |
 | `LOAD.041` | `INVARIANT` |  |  | `CompiledV2PaletteTest.resolvingAMarkerAtAPositionAllocatesNothing` |
 | `LOAD.042` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred`, `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag`, `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
-| `LOAD.043` | `INVARIANT` |  |  | `CompiledV2PaletteTest.theResultDependsOnlyOnTheSeedTheMarkerThePositionAndThePalette` |
+| `LOAD.043` | `INVARIANT` |  |  | `CompiledV2PaletteTest.theResultDependsOnlyOnTheSeedTheMarkerThePositionAndThePalette`, `V2PackGoldenTest.theVersion2PackResolvesToTheGoldenItWasPinnedAgainst`, `V2PackGoldenTest.twoIndependentCompilationsOfTheSamePackAgree` |
 | `LOAD.044` | `MUST` |  |  | — |
 | `LOAD.050` | `MUST` |  |  | `CompiledV2PaletteTest.theLoaderCanPrintAMarkersFullyResolvedFormWithItsSharesAndItsTraitProvenance`, `CompiledV2PaletteTest.aShareNoDecimalCanHoldIsPrintedAsTheRationalItIs` |
 | `LOAD.051` | `MUST` |  |  | `CompiledV2PaletteTest.theLoaderCanPrintAMarkersFullyResolvedFormWithItsSharesAndItsTraitProvenance` |
