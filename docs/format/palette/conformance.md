@@ -14,16 +14,16 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT` | 41 | 16 |
 | `REF` | 55 | 14 |
 | `MERGE` | 12 | 4 |
-| `WEIGHT` | 37 | 11 |
+| `WEIGHT` | 38 | 11 |
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
-| `DIAG` | 54 | 0 |
+| `DIAG` | 55 | 0 |
 | `VER` | 24 | 3 |
-| **total** | **303** | **74** |
+| **total** | **305** | **74** |
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (80):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.073`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (79):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.052`, `MODEL.060`, `MODEL.061`, `MODEL.063`, `MODEL.064`, `MODEL.074`, `MODEL.075`, `MODEL.080`, `TRAIT.007`, `TRAIT.008`, `TRAIT.010`, `TRAIT.011`, `TRAIT.020`, `TRAIT.022`, `TRAIT.030`, `TRAIT.032`, `TRAIT.040`, `TRAIT.042`, `TRAIT.050`, `TRAIT.054`, `TRAIT.055`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.072`, `TRAIT.073`, `TRAIT.090`, `TRAIT.091`, `TRAIT.092`, `TRAIT.093`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `CHAR.030`, `CHAR.031`, `LOAD.001`, `LOAD.002`, `LOAD.003`, `LOAD.010`, `LOAD.011`, `LOAD.012`, `LOAD.014`, `LOAD.020`, `LOAD.021`, `LOAD.022`, `LOAD.023`, `LOAD.024`, `LOAD.025`, `LOAD.030`, `LOAD.031`, `LOAD.040`, `LOAD.041`, `LOAD.042`, `LOAD.043`, `LOAD.044`, `LOAD.050`, `LOAD.051`, `DIAG.902`, `VER.007`, `VER.009`, `VER.020`, `VER.021`, `VER.022`, `VER.023`, `VER.030`, `VER.031`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 142 of 303 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 144 of 305 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -87,11 +87,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.064` | `MUST` |  |  | — |
 | `MODEL.070` | `MUST` |  |  | `ExclusionTest.aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade` |
 | `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists` |
-| `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndOneEmptiedListIsNotARefusal`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
-| `MODEL.073` | `MUST` |  |  | — |
+| `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
+| `MODEL.073` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap` |
 | `MODEL.074` | `MUST` |  |  | — |
 | `MODEL.075` | `MUST` |  |  | — |
-| `MODEL.076` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndOneEmptiedListIsNotARefusal`, `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
+| `MODEL.076` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
 | `MODEL.080` | `MUST` |  |  | — |
 | `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource` |
 | `MODEL.082` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
@@ -248,6 +248,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.022` | `MUST` |  |  | `ExclusionTest.whenIsEvaluatedOnceSoEveryPositionSeesTheSameReducedList` |
 | `WEIGHT.023` | `MUST` |  |  | `ExclusionTest.whenAcceptsAModIdAndAPackNamespaceAndNoOtherCondition`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
 | `WEIGHT.024` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay`, `ExclusionTest.aNestedNodeWithNothingLeftIsRemovedFromItsParentRatherThanRefused`, `ExclusionTest.aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade` |
+| `WEIGHT.026` | `MUST` | `DIAG.046` |  | `ExclusionTest.aNodeTheCascadeAbsorbsIsReportedAsAWarningThatDoesNotRefuseTheWorld`, `ExclusionTest.theCascadeWarningIsWithheldWhenNothingSurvivedToDivideTheShare` |
 | `WEIGHT.025` | `MUST NOT` |  |  | `ExclusionTest.aChoiceCarryingATraitKeepsItsSizeWhereAChoiceCarryingAWhenLeavesTheList` |
 | `WEIGHT.030` | `ACCEPT` |  | `accept` | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
 | `WEIGHT.031` | `MUST` |  |  | `ExclusionTest.anAbsentBlockIsDroppedAfterWhenAndBeforeAnyShareIsComputed` |
@@ -263,7 +264,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.060` | `MUST` |  |  | `ApportionTest.slotsGoByLargestRemainderWithTiesToTheLowestIndexAndNoneLeftOver` |
 | `WEIGHT.061` | `INVARIANT` |  |  | `ApportionTest.slotsGoByLargestRemainderWithTiesToTheLowestIndexAndNoneLeftOver` |
 | `WEIGHT.062` | `MUST` |  |  | `ApportionTest.aChoiceRoundingBelowOneSlotStillGetsOneAndTheDeficitComesFromTheLargest` |
-| `WEIGHT.063` | `REJECT` | `DIAG.044` | *n/a* | `ApportionTest.moreAlternativesThanSlotsIsRefusedBecauseEveryOneOfThemIsOwedASlot` |
+| `WEIGHT.063` | `REJECT` | `DIAG.044` | *n/a* | `ApportionTest.moreAlternativesThanSlotsIsRefusedBecauseEveryOneOfThemIsOwedASlot`, `ApportionTest.apportioningNoSharesOrMoreThanThereAreSlotsIsACallersMistakeAndSaysSo` |
 | `WEIGHT.064` | `MUST` |  |  | `ApportionTest.shufflingAListsDeclarationOrderDoesNotChangeItsDistribution` |
 
 ### `palette/06-characters.md`
@@ -318,11 +319,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 | Rule | Class | Diagnostic | Fixtures | Tests |
 |---|---|---|---|---|
-| `DIAG.900` | `MUST` |  |  | `DiagCatalogueTest.everyCatalogueRowNamesWhatItIsAboutAndWhatToWriteInstead`, `V2ChainTest.theTwoSentencesOfDiag036AreChosenByTheFileThatWroteTheEntry` |
+| `DIAG.900` | `MUST` |  |  | `DiagCatalogueTest.everyCatalogueRowNamesWhatItIsAboutAndWhatToWriteInstead`, `ApportionTest.moreAlternativesThanSlotsIsRefusedBecauseEveryOneOfThemIsOwedASlot`, `V2ChainTest.theTwoSentencesOfDiag036AreChosenByTheFileThatWroteTheEntry` |
 | `DIAG.901` | `MUST` |  |  | `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom` |
 | `DIAG.902` | `MUST` |  |  | — |
 | `DIAG.903` | `MUST` |  |  | `DiagCatalogueTest.severalDiagnosticsAreReportedTogetherRatherThanOneAtATime`, `NodeResolverTest.everyDiagnosticResolutionReportsCarriesItsCatalogueRow`, `NodeResolverTest.everyFailureInOneNodeIsCollectedRatherThanTheFirst`, `NodeResolverTest.aDiagnosticNamingSeveralPlacementListsOrdersThemByPlacement` |
-| `DIAG.904` | `MUST` |  |  | `DiagCatalogueTest.aDiagnosticIsAnErrorOrAWarningAndThereIsNoThirdLevel` |
+| `DIAG.904` | `MUST` |  |  | `DiagCatalogueTest.aDiagnosticIsAnErrorOrAWarningAndThereIsNoThirdLevel`, `ExclusionTest.aNodeTheCascadeAbsorbsIsReportedAsAWarningThatDoesNotRefuseTheWorld` |
 | `DIAG.001` | `DIAG` |  |  | — |
 | `DIAG.002` | `DIAG` |  |  | — |
 | `DIAG.003` | `DIAG` |  |  | — |
@@ -361,6 +362,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.042` | `DIAG` |  |  | — |
 | `DIAG.043` | `DIAG` |  |  | — |
 | `DIAG.044` | `DIAG` |  |  | — |
+| `DIAG.046` | `DIAG` |  |  | — |
 | `DIAG.050` | `DIAG` |  |  | — |
 | `DIAG.051` | `DIAG` |  |  | — |
 | `DIAG.052` | `DIAG` |  |  | — |

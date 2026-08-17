@@ -109,8 +109,9 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.041` | [WEIGHT.013](05-weights.md#2-share-weight-and-rest) | *`<asset>` marker `'<m>'`: `<`<n>` choices declare `rest`` / ``rest` is declared beside `<n>` weighted choices>`. `rest` is the single choice that takes what the shares leave; weighted choices already divide that between them.* |
 | `DIAG.045` | [WEIGHT.014](05-weights.md#2-share-weight-and-rest), [WEIGHT.019](05-weights.md#21-composition) | *`<asset>` marker `'<m>'`: shares total `<n>``< — <a> written here and <b> spread from '<id>'>`. `<Shares must leave something for the weight choices` / `Shares must total exactly 1 when nothing takes the remainder>`.* |
 | `DIAG.042` | *retired — see tombstones* | — |
-| `DIAG.043` | [WEIGHT.024](05-weights.md#3-when), [WEIGHT.032](05-weights.md#4-absent-blocks) | *`<asset>` marker `'<m>'`: every choice was excluded — `<n>` by `when`, `<n>` by absent blocks. The marker would generate as air; give it a choice that always applies.* |
-| `DIAG.044` | [WEIGHT.063](05-weights.md#7-rounding) | *`<asset>` marker `'<m>'`: `<n>` choices exceed the 128 slots available, so some would be dropped. Reduce the list, or nest the rare choices under one weighted choice.* |
+| `DIAG.043` | [WEIGHT.024](05-weights.md#3-when), [WEIGHT.032](05-weights.md#4-absent-blocks) | *`<asset>` marker `'<m>'`: every alternative was excluded — `<n>` by `when`, `<n>` by absent blocks. The marker would generate as air; give it an alternative that always applies.* |
+| `DIAG.044` | [WEIGHT.063](05-weights.md#7-rounding) | *`<asset>` marker `'<m>'`: `<n>` alternatives, flattened, exceed the 128 slots available, so one of them could not be given a slot. Reduce the number of alternatives, or move some of them to a marker of their own.* |
+| `DIAG.046` | [WEIGHT.026](05-weights.md#3-when) | *`<asset>` marker `'<m>'` `<via>`: a nested `<kind>` lost every alternative — `<n>` by `when`, `<n>` by absent blocks — and was itself removed from the list it is a choice of. The choices around it divide its share; remove it, or name content this installation has.* |
 
 ### Characters
 

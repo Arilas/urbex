@@ -102,7 +102,9 @@ public final class Exclusion {
      * A marker's node with every excluded alternative removed, or empty with {@code DIAG.043} when the
      * marker is left with nothing.
      * <p>
-     * <b>This is the only place {@code DIAG.043} is raised, and that is {@code WEIGHT.024}'s cascade.</b>
+     * <b>This is the only place {@code DIAG.043} is raised</b> - the file has one public entry point, and
+     * the brief's second one ({@code apply}, over a bare list) was deleted rather than left to raise the
+     * row from a second place with no caller and no test. <b>That is {@code WEIGHT.024}'s cascade:</b>
      * A <em>nested</em> node all of whose alternatives are excluded is removed from the list it is a
      * choice of rather than refused, upward until either something survives or the marker's own node is
      * empty. The format would otherwise recommend a shape it rejects: {@code DIAG.044}'s remedy is "nest
@@ -121,7 +123,7 @@ public final class Exclusion {
     public static Optional<ResolvedNode> prune(ResolvedNode node, Presence presence,
                                                PointerResolver.Site site, Diagnostics diagnostics) {
         Removed removed = new Removed();
-        Optional<ResolvedNode> pruned = exclude(node, presence, site, removed);
+        Optional<ResolvedNode> pruned = exclude(node, presence, site, removed, diagnostics);
         if (pruned.isEmpty()) {
             diagnostics.error(Diag.DIAG_043, site.location(), removed.byWhen, removed.byAbsentBlock);
         }
@@ -136,20 +138,23 @@ public final class Exclusion {
      * unchanged: {@code WEIGHT.030} drops "a choice", and a marker naming an absent block is
      * {@code MODEL.042}, which resolves to air and lets the load succeed.
      * <p>
-     * Nothing here reports, so there is no path on which a cascade prints a diagnostic about a node the
+     * Nothing here raises an <em>error</em>, so there is no path on which a cascade refuses a node the
      * parent then absorbs. {@link #prune} is the one caller that turns an empty result into
-     * {@code DIAG.043}, and it is only ever the marker's own node.
+     * {@code DIAG.043}, and it is only ever the marker's own node. {@code DIAG.046} is a warning and is
+     * raised by {@link #keep}, which is where a cascade is known to have been absorbed.
      */
     private static Optional<ResolvedNode> exclude(ResolvedNode node, Presence presence,
-                                                  PointerResolver.Site site, Removed removed) {
+                                                  PointerResolver.Site site, Removed removed,
+                                                  Diagnostics diagnostics) {
         return switch (node.source()) {
             case ResolvedNode.Source.Weighted weighted -> {
                 List<ResolvedNode.Choice> kept =
-                        keep(weighted.choices(), presence, site, "choice", removed);
+                        keep(weighted.choices(), presence, site, "choice", removed, diagnostics);
                 yield kept.isEmpty() ? Optional.empty() : Optional.of(new ResolvedNode(node.kind(),
                         new ResolvedNode.Source.Weighted(kept), node.traits()));
             }
-            case ResolvedNode.Source.Socket socket -> socket(node, socket, presence, site, removed);
+            case ResolvedNode.Source.Socket socket ->
+                    socket(node, socket, presence, site, removed, diagnostics);
             default -> Optional.of(node);
         };
     }
@@ -163,21 +168,31 @@ public final class Exclusion {
      * weighted node does. {@code MODEL.072} refuses a socket that <em>declares</em> no candidate; this is
      * the same absence arriving from the installed environment instead.
      * <p>
+     * <b>An emptied list is dropped from the map rather than kept empty,</b> so {@code MODEL.073}'s
+     * "falls through the opportunities that have nothing to place" is structural rather than a rule the
+     * chunk assembler has to remember. It was kept as an empty list until this round, and that state was
+     * a crash waiting for Task 7: {@code Apportion.materialise} on an empty candidate list indexes a
+     * zero-length array, which is a stack trace where {@code DIAG.043} or nothing at all is the answer.
+     * A socket with an empty {@code floor} and a surviving {@code ceiling} is a shape this deliberately
+     * produces, so the crash was on the ordinary path and not on an edge.
+     * <p>
      * A list emptied while another survives is not an exclusion at all: {@code MODEL.072} asks for a
-     * candidate in one of the four, not in all of them, and {@code MODEL.073} tries the opportunities in
-     * a fixed order and falls through the ones with nothing to place.
+     * candidate in one of the four, not in all of them.
      */
     private static Optional<ResolvedNode> socket(ResolvedNode node,
                                                  ResolvedNode.Source.Socket socket,
                                                  Presence presence, PointerResolver.Site site,
-                                                 Removed removed) {
+                                                 Removed removed, Diagnostics diagnostics) {
         Map<Kind.Placement, List<ResolvedNode.Choice>> kept = new LinkedHashMap<>();
         for (Map.Entry<Kind.Placement, List<ResolvedNode.Choice>> list : socket.placements()
                 .entrySet()) {
-            kept.put(list.getKey(), keep(list.getValue(), presence,
-                    site.inside("'" + list.getKey().key() + "'"), "candidate", removed));
+            List<ResolvedNode.Choice> candidates = keep(list.getValue(), presence,
+                    site.inside("'" + list.getKey().key() + "'"), "candidate", removed, diagnostics);
+            if (!candidates.isEmpty()) {
+                kept.put(list.getKey(), candidates);
+            }
         }
-        if (kept.values().stream().allMatch(List::isEmpty)) {
+        if (kept.isEmpty()) {
             return Optional.empty();
         }
         return Optional.of(new ResolvedNode(node.kind(),
@@ -185,33 +200,23 @@ public final class Exclusion {
     }
 
     /**
-     * One list, with the alternatives its conditions exclude removed ({@code WEIGHT.020},
-     * {@code WEIGHT.030}), or empty when every one of them went ({@code WEIGHT.024},
-     * {@code WEIGHT.032}).
+     * Walks one list, keeping what survives and counting what did not, by the rule that took it.
      * <p>
-     * The brief's entry point, and the shape a caller holding a bare list wants: it treats that list as a
-     * root, so an emptied one is {@code DIAG.043} rather than a cascade. A list <em>inside</em> a tree
-     * goes through {@link #prune}, which is where the cascade lives.
+     * <b>Where {@code WEIGHT.026}'s warning is raised, and why here.</b> A choice whose whole subtree was
+     * excluded is absorbed - {@code WEIGHT.024}'s cascade - and this is the one place that is known to
+     * have <em>happened</em> rather than to be about to. The warnings are held until the list is walked
+     * and then dropped if nothing survived, because {@code DIAG.046} says "the choices around it divide
+     * its share", which is false when there are no choices around it and something further up is about
+     * to report the real failure. That is conservative in one direction: a socket whose {@code floor}
+     * empties while its {@code ceiling} survives loses the warning about a node absorbed inside
+     * {@code floor}, because this list cannot see that the socket lived. Never false, sometimes silent.
      */
-    public static Optional<List<ResolvedNode.Choice>> apply(List<ResolvedNode.Choice> choices,
-                                                            Presence presence,
-                                                            PointerResolver.Site site,
-                                                            String position,
-                                                            Diagnostics diagnostics) {
-        Removed removed = new Removed();
-        List<ResolvedNode.Choice> survivors = keep(choices, presence, site, position, removed);
-        if (survivors.isEmpty()) {
-            diagnostics.error(Diag.DIAG_043, site.location(), removed.byWhen, removed.byAbsentBlock);
-            return Optional.empty();
-        }
-        return Optional.of(survivors);
-    }
-
-    /** Walks one list, keeping what survives and counting what did not, by the rule that took it. */
     private static List<ResolvedNode.Choice> keep(List<ResolvedNode.Choice> choices,
                                                   Presence presence, PointerResolver.Site site,
-                                                  String position, Removed removed) {
+                                                  String position, Removed removed,
+                                                  Diagnostics diagnostics) {
         List<ResolvedNode.Choice> survivors = new ArrayList<>();
+        List<Cascaded> absorbed = new ArrayList<>();
         for (int index = 0; index < choices.size(); index++) {
             ResolvedNode.Choice choice = choices.get(index);
             if (choice.when().isPresent() && !holds(choice.when().get(), presence)) {
@@ -224,14 +229,33 @@ public final class Exclusion {
                 removed.byAbsentBlock++;
                 continue;
             }
-            // Empty means the whole subtree was excluded, so this choice goes with it - WEIGHT.024's
-            // cascade. Its own counts are already in `removed`, which is what keeps DIAG.043's two
-            // numbers a count of causes rather than of nodes.
-            exclude(choice.node(), presence, site.inside(position + " " + index), removed)
-                    .ifPresent(pruned -> survivors.add(new ResolvedNode.Choice(pruned,
-                            choice.size(), choice.when(), choice.spreadFrom())));
+            // Counted into a Removed of its own so that DIAG.046 can name what this subtree lost, then
+            // folded into the parent's: DIAG.043's two numbers are a count of causes across the whole
+            // tree, and "a node that cascaded" is not a cause an author can act on.
+            PointerResolver.Site inside = site.inside(position + " " + index);
+            Removed subtree = new Removed();
+            Optional<ResolvedNode> pruned =
+                    exclude(choice.node(), presence, inside, subtree, diagnostics);
+            removed.byWhen += subtree.byWhen;
+            removed.byAbsentBlock += subtree.byAbsentBlock;
+            if (pruned.isEmpty()) {
+                absorbed.add(new Cascaded(inside.location(), choice.node().kind().key(), subtree));
+                continue;
+            }
+            survivors.add(new ResolvedNode.Choice(pruned.get(), choice.size(), choice.when(),
+                    choice.spreadFrom()));
+        }
+        if (!survivors.isEmpty()) {
+            for (Cascaded cascade : absorbed) {
+                diagnostics.warn(Diag.DIAG_046, cascade.location, cascade.kind,
+                        cascade.removed.byWhen, cascade.removed.byAbsentBlock);
+            }
         }
         return List.copyOf(survivors);
+    }
+
+    /** One node absorbed by {@code WEIGHT.024}'s cascade, pending {@code WEIGHT.026}'s warning. */
+    private record Cascaded(String location, String kind, Removed removed) {
     }
 
     /**

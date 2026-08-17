@@ -214,13 +214,32 @@ public enum Diag {
      */
     DIAG_042("—"),
 
-    /** {@code WEIGHT.024}, {@code WEIGHT.032}: args are the location, the when count, the absent count. */
-    DIAG_043("%s: every choice was excluded - %s by 'when', %s by absent blocks."
-            + " The marker would generate as air; give it a choice that always applies."),
+    /**
+     * {@code WEIGHT.024}, {@code WEIGHT.032}: args are the location, the when count, the absent count.
+     * <p>
+     * "Alternative" rather than "choice", because the row is raised about a {@code light_socket} as well
+     * as a {@code weighted} node and a socket has candidates, not choices - and because a one-element
+     * list reading "every choice was excluded - 3 by absent blocks" said something the reader had to
+     * reconcile. The counts are of causes across the whole subtree, which is what makes three of them
+     * possible under one choice.
+     */
+    DIAG_043("%s: every alternative was excluded - %s by 'when', %s by absent blocks."
+            + " The marker would generate as air; give it an alternative that always applies."),
 
-    /** {@code WEIGHT.063}: args are the location and the choice count. */
-    DIAG_044("%s: %s choices exceed the 128 slots available, so some would be dropped."
-            + " Reduce the list, or nest the rare choices under one weighted choice."),
+    /**
+     * {@code WEIGHT.063}: args are the location and the flattened alternative count.
+     * <p>
+     * <b>The remedy was false and is rewritten.</b> It read "Reduce the list, or nest the rare choices
+     * under one weighted choice", which worked while {@code WEIGHT.063} counted one list's elements and
+     * does nothing now that it counts the flattened tree: 150 leaves are 150 leaves however they are
+     * grouped, so the message told an author to do the thing they had already done. {@code DIAG.900}
+     * requires a remedy, and a remedy that cannot work is not one. What does work is having fewer
+     * alternatives, or giving some of them a marker of their own - 128 is a budget per node, not per
+     * palette.
+     */
+    DIAG_044("%s: %s alternatives, flattened, exceed the 128 slots available,"
+            + " so one of them could not be given a slot."
+            + " Reduce the number of alternatives, or move some of them to a marker of their own."),
 
     /**
      * {@code WEIGHT.014}, {@code WEIGHT.019}: args are the location, the total, the clause naming where
@@ -235,6 +254,21 @@ public enum Diag {
      * It is empty whenever every share in the sum was written where the diagnostic points.
      */
     DIAG_045("%s: shares total %s%s. %s."),
+
+    /**
+     * {@code WEIGHT.026}: args are the location of the removed node, its kind, the when count and the
+     * absent count.
+     * <p>
+     * <b>The only warning in the catalogue, and the reason it is one.</b> {@code WEIGHT.024}'s cascade
+     * is the single structural change a load-time condition can make that would otherwise leave no
+     * trace: dropping a choice shows up in what generates, and dropping the node the choices were
+     * nested under makes a pack look, from the inside, like a pack that never had them. Refusing would
+     * refuse a pack that is working as written ({@code WEIGHT.030}), so by {@code DIAG.904} this is the
+     * other level - it does not refuse the world, and it does not reach {@link Diagnostics#asError()}.
+     */
+    DIAG_046("%s: a nested %s lost every alternative - %s by 'when', %s by absent blocks - and was"
+            + " itself removed from the list it is a choice of. The choices around it divide its"
+            + " share; remove it, or name content this installation has."),
 
     // ---- Characters (050-059) ------------------------------------------------------------------
 

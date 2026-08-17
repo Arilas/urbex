@@ -87,7 +87,7 @@ compiles to: that number is an implementation detail of
 > any `weight` or `rest` choice, and shares not summing to 1 are refused when it has none.
 
 > **WEIGHT.015** · `INVARIANT` — The distribution of a list does not depend on the order its choices
-> are declared in.
+> are declared in, except for the single-slot tie break WEIGHT.064 allows.
 
 > > **Why** — version 1 read weights as absolute counts filled in declaration order until 128 slots
 > > were full, so order decided what got truncated, and an earlier draft of this document kept that
@@ -199,7 +199,16 @@ a quarter of the result and the inherited choices keep their ratios across the o
 
 > **WEIGHT.021** · `MUST` — A removed choice's size goes to the survivors: a removed `weight` leaves
 > the remaining weights to divide the same fraction, and a removed `share` is redistributed to the
-> `weight` choices, or in proportion to the remaining shares if there are none.
+> `weight` choices, or in proportion to the remaining shares if there are none. When what is removed
+> is the *last* `weight`, or the `rest` itself, nothing is left to take the remainder, and the
+> surviving shares divide the whole node in proportion to each other by the same rule.
+
+> > **Why the last one is stated separately** — because it is the one case where removal changes which
+> > clause of this rule applies rather than only what it applies to. `{share 0.25, share 0.25, weight
+> > 1}` on an installation without the weight's block is `[0.5, 0.5]`, and `{share 0.25, rest}` without
+> > the `rest`'s block is `[1]`. Both are the last sentence, and without it WEIGHT.005's promise that
+> > the survivors' sizes "follow from WEIGHT.021" would be false for exactly the two shapes an author
+> > is most likely to reach by writing one optional cross-mod entry.
 
 > **WEIGHT.022** · `MUST` — `when` is evaluated exactly once, at load. Every position resolving this
 > node sees the same reduced list.
@@ -217,20 +226,42 @@ a quarter of the result and the inherited choices keep their ratios across the o
 > > **Why** — the alternative is a marker that silently becomes air, which is the failure mode a
 > > pack notices only by looking at a chunk.
 
-> > **Why a nested node cascades rather than refusing** — because the format otherwise recommends a
-> > shape it rejects. DIAG.044's remedy is "nest the rare choices under one weighted choice", and the
-> > rare choices are the ones carrying `when` — so an author following that advice on a vanilla
-> > install would be refused for doing what the diagnostic told them to. Nothing is lost by
-> > cascading: an emptied nested node has a parent that divides the remainder between the choices
-> > that are left, which is WEIGHT.021 with no new mechanism. The `> Why` above is a statement about
-> > a *root* — only there is there nothing left to take the share — and DIAG.043's message says so in
-> > those words.
+> > **Why a nested node cascades rather than refusing** — because the `> Why` above is a statement
+> > about a *root*. Only at a marker's own node is there nothing left to take the share; a nested one
+> > has a parent that divides the remainder between the choices that are left, which is WEIGHT.021
+> > with no new mechanism, and DIAG.043's message says as much in its own words ("the marker would
+> > generate as air"), which is false of a nested node. Refusing there would also refuse a shape this
+> > format positively invites: grouping the rare, optional, cross-mod entries under one choice is the
+> > natural way to write them, and DIAG.044's remedy recommended it in so many words until
+> > WEIGHT.063 was rescoped to the flattened tree.
+
+> > **What is lost, and what replaces it** — a nested node leaving the tree is a structural change a
+> > `when` makes with nothing refusing it, which is the one thing refusing bought. WEIGHT.026 is what
+> > replaces it: the cascade is reported, as a warning, so the change leaves a trace without refusing
+> > a pack that is working as written.
 
 > > **Why a `light_socket` is named here** — its placement lists are lists like any other, whose
 > > candidates accept `when` by MODEL.076, and by MODEL.070 the candidates are its only block source.
 > > So a socket with none generates as air exactly as an emptied `weighted` node does, and DIAG.043's
 > > message is true of it word for word. MODEL.072 refuses a socket that *declares* no candidate;
 > > this is the same absence arriving from the installed environment instead.
+
+> **WEIGHT.026** · `MUST` (`DIAG.046`) — A node removed by WEIGHT.024's cascade is reported as a
+> warning, naming how many of its alternatives went each way. It is a warning and not a rejection: by
+> DIAG.904 a warning does not refuse the world, and this one does not.
+
+> > **Why** — the cascade is the only structural change a load-time condition can make to a palette
+> > that would otherwise leave no trace anywhere. Dropping a *choice* is visible in what generates;
+> > dropping the node the choices were nested under changes the shape of the tree, and a pack that
+> > loses a whole group of alternatives on a vanilla install would look, from the inside, exactly like
+> > a pack that never had them. WEIGHT.030's leniency is about not refusing such a pack, not about
+> > saying nothing to its author.
+
+> > **Why it is reported where the node was and not where the marker is** — the remedy is per node:
+> > either that choice should not have been written for this installation, or the mod it names should
+> > be installed, and both are decisions about the one nested list. The warning is not raised at all
+> > when the list that absorbed the node is itself empty, because "the choices around it divide its
+> > share" would then be false and something further up is about to report the real failure.
 
 ```json fixture:WEIGHT.024 reject=DIAG.043
 { "version": 2, "palette": { "c": { "kind": "weighted", "choices": [

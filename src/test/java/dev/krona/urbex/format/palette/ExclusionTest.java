@@ -314,12 +314,20 @@ class ExclusionTest {
 
     /**
      * A socket's candidates are excluded by the same rules ({@code MODEL.076}), and a list emptied
-     * beside a list that survives is not a refusal ({@code MODEL.072}).
+     * beside a list that survives is not a refusal ({@code MODEL.072}) - it leaves the map.
+     * <p>
+     * <b>Leaves the map, rather than staying as an empty list, and that is a crash fix.</b>
+     * {@code MODEL.073} says placement "falls through the opportunities that have nothing to place", and
+     * an emptied list kept in the map is that rule as something the chunk assembler has to remember:
+     * {@code Apportion.materialise} over a zero-length candidate list indexes an empty array. This shape
+     * is one exclusion deliberately produces, so the crash was on the ordinary path. Asserting the key is
+     * <em>absent</em> is what keeps the fall-through structural.
      */
     @Test
     @Rule("MODEL.076")
     @Rule("MODEL.072")
-    void aSocketsCandidatesAreExcludedTooAndOneEmptiedListIsNotARefusal() {
+    @Rule("MODEL.073")
+    void aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap() {
         ResolvedNode pruned = pruneNode("""
                 { "version": 2, "palette": { "T": { "kind": "light_socket",
                     "floor": [ { "weight": 1, "block": "nosuchmod:lamp" } ],
@@ -327,8 +335,65 @@ class ExclusionTest {
                 """, presence(Set.of(), Set.of("minecraft")), new Diagnostics()).orElseThrow();
         ResolvedNode.Source.Socket socket =
                 assertInstanceOf(ResolvedNode.Source.Socket.class, pruned.source());
-        assertTrue(socket.placements().get(Kind.Placement.FLOOR).isEmpty());
+        assertEquals(Set.of(Kind.Placement.CEILING), socket.placements().keySet(),
+                "the emptied 'floor' is gone, not present and empty");
         assertEquals(1, socket.placements().get(Kind.Placement.CEILING).size());
+    }
+
+    /**
+     * {@code WEIGHT.026}: a node the cascade absorbs is reported as a warning, and the warning does not
+     * refuse the world.
+     * <p>
+     * The cascade is the only structural change a `when` can make that would otherwise leave no trace: a
+     * dropped choice shows up in what generates, and a dropped <em>node</em> makes a pack look, from the
+     * inside, like a pack that never had those alternatives. {@code WEIGHT.030}'s leniency is about not
+     * refusing such a pack, not about saying nothing to its author.
+     */
+    @Test
+    @Rule("WEIGHT.026")
+    @Rule("DIAG.904")
+    void aNodeTheCascadeAbsorbsIsReportedAsAWarningThatDoesNotRefuseTheWorld() {
+        Diagnostics diagnostics = new Diagnostics();
+        assertTrue(pruneNode("""
+                { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
+                    { "weight": 3, "block": "minecraft:stone_bricks" },
+                    { "weight": 1, "kind": "weighted", "choices": [
+                        { "weight": 1, "block": "minecraft:andesite", "when": { "mod": "create" } },
+                        { "weight": 1, "block": "nosuchmod:sky_stone_block" } ] } ] } } }
+                """, presence(Set.of(), Set.of("minecraft")), diagnostics).isPresent());
+
+        assertEquals(1, diagnostics.all().size());
+        Diagnostics.Entry warning = diagnostics.all().get(0);
+        assertEquals(Diagnostics.Level.WARN, warning.level());
+        assertTrue(Diag.DIAG_046.matches(warning.message()), warning.message());
+        assertTrue(warning.message().contains("nested weighted"), warning.message());
+        assertTrue(warning.message().contains("1 by 'when', 1 by absent blocks"), warning.message());
+        assertTrue(warning.message().contains("choice 1"),
+                () -> "reported where the node was, since the remedy is about that list: "
+                        + warning.message());
+        assertFalse(diagnostics.hasFatal(), "a warning does not refuse the world");
+        assertTrue(diagnostics.asError().isEmpty());
+    }
+
+    /**
+     * {@code WEIGHT.026}'s warning is withheld when the list that absorbed the node is itself empty.
+     * <p>
+     * {@code DIAG.046} says "the choices around it divide its share", which is false when there are none
+     * - and something further up is about to report the real failure, which here is {@code DIAG.043} at
+     * the marker. A warning that is true of a file it does not describe is the shape this stack has now
+     * corrected six times; the cheapest way not to add a seventh is not to raise it.
+     */
+    @Test
+    @Rule("WEIGHT.026")
+    void theCascadeWarningIsWithheldWhenNothingSurvivedToDivideTheShare() {
+        Diagnostics diagnostics = new Diagnostics();
+        assertTrue(pruneNode("""
+                { "version": 2, "palette": { "#": { "kind": "weighted", "choices": [
+                    { "weight": 1, "kind": "weighted", "choices": [
+                        { "weight": 1, "block": "nosuchmod:a" } ] } ] } } }
+                """, presence(Set.of(), Set.of("minecraft")), diagnostics).isEmpty());
+        assertEquals(1, diagnostics.all().size(), "the refusal, and nothing beside it");
+        assertEquals(Diag.DIAG_043, diagnostics.all().get(0).diag());
     }
 
     // ---- Helpers -------------------------------------------------------------------------------

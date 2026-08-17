@@ -311,9 +311,25 @@ public final class Apportion {
      * {@code slotCount = n - z}, which forces {@code z = 0} and no transfer at all. {@code WEIGHT.063} is
      * what keeps {@code n <= slotCount} true, and {@link #materialise} raises it.
      *
-     * @param shares exact, in declaration order, summing to 1
+     * <b>The dependency on {@code WEIGHT.063} is enforced, not assumed.</b> This method is public and
+     * the argument above holds only while there is at least one share and no more than {@code slotCount}
+     * of them; outside that range it would quietly hand back an array violating {@code WEIGHT.062}, or
+     * index a zero-length one. Both were reachable: an empty list is what a socket's emptied placement
+     * list used to be, and {@link #materialise} raising {@code DIAG.044} is a check a second caller could
+     * simply not have made. A precondition is the honest shape - these are not malformed datapacks, they
+     * are callers using this wrongly, and {@code 08-errors.md} catalogues the former only.
+     *
+     * @param shares exact, in declaration order, summing to 1; at least one and at most {@code slotCount}
+     * @throws IllegalArgumentException when that is not so
      */
     public static int[] slots(List<Fraction> shares, int slotCount) {
+        if (shares.isEmpty()) {
+            throw new IllegalArgumentException("no shares to apportion " + slotCount + " slots over");
+        }
+        if (shares.size() > slotCount) {
+            throw new IllegalArgumentException(shares.size() + " shares over " + slotCount
+                    + " slots cannot satisfy WEIGHT.062; the caller owes a DIAG.044");
+        }
         int[] slots = new int[shares.size()];
         List<Fraction> remainders = new ArrayList<>();
         int assigned = 0;
@@ -365,6 +381,11 @@ public final class Apportion {
      * tree of four lists of fifty is 200 alternatives competing for 128 slots with no list in it anywhere
      * near the limit. The check subsumes the older wording, since a single list of more than 128 choices
      * flattens to at least that many leaves.
+     *
+     * @param choices a list {@link Exclusion} has already pruned, and therefore non-empty: an emptied
+     *                list either cascaded out of its parent or refused the marker with {@code DIAG.043},
+     *                so one arriving here is a caller that skipped stage 4's first half rather than a
+     *                datapack. {@link #slots} says so with a precondition
      */
     public static Optional<ResolvedNode[]> materialise(List<ResolvedNode.Choice> choices,
                                                        PointerResolver.Site site,

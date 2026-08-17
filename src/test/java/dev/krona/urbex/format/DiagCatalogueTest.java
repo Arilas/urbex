@@ -228,16 +228,6 @@ class DiagCatalogueTest {
     }
 
     /**
-     * The words of a message, with punctuation and placeholder brackets dropped.
-     * <p>
-     * Punctuation has to go, because the same word carries different punctuation in the two places:
-     * a catalogue row writes {@code is registered`<, and nothing loaded…>`} where a produced message
-     * writes {@code is registered.}, and the row spells its dash as an em dash where a message written
-     * for a log spells it as a hyphen. Comparing those would compare typesetting. A colon and a dollar
-     * stay part of a word, because {@code urbex:damaged} and {@code $imports} are single words that a
-     * reader would notice changing.
-     */
-    /**
      * Every clause a catalogue row delegates is either a slot in the template or spelled out in it.
      * <p>
      * <b>The hole the two word-subset guards above have, and why it took two rows to find.</b> Both
@@ -345,6 +335,16 @@ class DiagCatalogueTest {
         return outside.toString();
     }
 
+    /**
+     * The words of a message, with punctuation and placeholder brackets dropped.
+     * <p>
+     * Punctuation has to go, because the same word carries different punctuation in the two places:
+     * a catalogue row writes {@code is registered`<, and nothing loaded…>`} where a produced message
+     * writes {@code is registered.}, and the row spells its dash as an em dash where a message written
+     * for a log spells it as a hyphen. Comparing those would compare typesetting. A colon and a dollar
+     * stay part of a word, because {@code urbex:damaged} and {@code $imports} are single words that a
+     * reader would notice changing.
+     */
     private static Set<String> words(String text) {
         Set<String> words = new LinkedHashSet<>();
         for (String word : Diag.normalise(text).split("[^\\p{Alnum}$:_]+")) {

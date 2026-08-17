@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -82,7 +83,6 @@ class ApportionTest {
                 shares(resolved, '#'));
     }
 
-    /** {@code WEIGHT.013}: more than one {@code rest}, or a {@code rest} beside a {@code weight}. */
     /**
      * {@code WEIGHT.016}: a weight added to a spread list of weights takes its proportional part of the
      * combined total, whatever that total is.
@@ -112,6 +112,7 @@ class ApportionTest {
                 "four tenths of a total of ten, and the inherited three keep their 3:2:1");
     }
 
+    /** {@code WEIGHT.013}: more than one {@code rest}, or a {@code rest} beside a {@code weight}. */
     @Test
     @Rule("WEIGHT.013")
     void moreThanOneRestOrARestBesideAWeightIsRefusedOnTheExpandedList() {
@@ -375,22 +376,60 @@ class ApportionTest {
      * <p>
      * Both shapes are driven, and they are the same refusal: a single list of 129 choices, and a nested
      * tree of three lists of 50 in which no list is anywhere near 128. The second is the one the rule's
-     * own wording does not reach and its {@code > Why} does - a report entry says so - since it is the
-     * flattened count, not any one list's length, that decides whether every alternative can have a slot.
+     * older wording did not reach - it is the flattened count, not any one list's length, that decides
+     * whether every alternative can have a slot, and the rule now says so.
+     * <p>
+     * <b>The remedy is asserted, not only the identifier.</b> The row used to say "nest the rare choices
+     * under one weighted choice", which the rescoping made false - this test's own nested tree is
+     * <em>already</em> three nested lists, so the message told the author to do what they had done.
+     * {@code DIAG.900} requires a remedy; asserting the remedy is absent from the input's own shape is
+     * what stops the row drifting back to advice that does nothing.
      */
     @Test
     @Rule("WEIGHT.063")
+    @Rule("DIAG.900")
     void moreAlternativesThanSlotsIsRefusedBecauseEveryOneOfThemIsOwedASlot() {
         assertEquals(Diag.DIAG_044, materialisationRefusalOf(generatedList(129)).diag());
 
         Refusal nested = materialisationRefusalOf(generatedTree(3, 50));
         assertEquals(Diag.DIAG_044, nested.diag());
-        assertTrue(nested.message().contains("150 choices"), nested.message());
+        assertTrue(nested.message().contains("150 alternatives"), nested.message());
+        assertFalse(nested.message().contains("nest"),
+                () -> "the input is already nested three deep, so nesting cannot be the remedy: "
+                        + nested.message());
 
         // And 128 exactly is accepted, with every one of them holding a slot: the boundary is where
         // WEIGHT.062 stops being satisfiable, not one short of it.
         ResolvedNode[] slots = materialise(generatedList(128));
         assertEquals(128, Arrays.stream(slots).distinct().count());
+    }
+
+    /**
+     * The two ranges {@link Apportion#slots} cannot serve are preconditions rather than diagnostics.
+     * <p>
+     * {@code WEIGHT.062}'s "take the deficit from the largest" is only sound while there is at least one
+     * share and no more than {@code slotCount} of them, and this method is public - so the argument that
+     * {@code WEIGHT.063} guards it has to be enforced where it is relied on rather than described in a
+     * javadoc. Both were reachable: an emptied socket placement list used to be kept as an empty list,
+     * which reached here and indexed a zero-length array. Neither is a malformed datapack, so neither
+     * takes a catalogue row - {@code 08-errors.md} enumerates the rejections the <em>format</em>
+     * performs.
+     */
+    @Test
+    @Rule("WEIGHT.063")
+    void apportioningNoSharesOrMoreThanThereAreSlotsIsACallersMistakeAndSaysSo() {
+        assertThrows(IllegalArgumentException.class,
+                () -> Apportion.slots(List.of(), Apportion.SLOTS));
+        List<Fraction> tooMany = new ArrayList<>();
+        for (int index = 0; index < Apportion.SLOTS + 1; index++) {
+            tooMany.add(Fraction.of(1, Apportion.SLOTS + 1));
+        }
+        assertThrows(IllegalArgumentException.class,
+                () -> Apportion.slots(tooMany, Apportion.SLOTS));
+        // And exactly slotCount is served, which is the boundary WEIGHT.062 stops being satisfiable at.
+        assertEquals(Apportion.SLOTS,
+                Arrays.stream(Apportion.slots(tooMany.subList(0, Apportion.SLOTS), Apportion.SLOTS))
+                        .sum());
     }
 
     /**
