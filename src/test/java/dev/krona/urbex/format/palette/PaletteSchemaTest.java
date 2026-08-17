@@ -7,6 +7,7 @@ import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
+import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.SpecDocuments;
 import dev.krona.urbex.format.palette.traits.BlockEntityNbt;
 import dev.krona.urbex.format.palette.traits.Damaged;
@@ -55,8 +56,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * every fixture the specification defines, run through this schema, and asserted at whichever strength
  * the schema can actually claim - {@code accept} for every {@code accept}/{@code equiv} fixture, and
  * {@code reject} for the subset of {@code reject} fixtures whose refusal is a shape a JSON Schema can
- * express (an unknown key, a kind-specific key on the wrong kind, an out-of-range number, two keys that
- * are never both legal) rather than a fact about another document or the installed game.
+ * express (an unknown key, a kind-specific key on the wrong kind, a missing required key, an out-of-range
+ * number, two keys that are never both legal) rather than a fact about another document or the installed
+ * game.
  * {@link #SHAPE_LEVEL_REJECTIONS} is that subset, named explicitly rather than inferred, because which
  * rules belong in it is exactly the judgement call this task's brief asks for: "an accept fixture the
  * schema rejects, or a shape-level reject fixture it accepts, is a defect in one of the two, and finding
@@ -76,18 +78,27 @@ class PaletteSchemaTest {
      * ({@code MODEL.043}, {@code MODEL.053}, {@code TRAIT.021}, {@code TRAIT.031}, {@code TRAIT.041},
      * {@code TRAIT.044}, {@code TRAIT.052}, {@code TRAIT.053}), exact rational arithmetic over a list's
      * siblings ({@code WEIGHT.014}, {@code WEIGHT.024}, {@code WEIGHT.032}), a Unicode category table
-     * ({@code CHAR.003}-{@code CHAR.005}), a merged {@code extends} chain ({@code MERGE.007}), the
-     * position a node is written in rather than its own shape ({@code MODEL.033}, since a satellite and
-     * an ordinary node share the one {@code $defs/node} this task's brief requires), or a resolved
-     * pointer's target type ({@code REF.071}, {@code REF.083}). Those are asserted {@code accept} by
-     * {@link #everySpecificationFixtureValidatesAsTheShapeLevelExpects()} instead, which is the honest
+     * ({@code CHAR.003}-{@code CHAR.005}), a merged {@code extends} chain ({@code MERGE.007}), or a
+     * resolved pointer's target type ({@code REF.071}, {@code REF.083}). Those are asserted {@code accept}
+     * by {@link #everySpecificationFixtureValidatesAsTheShapeLevelExpects()} instead, which is the honest
      * claim: this schema does not refuse them, on purpose.
+     * <p>
+     * {@code MODEL.033} <b>used to be listed among those exclusions</b>, on the reasoning that a satellite
+     * and an ordinary node share the one {@code $defs/node} the brief requires, so the restriction "could
+     * not live in the node schema without a second copy of it". That reasoning was wrong: it does not need
+     * a second copy of {@code node}, only one extra {@code not} clause composed onto it with {@code allOf}
+     * - {@code $defs/satelliteNode} in the schema, used for the three block-valued trait fields
+     * ({@code urbex:damaged.into}, {@code urbex:light.unlit}, {@code urbex:optional.replacement}) instead
+     * of the plain {@code nodeOrBlock} every other position not needing that exclusion uses. Left here
+     * rather than deleted so the next reader sees what was tried and rejected, and why it turned out not
+     * to be necessary.
      */
     private static final Set<String> SHAPE_LEVEL_REJECTIONS = Set.of(
             "MODEL.002#1",  // version other than 1 or 2 - 'version' is fixed to the literal 2
             "MODEL.004#1",  // an unknown key ('damagd') inside a node
             "MODEL.012#1",  // a 'kind' outside the five defined values
             "MODEL.013#1",  // a kind-specific key ('choices') on the wrong kind ('block')
+            "MODEL.033#1",  // a satellite ('urbex:light.unlit') declaring kind 'light_socket'
             "MODEL.045#1",  // a 'weighted' node with an empty 'choices'
             "MODEL.051#1",  // a 'tag' value with no leading '#'
             "MODEL.072#1",  // a 'light_socket' with no candidate in any placement list
@@ -137,6 +148,7 @@ class PaletteSchemaTest {
     // ------------------------------------------------------------------------------------------
 
     /** {@code MODEL.001}: the five file-level keys, and no others. */
+    @Rule("MODEL.001")
     @Test
     void schemaFileLevelPropertiesMatchPaletteV2DefinitionFileLevelKeys() throws IOException {
         JsonNode schema = readSchemaNode();
@@ -159,6 +171,7 @@ class PaletteSchemaTest {
      * universe a node may carry, whatever its kind - {@link RawNode#ANY_KIND_KEYS} is that same union,
      * read off {@link Kind#allKindSpecificKeys()} and {@link RawNode#COMMON_KEYS}.
      */
+    @Rule("MODEL.010")
     @Test
     void schemaNodePropertiesMatchRawNodeAnyKindKeys() throws IOException {
         JsonNode schema = readSchemaNode();
@@ -173,6 +186,7 @@ class PaletteSchemaTest {
      * {@code rest} and {@code when} - {@link RawChoice#OWN_KEYS}, exactly, added on top of the node's
      * own properties and nothing else.
      */
+    @Rule("MODEL.046")
     @Test
     void schemaChoicePropertiesAddExactlyRawChoiceOwnKeysToTheNode() throws IOException {
         JsonNode schema = readSchemaNode();
@@ -188,6 +202,8 @@ class PaletteSchemaTest {
      * {@code REF.054}, {@code REF.055}: {@code $only} and {@code $without} name a node's top-level keys
      * only, and a name that is not one is refused - {@link RawNode#FILTERABLE_KEYS} is that set.
      */
+    @Rule("REF.054")
+    @Rule("REF.055")
     @Test
     void schemaOnlyAndWithoutEnumsMatchRawNodeFilterableKeys() throws IOException {
         JsonNode schema = readSchemaNode();
@@ -199,6 +215,7 @@ class PaletteSchemaTest {
     }
 
     /** {@code WEIGHT.023}: {@code when}'s two keys, and no others - {@link When#KEYS}. */
+    @Rule("WEIGHT.023")
     @Test
     void schemaWhenPropertiesMatchWhenKeys() throws IOException {
         JsonNode schema = readSchemaNode();
@@ -219,6 +236,7 @@ class PaletteSchemaTest {
      * keys at all ({@code TRAIT.001}'s scalar shorthand), so it is checked as a boolean schema instead
      * of a key set.
      */
+    @Rule("TRAIT.090")
     @Test
     void schemaTraitPropertiesMatchEachRegisteredTraitsKeySet() throws IOException {
         JsonNode schema = readSchemaNode();
@@ -423,5 +441,88 @@ class PaletteSchemaTest {
                 .toList();
         assertTrue(stale.isEmpty(), () -> "SHAPE_LEVEL_REJECTIONS names addresses that are not reject"
                 + " fixtures, or no longer exist: " + stale);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    // MODEL.081 completeness: required at four positions, deliberately not at a fifth.
+    // ------------------------------------------------------------------------------------------
+
+    /**
+     * {@code MODEL.081}: a node in a marker position must have its kind's required key - {@code block}
+     * for {@code block} (or no {@code kind} at all, {@code MODEL.011}'s default), {@code choices} for
+     * {@code weighted}, {@code tag} for {@code tag}, {@code of} for {@code alias} - unless a {@code $ref}
+     * is present to supply it once resolved, which is {@code REF.021}'s problem and not this schema's.
+     * {@code MODEL.082}/{@code REF.020} draw the opposite conclusion for a {@code $defs} entry, which may
+     * stay partial forever.
+     * <p>
+     * No fixture in the specification probes this shape - every {@code REJECT} fixture that touches
+     * completeness ({@code MODEL.081}'s own) does it through a {@code $ref} to an incomplete
+     * <em>referenced</em> node, which this schema correctly does not attempt (it is REF.021's territory,
+     * listed in {@link #SHAPE_LEVEL_REJECTIONS}'s javadoc). This test is what stands in for that missing
+     * fixture: eleven shapes, each run through {@link #workAroundHashMarkerBug} the same way
+     * {@link #everySpecificationFixtureValidatesAsTheShapeLevelExpects()} does, so a constraint that only
+     * held up on an unrenamed marker could not pass here unnoticed.
+     */
+    @Rule("MODEL.081")
+    @Test
+    void aMarkerPositionRequiresItsKindsOwnKeyUnlessAReferenceMightSupplyIt() throws IOException {
+        JsonSchema schema = loadSchema();
+        Map<String, Boolean> cases = new LinkedHashMap<>();
+
+        // Incomplete at a marker, nothing to defer to: refused.
+        cases.put("{\"version\":2,\"palette\":{\"X\":{}}}", false);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"kind\":\"weighted\"}}}", false);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"kind\":\"tag\"}}}", false);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"kind\":\"alias\"}}}", false);
+
+        // The same four kinds, complete: accepted.
+        cases.put("{\"version\":2,\"palette\":{\"X\":\"minecraft:stone\"}}", true);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"block\":\"minecraft:stone\"}}}", true);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"kind\":\"weighted\",\"choices\":"
+                + "[{\"weight\":1,\"block\":\"minecraft:stone\"}]}}}", true);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"kind\":\"tag\",\"tag\":\"#minecraft:planks\"}}}",
+                true);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"kind\":\"alias\",\"of\":\"Y\"}}}", true);
+
+        // The same incompleteness, deferred to a '$ref': accepted, because whether 'rubble' actually
+        // supplies the missing key is a fact only the loader has (REF.021).
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"$ref\":\"rubble\"}}}", true);
+        cases.put("{\"version\":2,\"palette\":{\"X\":{\"kind\":\"weighted\",\"$ref\":\"rubble\"}}}", true);
+
+        // The same incompleteness, in '$defs' instead of 'palette': accepted, on MODEL.082's own words.
+        cases.put("{\"version\":2,\"$defs\":{\"rubble\":{}}}", true);
+        cases.put("{\"version\":2,\"$defs\":{\"rubble\":{\"kind\":\"weighted\"}}}", true);
+
+        List<String> failures = new ArrayList<>();
+        for (Map.Entry<String, Boolean> testCase : cases.entrySet()) {
+            boolean expectValid = testCase.getValue();
+            Set<ValidationMessage> messages =
+                    schema.validate(workAroundHashMarkerBug(toJackson(testCase.getKey())));
+            boolean actuallyValid = messages.isEmpty();
+            if (actuallyValid != expectValid) {
+                failures.add(testCase.getKey() + ": expected " + (expectValid ? "valid" : "refused")
+                        + ", got " + (actuallyValid ? "valid" : messages.toString()));
+            }
+        }
+        assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
+    }
+
+    /**
+     * The reviewer's own caution on this fix: {@link #workAroundHashMarkerBug} only renames a key, and
+     * must never end up papering over a real defect along the way it touches. Proven directly rather than
+     * assumed - an incomplete {@code weighted} node under marker {@code "#"} is still refused after the
+     * rename, through the same path every fixture in
+     * {@link #everySpecificationFixtureValidatesAsTheShapeLevelExpects()} runs.
+     */
+    @Rule("MODEL.081")
+    @Test
+    void theHashMarkerWorkaroundDoesNotHideAnIncompleteNode() throws IOException {
+        JsonSchema schema = loadSchema();
+        JsonNode document = workAroundHashMarkerBug(
+                toJackson("{\"version\":2,\"palette\":{\"#\":{\"kind\":\"weighted\"}}}"));
+        Set<ValidationMessage> messages = schema.validate(document);
+        assertFalse(messages.isEmpty(),
+                "expected an incomplete 'weighted' node under marker '#' to be refused after the rename,"
+                        + " not silently accepted");
     }
 }

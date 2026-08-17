@@ -53,12 +53,12 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 | Rule | Class | Diagnostic | Fixtures | Tests |
 |---|---|---|---|---|
-| `MODEL.001` | `MUST` |  | `accept` | `PaletteV2DecodeTest.aPaletteFileAcceptsTheFiveKeysAndNoOthers`, `PaletteV2DecodeTest.aDecodedPaletteEncodesBackToADocumentThatDecodesToTheSameThing` |
+| `MODEL.001` | `MUST` |  | `accept` | `PaletteSchemaTest.schemaFileLevelPropertiesMatchPaletteV2DefinitionFileLevelKeys`, `PaletteV2DecodeTest.aPaletteFileAcceptsTheFiveKeysAndNoOthers`, `PaletteV2DecodeTest.aDecodedPaletteEncodesBackToADocumentThatDecodesToTheSameThing` |
 | `MODEL.002` | `REJECT` | `DIAG.001` | `reject=DIAG.001` | `VersionDispatchTest.aVersionThatIsNotOneOrTwoIsRefusedAndSoIsOneThatIsNotANumber` |
 | `MODEL.003` | `MUST` |  |  | `PaletteV2DecodeTest.aFileMayDeclareNoPaletteBecauseTheChainIsWhatRequiresOne` |
 | `MODEL.004` | `REJECT` | `DIAG.003` | `reject=DIAG.003` | `TraitTest.aKeyNoTraitDefinesIsRefusedInsideThePayload` |
 | `MODEL.005` | `MUST` |  |  | `PaletteV2DecodeTest.aMarkerCannotBeDeclaredTwiceBecausePaletteIsAnObject` |
-| `MODEL.010` | `MUST` |  |  | `PaletteV2DecodeTest.oneNodeTypeStandsInEveryPositionThatHoldsANode` |
+| `MODEL.010` | `MUST` |  |  | `PaletteSchemaTest.schemaNodePropertiesMatchRawNodeAnyKindKeys`, `PaletteV2DecodeTest.oneNodeTypeStandsInEveryPositionThatHoldsANode` |
 | `MODEL.011` | `DEFAULT` |  | `equiv=default-kind`, `equiv=default-kind` | `NodeResolverTest.aNodeWithNoKindTakesItsKindFromItsReferenceAndOnlyThenTheDefault` |
 | `MODEL.012` | `REJECT` | `DIAG.004` | `reject=DIAG.004` | — |
 | `MODEL.013` | `MUST` |  | `reject=DIAG.003` | `NodeResolverTest.aKeyOfAnotherKindIsRefusedOnceTheReferenceHasDecidedTheKind`, `NodeResolverTest.aDiagnosticNamingSeveralPlacementListsOrdersThemByPlacement`, `PaletteV2DecodeTest.aKindSpecificKeyIsRefusedOnAnotherKindNamingTheKey` |
@@ -74,7 +74,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.043` | `REJECT` | `DIAG.006` | `reject=DIAG.006` | — |
 | `MODEL.044` | `MUST` |  | `accept` | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind` |
 | `MODEL.045` | `REJECT` | `DIAG.007` | `reject=DIAG.007` | `NodeResolverTest.aWeightedNodeWhoseChoicesSpreadToNothingIsRefused` |
-| `MODEL.046` | `MUST` |  |  | `PaletteV2DecodeTest.aChoiceIsANodeWithASizeBesideIt` |
+| `MODEL.046` | `MUST` |  |  | `PaletteSchemaTest.schemaChoicePropertiesAddExactlyRawChoiceOwnKeysToTheNode`, `PaletteV2DecodeTest.aChoiceIsANodeWithASizeBesideIt` |
 | `MODEL.047` | `ACCEPT` |  | `accept` | — |
 | `MODEL.050` | `MUST` |  | `accept` | — |
 | `MODEL.051` | `MUST` |  | `reject=DIAG.012` | `PaletteV2DecodeTest.aTagWithoutItsLeadingHashIsRefused` |
@@ -93,7 +93,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.075` | `MUST` |  |  | — |
 | `MODEL.076` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
 | `MODEL.080` | `MUST` |  |  | — |
-| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource`, `TraitTest.aSatelliteThatResolvesToNoBlockIsRefusedWithARemedyItsAuthorCanFollow` |
+| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource`, `PaletteSchemaTest.aMarkerPositionRequiresItsKindsOwnKeyUnlessAReferenceMightSupplyIt`, `PaletteSchemaTest.theHashMarkerWorkaroundDoesNotHideAnIncompleteNode`, `TraitTest.aSatelliteThatResolvesToNoBlockIsRefusedWithARemedyItsAuthorCanFollow` |
 | `MODEL.082` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 
 ### `palette/01-traits.md`
@@ -139,7 +139,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.071` | `DEFAULT` |  | `accept` | `TraitTest.rotatableDefaultsToOnAndFalseIsMeaningful` |
 | `TRAIT.072` | `MUST` |  |  | `TraitTest.rotatableDefaultsToOnAndFalseIsMeaningful` |
 | `TRAIT.073` | `MUST` |  |  | — |
-| `TRAIT.090` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
+| `TRAIT.090` | `MUST` |  |  | `PaletteSchemaTest.schemaTraitPropertiesMatchEachRegisteredTraitsKeySet`, `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.094` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.091` | `MUST` |  |  | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
 | `TRAIT.095` | `MUST` |  |  | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitPhaseTest.aDecorationTraitBesideASelectionTraitIsNotRefusedForBeingBesideIt`, `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem`, `MarkerTraitsComposeTest.selectionIsAppliedBeforeDecorationSoNbtIsQueuedAgainstTheBlockThatSurvives` |
@@ -191,8 +191,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.051` | `MUST` |  | `accept` | `NodeResolverTest.onlyContributesJustTheNamedKeysOfTheTarget` |
 | `REF.052` | `MUST` |  |  | `NodeResolverTest.withoutContributesEveryKeyOfTheTargetExceptThoseNamed` |
 | `REF.053` | `REJECT` | `DIAG.035` | `reject=DIAG.035` | `NodeResolverTest.onlyAndWithoutTogetherAreRefused` |
-| `REF.054` | `MUST NOT` |  |  | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem` |
-| `REF.055` | `REJECT` | `DIAG.072` | `reject=DIAG.072` | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem`, `NodeResolverTest.aFilterKeyThatNamesNoKeyOfANodeIsRefused` |
+| `REF.054` | `MUST NOT` |  |  | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem`, `PaletteSchemaTest.schemaOnlyAndWithoutEnumsMatchRawNodeFilterableKeys` |
+| `REF.055` | `REJECT` | `DIAG.072` | `reject=DIAG.072` | `NodeResolverTest.aFilterNamesTopLevelKeysAndNotPathsIntoThem`, `NodeResolverTest.aFilterKeyThatNamesNoKeyOfANodeIsRefused`, `PaletteSchemaTest.schemaOnlyAndWithoutEnumsMatchRawNodeFilterableKeys` |
 | `REF.056` | `REJECT` | `DIAG.073` | `reject=DIAG.073` | `NodeResolverTest.aFilterWithNoReferenceIsRefused` |
 | `REF.060` | `MUST` |  |  | `NodeResolverTest.superResolvesToTheInheritedValue`, `V2ChainTest.anEntryReplacesWhatItInheritsUnlessItNamesItWithSuper` |
 | `REF.061` | `MUST` |  |  | `PointerTest.superMayCarryAFragmentAfterIt`, `V2ChainTest.superIsUsableAsTheBaseOfAFragment`, `V2ChainTest.superFollowsADeepChainOneLayerAtATime` |
@@ -251,7 +251,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.020` | `MUST` |  | `accept` | `ExclusionTest.aChoiceWhoseConditionDoesNotHoldLeavesTheListAndTheSurvivorsDivideItsSize` |
 | `WEIGHT.021` | `MUST` |  | `accept` | `ExclusionTest.aChoiceWhoseConditionDoesNotHoldLeavesTheListAndTheSurvivorsDivideItsSize`, `ExclusionTest.aRemovedShareGoesToTheWeightChoicesOrProportionallyToTheSharesThatAreLeft` |
 | `WEIGHT.022` | `MUST` |  |  | `ExclusionTest.whenIsEvaluatedOnceSoEveryPositionSeesTheSameReducedList` |
-| `WEIGHT.023` | `MUST` |  |  | `ExclusionTest.whenAcceptsAModIdAndAPackNamespaceAndNoOtherCondition`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines` |
+| `WEIGHT.023` | `MUST` |  |  | `ExclusionTest.whenAcceptsAModIdAndAPackNamespaceAndNoOtherCondition`, `ExclusionTest.theGamesOwnPresenceAnswersTheTwoQuestionsWeight023Defines`, `PaletteSchemaTest.schemaWhenPropertiesMatchWhenKeys` |
 | `WEIGHT.024` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay`, `ExclusionTest.aNestedNodeWithNothingLeftIsRemovedFromItsParentRatherThanRefused`, `ExclusionTest.aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade` |
 | `WEIGHT.026` | `WARN` | `DIAG.046` |  | `ExclusionTest.aNodeTheCascadeAbsorbsIsReportedAsAWarningThatDoesNotRefuseTheWorld`, `ExclusionTest.theCascadeWarningIsWithheldWhenNothingSurvivedToDivideTheShare` |
 | `WEIGHT.025` | `MUST NOT` |  |  | `ExclusionTest.aChoiceCarryingATraitKeepsItsSizeWhereAChoiceCarryingAWhenLeavesTheList` |

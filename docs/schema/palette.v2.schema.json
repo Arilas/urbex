@@ -28,7 +28,7 @@
     },
     "$defs": {
       "type": "object",
-      "description": "REF.001: a definition name to a node.",
+      "description": "REF.001: a definition name to a node. REF.020, MODEL.082: a definition need not resolve to a block source, so this is the one position that stays partial - 'nodeOrBlock', not 'nodeOrBlockComplete'.",
       "additionalProperties": {
         "$ref": "#/$defs/nodeOrBlock"
       },
@@ -38,9 +38,9 @@
     },
     "palette": {
       "type": "object",
-      "description": "MODEL.003: a marker to a node. Required somewhere in the 'extends' chain, not in every file - so this key is optional here.",
+      "description": "MODEL.003: a marker to a node. Required somewhere in the 'extends' chain, not in every file - so this key is optional here. MODEL.081: a marker position must resolve to a block source, so this is 'nodeOrBlockComplete'.",
       "additionalProperties": {
-        "$ref": "#/$defs/nodeOrBlock"
+        "$ref": "#/$defs/nodeOrBlockComplete"
       },
       "propertyNames": {
         "minLength": 1
@@ -432,7 +432,7 @@
       ]
     },
     "nodeOrBlock": {
-      "description": "MODEL.020: wherever a node is expected, a JSON string is that node with kind 'block' and that string as its 'block'. MODEL.021: a string is never a reference - the object form is required to name one.",
+      "description": "MODEL.020: wherever a node is expected, a JSON string is that node with kind 'block' and that string as its 'block'. MODEL.021: a string is never a reference - the object form is required to name one. Partial: see 'completeNode' for the four positions MODEL.081 holds to a stricter standard.",
       "oneOf": [
         {
           "type": "string"
@@ -447,12 +447,212 @@
         }
       ]
     },
-    "choice": {
-      "type": "object",
-      "description": "MODEL.046, MODEL.071: an entry in 'choices' or in a 'light_socket' placement list - a node carrying additionally 'share', 'weight' or 'rest', and optionally 'when'. A bare '$spread' element carries no other key (REF.072) and so states no size (REF.070).",
+    "completeNode": {
+      "description": "MODEL.081: a node in a marker position, a 'choices' entry, a socket candidate or a block-valued trait field must have a 'kind' and that kind's required keys, once references are resolved - MODEL.040 ('block'), MODEL.044 ('choices'), MODEL.050 ('tag'), MODEL.060 ('of'). 'light_socket' needs nothing further here: MODEL.072 already requires a candidate in 'node' itself, unconditionally of position. This schema cannot resolve a '$ref' or a '$spread', so each requirement is skipped when either is present - REF.021 makes that completeness a fact about the resolved node, checked where the reference resolves, which is outside what a static schema can reach; a '$spread' element carries no key of its own to begin with (REF.072). '$defs/node' stays partial on its own (REF.020, MODEL.082): this schema adds the requirement only at the four positions that need it, over 'node' rather than instead of it.",
       "allOf": [
         {
           "$ref": "#/$defs/node"
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "not": {
+                  "required": [
+                    "$ref"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "$spread"
+                  ]
+                }
+              },
+              {
+                "anyOf": [
+                  {
+                    "not": {
+                      "required": [
+                        "kind"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "kind"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "block"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "block"
+            ]
+          },
+          "description": "MODEL.040: a 'block' node's (or a node with no 'kind', MODEL.011's default) required field is 'block'."
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "not": {
+                  "required": [
+                    "$ref"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "$spread"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "weighted"
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "choices"
+            ]
+          },
+          "description": "MODEL.044: a 'weighted' node's required field is 'choices'."
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "not": {
+                  "required": [
+                    "$ref"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "$spread"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "tag"
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "tag"
+            ]
+          },
+          "description": "MODEL.050: a 'tag' node's required field is 'tag'."
+        },
+        {
+          "if": {
+            "allOf": [
+              {
+                "not": {
+                  "required": [
+                    "$ref"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "$spread"
+                  ]
+                }
+              },
+              {
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "alias"
+                  }
+                }
+              }
+            ]
+          },
+          "then": {
+            "required": [
+              "of"
+            ]
+          },
+          "description": "MODEL.060: an 'alias' node's required field is 'of'."
+        }
+      ]
+    },
+    "nodeOrBlockComplete": {
+      "description": "MODEL.020, MODEL.081: the node a marker's value, a 'choices' entry or a socket candidate must be - a string, or an object that resolves to a block source.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/completeNode"
+            }
+          ],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "satelliteNode": {
+      "description": "MODEL.081, MODEL.033: a satellite must resolve to a block source like any other node - so this builds on 'nodeOrBlockComplete' - but with one restriction beyond it: kind 'light_socket' is forbidden here, because a socket defers placement to search for a support and orient itself, and a satellite is written at a position already decided (MODEL.033's own words). Composed as one extra 'not' clause over 'nodeOrBlockComplete' rather than a second copy of the node shape, which is what the recursive '$defs/node' this schema is built around is for.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/nodeOrBlockComplete"
+        },
+        {
+          "not": {
+            "type": "object",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "const": "light_socket"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "choice": {
+      "type": "object",
+      "description": "MODEL.046, MODEL.071: an entry in 'choices' or in a 'light_socket' placement list - a node carrying additionally 'share', 'weight' or 'rest', and optionally 'when'. A bare '$spread' element carries no other key (REF.072) and so states no size (REF.070). MODEL.081: both kinds of list hold a 'completeNode', not a bare 'node' - a choice or a candidate must resolve to a block source.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/completeNode"
         }
       ],
       "properties": {
@@ -580,7 +780,7 @@
       "description": "TRAIT.010: 'urbex:damaged' - what this node's block becomes where the damage pass applies.",
       "properties": {
         "into": {
-          "$ref": "#/$defs/nodeOrBlock"
+          "$ref": "#/$defs/satelliteNode"
         }
       },
       "required": [
@@ -632,7 +832,7 @@
       "description": "TRAIT.050: 'urbex:light' - this node's block is an optional light. TRAIT.051: an absent 'unlit' is air, so it is not required here.",
       "properties": {
         "unlit": {
-          "$ref": "#/$defs/nodeOrBlock"
+          "$ref": "#/$defs/satelliteNode"
         }
       },
       "additionalProperties": false
@@ -646,7 +846,7 @@
           "description": "TRAIT.061: names a density in the preset's decoration settings."
         },
         "replacement": {
-          "$ref": "#/$defs/nodeOrBlock"
+          "$ref": "#/$defs/satelliteNode"
         }
       },
       "required": [
