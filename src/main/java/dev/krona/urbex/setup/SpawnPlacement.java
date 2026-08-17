@@ -5,6 +5,7 @@ import dev.krona.urbex.Urbex;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.PlanningContext;
+import dev.krona.urbex.worldgen.SiteSpawnClaims;
 import dev.krona.urbex.worldgen.lost.*;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.PredefinedCity;
@@ -74,6 +75,13 @@ public class SpawnPlacement {
      */
     public static boolean onCreateSpawnPoint(ServerLevel serverLevel, ServerLevelData settings) {
         LevelAccessor world = serverLevel;
+        // Ahead of everything below, including the "does Urbex generate here at all" check. A site
+        // claim is a mod saying something more specific than a preset's spawn rules can, and it has
+        // to work in a level that has no preset - a vanilla overworld with bunkers under it, which
+        // is exactly the configuration the site API exists to allow.
+        if (applySiteSpawn(serverLevel, settings)) {
+            return true;
+        }
         {
             PlanningContext dimensionInfo = GenerationSession.planningFor(serverLevel);
             if (dimensionInfo == null) {
@@ -163,6 +171,49 @@ public class SpawnPlacement {
                 return true;
             }
         }
+        return false;
+    }
+
+    /**
+     * Places the spawn inside a claimed site, if a mod asked for one and the search found somewhere.
+     *
+     * <p>The anchor a claim yields is the plan's ground floor at a chunk's centre - a Y that is
+     * correct about the layout and says nothing about what block is actually there. So this walks up
+     * from it looking for somewhere to stand, exactly as {@code findSafeSpawnPoint} does for the
+     * dimension's own rules, and reading those blocks is what forces the one chunk to generate.</p>
+     *
+     * <p>Eight blocks of headroom searched, not the whole column: the floor of a street is where the
+     * plan says it is, and a position further up than that is inside whatever was built above, not a
+     * better spot on the same street.</p>
+     */
+    private static boolean applySiteSpawn(ServerLevel serverLevel, ServerLevelData settings) {
+        if (SiteSpawnClaims.isEmpty()) {
+            return false;
+        }
+        SiteSpawnClaims.Anchor anchor = SiteSpawnClaims.findAnchor(serverLevel);
+        if (anchor == null) {
+            return false;
+        }
+        for (int dy = 0; dy <= 8; dy++) {
+            BlockPos candidate = anchor.pos().above(dy);
+            if (!isValidStandingPosition(serverLevel, candidate)) {
+                continue;
+            }
+            BlockPos spawn = candidate.above();
+            LevelData.RespawnData data = new LevelData.RespawnData(
+                    new GlobalPos(serverLevel.dimension(), spawn), 0.0f, 0.0f);
+            serverLevel.setRespawnData(data);
+            settings.setSpawn(data);
+            // Stored as well as set, for the single-player case this map exists for: level.dat may
+            // not exist yet, so the spawn is re-applied when the first player joins.
+            spawnPositions.put(serverLevel.dimension(), spawn);
+            Urbex.getLogger().info("Urbex site '{}' placed this world's spawn at {}, {}, {}.",
+                    anchor.site(), spawn.getX(), spawn.getY(), spawn.getZ());
+            return true;
+        }
+        Urbex.getLogger().warn("Urbex site '{}' offered a spawn at {}, {}, {}, but there was nowhere "
+                        + "to stand within eight blocks of it. The world keeps its own spawn.",
+                anchor.site(), anchor.pos().getX(), anchor.pos().getY(), anchor.pos().getZ());
         return false;
     }
 

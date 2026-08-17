@@ -76,6 +76,17 @@ public final class SiteRuntimes {
         return raced != null ? raced : built;
     }
 
+    /**
+     * The planning context behind a live site.
+     *
+     * <p>Package-visible and deliberately not on {@link UrbexSite}: a caller has no business holding
+     * a {@code PlanningContext}, which is an internal that moves whenever an issue moves it. The
+     * spawn search needs one because it asks for {@link dev.krona.urbex.worldgen.lost.ChunkPlan}s.
+     */
+    static PlanningContext planningFor(UrbexSite site) {
+        return ((Site) site).planning;
+    }
+
     /** Drops the sites of a level that is unloading. */
     public void unload(ServerLevel level) {
         byLevel.remove(level);

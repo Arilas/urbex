@@ -144,6 +144,31 @@ surface too; for a site it no longer matters, because neither reaches one.
 exclusion.** A bunker with a staircase up to a ruined station would be worth having. It needs the
 site to know where the surface is, which nothing here currently tells it.
 
+## Spawning a world's players inside a site
+
+`UrbexApi.spawnIn(factory, SiteSpawn.STREET)` asks that the world's spawn land inside your site.
+
+**Off unless called.** A site changes nothing about where a world puts its players until a mod asks
+it to — a mod that silently relocated spawn because it happened to be installed would be a bad guest.
+
+Call it **once, at mod initialisation**: the world's spawn is chosen while the level loads, so a
+claim made from the generation path has already missed it. That is also why it takes a
+`SiteSpecFactory` rather than a `SiteSpec` — your spec almost certainly needs the world seed, which
+does not exist that early. Return the same spec your generation path uses, id included, so the spawn
+search and the chunks the player walks out into are the same memoised site.
+
+`SiteSpawn.STREET` lands on a site chunk with no building — clear by construction and lit by the
+preset's lighting density. `SiteSpawn.BUILDING` lands on a building's ground floor, which is more
+dramatic and has more furniture for the search to reject.
+
+A claim **outranks the dimension's own spawn settings**, and it works in a dimension with no Urbex
+preset at all — which the dimension's own rules cannot, since they need one. A vanilla overworld
+whose players wake up sealed in a bunker is a supported configuration.
+
+If nothing is found — no site within 512 chunks of the origin, or no chunk matching `where` — the
+world keeps the spawn it would have had and a warning names the site. Two mods claiming one world's
+spawn is a modpack conflict: first registered wins, and the clash is logged.
+
 ## Cellars
 
 `buildingMaxCellars` means what it says in a site. In a dimension the effective cap is

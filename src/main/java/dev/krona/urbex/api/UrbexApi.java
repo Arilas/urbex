@@ -1,6 +1,7 @@
 package dev.krona.urbex.api;
 
 import dev.krona.urbex.worldgen.GenerationSession;
+import dev.krona.urbex.worldgen.SiteSpawnClaims;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
@@ -105,6 +106,33 @@ public final class UrbexApi {
                     + "UrbexApi.isAvailable(level).");
         }
         return session.sites().site(level, spec, assets);
+    }
+
+    /**
+     * Ask that a world's spawn be placed inside this site.
+     *
+     * <p>Off unless called: a site changes nothing about where a world puts its players until a mod
+     * asks it to. Call this once, at mod initialisation - the world's spawn is chosen while the
+     * level loads, so a claim made later has already missed it. That is why this takes a
+     * {@link SiteSpecFactory} rather than a {@link SiteSpec}: the spec usually needs the world seed,
+     * which does not exist yet at initialisation.</p>
+     *
+     * <p>A claim <strong>outranks the dimension's own spawn settings</strong>. A preset's
+     * {@code spawnCity}, {@code forceSpawnInBuilding} and friends describe where to land in the city
+     * on the surface; a mod that has gone to the trouble of asking for its own site has said
+     * something more specific, and the two cannot both be honoured.</p>
+     *
+     * <p>It also works in a dimension where Urbex's surface generation is switched off entirely,
+     * which the dimension's own spawn rules do not - they need a preset, and such a level has none.
+     * A vanilla overworld whose players start in a bunker is a supported configuration.</p>
+     *
+     * <p>If the search finds nothing - a field that puts no site within 512 chunks of the origin, or
+     * one whose chunks never match {@code where} - the world keeps the spawn it would have had, and
+     * a warning names the site. Two mods claiming one world's spawn is a modpack conflict: the first
+     * registered wins and the clash is logged.</p>
+     */
+    public static void spawnIn(SiteSpecFactory factory, SiteSpawn where) {
+        SiteSpawnClaims.add(factory, where);
     }
 
     /**
