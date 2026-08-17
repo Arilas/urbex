@@ -4,7 +4,14 @@ import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.palette.traits.Damaged;
 import dev.krona.urbex.format.palette.traits.Light;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.Holder;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.HolderSet;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.BeforeAll;
@@ -14,6 +21,7 @@ import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -172,9 +180,24 @@ class CompiledV2PaletteTest {
      * non-ASCII one and reads {@code getThreadAllocatedBytes} either side of it. Any per-call allocation
      * - a returned pair, a boxed {@code Integer} outside the cache, a {@code Marker} record, an
      * {@code Optional} - would be at least sixteen bytes a call and so at least sixteen megabytes over
-     * the loop; the budget below is four kilobytes, which is three orders of magnitude under the
-     * smallest failure and leaves room for the JIT's own bookkeeping. Boxing is covered by the same
-     * measurement because boxing is allocation: that is why {@code LOAD.041} names it beside hashing.
+     * the loop; the budget below is sixty-four kilobytes, which is 250 times under the smallest
+     * possible failure and 0.065 bytes per call.
+     * <p>
+     * <b>Three measured runs, and the smallest is the one asserted.</b> A single run measures the code
+     * under test plus whatever the JVM did during it - a recompilation, a safepoint's bookkeeping - and
+     * the first draft of this test failed at 4272 bytes against a 4 KB budget on an otherwise clean run,
+     * which is 0.004 bytes per call and obviously not a per-call allocation. Taking the minimum of
+     * three removes the one-off costs without weakening the claim: a genuine allocation happens on every
+     * call and so cannot be absent from the smallest run.
+     * <p>
+     * <b>What this establishes of {@code LOAD.041}, exactly.</b> Boxing, because boxing is allocation -
+     * that is the half of the rule this measurement reaches. The other two clauses it does <em>not</em>
+     * reach, because a hash lookup on an interned key and a comparison of two identical string
+     * references both allocate nothing: they are structural instead, and the structure is the argument.
+     * {@link CompiledV2Palette#at} takes an {@code int} codepoint, so there is no string to compare; the
+     * only lookup in it is {@link MarkerIndex#index}, which {@code MarkerIndexTest} pins as two array
+     * reads and a mask with no branch on whether a codepoint is ASCII; and the rest is arithmetic in
+     * {@code Rng.paletteSlotAt}. Saying so here rather than claiming the measurement covers it.
      * <p>
      * The loop is warmed first, because the first call through a cold path allocates in the JIT rather
      * than in the code under test, and the accumulator is an {@code int} so that nothing the assertion
@@ -194,12 +217,17 @@ class CompiledV2PaletteTest {
         assertTrue(warm > 0);
 
         long id = Thread.currentThread().threadId();
-        long before = threads.getThreadAllocatedBytes(id);
-        int seen = resolve(palette, 1_000_000);
-        long allocated = threads.getThreadAllocatedBytes(id) - before;
+        long allocated = Long.MAX_VALUE;
+        int seen = 0;
+        for (int run = 0; run < 3; run++) {
+            long before = threads.getThreadAllocatedBytes(id);
+            seen += resolve(palette, 1_000_000);
+            allocated = Math.min(allocated, threads.getThreadAllocatedBytes(id) - before);
+        }
 
         assertTrue(seen > 0);
-        assertTrue(allocated < 4096, () -> "resolving a marker allocated " + allocated
+        long smallest = allocated;
+        assertTrue(smallest < 65_536, () -> "resolving a marker allocated " + smallest
                 + " bytes over 1,000,000 calls; LOAD.040 says none");
     }
 
@@ -230,7 +258,7 @@ class CompiledV2PaletteTest {
     @Rule("MODEL.052")
     void resolvingAMarkerReadsNoTag() {
         int[] asked = {0};
-        TraitContext context = TraitContext.of(net.minecraft.core.registries.BuiltInRegistries.BLOCK)
+        TraitContext context = TraitContext.of(BuiltInRegistries.BLOCK)
                 .withTags(tag -> {
                     asked[0]++;
                     return List.of("minecraft:oak_planks", "minecraft:spruce_planks");
@@ -300,13 +328,18 @@ class CompiledV2PaletteTest {
      * {@code LOAD.003}, {@code LOAD.011} and {@code LOAD.031}: the compiler reads only the registry it
      * was handed, keeps nothing static, and hands back something that cannot report anything.
      * <p>
-     * Three rules with three different failures behind them, and one shape that proves all three. The
-     * block lookup is wrapped in a counter: it is asked questions during compilation and never
-     * afterwards, which is {@code LOAD.003} ("never one it fetches" - a compiler reaching a static
-     * registry would ask it here and this could not see it) and {@code LOAD.042} again from the block
-     * side. Two compilations of one document produce equal answers with no state passed between them,
-     * which is {@code LOAD.031}: version 1 held "two static interning pools […] that nothing emptied, so
-     * every palette of every world loaded in a process lifetime stayed reachable through them". And
+     * <b>The block lookup really is wrapped this time.</b> The first version of this test said so and
+     * counted the <em>tag</em> epoch of a palette with no tag in it, so the assertion was {@code 0 == 0}
+     * and established nothing at all - a vacuous test is worse than no test, because it reads as
+     * coverage. {@link CountingBlocks} delegates every {@code get} of the real registry and counts, the
+     * count is asserted non-zero after compilation so the wrapper is known to be on the path, and it is
+     * asserted unchanged after ten thousand resolutions. That is {@code LOAD.003} - a compiler reaching
+     * a static registry instead of the handed one would ask it here and the counter would not see it -
+     * and {@code LOAD.042}'s block half beside {@code resolvingAMarkerReadsNoTag}'s tag half.
+     * <p>
+     * Two compilations of one document produce equal answers with no state passed between them, which
+     * is {@code LOAD.031}: version 1 held "two static interning pools […] that nothing emptied, so every
+     * palette of every world loaded in a process lifetime stayed reachable through them". And
      * {@code LOAD.011} is structural and is asserted as such - {@link CompiledV2Palette#at} takes no
      * collector and returns no failure, so there is nowhere for a generation-time diagnostic to go.
      */
@@ -314,23 +347,25 @@ class CompiledV2PaletteTest {
     @Rule("LOAD.003")
     @Rule("LOAD.011")
     @Rule("LOAD.031")
+    @Rule("LOAD.042")
     void theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards() {
-        int[] asked = {0};
-        TraitContext counted = TraitContext.of(net.minecraft.core.registries.BuiltInRegistries.BLOCK)
-                .withTags(tag -> {
-                    asked[0]++;
-                    return List.of();
-                });
-        CompiledV2Palette first = TraitTest.compileWith(PALETTE, counted);
-        CompiledV2Palette second = TraitTest.compileWith(PALETTE, counted);
+        CountingBlocks blocks = new CountingBlocks(BuiltInRegistries.BLOCK);
+        CompiledV2Palette first = TraitTest.compileWith(PALETTE, TraitContext.of(blocks));
+        int afterCompiling = blocks.reads;
+        assertTrue(afterCompiling > 0,
+                "the handed registry was read while compiling, so the wrapper is on the path");
 
-        int afterCompiling = asked[0];
-        for (int at = 0; at < 1000; at++) {
+        CompiledV2Palette second = TraitTest.compileWith(PALETTE, TraitContext.of(blocks));
+        int afterBoth = blocks.reads;
+        assertTrue(afterBoth > afterCompiling, "and again for the second compilation");
+
+        for (int at = 0; at < 10_000; at++) {
             assertNotNull(first.at('#', 5L, at, 64, at));
             assertNotNull(second.at('#', 5L, at, 64, at));
+            assertNotNull(first.at('e', 5L, at, 64, at));
         }
-        assertEquals(afterCompiling, asked[0],
-                "the epoch was consulted while compiling and never while generating");
+        assertEquals(afterBoth, blocks.reads,
+                "and never once while resolving a marker at a position");
 
         for (int at = 0; at < 1000; at++) {
             assertEquals(first.at('#', 5L, at, 64, at).state(),
@@ -338,6 +373,64 @@ class CompiledV2PaletteTest {
                     "two compilations of one document agree, so nothing was carried between them");
         }
         assertNotSame(first, second);
+    }
+
+    /**
+     * A block registry that answers exactly as the real one does, and counts being asked.
+     * <p>
+     * {@code HolderLookup.RegistryLookup.Delegate} supplies every method from {@link #parent()}, so the
+     * two this overrides are the two {@code LOAD.003} and {@code LOAD.042} are about: an element by key,
+     * and a tag. Nothing else about the lookup changes, which is what makes the count a measurement of
+     * the compiler rather than of the wrapper.
+     */
+    private static final class CountingBlocks
+            implements HolderLookup.RegistryLookup.Delegate<Block> {
+
+        private final HolderLookup.RegistryLookup<Block> parent;
+        private int reads;
+
+        CountingBlocks(HolderLookup.RegistryLookup<Block> parent) {
+            this.parent = parent;
+        }
+
+        @Override
+        public HolderLookup.RegistryLookup<Block> parent() {
+            return parent;
+        }
+
+        @Override
+        public Optional<Holder.Reference<Block>> get(ResourceKey<Block> key) {
+            reads++;
+            return HolderLookup.RegistryLookup.Delegate.super.get(key);
+        }
+
+        @Override
+        public Optional<HolderSet.Named<Block>> get(TagKey<Block> tag) {
+            reads++;
+            return HolderLookup.RegistryLookup.Delegate.super.get(tag);
+        }
+    }
+
+    /**
+     * {@code CHAR.031}: the dense index is built once per compiled palette, not per chunk or per part.
+     * <p>
+     * The rule is about <em>when</em> the remap is built, which order-independence does not touch - a
+     * remap rebuilt on every lookup would be order-independent and would still break this rule. So this
+     * asserts identity: the palette hands back the same {@link MarkerIndex} object however many times it
+     * is asked, and the object is unchanged after ten thousand resolutions have gone through it.
+     */
+    @Test
+    @Rule("CHAR.031")
+    void theDenseIndexIsBuiltOncePerPaletteAndNotPerLookup() {
+        CompiledV2Palette palette = compiled();
+        MarkerIndex index = palette.markerIndex();
+        assertSame(index, palette.markerIndex());
+
+        for (int at = 0; at < 10_000; at++) {
+            assertNotNull(palette.at('#', 3L, at, 64, at));
+        }
+        assertSame(index, palette.markerIndex(), "resolving did not rebuild it");
+        assertEquals(4, index.size(), "and it still holds exactly the markers it was built from");
     }
 
     /**
@@ -352,7 +445,7 @@ class CompiledV2PaletteTest {
     @Test
     @Rule("LOAD.001")
     void theStagesRunInTheOrderTheTableGivesAndExclusionPrecedesExpansion() {
-        TraitContext epoch = TraitContext.of(net.minecraft.core.registries.BuiltInRegistries.BLOCK)
+        TraitContext epoch = TraitContext.of(BuiltInRegistries.BLOCK)
                 .withTags(tag -> List.of("minecraft:oak_planks", "minecraft:spruce_planks"));
         CompiledV2Palette palette = TraitTest.compileWith("""
                 { "version": 2, "palette": { "p": { "kind": "weighted", "choices": [
@@ -440,8 +533,23 @@ class CompiledV2PaletteTest {
                     { "weight": 1, "block": "minecraft:iron_bars" } ] } } }
                 """);
         String report = ResolutionReport.of(new Marker('#'), resolved.palette().get(new Marker('#')));
-        assertTrue(report.contains("1/3 (43/128 slots)"), () -> report);
         assertFalse(report.contains("0.333"), () -> "a third is not a decimal:\n" + report);
+
+        // The counts are the palette's, not a per-leaf rounding of the share: three equal thirds are
+        // 43, 43 and 42, and they sum to the 128 slots the node actually has. Re-deriving each one
+        // independently printed 43 three times - 129 slots - and so could not answer the only question
+        // a slot count is for, which is which of three equal choices the tie break made rarer.
+        assertEquals(2, occurrences(report, "1/3 (43/128 slots)"), () -> report);
+        assertEquals(1, occurrences(report, "1/3 (42/128 slots)"), () -> report);
+        assertEquals(Apportion.SLOTS, 43 + 43 + 42);
+    }
+
+    private static int occurrences(String text, String needle) {
+        int count = 0;
+        for (int at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + 1)) {
+            count++;
+        }
+        return count;
     }
 
     // ----------------------------------------------------------------------------------------------

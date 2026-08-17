@@ -20,15 +20,21 @@ import java.util.Set;
 /**
  * Every trait this Urbex knows, by id ({@code TRAIT.003}, {@code TRAIT.090}).
  * <p>
- * <b>Immutable, and deliberately not a mutable registry.</b> {@code TRAIT.090} makes traits the
- * format's extension point and {@code TRAIT.091} speaks of "a namespace no loaded mod registers", so a
- * registration API is owed - but {@code LOAD.031} forbids compilation retaining state in static fields,
- * and a static mutable map written by mod initialisation and read by every load is exactly the shape
- * that rule's {@code > Why} records as having gone wrong before ("unsynchronised while being written
- * from a decoding worker pool, and nothing emptied them"). Until there is an addon API to hang
- * registration on, this holds the seven traits {@code 01-traits.md} §4 defines and nothing can add an
- * eighth at runtime. {@code TRAIT.091}'s namespace question is answered from {@link #namespaces()},
- * which is that set's namespaces - today, {@code urbex} alone.
+ * <b>Immutable, which is what {@code TRAIT.094} requires rather than a limitation of it.</b> That rule
+ * says traits are registered at mod initialisation "into a registry that never changes afterwards: the
+ * compiler is handed it rather than fetching one, and a decoder reads it directly" - and the second
+ * clause is why this class is read statically from {@link Trait}'s codec without that being a defect. A
+ * codec is handed a document and nothing else, so there is nowhere to thread a registry through stage 1;
+ * the read is safe for exactly one reason, and it is the one the rule states. What {@code LOAD.031}
+ * forbids is retained <em>mutable</em> state, whose failure it records as two pools "unsynchronised
+ * while being written from a decoding worker pool, and nothing emptied them" - a map fixed before any
+ * document is read has neither half of that.
+ * <p>
+ * <b>What is still owed.</b> {@code TRAIT.090} makes traits the format's extension point and a mod "may
+ * register its own"; there is no API here to do it with, so this holds the seven traits
+ * {@code 01-traits.md} §4 defines and nothing can add an eighth. Adding one means a hook that runs at
+ * initialisation and freezes, not a map that stays open. {@code TRAIT.091}'s namespace question is
+ * answered from {@link #namespaces()} - today, {@code urbex} alone.
  * <p>
  * Ordered by the section order of {@code 01-traits.md} §4 rather than by hash: the id set reaches
  * {@code DIAG.020}'s message through nothing today, but {@link #ids()} is what a schema generator and a

@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -211,7 +212,27 @@ class TraitTest {
      */
     @Test
     @Rule("TRAIT.090")
+    @Rule("TRAIT.094")
     void everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree() {
+        // TRAIT.094: the registry cannot change after initialisation, and that is the property the
+        // rule rests on - a decoder reads it as a static lookup, which is safe for no other reason.
+        // Asserted over the API rather than by trying to mutate it: a registry with no mutator is a
+        // registry nothing can write, and LOAD.031's failure was a pool that could be written from a
+        // decoding worker pool while being read.
+        for (java.lang.reflect.Method method : Traits.class.getMethods()) {
+            if (method.getDeclaringClass() != Traits.class) {
+                continue;
+            }
+            // A method that could add a trait has to be handed one, so the parameter type is the
+            // check rather than the name - 'registersNamespace' is a question, not a mutation.
+            assertFalse(List.of(method.getParameterTypes()).contains(TraitType.class),
+                    () -> "Traits." + method.getName() + " takes a TraitType, so it could let the"
+                            + " registry change after initialisation - TRAIT.094 and LOAD.031 both"
+                            + " forbid that");
+        }
+        assertThrows(UnsupportedOperationException.class,
+                () -> Traits.ids().add(Identifier.parse("urbex:invented")));
+
         assertEquals(7, Traits.all().size(), "01-traits.md §4 defines seven traits");
         for (TraitType<?> type : Traits.all()) {
             assertTrue(type.id().getNamespace().length() > 0, "TRAIT.002: a trait id is namespaced");
@@ -370,6 +391,37 @@ class TraitTest {
     private static String damagedInto(CompiledV2Palette palette, char marker) {
         return palette.at(marker, 1L, 0, 0, 0).traits().get(DAMAGED).orElseThrow()
                 .satellite(Damaged.INTO).slot(0).state().getBlock().toString();
+    }
+
+    /**
+     * {@code MODEL.081}'s fourth position: a satellite that resolves to no block is refused, and the
+     * remedy is one the author can follow.
+     * <p>
+     * The rule gained "a block-valued trait field" in this task's ruling round, and the row it cites did
+     * not move with it: {@code DIAG.011} ended "give this <b>marker</b> a {@code block}, {@code choices},
+     * {@code tag} or {@code alias} as well", which is false here — the marker has a block, and the thing
+     * that needs one is the satellite. {@code DIAG.900} requires the remedy as much as the finding, so
+     * this asserts the remedy as well as the row, and asserts the false one is <em>absent</em>.
+     * <p>
+     * It is the same shape as {@code DIAG.023}'s, one amendment later. A rule that grows a position
+     * grows it in every clause of its row, including the sentence that reads like boilerplate.
+     */
+    @Test
+    @Rule("MODEL.081")
+    void aSatelliteThatResolvesToNoBlockIsRefusedWithARemedyItsAuthorCanFollow() {
+        String message = refusal("""
+                { "version": 2,
+                  "$defs": { "traitsOnly": { "traits": { "urbex:rotatable": false } } },
+                  "palette": { "X": { "block": "minecraft:stone_bricks", "traits": {
+                      "urbex:damaged": { "into": { "$ref": "traitsOnly" } } } } } }
+                """);
+        assertTrue(Diag.DIAG_011.matches(message), message);
+        assertTrue(message.contains("'urbex:damaged'") && message.contains("'into'"),
+                () -> "the location names the field that has no block: " + message);
+        assertTrue(message.contains("give this trait field a block"),
+                () -> "the remedy has to be one the author can follow: " + message);
+        assertFalse(message.contains("give this marker"),
+                () -> "the marker already has a block: " + message);
     }
 
     // ---- What each trait refuses ---------------------------------------------------------------

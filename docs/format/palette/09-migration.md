@@ -238,9 +238,10 @@ The retired set, and what each becomes:
 > fields, so a satellite is a node the loader resolves like any other and an operand inside one is no
 > longer unresolved. Its diagnostic `DIAG.064` is retired with it, with its own tombstone; the tests
 > citing VER.016 were deleted. The half of it that was never transitional —
-> [REF.022](02-references.md#4-partial-definitions), `$ref` on the trait *object* — is now refused by
-> [MODEL.004](00-model.md#1-the-file) against the trait's declared key set, which is narrower and is
-> stated on REF.022 itself. No replacement identifier.
+> [REF.022](02-references.md#4-partial-definitions), an operand on the trait *object* — is refused by
+> that rule with `DIAG.074`, which is narrower and carries the remedy this one could not: put the
+> reference on a block-valued field, or share the whole trait with a partial definition. No replacement
+> identifier.
 
 > **VER.014** — *retired in draft.* Refused a palette written inline in a part or building that
 > declared a `version` other than 1, while nothing could read one: the version 1 codec ignores keys it

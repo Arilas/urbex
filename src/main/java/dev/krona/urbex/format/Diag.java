@@ -91,9 +91,16 @@ public enum Diag {
      * The fixed wording "declares only traits" also made this class raise {@code DIAG.007} for a weighted
      * node with no {@code choices}, to avoid printing something false. A diagnostic that forces the code
      * to name the wrong rule is worse than a slightly vaguer one.
+     * <p>
+     * <b>The remedy is a slot for the same reason the clause is.</b> {@code MODEL.081} gained a fourth
+     * position - a block-valued trait field - and "give this <em>marker</em> a 'block', 'choices', 'tag'
+     * or 'alias' as well" is false there: the marker has a block, and the thing that needs one is the
+     * satellite. That is the identical defect this enum's {@link #DIAG_023} note describes, one
+     * amendment later and in the amendment that introduced it, which is why the rule is stated here
+     * rather than only observed: <b>amending a rule means amending every clause of its row that the
+     * amendment can reach</b>, including the sentence that looked like boilerplate.
      */
-    DIAG_011("%s: resolves to no block. %s;"
-            + " give this marker a 'block', 'choices', 'tag' or 'alias' as well."),
+    DIAG_011("%s: resolves to no block. %s; %s."),
 
     /** {@code MODEL.051}: args are the location and the tag as written. */
     DIAG_012("%s: tag %s has no leading '#'."
@@ -367,8 +374,9 @@ public enum Diag {
      * was opaque and nothing could say which of a trait's fields hold nodes. {@code TRAIT.090} makes a
      * registered trait declare exactly that, so {@code TRAIT.009}'s satellites resolve like any other
      * node and there is nothing left to refuse. The half that was never transitional - {@code REF.022},
-     * an operand on the trait <em>object</em> - is {@link #DIAG_003} against the trait's declared key
-     * set. The constant stays, holding the row's own {@code —}, for the reason {@link #DIAG_042}
+     * an operand on the trait <em>object</em> - is {@link #DIAG_074}, which is looked for before the key
+     * check so that {@code DIAG.003} never fires for it. The constant stays, holding the row's own
+     * {@code —}, for the reason {@link #DIAG_042}
      * records: a number is permanent by {@code DIAG.910}, and the only way to prove it is not silently
      * reused is for this enum and the catalogue to be provably the same set of identifiers. Nothing
      * raises it, and nothing may.

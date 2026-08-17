@@ -629,6 +629,15 @@ public final class CompiledV2Palette {
          * {@link Diagnostics#error}, which would re-format a finished message against its own template
          * and throw for any row whose arity is not one. {@code DIAG.026} is arity two, so the warning
          * half of this was a latent crash until the second {@code WARN} rule made it reachable.
+         * <p>
+         * <b>And the non-catalogue half is folded too,</b> which is the same defect one field over.
+         * {@link Diagnostics#nested} holds failures with no catalogue row - a message from a deeper
+         * codec, a DFU type error - and they count as fatal. Folding only {@link Diagnostics#all()}
+         * would let a trait refuse a compile and contribute no text: {@code hasFatal} would be true,
+         * {@code run} would return empty, and the outer collector would hold nothing, so every caller's
+         * {@code asError().orElseThrow()} would throw instead of reporting. No trait calls
+         * {@code nested} today; the point is that one could, and this is the method where that class of
+         * silence has already bitten once.
          */
         private void report(Diagnostics from) {
             from.all().forEach(entry -> {
@@ -638,6 +647,7 @@ public final class CompiledV2Palette {
                     diagnostics.errorAlreadyFormatted(entry.diag(), entry.message());
                 }
             });
+            from.nestedMessages().forEach(diagnostics::nested);
         }
 
         /**

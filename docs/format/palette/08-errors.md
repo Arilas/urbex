@@ -67,7 +67,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.008` | [MODEL.053](00-model.md#43-tag) | *`<asset>` marker `'<m>'`: tag `<tag>` contains no blocks. An empty tag has nothing to place; name a tag with members, or name blocks directly.* |
 | `DIAG.009` | [MODEL.062](00-model.md#44-alias) | *`<asset>` marker `'<m>'`: aliases `'<t>'`, which no palette in this context defines. Alias a marker that exists, or give this one a block of its own.* |
 | `DIAG.010` | [MODEL.072](00-model.md#45-light_socket) | *`<asset>` marker `'<m>'`: a light_socket declares no candidate in floor, wall, ceiling or free. Give it at least one.* |
-| `DIAG.011` | [MODEL.081](00-model.md#5-completeness) | *`<asset>` marker `'<m>'` `<via>`: resolves to no block. `<`<def>` declares only traits` / `<def>` declares kind `<k>` and no `<key>`` / `<def>` declares no `<key>`` / `<operand>` kept no key of `<def>` that places a block` / `this marker declares kind `<k>` and no `<key>`>`; give this marker a `block`, `choices`, `tag` or `alias` as well.* |
+| `DIAG.011` | [MODEL.081](00-model.md#5-completeness) | *`<asset>` marker `'<m>'` `<via>`: resolves to no block. `<`<def>` declares only traits` / `<def>` declares kind `<k>` and no `<key>`` / `<def>` declares no `<key>`` / `<operand>` kept no key of `<def>` that places a block` / `this marker declares kind `<k>` and no `<key>`>`; `<give this marker a `block`, `choices`, `tag` or `alias` as well` / `give this trait field a block, or a weighted list of them`>.* |
 | `DIAG.012` | [MODEL.051](00-model.md#43-tag) | *`<asset>` marker `'<m>'`: tag `<tag>` has no leading `#`. A block tag reference is written `#namespace:path`.* |
 
 ### Traits
@@ -163,6 +163,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 > `$spread` — was written anywhere inside a `traits` value, under
 > [VER.016](09-migration.md#tombstones), which is retired with it. A trait now declares which of its
 > fields hold nodes ([TRAIT.090](01-traits.md#5-defining-a-trait)), so a satellite is resolved like any
-> other node and there is nothing left to refuse. The refusal that survives beside it is `DIAG.003` —
-> an operand on the trait *object*, which is a key no trait's schema defines — which is a different
-> message with a different remedy. The number stays retired.
+> other node and there is nothing left to refuse. The refusal that survives beside it is `DIAG.074` —
+> an operand on the trait *object*, which [REF.022](02-references.md#4-partial-definitions) forbids
+> permanently and for its own reason — which is a different message with a different remedy. The number
+> stays retired.

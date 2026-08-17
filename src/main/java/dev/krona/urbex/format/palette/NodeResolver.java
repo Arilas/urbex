@@ -576,10 +576,11 @@ public final class NodeResolver {
         for (Map.Entry<String, RawNode> field : trait.satellites().entrySet()) {
             PointerResolver.Site at = satelliteSite(site, trait, field.getKey());
             Optional<ResolvedNode> completed =
-                    // Origin.unknown: the satellite reaching here has already had its own $ref applied
-                    // by satellitesOf, so the node in hand cannot say which key came from where and
-                    // DIAG.011 must read its subject off the node itself rather than guess.
-                    complete(field.getValue(), Map.of(), Origin.unknown(), at);
+                    // Origin.satellite: the satellite reaching here has already had its own $ref
+                    // applied by satellitesOf, so the node in hand cannot say which key came from where
+                    // and DIAG.011 reads its subject off the node itself - but it does know it is in a
+                    // trait field, which is what MODEL.081's fourth position needs for its remedy.
+                    complete(field.getValue(), Map.of(), Origin.inTraitField(), at);
             if (completed.isEmpty()) {
                 ok = false;
                 continue;
@@ -628,12 +629,20 @@ public final class NodeResolver {
      *       the resolved node, read off the node itself and therefore true of it.</li>
      * </ol>
      *
+     * <b>The remedy is chosen the same way the clause is.</b> {@code MODEL.081} covers a block-valued
+     * trait field as of this task, and "give this marker a {@code block} … as well" is false there - the
+     * marker has a block, and the satellite is what does not. A row whose remedy cannot be followed is
+     * a row that fails {@code DIAG.900}, which requires the remedy as much as the finding.
+     *
      * @param required the key this kind needs and does not have
      */
     private Optional<ResolvedNode> noBlockSource(RawNode node, Kind kind, String required,
                                                  Origin origin, PointerResolver.Site site) {
         String key = "'" + required + "'";
         String def = origin.ref().map(pointer -> "'" + pointer + "'").orElse("it");
+        String remedy = origin.satellite()
+                ? "give this trait field a block, or a weighted list of them"
+                : "give this marker a 'block', 'choices', 'tag' or 'alias' as well";
         String clause;
         if (origin.filter().isPresent() && origin.ref().isPresent()) {
             clause = origin.filter().orElseThrow() + " kept no key of " + def
@@ -647,7 +656,7 @@ public final class NodeResolver {
         } else {
             clause = def + " declares no " + key;
         }
-        diagnostics.error(Diag.DIAG_011, site.location(), clause);
+        diagnostics.error(Diag.DIAG_011, site.location(), clause, remedy);
         failed = true;
         return Optional.empty();
     }
@@ -662,20 +671,30 @@ public final class NodeResolver {
      * @param ref     the {@code $ref} this node was reached through, which {@code DIAG.011} names as
      *                {@code <def>}
      * @param filter  {@code '$only'} or {@code '$without'} when one was written
-     * @param ownKind whether the node declared its own {@code kind}, rather than taking one from its target
+     * @param ownKind   whether the node declared its own {@code kind}, rather than taking one from its
+     *                  target
+     * @param satellite whether this node stands in a block-valued trait field, which decides
+     *                  {@code DIAG.011}'s <em>remedy</em>: the marker already has a block, and telling
+     *                  its author to give it one is advice they cannot follow
      */
-    private record Origin(Optional<String> ref, Optional<String> filter, boolean ownKind) {
+    private record Origin(Optional<String> ref, Optional<String> filter, boolean ownKind,
+                          boolean satellite) {
 
         static Origin of(RawNode written) {
             Optional<String> filter = written.only().isPresent()
                     ? Optional.of("'$only'")
                     : written.without().map(ignored -> "'$without'");
-            return new Origin(written.ref(), filter, written.kind().isPresent());
+            return new Origin(written.ref(), filter, written.kind().isPresent(), false);
         }
 
         /** A node whose provenance this pass did not keep - an element of a resolved list. */
         static Origin unknown() {
-            return new Origin(Optional.empty(), Optional.empty(), false);
+            return new Origin(Optional.empty(), Optional.empty(), false, false);
+        }
+
+        /** A node in a block-valued trait field ({@code MODEL.081}'s fourth position). */
+        static Origin inTraitField() {
+            return new Origin(Optional.empty(), Optional.empty(), false, true);
         }
     }
 

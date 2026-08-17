@@ -220,9 +220,6 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > > exists as a class to prevent; refusing only when *nothing* can hold it keeps the version 1 silence
 > > closed without inventing a new noise.
 
-> **TRAIT.043** · `ACCEPT` — Where only some of a node's resolved states have a block entity, the `nbt`
-> is written to those that do and the load succeeds.
-
 > **TRAIT.042** · `WARN` (`DIAG.026`) — `nbt` carrying the positional keys `x`, `y`, `z` or the type key
 > `id` is accepted, those keys are dropped, and the drop is reported; the loader supplies all four.
 
@@ -234,6 +231,9 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > > block entity is written correctly, and the author has written something redundant rather than
 > > something wrong. That is the middle [DIAG.904](08-errors.md#1-what-a-diagnostic-must-contain)
 > > allows, and the only one it allows.
+
+> **TRAIT.043** · `ACCEPT` — Where only some of a node's resolved states have a block entity, the `nbt`
+> is written to those that do and the load succeeds.
 
 ```json fixture:TRAIT.041 reject=DIAG.022
 {
@@ -411,18 +411,28 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 Traits are the format's extension point. A mod may register its own.
 
 > **TRAIT.090** · `MUST` — A registered trait declares its id, its schema, which of its fields are
-> [block-valued](#3-block-valued-fields), and which of its fields are references into which registry;
-> registration happens at mod initialisation, into an immutable trait registry the compiler is handed
-> rather than one it fetches.
+> [block-valued](#3-block-valued-fields), and which of its fields are references into which registry.
 
-> > **Why the registry is handed over** — the same reason
-> > [LOAD.003](07-compilation.md#1-the-pipeline) hands the compiler its block registry, and it is
-> > measured: when a registry was fetched from a static reference, "which registry answered depended on
-> > whether the server field was populated yet". A trait registry mutated after initialisation would put
-> > that timing back, and a *mutable* one is what
-> > [LOAD.031](07-compilation.md#4-sharing-and-identity) forbids outright — its `> Why` is two static
-> > pools "unsynchronised while being written from a decoding worker pool, [that] nothing emptied".
-> > Fixed once, handed down, discarded with nothing.
+> **TRAIT.094** · `MUST` — Traits are registered at mod initialisation into a registry that never
+> changes afterwards: the compiler is handed it rather than fetching one, and a decoder reads it
+> directly.
+
+> > **Why immutability is the property, and not who holds the reference** — the rule this is drawn
+> > from is [LOAD.031](07-compilation.md#4-sharing-and-identity), and what it forbids is *retained
+> > mutable* state: its `> Why` is two static pools "unsynchronised while being written from a decoding
+> > worker pool, [that] nothing emptied". A registry fixed before any document is read has neither
+> > failure — nothing writes it, and there is nothing to empty. Handing it to the compiler is worth
+> > doing anyway, for [LOAD.003](07-compilation.md#1-the-pipeline)'s measured reason: when a registry
+> > was fetched from a static reference, "which registry answered depended on whether the server field
+> > was populated yet". That question has an answer here whoever asks it.
+
+> > **Why a decoder reads it directly, said plainly rather than aspirationally** — a
+> > [codec](07-compilation.md#1-the-pipeline) is handed a document and nothing else, which is the same
+> > limitation [DIAG.902](08-errors.md#1-what-a-diagnostic-must-contain) is unmet under: a decode does
+> > not know which asset it is decoding either. So [TRAIT.003](#1-the-mechanism)'s refusal of an
+> > unregistered id happens against the registry as a static lookup, and this rule says so rather than
+> > describing a hand-off that stage 1 has nowhere to put. It is safe for exactly one reason, and the
+> > rule states it: the registry cannot change after initialisation.
 
 > **TRAIT.091** · `MUST` — A trait id in a namespace no loaded mod registers is refused by
 > TRAIT.003, and the diagnostic names the namespace.

@@ -21,6 +21,14 @@ import java.util.Map;
  * the uncommon ones" - and the addressing is unaffected, because {@code Rng.paletteSlotAt} is given the
  * array's length.
  *
+ * <b>This record's {@code equals} is array identity, and nothing may rely on it.</b> A record's
+ * generated {@code equals} compares components with {@code Object.equals}, which for {@code Resolved[]}
+ * is reference identity - so two entries built from one document are never equal. That costs nothing
+ * today because {@code LOAD.023}'s interning is done one level down, on {@link TraitSet}, and one level
+ * further by the per-alternative memo that builds each {@link Resolved} once. It would cost something
+ * the moment a second construction path built entries and expected equal ones to collapse, so: intern
+ * the parts, never the entry.
+ *
  * @param slots      the states and traits, one entry per slot; empty for a {@code light_socket}, whose
  *                   block source is its candidates ({@code MODEL.070})
  * @param placements a socket's four candidate lists, each compiled as an entry of its own

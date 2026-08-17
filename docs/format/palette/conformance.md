@@ -11,7 +11,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | Area | Rules | Fixtures |
 |---|---:|---:|
 | `MODEL` | 42 | 22 |
-| `TRAIT` | 42 | 17 |
+| `TRAIT` | 43 | 17 |
 | `REF` | 55 | 15 |
 | `MERGE` | 12 | 4 |
 | `WEIGHT` | 38 | 11 |
@@ -19,7 +19,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD` | 24 | 0 |
 | `DIAG` | 57 | 0 |
 | `VER` | 24 | 2 |
-| **total** | **308** | **75** |
+| **total** | **309** | **75** |
 
 ## Outstanding
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 188 of 308 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 189 of 309 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -93,7 +93,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.075` | `MUST` |  |  | — |
 | `MODEL.076` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
 | `MODEL.080` | `MUST` |  |  | — |
-| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource` |
+| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource`, `TraitTest.aSatelliteThatResolvesToNoBlockIsRefusedWithARemedyItsAuthorCanFollow` |
 | `MODEL.082` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 
 ### `palette/01-traits.md`
@@ -120,8 +120,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.032` | `MUST` |  |  | — |
 | `TRAIT.040` | `MUST` |  |  | — |
 | `TRAIT.041` | `REJECT` | `DIAG.022` | `reject=DIAG.022` | `TraitTest.blockEntityNbtOnABlockWithNoBlockEntityIsRefusedAndNamesTheBlock` |
-| `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
 | `TRAIT.042` | `WARN` | `DIAG.026` |  | `TraitTest.theFourPositionalKeysAreDroppedAndTheDropIsReported` |
+| `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
 | `TRAIT.050` | `MUST` |  |  | — |
 | `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | — |
 | `TRAIT.052` | `REJECT` | `DIAG.023` | `reject=DIAG.023` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
@@ -139,6 +139,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.072` | `MUST` |  |  | `TraitTest.rotatableDefaultsToOnAndFalseIsMeaningful` |
 | `TRAIT.073` | `MUST` |  |  | — |
 | `TRAIT.090` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
+| `TRAIT.094` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.091` | `MUST` |  |  | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
 | `TRAIT.092` | `MUST NOT` |  |  | `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
 | `TRAIT.093` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
@@ -285,7 +286,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `CHAR.021` | `MUST` |  |  | — |
 | `CHAR.022` | `REJECT` | `DIAG.054` | *n/a* | — |
 | `CHAR.030` | `INVARIANT` |  |  | `MarkerIndexTest.everyMarkerInTheDomainResolvesByIndexAndNotOnlyTheAsciiOnes`, `MarkerIndexTest.theRemapPaysForThePagesAPaletteUsesAndNotForTheCodepointRangeItSpans` |
-| `CHAR.031` | `INVARIANT` |  |  | `MarkerIndexTest.theIndexIsTheSameWhateverOrderTheMarkersArriveIn` |
+| `CHAR.031` | `INVARIANT` |  |  | `CompiledV2PaletteTest.theDenseIndexIsBuiltOncePerPaletteAndNotPerLookup`, `MarkerIndexTest.theIndexIsTheSameWhateverOrderTheMarkersArriveIn` |
 
 ### `palette/07-compilation.md`
 
@@ -310,7 +311,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.031` | `MUST NOT` |  |  | `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
 | `LOAD.040` | `INVARIANT` |  |  | `CompiledV2PaletteTest.resolvingAMarkerAtAPositionAllocatesNothing` |
 | `LOAD.041` | `INVARIANT` |  |  | `CompiledV2PaletteTest.resolvingAMarkerAtAPositionAllocatesNothing` |
-| `LOAD.042` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred`, `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag` |
+| `LOAD.042` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred`, `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag`, `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
 | `LOAD.043` | `INVARIANT` |  |  | `CompiledV2PaletteTest.theResultDependsOnlyOnTheSeedTheMarkerThePositionAndThePalette` |
 | `LOAD.044` | `MUST` |  |  | — |
 | `LOAD.050` | `MUST` |  |  | `CompiledV2PaletteTest.theLoaderCanPrintAMarkersFullyResolvedFormWithItsSharesAndItsTraitProvenance`, `CompiledV2PaletteTest.aShareNoDecimalCanHoldIsPrintedAsTheRationalItIs` |
