@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 189 of 309 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 190 of 309 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -103,7 +103,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.001` | `MUST` |  |  | `PaletteV2DecodeTest.aTraitIdIsNamespacedAndAnUnqualifiedOneIsRefused`, `TraitTest.onlyRotatableHasAScalarShorthandAndItsKeySetIsEmpty` |
 | `TRAIT.002` | `MUST` |  |  | `PaletteV2DecodeTest.aTraitIdIsNamespacedAndAnUnqualifiedOneIsRefused` |
 | `TRAIT.003` | `REJECT` | `DIAG.020` | `reject=DIAG.020` | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
-| `TRAIT.004` | `MUST` |  | `accept` | — |
+| `TRAIT.004` | `MUST` |  | `accept` | `MarkerTraitsComposeTest.aMarkerCarryingBothALightAndAMobAppliesBothRatherThanOnlyTheFirstOne`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem` |
 | `TRAIT.005` | `MUST` |  | `accept` | `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne` |
 | `TRAIT.006` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole`, `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField` |
 | `TRAIT.007` | `MUST NOT` |  |  | `TraitTest.aSatelliteInheritsNothingSoAnUnlitReplacementIsNotItselfAnOptionalLight` |

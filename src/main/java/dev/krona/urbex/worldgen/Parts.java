@@ -129,16 +129,26 @@ public class Parts {
                                         break;
                                 }
                             } else if (inf != null) {
-                                if (inf.lightSource() != null) {
-                                    b = handleLightSource(ctx, feature, inf.lightSource(), b, driver.getCurrentCopy());
-                                } else if (inf.loot() != null && !inf.loot().isEmpty()) {
-                                    handleLoot(ctx, feature, info, part, b, inf);
-                                } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
-                                    // ctx.region, not feature.provider.getWorld(): these write block entity
-                                    // NBT into a chunk, which only the generating region has.
-                                    b = handleSpawner(ctx, feature, info, part, oy, ctx.region, rx, rz, y, b, inf);
-                                } else if (inf.tag() != null) {
-                                    b = handleBlockEntity(ctx, feature, info, oy, ctx.region, rx, rz, y, b, inf);
+                                // A loop over what the marker carries, not a chain over four fields.
+                                // The chain applied the first trait it found and dropped the rest, so
+                                // a marker declaring both a light and a mob placed the light and lost
+                                // the spawner - silently, on every block it wrote. Traits compose
+                                // (TRAIT.004), and a list the palette computed once is what makes
+                                // composing them free here. See MarkerTrait for why this order is
+                                // 01-traits.md §4's, and for the specification defect that order
+                                // exposes rather than settles.
+                                for (MarkerTrait trait : inf.applied()) {
+                                    switch (trait) {
+                                        case LOOT -> handleLoot(ctx, feature, info, part, b, inf);
+                                        // ctx.region, not feature.provider.getWorld(): these write block
+                                        // entity NBT into a chunk, which only the generating region has.
+                                        case SPAWNER -> b = handleSpawner(ctx, feature, info, part, oy,
+                                                ctx.region, rx, rz, y, b, inf);
+                                        case BLOCK_ENTITY -> b = handleBlockEntity(ctx, feature, info,
+                                                oy, ctx.region, rx, rz, y, b, inf);
+                                        case LIGHT -> b = handleLightSource(ctx, feature,
+                                                inf.lightSource(), b, driver.getCurrentCopy());
+                                    }
                                 }
                             } else if (ctx.tags.needsPoiUpdate(b)) {
                                 // If this block has POI data we need to delay setting it

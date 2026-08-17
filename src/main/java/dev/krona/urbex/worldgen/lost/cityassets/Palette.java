@@ -168,7 +168,7 @@ public class Palette {
                     : LightPool.compile(blockLookup, name, c, settings);
             LightSource lightSource = settings == null ? null
                     : new LightSource(light, compileUnlit(blockLookup, settings, c));
-            Info info = new Info(entry.getMob(), entry.getLoot(), lightSource, entry.getTag());
+            Info info = Info.of(entry.getMob(), entry.getLoot(), lightSource, entry.getTag());
             // What the character resolves to, for the in-place emission check below. Empty for a
             // socket, which has no block of its own, and for 'frompalette', whose target is only
             // known once CompiledPalette has resolved the character it names.
@@ -354,7 +354,45 @@ public class Palette {
         return this;
     }
 
-    public record Info(String mobId, String loot, LightSource lightSource, CompoundTag tag) {
+    /**
+     * What a marker carries beyond its block: version 1's four metadata fields, plus the ordered list
+     * of the traits they amount to.
+     *
+     * @param applied the traits this marker actually applies, in {@link MarkerTrait} order. Computed
+     *                once, at compile time, because {@code Parts.generatePart} walks it for every block
+     *                of every part that has one and building it there would allocate at a position.
+     */
+    public record Info(String mobId, String loot, LightSource lightSource, CompoundTag tag,
+                       List<MarkerTrait> applied) {
+
+        /**
+         * The traits these four fields amount to, in {@link MarkerTrait} order.
+         * <p>
+         * The emptiness guards on {@code loot} and {@code mobId} are version 1's, kept exactly: the
+         * {@code else if} chain this replaces tested {@code != null && !isEmpty()} for both and bare
+         * {@code != null} for the other two, so a marker declaring {@code "loot": ""} was special enough
+         * to skip the block's other handling and not special enough to be given loot. That is not a
+         * behaviour worth preserving on its merits; it is preserved because {@link #isSpecial} still
+         * answers the same way and changing what an empty string means is a separate decision from
+         * fixing the chain.
+         */
+        public static Info of(String mobId, String loot, LightSource lightSource, CompoundTag tag) {
+            List<MarkerTrait> applied = new ArrayList<>(4);
+            if (loot != null && !loot.isEmpty()) {
+                applied.add(MarkerTrait.LOOT);
+            }
+            if (mobId != null && !mobId.isEmpty()) {
+                applied.add(MarkerTrait.SPAWNER);
+            }
+            if (tag != null) {
+                applied.add(MarkerTrait.BLOCK_ENTITY);
+            }
+            if (lightSource != null) {
+                applied.add(MarkerTrait.LIGHT);
+            }
+            return new Info(mobId, loot, lightSource, tag, List.copyOf(applied));
+        }
+
         public boolean isSpecial() {
             return mobId != null || loot != null || lightSource != null || tag != null;
         }
