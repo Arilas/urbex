@@ -3,7 +3,6 @@ package dev.krona.urbex.format.palette;
 import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.format.palette.traits.Light;
-import dev.krona.urbex.format.palette.traits.OptionalTrait;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Blocks;
@@ -655,12 +654,20 @@ public final class CompiledV2Palette {
 
         private boolean validateNode(ResolvedNode node, PointerResolver.Site site) {
             boolean ok = true;
-            // TRAIT.064: two densities would roll against one position, and which replacement is
-            // written would depend on which trait was consulted first - which TRAIT.092 forbids. Asked
-            // of the effective set, because a node inheriting urbex:light and declaring
-            // urbex:optional carries both just as squarely as one declaring both.
-            if (node.traits().containsKey(Light.TYPE.id())
-                    && node.traits().containsKey(OptionalTrait.TYPE.id())) {
+            // TRAIT.064, asked as the instance of TRAIT.092 that it is: two traits of the SELECTION
+            // phase would roll against one position, and which replacement is written would depend on
+            // which was consulted first. TRAIT.095 makes order matter *between* phases and TRAIT.092
+            // forbids it mattering *within* one, so a second selection trait is the case that has to be
+            // refused rather than ordered.
+            //
+            // Counted off TraitType.phase rather than testing for urbex:light beside urbex:optional by
+            // name: a mod that registers a selection trait of its own has to be refused beside either
+            // of them without this method knowing what it is called. Asked of the effective set,
+            // because a node inheriting one and declaring the other carries both just as squarely as
+            // one declaring both.
+            if (node.traits().values().stream()
+                    .filter(trait -> trait.type().phase() == TraitType.Phase.SELECTION)
+                    .count() > 1) {
                 diagnostics.error(Diag.DIAG_025, site.location());
                 ok = false;
             }

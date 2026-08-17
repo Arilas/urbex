@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceKey;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -63,6 +64,58 @@ public interface TraitType<T extends TraitValue> {
 
     /** {@code TRAIT.090}: which of this trait's fields are references, and into which registry. */
     List<ReferenceTarget> references();
+
+    /**
+     * Which of {@code TRAIT.095}'s three phases this trait applies in.
+     * <p>
+     * Declared rather than looked up in a table here, for the reason {@code TRAIT.090}'s whole design
+     * exists: the 48-name table an addon importer kept was a second copy of a fact the format did not
+     * state, and it drifted. A mod registering a selection trait of its own has to be refusable beside
+     * {@code urbex:light} by {@code TRAIT.064}, and reachable by {@code TRAIT.044}'s check, without
+     * either of those knowing its name.
+     * <p>
+     * {@link Phase#DECORATION} is the default because it is the phase that assumes least: a decorator
+     * attaches data to whatever selection produced and changes nothing about which block stands there,
+     * so a trait that forgets to declare its phase cannot silently start deciding placement.
+     */
+    default Phase phase() {
+        return Phase.DECORATION;
+    }
+
+    /**
+     * For a {@link Phase#SELECTION} trait, the satellite field holding what is written when its roll
+     * rejects the node's own block. Empty for every other phase.
+     * <p>
+     * This is what makes {@code TRAIT.044} askable generically. A decoration trait has to know which
+     * state it will really be attached to, and by {@code TRAIT.096} that is the replacement whenever
+     * the selection rejects - so the field name has to be a value the selection trait declares, not one
+     * {@code urbex:block_entity} hardcodes for the two traits this repository happens to ship.
+     */
+    default Optional<String> replacementField() {
+        return Optional.empty();
+    }
+
+    /**
+     * {@code TRAIT.095}'s three phases, in application order.
+     * <p>
+     * The order of the constants <em>is</em> the application order, and nothing may reorder them: a
+     * decorator applied before selection would attach its data to a block that selection then replaces,
+     * which is the defect {@code TRAIT.096} exists to make impossible.
+     */
+    enum Phase {
+
+        /** Decides which block stands here: {@code urbex:light}, {@code urbex:optional}. */
+        SELECTION,
+
+        /** Rewrites the selected state: {@code urbex:rotatable}. */
+        TRANSFORMATION,
+
+        /**
+         * Attaches data to what selection produced: {@code urbex:loot}, {@code urbex:spawner},
+         * {@code urbex:block_entity}.
+         */
+        DECORATION
+    }
 
     /**
      * The satellite nodes this value holds, by field name, in declaration order.

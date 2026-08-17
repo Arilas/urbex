@@ -726,7 +726,7 @@ class TraitTest {
                         "expected the palette to compile: " + diagnostics.asError().orElse("?")));
     }
 
-    private static NodeResolver.ResolvedPalette resolve(String json) {
+    static NodeResolver.ResolvedPalette resolve(String json) {
         Diagnostics diagnostics = new Diagnostics();
         return NodeResolver.resolve(decode(json), diagnostics)
                 .orElseThrow(() -> new AssertionError(

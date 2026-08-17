@@ -11,7 +11,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | Area | Rules | Fixtures |
 |---|---:|---:|
 | `MODEL` | 42 | 22 |
-| `TRAIT` | 43 | 17 |
+| `TRAIT` | 46 | 19 |
 | `REF` | 55 | 15 |
 | `MERGE` | 12 | 4 |
 | `WEIGHT` | 38 | 11 |
@@ -19,7 +19,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD` | 24 | 0 |
 | `DIAG` | 57 | 0 |
 | `VER` | 24 | 2 |
-| **total** | **309** | **75** |
+| **total** | **312** | **77** |
 
 ## Outstanding
 
@@ -44,7 +44,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.013` | a palette and a conditions asset |
 | `VER.015` | an entry that must be compiled, not a document |
 
-**Tests:** 194 of 309 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 197 of 312 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -121,7 +121,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.040` | `MUST` |  |  | — |
 | `TRAIT.041` | `REJECT` | `DIAG.022` | `reject=DIAG.022` | `TraitTest.blockEntityNbtOnABlockWithNoBlockEntityIsRefusedAndNamesTheBlock` |
 | `TRAIT.042` | `WARN` | `DIAG.026` |  | `TraitTest.theFourPositionalKeysAreDroppedAndTheDropIsReported` |
-| `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
+| `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
+| `TRAIT.044` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `accept` | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `TraitPhaseTest.aBlockEntityBesideALightIsAcceptedWhenTheUnlitReplacementCanHoldTheNbtToo`, `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitPhaseTest.aBlockEntityWithNoSelectionTraitIsUnaffectedSoNothingThatCompilesTodayStopsCompiling`, `TraitPhaseTest.anAbsentReplacementIsAirAndAirIsRefusedBecauseAirHoldsNoBlockEntityEither` |
 | `TRAIT.050` | `MUST` |  |  | — |
 | `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | — |
 | `TRAIT.052` | `REJECT` | `DIAG.023` | `reject=DIAG.023` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
@@ -132,7 +133,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.061` | `MUST` |  |  | — |
 | `TRAIT.062` | `DEFAULT` |  | `equiv=absent-replacement`, `equiv=absent-replacement` | — |
 | `TRAIT.063` | `MUST` |  |  | — |
-| `TRAIT.064` | `REJECT` | `DIAG.025` | `reject=DIAG.025` | `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
+| `TRAIT.064` | `REJECT` | `DIAG.025` | `reject=DIAG.025` | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
 | `TRAIT.065` | `MUST` |  |  | — |
 | `TRAIT.070` | `MUST` |  |  | — |
 | `TRAIT.071` | `DEFAULT` |  | `accept` | `TraitTest.rotatableDefaultsToOnAndFalseIsMeaningful` |
@@ -141,6 +142,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.090` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.094` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.091` | `MUST` |  |  | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
+| `TRAIT.095` | `MUST` |  |  | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitPhaseTest.aDecorationTraitBesideASelectionTraitIsNotRefusedForBeingBesideIt` |
+| `TRAIT.096` | `MUST` |  |  | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt` |
 | `TRAIT.092` | `MUST NOT` |  |  | `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
 | `TRAIT.093` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
 

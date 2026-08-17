@@ -15,6 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -85,6 +86,22 @@ public final class Light implements TraitType<Light.Value> {
     @Override
     public Set<String> blockValuedFields() {
         return Set.of(UNLIT);
+    }
+
+    /**
+     * {@code TRAIT.095}: {@code urbex:light} selects. It rolls the lighting density and decides whether
+     * this position holds the lit block or {@link #UNLIT}, which is what makes it conflict with any
+     * other trait that decides the same thing - {@code TRAIT.064}, now an instance of {@code TRAIT.092}
+     * asked of one phase rather than a rule about one pair.
+     */
+    @Override
+    public Phase phase() {
+        return Phase.SELECTION;
+    }
+
+    @Override
+    public Optional<String> replacementField() {
+        return Optional.of(UNLIT);
     }
 
     @Override

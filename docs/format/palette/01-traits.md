@@ -235,6 +235,49 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.043** · `ACCEPT` — Where only some of a node's resolved states have a block entity, the `nbt`
 > is written to those that do and the load succeeds.
 
+> **TRAIT.044** · `REJECT` (`DIAG.022`) — On a node that also carries a
+> [selection](#5-defining-a-trait) trait, TRAIT.041 is asked of that trait's replacement as well, and a
+> replacement none of whose resolved states has a block entity is refused.
+
+> > **Why** — by [TRAIT.096](#5-defining-a-trait) this `nbt` is written to whatever selection produced,
+> > so on a marker carrying `urbex:light` it is written to the unlit replacement on every position where
+> > the lighting roll rejects the light. A replacement with no block entity is TRAIT.041's own silence
+> > one position over: the NBT the author supplied simply never appears there, and nothing says so.
+> >
+> > **This case did not exist before the traits composed.** Version 1's `else if` chain applied one trait
+> > per marker, so the NBT was dropped before it could be written to a replacement at all. The rule
+> > arrives with the loop that made the position reachable.
+
+```json fixture:TRAIT.044 reject=DIAG.022
+{
+  "version": 2,
+  "palette": {
+    "C": {
+      "block": "minecraft:campfire",
+      "traits": {
+        "urbex:block_entity": { "nbt": { "Items": [] } },
+        "urbex:light": { "unlit": "minecraft:stone_bricks" }
+      }
+    }
+  }
+}
+```
+
+```json fixture:TRAIT.044 accept
+{
+  "version": 2,
+  "palette": {
+    "C": {
+      "block": "minecraft:campfire",
+      "traits": {
+        "urbex:block_entity": { "nbt": { "Items": [] } },
+        "urbex:light": { "unlit": "minecraft:barrel" }
+      }
+    }
+  }
+}
+```
+
 ```json fixture:TRAIT.041 reject=DIAG.022
 {
   "version": 2,
@@ -338,12 +381,19 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.063** · `MUST` — `urbex:light` behaves exactly as `urbex:optional` with `density` fixed to
 > the preset's lighting density, plus the emission rules TRAIT.052 and TRAIT.053.
 
-> **TRAIT.064** · `REJECT` (`DIAG.025`) — A node carrying both `urbex:light` and `urbex:optional` is
-> refused.
+> **TRAIT.064** · `REJECT` (`DIAG.025`) — A node carrying two traits of the **selection** phase — today,
+> `urbex:light` and `urbex:optional` — is refused.
 
 > > **Why** — two densities would roll against one position, and which replacement is written would
-> > depend on which trait was consulted first. TRAIT.092 forbids traits that depend on application
-> > order, so the pair has to be refused rather than ordered.
+> > depend on which trait was consulted first. [TRAIT.092](#5-defining-a-trait) forbids traits that
+> > depend on application order within a phase, so the pair has to be refused rather than ordered.
+
+> > **Why it is stated by phase rather than by name** — this rule used to name `urbex:light` and
+> > `urbex:optional` and so was a rule about one pair, which meant a mod registering a selection trait of
+> > its own got no refusal beside either of them. [TRAIT.095](#5-defining-a-trait) makes the phase a
+> > thing a trait declares, so this is now an instance of the general prohibition rather than a special
+> > case of it, and the two built-in traits are named as today's members of the phase rather than as the
+> > rule's subject.
 
 > **TRAIT.065** · `MUST` — The roll is addressed by position, so a marker's outcome does not depend
 > on how many other markers the chunk resolved first.
@@ -437,8 +487,43 @@ Traits are the format's extension point. A mod may register its own.
 > **TRAIT.091** · `MUST` — A trait id in a namespace no loaded mod registers is refused by
 > TRAIT.003, and the diagnostic names the namespace.
 
-> **TRAIT.092** · `MUST NOT` — A trait may not depend on the order traits are applied in. Two traits
-> on one node whose outcomes conflict is a bug in one of them, not a resolution rule.
+> **TRAIT.095** · `MUST` — Traits apply in phase order: **selection**, then **transformation**, then
+> **decoration**. [`urbex:light`](#45-urbexlight) and [`urbex:optional`](#46-urbexoptional) select;
+> [`urbex:rotatable`](#47-urbexrotatable) transforms; [`urbex:loot`](#42-urbexloot),
+> [`urbex:spawner`](#43-urbexspawner) and [`urbex:block_entity`](#44-urbexblock_entity) decorate.
+> [`urbex:damaged`](#41-urbexdamaged) is a separate pass over placed blocks and is in no phase.
+
+> > **Why the phases exist, and what was found without them** — the three do different jobs and cannot
+> > be interleaved freely. A selection trait decides *which block stands here*; a decoration trait
+> > attaches data *to the block already chosen*. Applied in the other order a decorator writes its data
+> > to a block that selection then replaces, so the data is attached to something that is not there.
+> >
+> > **Version 1 hid this for its entire lifetime, and a loop cannot.** Its generator tested the four
+> > metadata fields in an `else if` chain, so a marker carrying two of them applied the *first* and
+> > dropped the rest without a word — which meant no two traits were ever applied to one position and
+> > the question of their order never arose. That was never a design; it was the bug that a marker
+> > declaring both a light and a mob placed the light and lost the spawner. Fixing it by looping over
+> > what the marker carries makes the order observable, and this rule is what it has to be observed
+> > against.
+
+> **TRAIT.096** · `MUST` — A decoration trait applies to the state selection produced, not to the state
+> the node would have placed had it carried no selection trait.
+
+> > **Why** — this is the phase order read at a position rather than as a list. A marker carrying
+> > `urbex:block_entity` and `urbex:light` writes its NBT to the **unlit replacement** on every position
+> > where the lighting roll rejects the light, because that is the block that is really there.
+> > [TRAIT.044](#44-urbexblock_entity) is what stops that being a new silence.
+
+> **TRAIT.092** · `MUST NOT` — A trait may not depend on the order traits are applied in **within its
+> phase**. Two traits of one phase on one node whose outcomes conflict is a bug in one of them, not a
+> resolution rule.
+
+> > **Why the qualifier was added** — this rule used to forbid order mattering at all, and three pairs
+> > made it matter: `urbex:light` beside each of `urbex:loot`, `urbex:spawner` and
+> > `urbex:block_entity`. The rule was not wrong about the principle, it was wrong about the scope —
+> > between phases, order is *fixed by* TRAIT.095 rather than left to a trait, so there is nothing for a
+> > trait to depend on. Within a phase there is no order to fix, which is why two selection traits on
+> > one node are refused ([TRAIT.064](#46-urbexoptional)) rather than sequenced.
 
 > **TRAIT.093** · `MUST` — A trait's validation runs at load, against the compiling world's
 > registries, and produces a `DIAG` identifier from the catalogue.

@@ -13,6 +13,7 @@ import net.minecraft.resources.Identifier;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -81,6 +82,17 @@ public final class OptionalTrait implements TraitType<OptionalTrait.Value> {
     @Override
     public Set<String> blockValuedFields() {
         return Set.of(REPLACEMENT);
+    }
+
+    /** {@code TRAIT.095}: {@code urbex:optional} selects; see {@link Light#phase()}. */
+    @Override
+    public Phase phase() {
+        return Phase.SELECTION;
+    }
+
+    @Override
+    public Optional<String> replacementField() {
+        return Optional.of(REPLACEMENT);
     }
 
     @Override

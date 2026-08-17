@@ -7,6 +7,7 @@ import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.format.palette.PointerResolver;
 import dev.krona.urbex.format.palette.RawNode;
 import dev.krona.urbex.format.palette.ResolvedNode;
+import dev.krona.urbex.format.palette.ResolvedTrait;
 import dev.krona.urbex.format.palette.TraitContext;
 import dev.krona.urbex.format.palette.TraitType;
 import dev.krona.urbex.format.palette.TraitValue;
@@ -17,6 +18,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -139,14 +141,60 @@ public final class BlockEntityNbt implements TraitType<BlockEntityNbt.Value> {
         }
 
         // TRAIT.041.
-        List<BlockState> states = context.statesOf(owner);
+        refuseIfNothingHoldsIt(owner, context, site, diagnostics);
+
+        // TRAIT.044, which is TRAIT.041 asked one position over. By TRAIT.096 a decoration trait
+        // applies to the state selection produced, so on a node that also carries a selection trait
+        // this NBT is written to the replacement on every position where that selection's roll
+        // rejects the node's own block. A replacement with no block entity is therefore the exact
+        // version 1 silence TRAIT.041 closes - the NBT the author supplied simply never appears -
+        // and it is a silence version 1 could not even reach, because its else-if chain applied one
+        // trait ever and dropped this one before it could be written anywhere.
+        //
+        // Asked through TraitType.replacementField rather than of 'unlit' and 'replacement' by name:
+        // a mod's selection trait has to be reachable here without this class knowing what it is
+        // called, which is the whole of what TRAIT.090's declarations buy.
+        for (ResolvedTrait other : owner.traits().values()) {
+            if (other.type().phase() != TraitType.Phase.SELECTION) {
+                continue;
+            }
+            Optional<String> field = other.type().replacementField();
+            if (field.isEmpty()) {
+                continue;
+            }
+            ResolvedNode replacement = other.satellites().get(field.orElseThrow());
+            if (replacement == null) {
+                continue;
+            }
+            refuseIfNothingHoldsIt(replacement, context,
+                    site.through("'" + other.id() + "." + field.orElseThrow() + "'"), diagnostics);
+        }
+    }
+
+    /**
+     * {@code TRAIT.041}'s question, asked of one node: refuse when <b>none</b> of its resolved states
+     * has a block entity.
+     * <p>
+     * None rather than any, here and at the replacement alike, so that {@code TRAIT.043}'s mixed case
+     * reads the same one position over: a weighted replacement of a barrel and a stone block writes the
+     * NBT to the barrel, and refusing it over the stone block is the over-rejection {@code ACCEPT}
+     * exists as a class to prevent.
+     * <p>
+     * An empty state list returns without refusing, which is the reading Task 6 recorded for both of
+     * these checks: a marker naming a cross-mod block this installation does not have resolves to no
+     * state at all ({@code MODEL.042}), and answering "none of them has a block entity" about an empty
+     * set would refuse a pack that works on every install that has the mod.
+     */
+    private static void refuseIfNothingHoldsIt(ResolvedNode node, TraitContext context,
+                                               PointerResolver.Site site, Diagnostics diagnostics) {
+        List<BlockState> states = context.statesOf(node);
         if (states.isEmpty() || states.stream().anyMatch(BlockState::hasBlockEntity)) {
             return;
         }
         // DIAG.022 names the block, and it names it as the file wrote it: reversing a BlockState back
         // through the registry would print a canonical id the author may never have typed. Duplicates
         // dropped, declaration order kept - both so that one file produces one sentence, every run.
-        Set<String> named = new LinkedHashSet<>(context.writtenBlocks(owner));
+        Set<String> named = new LinkedHashSet<>(context.writtenBlocks(node));
         diagnostics.error(Diag.DIAG_022, site.location(), String.join(", ", named));
     }
 }
