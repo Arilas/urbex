@@ -1,8 +1,15 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
 import com.mojang.serialization.Lifecycle;
+import dev.krona.urbex.format.palette.CompiledEntry;
+import dev.krona.urbex.format.palette.CompiledV2Palette;
+import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.setup.TestRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
@@ -31,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 
@@ -254,6 +262,89 @@ class AssetCompilerTest {
                         Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block))))));
     }
 
+    /**
+     * The production path: {@link AssetCompiler} compiling a <em>registered</em> version 2 palette whose
+     * {@code $ref} resolves against the <em>world's</em> {@code definitions} registry.
+     *
+     * <h2>Why this test exists</h2>
+     *
+     * <p>Before it, the entire {@code AssetCompiler} → {@code V2Palettes} → version 2 path was reached by
+     * no test at all. Proved three ways, each leaving the whole suite green: disabling the registry
+     * lookup in {@code V2Palettes.definitions} so it always returns an empty index; making
+     * {@code V2Palettes.compileV2} throw unconditionally; making the version 2 branch of
+     * {@code V2Palettes.compile} throw. The first of those is the bug this branch shipped and fixed in
+     * Task 9 — 14 of the 30 bundled palettes carry a {@code $ref}, so it breaks a real world load — and
+     * only {@code runDigestCheck}, a manual task in neither {@code test} nor {@code check}, would have
+     * caught it.</p>
+     *
+     * <p>Two things were missing at once and both are fixed here. No test registered a
+     * {@link PaletteV2Definition} into the palette registry, so the version 2 branch never ran; and
+     * every access a test built listed 13 of the 14 registries and omitted {@code definitions}, so even
+     * if one had, the {@code $ref} would have failed with {@code DIAG.030} and the test would have been
+     * written around it. {@link TestRegistries} is what stops the second half recurring.</p>
+     *
+     * <p><b>The assertion that carries the weight is the first one.</b> {@code V2Palettes.definitions}
+     * reads the registry with {@code lookup} rather than {@code lookupOrThrow}, deliberately, so an
+     * unwired registry produces an <em>empty index</em> and not an error — which means "the palette
+     * compiled" is only evidence if the palette could not have compiled without the registry. This one
+     * could not: {@code 'R'} is nothing but a {@code $ref} into {@code urbex:rubble}, so an empty index
+     * refuses the asset by name and {@code diagnostics} is non-empty.</p>
+     */
+    @Test
+    void aRegisteredVersion2PaletteCompilesThroughTheWorldsDefinitionsRegistry() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        RegistryAccess access = registries(
+                definitionsAsset("rubble", """
+                        { "version": 2, "kind": "weighted", "choices": [
+                            { "weight": 1, "block": "minecraft:cobweb" },
+                            { "weight": 1, "block": "minecraft:iron_bars" } ] }
+                        """),
+                paletteV2("walls", """
+                        { "version": 2, "palette": {
+                            "R": { "$ref": "urbex:rubble" },
+                            "S": "minecraft:stone_bricks" } }
+                        """));
+
+        AssetSnapshot snapshot = AssetCompiler.compile(access, diagnostics);
+
+        assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(
+                "the $ref did not resolve, which is what an unwired definitions registry looks like"));
+
+        Palette palette = snapshot.palettes().getOrThrow("urbex:walls");
+        CompiledV2Palette compiled = palette.v2();
+        assertNotNull(compiled, "AssetCompiler took the version 2 branch of V2Palettes.compile");
+
+        Set<String> drawn = new LinkedHashSet<>();
+        CompiledEntry rubble = compiled.entry('R');
+        for (int slot = 0; slot < rubble.slotCount(); slot++) {
+            drawn.add(rubble.slot(slot).state().getBlock().toString());
+        }
+        assertEquals(2, drawn.size(),
+                () -> "'R' is only a $ref into urbex:rubble, so its two alternatives can only have come"
+                        + " from the definitions registry this access carries: " + drawn);
+        assertEquals("minecraft:stone_bricks",
+                blockOf(compiled.entry('S').slot(0).state()),
+                "and the marker that needs no reference compiled beside it");
+    }
+
+    private static String blockOf(net.minecraft.world.level.block.state.BlockState state) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
+    }
+
+    /** One {@code definitions} asset, decoded from the text a pack would ship. */
+    private static Entry<DefinitionAssetDefinition> definitionsAsset(String path, String json) {
+        return new Entry<>(CustomRegistries.DEFINITIONS_REGISTRY_KEY, id(path),
+                DefinitionAssetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json))
+                        .getOrThrow());
+    }
+
+    /** One registered version 2 palette, decoded through the registry's own dispatching codec. */
+    private static Entry<PaletteAssetDefinition> paletteV2(String path, String json) {
+        return new Entry<>(CustomRegistries.PALETTE_REGISTRY_KEY, id(path),
+                PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json))
+                        .getOrThrow());
+    }
+
     private static Entry<PaletteAssetDefinition> paletteNamingVariant(String path, char marker, String variant) {
         PaletteEntry entry = new PaletteEntry(Character.toString(marker), Optional.empty(),
                 Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
@@ -293,24 +384,23 @@ class AssetCompilerTest {
         return Identifier.fromNamespaceAndPath("urbex", path);
     }
 
+    /**
+     * An access holding every Urbex registry, with {@code entries} filed under theirs.
+     * <p>
+     * The key list this used to hold was 13 of the 14 and omitted {@code definitions}, so nothing
+     * reachable from this file could tell {@code V2Palettes.definitions} reading the registry from it
+     * finding no registry at all - the two are the same empty index. {@link TestRegistries#keys()}
+     * reads {@code CustomRegistries} instead, so a registry cannot be left out of an access built here.
+     */
     @SafeVarargs
     private static RegistryAccess registries(Entry<?>... entries) {
         List<Registry<?>> all = new ArrayList<>();
-        // The block registry, because compilation resolves every block string against the world's
-        // own rather than reaching for a static one. A real world always has it; this access is
-        // built by hand, so it has to be said.
-        all.add(BuiltInRegistries.BLOCK);
-        for (ResourceKey<? extends Registry<?>> key : List.of(
-                CustomRegistries.VARIANTS_REGISTRY_KEY, CustomRegistries.PALETTE_REGISTRY_KEY,
-                CustomRegistries.CONDITIONS_REGISTRY_KEY, CustomRegistries.STYLE_REGISTRY_KEY,
-                CustomRegistries.PART_REGISTRY_KEY, CustomRegistries.BUILDING_REGISTRY_KEY,
-                CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, CustomRegistries.SCATTERED_REGISTRY_KEY,
-                CustomRegistries.WORLDSTYLES_REGISTRY_KEY, CustomRegistries.CITYSTYLES_REGISTRY_KEY,
-                CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, CustomRegistries.STUFF_REGISTRY_KEY,
-                CustomRegistries.PRESET_REGISTRY_KEY)) {
+        for (ResourceKey<? extends Registry<?>> key : TestRegistries.keys()) {
             all.add(fill(key, entries));
         }
-        return new RegistryAccess.ImmutableRegistryAccess(all).freeze();
+        RegistryAccess access = TestRegistries.with(all.toArray(new Registry<?>[0]));
+        TestRegistries.assertHoldsEveryUrbexRegistry(access);
+        return access;
     }
 
     /** Replaces one registry in an existing access, for a test that builds one separately. */

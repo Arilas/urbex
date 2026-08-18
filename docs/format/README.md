@@ -245,11 +245,16 @@ drift-guard the preset schema already uses, applied to the rule set. It addition
   fixture expects (the converse of the line above, and the one that catches a misclassified rule
   before the line above skips it)
 
-**What the index cannot see is whether a citing test could fail.** A `@Rule` annotation binds a test
-to a rule; nothing checks that the test's assertions are reachable, so an assertion that reduces to
-`assertSame(EMPTY, EMPTY)` counts here exactly as a real one does. Four such guards have been found in
-this specification's tests so far, each by hand. Making that mechanical — mutation over the rules a
-test claims to cover — is [issue #217](https://github.com/Arilas/urbex/issues/217).
+**What the index cannot see is whether a citing test could fail,** and neither does anything else here.
+A `@Rule` annotation binds a test to a rule; nothing checks that the test's assertions are reachable, so
+an assertion that reduces to `assertSame(EMPTY, EMPTY)` counts here exactly as a real one does — and
+nothing at all watches the production seams no rule is written about. Both have been found repeatedly
+and only ever by hand, by someone breaking the code and looking at what stayed green: three `LOAD`
+guards that could not fail, a guard whose regex matched an overload that no longer exists, a javadoc
+claiming to cover a seam it never touched, and an entire compile path — `AssetCompiler` through
+`V2Palettes` to a version 2 palette — that no test reached while the suite reported 1,251 passes. Making
+that mechanical is [issue #217](https://github.com/Arilas/urbex/issues/217), and it is the highest-value
+open item against this specification's tooling.
 
 ### 5.1 How a test cites a rule
 
@@ -357,6 +362,22 @@ they do. That field fails the moment either gains a test, so it cannot outlive t
 alternatives considered and measurements, on the grounds that a design record holds them. There is no
 palette v2 record under `docs/superpowers/specs/`, so the rejected alternatives currently survive only
 in `> Why` blocks — which is the right place for the reason but the wrong place for the argument.
+
+**Four guards are latently vacuous, and one was born so.** Recorded rather than fixed, because each is
+either outside this format's scope or becomes wrong on a change nobody has made yet:
+
+- `NoAssetReferenceDefaultsTest`'s regex matches a three-argument `listOrStringList` overload that was
+  deleted in the same commit that added the test. The only text it can match is text that does not
+  compile, so it has never been able to fail. Pre-existing and unrelated to version 2.
+- `ShippedBlockRefs.Ref.version2` records the *document's* top-level version while `collect()` dispatches
+  per nested node. The 43/18 split its guard pins therefore misdescribes coverage the moment one of the
+  six inline version 1 palettes converts.
+- `DatapackGuideExamplesTest.codecs()` hardcodes 13 registries where there are 14, so its "an example for
+  every registry" check cannot notice that `definitions` has no example in the guide — which is the same
+  hole the paragraph above this one is about, one directory over.
+- `V1ToV2Test`'s two loops over the bundled `palettes/` compare the converter's output against files that
+  are now version 2, so idempotence makes those 30 iterations assert nothing about the converter. The
+  reference packs, which are still version 1, are what those tests actually measure.
 
 **`LOAD` has no fixtures, by construction.** Every rule in it is `MUST` or `INVARIANT`, so §4.2's
 completeness check does not reach it. The compilation guarantees — including every performance

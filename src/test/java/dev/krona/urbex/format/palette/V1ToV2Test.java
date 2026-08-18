@@ -702,8 +702,20 @@ class V1ToV2Test {
      * <p>Both halves, because the second was the shipped behaviour. {@code V2Palettes.compileV2} passed
      * {@code DefinitionIndex.empty()} — the registry was declared, the converter wrote assets into it,
      * and nothing handed it to the resolver — so a fully converted bundled pack refused to load naming
-     * four palettes and {@code DIAG.030}. The failing half is asserted here so that unwiring it again
-     * fails a test rather than a world load.</p>
+     * four palettes and {@code DIAG.030}.</p>
+     *
+     * <p><b>What this test does not cover, and used to claim it did.</b> It said "the failing half is
+     * asserted here so that unwiring it again fails a test rather than a world load", and that was
+     * false: both halves read a {@link DefinitionIndex} this file builds — {@code Fixture}'s, below,
+     * from the pack on disk — or are handed {@link DefinitionIndex#empty()} directly. The production
+     * seam is {@code V2Palettes.definitions(RegistryAccess)}, which reads the registry off the world
+     * being loaded, and nothing here touches it. Disabling that lookup left the whole suite green.
+     * What covers it is
+     * {@code AssetCompilerTest.aRegisteredVersion2PaletteCompilesThroughTheWorldsDefinitionsRegistry},
+     * which drives {@code AssetCompiler} over a registered version 2 palette and a real
+     * {@code definitions} registry. This test still earns its place: it is the one that shows the
+     * <em>converter's</em> output needing the registry, over the real reference pack, which that one
+     * does not.</p>
      */
     @Rule("REF.010")
     @Rule("VER.021")

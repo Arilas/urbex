@@ -2,13 +2,12 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.setup.TestRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistrationInfo;
-import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
@@ -102,27 +101,9 @@ class AssetValidationTest {
                     new VariantDefinition(Optional.empty(), Optional.empty()),
                     RegistrationInfo.BUILT_IN);
         }
-        return new RegistryAccess.ImmutableRegistryAccess(List.of(
-                // Compilation resolves block strings against the world's own block registry, so an
-                // access built by hand has to carry it.
-                BuiltInRegistries.BLOCK,
-                variants.freeze(),
-                empty(CustomRegistries.PALETTE_REGISTRY_KEY),
-                empty(CustomRegistries.CONDITIONS_REGISTRY_KEY),
-                empty(CustomRegistries.STYLE_REGISTRY_KEY),
-                empty(CustomRegistries.PART_REGISTRY_KEY),
-                empty(CustomRegistries.BUILDING_REGISTRY_KEY),
-                empty(CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY),
-                empty(CustomRegistries.SCATTERED_REGISTRY_KEY),
-                empty(CustomRegistries.WORLDSTYLES_REGISTRY_KEY),
-                empty(CustomRegistries.CITYSTYLES_REGISTRY_KEY),
-                empty(CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY),
-                empty(CustomRegistries.STUFF_REGISTRY_KEY),
-                // Read by the compiler's city-style reachability walk, not compiled by it.
-                empty(CustomRegistries.PRESET_REGISTRY_KEY))).freeze();
-    }
-
-    private static <T> Registry<T> empty(ResourceKey<Registry<T>> key) {
-        return new MappedRegistry<>(key, Lifecycle.stable()).freeze();
+        // Every Urbex registry, derived from CustomRegistries rather than listed: the list this
+        // replaced named 13 of the 14 and omitted 'definitions', under a javadoc claiming "every
+        // registry validate walks".
+        return TestRegistries.with(variants.freeze());
     }
 }

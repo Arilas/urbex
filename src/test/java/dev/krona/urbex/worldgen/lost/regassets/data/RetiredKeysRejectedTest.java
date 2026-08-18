@@ -6,6 +6,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.setup.TestRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.RetiredPresetKeyException;
 import net.minecraft.SharedConstants;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -169,20 +169,23 @@ class RetiredKeysRejectedTest {
      * itself makes. That is what closes the hole a count alone would leave open now that one registry's
      * value type is not a {@code *Definition} class of its own: a fourteenth registry still cannot be
      * added without retired-key rejection, because its key field is what this reads.
+     * <p>
+     * The reflection and the count both moved to {@link TestRegistries}, which is where the accesses
+     * every other test builds are derived from now. This test counted 14 correctly while three
+     * neighbours listed 13 and omitted {@code definitions}; one number in one place is what stops the
+     * two answers existing at once.
      */
     @Test
     void everyDynamicRegistryIsCovered() throws Exception {
         Map<String, Codec<?>> swept = registryCodecs();
-        List<Field> keyFields = Stream.of(CustomRegistries.class.getDeclaredFields())
-                .filter(f -> Modifier.isStatic(f.getModifiers()) && f.getName().endsWith("_REGISTRY_KEY"))
-                .toList();
-        assertEquals(14, keyFields.size(), "the fourteen dynamic registries");
+        Map<String, Class<?>> valueTypes = TestRegistries.valueTypesByFieldName();
+        assertEquals(TestRegistries.COUNT, valueTypes.size(), "the dynamic registries");
 
         List<String> problems = new ArrayList<>();
-        for (Field keyField : keyFields) {
-            Class<?> valueType = registryValueType(keyField);
+        for (Map.Entry<String, Class<?>> field : valueTypes.entrySet()) {
+            Class<?> valueType = field.getValue();
             if (!swept.containsKey(valueType.getSimpleName())) {
-                problems.add(keyField.getName() + " holds entries of " + valueType.getSimpleName()
+                problems.add(field.getKey() + " holds entries of " + valueType.getSimpleName()
                         + ", whose CODEC this test does not sweep");
                 continue;
             }
@@ -191,13 +194,6 @@ class RetiredKeysRejectedTest {
                     valueType.getSimpleName() + ".CODEC should be public static");
         }
         assertTrue(problems.isEmpty(), () -> String.join("\n", problems));
-    }
-
-    /** {@code X} out of a {@code ResourceKey<Registry<X>>} field. */
-    private static Class<?> registryValueType(Field keyField) {
-        ParameterizedType resourceKey = (ParameterizedType) keyField.getGenericType();
-        ParameterizedType registry = (ParameterizedType) resourceKey.getActualTypeArguments()[0];
-        return (Class<?>) registry.getActualTypeArguments()[0];
     }
 
     /** A valid file is untouched: the wrapper is a pre-check, not a new required field. */
