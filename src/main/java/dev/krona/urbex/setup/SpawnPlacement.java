@@ -17,6 +17,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.biome.Biome;
@@ -26,6 +27,7 @@ import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.ServerLevelData;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -209,43 +211,88 @@ public class SpawnPlacement {
      * Places the spawn inside a claimed site, if a mod asked for one and the search found somewhere.
      *
      * <p>The anchor a claim yields is the plan's ground floor at a chunk's centre - a Y that is
-     * correct about the layout and says nothing about what block is actually there. So this walks up
-     * from it looking for somewhere to stand, exactly as {@code findSafeSpawnPoint} does for the
-     * dimension's own rules, and reading those blocks is what forces the one chunk to generate.</p>
-     *
-     * <p>Eight blocks of headroom searched, not the whole column: the floor of a street is where the
-     * plan says it is, and a position further up than that is inside whatever was built above, not a
-     * better spot on the same street.</p>
+     * correct about the layout and says nothing about what block is actually there. Turning that
+     * into somewhere to stand is this class's half of the search, because it already owns that check
+     * for the dimension's own rules and because it is the only step that reads a block and so forces
+     * a chunk to generate.</p>
      */
     private static boolean applySiteSpawn(ServerLevel serverLevel, ServerLevelData settings) {
         if (SiteSpawnClaims.isEmpty()) {
             return false;
         }
-        SiteSpawnClaims.Anchor anchor = SiteSpawnClaims.findAnchor(serverLevel);
-        if (anchor == null) {
+        SiteSpawnClaims.Spawn found =
+                SiteSpawnClaims.findSpawn(serverLevel, anchor -> standingSpotIn(serverLevel, anchor));
+        if (found == null) {
             return false;
         }
-        for (int dy = 0; dy <= 8; dy++) {
-            BlockPos candidate = anchor.pos().above(dy);
-            if (!isValidStandingPosition(serverLevel, candidate)) {
-                continue;
+        BlockPos spawn = found.pos();
+        LevelData.RespawnData data = new LevelData.RespawnData(
+                new GlobalPos(serverLevel.dimension(), spawn), 0.0f, 0.0f);
+        serverLevel.setRespawnData(data);
+        settings.setSpawn(data);
+        // Forced, because the player still has to be moved even though the world spawn is now
+        // right: vanilla fudges the arrival position onto the surface heightmap. See Pending.
+        spawnPositions.put(serverLevel.dimension(), new Pending(spawn, true));
+        Urbex.getLogger().info("Urbex site '{}' placed this world's spawn at {}, {}, {}.",
+                found.site(), spawn.getX(), spawn.getY(), spawn.getZ());
+        return true;
+    }
+
+    /**
+     * How far above the plan's floor a standing position is still on that floor.
+     *
+     * <p>Not the whole column: the floor of a street is where the plan says it is, and a position
+     * further up than that is on top of whatever was built above it, not a better spot on the same
+     * street. Eight blocks is enough to clear a park's raised lawn or a ground floor whose own floor
+     * sits a course above the street.</p>
+     */
+    private static final int SPAWN_HEADROOM = 8;
+
+    /**
+     * Somewhere to stand in the anchor's chunk, or {@code null} if it has nowhere.
+     *
+     * <p>The whole chunk, not the anchor's own column, and that is the fix for a real failure rather
+     * than thoroughness for its own sake. The anchor is a chunk's centre, and a chunk's centre is
+     * exactly where a park puts its fountain, its lamp post or its tree - so on a site whose streets
+     * include parks the one column this used to read was the one column most likely to be occupied,
+     * and roughly two worlds in five woke their player up on the surface instead.</p>
+     *
+     * <p>Level by level rather than column by column, so the plan's own floor is exhausted across
+     * the chunk before anything a block higher is considered. The other order finds the top of the
+     * lamp post before it finds the grass beside it.</p>
+     *
+     * <p>Columns are visited outwards from the centre, so a spawn that could be anywhere in the
+     * chunk still lands as near the middle of it as the blocks allow.</p>
+     */
+    @Nullable
+    static BlockPos standingSpotIn(BlockGetter level, BlockPos anchor) {
+        int minX = (anchor.getX() >> 4) << 4;
+        int minZ = (anchor.getZ() >> 4) << 4;
+        for (int dy = 0; dy <= SPAWN_HEADROOM; dy++) {
+            int y = anchor.getY() + dy;
+            for (int ring = 0; ring <= 8; ring++) {
+                for (int dx = -ring; dx <= ring; dx++) {
+                    for (int dz = -ring; dz <= ring; dz++) {
+                        // Only the ring's edge; everything inside it was covered by a smaller ring.
+                        if (ring != 0 && Math.abs(dx) != ring && Math.abs(dz) != ring) {
+                            continue;
+                        }
+                        int x = anchor.getX() + dx;
+                        int z = anchor.getZ() + dz;
+                        // The chunk the anchor names and no other. A neighbour is a different plan,
+                        // and may be a building, a rim or no site at all.
+                        if (x < minX || x > minX + 15 || z < minZ || z > minZ + 15) {
+                            continue;
+                        }
+                        BlockPos candidate = new BlockPos(x, y, z);
+                        if (isValidStandingPosition(level, candidate)) {
+                            return candidate.above();
+                        }
+                    }
+                }
             }
-            BlockPos spawn = candidate.above();
-            LevelData.RespawnData data = new LevelData.RespawnData(
-                    new GlobalPos(serverLevel.dimension(), spawn), 0.0f, 0.0f);
-            serverLevel.setRespawnData(data);
-            settings.setSpawn(data);
-            // Forced, because the player still has to be moved even though the world spawn is now
-            // right: vanilla fudges the arrival position onto the surface heightmap. See Pending.
-            spawnPositions.put(serverLevel.dimension(), new Pending(spawn, true));
-            Urbex.getLogger().info("Urbex site '{}' placed this world's spawn at {}, {}, {}.",
-                    anchor.site(), spawn.getX(), spawn.getY(), spawn.getZ());
-            return true;
         }
-        Urbex.getLogger().warn("Urbex site '{}' offered a spawn at {}, {}, {}, but there was nowhere "
-                        + "to stand within eight blocks of it. The world keeps its own spawn.",
-                anchor.site(), anchor.pos().getX(), anchor.pos().getY(), anchor.pos().getZ());
-        return false;
+        return null;
     }
 
     private static boolean isOutsideBuilding(PlanningContext provider, BlockPos pos) {
@@ -299,7 +346,7 @@ public class SpawnPlacement {
         }
     }
 
-    static boolean isValidStandingPosition(Level world, BlockPos pos) {
+    static boolean isValidStandingPosition(BlockGetter world, BlockPos pos) {
         BlockState state = world.getBlockState(pos);
         if (!state.isFaceSturdy(world, pos, Direction.UP)) {
             return false;
