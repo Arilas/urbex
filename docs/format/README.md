@@ -358,10 +358,12 @@ one as the stages landed; `CHAR.011` needs a part file's slice rows and `CHAR.02
 marker-assigning command, and `ConformanceIndexTest` carries those two as enumerated exemptions until
 they do. That field fails the moment either gains a test, so it cannot outlive the work.
 
-**The design record does not exist.** §2 forbids these documents from holding discussion,
-alternatives considered and measurements, on the grounds that a design record holds them. There is no
-palette v2 record under `docs/superpowers/specs/`, so the rejected alternatives currently survive only
-in `> Why` blocks — which is the right place for the reason but the wrong place for the argument.
+**The design record exists**, at
+[`docs/superpowers/specs/2026-08-18-palette-v2-design-record.md`](../superpowers/specs/2026-08-18-palette-v2-design-record.md).
+§2 forbids these documents from holding discussion, alternatives considered and measurements on the
+grounds that a design record holds them, and it now does: the corpus measurements, the four
+whole-format shapes costed before this one was chosen, and what implementing the rules taught about
+them. A `> Why` block remains the right place for a reason and the wrong place for an argument.
 
 **Four guards are latently vacuous, and one was born so.** Recorded rather than fixed, because each is
 either outside this format's scope or becomes wrong on a change nobody has made yet:

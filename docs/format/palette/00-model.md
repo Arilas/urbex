@@ -5,10 +5,8 @@
 Defines the shape of a palette file and the single value type it is built from. Read this before
 any other document in this directory; everything else names terms defined here.
 
-Design record: not yet written. The measurements and the rejected alternatives behind these rules
-live in the research documents this specification was drawn from; §7 of the
-[specification system](../README.md#7-relationship-to-other-documents) says where a design record
-belongs once it exists.
+Design record: [`2026-08-18-palette-v2-design-record.md`](../../superpowers/specs/2026-08-18-palette-v2-design-record.md)
+— the measurements, the rejected alternatives, and what implementing these rules taught about them.
 
 ---
 
