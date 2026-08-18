@@ -78,22 +78,6 @@ everything it inherited and adds one trait. Both are legible without opening the
 > > **Why** — an inline palette is not a registry entry, so nothing can resolve the link. Accepting
 > > a key and ignoring it is how a pack ends up meaning something other than what it says.
 
-> **MERGE.010** · `REJECT` (`DIAG.038`) `[NO-FIXTURE: a version 1 and a version 2 file]` — An `extends` chain may not cross format versions, in
-> either direction: a version 2 palette may not `extends` a version 1 palette, and a version 1 palette
-> may not `extends` a version 2 one. The diagnostic names both assets and both versions.
-
-> > **Why** — the alternative was an invariant that a version 1 palette and its version 2 translation
-> > compile to identical forms, maintained for every construct, forever. It is a heavy promise bought
-> > for one convenience, and it caps version 2 at whatever version 1 could already express: per-slot
-> > traits, `$super` and pointers have no version 1 counterpart to be equal to. The two formats are
-> > developed independently, and neither is a dialect of the other.
-
-> > **Why a merge is the thing refused, and not a composition** — a style's `randompalettes` may still
-> > draw a version 1 palette and a version 2 palette into one selection ([VER.006](09-migration.md#1-versioning)).
-> > That operates on compiled palettes rather than on JSON, so it needs no correspondence between the two
-> > formats; forbidding it as well would mean a pack could only migrate every palette at once, and the
-> > packs this has to work for hold 30 and 98 palette files.
-
 > **MERGE.011** · `MUST` — A palette written inline in a part or building declares `version`, and is
 > read by the rules of the version it declares.
 
@@ -137,5 +121,12 @@ the chain step into a `$ref` and so into the first behaviour.
 
 
 ## Tombstones
+
+> **MERGE.010** — *retired.* Refused an `extends` chain that crossed format versions, in either
+> direction, with the diagnostic that is retired beside it. Retired with [VER.005](09-migration.md#tombstones) by
+> [VER.018](09-migration.md#1-versioning): one format loads, so a chain has nothing to cross. It stated
+> the constraint once for both sides — VER.005 named it from the versioning side and pointed here — and
+> the pair go together. Its diagnostic `DIAG.038` is retired with it; the test citing MERGE.010 is
+> deleted. No replacement identifier.
 
 *None. This document has not yet left draft.*

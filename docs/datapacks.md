@@ -477,11 +477,15 @@ thirty leaves the other twenty-eight exactly as they were:
 <!-- example: palettes -->
 ```json
 {
+  "version": 2,
   "extends": "urbex:bricks_standard",
-  "palette": [
-    { "char": "#", "variant": "urbexmt:concrete" },
-    { "char": "X", "block": "minecraft:cracked_stone_bricks", "damaged": "minecraft:iron_bars" }
-  ]
+  "palette": {
+    "#": { "$ref": "urbexmt:concrete" },
+    "X": {
+      "block": "minecraft:cracked_stone_bricks",
+      "traits": { "urbex:damaged": { "into": "minecraft:iron_bars" } }
+    }
+  }
 }
 ```
 
@@ -538,54 +542,66 @@ placed unconditionally, so moving the slider changed nothing visible.
 <!-- example: palettes -->
 ```json
 {
-  "palette": [
-    { "char": "e", "block": "minecraft:lantern[hanging=false]", "lightSource": true }
-  ]
+  "version": 2,
+  "palette": {
+    "e": {
+      "block": "minecraft:lantern[hanging=false]",
+      "traits": { "urbex:light": {} }
+    }
+  }
 }
 ```
 
 <!-- example: palettes -->
 ```json
 {
-  "palette": [
-    {
-      "char": "E",
+  "version": 2,
+  "palette": {
+    "E": {
       "block": "minecraft:lantern[hanging=true]",
-      "lightSource": { "unlit": "minecraft:iron_chain[axis=y]" }
+      "traits": { "urbex:light": { "unlit": "minecraft:iron_chain[axis=y]" } }
     }
-  ]
+  }
 }
 ```
 
-The entry's own `block`, `blocks`, `variant` or `frompalette` is the lit block, written exactly where
-and as you wrote it — no support search, no reorientation. When the roll rejects it, `unlit` is
-written instead; `unlitBlocks` takes a weighted list in the same shape as `blocks`. Name neither and
-the replacement is air, which is what an unlit marker has always left behind.
+The node the marker resolves to is the lit block, written exactly where and as you wrote it — no
+support search, no reorientation. When the roll rejects it, the trait's `unlit` is written instead,
+and `unlit` is a node like any other, so a weighted list goes there directly. Name none and the
+replacement is air, which is what an unlit marker has always left behind.
 
-`"lightSource": true` is shorthand for `{}`. `"lightSource": false` is a load error: omitting the
-field is how you say "not a light", and a field that can be present and mean nothing is how a pack
-ends up meaning something other than what its author read.
+An empty `urbex:light` trait — `{}` — is a marker that is a light and leaves nothing behind. There is
+no way to write "not a light" other than by omitting the trait, which is deliberate: a field that can
+be present and mean nothing is how a pack ends up meaning something other than what its author read.
 
 ### A socket: let Urbex pick and orient one
 
 <!-- example: palettes -->
 ```json
 {
-  "palette": [
-    {
-      "char": "T",
-      "lightSource": {
-        "floor": [
-          { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
-          { "weight": 3, "block": "minecraft:torch", "unlit": "minecraft:candle[candles=1,lit=false]" }
-        ],
-        "wall":    [ { "weight": 8, "block": "minecraft:wall_torch[facing=north]" } ],
-        "ceiling": [ { "weight": 8, "block": "minecraft:lantern[hanging=true]",
-                       "unlit": "minecraft:iron_chain[axis=y]" } ],
-        "free":    [ { "weight": 1, "block": "minecraft:sea_lantern" } ]
-      }
+  "version": 2,
+  "palette": {
+    "T": {
+      "kind": "light_socket",
+      "floor": [
+        { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
+        {
+          "weight": 3,
+          "block": "minecraft:torch",
+          "traits": { "urbex:light": { "unlit": "minecraft:candle[candles=1,lit=false]" } }
+        }
+      ],
+      "wall":    [ { "weight": 8, "block": "minecraft:wall_torch[facing=north]" } ],
+      "ceiling": [
+        {
+          "weight": 8,
+          "block": "minecraft:lantern[hanging=true]",
+          "traits": { "urbex:light": { "unlit": "minecraft:iron_chain[axis=y]" } }
+        }
+      ],
+      "free":    [ { "weight": 1, "block": "minecraft:sea_lantern" } ]
     }
-  ]
+  }
 }
 ```
 
@@ -595,10 +611,10 @@ opportunities are tried in one fixed order — floor, then west, east, north and
 ceiling, then `free`, which needs no anchor at all. The chosen candidate is oriented toward its
 support, so one `wall_torch[facing=north]` covers all four walls.
 
-A candidate's `unlit` is its own, because an unlit torch on a wall and an unlit torch on a floor are
-two different blocks — one replacement for the whole socket could be right for at most one of its
-placements. A candidate that names none falls back to the source's `unlit`, then to air. An `unlit`
-that emits light is a load error.
+A candidate's `urbex:light` is its own, because an unlit torch on a wall and an unlit torch on a floor
+are two different blocks — one replacement for the whole socket could be right for at most one of its
+placements. A candidate that declares none inherits the socket's, by the ordinary trait inheritance
+every alternative gets, and then falls back to air. An `unlit` that emits light is a load error.
 
 Both passes draw from one stream at one position, so the fixture a marker would light is the fixture
 standing there while it is dark: raising `lightingDensity` lights the candle that was already on that

@@ -146,7 +146,7 @@ class PaletteCharacterCheckTest {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         Style style = style(group(palette("base", entry('a', "minecraft:stone"))));
 
-        PaletteCharacterCheck.check(partWithPalette("tower", "ab", entry('b', "minecraft:glass")),
+        PaletteCharacterCheck.check(partWithPalette("tower", "ab", "b", "minecraft:glass"),
                 usage(style), diagnostics);
 
         assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(""));
@@ -206,9 +206,21 @@ class PaletteCharacterCheckTest {
         return buildPart(path, slice, Optional.empty());
     }
 
-    private static BuildingPart partWithPalette(String path, String slice, PaletteEntry... entries) {
-        return buildPart(path, slice, Optional.<PaletteAssetDefinition>of(
-                new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries)))));
+    /**
+     * A part whose inline palette defines the given markers, written as the version 2 document a part
+     * carries since {@code VER.018}.
+     */
+    private static BuildingPart partWithPalette(String path, String slice, String... markerAndBlock) {
+        StringBuilder json = new StringBuilder("{\"version\":2,\"palette\":{");
+        for (int i = 0; i < markerAndBlock.length; i += 2) {
+            if (i > 0) {
+                json.append(',');
+            }
+            json.append('"').append(markerAndBlock[i]).append("\":\"")
+                    .append(markerAndBlock[i + 1]).append('"');
+        }
+        return buildPart(path, slice,
+                Optional.of(TestV2Context.inline(json.append("}}").toString())));
     }
 
     /**
@@ -224,7 +236,8 @@ class PaletteCharacterCheckTest {
         }
         return new BuildingPart(id, BuiltInRegistries.BLOCK, AssetIndex.empty("urbex:palettes"),
                 List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(1), Optional.of(1),
-                        Optional.of(levels), Optional.empty(), local, Optional.empty())));
+                        Optional.of(levels), Optional.empty(), local, Optional.empty())),
+                TestV2Context.empty());
     }
 
     // ---- MODEL.062 at LOAD.013's stage --------------------------------------------------------

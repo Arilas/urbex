@@ -333,12 +333,16 @@ name. What is not finished:
   [conformance index](palette/conformance.md) lists it separately from the rules whose citing tests
   cover what they do.
 
-**The authoring guide has no version 2 content.** [`docs/datapacks.md`](../datapacks.md) is the
-task-shaped guide §7's table points at, and it describes the version 1 palette throughout — `blocks`,
-the `variants` registry, a `variant` behind a character. It mentions neither `$defs` nor `$ref` nor
-`traits` nor the `definitions` registry, and it does not say that the bundled pack it uses as its
-worked example is now written in a format it does not document. §7 says a conflict between the guide
-and the specification is a bug in the guide; this is a whole registry of them.
+**The authoring guide is half converted, and the half that is done was forced.**
+[`docs/datapacks.md`](../datapacks.md) is the task-shaped guide §7's table points at, and it described
+the version 1 palette throughout. `VER.018` made that untenable for its *examples*: a version 1 palette
+no longer decodes, and `DatapackGuideExamplesTest` runs every example through the registry codec, so
+the seven palette examples are version 2 now and the prose immediately around them moved with them.
+
+What has not moved is everything else — the narrative order, the worked examples that are not palettes,
+and the framing that still teaches a marker as a thing with a `block` beside it rather than a node.
+Nothing fails while that is true, which is exactly why it is written down here: the examples are
+checked and the prose is not.
 
 **Version 1 cannot be removed, and the shipped pack is no longer why.** It was: six files — three parts
 and three buildings — carried inline palettes written in version 1, tracked as
@@ -351,12 +355,17 @@ those twelve assets and nothing else, so it now covers no bundled file at all. I
 rather than deleted — the branch still reads the registries that are not palettes, none of which spells
 a block today, and an assertion of zero fails the moment one does.
 
-What keeps version 1 alive is `VER.001`, and the two packs it was written for. Both are version 1
-throughout: Modern Tweaks (98 palettes, 58 variants, 245 inline entries across 60 parts and buildings,
-79 of them naming a variant) and Zombie Apocalypse Essentials (7 palettes, 6,527 inline entries). So
-`VER.004`'s promise that version 1 does not change is now load-bearing for other people's packs and not
-for this one — which is the state `VER.001` describes, and the state in which removing version 1 means
-converting those two first.
+Both of those rules are retired. Modern Tweaks converted — 98 palettes, 58 variants and 60 inline
+palettes, with the shipped tool and no blockers — and `VER.018` then removed version 1 from the loader
+outright. Zombie Apocalypse Essentials has not converted and cannot yet: 41 of its 79 inline palettes
+name markers on unassigned codepoints, which its exporter produced and only its exporter can fix
+(`CHAR.021`'s `> Why`). It is the one pack this removal breaks, knowingly.
+
+What survives of version 1 is the compile path, and only in the sense that the converter needs it:
+`VER.021` is verified by compiling every shipped version 1 palette both ways and comparing marker by
+marker, which requires a version 1 implementation to exist for as long as the converter does.
+`PaletteDefinition` is unregistered and excluded by name from the retired-key sweep for that reason.
+It is not loadable from any datapack, and moving it to test scope is the next thing owed here.
 
 **Not every fixture runs.** `FormatFixtureTest` runs every fixture whose outcome decoding alone
 decides. One is listed in that class instead: `MODEL.062#1`, whose rule is decided where a style's
