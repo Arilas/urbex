@@ -83,7 +83,71 @@ class V1ToV2Test {
             "urbexmt", Path.of("../Urbex-ModernTweaks/pack/data/urbexmt/urbex"),
             "urbexza", Path.of("../Urbex-Zombie-Apocalypse-Essentials/pack/data/urbexza/urbex"));
 
+    /**
+     * The two of them still written in version 1, which is what a before-and-after can be run over.
+     *
+     * <p>The bundled pack left this set in Task 10 and its evidence moved with it: a version 2 file has
+     * no version 1 form to compile beside, and the property {@code VER.021} actually asks for — "a world
+     * generated from the converted pack is identical to one generated from the original" — is now
+     * measured the way the rule words it, by {@code runDigestCheck} and its five sibling windows over
+     * the shipped pack itself. That is a stronger measurement than this one and not a weaker: it drives
+     * chunks rather than asking a palette what it would have answered.</p>
+     *
+     * <p>Named as its own constant rather than by deleting the bundled entry from {@link #PACKS},
+     * because the converter is still run over all three — {@code VER.023} makes converting a version 2
+     * file return it unchanged, and the survey in §5 reads whatever the pack is.</p>
+     */
+    private static final Map<String, Path> VERSION_1_PACKS = Map.of(
+            "urbexmt", PACKS.get("urbexmt"),
+            "urbexza", PACKS.get("urbexza"));
+
     private static final long SEED = 20260817L;
+
+    /**
+     * The two sockets the bundled pack shipped in version 1, as it wrote them at {@code 2ada507f}.
+     *
+     * <p>Written here rather than read from {@code palettes/common.json} because that file is version 2
+     * now, and a version 2 file has no version 1 side for a before-and-after to have. Neither reference
+     * pack has a {@code free} list, so without this the four-candidate case would go uncompared —
+     * which is the coverage this document exists to keep, not a fixture invented to make a point.</p>
+     */
+    private static final String BUNDLED_SOCKETS_IN_VERSION_1 = """
+            {
+              "palette": [
+                {
+                  "char": "T",
+                  "lightSource": {
+                    "floor": [
+                      { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
+                      { "weight": 3, "block": "minecraft:torch",
+                        "unlit": "minecraft:candle[candles=1,lit=false]" },
+                      { "weight": 1, "block": "minecraft:end_rod[facing=up]" }
+                    ],
+                    "wall": [
+                      { "weight": 8, "block": "minecraft:wall_torch[facing=north]" },
+                      { "weight": 2, "block": "minecraft:end_rod[facing=north]" }
+                    ],
+                    "ceiling": [
+                      { "weight": 8, "block": "minecraft:lantern[hanging=true]",
+                        "unlit": "minecraft:iron_chain[axis=y]" },
+                      { "weight": 2, "block": "minecraft:end_rod[facing=down]" }
+                    ]
+                  }
+                },
+                {
+                  "char": "h",
+                  "lightSource": {
+                    "free": [
+                      { "weight": 6, "block": "minecraft:glowstone" },
+                      { "weight": 2, "block": "minecraft:sea_lantern" },
+                      { "weight": 1, "block": "minecraft:shroomlight" },
+                      { "weight": 1, "block": "minecraft:ochre_froglight" }
+                    ]
+                  }
+                }
+              ]
+            }
+            """;
 
     /** The id both compilations are given, so nothing in either depends on which file it came from. */
     private static final Identifier UNDER_TEST =
@@ -368,8 +432,21 @@ class V1ToV2Test {
     void theConverterInventsNoDefinitionAndReportsTheOnesItDeclined() {
         V1ToV2.Survey survey = V1ToV2.survey(PACKS.get("urbex"));
 
-        assertEquals(Map.of("minecraft:iron_bars", 60), survey.damagedValues(),
-                "VER.031's own number: 'damaged' has one distinct value across sixty uses");
+        // VER.031's first number was the bundled pack's sixty uses of one value, and it is the one
+        // target of the four that has since been taken: Task 10 hoisted 45 of them into the shared
+        // 'urbex:damageable' definition and left 9 written inline, because those markers already carry
+        // a $ref and a node has one. What the tool still counts here is version 1's spelling, which
+        // survives only in the inline palettes of six parts and buildings.
+        assertEquals(Map.of("minecraft:iron_bars", 6), survey.damagedValues(),
+                "the bundled pack after the hoist; VER.031's > Why records both numbers");
+
+        // Still measured where it has not been acted on, so the rule keeps a live instance rather than
+        // only a historical one.
+        Map<String, Integer> modernTweaks = V1ToV2.survey(PACKS.get("urbexmt")).damagedValues();
+        assertEquals(7, modernTweaks.size(), () -> "seven distinct 'damaged' values: " + modernTweaks);
+        assertEquals(257, modernTweaks.values().stream().mapToInt(Integer::intValue).sum(),
+                "across 257 uses");
+
         for (Path file : V1ToV2.jsonUnder(PACKS.get("urbex").resolve("palettes"))) {
             assertFalse(V1ToV2.paletteFile(read(file), file.toString()).json().contains("$defs"),
                     () -> file + " grew a $defs, and VER.030 forbids inventing one");
@@ -508,8 +585,8 @@ class V1ToV2Test {
         Map<String, String> absentBlockCases = new java.util.TreeMap<>();
         int compared = 0;
         int markers = 0;
-        for (String name : new TreeSet<>(PACKS.keySet())) {
-            Path pack = PACKS.get(name);
+        for (String name : new TreeSet<>(VERSION_1_PACKS.keySet())) {
+            Path pack = VERSION_1_PACKS.get(name);
             Fixture fixture = new Fixture(name, pack);
             for (Path file : V1ToV2.jsonUnder(pack.resolve("palettes"))) {
                 compared++;
@@ -531,11 +608,14 @@ class V1ToV2Test {
         }
         assertEquals(List.of(), unexplained,
                 "a converted palette answered differently for a reason nothing here accounts for");
-        assertEquals(135, compared, "30 + 98 + 7 shipped palettes were compared");
-        assertEquals(663, markers,
-                "and every marker of each of them, so the three exceptions below are three out of this "
-                        + "and not three out of however many the comparison happened to reach. It used "
-                        + "to stop at the first differing marker of a file, which hid four more");
+        assertEquals(105, compared, "98 + 7 shipped version 1 palettes were compared; the bundled "
+                + "pack's thirty are version 2 since Task 10 and are measured by the digest windows");
+        assertEquals(474, markers,
+                "and every marker of each of them, so the twelve exceptions below are twelve out of "
+                        + "this and not twelve out of however many the comparison happened to reach. "
+                        + "It used to stop at the first differing marker of a file, which hid four "
+                        + "more; it counted 663 over three packs until the bundled pack's 189 became "
+                        + "version 2");
         assertEquals(List.of(
                         "urbexza/bricks_building.json '#'",
                         "urbexza/default.json '/'", "urbexza/default.json ':'",
@@ -574,30 +654,37 @@ class V1ToV2Test {
     @Rule("WEIGHT.043")
     @Test
     void aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat() {
-        Path common = PACKS.get("urbex").resolve("palettes/common.json");
         Fixture fixture = new Fixture("urbex", PACKS.get("urbex"));
+        CompiledPalette version1 = fixture.compiledVersion1(BUNDLED_SOCKETS_IN_VERSION_1, "common.json");
+        CompiledPalette version2 = fixture.compiledVersion2(BUNDLED_SOCKETS_IN_VERSION_1, "common.json");
 
-        assertEquals(List.of(6, 3, 1, 8, 2, 8, 2), fixture.socketWeights(common, 'T', false),
+        assertEquals(List.of(6, 3, 1, 8, 2, 8, 2), fixture.socketWeights(version1, 'T'),
                 "version 1 hands LightPool the weights the file wrote");
-        assertEquals(List.of(77, 38, 13, 102, 26, 102, 26), fixture.socketWeights(common, 'T', true),
+        assertEquals(List.of(77, 38, 13, 102, 26, 102, 26), fixture.socketWeights(version2, 'T'),
                 "version 2 hands it the slot counts, which total 128 per placement list");
 
-        // Both of the bundled pack's sockets, not one: 'T' has floor, wall and ceiling lists and 'h'
-        // has a four-candidate 'free' list, which no assertion about 'T' reaches.
-        assertEquals(List.of(6, 2, 1, 1), fixture.socketWeights(common, 'h', false));
-        assertEquals(List.of(77, 25, 13, 13), fixture.socketWeights(common, 'h', true));
+        // Both sockets, not one: 'T' has floor, wall and ceiling lists and 'h' has a four-candidate
+        // 'free' list, which no assertion about 'T' reaches.
+        assertEquals(List.of(6, 2, 1, 1), fixture.socketWeights(version1, 'h'));
+        assertEquals(List.of(77, 25, 13, 13), fixture.socketWeights(version2, 'h'));
         for (char marker : new char[] {'T', 'h'}) {
-            assertEquals(fixture.socketSlots(common, marker, false),
-                    fixture.socketSlots(common, marker, true),
+            assertEquals(fixture.socketSlots(version1, marker), fixture.socketSlots(version2, marker),
                     () -> "marker '" + marker + "': both formats are apportioned to the same 128 "
                             + "slots, so 6 of 10 and 77 of 128 select the same candidate at every "
                             + "position - which is what VER.021 asks of a socket and what no converter "
                             + "output could deliver before WEIGHT.043 was built");
         }
 
-        assertEquals(List.of(), V1ToV2.paletteFile(read(common), "common.json").findings().stream()
-                        .filter(f -> f.rule().equals("VER.021")).toList(),
+        assertEquals(List.of(), V1ToV2.paletteFile(BUNDLED_SOCKETS_IN_VERSION_1, "common.json")
+                        .findings().stream().filter(f -> f.rule().equals("VER.021")).toList(),
                 "and the converter has nothing left to warn about here");
+
+        // And the same property over a socket still shipped in version 1, so this does not become an
+        // assertion about a document only this file has: Modern Tweaks' own 'T'.
+        Path modernTweaks = PACKS.get("urbexmt").resolve("palettes/common.json");
+        Fixture mt = new Fixture("urbexmt", PACKS.get("urbexmt"));
+        assertEquals(mt.socketSlots(mt.compiledVersion1(modernTweaks), 'T'),
+                mt.socketSlots(mt.compiledVersion2(modernTweaks), 'T'));
     }
 
     /**
@@ -614,17 +701,22 @@ class V1ToV2Test {
     @Rule("VER.021")
     @Test
     void aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt() {
-        Path pack = PACKS.get("urbex");
-        Path file = pack.resolve("palettes/bricks_standard.json");
-        assertTrue(V1ToV2.paletteFile(read(file), "bricks_standard.json").json().contains("\"$ref\""),
+        // A version 1 palette naming a variant, which is what the conversion turns into a $ref. The
+        // bundled pack's bricks_standard.json was this test's subject until Task 10 converted it, and
+        // a converted file cannot show the conversion doing anything.
+        Path pack = PACKS.get("urbexmt");
+        Path file = pack.resolve("palettes/common.json");
+        assertFalse(V1ToV2.paletteFile(read(file), file.toString()).json().contains("\"variant\""),
+                "the retired key does not survive the conversion");
+        assertTrue(V1ToV2.paletteFile(read(file), file.toString()).json().contains("\"$ref\""),
                 "this file's markers name variants, which §2's table turns into $ref");
 
-        assertNotNull(new Fixture("urbex", pack).compiledVersion2(file),
+        assertNotNull(new Fixture("urbexmt", pack).compiledVersion2(file),
                 "with the definitions registry it compiles");
 
         Diagnostics diagnostics = new Diagnostics();
         PaletteV2Definition converted = decode(PaletteV2Definition.CODEC,
-                V1ToV2.paletteFile(read(file), "bricks_standard.json").json(), file);
+                V1ToV2.paletteFile(read(file), file.toString()).json(), file);
         assertTrue(NodeResolver.resolve(converted, DefinitionIndex.empty(), Map.of(), diagnostics)
                         .isEmpty(),
                 "and without it, it does not");
@@ -827,8 +919,8 @@ class V1ToV2Test {
          * order, which is the same order both formats build them in, so the two lists are comparable
          * element by element.</p>
          */
-        List<Integer> socketWeights(Path file, char marker, boolean version2) {
-            return pool(file, marker, version2).allCandidates().stream()
+        List<Integer> socketWeights(CompiledPalette palette, char marker) {
+            return pool(palette, marker).allCandidates().stream()
                     .map(candidate -> candidate.weight()).toList();
         }
 
@@ -839,8 +931,8 @@ class V1ToV2Test {
          * alone would pass on two pools that round to the same numbers and address them differently;
          * comparing one position would pass on two that agree there by luck.</p>
          */
-        List<String> socketSlots(Path file, char marker, boolean version2) {
-            LightPool pool = pool(file, marker, version2);
+        List<String> socketSlots(CompiledPalette palette, char marker) {
+            LightPool pool = pool(palette, marker);
             List<String> winners = new ArrayList<>();
             for (LightPool.Placement placement : LightPool.Placement.values()) {
                 if (!pool.hasCandidates(placement)) {
@@ -856,9 +948,8 @@ class V1ToV2Test {
             return winners;
         }
 
-        private LightPool pool(Path file, char marker, boolean version2) {
-            Palette.Info info = (version2 ? compiledVersion2(file) : compiledVersion1(file))
-                    .placedAt(marker, SEED, 0, 64, 0).info();
+        private LightPool pool(CompiledPalette palette, char marker) {
+            Palette.Info info = palette.placedAt(marker, SEED, 0, 64, 0).info();
             return info.lightSource().pool();
         }
 
@@ -872,25 +963,9 @@ class V1ToV2Test {
          * self-consistent.</p>
          */
         Map<Block, Integer> slotCensus(String version1Document, char marker, boolean version2) {
-            CompiledPalette palette;
-            if (version2) {
-                Diagnostics diagnostics = new Diagnostics();
-                PaletteV2Definition converted = PaletteV2Definition.CODEC
-                        .parse(JsonOps.INSTANCE, JsonParser.parseString(
-                                V1ToV2.paletteFile(version1Document, "inline").json()))
-                        .getOrThrow(AssertionError::new);
-                palette = new CompiledPalette(Palette.version2(UNDER_TEST,
-                        NodeResolver.resolve(converted, definitions, Map.of(), diagnostics)
-                                .flatMap(resolved -> CompiledV2Palette.compile(resolved, presence,
-                                        traits, "'inline'", diagnostics))
-                                .orElseThrow(() -> new AssertionError(diagnostics.asError()
-                                        .orElse("?")))));
-            } else {
-                palette = new CompiledPalette(new Palette(UNDER_TEST, BuiltInRegistries.BLOCK, variants,
-                        List.of(PaletteDefinition.CODEC
-                                .parse(JsonOps.INSTANCE, JsonParser.parseString(version1Document))
-                                .getOrThrow(AssertionError::new))));
-            }
+            CompiledPalette palette = version2
+                    ? compiledVersion2(version1Document, "inline")
+                    : compiledVersion1(version1Document, "inline");
             // Exact, not sampled. A slot is addressed by position rather than indexed, so the slot
             // array is recovered by finding one position per index through the same Rng.paletteSlotAt
             // both formats resolve with, and asking the palette what stands there. Counting hits over a
@@ -917,20 +992,35 @@ class V1ToV2Test {
 
         /** The palette as version 1 compiles it, through the merge a style's draw would use. */
         CompiledPalette compiledVersion1(Path file) {
-            return new CompiledPalette(new Palette(UNDER_TEST, BuiltInRegistries.BLOCK, variants,
-                    List.of(decode(PaletteDefinition.CODEC, read(file), file))));
+            return compiledVersion1(read(file), file.toString());
         }
 
         /** The converted palette, through all eight stages of {@code LOAD.001} and the same merge. */
         CompiledPalette compiledVersion2(Path file) {
+            return compiledVersion2(read(file), file.toString());
+        }
+
+        /**
+         * The same two compilations over a document written in the test rather than read from a pack.
+         *
+         * <p>Both forms exist because the corpus of version 1 palettes shrank: the bundled pack is
+         * written in version 2 since Task 10, so a construct it was the only shipped instance of has
+         * to be stated here to keep being compared. {@code where} is what a diagnostic names.</p>
+         */
+        CompiledPalette compiledVersion1(String document, String where) {
+            return new CompiledPalette(new Palette(UNDER_TEST, BuiltInRegistries.BLOCK, variants,
+                    List.of(decode(PaletteDefinition.CODEC, document, Path.of(where)))));
+        }
+
+        CompiledPalette compiledVersion2(String version1Document, String where) {
             Diagnostics diagnostics = new Diagnostics();
             PaletteV2Definition converted = decode(PaletteV2Definition.CODEC,
-                    V1ToV2.paletteFile(read(file), file.toString()).json(), file);
+                    V1ToV2.paletteFile(version1Document, where).json(), Path.of(where));
             CompiledV2Palette compiled =
                     NodeResolver.resolve(converted, definitions, Map.of(), diagnostics)
                             .flatMap(resolved -> CompiledV2Palette.compile(resolved, presence, traits,
-                                    "'" + file + "'", diagnostics))
-                            .orElseThrow(() -> new AssertionError(file
+                                    "'" + where + "'", diagnostics))
+                            .orElseThrow(() -> new AssertionError(where
                                     + ": the converted palette did not compile: "
                                     + diagnostics.asError().orElse("?")));
             return new CompiledPalette(Palette.version2(UNDER_TEST, compiled));

@@ -1,9 +1,9 @@
 {
-  "palette": [
-    {
-      "char": "@",
-      "block": "minecraft:quartz_block",
-      "damaged": "minecraft:iron_bars"
+  "version": 2,
+  "palette": {
+    "@": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:quartz_block"
     }
-  ]
+  }
 }

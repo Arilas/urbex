@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 32,
+      "block": "minecraft:cracked_deepslate_tiles"
+    },
+    {
+      "weight": 32,
+      "block": "minecraft:cobbled_deepslate_slab[type=bottom]"
+    },
+    {
+      "weight": 32,
+      "block": "minecraft:cobbled_deepslate_stairs[facing=north,half=bottom]"
+    },
+    {
+      "weight": 32,
+      "block": "minecraft:deepslate_tiles"
+    }
+  ]
+}

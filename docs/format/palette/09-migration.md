@@ -241,10 +241,22 @@ The retired set, and what each becomes:
 > **VER.031** · `MUST` — The converter reports the opportunities it declined to take: repeated
 > `damaged` values, weighted lists repeated across files, and markers whose definitions are equal.
 
-> > **Why** — the measured targets are worth naming. `damaged` has one distinct value across sixty
-> > uses; Zombie Apocalypse Essentials carries 6,527 inline entries of which 1,242 are distinct;
-> > Modern Tweaks has 39 NBT-carrying markers holding 12 distinct blobs, and 149 markers in 48
-> > families differing only by a directional property, by VER.032's rule.
+> > **Why** — the measured targets are worth naming. In the bundled pack `damaged` had one distinct
+> > value across sixty uses; Zombie Apocalypse Essentials carries 6,527 inline entries of which 1,242
+> > are distinct; Modern Tweaks has 39 NBT-carrying markers holding 12 distinct blobs, and 149 markers
+> > in 48 families differing only by a directional property, by VER.032's rule.
+
+> > **The first of those has been taken, and the number the tool prints moved with it.** Converting the
+> > bundled pack was the occasion to act on what this rule reports, so 45 of the 60 became
+> > `{ "$ref": "urbex:damageable" }` against one partial definition in the `definitions` registry — the
+> > registry tier rather than `$defs`, because [REF.011](02-references.md#2-where-a-name-resolves)'s
+> > table puts a definition used by more than one file there and these were used by fourteen. Nine
+> > stayed written out, because their markers already carry a `$ref` into a converted variant and a node
+> > has one. The tool now counts **6** there, which are version 1's spelling surviving in the inline
+> > palettes of six parts and buildings; the reference packs are untouched and Modern Tweaks still
+> > reports 257 uses of 7 distinct values. Restated here rather than left at sixty because
+> > [VER.032](#5-what-the-converter-cannot-do) makes a figure nobody can reproduce a claim, and the
+> > figure a reader can reproduce is whatever the pack currently says.
 
 > **VER.032** · `MUST` — Each reported opportunity states the rule by which it was counted, because a
 > count nobody can reproduce is a claim rather than a measurement.

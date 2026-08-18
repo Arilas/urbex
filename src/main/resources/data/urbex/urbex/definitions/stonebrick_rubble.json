@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 9,
+      "block": "minecraft:cracked_stone_bricks"
+    },
+    {
+      "weight": 8,
+      "block": "minecraft:mossy_stone_bricks"
+    },
+    {
+      "weight": 5,
+      "block": "minecraft:stone_brick_stairs"
+    },
+    {
+      "weight": 15,
+      "block": "minecraft:stone_brick_slab"
+    },
+    {
+      "weight": 91,
+      "block": "minecraft:stone_bricks"
+    }
+  ]
+}

@@ -1,16 +1,8 @@
 {
-  "palette": [
-    {
-      "char": "+",
-      "block": "minecraft:white_stained_glass"
-    },
-    {
-      "char": "`",
-      "block": "minecraft:white_stained_glass_pane"
-    },
-    {
-      "char": "a",
-      "block": "minecraft:white_stained_glass"
-    }
-  ]
+  "version": 2,
+  "palette": {
+    "+": "minecraft:white_stained_glass",
+    "`": "minecraft:white_stained_glass_pane",
+    "a": "minecraft:white_stained_glass"
+  }
 }

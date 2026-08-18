@@ -1,24 +1,29 @@
 {
-  "palette": [
-    {
-      "char": "X",
-      "block": "minecraft:infested_stone_bricks",
-      "damaged": "minecraft:iron_bars"
+  "version": 2,
+  "palette": {
+    "X": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:infested_stone_bricks"
     },
-    {
-      "char": "$",
-      "block": "minecraft:smooth_stone_slab[type=double]",
-      "damaged": "minecraft:iron_bars"
+    "$": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:smooth_stone_slab[type=double]"
     },
-    {
-      "char": "#",
-      "variant": "urbex:bricks",
-      "damaged": "minecraft:iron_bars"
+    "#": {
+      "$ref": "urbex:bricks",
+      "traits": {
+        "urbex:damaged": {
+          "into": "minecraft:iron_bars"
+        }
+      }
     },
-    {
-      "char": "}",
-      "variant": "urbex:bricks_rubble",
-      "damaged": "minecraft:iron_bars"
+    "}": {
+      "$ref": "urbex:bricks_rubble",
+      "traits": {
+        "urbex:damaged": {
+          "into": "minecraft:iron_bars"
+        }
+      }
     }
-  ]
+  }
 }

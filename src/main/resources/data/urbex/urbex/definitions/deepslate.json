@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 32,
+      "block": "minecraft:cracked_deepslate_tiles"
+    },
+    {
+      "weight": 96,
+      "block": "minecraft:deepslate_tiles"
+    }
+  ]
+}

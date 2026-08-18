@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 20,
+      "block": "minecraft:polished_blackstone_bricks"
+    },
+    {
+      "weight": 20,
+      "block": "minecraft:cracked_polished_blackstone_bricks"
+    },
+    {
+      "weight": 20,
+      "block": "minecraft:polished_blackstone_slab[type=bottom]"
+    },
+    {
+      "weight": 20,
+      "block": "minecraft:polished_blackstone_stairs[facing=north,half=bottom]"
+    },
+    {
+      "weight": 48,
+      "block": "minecraft:polished_blackstone"
+    }
+  ]
+}

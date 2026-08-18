@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 10,
+      "block": "minecraft:bricks"
+    },
+    {
+      "weight": 10,
+      "block": "minecraft:brick_stairs"
+    },
+    {
+      "weight": 10,
+      "block": "minecraft:brick_slab"
+    },
+    {
+      "weight": 98,
+      "block": "minecraft:red_terracotta"
+    }
+  ]
+}

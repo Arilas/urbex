@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 10,
+      "block": "minecraft:bricks"
+    },
+    {
+      "weight": 118,
+      "block": "minecraft:red_terracotta"
+    }
+  ]
+}

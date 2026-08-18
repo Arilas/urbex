@@ -1,28 +1,27 @@
 {
-  "palette": [
-    {
-      "char": "X",
-      "block": "minecraft:cut_sandstone",
-      "damaged": "minecraft:iron_bars"
+  "version": 2,
+  "palette": {
+    "X": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:cut_sandstone"
     },
-    {
-      "char": "$",
-      "block": "minecraft:red_sandstone_slab[type=double]",
-      "damaged": "minecraft:iron_bars"
+    "$": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:red_sandstone_slab[type=double]"
     },
-    {
-      "char": "#",
-      "blocks": [
+    "#": {
+      "$ref": "urbex:damageable",
+      "kind": "weighted",
+      "choices": [
         {
-          "random": 12,
+          "weight": 12,
           "block": "minecraft:sandstone"
         },
         {
-          "random": 2000,
+          "weight": 116,
           "block": "minecraft:cut_sandstone"
         }
-      ],
-      "damaged": "minecraft:iron_bars"
+      ]
     }
-  ]
+  }
 }

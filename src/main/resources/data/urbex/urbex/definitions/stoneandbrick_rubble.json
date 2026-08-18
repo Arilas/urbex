@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 20,
+      "block": "minecraft:cracked_stone_bricks"
+    },
+    {
+      "weight": 20,
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "weight": 20,
+      "block": "minecraft:smooth_stone_slab[type=bottom]"
+    },
+    {
+      "weight": 20,
+      "block": "minecraft:stone_stairs[facing=east,half=bottom]"
+    },
+    {
+      "weight": 48,
+      "block": "minecraft:stone"
+    }
+  ]
+}

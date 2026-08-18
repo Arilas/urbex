@@ -196,19 +196,45 @@ class DatapackReferenceIntegrityTest {
                 iconRef(src, d.get("icon"));
             }
             case "palettes", "variants" -> { /* only palette-entry refs, handled below */ }
+            // A definitions asset is one node (REF.014), so everything it can reference - a $ref into
+            // this registry, a trait naming a conditions pool - is a node reference, and the walk
+            // below is the one that reads those. It has no keys of its own beyond "extends", which is
+            // checked unconditionally above.
+            case "definitions" -> { /* only node refs, handled below */ }
             default -> problems.add(file + ": category '" + category
                     + "' has no reference checks; add a case to this switch");
         }
         walkPaletteEntries(src, d);
     }
 
-    /** Any "palette" array anywhere: entries may reference variants ("variant") and conditions ("loot"/"mob"). */
+    /**
+     * Every reference a palette entry can make, in either format, at any depth.
+     *
+     * <p>Version 1 writes them as keys on an entry of a {@code palette} <em>array</em>:
+     * {@code variant} into the variants registry and {@code loot}/{@code mob} into conditions. Version
+     * 2 writes the same three as {@code $ref} into the definitions registry and as the {@code pool} of
+     * {@code urbex:loot} and {@code urbex:spawner}, on a node that may sit inside {@code $defs}, a
+     * choice, a placement list or another trait's satellite — so those two are matched wherever they
+     * appear rather than only on an entry, which is also what covers an inline palette in either
+     * format without a second walk.</p>
+     */
     private void walkPaletteEntries(String src, JsonElement el) {
         if (el == null) {
             return;
         }
         if (el.isJsonObject()) {
-            for (Map.Entry<String, JsonElement> e : el.getAsJsonObject().entrySet()) {
+            JsonObject node = el.getAsJsonObject();
+            definitionRef(src, node.get("$ref"));
+            JsonObject traits = asObject(node.get("traits"));
+            if (traits != null) {
+                for (String trait : List.of("urbex:loot", "urbex:spawner")) {
+                    JsonObject payload = asObject(traits.get(trait));
+                    if (payload != null) {
+                        ref(src, payload.get("pool"), "conditions");
+                    }
+                }
+            }
+            for (Map.Entry<String, JsonElement> e : node.entrySet()) {
                 if (e.getKey().equals("palette") && e.getValue().isJsonArray()) {
                     forEachObject(e.getValue(), entry -> {
                         ref(src, entry.get("variant"), "variants");
@@ -224,6 +250,29 @@ class DatapackReferenceIntegrityTest {
                 walkPaletteEntries(src, e);
             }
         }
+    }
+
+    /**
+     * A version 2 {@code $ref}, checked only when it names the definitions registry.
+     *
+     * <p>{@code REF.012}: a name resolves in exactly one tier and the colon decides which. A name
+     * without one is this file's own {@code $defs} and there is no file for it to resolve to; a name
+     * starting with {@code $} is an import alias or {@code $super} ({@code REF.040}), which this test
+     * cannot expand. Both are left to the loader, which refuses them by name with {@code DIAG.030}.
+     * A fragment addresses a path inside the asset ({@code REF.005}); the asset is what has to
+     * exist.</p>
+     */
+    private void definitionRef(String src, JsonElement el) {
+        if (el == null || !el.isJsonPrimitive()) {
+            return;
+        }
+        String name = el.getAsString();
+        if (name.startsWith("$") || name.indexOf(':') < 0) {
+            return;
+        }
+        int fragment = name.indexOf('#');
+        ref(src, new com.google.gson.JsonPrimitive(fragment < 0 ? name : name.substring(0, fragment)),
+                "definitions");
     }
 
     private void ref(String src, JsonElement el, String targetCategory) {

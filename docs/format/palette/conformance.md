@@ -87,7 +87,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.063` | `MUST` |  |  | `PendingAliasTest.aPendingAliasCarriesItsOwnTraitsSoTheMergeCanApplyThemOverWhateverItResolves`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
 | `MODEL.064` | `MUST` |  |  | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesNotDefineIsCarriedOutRatherThanDropped`, `PaletteCharacterCheckTest.aVersion2AliasAnsweredByAnotherGroupsPaletteIsReportedAsNeitherErrorNorWarning` |
 | `MODEL.070` | `MUST` |  |  | `ExclusionTest.aSocketWithNoCandidateLeftAnywhereIsTheSameRefusalAndTheSameCascade` |
-| `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists`, `V2SocketsTest.eachPlacementListBecomesItsOwnCandidateGroupAndAnEmptyOneStaysEmpty` |
+| `MODEL.071` | `MUST` |  |  | `PaletteV2DecodeTest.aLightSocketDeclaresItsCandidatesInFourNamedLists`, `CommonPaletteLightingTest.theCommonPaletteCompilesExactSocketsWithoutRedstoneTorches`, `V2SocketsTest.eachPlacementListBecomesItsOwnCandidateGroupAndAnEmptyOneStaysEmpty` |
 | `MODEL.072` | `REJECT` | `DIAG.010` | `reject=DIAG.010` | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `PaletteV2DecodeTest.aSocketWithAMalformedCandidateIsNotToldItHasNoCandidate` |
 | `MODEL.073` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `V2SocketsTest.theCandidateOrderComesFromTheSlotsAndNotFromAHashSoItIsTheSameEveryRun` |
 | `MODEL.074` | `MUST` |  |  | — |
@@ -105,8 +105,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.002` | `MUST` |  |  | `PaletteV2DecodeTest.aTraitIdIsNamespacedAndAnUnqualifiedOneIsRefused` |
 | `TRAIT.003` | `REJECT` | `DIAG.020` | `reject=DIAG.020` | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
 | `TRAIT.004` | `MUST` |  | `accept` | `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration`, `MarkerTraitsComposeTest.aMarkerCarryingBothALightAndAMobAppliesBothRatherThanOnlyTheFirstOne`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem` |
-| `TRAIT.005` | `MUST` |  | `accept` | `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
-| `TRAIT.006` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole`, `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField` |
+| `TRAIT.005` | `MUST` |  | `accept` | `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `CommonPaletteLightingTest.bothBundledSocketsNameTheirUnlitStandInRatherThanDefaultingIntoIt`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
+| `TRAIT.006` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole`, `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField`, `CommonPaletteLightingTest.bothBundledSocketsNameTheirUnlitStandInRatherThanDefaultingIntoIt` |
 | `TRAIT.007` | `MUST NOT` |  |  | `TraitTest.aSatelliteInheritsNothingSoAnUnlitReplacementIsNotItselfAnOptionalLight` |
 | `TRAIT.008` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole` |
 | `TRAIT.009` | `MUST` |  | `accept` | `NodeResolverTest.aSatellitesNodeIsResolvedAndIsStillNotAnAlternativeOfItsOwner` |
@@ -125,11 +125,11 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
 | `TRAIT.044` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `accept` | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `TraitPhaseTest.aBlockEntityBesideALightIsAcceptedWhenTheUnlitReplacementCanHoldTheNbtToo`, `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitPhaseTest.aBlockEntityWithNoSelectionTraitIsUnaffectedSoNothingThatCompilesTodayStopsCompiling`, `TraitPhaseTest.anAbsentReplacementIsAirAndAirIsRefusedBecauseAirHoldsNoBlockEntityEither` |
 | `TRAIT.050` | `MUST` |  |  | — |
-| `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | `V2SocketsTest.aCandidateCarryingTheLightTraitWithNoUnlitGetsAirRatherThanTheSockets` |
+| `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | `CommonPaletteLightingTest.theOilrigDeckLightsAreInPlaceSourcesThatLeaveTheirFixtureBehind`, `V2SocketsTest.aCandidateCarryingTheLightTraitWithNoUnlitGetsAirRatherThanTheSockets` |
 | `TRAIT.052` | `REJECT` | `DIAG.023` | `reject=DIAG.023` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
 | `TRAIT.053` | `REJECT` | `DIAG.024` | `reject=DIAG.024` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd` |
 | `TRAIT.054` | `MUST` |  |  | — |
-| `TRAIT.055` | `MUST` |  |  | `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
+| `TRAIT.055` | `MUST` |  |  | `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField`, `CommonPaletteLightingTest.bothBundledSocketsNameTheirUnlitStandInRatherThanDefaultingIntoIt`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
 | `TRAIT.060` | `MUST` |  |  | — |
 | `TRAIT.061` | `MUST` |  |  | — |
 | `TRAIT.062` | `DEFAULT` |  | `equiv=absent-replacement`, `equiv=absent-replacement` | — |
@@ -157,7 +157,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.003` | `MUST` |  | `accept` | `NodeResolverTest.aKeyBesideARefReplacesTheReferencedNodesValueForThatKey` |
 | `REF.004` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole` |
 | `REF.005` | `MUST` |  |  | — |
-| `REF.010` | `MUST` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset`, `PointerTest.aNameWithAColonAndNoFragmentIsADefinitionsAsset`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt` |
+| `REF.010` | `MUST` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset`, `PointerTest.aNameWithAColonAndNoFragmentIsADefinitionsAsset`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `CommonPaletteLightingTest.everyBundledPaletteIsVersion2AndCompilesAgainstThePacksOwnDefinitions` |
 | `REF.011` | `MUST` |  |  | `PointerTest.aNameWithNoColonAndNoFragmentIsADefinitionOfThisFile` |
 | `REF.012` | `MUST NOT` |  |  | `NodeResolverTest.aNameResolvesInOneTierAndTheOtherIsNeverTried` |
 | `REF.013` | `REJECT` | `DIAG.030` | `reject=DIAG.030` | — |
@@ -262,7 +262,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.040` | `MUST` |  |  | `ApportionTest.aWeightedNodeCompilesToExactlyOneHundredAndTwentyEightSlots`, `V2SocketsTest.candidateWeightsAreTheApportionedSlotCountsAndNotTheAuthoredWeights` |
 | `WEIGHT.041` | `MUST` |  |  | `ApportionTest.twoMarkersPlaceTheirMinorityChoicesAtDifferentOffsets` |
 | `WEIGHT.042` | `INVARIANT` |  |  | `ApportionTest.selectionIsAddressedSoResolutionOrderCannotChangeIt`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
-| `WEIGHT.043` | `MUST` |  | *n/a* | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
+| `WEIGHT.043` | `MUST` |  | *n/a* | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `CommonPaletteLightingTest.theCommonPaletteCompilesExactSocketsWithoutRedstoneTorches`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
 | `WEIGHT.050` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
 | `WEIGHT.051` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
 | `WEIGHT.052` | `MUST` |  |  | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint`, `CompiledV2PaletteTest.aShareNoDecimalCanHoldIsPrintedAsTheRationalItIs` |
@@ -389,7 +389,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | Rule | Class | Diagnostic | Fixtures | Tests |
 |---|---|---|---|---|
 | `VER.001` | `MUST` |  |  | `VersionDispatchTest.aFileWithNoVersionIsReadAsVersionOne` |
-| `VER.002` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `VersionDispatchTest.versionTwoSelectsTheVersionTwoRulesInFull` |
+| `VER.002` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `VersionDispatchTest.versionTwoSelectsTheVersionTwoRulesInFull`, `CommonPaletteLightingTest.everyBundledPaletteIsVersion2AndCompilesAgainstThePacksOwnDefinitions` |
 | `VER.003` | `MUST` |  |  | `VersionDispatchTest.aVersionTwoDocumentIsNeverHandedToTheVersionOneCodec` |
 | `VER.004` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt`, `LightPoolTest.aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears`, `LightPoolTest.aVersion1SocketWithMoreCandidatesThanSlotsStillLoads` |
 | `VER.005` | `REJECT` | `DIAG.038` | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |

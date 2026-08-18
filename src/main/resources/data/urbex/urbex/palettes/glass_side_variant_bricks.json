@@ -1,8 +1,9 @@
 {
-  "palette": [
-    {
-      "char": "@",
-      "frompalette": "#"
+  "version": 2,
+  "palette": {
+    "@": {
+      "kind": "alias",
+      "of": "#"
     }
-  ]
+  }
 }
