@@ -123,7 +123,7 @@ the chain step into a `$ref` and so into the first behaviour.
 ## Tombstones
 
 > **MERGE.010** — *retired.* Refused an `extends` chain that crossed format versions, in either
-> direction, with `DIAG.038`. Retired with [VER.005](09-migration.md#tombstones) by
+> direction, with the diagnostic that is retired beside it. Retired with [VER.005](09-migration.md#tombstones) by
 > [VER.018](09-migration.md#1-versioning): one format loads, so a chain has nothing to cross. It stated
 > the constraint once for both sides — VER.005 named it from the versioning side and pointed here — and
 > the pair go together. Its diagnostic `DIAG.038` is retired with it; the test citing MERGE.010 is

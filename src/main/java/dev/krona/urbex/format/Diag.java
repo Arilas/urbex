@@ -230,11 +230,16 @@ public enum Diag {
             + " A spread element can only be replaced by list elements."),
 
     /**
-     * {@code MERGE.010}, {@code VER.005}: args are the asset, its version, the id it extends, and
-     * that asset's version.
+     * Retired with {@code VER.005 and MERGE.010}; see {@code 08-errors.md}'s tombstone.
+     * <p>
+     * It refused an {@code extends} chain that crossed format versions, in either direction. One format
+     * loads now, so a chain has nothing to cross.
+     * <p>
+     * Kept as a constant with no template, exactly as {@link #DIAG_062} is: the number is permanent by
+     * {@code DIAG.910}, and the only way to prove it is not silently reused is for this enum and the
+     * catalogue to be provably the same set of identifiers. Nothing raises it, and nothing may.
      */
-    DIAG_038("%s (version %s) extends %s (version %s)."
-            + " An extends chain cannot cross format versions; convert one of them."),
+    DIAG_038("—"),
 
     /**
      * {@code REF.083}: args are the location, the undeclared alias, and the nearest declared one.
@@ -387,19 +392,16 @@ public enum Diag {
     DIAG_063("—"),
 
     /**
-     * {@code VER.007}: args are the owner, the version some link declares, and the version the leaf
-     * declares.
+     * Retired with {@code VER.007}; see {@code 08-errors.md}'s tombstone.
      * <p>
-     * New with {@code VER.015}'s retirement rather than before it, and that is the whole of why
-     * {@code VER.007} carried a "Why it is stated and not yet checked" block: an inline version 2
-     * palette was refused outright, so no mixed stack survived long enough to be merged and nothing
-     * could observe the rule being broken. Once version 2 compiles, a part whose ancestor writes a
-     * version 1 inline palette and which writes a version 2 one is a thing an author can express, and
-     * this is what it gets.
+     * It refused the inline palettes along one owner's {@code extends} chain declaring more than one
+     * format version. Same removal, same commit: a stack cannot mix two formats when one loads.
+     * <p>
+     * Kept as a constant with no template, exactly as {@link #DIAG_062} is: the number is permanent by
+     * {@code DIAG.910}, and the only way to prove it is not silently reused is for this enum and the
+     * catalogue to be provably the same set of identifiers. Nothing raises it, and nothing may.
      */
-    DIAG_065("%s: the inline palettes along this asset's 'extends' chain declare format version %s and"
-            + " version %s. An owner's inline palettes are merged by marker, so they are all of one"
-            + " format version; convert one of them."),
+    DIAG_065("—"),
 
     /**
      * Retired in draft with {@code VER.016}; see {@code 08-errors.md}'s tombstone.

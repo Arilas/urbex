@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -49,17 +50,52 @@ class VersionDispatchTest {
         Bootstrap.bootStrap();
     }
 
-    /** {@code VER.001}: a palette file with no {@code version} is a version 1 palette. */
+    /**
+     * {@code VER.018}: a palette file with no {@code version} is refused, and told what to run.
+     *
+     * <p>Both spellings, because they are one case to the loader and two to the author. An absent
+     * {@code version} reaches the dispatcher as 1 - the default {@code VER.001} set, which outlived
+     * {@code VER.001} itself as an implementation detail - so a message quoting "version 1" at a file
+     * that declares none would name a key its author never wrote. {@code DIAG.066} is worded for the
+     * file rather than for the number, which is why the same diagnostic serves both.</p>
+     */
     @Test
-    @Rule("VER.001")
-    void aFileWithNoVersionIsReadAsVersionOne() {
-        PaletteAssetDefinition decoded = decoded("""
+    @Rule("VER.018")
+    void aFileWithNoVersionAndAFileDeclaringVersionOneAreBothRefusedNamingTheConverter() {
+        for (String document : List.of(
+                """
                 { "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }
-                """);
-        assertEquals(1, decoded.formatVersion());
-        PaletteDefinition version1 = assertInstanceOf(PaletteDefinition.class, decoded);
-        assertEquals(1, version1.getPaletteEntries().size());
-        assertEquals("minecraft:stone_bricks", version1.getPaletteEntries().getFirst().getBlock());
+                """,
+                """
+                { "version": 1, "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }
+                """)) {
+            DataResult<PaletteAssetDefinition> result = decode(document);
+            String message = result.error()
+                    .orElseThrow(() -> new AssertionError("version 1 must not decode: " + document))
+                    .message();
+            assertTrue(Diag.DIAG_066.matches(message), message);
+            assertTrue(message.contains("convertPalettes"),
+                    () -> "the remedy is a conversion, so the diagnostic names the tool: " + message);
+        }
+    }
+
+    /**
+     * A version this Urbex has never had still gets {@code DIAG.001}, not {@code DIAG.066}.
+     *
+     * <p>The two refusals are one line apart in {@code Versioned} and it would be easy for the wrong one
+     * to answer both. They are different statements - one format was removed, the other never existed -
+     * and only the first has a conversion as its remedy.</p>
+     */
+    @Test
+    @Rule("VER.018")
+    void aVersionThatNeverExistedIsStillTheOtherDiagnostic() {
+        String message = decode("""
+                { "version": 9, "palette": {} }
+                """).error().orElseThrow().message();
+
+        assertTrue(Diag.DIAG_001.matches(message), message);
+        assertFalse(message.contains("convertPalettes"),
+                () -> "there is nothing to convert a version 9 file from: " + message);
     }
 
     /** {@code VER.002}: {@code "version": 2} selects this specification in full. */
@@ -108,26 +144,6 @@ class VersionDispatchTest {
                 "it decodes to a palette with no entries and no diagnostic - the whole file is gone");
     }
 
-    /**
-     * {@code VER.004}: version 1 does not become stricter. {@code MODEL.004} applies to version 2 files
-     * only.
-     * <p>
-     * A {@code MUST NOT} rule, proved the way a {@code MUST NOT} is: exercise the situation and assert
-     * the behaviour does not occur. Making version 1 refuse unknown keys would break packs
-     * retroactively, which this project has never done - strictness is a reason to migrate, not a
-     * penalty for not having.
-     */
-    @Test
-    @Rule("VER.004")
-    void versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt() {
-        PaletteAssetDefinition decoded = decoded("""
-                { "palette": [ { "char": "X", "block": "minecraft:stone_bricks",
-                                 "damagd": "minecraft:iron_bars" } ] }
-                """);
-        assertEquals(1, decoded.formatVersion());
-        assertEquals(1, assertInstanceOf(PaletteDefinition.class, decoded)
-                .getPaletteEntries().size());
-    }
 
     /**
      * {@code MODEL.002}: a version other than 1 or 2 is refused - including a {@code version} that is
@@ -157,34 +173,6 @@ class VersionDispatchTest {
         }
     }
 
-    /**
-     * {@code MERGE.011}: an inline palette is read by the rules of the version it declares.
-     * <p>
-     * This is issue #214, and until this task the answer was {@code VER.014}: the inline field was the
-     * version 1 codec, and an inline {@code "version": 2} palette was refused by name because the only
-     * other option was to hand it to a codec that ignores keys it does not know - which would have
-     * decoded a palette holding none of the markers its author wrote, and generated the part as air.
-     * The rule is retired with a tombstone and this test replaces the one that cited it.
-     * <p>
-     * Three spellings, because the rule is about all three: an absent {@code version} is version 1
-     * ({@code VER.001}) and keeps the version 1 shape, a declared 1 is the same thing said out loud, and
-     * a declared 2 now decodes as a version 2 document - marker keys, node objects and all.
-     */
-    @Test
-    @Rule("MERGE.011")
-    void anInlinePaletteIsReadByTheVersionItDeclares() {
-        assertInstanceOf(PaletteDefinition.class, inlinePaletteOf("""
-                { "palette": [ { "char": "b", "block": "minecraft:grass_block" } ] }
-                """), "an inline palette with no version is version 1, by VER.001");
-        assertInstanceOf(PaletteDefinition.class, inlinePaletteOf("""
-                { "version": 1, "palette": [ { "char": "b", "block": "minecraft:grass_block" } ] }
-                """), "declaring version 1 says the same thing out loud");
-
-        PaletteV2Definition version2 = assertInstanceOf(PaletteV2Definition.class, inlinePaletteOf("""
-                { "version": 2, "palette": { "b": "minecraft:grass_block" } }
-                """), "an inline palette declaring version 2 is read by the version 2 rules");
-        assertEquals(Set.of(new Marker('b')), version2.palette().orElseThrow().keySet());
-    }
 
     /**
      * {@code MERGE.012}: an inline palette may carry {@code $imports} and {@code $defs}.
@@ -294,47 +282,6 @@ class VersionDispatchTest {
         ).apply(instance, Thing::new));
     }
 
-    /**
-     * {@code VER.007}: the inline palettes along one owner's {@code extends} chain are all of one
-     * format version.
-     * <p>
-     * The rule this task's {@code VER.015} retirement made enforceable. While version 2 was refused
-     * where it compiled, no mixed stack survived long enough to be merged, so the rule was stated with a
-     * {@code > Why it is stated and not yet checked} block and nothing could observe it being broken.
-     * <p>
-     * It carries {@code [NO-FIXTURE]} because its input is two assets - a part and the ancestor it
-     * extends, each with an inline palette - and a fixture is one document. This is the citing test that
-     * marker obliges, and it drives both directions: a version 1 ancestor under a version 2 leaf, and
-     * the reverse. Both name the owner, which is the asset an author can edit.
-     */
-    @Test
-    @Rule("VER.007")
-    void inlinePalettesAlongOneOwnersChainAreAllOfOneVersionInEitherDirection() {
-        Identifier owner = Identifier.parse("urbex:tower");
-        PaletteAssetDefinition version1 = decoded("""
-                { "palette": [ { "char": "X", "block": "minecraft:stone_bricks" } ] }
-                """);
-        PaletteAssetDefinition version2 = decoded("""
-                { "version": 2, "palette": { "X": "minecraft:stone_bricks" } }
-                """);
-
-        IllegalStateException upgrading = assertThrows(IllegalStateException.class,
-                () -> Palette.inline(BuiltInRegistries.BLOCK, owner,
-                        List.of(version1, version2)));
-        assertTrue(Diag.DIAG_065.matches(upgrading.getMessage()), upgrading.getMessage());
-        assertTrue(upgrading.getMessage().contains(owner.toString()),
-                () -> "the diagnostic names the owner, which is the asset an author can edit: "
-                        + upgrading.getMessage());
-
-        IllegalStateException downgrading = assertThrows(IllegalStateException.class,
-                () -> Palette.inline(BuiltInRegistries.BLOCK, owner,
-                        List.of(version2, version1)));
-        assertTrue(Diag.DIAG_065.matches(downgrading.getMessage()), downgrading.getMessage());
-
-        assertDoesNotThrow(() -> Palette.inline(BuiltInRegistries.BLOCK, owner,
-                        List.of(version1, version1)),
-                "a chain of one version is what the rule permits, and is the common case");
-    }
 
     private static DataResult<PaletteAssetDefinition> decode(String json) {
         return PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json));

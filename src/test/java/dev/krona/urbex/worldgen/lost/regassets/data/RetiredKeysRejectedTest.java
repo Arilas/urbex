@@ -45,18 +45,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * reject, and {@link #everyDynamicRegistryIsCovered} cross-checks that set against the registry keys
  * {@code CustomRegistries} actually registers, so a registry cannot be added uncovered.
  * <p>
- * <b>Palettes are now two codecs behind one registry key, and both have to reject.</b> The
+ * <b>The palette dispatcher has one branch, and the sweep reaches it by declaring a version.</b> The
  * {@code palettes} registry takes {@link dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition#CODEC},
  * a dispatcher that reads {@code version} and delegates - so "the registered codec rejects
- * {@code inherit}" is a claim about whichever branch the document selects, and a document selects the
- * version 1 branch by declaring no {@code version} at all. The sweep below therefore counts fourteen
- * {@code *Definition} classes against fourteen registry keys, and the extra one is not slack: it is
- * {@code PaletteDefinition}, still reachable as a branch of the dispatcher rather than as a registered
- * codec, and {@link #bothBranchesOfThePaletteDispatcherRejectBothRetiredKeys} walks the branches
- * explicitly. The contract the count pins is unchanged in strength - every dynamic registry key has
- * exactly one registered codec, and every codec that can read a datapack file refuses both keys - and it
- * is now stated over the registry keys, which are what actually create registries, rather than over a
- * class-name glob.
+ * {@code inherit}" is a claim about whichever branch the document selects, and since {@code VER.018}
+ * a document that declares none selects nothing at all: it is refused as version 1. The sweep therefore
+ * hands the palette codec a document carrying {@code "version": 2}, and counts thirteen
+ * {@code *Definition} classes against thirteen registry keys, one each.
+ * <p>
+ * It counted fourteen while {@code PaletteDefinition} was reachable as the dispatcher's other branch,
+ * and {@code bothBranchesOfThePaletteDispatcherRejectBothRetiredKeys} walked the two explicitly. There
+ * is one branch now, so that test is gone and its half of the work is done by the sweep.
  * <p>
  * <b>The {@code definitions} registry has no version 1 branch and is still swept.</b> Its codec reads the
  * document as a node <em>before</em> it checks {@code version}, which is what lets the sweep reach its
@@ -89,6 +88,14 @@ class RetiredKeysRejectedTest {
         }
         for (Path source : sources) {
             String simple = source.getFileName().toString().replace(".java", "");
+            // VER.018 unregistered the version 1 palette codec. It still lives in this package, and it
+            // is still a *Definition with a CODEC, but nothing hands it a datapack file any more: it
+            // survives as the version 1 side of the converter's equivalence check and nothing else.
+            // Excluded by name rather than by narrowing the glob, so registering it again would fail
+            // the count below instead of quietly restoring a fourteenth codec nobody swept.
+            if (simple.equals("PaletteDefinition")) {
+                continue;
+            }
             Class<?> type = Class.forName("dev.krona.urbex.worldgen.lost.regassets." + simple);
             Field field = type.getDeclaredField("CODEC");
             assertTrue(Modifier.isPublic(field.getModifiers()) && Modifier.isStatic(field.getModifiers()),
@@ -101,36 +108,21 @@ class RetiredKeysRejectedTest {
     @Test
     void everyRegisteredCodecRejectsBothRetiredKeys() throws Exception {
         Map<String, Codec<?>> codecs = registryCodecs();
-        assertEquals(14, codecs.size(),
-                "expected the fourteen definition codecs - thirteen registries plus the version 1"
-                        + " palette branch behind the palette dispatcher - found " + codecs.keySet());
+        assertEquals(TestRegistries.COUNT, codecs.size(),
+                "expected one definition codec per registry key - found " + codecs.keySet());
 
         List<String> problems = new ArrayList<>();
         for (Map.Entry<String, Codec<?>> entry : codecs.entrySet()) {
-            problems.addAll(rejectionsOf(entry.getKey(), entry.getValue(), ""));
+            // The palette codec is a dispatcher, so a document has to select a branch before there is
+            // a codec to refuse anything: since VER.018 one that declares no version is refused as
+            // version 1 and never reaches the retired-key check. Declaring the version is what lets
+            // this sweep ask the question it means to ask, rather than getting DIAG.066 for every key.
+            String prefix = entry.getKey().equals("PaletteAssetDefinition") ? "\"version\":2," : "";
+            problems.addAll(rejectionsOf(entry.getKey(), entry.getValue(), prefix));
         }
         assertTrue(problems.isEmpty(), () -> String.join("\n", problems));
     }
 
-    /**
-     * Both branches of the palette dispatcher refuse both keys.
-     * <p>
-     * The version 1 branch is reached by declaring no {@code version} - which is what
-     * {@link #everyRegisteredCodecRejectsBothRetiredKeys} already exercises through the dispatcher - and
-     * the version 2 branch by declaring {@code "version": 2}, where the refusal comes from the version 2
-     * retired-key table rather than from {@code RetiredKeys}. Both are asserted here because they are two
-     * pieces of code, and a registry that refuses a retired key on only the branch nobody's pack uses
-     * refuses nothing: every shipped pack is version 1 today, and every converted pack will be version 2.
-     */
-    @Test
-    void bothBranchesOfThePaletteDispatcherRejectBothRetiredKeys() {
-        List<String> problems = new ArrayList<>(rejectionsOf("palettes (version 1 branch)",
-                dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition.CODEC, ""));
-        problems.addAll(rejectionsOf("palettes (version 2 branch)",
-                dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition.CODEC,
-                "\"version\":2,"));
-        assertTrue(problems.isEmpty(), () -> String.join("\n", problems));
-    }
 
     /** What {@code codec} fails to say about each retired key, given a document prefix. */
     private static List<String> rejectionsOf(String name, Codec<?> codec, String prefix) {

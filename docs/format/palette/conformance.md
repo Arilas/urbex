@@ -17,13 +17,13 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT` | 38 | 11 |
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
-| `DIAG` | 57 | 0 |
+| `DIAG` | 59 | 0 |
 | `VER` | 27 | 2 |
-| **total** | **315** | **78** |
+| **total** | **317** | **78** |
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (31):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.018`, `VER.020`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (31):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `MERGE.011`, `CHAR.010`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (12), which must each be covered by a citing test:**
 
@@ -48,7 +48,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 |---|---|
 | `TRAIT.011` | issue #216 |
 
-**Tests:** 218 of 315 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 214 of 317 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -229,9 +229,9 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MERGE.007` | `REJECT` | `DIAG.002` | `reject=DIAG.002` | `V2ChainTest.aPaletteIsRequiredSomewhereInTheChainAndNotInEveryFile` |
 | `MERGE.008` | `MUST` |  |  | `V2ChainTest.anOverriddenMarkerTakesItsTraitsWithIt` |
 | `MERGE.009` | `REJECT` | `DIAG.031` | `reject=DIAG.031` | `VersionDispatchTest.extendsInsideAnInlineVersionTwoPaletteIsRefused` |
-| `MERGE.011` | `MUST` |  |  | `VersionDispatchTest.anInlinePaletteIsReadByTheVersionItDeclares` |
+| `MERGE.011` | `MUST` |  |  | — |
 | `MERGE.012` | `ACCEPT` |  | *n/a* | `VersionDispatchTest.anInlinePaletteMayCarryImportsAndDefs` |
-| `MERGE.010` | `RETIRED` |  |  | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
+| `MERGE.010` | `RETIRED` |  |  | — |
 
 ### `palette/05-weights.md`
 
@@ -360,6 +360,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.035` | `DIAG` |  |  | — |
 | `DIAG.036` | `DIAG` |  |  | — |
 | `DIAG.037` | `DIAG` |  |  | — |
+| `DIAG.038` | `DIAG` |  |  | — |
 | `DIAG.039` | `DIAG` |  |  | — |
 | `DIAG.070` | `DIAG` |  |  | — |
 | `DIAG.071` | `DIAG` |  |  | — |
@@ -384,13 +385,14 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.063` | `DIAG` |  |  | — |
 | `DIAG.066` | `DIAG` |  |  | — |
 | `DIAG.064` | `DIAG` |  |  | — |
+| `DIAG.065` | `DIAG` |  |  | — |
 | `DIAG.910` | `MUST` |  |  | `DiagCatalogueTest.theDiagEnumCoversExactlyTheCatalogue`, `DiagCatalogueTest.everyDiagTemplateIsWordedAsItsCatalogueRowIs`, `DiagCatalogueTest.everyWordACatalogueRowStatesOutrightAppearsInItsTemplate`, `DiagCatalogueTest.aFormattedMessageIsRecognisedAsItsOwnDiagnostic`, `DiagCatalogueTest.everyCatalogueIdentifierIsLookedUpByItsId`, `DiagCatalogueTest.everyClauseACatalogueRowDelegatesIsASlotOrIsSpelledOutInTheTemplate` |
 
 ### `palette/09-migration.md`
 
 | Rule | Class | Diagnostic | Fixtures | Tests |
 |---|---|---|---|---|
-| `VER.018` | `REJECT` | `DIAG.066` | *—* | — |
+| `VER.018` | `REJECT` | `DIAG.066` | *—* | `VersionDispatchTest.aFileWithNoVersionAndAFileDeclaringVersionOneAreBothRefusedNamingTheConverter`, `VersionDispatchTest.aVersionThatNeverExistedIsStillTheOtherDiagnostic` |
 | `VER.002` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `VersionDispatchTest.versionTwoSelectsTheVersionTwoRulesInFull`, `CommonPaletteLightingTest.everyBundledPaletteIsVersion2AndCompilesAgainstThePacksOwnDefinitions` |
 | `VER.003` | `MUST` |  |  | `VersionDispatchTest.aVersionTwoDocumentIsNeverHandedToTheVersionOneCodec` |
 | `VER.017` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsIsNot`, `VariantKeyRefusedTest.aVersion1EntryNamingAVariantIsRefusedAndTheMessageNamesItsReplacement`, `VariantKeyRefusedTest.anEntryNamingBothAVariantAndALiveKeyIsStillRefused` |
@@ -410,10 +412,10 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.032` | `MUST` |  |  | `V1ToV2Test.everyDeclinedOpportunityStatesTheRuleItWasCountedBy` |
 | `VER.040` | `MUST` |  |  | `VersionDispatchTest.theVersionMechanismIsRegistryAgnostic` |
 | `VER.041` | `MUST` |  |  | — |
-| `VER.005` | `RETIRED` |  |  | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
-| `VER.007` | `RETIRED` |  |  | `VersionDispatchTest.inlinePalettesAlongOneOwnersChainAreAllOfOneVersionInEitherDirection` |
-| `VER.001` | `RETIRED` |  |  | `VersionDispatchTest.aFileWithNoVersionIsReadAsVersionOne` |
-| `VER.004` | `RETIRED` |  |  | `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt`, `LightPoolTest.aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears`, `LightPoolTest.aVersion1SocketWithMoreCandidatesThanSlotsStillLoads` |
+| `VER.005` | `RETIRED` |  |  | — |
+| `VER.007` | `RETIRED` |  |  | — |
+| `VER.001` | `RETIRED` |  |  | — |
+| `VER.004` | `RETIRED` |  |  | `LightPoolTest.aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears`, `LightPoolTest.aVersion1SocketWithMoreCandidatesThanSlotsStillLoads` |
 | `VER.016` | `RETIRED` |  |  | — |
 | `VER.015` | `RETIRED` |  |  | — |
 | `VER.014` | `RETIRED` |  |  | — |
