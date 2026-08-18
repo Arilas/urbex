@@ -152,45 +152,14 @@ public class Palette {
                         "'" + re.getExtends().orElseThrow() + "'", "'" + owner + "'"));
             }
         }
-        requireOneVersion(owner, chainRootFirst);
-        if (chainRootFirst.getLast().formatVersion() == 2) {
-            if (v2 == null) {
-                throw new IllegalStateException("'" + owner + "' carries an inline palette written in "
-                        + "format version 2, and this caller compiles without the registries version 2 "
-                        + "needs; compile it through AssetCompiler");
-            }
-            return version2(Identifier.fromNamespaceAndPath(Urbex.MODID,
-                            "__local__" + owner.getPath()),
-                    V2Palettes.compileV2(owner, "'" + owner + "'", chainRootFirst, v2));
+        if (v2 == null) {
+            throw new IllegalStateException("'" + owner + "' carries an inline palette, and this "
+                    + "caller compiles without the registries version 2 needs; compile it through "
+                    + "AssetCompiler");
         }
-        List<PaletteDefinition> version1 = new ArrayList<>(chainRootFirst.size());
-        chainRootFirst.forEach(link -> version1.add((PaletteDefinition) link));
-        Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(blockLookup, mergeByCharacter(version1, owner));
-        return palette;
-    }
-
-    /**
-     * {@code VER.007}: the inline palettes along one owner's {@code extends} chain are all of one
-     * format version.
-     * <p>
-     * This is {@code MERGE.010}'s constraint arriving through the <em>owner's</em> {@code extends}
-     * rather than through the palette's, and it needs stating separately because {@code VER.005} is
-     * about a chain of palettes and this chain is a chain of parts. The reason is the same: the inline
-     * blocks an owner's chain declares are merged by marker exactly as a registry chain is, and there is
-     * no correspondence between the two formats for that merge to preserve.
-     * <p>
-     * The message names the first link whose version differs from the leaf's, both versions, and the
-     * owner - which is the asset an author can actually edit.
-     */
-    private static void requireOneVersion(Identifier owner, List<PaletteAssetDefinition> chain) {
-        int leaf = chain.getLast().formatVersion();
-        for (PaletteAssetDefinition link : chain) {
-            if (link.formatVersion() != leaf) {
-                throw new IllegalStateException(Diag.DIAG_065.message("'" + owner + "'",
-                        link.formatVersion(), leaf));
-            }
-        }
+        return version2(Identifier.fromNamespaceAndPath(Urbex.MODID,
+                        "__local__" + owner.getPath()),
+                V2Palettes.compileV2(owner, "'" + owner + "'", chainRootFirst, v2));
     }
 
     /**

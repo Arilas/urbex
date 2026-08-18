@@ -38,7 +38,20 @@ public enum Diag {
 
     /** {@code MODEL.002}: args are the location and the version found. */
     DIAG_001("%s: declares version %s, which this Urbex does not know."
-            + " Write \"version\": 2, or omit it for the version 1 format."),
+            + " Write \"version\": 2."),
+
+    /**
+     * {@code VER.018}: the argument is the location.
+     *
+     * <p>Separate from {@code DIAG.001} because the two cases read differently to the author. A file
+     * declaring version 9 wrote a number this Urbex does not know; a file declaring version 1, or
+     * declaring nothing, wrote a format this Urbex used to have and removed. Only the second has a
+     * conversion as its remedy, and {@code DIAG.001} naming "version 1" for a file that declared no
+     * version at all would be a message about a key the author never wrote.
+     */
+    DIAG_066("%s: is written in palette format version 1, which Urbex no longer loads."
+            + " Convert it with the 'convertPalettes' task, which rewrites a version 1 pack as"
+            + " version 2, or write \"version\": 2 and the version 2 keys by hand."),
 
     /** {@code MERGE.007}: the argument is the location. */
     DIAG_002("%s: declares no 'palette', and neither does anything it extends."

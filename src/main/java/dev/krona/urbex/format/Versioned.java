@@ -69,6 +69,14 @@ public final class Versioned {
                 int declared = version.result().orElseThrow();
                 Codec<? extends T> codec = codecs.get(declared);
                 if (codec == null) {
+                    // VER.018: version 1 is a format this Urbex removed, not a number it never knew,
+                    // and the two want different messages - only one of them has a conversion as its
+                    // remedy. An absent version reaches here as 1 by VER.001's old default, which is
+                    // why this tests the value rather than the document: the file wrote no version at
+                    // all, and a message quoting one would be about a key its author never typed.
+                    if (declared == 1) {
+                        return DataResult.error(() -> Diag.DIAG_066.message(context));
+                    }
                     return DataResult.error(() -> Diag.DIAG_001.message(context, declared));
                 }
                 return codec.decode(ops, input).map(pair -> pair.mapFirst(value -> (T) value));

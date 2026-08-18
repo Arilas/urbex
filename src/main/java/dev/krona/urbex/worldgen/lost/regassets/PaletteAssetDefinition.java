@@ -48,11 +48,16 @@ public interface PaletteAssetDefinition extends Extendable, Versioned.Asset {
      * Version 1 keeps its own {@code RetiredKeys} wrapper, so it keeps refusing {@code inherit} and
      * {@code parent} and keeps ignoring every other unknown key ({@code VER.004} - version 1 does not
      * become stricter). Version 2 refuses both, by {@code MODEL.004} and the retired-key table.
-     * {@code RetiredKeysRejectedTest} walks both branches, because a registry that rejects a retired key
-     * on one of its two branches rejects it on the branch nobody's pack uses.
+     * <p>
+     * <b>There is one branch now.</b> {@code VER.018} removed version 1 from the loader, so the
+     * dispatcher registers version 2 alone and a document declaring anything else is refused before it
+     * decodes. The dispatch survives the removal of the thing it dispatched on, and deliberately: it is
+     * what makes {@code VER.003} - the version is read off the raw document, before any field is - a
+     * property of the code rather than of the number of formats that happen to exist. A registry that
+     * knew only one format would have to grow the pre-pass back on the day it knew two, and the failure
+     * that costs is silent, which is the whole of {@code Versioned}'s reason for existing.
      */
     Codec<PaletteAssetDefinition> CODEC = Versioned.dispatch("palette", Map.of(
-            1, PaletteDefinition.CODEC,
             PaletteV2Definition.FORMAT_VERSION, PaletteV2Definition.CODEC));
 
     /**

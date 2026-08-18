@@ -57,7 +57,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 
 | Id | Raised by | Message |
 |---|---|---|
-| `DIAG.001` | [MODEL.002](00-model.md#1-the-file) | *`<asset>`: declares version `<n>`, which this Urbex does not know. Write `"version": 2`, or omit it for the version 1 format.* |
+| `DIAG.001` | [MODEL.002](00-model.md#1-the-file) | *`<asset>`: declares version `<n>`, which this Urbex does not know. Write `"version": 2`.* |
 | `DIAG.002` | [MERGE.007](04-merging.md#1-extends) | *`<asset>`: declares no `palette`, and neither does anything it extends. Add one, or extend a palette that has one.* |
 | `DIAG.003` | [MODEL.004](00-model.md#1-the-file) | *`<asset>` marker `'<m>'`: `<key>` is not a key of `<context>`. Version 2 palettes refuse keys they do not define; check the spelling against the schema.* |
 | `DIAG.004` | [MODEL.012](00-model.md#2-the-node) | *`<asset>` marker `'<m>'`: kind `<k>` does not exist. The kinds are block, weighted, tag, alias and light_socket.* |
@@ -96,7 +96,6 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.036` | [REF.062](03-pointers.md#22-super) | *`<asset>` marker `'<m>'`: `$super` names what this entry inherits, and `<this file declares no extends` / `nothing in its extends chain declares '<m>'>`. Remove `$super`, or extend something that defines it.* |
 | `DIAG.037` | [REF.071](03-pointers.md#23-spread) | *`<asset>` marker `'<m>'`: `$spread` `<p>` names a `<kind>`, not a list. A spread element can only be replaced by list elements.* |
 | `DIAG.039` | [REF.083](03-pointers.md#3-imports) | *`<asset>` marker `'<m>'`: `$<alias>` is not an import of this file`<, and the closest declared is '$<near>'>`. Declare it in `$imports`, or write the pointer in full.* |
-| `DIAG.038` | [MERGE.010](04-merging.md#1-extends), [VER.005](09-migration.md#1-versioning) | *`<asset>` (version `<n>`) extends `<id>` (version `<m>`). An extends chain cannot cross format versions; convert one of them.* |
 | `DIAG.070` | [REF.082](03-pointers.md#3-imports) | *`<asset>`: `$imports` declares `super`, which is a built-in alias naming what this entry inherits and cannot be redeclared. Remove it, or choose another alias name.* |
 | `DIAG.071` | [REF.019](02-references.md#2-where-a-name-resolves) | *`<asset>`: a definitions asset `<declares no `version`` / `declares version `<n>`>`. The `definitions` registry is new in palette format version 2 and has no version 1 form, so an absent `version` is not one; write `"version": 2`.* |
 | `DIAG.072` | [REF.055](03-pointers.md#21-only-and-without) | *`<asset>` marker `'<m>'`: `<operand>` names `<key>`, which is not a key of a node`<, and the closest is `<near>`>`. The keys a filter may name are kind, block, choices, tag, of, floor, wall, ceiling, free and traits.* |
@@ -133,7 +132,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 | `DIAG.061` | [VER.011](09-migration.md#3-retired-keys) | *`<asset>`: `<key>` was deleted, not renamed. `<explanation>`* |
 | `DIAG.062` | *retired — see tombstones* | — |
 | `DIAG.063` | *retired — see tombstones* | — |
-| `DIAG.065` | [VER.007](09-migration.md#1-versioning) | *`<owner>`: the inline palettes along this asset's `extends` chain declare format version `<n>` and version `<m>`. An owner's inline palettes are merged by marker, so they are all of one format version; convert one of them.* |
+| `DIAG.066` | [VER.018](09-migration.md#1-versioning) | *`<asset>`: is written in palette format version 1, which Urbex no longer loads. Convert it with the `convertPalettes` task, which rewrites a version 1 pack as version 2, or write `"version": 2` and the version 2 keys by hand.* |
 | `DIAG.064` | *retired — see tombstones* | — |
 
 ## 5. Retired identifiers
@@ -145,6 +144,13 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 > > and a reused number makes an old report describe a new problem.
 
 ## Tombstones
+
+> `DIAG.038` — *retired* with [MERGE.010](04-merging.md#tombstones) and
+> [VER.005](09-migration.md#tombstones). An `extends` chain crossing format versions, which one loadable
+> format makes impossible.
+
+> `DIAG.065` — *retired* with [VER.007](09-migration.md#tombstones). The inline palettes along one
+> owner's chain disagreeing about their version, which the same removal makes impossible.
 
 > **DIAG.062** — *retired in draft.* Raised when a palette written inline in a part or building
 > declared a `version` other than 1, under [VER.014](09-migration.md#tombstones), which is retired with
@@ -163,10 +169,6 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 > **DIAG.063** — *retired in draft.* Raised when a version 2 palette reached compilation, registered or
 > inline, under [VER.015](09-migration.md#tombstones), which is retired with it. Version 2 palettes
 > compile, so the case this named is no longer a rejection at all. The refusal that survives beside it is
-> `DIAG.065` — the inline palettes along one owner's chain disagreeing about their version — which is
-> [VER.007](09-migration.md#1-versioning), a permanent rule with a different message and a different
-> remedy, and which this row's existence was what made unenforceable. The number stays retired.
-
 > **DIAG.064** — *retired in draft.* Raised when an operand — `$ref`, `$only`, `$without` or
 > `$spread` — was written anywhere inside a `traits` value, under
 > [VER.016](09-migration.md#tombstones), which is retired with it. A trait now declares which of its
