@@ -48,7 +48,7 @@ class BuildingPartExtendsTest {
         BuildingPartDefinition child = part("radiotower_rusted", inherits("urbex:radiotower")
                 .refpalette("urbexmt:radiotower_rusted"));
 
-        BuildingPart resolved = new BuildingPart(TestAssetId.of("radiotower_rusted"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child));
+        BuildingPart resolved = new BuildingPart(TestAssetId.of("radiotower_rusted"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child), TestV2Context.empty());
 
         assertEquals(2, resolved.getXSize());
         assertEquals(2, resolved.getZSize());
@@ -65,7 +65,7 @@ class BuildingPartExtendsTest {
         BuildingPartDefinition child = part("tower_short", inherits("urbex:tower")
                 .slices(List.of(List.of("ij", "kl"))));
 
-        BuildingPart resolved = new BuildingPart(TestAssetId.of("tower_short"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child));
+        BuildingPart resolved = new BuildingPart(TestAssetId.of("tower_short"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child), TestV2Context.empty());
 
         assertEquals(1, resolved.getSliceCount());
         assertArrayEquals(new String[]{"ijkl"}, resolved.getSlices());
@@ -79,7 +79,7 @@ class BuildingPartExtendsTest {
         BuildingPartDefinition child = part("tower_wide", inherits("urbex:tower").xsize(3));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(TestAssetId.of("tower_wide"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child)));
+                () -> new BuildingPart(TestAssetId.of("tower_wide"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child), TestV2Context.empty()));
 
         assertTrue(error.getMessage().contains("urbex:tower_wide"),
                 () -> "the error must name the part: " + error.getMessage());
@@ -95,7 +95,7 @@ class BuildingPartExtendsTest {
         BuildingPartDefinition child = part("tower_deep", inherits("urbex:tower").zsize(5));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(TestAssetId.of("tower_deep"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child)));
+                () -> new BuildingPart(TestAssetId.of("tower_deep"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child), TestV2Context.empty()));
 
         assertTrue(error.getMessage().contains("urbex:tower_deep"),
                 () -> "the error must name the part: " + error.getMessage());
@@ -108,7 +108,7 @@ class BuildingPartExtendsTest {
                 .refpalette("urbex:rusted"));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(TestAssetId.of("tower_rusted"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child)));
+                () -> new BuildingPart(TestAssetId.of("tower_rusted"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child), TestV2Context.empty()));
 
         assertTrue(error.getMessage().contains("urbex:tower_rusted"),
                 () -> "the error must name the part that failed to resolve: " + error.getMessage());
@@ -121,7 +121,7 @@ class BuildingPartExtendsTest {
         BuildingPartDefinition parent = part("sliced_only", new Builder().slices(TOWER));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(TestAssetId.of("sliced_only"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent)));
+                () -> new BuildingPart(TestAssetId.of("sliced_only"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent), TestV2Context.empty()));
 
         assertTrue(error.getMessage().contains("urbex:sliced_only"), error::getMessage);
     }
@@ -132,11 +132,11 @@ class BuildingPartExtendsTest {
         BuildingPartDefinition replacing = part("tower_a", inherits("urbex:tower").meta(true, meta("nowater")));
         BuildingPartDefinition appending = part("tower_b", inherits("urbex:tower").meta(false, meta("nowater")));
 
-        BuildingPart replaced = new BuildingPart(TestAssetId.of("tower_b"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, replacing));
+        BuildingPart replaced = new BuildingPart(TestAssetId.of("tower_b"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, replacing), TestV2Context.empty());
         assertTrue(replaced.getMetaBoolean("nowater"));
         assertFalse(replaced.getMetaBoolean("support"), "a bare array replaces");
 
-        BuildingPart appended = new BuildingPart(TestAssetId.of("tower_b"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, appending));
+        BuildingPart appended = new BuildingPart(TestAssetId.of("tower_b"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, appending), TestV2Context.empty());
         assertTrue(appended.getMetaBoolean("nowater"));
         assertTrue(appended.getMetaBoolean("support"), "{\"replace\": false} keeps the inherited meta");
     }
@@ -147,15 +147,14 @@ class BuildingPartExtendsTest {
         // level down, exactly the failure the keyed-collection rule exists to prevent: a child
         // repainting one marker would silently lose the other two.
         BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER)
-                .inlinePalette(entry('a', "minecraft:stone"),
-                        entry('b', "minecraft:bricks"),
-                        entry('c', "minecraft:glass")));
+                .inlinePalette("a", "minecraft:stone", "b", "minecraft:bricks",
+                        "c", "minecraft:glass"));
         BuildingPartDefinition child = part("tower_rusted", inherits("urbex:tower")
-                .inlinePalette(entry('a', "minecraft:deepslate")));
+                .inlinePalette("a", "minecraft:deepslate"));
 
-        Palette resolved = new BuildingPart(TestAssetId.of("tower_rusted"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child)).getLocalPalette();
+        Palette resolved = new BuildingPart(TestAssetId.of("tower_rusted"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child), TestV2Context.empty()).getLocalPalette();
 
-        assertEquals(3, resolved.getPalette().size(),
+        assertEquals(3, resolved.v2().markers().size(),
                 "the two characters the child never mentions must survive");
         assertEquals("minecraft:deepslate", blockOf(resolved, 'a'), "the child's character wins");
         assertEquals("minecraft:bricks", blockOf(resolved, 'b'));
@@ -166,7 +165,7 @@ class BuildingPartExtendsTest {
     void namingAPaletteWithRefpaletteDropsAnInheritedInlineOne() {
         // refpalette and an inline block are two ways to say the same thing, not two layers.
         BuildingPartDefinition parent = part("tower", geometry(2, 2, TOWER)
-                .inlinePalette(entry('a', "minecraft:stone")));
+                .inlinePalette("a", "minecraft:stone"));
         BuildingPartDefinition child = part("tower_ref", inherits("urbex:tower")
                 .refpalette("urbex:somewhere_else"));
 
@@ -174,7 +173,7 @@ class BuildingPartExtendsTest {
         // built at all unless the named palette exists. That is the compile-time resolution doing its
         // job: this used to build fine and blow up on the first chunk that asked for the palette.
         RuntimeException failure = assertThrows(RuntimeException.class,
-                () -> new BuildingPart(TestAssetId.of("tower_ref"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child)),
+                () -> new BuildingPart(TestAssetId.of("tower_ref"), BuiltInRegistries.BLOCK, PALETTES, List.of(parent, child), TestV2Context.empty()),
                 "an ancestor's inline palette must not survive the child naming a refpalette");
         assertTrue(failure.getMessage().contains("urbex:somewhere_else"), failure.getMessage());
     }
@@ -186,26 +185,26 @@ class BuildingPartExtendsTest {
         // lets a datapack mean something other than what it says.
         BuildingPartDefinition part = part("tower", geometry(2, 2, TOWER)
                 .inlinePalette(Optional.of(Identifier.parse("urbex:common")),
-                        entry('a', "minecraft:stone")));
+                        "a", "minecraft:stone"));
 
         IllegalStateException error = assertThrows(IllegalStateException.class,
-                () -> new BuildingPart(TestAssetId.of("tower"), BuiltInRegistries.BLOCK, PALETTES, List.of(part)));
+                () -> new BuildingPart(TestAssetId.of("tower"), BuiltInRegistries.BLOCK, PALETTES, List.of(part), TestV2Context.empty()));
 
         assertTrue(error.getMessage().contains("urbex:tower"), error::getMessage);
         assertTrue(error.getMessage().contains("urbex:common"), error::getMessage);
         assertTrue(error.getMessage().contains("refpalette"), error::getMessage);
     }
 
+    /**
+     * The block one marker resolves to, read off the version 2 compiled palette.
+     *
+     * <p>Slot 0 of the entry: a marker naming one block compiles to 128 identical slots, so any of them
+     * answers. It read {@code Palette.getPalette()} - the version 1 compiled map - until {@code VER.018}
+     * left these parts with a version 2 inline palette and no version 1 map to have.</p>
+     */
     private static String blockOf(Palette palette, char marker) {
-        BlockState state = (BlockState) palette.getPalette().get(marker).blocks();
+        BlockState state = palette.v2().entry(marker).slot(0).state();
         return BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString();
-    }
-
-    private static PaletteEntry entry(char marker, String block) {
-        return new PaletteEntry(Character.toString(marker), Optional.of(block),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty());
     }
 
     private static PartMeta meta(String key) {
@@ -273,13 +272,29 @@ class BuildingPartExtendsTest {
             return this;
         }
 
-        Builder inlinePalette(PaletteEntry... entries) {
-            return inlinePalette(Optional.empty(), entries);
+        /**
+         * An inline palette, written as the version 2 document a part carries since {@code VER.018}.
+         *
+         * <p>Built from JSON rather than from records because that is what {@code MERGE.011} is about:
+         * the inline block goes through the registry's own dispatching codec, so a fixture assembled
+         * out of objects would skip the decode these tests depend on being real.</p>
+         */
+        Builder inlinePalette(String... markerAndBlock) {
+            return inlinePalette(Optional.empty(), markerAndBlock);
         }
 
-        Builder inlinePalette(Optional<Identifier> paletteExtends, PaletteEntry... entries) {
-            this.inlinePalette = Optional.of(
-                    new PaletteDefinition(paletteExtends, Optional.of(List.of(entries))));
+        Builder inlinePalette(Optional<Identifier> paletteExtends, String... markerAndBlock) {
+            StringBuilder json = new StringBuilder("{\"version\":2");
+            paletteExtends.ifPresent(id -> json.append(",\"extends\":\"").append(id).append('"'));
+            json.append(",\"palette\":{");
+            for (int i = 0; i < markerAndBlock.length; i += 2) {
+                if (i > 0) {
+                    json.append(',');
+                }
+                json.append('"').append(markerAndBlock[i]).append("\":\"")
+                        .append(markerAndBlock[i + 1]).append('"');
+            }
+            this.inlinePalette = Optional.of(TestV2Context.inline(json.append("}}").toString()));
             return this;
         }
 

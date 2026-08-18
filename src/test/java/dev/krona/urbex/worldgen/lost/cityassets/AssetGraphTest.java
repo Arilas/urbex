@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
@@ -379,7 +380,8 @@ class AssetGraphTest {
             extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK, AssetIndex.empty("urbex:palettes"),
                     List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(xSize), Optional.of(zSize),
                             Optional.of(slices), Optional.empty(),
-                            Optional.of(singleMarkerPaletteDefinition(paletteMarker)), Optional.empty()))));
+                            Optional.of(singleMarkerInlinePalette(paletteMarker)), Optional.empty())),
+                    TestV2Context.empty()));
             return this;
         }
 
@@ -496,6 +498,16 @@ class AssetGraphTest {
         private static Palette singleMarkerPalette(String path, char marker) {
             return new Palette(Identifier.fromNamespaceAndPath("urbex", path), BuiltInRegistries.BLOCK,
                     List.of(singleMarkerPaletteDefinition(marker)));
+        }
+
+        /**
+         * The same one-marker palette as a version 2 inline document, which is the only kind a part
+         * carries since {@code VER.018}. The registered-palette fixture beside it stays version 1: it
+         * feeds {@code new Palette(...)} directly, which is the converter's side of the house.
+         */
+        private static PaletteAssetDefinition singleMarkerInlinePalette(char marker) {
+            return TestV2Context.inline("{\"version\":2,\"palette\":{\""
+                    + marker + "\":\"minecraft:stone\"}}");
         }
 
         private static PaletteDefinition singleMarkerPaletteDefinition(char marker) {
