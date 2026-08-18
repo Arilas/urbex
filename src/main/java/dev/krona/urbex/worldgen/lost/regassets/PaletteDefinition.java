@@ -17,12 +17,24 @@ import java.util.Optional;
  * {@code palette} is optional here rather than required, because requiredness is checked after the
  * {@code extends} chain is resolved, in {@link dev.krona.urbex.worldgen.lost.cityassets.Palette}.
  * <p>
- * <b>Deprecated in fact, not in annotation.</b> Version 1 is what every shipped pack is written in, so
- * it must keep loading unchanged ({@code VER.001}), and it must not become stricter ({@code VER.004}) -
- * refusing unknown keys here would break packs retroactively, which this project has never done.
- * Nothing new should be built on it, and nothing here is shared with
- * {@link dev.krona.urbex.format.palette.PaletteV2Definition}: the two formats meet only at
- * {@link PaletteAssetDefinition}, which is the version and the {@code extends} link and nothing else.
+ * <b>No datapack reaches this class.</b> {@code VER.018} unregistered it: the palettes registry
+ * dispatches on version 2 alone, and a document declaring version 1 - or declaring nothing - is refused
+ * with {@code DIAG.066} before it decodes. {@code VER.001} and {@code VER.004}, which used to be the
+ * reasons this class had to keep working, are retired.
+ * <p>
+ * <b>Why it still exists.</b> {@code VER.021} - "a world generated from the converted pack is identical
+ * to one generated from the original" - is verified by compiling every shipped version 1 palette both
+ * ways and comparing marker by marker, which needs a version 1 implementation for as long as the
+ * converter does. This is that implementation, and it has exactly one caller left:
+ * {@code V1ToV2Test}. It is excluded by name from {@code RetiredKeysRejectedTest}'s registry sweep,
+ * which counts registered codecs, so registering it again fails that count rather than passing
+ * unnoticed.
+ * <p>
+ * It belongs in test scope and is not there yet: moving it means moving {@code PaletteEntry},
+ * {@code BlockEntry}, {@code LightSourceSettings}, {@code Palette}'s version 1 half and
+ * {@code LightPool}'s version 1 entry with it, and {@code Palette} is one class serving both formats.
+ * Recorded here rather than in a tracker because this javadoc is what the next reader of this file
+ * will see. Nothing new should be built on it.
  * <p>
  * The one thing that changed here is that it names {@link PaletteAssetDefinition} instead of
  * {@link Extendable} - the interface that supersedes it also carries the format version - and gained

@@ -11,7 +11,6 @@ import dev.krona.urbex.format.palette.V2Chain;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.Registries;
@@ -126,21 +125,20 @@ final class V2Palettes {
     }
 
     /**
-     * One registered palette, compiled by the rules of the version its chain declares.
+     * One registered palette.
      *
-     * <p>The chain is all of one version already: {@code VER.005}/{@code MERGE.010} refuse a chain that
-     * crosses versions, enforced in {@link AssetStage} where the chain is walked. So testing the leaf is
-     * testing all of it, and the cast below cannot fail for a reason a pack author can cause.</p>
+     * <p>There is no version to test. {@code VER.018} refuses a version 1 document before it decodes, so
+     * every link of every chain that reaches here is version 2 - the branch this method used to open
+     * with, and the {@code version1} cast behind it, were unreachable the moment the dispatcher lost its
+     * other branch. Deleted rather than left as defensive code: a branch that cannot be taken is a
+     * branch no test can cover, and this file has already paid for one of those.</p>
      */
     static Palette compile(Identifier id, HolderLookup<Block> blockLookup,
                            List<PaletteAssetDefinition> chainRootFirst, Context context) {
         if (chainRootFirst.isEmpty()) {
             throw new IllegalArgumentException("an extends chain holds at least the file it is for");
         }
-        if (chainRootFirst.getLast().formatVersion() == PaletteV2Definition.FORMAT_VERSION) {
-            return Palette.version2(id, compileV2(id, "'" + id + "'", chainRootFirst, context));
-        }
-        return new Palette(id, blockLookup, version1(chainRootFirst));
+        return Palette.version2(id, compileV2(id, "'" + id + "'", chainRootFirst, context));
     }
 
     /**
@@ -178,12 +176,4 @@ final class V2Palettes {
                 .orElse("the palette did not compile and no diagnostic said why"));
     }
 
-    /** A chain already known to be version 1, as the type its compiler takes. */
-    private static List<PaletteDefinition> version1(List<PaletteAssetDefinition> chainRootFirst) {
-        List<PaletteDefinition> version1 = new ArrayList<>(chainRootFirst.size());
-        for (PaletteAssetDefinition link : chainRootFirst) {
-            version1.add((PaletteDefinition) link);
-        }
-        return version1;
-    }
 }
