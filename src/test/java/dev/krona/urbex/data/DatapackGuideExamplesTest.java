@@ -223,28 +223,12 @@ class DatapackGuideExamplesTest {
                 Optional.of(Identifier.fromNamespaceAndPath("urbex", "common")), Optional.empty()))));
 
         // A palette entry that resolves to nothing at all.
-        PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, List.of(
-                new PaletteDefinition(Optional.empty(), Optional.of(List.of(empty))))));
-
-        // The four ways a 'lightSource' can be wrong, and the two removed spellings it replaced.
-        // Every one of them names the palette and the character, so a pack author who has copied a
-        // light onto the wrong entry is told which entry.
-        Identifier x = Identifier.fromNamespaceAndPath("urbex", "x");
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","lightSource":true}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"L","block":"minecraft:stone","lightSource":true}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","block":"minecraft:torch","torch":true}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","light":{"floor":[{"weight":1,"block":"minecraft:torch"}]}}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","lightSource":{"wall":[
-                  {"weight":1,"block":"minecraft:wall_torch[facing=north]","unlit":"minecraft:glowstone"}
-                ]}}]}"""));
+        // The version 1 palette messages this used to check are gone from the guide, and had to be:
+        // VER.018 stopped loading version 1, so none of them can reach a pack author any more. A guide
+        // that still quoted them would be teaching the reader to recognise failures they will never
+        // see. Version 2's refusals are numbered and live in their own catalogue - 08-errors.md, which
+        // DiagCatalogueTest checks against the enum word by word - so the guide points there instead of
+        // keeping a second copy that goes stale. This is the copy that went stale.
 
         // A 'randompalettes' group nothing could ever be drawn from, and a stuff entry whose two
         // count bounds contradict. Both are checked at the chain fold rather than per field.
