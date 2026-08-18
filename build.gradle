@@ -647,7 +647,7 @@ tasks.register('regenerateConformance', JavaExec) {
 // writing into build/ rather than over src/ - Task 10 is where the bundled pack itself is converted,
 // and a task whose default is an in-place rewrite of tracked files is one nobody can run to look.
 // -PurbexPackIn and -PurbexPackOut point it at an addon pack:
-//   ./gradlew convertPalettes -PurbexPackIn=../Urbex-ModernTweaks/pack/data/urbexmt/urbex \
+//   ./gradlew convertPalettes -PurbexPackIn=../Urbex-Zombie-Apocalypse-Essentials/pack/data/urbexza/urbex \
 //                             -PurbexPackOut=/tmp/mt/urbex
 // A pack root is the directory holding palettes/ and variants/, i.e. data/<namespace>/urbex. Exits
 // non-zero when VER.022 finds a construct it will not guess at, so it is usable as a gate.

@@ -76,10 +76,25 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class V1ToV2Test {
 
-    /** The three packs {@code VER.021} names, as pack roots: the directory holding {@code palettes/}. */
+    /**
+     * The three packs {@code VER.021} names, as pack roots: the directory holding {@code palettes/}.
+     *
+     * <p><b>Modern Tweaks is read from a frozen snapshot, not from its live pack.</b> That pack is
+     * written in version 2 now, and a version 2 palette has no version 1 form to compile beside — so
+     * pointing at it would not have failed, it would have silently emptied the corpus this whole class
+     * measures. {@code reference/v1-snapshot/urbex} is that pack exactly as it stood before conversion,
+     * kept in its own repository and never edited to follow it.
+     *
+     * <p>The property here is about the <em>converter</em>, not about what any pack ships today, so the
+     * corpus must not shrink every time a pack migrates. Left pointing at the live pack, the sweep in
+     * {@link #everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion} would have fallen from 79
+     * palettes to five — Zombie Apocalypse Essentials' seven less the two that name a variant — and
+     * every count in this class would have been re-pinned downwards to match, which is how a guard
+     * stops guarding while every assertion in it still passes.</p>
+     */
     private static final Map<String, Path> PACKS = Map.of(
             "urbex", Path.of("src/main/resources/data/urbex/urbex"),
-            "urbexmt", Path.of("../Urbex-ModernTweaks/pack/data/urbexmt/urbex"),
+            "urbexmt", Path.of("../Urbex-ModernTweaks/reference/v1-snapshot/urbex"),
             "urbexza", Path.of("../Urbex-Zombie-Apocalypse-Essentials/pack/data/urbexza/urbex"));
 
     /**
