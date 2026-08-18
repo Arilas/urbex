@@ -8,6 +8,8 @@ import dev.krona.urbex.format.palette.NodeResolver;
 import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.format.palette.TraitContext;
 import dev.krona.urbex.format.palette.V2Chain;
+import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import net.minecraft.core.HolderLookup;
@@ -18,6 +20,7 @@ import net.minecraft.world.level.block.Block;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +65,7 @@ final class V2Palettes {
      * epochs — {@code MODEL.052} compiles a tag "against the tag epoch the palette is compiled under",
      * and a {@code /reload} landing between two palettes would otherwise give them different ones.
      */
-    record Context(Exclusion.Presence presence, TraitContext traits) {
+    record Context(Exclusion.Presence presence, TraitContext traits, DefinitionIndex definitions) {
     }
 
     /**
@@ -76,7 +79,32 @@ final class V2Palettes {
         Set<Identifier> conditionIds = new LinkedHashSet<>();
         conditions.all().forEach(condition -> conditionIds.add(condition.getId()));
         return new Context(Exclusion.installed(blockLookup, packNamespaces(access)),
-                TraitContext.withConditions(blockLookup, conditionIds));
+                TraitContext.withConditions(blockLookup, conditionIds), definitions(access));
+    }
+
+    /**
+     * The {@code definitions} registry, read off the world being loaded ({@code REF.010}).
+     *
+     * <p>Read here rather than fetched where a pointer is resolved, for {@code LOAD.003}'s measured
+     * reason — "which registry answered depended on whether the server field was populated yet" — and
+     * gathered once per load beside the block presence and the tag epoch, because a definitions asset
+     * is part of the same snapshot those two are.</p>
+     *
+     * <p>Decoded assets rather than compiled ones, which is what {@link DefinitionIndex} holds and why:
+     * a definitions asset carries its own {@code $imports} ({@code REF.018}) and a pointer written
+     * inside it expands against those, not against the file that points at it ({@code REF.086}). There
+     * is nothing to compile before that expansion happens.</p>
+     */
+    private static DefinitionIndex definitions(RegistryAccess access) {
+        Map<Identifier, DefinitionAssetDefinition> byId = new LinkedHashMap<>();
+        // lookup rather than lookupOrThrow: an empty index and an unregistered registry are the same
+        // answer here - no definitions asset is loaded, so every qualified $ref fails with DIAG.030
+        // naming the tier it searched. Throwing instead would turn a RegistryAccess assembled without
+        // this registry into a crash with no asset in it, which is what LOAD.004 exists to avoid.
+        access.lookup(CustomRegistries.DEFINITIONS_REGISTRY_KEY).ifPresent(registry ->
+                registry.listElements().forEach(
+                        holder -> byId.put(holder.key().identifier(), holder.value())));
+        return new DefinitionIndex(byId);
     }
 
     /**
@@ -92,7 +120,7 @@ final class V2Palettes {
         Set<String> namespaces = new LinkedHashSet<>();
         access.lookupOrThrow(Registries.BLOCK).listElementIds()
                 .forEach(key -> namespaces.add(key.identifier().getNamespace()));
-        access.lookupOrThrow(dev.krona.urbex.setup.CustomRegistries.PALETTE_REGISTRY_KEY)
+        access.lookupOrThrow(CustomRegistries.PALETTE_REGISTRY_KEY)
                 .registryKeySet().forEach(key -> namespaces.add(key.identifier().getNamespace()));
         return namespaces;
     }
@@ -129,12 +157,15 @@ final class V2Palettes {
             files.add((PaletteV2Definition) link);
         }
         Diagnostics diagnostics = new Diagnostics();
-        // DefinitionIndex.empty() and no sibling palettes: REF.043/REF.045 let a pointer name another
-        // asset, and wiring that registry through is Task 8's. A pointer at another asset therefore
-        // fails to resolve here and says so by name, which is a refusal rather than a silence.
+        // The definitions registry is the world's; the sibling-palette map is still empty, so a
+        // fragment pointer into another *palette* (REF.043) fails to resolve here and says so by name.
+        // That half needs the decoded chains of every other palette, which this stage does not hold.
+        // The registry half is wired, because without it VER's translation table has no destination:
+        // "variant" becomes a $ref into 'definitions', so every converted pack that used a variant
+        // refused to load - four of the bundled pack's thirty palettes, naming DIAG.030.
         Optional<CompiledV2Palette> compiled = V2Chain
                 .merge(files, Optional.of(id), diagnostics)
-                .flatMap(merged -> NodeResolver.resolve(merged, DefinitionIndex.empty(), Map.of(),
+                .flatMap(merged -> NodeResolver.resolve(merged, context.definitions(), Map.of(),
                         diagnostics))
                 .flatMap(resolved -> CompiledV2Palette.compile(resolved, context.presence(),
                         context.traits(), asset, diagnostics));

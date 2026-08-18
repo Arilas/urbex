@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
@@ -38,13 +38,13 @@ public final class OptionalLightPlacer {
         boolean isPresent(LightPool.Placement placement, @Nullable Direction supportDirection);
     }
 
-    public static Optional<Attempt> select(LightPool pool, RandomSource random, Survival survival) {
-        return select(pool, random, (placement, supportDirection) -> true, survival);
+    public static Optional<Attempt> select(LightPool pool, long seed, BlockPos at, Survival survival) {
+        return select(pool, seed, at, (placement, supportDirection) -> true, survival);
     }
 
-    public static Optional<Attempt> select(LightPool pool, RandomSource random,
+    public static Optional<Attempt> select(LightPool pool, long seed, BlockPos at,
                                            OpportunitySupport support, Survival survival) {
-        return select(pool, random, support, survival, LightPool.Candidate::state, true);
+        return select(pool, seed, at, support, survival, LightPool.Candidate::state, true);
     }
 
     /**
@@ -56,12 +56,19 @@ public final class OptionalLightPlacer {
      * marker that would hold a lit wall torch holds that torch's unlit form, and raising lighting
      * density lights the fixture that was already standing there rather than moving it.</p>
      *
+     * <p>{@code WEIGHT.043}: the position is the marker's own, and it is passed rather than a
+     * {@link net.minecraft.util.RandomSource} because a placement list is addressed and not drawn. One
+     * consequence is worth stating, because it is a behaviour change and not only a refactor: an
+     * opportunity that is supported but whose candidates the world rejects used to consume a draw and
+     * shift every later opportunity's, so which light stood in a doorway depended on whether the floor
+     * beneath it had been rejected first. It no longer does.</p>
+     *
      * <p>The one asymmetry is {@code fallThrough}. Lit, a candidate the world will not accept hands
      * over to the next one in the list - a light is worth another try. Unlit, the first drawn
      * candidate is the answer even when its replacement is air, because falling through would put
      * <em>another</em> candidate's replacement at a position that candidate never won.</p>
      */
-    public static Optional<Attempt> select(LightPool pool, RandomSource random,
+    public static Optional<Attempt> select(LightPool pool, long seed, BlockPos at,
                                            OpportunitySupport support, Survival survival,
                                            Function<LightPool.Candidate, BlockState> stateOf,
                                            boolean fallThrough) {
@@ -70,7 +77,8 @@ public final class OptionalLightPlacer {
                     || !support.isPresent(opportunity.placement(), opportunity.supportDirection())) {
                 continue;
             }
-            for (LightPool.Candidate candidate : pool.weightedOrder(opportunity.placement(), random)) {
+            for (LightPool.Candidate candidate : pool.weightedOrder(opportunity.placement(), seed,
+                    at.getX(), at.getY(), at.getZ())) {
                 BlockState chosen = stateOf.apply(candidate);
                 if (chosen == null || chosen.isAir()) {
                     return Optional.empty();

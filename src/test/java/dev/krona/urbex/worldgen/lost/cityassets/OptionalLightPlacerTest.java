@@ -1,12 +1,13 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -23,6 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OptionalLightPlacerTest {
+
+    /** The marker's own block position; WEIGHT.043 addresses a placement list by it. */
+    private static final BlockPos AT = new BlockPos(3, 64, 9);
 
     private static final Identifier PALETTE_ID = Identifier.fromNamespaceAndPath("urbex", "placer_test");
 
@@ -186,30 +190,48 @@ class OptionalLightPlacerTest {
         assertTrue(selected.isEmpty());
     }
 
+    /**
+     * {@code WEIGHT.042}, now true of a socket: an earlier opportunity cannot change a later one.
+     *
+     * <p>Both halves are asserted, and only the first held before {@code WEIGHT.043} was implemented.
+     * An <em>unsupported</em> opportunity never reached {@code weightedOrder} and so consumed nothing
+     * even from a sequential stream. A <em>supported</em> one whose candidates the world rejects did
+     * reach it, drew a ticket, and shifted every later opportunity's draw — so which light stood in a
+     * doorway depended on whether the floor beneath it had been rejected first. A placement list is
+     * addressed by position now, so neither can.</p>
+     */
+    @Rule("WEIGHT.042")
+    @Rule("WEIGHT.043")
     @Test
-    void unsupportedOpportunityDoesNotConsumeVariantRandomness() {
+    void anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes() {
         List<LightSourceSettings.Entry> wall = List.of(
                 entry("minecraft:wall_torch[facing=north]"),
                 entry("minecraft:end_rod[facing=north]"));
-        LightPool withUnsupportedFloor = pool(
-                List.of(
-                        entry("minecraft:lantern[hanging=false]"),
-                        entry("minecraft:redstone_torch[lit=true]")),
-                wall, List.of(), List.of());
+        List<LightSourceSettings.Entry> floor = List.of(
+                entry("minecraft:lantern[hanging=false]"),
+                entry("minecraft:redstone_torch[lit=true]"));
+        LightPool withFloor = pool(floor, wall, List.of(), List.of());
         LightPool wallOnly = pool(List.of(), wall, List.of(), List.of());
-        long seed = seedWhoseFirstTwoBinaryDrawsDiffer();
 
         OptionalLightPlacer.Attempt expected = OptionalLightPlacer.select(
-                wallOnly, RandomSource.create(seed),
-                (placement, supportDirection) -> true,
-                attempt -> true).orElseThrow();
-        OptionalLightPlacer.Attempt actual = OptionalLightPlacer.select(
-                withUnsupportedFloor, RandomSource.create(seed),
-                (placement, supportDirection) -> placement != LightPool.Placement.FLOOR,
+                wallOnly, 17L, AT, (placement, supportDirection) -> true,
                 attempt -> true).orElseThrow();
 
-        assertEquals(expected.state(), actual.state());
-        assertEquals(LightPool.Placement.WALL, actual.placement());
+        OptionalLightPlacer.Attempt unsupported = OptionalLightPlacer.select(
+                withFloor, 17L, AT,
+                (placement, supportDirection) -> placement != LightPool.Placement.FLOOR,
+                attempt -> true).orElseThrow();
+        assertEquals(expected.state(), unsupported.state(),
+                "an unsupported floor was never a draw, and still is not");
+        assertEquals(LightPool.Placement.WALL, unsupported.placement());
+
+        OptionalLightPlacer.Attempt rejected = OptionalLightPlacer.select(
+                withFloor, 17L, AT, (placement, supportDirection) -> true,
+                attempt -> attempt.placement() != LightPool.Placement.FLOOR).orElseThrow();
+        assertEquals(expected.state(), rejected.state(),
+                "and a supported floor whose candidates the world refuses no longer shifts the wall's "
+                        + "choice - it did, while the pool drew a sequential ticket");
+        assertEquals(LightPool.Placement.WALL, rejected.placement());
     }
 
     @Test
@@ -265,7 +287,7 @@ class OptionalLightPlacerTest {
 
     private static Optional<OptionalLightPlacer.Attempt> select(LightPool pool,
                                                                  OptionalLightPlacer.Survival survival) {
-        return OptionalLightPlacer.select(pool, RandomSource.create(17L), survival);
+        return OptionalLightPlacer.select(pool, 17L, AT, survival);
     }
 
     private static LightPool pool(List<LightSourceSettings.Entry> floor,
@@ -277,16 +299,6 @@ class OptionalLightPlacerTest {
 
     private static LightSourceSettings.Entry entry(String block) {
         return new LightSourceSettings.Entry(1, block);
-    }
-
-    private static long seedWhoseFirstTwoBinaryDrawsDiffer() {
-        for (long seed = 0; seed < 1_000; seed++) {
-            RandomSource random = RandomSource.create(seed);
-            if (random.nextInt(2) != random.nextInt(2)) {
-                return seed;
-            }
-        }
-        throw new AssertionError("Could not find a discriminating RandomSource seed");
     }
 
     private static void assertJsonOrderRotation(List<Block> actual) {

@@ -4,13 +4,13 @@ import com.google.gson.JsonParser;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -47,10 +47,10 @@ class LightPoolTest {
                 """);
 
         LightPool pool = LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings);
-        assertEquals(1, pool.weightedOrder(LightPool.Placement.FLOOR, RandomSource.create(1L)).size());
-        assertEquals(1, pool.weightedOrder(LightPool.Placement.WALL, RandomSource.create(1L)).size());
-        assertEquals(1, pool.weightedOrder(LightPool.Placement.CEILING, RandomSource.create(1L)).size());
-        assertEquals(1, pool.weightedOrder(LightPool.Placement.FREE, RandomSource.create(1L)).size());
+        assertEquals(1, pool.weightedOrder(LightPool.Placement.FLOOR, 1L, 0, 64, 0).size());
+        assertEquals(1, pool.weightedOrder(LightPool.Placement.WALL, 1L, 0, 64, 0).size());
+        assertEquals(1, pool.weightedOrder(LightPool.Placement.CEILING, 1L, 0, 64, 0).size());
+        assertEquals(1, pool.weightedOrder(LightPool.Placement.FREE, 1L, 0, 64, 0).size());
         assertEquals(4, pool.allCandidates().size());
     }
 
@@ -278,7 +278,7 @@ class LightPoolTest {
                 ]}
                 """);
         LightPool pool = LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings);
-        List<LightPool.Candidate> order = pool.weightedOrder(LightPool.Placement.FLOOR, RandomSource.create(5L));
+        List<LightPool.Candidate> order = pool.weightedOrder(LightPool.Placement.FLOOR, 5L, 0, 64, 0);
 
         List<Block> states = order.stream()
                 .map(candidate -> candidate.state().getBlock())
@@ -294,8 +294,19 @@ class LightPoolTest {
         ), states);
     }
 
+    /**
+     * The successor to an overflow guard, refusing strictly more than it did.
+     *
+     * <p>The check this replaces summed the authored weights with {@code Math.addExact} and reported
+     * only a list totalling more than {@code Integer.MAX_VALUE}. {@code WEIGHT.043}'s apportionment
+     * sums into a {@code long}, so that input no longer overflows anything — but it still gives the
+     * second candidate none of the 128 slots, and a light that can never be placed is what the message
+     * has to name. The same input is used, so the case that used to be about arithmetic is now about
+     * the thing the arithmetic was standing in for.</p>
+     */
+    @Rule("WEIGHT.043")
     @Test
-    void compileRejectsWeightSumOverflowWithCandidateContext() {
+    void compileRejectsACandidateTheApportionmentLeavesNoSlotForNamingIt() {
         LightSourceSettings settings = new LightSourceSettings(
                 List.of(
                         new LightSourceSettings.Entry(Integer.MAX_VALUE, "minecraft:torch"),
@@ -308,6 +319,7 @@ class LightPoolTest {
         assertTrue(error.getMessage().contains("L"));
         assertTrue(error.getMessage().contains("floor"));
         assertTrue(error.getMessage().contains("minecraft:soul_torch"));
+        assertTrue(error.getMessage().contains("could never be placed"), error.getMessage());
     }
 
     @Test

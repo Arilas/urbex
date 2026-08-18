@@ -355,8 +355,31 @@ They are near-neighbours and behave completely differently. This table is normat
 > **WEIGHT.042** · `INVARIANT` — Selection draws from no sequential stream, so the result at a
 > position does not depend on how many other positions the chunk resolved first, or in what order.
 
-> **WEIGHT.043** · `MUST` — A `light_socket` placement list is selected by the same rules, addressed
-> by the same position.
+> **WEIGHT.043** · `MUST` `[NO-FIXTURE: a placed socket, which needs a chunk]` — A `light_socket`
+> placement list is selected by the same rules, addressed by the same position: apportioned to the same
+> 128 slots, and the slot read from the position rather than drawn from a stream.
+
+> > **Why it is spelled out, having been stated and unimplemented** — "the same rules" was read as
+> > "weighted, somehow" for as long as nothing checked it. Version 1 placed a socket by allocating a
+> > `RandomSource` at the marker and drawing `nextInt(total)` over the *authored* weights, so a
+> > placement list of `6, 3, 1` drew a ticket below ten; version 2 apportions every list to 128 slots,
+> > and the two cannot agree on which candidate a position takes. That made
+> > [VER.021](09-migration.md#4-the-migration-tool) false for every pack with a socket — the converted
+> > file relit the city — and no converter output could avoid it, because 6/10 is not a number of
+> > 128ths. Reading the slot at the position instead makes this rule true, makes WEIGHT.042 true of a
+> > socket for the first time, and makes the two formats place the same light.
+
+> > **What else it fixed, which is the WEIGHT.042 half** — a sequential ticket meant an opportunity
+> > tried earlier at the same position changed the one taken later. An unsupported opportunity never
+> > drew, but a *supported* one whose candidate the world refused did, so which light stood in a doorway
+> > depended on whether the floor beneath it had been rejected first. That is precisely what "draws from
+> > no sequential stream" forbids, one position rather than one chunk over.
+
+> > **The marker is not in the address, and WEIGHT.041 does not need it to be.** That rule exists so two
+> > weighted markers at one block do not share a draw. A socket *is* the marker at its position and no
+> > second socket can occupy it, so the address is the block under the lighting purpose — which is the
+> > address version 1 already seeded its stream from. What changed is that the slot is read there rather
+> > than a stream allocated there.
 
 ## 6. Nesting
 

@@ -410,14 +410,22 @@ public final class V1ToV2 {
     /**
      * A version 1 {@code lightSource} carrying placement lists, as a {@code light_socket}.
      *
-     * <p>The candidate weights are written out as the file wrote them, and that is the one place this
-     * converter knowingly does not preserve the world. Version 1 draws a socket candidate with
-     * {@code LightPool.weightedOrder}, a ticket below the <em>authored</em> total; version 2
-     * apportions the placement list to 128 slots like any other list ({@code WEIGHT.043}) and
-     * {@code V2Sockets} counts the slots back into weights. A list of {@code [6, 3, 1]} therefore
-     * becomes {@code [77, 38, 13]} on the far side, and no choice of numbers here avoids it: the
-     * counts always total 128, and 6/10 is not a number of 128ths. It is reported per socket rather
-     * than papered over.</p>
+     * <p>The candidate weights are written out as the file wrote them, and that is correct because
+     * both formats now apportion them the same way. {@code WEIGHT.043} says a placement list is
+     * "selected by the same rules, addressed by the same position", and {@code LightPool} materialises
+     * one to 128 slots with the same {@code distributeSlots} every other weighted list uses. Version 2
+     * apportions the written list to 128 slots and {@code V2Sockets} counts them back, so a floor list
+     * of {@code 6, 3, 1} reaches the placer as {@code 77, 38, 13} — and so does the version 1 form,
+     * because {@code distributeSlots} scales {@code 6, 3, 1} to exactly those numbers. The two are the
+     * same slots at the same address.</p>
+     *
+     * <p><b>This was the one construct conversion could not preserve, and it is worth recording why it
+     * is no longer.</b> Version 1 drew a socket candidate on a sequential ticket below the authored
+     * total — {@code nextInt(10)} where version 2 apportioned to 128 — so a converted socket relit the
+     * city, and no choice of numbers written here avoided it: the counts always total 128, and 6/10 is
+     * not a number of 128ths. The defect was that {@code WEIGHT.043} was specified and unimplemented,
+     * not that the translation was wrong, and implementing it removed the exception rather than
+     * recording one.</p>
      */
     private static void socket(JsonObject settings, JsonObject node, String marker,
                                List<Finding> findings, String asset) {
@@ -444,11 +452,6 @@ public final class V1ToV2 {
             }
             node.add(placement, candidates);
         }
-        findings.add(new Finding(Severity.WARNING, "VER.021", asset, marker,
-                "is a light_socket. Version 1 draws its candidates on their authored weights and "
-                        + "version 2 apportions the list to 128 slots first, so the two do not place "
-                        + "the same light at the same position. Nothing this converter writes avoids "
-                        + "that; see the task 9 report."));
         if (settings.has("unlit") || settings.has("unlitBlocks")) {
             socketReplacement(settings, node, marker, findings, asset);
         }
@@ -483,7 +486,8 @@ public final class V1ToV2 {
             findings.add(new Finding(Severity.WARNING, "VER.021", asset, marker,
                     "gives a light_socket a weighted 'unlitBlocks'. Version 1 draws that replacement "
                             + "per position; version 2 gives a socket one replacement state, its "
-                            + "first alternative. Name a single block to keep the behaviour."));
+                            + "first alternative (V2Sockets.unlitOf). Name a single block to keep the "
+                            + "behaviour. No shipped socket declares one."));
         }
         traits.add("urbex:light", light);
         node.add("traits", traits);

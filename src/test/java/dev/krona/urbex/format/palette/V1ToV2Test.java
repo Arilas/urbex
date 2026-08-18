@@ -3,10 +3,12 @@ package dev.krona.urbex.format.palette;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
+import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetIndex;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.cityassets.Variant;
 import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
@@ -34,6 +36,7 @@ import java.util.TreeSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -414,41 +417,75 @@ class V1ToV2Test {
     }
 
     /**
-     * The one construct in the corpus whose world the conversion cannot preserve, measured rather than
-     * argued.
+     * The construct that could not be preserved until {@code WEIGHT.043} was implemented, measured on
+     * both sides.
      *
-     * <p>Version 1 draws a socket candidate with {@code LightPool.weightedOrder}, a ticket below the
-     * <em>authored</em> total; version 2 apportions a placement list to 128 slots like any other list
-     * ({@code WEIGHT.043}) and {@code V2Sockets} counts the slots back into weights. Nothing the
-     * converter writes avoids it: the counts always total 128, and 6/10 is not a number of 128ths. So
-     * the two pools below differ, {@code weightedOrder} draws {@code nextInt} against a different bound,
-     * and the light placed at a given position is a different one.</p>
+     * <p>Version 1 drew a socket candidate with {@code LightPool.weightedOrder}, a sequential ticket
+     * below the <em>authored</em> total; version 2 apportions a placement list to 128 slots like any
+     * other list and {@code V2Sockets} counts the slots back into weights. So a floor list of
+     * {@code 6, 3, 1} reached the placer as {@code 6, 3, 1} out of 10 on one side and
+     * {@code 77, 38, 13} out of 128 on the other, {@code weightedOrder} called {@code nextInt} against
+     * a different bound, and a converted socket relit the city. Nothing the converter could write
+     * avoided it: the counts always total 128, and 6/10 is not a number of 128ths.</p>
      *
-     * <p>{@link Fixture#compare} cannot see this: it reads what a marker resolves to, and a socket
-     * resolves to its representative and defers the rest to {@code OptionalLightPlacer}. That is exactly
-     * why the difference is asserted here, against the pool itself.</p>
+     * <p>{@code WEIGHT.043} — "selected by the same rules, addressed by the same position" — was
+     * specified and unimplemented, and that was the defect. {@code LightPool} now materialises a
+     * placement list to 128 slots with the same {@code distributeSlots} every other weighted list uses,
+     * which is the identity on a version 2 pool and scales {@code 6, 3, 1} to {@code 77, 38, 13} on a
+     * version 1 one. Both assertions below are what that buys: the same weights, and the same candidate
+     * at the same position.</p>
      */
     @Rule("VER.021")
     @Rule("WEIGHT.043")
     @Test
-    void aLightSocketIsTheOneConstructConversionCannotPreserve() {
+    void aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat() {
         Path common = PACKS.get("urbex").resolve("palettes/common.json");
         Fixture fixture = new Fixture("urbex", PACKS.get("urbex"));
 
         assertEquals(List.of(6, 3, 1, 8, 2, 8, 2), fixture.socketWeights(common, 'T', false),
                 "version 1 hands LightPool the weights the file wrote");
         assertEquals(List.of(77, 38, 13, 102, 26, 102, 26), fixture.socketWeights(common, 'T', true),
-                "version 2 hands it the slot counts, which total 128 per placement list. 6/10 is "
-                        + "0.6 and 77/128 is 0.6015625, so the ticket falls differently.");
+                "version 2 hands it the slot counts, which total 128 per placement list");
+        assertEquals(fixture.socketSlots(common, 'T', false), fixture.socketSlots(common, 'T', true),
+                "and both are apportioned to the same 128 slots, so 6 of 10 and 77 of 128 select the "
+                        + "same candidate at every position - which is what VER.021 asks of a socket "
+                        + "and what no converter output could deliver before WEIGHT.043 was built");
 
-        V1ToV2.Converted converted = V1ToV2.paletteFile(read(common), "common.json");
-        assertEquals(List.of("T", "h"), converted.findings().stream()
-                        .filter(f -> f.rule().equals("VER.021")).map(V1ToV2.Finding::where)
-                        .sorted().toList(),
-                "both of the bundled pack's sockets are reported, by marker");
-        assertFalse(converted.blocked(),
-                "and reported rather than refused: the conversion is still the only version 2 form "
-                        + "this file has, and refusing it would leave the pack on version 1 forever");
+        assertEquals(List.of(), V1ToV2.paletteFile(read(common), "common.json").findings().stream()
+                        .filter(f -> f.rule().equals("VER.021")).toList(),
+                "and the converter has nothing left to warn about here");
+    }
+
+    /**
+     * {@code REF.010}: a converted {@code variant} resolves against the {@code definitions} registry,
+     * and says so by name when the registry is not there.
+     *
+     * <p>Both halves, because the second was the shipped behaviour. {@code V2Palettes.compileV2} passed
+     * {@code DefinitionIndex.empty()} — the registry was declared, the converter wrote assets into it,
+     * and nothing handed it to the resolver — so a fully converted bundled pack refused to load naming
+     * four palettes and {@code DIAG.030}. The failing half is asserted here so that unwiring it again
+     * fails a test rather than a world load.</p>
+     */
+    @Rule("REF.010")
+    @Rule("VER.021")
+    @Test
+    void aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt() {
+        Path pack = PACKS.get("urbex");
+        Path file = pack.resolve("palettes/bricks_standard.json");
+        assertTrue(V1ToV2.paletteFile(read(file), "bricks_standard.json").json().contains("\"$ref\""),
+                "this file's markers name variants, which §2's table turns into $ref");
+
+        assertNotNull(new Fixture("urbex", pack).compiledVersion2(file),
+                "with the definitions registry it compiles");
+
+        Diagnostics diagnostics = new Diagnostics();
+        PaletteV2Definition converted = decode(PaletteV2Definition.CODEC,
+                V1ToV2.paletteFile(read(file), "bricks_standard.json").json(), file);
+        assertTrue(NodeResolver.resolve(converted, DefinitionIndex.empty(), Map.of(), diagnostics)
+                        .isEmpty(),
+                "and without it, it does not");
+        assertTrue(Diag.DIAG_030.matches(diagnostics.asError().orElseThrow()),
+                () -> "REF.013 names the tier it searched: " + diagnostics.asError().orElseThrow());
     }
 
     /**
@@ -573,10 +610,38 @@ class V1ToV2Test {
          * element by element.</p>
          */
         List<Integer> socketWeights(Path file, char marker, boolean version2) {
+            return pool(file, marker, version2).allCandidates().stream()
+                    .map(candidate -> candidate.weight()).toList();
+        }
+
+        /**
+         * Which candidate each of a socket's placement lists offers first, over a lattice of positions.
+         *
+         * <p>{@code WEIGHT.043}'s actual claim, asked the way generation asks it. Comparing the weights
+         * alone would pass on two pools that round to the same numbers and address them differently;
+         * comparing one position would pass on two that agree there by luck.</p>
+         */
+        List<String> socketSlots(Path file, char marker, boolean version2) {
+            LightPool pool = pool(file, marker, version2);
+            List<String> winners = new ArrayList<>();
+            for (LightPool.Placement placement : LightPool.Placement.values()) {
+                if (!pool.hasCandidates(placement)) {
+                    continue;
+                }
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        winners.add(placement + "@" + x + "," + z + "="
+                                + pool.weightedOrder(placement, SEED, x, 64, z).getFirst().state());
+                    }
+                }
+            }
+            return winners;
+        }
+
+        private LightPool pool(Path file, char marker, boolean version2) {
             Palette.Info info = (version2 ? compiledVersion2(file) : compiledVersion1(file))
                     .placedAt(marker, SEED, 0, 64, 0).info();
-            return info.lightSource().pool().allCandidates().stream()
-                    .map(candidate -> candidate.weight()).toList();
+            return info.lightSource().pool();
         }
 
         /** The palette as version 1 compiles it, through the merge a style's draw would use. */

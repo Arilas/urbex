@@ -122,6 +122,16 @@ half of the `candidate "unlit"` row above it, and both are [TRAIT.055](01-traits
 > > socket, in that order, silently. The translation must preserve behaviour, but the author should
 > > learn that the file said something it never meant.
 
+> > **Why this warning cites no `DIAG`, and what it would take to** — the converter is not a loader.
+> > [DIAG.900](08-errors.md#1-what-a-diagnostic-must-contain) makes a diagnostic a statement about an
+> > asset being loaded, DIAG.903 collects them into one load report, and DIAG.904 sorts them by whether
+> > they refuse the *world* — none of which is true of a tool reading version 1 files and writing
+> > version 2 ones. So this warning and [VER.022](#4-the-migration-tool)'s refusals cite the rule that
+> > owes them instead. Bringing them into the catalogue is a coherent thing to want, and it starts here
+> > rather than in the enum: these two rules would gain `(DIAG.0NN)` citations from the free numbers in
+> > the versioning range, and only then would the rows exist for anything to raise. Stated so the next
+> > reader does not re-derive it from the house convention and conclude the converter forgot.
+
 ## 3. Retired keys
 
 > **VER.010** · `REJECT` (`DIAG.060`) — A version 2 palette using a version 1 key that version 2
@@ -176,14 +186,39 @@ The retired set, and what each becomes:
 
 > **VER.021** · `MUST` — The converter is verified by generation: for every shipped palette in
 > every bundled and reference pack, a world generated from the converted pack is identical to one
-> generated from the original, at the same seed.
+> generated from the original, at the same seed, **on an installation where every block the pack names
+> resolves**.
 
 > > **Why** — VER.006 used to carry this, as an equality of compiled forms. With the two formats
 > > independent there is no such equality to assert, and the property that actually matters to a
 > > pack author was never the compiled form anyway — it was that their city still looks the same.
 
+> > **Why the installation is quantified, and what is outside it** — because without it the rule has no
+> > truth value, and the two answers differ. The formats redistribute an *absent* block differently, and
+> > neither is wrong: version 1 drops the choice and apportions the survivors' authored weights
+> > ([WEIGHT.030](05-weights.md#4-absent-blocks) has always been version 1's leniency too), while
+> > version 2 drops it and divides its share among the survivors in proportion to theirs. Given the slot
+> > counts §2's table emits, `32, 32, 1000` with the middle block absent is `32, 96` in version 1 and
+> > `43, 85` in version 2. Three of the 135 shipped palettes reach this — all in Zombie Apocalypse
+> > Essentials, all naming `immersive_weathering` blocks — and on the installation that pack is written
+> > for they do not. This is a real behavioural difference between the formats rather than a defect in
+> > the converter, and it is written here so the next reader finds it in the rule rather than in a
+> > chunk.
+
+> > **Why a `light_socket` used to be an exception and is not** — [WEIGHT.043](05-weights.md#5-selection)
+> > was stated and unimplemented: version 1 drew a socket candidate on a sequential ticket below the
+> > authored total and version 2 apportions the list to 128 slots, so a converted socket relit the city
+> > and nothing the converter wrote could avoid it. Implementing WEIGHT.043 removed the exception
+> > instead of recording one — the two formats now read the same slot at the same position — which is
+> > why this rule needs no clause about sockets and needed one before.
+
 > **VER.022** · `MUST` — The converter names, per file, every construct it could not translate
 > without a decision, and exits non-zero rather than guessing.
+
+> > **Its refusals cite no `DIAG`**, for the reason [VER.009](#2-what-every-version-1-construct-becomes)
+> > records: the converter is not a loader, and this catalogue is about assets being loaded. That note
+> > also says what bringing it into the catalogue would take, and that it starts with a citation on this
+> > rule rather than with a row in the enum.
 
 > **VER.023** · `MUST` — The converter is idempotent: converting a version 2 file returns it
 > unchanged.
@@ -202,8 +237,21 @@ The retired set, and what each becomes:
 
 > > **Why** — the measured targets are worth naming. `damaged` has one distinct value across sixty
 > > uses; Zombie Apocalypse Essentials carries 6,527 inline entries of which 1,242 are distinct;
-> > Modern Tweaks has 39 NBT-carrying markers holding 12 distinct blobs, and 152 markers in 54
-> > families differing only by a directional property.
+> > Modern Tweaks has 39 NBT-carrying markers holding 12 distinct blobs, and 149 markers in 48
+> > families differing only by a directional property, by VER.032's rule.
+
+> **VER.032** · `MUST` — Each reported opportunity states the rule by which it was counted, because a
+> count nobody can reproduce is a claim rather than a measurement.
+
+> > **Why, and what it corrects** — the first two figures above are reproduced by the converter to the
+> > digit. The third is not the one this document originally carried. It read "152 markers in 54
+> > families", from a research pass whose grouping was never written down, and no reading of "differing
+> > only by a directional property" recovers it: a search over every subset of `facing`, `axis`,
+> > `rotation`, `shape`, `half`, `hanging`, `type`, `face` and `orientation`, under both per-file and
+> > per-pack grouping, produced no combination giving that pair. The figure is replaced by the one with
+> > a method behind it. A family is now defined — one file, one entry minus its marker, with every
+> > directional property value erased, counted where more than one marker lands together — and the tool
+> > prints what that definition measures.
 
 ## 6. Adopting this pattern in another registry
 

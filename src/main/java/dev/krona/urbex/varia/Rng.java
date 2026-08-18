@@ -138,9 +138,16 @@ public final class Rng {
     private static final long MARKER_KEY = 0x9E3779B97F4A7C15L;
 
     /**
-     * Which slot of a weighted palette marker a block position takes - the whole of {@code WEIGHT.040}
-     * to {@code WEIGHT.043}, in one function so that the two palette formats cannot address it
-     * differently.
+     * Which slot of a weighted palette marker a block position takes - {@code WEIGHT.040} to
+     * {@code WEIGHT.042}, in one function so that the two palette formats cannot address it differently.
+     * <p>
+     * {@code WEIGHT.043} - a {@code light_socket}'s placement list, "selected by the same rules,
+     * addressed by the same position" - is {@code LightPool.weightedOrder} and not this method, and the
+     * difference is {@code WEIGHT.041}: a socket has no marker in its address, because it is placed from
+     * a queue that carries a position and a pool rather than a character. It reaches the same 128 slots
+     * through {@link #indexAtPos} under {@code Purpose.LIGHTING_VARIANT}. This javadoc claimed all four
+     * rules while a socket still drew a sequential ticket, which is the kind of claim
+     * {@code docs/format/README.md} §1 exists to stop being made in only one place.
      * <p>
      * {@code WEIGHT.040}: "Which slot a position takes is a pure function of the world seed, the marker,
      * and the block position." {@code WEIGHT.042}: it draws from no sequential stream, so the result at a

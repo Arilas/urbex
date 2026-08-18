@@ -15,7 +15,6 @@ import dev.krona.urbex.format.palette.TraitContext;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.Bootstrap;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -88,7 +87,7 @@ class V2SocketsTest {
                 """);
 
         List<LightPool.Candidate> floor = pool.weightedOrder(LightPool.Placement.FLOOR,
-                RandomSource.create(1L));
+                1L, 0, 64, 0);
         assertEquals(3, floor.size());
         assertEquals(128, floor.stream().mapToInt(LightPool.Candidate::weight).sum(),
                 "three equal alternatives are 43, 43 and 42 of 128 slots - WEIGHT.040's one rounding "
@@ -119,7 +118,7 @@ class V2SocketsTest {
                 """);
 
         List<LightPool.Candidate> floor = pool.weightedOrder(LightPool.Placement.FLOOR,
-                RandomSource.create(1L));
+                1L, 0, 64, 0);
         LightPool.Candidate lantern = named(floor, Blocks.LANTERN);
         LightPool.Candidate torch = named(floor, Blocks.TORCH);
 
@@ -150,7 +149,7 @@ class V2SocketsTest {
                 """);
 
         LightPool.Candidate only = pool.weightedOrder(LightPool.Placement.FLOOR,
-                RandomSource.create(1L)).getFirst();
+                1L, 0, 64, 0).getFirst();
 
         assertEquals(Blocks.AIR.defaultBlockState(), only.unlit(),
                 "TRAIT.051 defaults an absent unlit to air at decode, so carrying the trait and naming "

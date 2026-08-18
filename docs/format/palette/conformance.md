@@ -18,14 +18,14 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
 | `DIAG` | 58 | 0 |
-| `VER` | 24 | 2 |
-| **total** | **313** | **77** |
+| `VER` | 25 | 2 |
+| **total** | **314** | **77** |
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (32):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (33):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.032`, `VER.041`
 
-**Rules marked `[NO-FIXTURE]` (14), which must each be covered by a citing test:**
+**Rules marked `[NO-FIXTURE]` (15), which must each be covered by a citing test:**
 
 | Rule | Reason |
 |---|---|
@@ -35,6 +35,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MERGE.010` | a version 1 and a version 2 file |
 | `MERGE.012` | a part carrying an inline palette |
 | `WEIGHT.019` | a parent palette to spread from |
+| `WEIGHT.043` | a placed socket, which needs a chunk |
 | `WEIGHT.063` | a generated 129-choice list |
 | `CHAR.011` | a part file, not a palette |
 | `CHAR.022` | a command invocation |
@@ -44,7 +45,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.007` | a part and its ancestor, each with an inline palette |
 | `VER.013` | a palette and a conditions asset |
 
-**Tests:** 211 of 313 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 211 of 314 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -156,7 +157,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.003` | `MUST` |  | `accept` | `NodeResolverTest.aKeyBesideARefReplacesTheReferencedNodesValueForThatKey` |
 | `REF.004` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole` |
 | `REF.005` | `MUST` |  |  | — |
-| `REF.010` | `MUST` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset`, `PointerTest.aNameWithAColonAndNoFragmentIsADefinitionsAsset` |
+| `REF.010` | `MUST` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset`, `PointerTest.aNameWithAColonAndNoFragmentIsADefinitionsAsset`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt` |
 | `REF.011` | `MUST` |  |  | `PointerTest.aNameWithNoColonAndNoFragmentIsADefinitionOfThisFile` |
 | `REF.012` | `MUST NOT` |  |  | `NodeResolverTest.aNameResolvesInOneTierAndTheOtherIsNeverTried` |
 | `REF.013` | `REJECT` | `DIAG.030` | `reject=DIAG.030` | — |
@@ -260,8 +261,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.032` | `REJECT` | `DIAG.043` | `reject=DIAG.043` | `ExclusionTest.aWeightedNodeWithNoChoiceLeftIsRefusedNamingHowManyWentEachWay`, `ExclusionTest.aNestedNodeWithNothingLeftIsRemovedFromItsParentRatherThanRefused`, `V2SocketsTest.aSocketWhoseEveryCandidateNamesAnAbsentBlockNeverReachesThisMappingAtAll`, `V2SocketsTest.oneEmptyPlacementListIsFineBecauseOnlyAllFourAtOnceIsRefused` |
 | `WEIGHT.040` | `MUST` |  |  | `ApportionTest.aWeightedNodeCompilesToExactlyOneHundredAndTwentyEightSlots`, `V2SocketsTest.candidateWeightsAreTheApportionedSlotCountsAndNotTheAuthoredWeights` |
 | `WEIGHT.041` | `MUST` |  |  | `ApportionTest.twoMarkersPlaceTheirMinorityChoicesAtDifferentOffsets` |
-| `WEIGHT.042` | `INVARIANT` |  |  | `ApportionTest.selectionIsAddressedSoResolutionOrderCannotChangeIt` |
-| `WEIGHT.043` | `MUST` |  |  | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition`, `V1ToV2Test.aLightSocketIsTheOneConstructConversionCannotPreserve` |
+| `WEIGHT.042` | `INVARIANT` |  |  | `ApportionTest.selectionIsAddressedSoResolutionOrderCannotChangeIt`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
+| `WEIGHT.043` | `MUST` |  | *n/a* | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `LightPoolTest.compileRejectsACandidateTheApportionmentLeavesNoSlotForNamingIt`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
 | `WEIGHT.050` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
 | `WEIGHT.051` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
 | `WEIGHT.052` | `MUST` |  |  | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint`, `CompiledV2PaletteTest.aShareNoDecimalCanHoldIsPrintedAsTheRationalItIs` |
@@ -401,11 +402,12 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.011` | `REJECT` | `DIAG.061` | `reject=DIAG.061` | `PaletteV2DecodeTest.aDeletedVersionOneKeyIsRefusedSayingWhatToWriteInstead` |
 | `VER.012` | `MUST NOT` |  |  | `PaletteV2DecodeTest.noRetiredKeyIsSilentlyAcceptedOrSilentlyIgnored` |
 | `VER.020` | `MUST` |  |  | — |
-| `VER.021` | `MUST` |  |  | `V1ToV2Test.everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion`, `V1ToV2Test.aLightSocketIsTheOneConstructConversionCannotPreserve`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats` |
+| `VER.021` | `MUST` |  |  | `V1ToV2Test.everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats` |
 | `VER.022` | `MUST` |  |  | `V1ToV2Test.aKeyVersion1NeverReadIsNamedAndRefusedRatherThanGuessedAt` |
 | `VER.023` | `MUST` |  |  | `V1ToV2Test.convertingAVersion2FileReturnsItByteForByteUnchanged` |
 | `VER.030` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined` |
 | `VER.031` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined` |
+| `VER.032` | `MUST` |  |  | — |
 | `VER.040` | `MUST` |  |  | `VersionDispatchTest.theVersionMechanismIsRegistryAgnostic` |
 | `VER.041` | `MUST` |  |  | — |
 | `VER.016` | `RETIRED` |  |  | — |
