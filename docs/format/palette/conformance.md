@@ -23,7 +23,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (32):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (30):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (15), which must each be covered by a citing test:**
 
@@ -51,7 +51,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 |---|---|
 | `TRAIT.011` | issue #216 |
 
-**Tests:** 215 of 315 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 218 of 315 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -292,9 +292,9 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `CHAR.007` | `MUST NOT` |  |  | `PaletteV2DecodeTest.twoMarkersDifferingOnlyByNormalisationStayTwoMarkers` |
 | `CHAR.010` | `MUST` |  |  | — |
 | `CHAR.011` | `REJECT` | `DIAG.053` | *n/a* | — |
-| `CHAR.020` | `MUST` |  |  | — |
-| `CHAR.021` | `MUST` |  |  | — |
-| `CHAR.022` | `REJECT` | `DIAG.054` | *n/a* | — |
+| `CHAR.020` | `MUST` |  |  | `MarkerAlphabetTest.nextTakesTheFirstMarkerNotAlreadyInUse`, `MarkerAlphabetTest.everyMarkerAppearsOnce` |
+| `CHAR.021` | `MUST` |  |  | `MarkerAlphabetTest.theNineUnassignedCodepointsThatReachedAShippedPackAreNotAssignable`, `MarkerAlphabetTest.everyAssignableMarkerIsOneTheLoaderAccepts`, `MarkerAlphabetTest.printableAsciiIsExhaustedFirst`, `MarkerAlphabetTest.spaceIsNotAssignedEvenThoughItIsALegalMarker` |
+| `CHAR.022` | `REJECT` | `DIAG.054` | *n/a* | `MarkerAlphabetTest.exhaustingTheAlphabetFailsNamingTheLimitRatherThanContinuingPastIt` |
 | `CHAR.030` | `INVARIANT` |  |  | `MarkerIndexTest.everyMarkerInTheDomainResolvesByIndexAndNotOnlyTheAsciiOnes`, `MarkerIndexTest.theRemapPaysForThePagesAPaletteUsesAndNotForTheCodepointRangeItSpans` |
 | `CHAR.031` | `INVARIANT` |  |  | `CompiledV2PaletteTest.theDenseIndexIsBuiltOncePerPaletteAndNotPerLookup`, `MarkerIndexTest.theIndexIsTheSameWhateverOrderTheMarkersArriveIn` |
 

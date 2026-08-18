@@ -66,7 +66,6 @@ class ConformanceIndexTest {
     private static Map<String, String> noFixtureRulesAwaitingACitingTest() {
         Map<String, String> awaiting = new LinkedHashMap<>();
         awaiting.put("CHAR.011", "a part file's slice rows; Task 7, with the part loader");
-        awaiting.put("CHAR.022", "a marker-assigning command; not scheduled - /exportpart is version 1's");
         return Collections.unmodifiableMap(awaiting);
     }
 
