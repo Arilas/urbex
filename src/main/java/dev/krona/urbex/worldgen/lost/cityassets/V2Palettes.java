@@ -133,7 +133,6 @@ final class V2Palettes {
      * testing all of it, and the cast below cannot fail for a reason a pack author can cause.</p>
      */
     static Palette compile(Identifier id, HolderLookup<Block> blockLookup,
-                           @Nullable AssetIndex<Variant> variants,
                            List<PaletteAssetDefinition> chainRootFirst, Context context) {
         if (chainRootFirst.isEmpty()) {
             throw new IllegalArgumentException("an extends chain holds at least the file it is for");
@@ -141,7 +140,7 @@ final class V2Palettes {
         if (chainRootFirst.getLast().formatVersion() == PaletteV2Definition.FORMAT_VERSION) {
             return Palette.version2(id, compileV2(id, "'" + id + "'", chainRootFirst, context));
         }
-        return new Palette(id, blockLookup, variants, version1(chainRootFirst));
+        return new Palette(id, blockLookup, version1(chainRootFirst));
     }
 
     /**

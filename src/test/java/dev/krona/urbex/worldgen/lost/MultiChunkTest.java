@@ -110,7 +110,7 @@ class MultiChunkTest {
         WorldStyle worldStyle = TestWorldStyles.minimal("multi-opt-out", List.of(
                 new CityStyleSelector(1.0f, optOut.getName(), null)));
         AssetSnapshot empty = AssetSnapshot.empty();
-        AssetSnapshot assets = new AssetSnapshot(empty.variants(), empty.palettes(), empty.conditions(),
+        AssetSnapshot assets = new AssetSnapshot(empty.palettes(), empty.conditions(),
                 empty.styles(), empty.parts(), empty.buildings(), empty.multiBuildings(), empty.scattered(),
                 empty.worldStyles(), new AssetIndex<>("urbex:citystyles", Map.of(optOut.getId(), optOut)),
                 empty.predefinedCities(), empty.stuff(), empty.stuffByTag(), PredefinedIndex.empty());

@@ -212,21 +212,21 @@ class DatapackGuideExamplesTest {
         expect(guide, missing, () -> Resolved.require(null, downtown, "streetblocks.parts.stair"));
 
         // A part with no geometry, and a part whose redeclared size contradicts inherited slices.
-        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
-        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(
+        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
+        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, NO_PALETTES, List.of(
                 namedPart(Identifier.fromNamespaceAndPath("urbexmt", "tower_base"), 16, 16,
                         List.of(List.of("x".repeat(256)))),
                 namedPart(tower, 8, null, null))));
 
         // 'extends' inside an inline palette block.
-        expect(guide, missing, () -> Palette.inline(BuiltInRegistries.BLOCK, null, tower, List.of(new PaletteDefinition(
+        expect(guide, missing, () -> Palette.inline(BuiltInRegistries.BLOCK, tower, List.of(new PaletteDefinition(
                 Optional.of(Identifier.fromNamespaceAndPath("urbex", "common")), Optional.empty()))));
 
         // A palette entry that resolves to nothing at all.
         PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, null, List.of(
+        expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, List.of(
                 new PaletteDefinition(Optional.empty(), Optional.of(List.of(empty))))));
 
         // The four ways a 'lightSource' can be wrong, and the two removed spellings it replaced.
@@ -281,7 +281,7 @@ class DatapackGuideExamplesTest {
                 .parse(JsonOps.INSTANCE, JsonParser.parseString(json))
                 .result()
                 .orElseThrow(() -> new AssertionError("fixture does not decode: " + json));
-        return new Palette(id, BuiltInRegistries.BLOCK, null, List.of(definition));
+        return new Palette(id, BuiltInRegistries.BLOCK, List.of(definition));
     }
 
     /** A stuff entry declaring everything required, with the two count bounds the caller names. */

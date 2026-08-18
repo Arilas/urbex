@@ -98,7 +98,7 @@ class TagSnapshotTest {
             byId.put(style.getId(), style);
         }
         AssetSnapshot empty = AssetSnapshot.empty();
-        return new AssetSnapshot(empty.variants(), empty.palettes(), empty.conditions(), empty.styles(),
+        return new AssetSnapshot(empty.palettes(), empty.conditions(), empty.styles(),
                 empty.parts(), empty.buildings(), empty.multiBuildings(), empty.scattered(),
                 new AssetIndex<>("urbex:worldstyles", byId), empty.cityStyles(),
                 empty.predefinedCities(), empty.stuff(), empty.stuffByTag(), empty.predefined());

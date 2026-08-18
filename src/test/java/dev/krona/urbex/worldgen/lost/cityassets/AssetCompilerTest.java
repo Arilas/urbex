@@ -13,7 +13,6 @@ import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleEdge;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
@@ -67,16 +66,15 @@ class AssetCompilerTest {
     void aStageCanReadWhatAnEarlierStageCompiled() {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         RegistryAccess access = registries(
-                variant("rubble", "minecraft:deepslate"),
-                paletteNamingVariant("walls", 'V', "urbex:rubble"));
+                definitionsAsset("rubble", RUBBLE_DEFINITION),
+                paletteV2("walls", paletteReferencing("urbex:rubble")));
 
         AssetSnapshot snapshot = AssetCompiler.compile(access, diagnostics);
 
         assertTrue(diagnostics.isEmpty(), () -> diagnostics.format("unexpected"));
-        assertEquals(1, snapshot.variants().size());
         assertNotNull(snapshot.palettes().get("urbex:walls"), "the palette compiled");
-        assertNotNull(snapshot.palettes().getOrThrow("urbex:walls").getPalette().get('V'),
-                "and its variant entry resolved against the variants stage above it");
+        assertNotNull(snapshot.palettes().getOrThrow("urbex:walls").v2().entry('V'),
+                "and its $ref resolved against the definitions stage above it");
     }
 
     /**
@@ -87,9 +85,9 @@ class AssetCompilerTest {
     void oneBrokenAssetDoesNotStopTheRestOfTheCompilation() {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         RegistryAccess access = registries(
-                variant("rubble", "minecraft:deepslate"),
-                paletteNamingVariant("broken", 'V', "urbex:nonexistent"),
-                paletteNamingVariant("walls", 'V', "urbex:rubble"));
+                definitionsAsset("rubble", RUBBLE_DEFINITION),
+                paletteV2("broken", paletteReferencing("urbex:nonexistent")),
+                paletteV2("walls", paletteReferencing("urbex:rubble")));
 
         AssetSnapshot snapshot = AssetCompiler.compile(access, diagnostics);
 
@@ -98,7 +96,6 @@ class AssetCompilerTest {
                 () -> "the report names the file that is wrong: " + diagnostics.problems());
         assertNull(snapshot.palettes().get("urbex:broken"), "the broken one is absent");
         assertNotNull(snapshot.palettes().get("urbex:walls"), "the one after it compiled anyway");
-        assertEquals(1, snapshot.variants().size(), "and the stage before it is untouched");
     }
 
     /**
@@ -113,8 +110,8 @@ class AssetCompilerTest {
     @Test
     void skippingValidationChangesTheReportAndNotTheSnapshot() {
         RegistryAccess access = registries(
-                variant("rubble", "minecraft:deepslate"),
-                paletteNamingVariant("walls", 'V', "urbex:rubble"),
+                definitionsAsset("rubble", RUBBLE_DEFINITION),
+                paletteV2("walls", paletteReferencing("urbex:rubble")),
                 // Names a city style nothing registers, so the validated path has something to report.
                 worldStyleEntry("missing", Optional.empty()));
         AssetDiagnostics diagnostics = new AssetDiagnostics();
@@ -124,7 +121,6 @@ class AssetCompilerTest {
 
         assertFalse(diagnostics.isEmpty(), "the validated path has something to say about this pack");
         assertEquals(validated.totalAssets(), unvalidated.totalAssets());
-        assertEquals(names(validated.variants()), names(unvalidated.variants()));
         assertEquals(names(validated.palettes()), names(unvalidated.palettes()));
         assertEquals(names(validated.worldStyles()), names(unvalidated.worldStyles()));
         assertEquals(names(validated.cityStyles()), names(unvalidated.cityStyles()));
@@ -256,10 +252,21 @@ class AssetCompilerTest {
 
     private record Entry<T>(ResourceKey<Registry<T>> key, Identifier id, T value) { }
 
-    private static Entry<VariantDefinition> variant(String path, String block) {
-        return new Entry<>(CustomRegistries.VARIANTS_REGISTRY_KEY, id(path),
-                new VariantDefinition(Optional.empty(),
-                        Optional.of(new Mergeable<>(true, List.of(new BlockEntry(1, block))))));
+    /**
+     * A shared weighted node, in the registry that replaced {@code variants} ({@code VER.017}).
+     *
+     * <p>These three tests were written on a {@code variant} and a version 1 palette naming it, because
+     * that was the cheapest pair of stages where the later one reads what the earlier one compiled. The
+     * pair is now {@code definitions} and a version 2 palette whose {@code $ref} reaches it, which is the
+     * same dependency between the same two positions in the stage order.</p>
+     */
+    private static final String RUBBLE_DEFINITION = """
+            { "version": 2, "kind": "weighted",
+              "choices": [ { "weight": 1, "block": "minecraft:deepslate" } ] }
+            """;
+
+    private static String paletteReferencing(String definition) {
+        return "{ \"version\": 2, \"palette\": { \"V\": { \"$ref\": \"" + definition + "\" } } }";
     }
 
     /**
@@ -349,15 +356,6 @@ class AssetCompilerTest {
         return new Entry<>(CustomRegistries.PALETTE_REGISTRY_KEY, id(path),
                 PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, JsonParser.parseString(json))
                         .getOrThrow());
-    }
-
-    private static Entry<PaletteAssetDefinition> paletteNamingVariant(String path, char marker, String variant) {
-        PaletteEntry entry = new PaletteEntry(Character.toString(marker), Optional.empty(),
-                Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty());
-        return new Entry<>(CustomRegistries.PALETTE_REGISTRY_KEY, id(path),
-                new PaletteDefinition(Optional.empty(), Optional.of(List.of(entry))));
     }
 
     /** A city style declaring nothing: complete only through a child that extends it. */

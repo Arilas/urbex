@@ -222,7 +222,7 @@ class PaletteCharacterCheckTest {
         for (char c : slice.toCharArray()) {
             levels.add(List.of(String.valueOf(c)));
         }
-        return new BuildingPart(id, BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"),
+        return new BuildingPart(id, BuiltInRegistries.BLOCK, AssetIndex.empty("urbex:palettes"),
                 List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(1), Optional.of(1),
                         Optional.of(levels), Optional.empty(), local, Optional.empty())));
     }
@@ -360,7 +360,7 @@ class PaletteCharacterCheckTest {
     /** Registers a palette and returns its id, so {@link #group} can name it. */
     private static String palette(String path, PaletteEntry... entries) {
         Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
-        PALETTES.put(id, new Palette(id, BuiltInRegistries.BLOCK, null,
+        PALETTES.put(id, new Palette(id, BuiltInRegistries.BLOCK,
                 List.of(new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries))))));
         return id.toString();
     }

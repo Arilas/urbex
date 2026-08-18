@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
@@ -46,7 +45,6 @@ class MissingBlocksAreSkippedTest {
 
     private static final String ABSENT = "somemod:no_such_block";
     private static final Identifier PALETTE_ID = Identifier.fromNamespaceAndPath("urbex", "test_palette");
-    private static final Identifier VARIANT_ID = Identifier.fromNamespaceAndPath("urbex", "test_variant");
 
     @BeforeAll
     static void bootstrap() {
@@ -55,23 +53,8 @@ class MissingBlocksAreSkippedTest {
     }
 
     @Test
-    void aVariantKeepsTheBlocksThisGameHas() {
-        Variant variant = new Variant(VARIANT_ID, BuiltInRegistries.BLOCK, List.of(variantOf(
-                new BlockEntry(3, "minecraft:mossy_cobblestone"),
-                new BlockEntry(1, ABSENT),
-                new BlockEntry(2, "minecraft:stone"))));
-
-        assertEquals(List.of(
-                        Pair.of(3, Blocks.MOSSY_COBBLESTONE.defaultBlockState()),
-                        Pair.of(2, Blocks.STONE.defaultBlockState())),
-                variant.getBlocks(),
-                "the absent entry is gone and the survivors keep their authored weights - the "
-                        + "draw is over their total, so they have absorbed its share");
-    }
-
-    @Test
     void aWeightedPaletteEntryKeepsTheBlocksThisGameHas() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 weighted('r', new BlockEntry(1, ABSENT), new BlockEntry(1, "minecraft:gravel")))));
 
         Pair<Integer, BlockState>[] blocks = weightedBlocksOf(palette, 'r');
@@ -85,7 +68,7 @@ class MissingBlocksAreSkippedTest {
      */
     @Test
     void aPropertyCarryingEntryFromAMissingModIsSkippedRatherThanThrowing() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 weighted('r', new BlockEntry(1, ABSENT + "[facing=north]"),
                         new BlockEntry(1, "minecraft:gravel")))));
 
@@ -96,7 +79,7 @@ class MissingBlocksAreSkippedTest {
 
     @Test
     void aCharacterLeftWithNothingGeneratesAsAir() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 weighted('r', new BlockEntry(1, ABSENT), new BlockEntry(1, "othermod:also_absent")))));
 
         Palette.PE entry = palette.getPalette().get('r');
@@ -105,28 +88,13 @@ class MissingBlocksAreSkippedTest {
         assertSame(Blocks.AIR.defaultBlockState(), entry.blocks());
     }
 
-    /** A variant whose every block is absent reaches the palette as an empty list, not as a crash. */
-    @Test
-    void aVariantWithNothingLeftReachesThePaletteAsAir() {
-        Variant emptied = new Variant(VARIANT_ID, BuiltInRegistries.BLOCK,
-                List.of(variantOf(new BlockEntry(1, ABSENT))));
-        assertTrue(emptied.getBlocks().isEmpty());
-
-        AssetIndex<Variant> variants = new AssetIndex<>("urbex:variants",
-                Map.of(Identifier.fromNamespaceAndPath("urbex", "gone"), emptied));
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, variants, List.of(paletteOf(
-                namingVariant('v', "urbex:gone"))));
-
-        assertSame(Blocks.AIR.defaultBlockState(), palette.getPalette().get('v').blocks());
-    }
-
     /**
      * A single {@code block} has no list to fall back on, so it is air — as it always was, except
      * that the property-carrying form used to throw instead.
      */
     @Test
     void aSingleBlockThatIsAbsentIsAir() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 single('x', ABSENT), single('y', ABSENT + "[facing=north]"))));
 
         assertSame(Blocks.AIR.defaultBlockState(), palette.getPalette().get('x').blocks());
@@ -139,7 +107,7 @@ class MissingBlocksAreSkippedTest {
      */
     @Test
     void anAbsentDamagedBlockLeavesNoMapping() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 damaged('S', "minecraft:stone", ABSENT))));
 
         assertTrue(palette.getDamaged().isEmpty());
@@ -150,10 +118,6 @@ class MissingBlocksAreSkippedTest {
         Palette.PE entry = palette.getPalette().get(marker);
         assertNotNull(entry, () -> "No palette entry for marker '" + marker + "'");
         return (Pair<Integer, BlockState>[]) entry.blocks();
-    }
-
-    private static VariantDefinition variantOf(BlockEntry... blocks) {
-        return new VariantDefinition(Optional.empty(), Optional.of(new Mergeable<>(true, List.of(blocks))));
     }
 
     private static PaletteDefinition paletteOf(PaletteEntry... entries) {
@@ -178,9 +142,4 @@ class MissingBlocksAreSkippedTest {
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
-    private static PaletteEntry namingVariant(char marker, String variant) {
-        return new PaletteEntry(Character.toString(marker), Optional.empty(),
-                Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-    }
 }

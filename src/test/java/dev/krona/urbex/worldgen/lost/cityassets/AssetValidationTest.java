@@ -3,7 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
 import dev.krona.urbex.setup.TestRegistries;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.MappedRegistry;
 import net.minecraft.core.RegistrationInfo;
@@ -25,10 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A pack with several broken files is diagnosed once, not once per world load (issue #56), and
  * asking for that diagnosis on a running world changes nothing.
  * <p>
- * Both properties are exercised through the {@code variants} registry, whose entries are the
- * cheapest asset to break: a {@code VariantDefinition} declaring no {@code blocks} anywhere in its chain is
- * exactly the "a field nothing declares" failure {@link Resolved} raises, and it needs no other
- * registry to be populated to reach it.
+ * Both properties are exercised through the {@code parts} registry, whose entries are the cheapest
+ * asset to break: a {@code BuildingPartDefinition} declaring no {@code slices} anywhere in its chain is
+ * exactly the "a field nothing declares" failure, and it needs no other registry to be populated to
+ * reach it - a part naming no {@code refpalette} asks the palettes index for nothing.
+ * <p>
+ * This was the {@code variants} registry until {@code VER.017} removed it. Parts are the replacement
+ * rather than palettes, because a palette is the asset this whole branch is changing and a fixture that
+ * moves with its subject stops being a fixture.
  */
 class AssetValidationTest {
 
@@ -41,7 +45,7 @@ class AssetValidationTest {
 
     @Test
     void everyBrokenAssetIsReportedRatherThanOnlyTheFirst() {
-        RegistryAccess access = registriesWithBrokenVariants("rubble", "leaves", "gravel");
+        RegistryAccess access = registriesWithBrokenParts("rubble", "leaves", "gravel");
 
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         AssetCompiler.compile(access, diagnostics);
@@ -51,7 +55,7 @@ class AssetValidationTest {
                         + diagnostics.format("found"));
         List<String> lines = diagnostics.problems().stream()
                 .map(AssetDiagnostics.Problem::toString).toList();
-        assertTrue(lines.stream().allMatch(line -> line.contains("declares no 'blocks'")), lines::toString);
+        assertTrue(lines.stream().allMatch(line -> line.contains("declares no slices")), lines::toString);
         for (String path : List.of("urbex:gravel", "urbex:leaves", "urbex:rubble")) {
             assertTrue(lines.stream().anyMatch(line -> line.contains(path)),
                     () -> path + " is missing from " + lines);
@@ -60,7 +64,7 @@ class AssetValidationTest {
 
     @Test
     void aPackWithNothingWrongReportsNothing() {
-        RegistryAccess access = registriesWithBrokenVariants();
+        RegistryAccess access = registriesWithBrokenParts();
 
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         AssetCompiler.compile(access, diagnostics);
@@ -77,33 +81,34 @@ class AssetValidationTest {
      */
     @Test
     void compilingForAReportPublishesNothing() {
-        RegistryAccess access = registriesWithBrokenVariants();
+        RegistryAccess access = registriesWithBrokenParts();
 
         AssetSnapshot first = AssetCompiler.compile(access, new AssetDiagnostics());
         AssetSnapshot second = AssetCompiler.compile(access, new AssetDiagnostics());
 
         assertNotSame(first, second);
-        assertNotSame(first.variants(), second.variants());
+        assertNotSame(first.parts(), second.parts());
     }
 
 
     /**
-     * A registry access holding every registry {@code validate} walks, all empty except
-     * {@code variants}, which holds one entry per name given - each declaring no {@code blocks}.
+     * A registry access holding every registry {@code validate} walks, all empty except {@code parts},
+     * which holds one entry per name given - each declaring no {@code slices}.
      */
-    private static RegistryAccess registriesWithBrokenVariants(String... brokenPaths) {
-        MappedRegistry<VariantDefinition> variants = new MappedRegistry<>(
-                CustomRegistries.VARIANTS_REGISTRY_KEY, Lifecycle.stable());
+    private static RegistryAccess registriesWithBrokenParts(String... brokenPaths) {
+        MappedRegistry<BuildingPartDefinition> parts = new MappedRegistry<>(
+                CustomRegistries.PART_REGISTRY_KEY, Lifecycle.stable());
         for (String path : brokenPaths) {
-            variants.register(
-                    ResourceKey.create(CustomRegistries.VARIANTS_REGISTRY_KEY,
+            parts.register(
+                    ResourceKey.create(CustomRegistries.PART_REGISTRY_KEY,
                             Identifier.fromNamespaceAndPath("urbex", path)),
-                    new VariantDefinition(Optional.empty(), Optional.empty()),
+                    new BuildingPartDefinition(Optional.empty(), Optional.empty(), Optional.empty(),
+                            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
                     RegistrationInfo.BUILT_IN);
         }
         // Every Urbex registry, derived from CustomRegistries rather than listed: the list this
         // replaced named 13 of the 14 and omitted 'definitions', under a javadoc claiming "every
         // registry validate walks".
-        return TestRegistries.with(variants.freeze());
+        return TestRegistries.with(parts.freeze());
     }
 }

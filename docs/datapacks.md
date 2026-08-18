@@ -965,26 +965,34 @@ A **palette**, redefining two characters of a registered one:
 <!-- example: palettes -->
 ```json
 {
+  "version": 2,
   "extends": "urbex:bricks_standard",
-  "palette": [
-    { "char": "#", "variant": "urbexmt:concrete" },
-    { "char": "}", "variant": "urbexmt:concrete_rubble" }
-  ]
+  "palette": {
+    "#": { "$ref": "urbexmt:concrete" },
+    "}": { "$ref": "urbexmt:concrete_rubble" }
+  }
 }
 ```
 
-A **variant** — the weighted blockstates one palette character can land on:
+A **definition** — the weighted blockstates one palette character can land on:
 
-<!-- example: variants -->
+<!-- example: definitions -->
 ```json
 {
-  "blocks": [
-    { "random": 1000, "block": "minecraft:smooth_stone" },
-    { "random": 40, "block": "minecraft:cracked_stone_bricks" },
-    { "random": 10, "block": "minecraft:mossy_stone_bricks" }
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    { "weight": 78, "block": "minecraft:smooth_stone" },
+    { "weight": 40, "block": "minecraft:cracked_stone_bricks" },
+    { "weight": 10, "block": "minecraft:mossy_stone_bricks" }
   ]
 }
 ```
+
+> These two examples are written in palette format version 2. The rest of this guide is not, and that
+> is a known defect rather than a style: see `docs/format/README.md` §9. They are converted because
+> the `variants` registry they used no longer exists (`VER.017`), so the version 1 forms they carried
+> were not merely dated — they named a registry nothing would load.
 
 A **part**, repainted from an existing one:
 

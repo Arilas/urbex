@@ -18,8 +18,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
 | `DIAG` | 58 | 0 |
-| `VER` | 25 | 2 |
-| **total** | **314** | **78** |
+| `VER` | 26 | 2 |
+| **total** | **315** | **78** |
 
 ## Outstanding
 
@@ -51,7 +51,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 |---|---|
 | `TRAIT.011` | issue #216 |
 
-**Tests:** 214 of 314 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 215 of 315 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -163,7 +163,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.003` | `MUST` |  | `accept` | `NodeResolverTest.aKeyBesideARefReplacesTheReferencedNodesValueForThatKey` |
 | `REF.004` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole` |
 | `REF.005` | `MUST` |  |  | — |
-| `REF.010` | `MUST` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset`, `PointerTest.aNameWithAColonAndNoFragmentIsADefinitionsAsset`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `CommonPaletteLightingTest.everyBundledPaletteIsVersion2AndCompilesAgainstThePacksOwnDefinitions` |
+| `REF.010` | `MUST` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsIsNot`, `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset`, `PointerTest.aNameWithAColonAndNoFragmentIsADefinitionsAsset`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `CommonPaletteLightingTest.everyBundledPaletteIsVersion2AndCompilesAgainstThePacksOwnDefinitions` |
 | `REF.011` | `MUST` |  |  | `PointerTest.aNameWithNoColonAndNoFragmentIsADefinitionOfThisFile` |
 | `REF.012` | `MUST NOT` |  |  | `NodeResolverTest.aNameResolvesInOneTierAndTheOtherIsNeverTried` |
 | `REF.013` | `REJECT` | `DIAG.030` | `reject=DIAG.030` | — |
@@ -397,7 +397,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.001` | `MUST` |  |  | `VersionDispatchTest.aFileWithNoVersionIsReadAsVersionOne` |
 | `VER.002` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `VersionDispatchTest.versionTwoSelectsTheVersionTwoRulesInFull`, `CommonPaletteLightingTest.everyBundledPaletteIsVersion2AndCompilesAgainstThePacksOwnDefinitions` |
 | `VER.003` | `MUST` |  |  | `VersionDispatchTest.aVersionTwoDocumentIsNeverHandedToTheVersionOneCodec` |
-| `VER.004` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt`, `LightPoolTest.aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears`, `LightPoolTest.aVersion1SocketWithMoreCandidatesThanSlotsStillLoads` |
+| `VER.004` | `MUST NOT` |  |  | `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt`, `LightPoolTest.aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears`, `LightPoolTest.aVersion1SocketWithMoreCandidatesThanSlotsStillLoads` |
+| `VER.017` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsIsNot`, `VariantKeyRefusedTest.aVersion1EntryNamingAVariantIsRefusedAndTheMessageNamesItsReplacement`, `VariantKeyRefusedTest.anEntryNamingBothAVariantAndALiveKeyIsStillRefused` |
 | `VER.005` | `REJECT` | `DIAG.038` | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
 | `VER.006` | `ACCEPT` |  | *n/a* | `PaletteCharacterCheckTest.aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays` |
 | `VER.007` | `REJECT` | `DIAG.065` | *n/a* | `VersionDispatchTest.inlinePalettesAlongOneOwnersChainAreAllOfOneVersionInEitherDirection` |
@@ -408,7 +409,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.011` | `REJECT` | `DIAG.061` | `reject=DIAG.061` | `PaletteV2DecodeTest.aDeletedVersionOneKeyIsRefusedSayingWhatToWriteInstead` |
 | `VER.012` | `MUST NOT` |  |  | `PaletteV2DecodeTest.noRetiredKeyIsSilentlyAcceptedOrSilentlyIgnored` |
 | `VER.020` | `MUST` |  |  | — |
-| `VER.021` | `MUST` |  |  | `V1ToV2Test.everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats`, `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt` |
+| `VER.021` | `MUST` |  |  | `V1ToV2Test.getAsJsonObject`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats`, `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt` |
 | `VER.022` | `MUST` |  |  | `V1ToV2Test.aKeyVersion1NeverReadIsNamedAndRefusedRatherThanGuessedAt`, `V1ToV2Test.aWeightedReplacementOnASocketIsRefusedRatherThanQuietlyCollapsed`, `V1ToV2Test.aMergeableBlocksObjectConvertsWhenItReplacesAndIsNamedWhenItAppends`, `V1ToV2Test.aKeyNoVersion1VariantHasIsRefusedRatherThanAccepted` |
 | `VER.023` | `MUST` |  |  | `V1ToV2Test.convertingAVersion2FileReturnsItByteForByteUnchanged` |
 | `VER.030` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined` |

@@ -8,6 +8,7 @@ import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.Diagnostics;
 import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.setup.TestRegistries;
 import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.resources.Identifier;
@@ -268,24 +269,29 @@ class ImportsTest {
     }
 
     /**
-     * The registry is registered as {@code urbex:definitions}, and {@code variants} is still registered
-     * beside it.
+     * The registry is registered as {@code urbex:definitions}, and {@code variants} is not registered at
+     * all.
      * <p>
-     * Both halves, because the second is the promise to every shipped pack: {@code VER.004} says version
-     * 1 does not change, and version 1 palettes reach their weighted lists through {@code variants}. The
-     * new registry is what {@code variants} <em>becomes</em> for a version 2 file, not what replaces it.
+     * Both halves, and the second is the one that changed. This asserted that {@code variants} was still
+     * registered beside it, because {@code VER.004} promised version 1 would not change and version 1
+     * palettes reached their weighted lists through {@code variants}. {@code VER.017} removed the
+     * registry, and narrowed that promise to the keys it is actually kept for: a version 1 palette
+     * naming a variant now fails by name rather than painting air. Asserted as an absence rather than deleted, because a registry is re-added by
+     * one line and nothing else in the suite would notice.
      */
     @Test
     @Rule("REF.010")
-    @Rule("VER.004")
-    void theDefinitionsRegistryIsRegisteredAndVariantsStillIs() {
+    @Rule("VER.017")
+    void theDefinitionsRegistryIsRegisteredAndVariantsIsNot() {
         assertEquals(Identifier.fromNamespaceAndPath("urbex", "definitions"),
                 CustomRegistries.DEFINITIONS_REGISTRY_KEY.identifier());
-        assertEquals(Identifier.fromNamespaceAndPath("urbex", "variants"),
-                CustomRegistries.VARIANTS_REGISTRY_KEY.identifier());
         assertEquals(Pointer.DEFINITIONS_REGISTRY,
                 CustomRegistries.DEFINITIONS_REGISTRY_KEY.identifier(),
                 "a pointer's 'definitions' prefix and the registry key must be the same id");
+        assertTrue(TestRegistries.keys().stream()
+                        .noneMatch(key -> key.identifier().getPath().equals("variants")),
+                () -> "the variants registry is removed (VER.017), and these are registered: "
+                        + TestRegistries.keys());
     }
 
     /**

@@ -25,7 +25,6 @@ import java.util.SortedMap;
  *                   and used to be five lazily-latched static maps on {@code City} (issue #129).
  */
 public record AssetSnapshot(
-        AssetIndex<Variant> variants,
         AssetIndex<Palette> palettes,
         AssetIndex<Condition> conditions,
         AssetIndex<Style> styles,
@@ -55,7 +54,7 @@ public record AssetSnapshot(
 
     /** Total compiled assets, for the one-line summary the compiler logs. */
     public int totalAssets() {
-        return variants.size() + palettes.size() + conditions.size() + styles.size() + parts.size()
+        return palettes.size() + conditions.size() + styles.size() + parts.size()
                 + buildings.size() + multiBuildings.size() + scattered.size() + worldStyles.size()
                 + cityStyles.size() + predefinedCities.size() + stuff.size();
     }
@@ -63,7 +62,6 @@ public record AssetSnapshot(
     /** An empty snapshot, for a context that has no registries at all (a test, a null level). */
     public static AssetSnapshot empty() {
         return new AssetSnapshot(
-                AssetIndex.empty("urbex:variants"),
                 AssetIndex.empty("urbex:palettes"),
                 AssetIndex.empty("urbex:conditions"),
                 AssetIndex.empty("urbex:styles"),

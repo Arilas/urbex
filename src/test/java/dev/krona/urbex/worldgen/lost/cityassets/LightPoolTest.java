@@ -66,7 +66,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(palette)));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
         assertTrue(error.getMessage().contains("entry 'L'"));
         assertTrue(error.getMessage().contains("floor, wall, ceiling, or free"));
@@ -79,7 +79,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(palette)));
         assertTrue(error.getMessage().contains("entry 'L'"));
         assertTrue(error.getMessage().contains("names nothing to place"));
     }
@@ -91,7 +91,7 @@ class LightPoolTest {
                 """);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(palette)));
         assertTrue(error.getMessage().contains("entry 'L'"));
         assertTrue(error.getMessage().contains("emit any light"));
     }
@@ -106,7 +106,7 @@ class LightPoolTest {
                 }]}
                 """);
 
-        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette))
+        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(palette))
                 .getPalette().get('L');
         BlockState lit = assertInstanceOf(BlockState.class, entry.blocks());
         assertEquals(Blocks.LANTERN, lit.getBlock());
@@ -128,7 +128,7 @@ class LightPoolTest {
                 }]}
                 """);
 
-        LightSource source = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette))
+        LightSource source = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(palette))
                 .getPalette().get('L').info().lightSource();
         assertInstanceOf(BlockChoice.Weighted.class, source.unlit());
         BlockPos pos = new BlockPos(11, 71, -4);
@@ -172,7 +172,7 @@ class LightPoolTest {
                     """.formatted(weight));
 
             IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                    () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(palette)));
+                    () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(palette)));
             assertTrue(error.getMessage().contains("urbex:test_lights"));
             assertTrue(error.getMessage().contains("marker 'L'"));
             assertTrue(error.getMessage().contains("placement 'floor'"));
@@ -390,7 +390,7 @@ class LightPoolTest {
         PaletteDefinition paletteDefinition = result.result().orElseThrow();
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteDefinition)));
         assertTrue(error.getMessage().contains("'torch'"));
         assertTrue(error.getMessage().contains("lightSource"));
         assertTrue(error.getMessage().contains("urbex:test_lights"));
@@ -408,7 +408,7 @@ class LightPoolTest {
         PaletteDefinition paletteDefinition = result.result().orElseThrow();
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteDefinition)));
         assertTrue(error.getMessage().contains("'light'"));
         assertTrue(error.getMessage().contains("lightSource"));
     }
@@ -427,7 +427,7 @@ class LightPoolTest {
         assertTrue(result.result().isPresent());
         PaletteDefinition paletteDefinition = result.result().orElseThrow();
 
-        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteDefinition)).getPalette().get('L');
+        Palette.PE entry = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteDefinition)).getPalette().get('L');
         BlockState representative = assertInstanceOf(BlockState.class, entry.blocks());
         assertEquals(Blocks.SOUL_WALL_TORCH, representative.getBlock());
         assertTrue(entry.info().isSpecial());
