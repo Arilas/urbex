@@ -443,10 +443,12 @@ class V1ToV2Test {
         // VER.031's first number was the bundled pack's sixty uses of one value, and it is the one
         // target of the four that has since been taken: Task 10 hoisted 45 of them into the shared
         // 'urbex:damageable' definition and left 9 written inline, because those markers already carry
-        // a $ref and a node has one. What the tool still counts here is version 1's spelling, which
-        // survives only in the inline palettes of six parts and buildings.
-        assertEquals(Map.of("minecraft:iron_bars", 6), survey.damagedValues(),
-                "the bundled pack after the hoist; VER.031's > Why records both numbers");
+        // a $ref and a node has one. The last 6 were version 1's spelling in the inline palettes of
+        // three buildings, and converting those six owners to version 2 leaves the bundled pack with
+        // no 'damaged' key at all. Empty is therefore the measurement, not an unexercised survey: the
+        // ModernTweaks assertions below run the same walk over a pack that still writes 257 of them.
+        assertEquals(Map.of(), survey.damagedValues(),
+                "the bundled pack writes no version 1 'damaged'; VER.031's > Why records the numbers");
 
         // Still measured where it has not been acted on, so the rule keeps a live instance rather than
         // only a historical one.

@@ -188,13 +188,16 @@ In the shipped Urbex palettes `damaged` had exactly one distinct value across al
 single partial definition replaces most of them. It is written as one now — `urbex:damageable`, in the
 `definitions` registry rather than in one file's `$defs`, because §2's tier table puts a definition used
 by more than one file there and these were used by fourteen — and **45 of the 60** point at it. The
-other fifteen are the two limits worth knowing about: nine markers already carry a `$ref` into a
-converted variant and a node has one `$ref`, so the trait stays written out beside it unless the shared
-definition is respelled to carry both (`{ "$ref": "urbex:bricks", "traits": { … } }`, one asset per
-variant); and six are in inline palettes still written in version 1, which have no `$defs` and no `$ref`
-at all. Those six are why version 1 cannot be removed —
-[issue #219](https://github.com/Arilas/urbex/issues/219) is the work of converting them, and until it
-lands `VER.004`'s promise is load-bearing for the shipped pack and not only for other people's.
+other fifteen are all one limit: the marker already carries a `$ref` into a converted variant and a node
+has one `$ref`, so the trait stays written out beside it unless the shared definition is respelled to
+carry both (`{ "$ref": "urbex:bricks", "traits": { … } }`, one asset per variant).
+
+It was two limits until [issue #219](https://github.com/Arilas/urbex/issues/219) closed. Six of the
+fifteen were in inline palettes still written in version 1, which have no `$defs` and no `$ref` at all,
+and converting their owners moved them into the first group rather than out of the count: three of those
+six are the buildings whose markers now carry `$ref` into `urbex:deepslate`, `urbex:blackstone` and
+`urbex:stoneandbrick`. A limit that a conversion turns into a different limit is worth saying once, so
+that the next reader does not expect the number to fall.
 
 Stated with its arithmetic rather than as "replaces every one of them", which this pack disproved the
 first time anyone tried it. [VER.031](09-migration.md#5-what-the-converter-cannot-do) carries the same

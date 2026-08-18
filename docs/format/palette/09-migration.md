@@ -258,10 +258,12 @@ The retired set, and what each becomes:
 > > the `$ref` and the trait, which is the only one of the three that both shares the trait and leaves
 > > the variant alone. The third was measured and generates identically; it was declined because six new
 > > registry assets to remove nine inline trait blocks is not a saving, and that is a judgement rather
-> > than a constraint. The tool now counts **6** there, which are version 1's spelling surviving in the inline
-> > palettes of six parts and buildings — the same six that keep version 1 unremovable, tracked as
-> > [issue #219](https://github.com/Arilas/urbex/issues/219); the reference packs are untouched and Modern Tweaks still
-> > reports 257 uses of 7 distinct values. Restated here rather than left at sixty because
+> > than a constraint. The tool now counts **0** there. It counted 6 until
+> > [issue #219](https://github.com/Arilas/urbex/issues/219) closed: those were version 1's spelling
+> > surviving in the inline palettes of six parts and buildings, and converting those six owners left the
+> > bundled pack writing no `damaged` at all. The reference packs are untouched and Modern Tweaks still
+> > reports 257 uses of 7 distinct values, which is what keeps this rule measured on a live pack rather
+> > than only on a historical one. Restated here rather than left at sixty because
 > > [VER.032](#5-what-the-converter-cannot-do) makes a figure nobody can reproduce a claim, and the
 > > figure a reader can reproduce is whatever the pack currently says.
 

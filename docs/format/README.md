@@ -340,12 +340,21 @@ the `variants` registry, a `variant` behind a character. It mentions neither `$d
 worked example is now written in a format it does not document. §7 says a conflict between the guide
 and the specification is a bug in the guide; this is a whole registry of them.
 
-**Version 1 cannot be removed, and the shipped pack is why.** Six files — three parts and three
-buildings — carry inline palettes still written in version 1, and the `variants` registry they use is
-version 1 with no version 2 form of its own. So `VER.004`'s promise that version 1 does not change is
-load-bearing for this pack and not only for other people's, and every version 1 code path it names is
-reachable from the bundled data. Converting those six is
-[issue #219](https://github.com/Arilas/urbex/issues/219).
+**Version 1 cannot be removed, and the shipped pack is no longer why.** It was: six files — three parts
+and three buildings — carried inline palettes written in version 1, tracked as
+[issue #219](https://github.com/Arilas/urbex/issues/219). Those six are converted, and the bundled pack
+now writes version 1 in exactly one place: the twelve `variants` assets, which nothing in it references
+any more and which no addon pack references either. Deleting them is a decision rather than a
+conversion, and it is not free — they are the only bundled files the key-name half of
+`ShippedBlockRefs` walks, so removing them leaves that half covering nothing.
+
+What keeps version 1 alive is `VER.001`, and the packs it was written for. All four Urbex addon packs
+are version 1 throughout: Modern Tweaks (98 palettes, 58 variants, 245 inline entries across 60 parts
+and buildings, 79 of them naming a variant), Zombie Apocalypse Essentials (7 palettes, 6,527 inline
+entries), Chaos (119,527 inline entries and no palette registry at all) and Modern City (84 palettes).
+So `VER.004`'s promise that version 1 does not change is now load-bearing for other people's packs and
+not for this one — which is the state `VER.001` describes, and the state in which removing version 1
+means converting those four first.
 
 **Not every fixture runs.** `FormatFixtureTest` runs every fixture whose outcome decoding alone
 decides. One is listed in that class instead: `MODEL.062#1`, whose rule is decided where a style's
@@ -365,15 +374,19 @@ grounds that a design record holds them, and it now does: the corpus measurement
 whole-format shapes costed before this one was chosen, and what implementing the rules taught about
 them. A `> Why` block remains the right place for a reason and the wrong place for an argument.
 
-**Four guards are latently vacuous, and one was born so.** Recorded rather than fixed, because each is
-either outside this format's scope or becomes wrong on a change nobody has made yet:
+**Four guards were latently vacuous, one was born so, and one has since come true.** Recorded rather
+than fixed, because each is either outside this format's scope or becomes wrong on a change nobody has
+made yet — until somebody makes it:
 
 - `NoAssetReferenceDefaultsTest`'s regex matches a three-argument `listOrStringList` overload that was
   deleted in the same commit that added the test. The only text it can match is text that does not
   compile, so it has never been able to fail. Pre-existing and unrelated to version 2.
-- `ShippedBlockRefs.Ref.version2` records the *document's* top-level version while `collect()` dispatches
-  per nested node. The 43/18 split its guard pins therefore misdescribes coverage the moment one of the
-  six inline version 1 palettes converts.
+- ~~`ShippedBlockRefs.Ref.version2` records the *document's* top-level version while `collect()`
+  dispatches per nested node. The 43/18 split its guard pins therefore misdescribes coverage the moment
+  one of the six inline version 1 palettes converts.~~ **Fixed**, by the change this paragraph predicted:
+  converting the six made the flag wrong for every block string in them, so it is now recorded per string
+  by the branch that produced it, and the split is 49/12. Kept struck through rather than deleted because
+  a latent vacuity that was written down and then came true is the evidence that writing them down works.
 - `DatapackGuideExamplesTest.codecs()` hardcodes 13 registries where there are 14, so its "an example for
   every registry" check cannot notice that `definitions` has no example in the guide — which is the same
   hole the paragraph above this one is about, one directory over.

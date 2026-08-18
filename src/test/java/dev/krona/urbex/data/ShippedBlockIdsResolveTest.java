@@ -83,9 +83,9 @@ class ShippedBlockIdsResolveTest {
      * rotatable one beside it - stops guarding.
      *
      * <p>The counts are the shape of the pack rather than a second copy of it: thirty version 2
-     * palettes and thirteen definitions on one side, and on the other the six parts and buildings whose
-     * inline palettes are still version 1 ({@code VER.006} allows the mix) together with the twelve
-     * {@code variants} the version 1 side of the pack still reads.</p>
+     * palettes, thirteen definitions and the six parts and buildings whose inline palettes are now
+     * version 2 as well on one side, and on the other the twelve {@code variants} that are all the
+     * version 1 the bundled pack still writes.</p>
      */
     @Test
     void bothWalksReachTheFilesTheyAreFor() throws IOException {
@@ -94,25 +94,32 @@ class ShippedBlockIdsResolveTest {
         TreeSet<String> version1 = new TreeSet<>();
         refs.stream().filter(ref -> !ref.version2()).forEach(ref -> version1.add(ref.file()));
 
-        assertEquals(43, version2.size(),
-                () -> "thirty palettes and thirteen definitions assets are written in version 2, and "
-                        + "the version 2 walk is responsible for " + version2.size() + ": " + version2);
-        assertEquals(18, version1.size(),
-                () -> "twelve variants and the six parts and buildings with an inline version 1 "
-                        + "palette still spell a block by key, and the key walk reached "
-                        + version1.size() + ": " + version1);
+        assertEquals(49, version2.size(),
+                () -> "thirty palettes, thirteen definitions assets and the six parts and buildings "
+                        + "whose inline palette is version 2 are what the version 2 walk is "
+                        + "responsible for, and it is responsible for " + version2.size()
+                        + ": " + version2);
+        assertEquals(12, version1.size(),
+                () -> "the twelve variants are the only version 1 left to spell a block by key, and "
+                        + "the key walk reached " + version1.size() + ": " + version1);
 
         // The totals, so that a walk narrowing without losing a whole file is caught too. This is the
         // number the rotatable guard lost: run version 1's key names over the converted pack and it
-        // finds 200 of these and 89 distinct, because the string shorthand has no 'block' key - every
+        // finds 184 of these and 79 distinct, because the string shorthand has no 'block' key - every
         // rail, ladder, lever, iron_trapdoor, iron_door, barrel, oak_fence and most stairs go missing.
+        // It found 200 and 89 before the six inline palettes converted, and the 16 it lost are exactly
+        // those files: 9 in cabin and 1 in top1x1_5 became string shorthand, and the three buildings'
+        // 6 'damaged' became 'into'. park_trees lost none, because a weighted choice still spells its
+        // block 'block'.
         //
         // 337 rather than the 333 the same key walk found over the pack in version 1, and the four
         // causes account for it exactly: +42 for definitions/, which ships beside the variants/ it was
-        // converted from and is counted twice until the inline palettes convert; +4 for the unlit
-        // values the key walk never saw in either format, since 'unlit' was not one of its two keys;
-        // +2 for the stand-ins the two sockets now state; and -44 for the 45 repetitions of
-        // 'damaged: iron_bars' that became one 'into' in urbex:damageable. 333 + 42 + 4 + 2 - 44 = 337.
+        // converted from and is counted twice for as long as both are shipped - converting the inline
+        // palettes took the last reader off variants/, so deleting it is now only a decision
+        // (issue #219); +4 for the unlit values the key walk never saw in either format, since 'unlit'
+        // was not one of its two keys; +2 for the stand-ins the two sockets now state; and -44 for the
+        // 45 repetitions of 'damaged: iron_bars' that became one 'into' in urbex:damageable.
+        // 333 + 42 + 4 + 2 - 44 = 337.
         assertEquals(337, refs.size(), () -> "block strings written across the pack: " + refs.size());
         assertEquals(163, refs.stream().map(ShippedBlockRefs.Ref::value).distinct().count(),
                 "of which this many are distinct");
