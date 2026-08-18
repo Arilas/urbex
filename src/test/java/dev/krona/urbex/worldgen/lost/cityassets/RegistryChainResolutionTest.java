@@ -16,7 +16,6 @@ import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleEdge;
@@ -244,24 +243,6 @@ class RegistryChainResolutionTest {
         assertEquals(Set.of("urbex:common_loot", "urbex:rare_loot", "urbex:barrel_loot"),
                 valuesOf(new Condition(TestAssetId.ANY, List.of(parent, condition("loot_barrel", false, "urbex:barrel_loot")))),
                 "{\"replace\": false} keeps the inherited values");
-    }
-
-    // ------------------------------------------------------------- variants
-
-    @Test
-    void variantBlocksReplaceByDefaultAndAppendWhenTheChildOptsIn() {
-        VariantDefinition parent = variant("stones", true,
-                new BlockEntry(1, "minecraft:stone"), new BlockEntry(2, "minecraft:andesite"));
-
-        Variant replaced = new Variant(TestAssetId.ANY, BuiltInRegistries.BLOCK, List.of(parent,
-                variant("stones_deep", true, new BlockEntry(3, "minecraft:deepslate"))));
-        assertEquals(List.of("minecraft:deepslate"), blockIdsOf(replaced), "a bare array replaces");
-        assertEquals(List.of(3), replaced.getBlocks().stream().map(org.apache.commons.lang3.tuple.Pair::getLeft).toList());
-
-        Variant appended = new Variant(TestAssetId.ANY, BuiltInRegistries.BLOCK, List.of(parent,
-                variant("stones_deep", false, new BlockEntry(3, "minecraft:deepslate"))));
-        assertEquals(List.of("minecraft:stone", "minecraft:andesite", "minecraft:deepslate"),
-                blockIdsOf(appended), "{\"replace\": false} keeps the inherited blocks, in order");
     }
 
     // --------------------------------------------------------------- styles
@@ -574,12 +555,6 @@ class RegistryChainResolutionTest {
         }
     }
 
-    private static List<String> blockIdsOf(Variant variant) {
-        return variant.getBlocks().stream()
-                .map(pair -> BuiltInRegistries.BLOCK.getKey(pair.getRight().getBlock()).toString())
-                .toList();
-    }
-
     /**
      * The distinct values a condition can hand back. {@code Condition} exposes only a weighted
      * draw, so this sweeps a fixed random sequence; the sequence is seeded, so the result is a
@@ -620,10 +595,6 @@ class RegistryChainResolutionTest {
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()))
                 .toList();
         return new ConditionDefinition(Optional.empty(), Optional.of(new Mergeable<>(replace, parts)));
-    }
-
-    private static VariantDefinition variant(String path, boolean replace, BlockEntry... blocks) {
-        return new VariantDefinition(Optional.empty(), Optional.of(new Mergeable<>(replace, List.of(blocks))));
     }
 
     private static StuffBuilder stuff(String path) {

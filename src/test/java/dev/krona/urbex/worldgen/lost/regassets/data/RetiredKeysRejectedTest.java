@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code palettes} registry takes {@link dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition#CODEC},
  * a dispatcher that reads {@code version} and delegates - so "the registered codec rejects
  * {@code inherit}" is a claim about whichever branch the document selects, and a document selects the
- * version 1 branch by declaring no {@code version} at all. The sweep below therefore counts fifteen
+ * version 1 branch by declaring no {@code version} at all. The sweep below therefore counts fourteen
  * {@code *Definition} classes against fourteen registry keys, and the extra one is not slack: it is
  * {@code PaletteDefinition}, still reachable as a branch of the dispatcher rather than as a registered
  * codec, and {@link #bothBranchesOfThePaletteDispatcherRejectBothRetiredKeys} walks the branches
@@ -101,8 +101,8 @@ class RetiredKeysRejectedTest {
     @Test
     void everyRegisteredCodecRejectsBothRetiredKeys() throws Exception {
         Map<String, Codec<?>> codecs = registryCodecs();
-        assertEquals(15, codecs.size(),
-                "expected the fifteen definition codecs - fourteen registries plus the version 1"
+        assertEquals(14, codecs.size(),
+                "expected the fourteen definition codecs - thirteen registries plus the version 1"
                         + " palette branch behind the palette dispatcher - found " + codecs.keySet());
 
         List<String> problems = new ArrayList<>();

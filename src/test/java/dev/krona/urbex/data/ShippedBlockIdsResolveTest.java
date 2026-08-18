@@ -84,8 +84,14 @@ class ShippedBlockIdsResolveTest {
      *
      * <p>The counts are the shape of the pack rather than a second copy of it: thirty version 2
      * palettes, thirteen definitions and the six parts and buildings whose inline palettes are now
-     * version 2 as well on one side, and on the other the twelve {@code variants} that are all the
-     * version 1 the bundled pack still writes.</p>
+     * version 2 as well - and, on the other side, nothing.</p>
+     *
+     * <p><b>The key-name branch now covers no bundled file, and that is asserted rather than left to be
+     * noticed.</b> It covered the twelve {@code variants} until {@code VER.017} removed the registry.
+     * The branch is kept because it is what reads the registries that are not palettes, and none of
+     * those happens to spell a block today; an assertion of zero is the honest statement of that, and it
+     * fails the moment a bundled file spells one by key again - which is the only event that would make
+     * the branch load-bearing without anyone deciding it should be.</p>
      */
     @Test
     void bothWalksReachTheFilesTheyAreFor() throws IOException {
@@ -99,9 +105,10 @@ class ShippedBlockIdsResolveTest {
                         + "whose inline palette is version 2 are what the version 2 walk is "
                         + "responsible for, and it is responsible for " + version2.size()
                         + ": " + version2);
-        assertEquals(12, version1.size(),
-                () -> "the twelve variants are the only version 1 left to spell a block by key, and "
-                        + "the key walk reached " + version1.size() + ": " + version1);
+        assertEquals(0, version1.size(),
+                () -> "VER.017 took the twelve variants with the registry, and they were the last "
+                        + "bundled files to spell a block by key; the key walk reached "
+                        + version1.size() + ": " + version1);
 
         // The totals, so that a walk narrowing without losing a whole file is caught too. This is the
         // number the rotatable guard lost: run version 1's key names over the converted pack and it
@@ -112,15 +119,17 @@ class ShippedBlockIdsResolveTest {
         // 6 'damaged' became 'into'. park_trees lost none, because a weighted choice still spells its
         // block 'block'.
         //
-        // 337 rather than the 333 the same key walk found over the pack in version 1, and the four
-        // causes account for it exactly: +42 for definitions/, which ships beside the variants/ it was
-        // converted from and is counted twice for as long as both are shipped - converting the inline
-        // palettes took the last reader off variants/, so deleting it is now only a decision
-        // (issue #219); +4 for the unlit values the key walk never saw in either format, since 'unlit'
-        // was not one of its two keys; +2 for the stand-ins the two sockets now state; and -44 for the
-        // 45 repetitions of 'damaged: iron_bars' that became one 'into' in urbex:damageable.
-        // 333 + 42 + 4 + 2 - 44 = 337.
-        assertEquals(337, refs.size(), () -> "block strings written across the pack: " + refs.size());
+        // 295 rather than the 333 the same key walk found over the pack in version 1, and three causes
+        // account for it exactly: +4 for the unlit values the key walk never saw in either format,
+        // since 'unlit' was not one of its two keys; +2 for the stand-ins the two sockets now state;
+        // and -44 for the 45 repetitions of 'damaged: iron_bars' that became one 'into' in
+        // urbex:damageable. 333 + 4 + 2 - 44 = 295.
+        //
+        // There was a fourth term until VER.017: +42 for definitions/, which shipped beside the
+        // variants/ it was converted from and was counted twice while both existed. Deleting the
+        // registry deleted the duplicate, which is the whole of the difference between this number and
+        // the 337 that stood here.
+        assertEquals(295, refs.size(), () -> "block strings written across the pack: " + refs.size());
         assertEquals(163, refs.stream().map(ShippedBlockRefs.Ref::value).distinct().count(),
                 "of which this many are distinct");
     }

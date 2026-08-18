@@ -342,11 +342,14 @@ and the specification is a bug in the guide; this is a whole registry of them.
 
 **Version 1 cannot be removed, and the shipped pack is no longer why.** It was: six files — three parts
 and three buildings — carried inline palettes written in version 1, tracked as
-[issue #219](https://github.com/Arilas/urbex/issues/219). Those six are converted, and the bundled pack
-now writes version 1 in exactly one place: the twelve `variants` assets, which nothing in it references
-any more and which no addon pack references either. Deleting them is a decision rather than a
-conversion, and it is not free — they are the only bundled files the key-name half of
-`ShippedBlockRefs` walks, so removing them leaves that half covering nothing.
+[issue #219](https://github.com/Arilas/urbex/issues/219). Those six are converted, and `VER.017` then
+removed the `variants` registry, which was the only version 1 the bundled pack had left. The pack now
+writes none of it.
+
+That cost the thing this section predicted it would: the key-name half of `ShippedBlockRefs` walked
+those twelve assets and nothing else, so it now covers no bundled file at all. It is asserted at zero
+rather than deleted — the branch still reads the registries that are not palettes, none of which spells
+a block today, and an assertion of zero fails the moment one does.
 
 What keeps version 1 alive is `VER.001`, and the two packs it was written for. Both are version 1
 throughout: Modern Tweaks (98 palettes, 58 variants, 245 inline entries across 60 parts and buildings,

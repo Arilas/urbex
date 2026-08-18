@@ -21,11 +21,46 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > **VER.003** · `MUST` — Version selection happens before decoding, by inspecting the raw document,
 > so a version 2 file is never first decoded by the version 1 codec.
 
-> **VER.004** · `MUST NOT` — Version 1 does not become stricter. [MODEL.004](00-model.md#1-the-file)
-> applies to version 2 files only.
+> **VER.004** · `MUST NOT` — Version 1 does not become stricter *about keys it does not know*.
+> [MODEL.004](00-model.md#1-the-file) applies to version 2 files only.
 
-> > **Why** — making version 1 refuse unknown keys would break packs retroactively, which this
-> > project has never done. Strictness is a reason to migrate, not a penalty for not having.
+> > **Why** — making version 1 refuse unknown keys would break packs retroactively. Strictness is a
+> > reason to migrate, not a penalty for not having.
+
+> > **Why it is now scoped to keys, and what that cost** — this read "version 1 does not become
+> > stricter", flat, and its `> Why` said retroactive breakage was something "this project has never
+> > done". [VER.017](#1-versioning) is the project doing it: the `variants` registry is removed, and a
+> > version 1 palette that named one loaded yesterday and is refused today. Narrowing the rule rather
+> > than retiring it, because the two are different promises and only one is broken — an unknown key is
+> > still ignored, which is what the rule is cited for and what
+> > [WEIGHT.030](05-weights.md#4-absent-blocks) and the two version 1 socket rules depend on. A removed
+> > *feature* is not a key nobody read; it is a capability withdrawn on purpose, and it fails by name.
+
+> **VER.017** · `MUST NOT` — The `variants` registry is removed. A version 1 palette entry naming
+> `variant` is refused where the palette is compiled, and the refusal names the `definitions` registry,
+> `$ref`, and the converter that rewrites both.
+
+> > **Why** — `variants` had one reader, the version 1 `variant` key, and one successor, the
+> > `definitions` registry ([REF.010](02-references.md#2-where-a-name-resolves)) — which does everything
+> > it did and, being a node, everything it could not: any of the five kinds, and traits. Two registries
+> > meaning one thing is the duplication this format exists to remove, and keeping the dead one until
+> > version 1 goes would keep an entire registry, its codec and its compile stage alive for a key no
+> > bundled file writes.
+
+> > **Why it is refused and not dropped** — a version 1 palette ignores a key it does not know
+> > ([VER.004](#1-versioning)), so deleting `variant` from the entry codec would load the pack, paint
+> > every marker that used one as air, and say nothing. The key is therefore held decodable purely so
+> > that it can fail by name, which is [VER.012](#3-retired-keys)'s rule and the third time it has been
+> > applied — `torch` and `light` are the other two, and the measured cost of not doing it is in
+> > VER.012's own `> Why`.
+
+> > **Why it is `MUST NOT` and not `REJECT`** — a `REJECT` owes a `DIAG`, and this refusal has none. It
+> > is refused where a palette is compiled, not where a document is
+> > decoded, because `variant` is a key of a palette *entry* and the retired-key pre-pass reads a
+> > document's top level. That is exactly where and why `torch` and `light` are refused, and this rule
+> > follows them rather than inventing a second mechanism. [DIAG.900](08-errors.md#1-what-a-diagnostic-must-contain)
+> > makes the catalogue a statement about an asset being loaded; bringing all three of these refusals
+> > into it is a coherent thing to want and is one piece of work, not three.
 
 > **VER.005** · `REJECT` (`DIAG.038`) `[NO-FIXTURE: a version 1 and a version 2 file]` — A format version is chosen per chain, not per file:
 > every link of one `extends` chain declares the same version. What that refuses, and what refusing it

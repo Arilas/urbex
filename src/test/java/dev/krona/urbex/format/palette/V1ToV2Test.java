@@ -1,5 +1,6 @@
 package dev.krona.urbex.format.palette;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -12,10 +13,8 @@ import dev.krona.urbex.worldgen.lost.cityassets.AssetIndex;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
-import dev.krona.urbex.worldgen.lost.cityassets.Variant;
 import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -427,9 +426,10 @@ class V1ToV2Test {
             }
         }
         assertEquals(List.of(), blocked, "the translation is total");
-        assertEquals(216, files,
-                "30 + 98 + 7 palettes and 12 + 58 + 11 variants; if a pack gained a file this "
-                        + "number moves and the claim above is about a corpus nobody counted");
+        assertEquals(204, files,
+                "30 + 98 + 7 palettes and 58 + 11 variants; the bundled pack's twelve went with the "
+                        + "registry (VER.017). If a pack gained a file this number moves and the claim "
+                        + "above is about a corpus nobody counted");
     }
 
     // ---- §5, what it will not do ---------------------------------------------------------------
@@ -589,16 +589,64 @@ class V1ToV2Test {
      * that this test cannot quietly grow a third.</p>
      */
     @Rule("VER.021")
+    /**
+     * The same version 1 document with every entry naming a {@code variant} removed ({@code VER.017}).
+     *
+     * <p>Needed because the version 1 side of a comparison can no longer compile one: there is no
+     * {@code variants} registry to resolve it against, and {@code Palette} refuses the key by name.
+     * Applied to <em>both</em> sides, so the two compilers are still handed the same document and the
+     * comparison keeps meaning what it says - stripping only the version 1 side would compare two
+     * different palettes and call them equal.</p>
+     *
+     * <p>What it costs is stated where it is used: a marker naming a variant is a marker neither format
+     * is asked about here. Nothing in these two tests is about such a marker, and the sweep in
+     * {@link #everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion} counts the palettes it
+     * skips for the same reason.</p>
+     */
+    private static String withoutVariantEntries(String document) {
+        JsonObject root = JsonParser.parseString(document).getAsJsonObject();
+        JsonArray kept = new JsonArray();
+        for (JsonElement element : root.getAsJsonArray("palette")) {
+            if (!element.getAsJsonObject().has("variant")) {
+                kept.add(element);
+            }
+        }
+        root.add("palette", kept);
+        return root.toString();
+    }
+
+    /** Whether any entry of this version 1 palette names a {@code variant} ({@code VER.017}). */
+    private static boolean namesAVariant(Path file) {
+        JsonElement palette = JsonParser.parseString(read(file)).getAsJsonObject().get("palette");
+        if (palette == null || !palette.isJsonArray()) {
+            return false;
+        }
+        for (JsonElement element : palette.getAsJsonArray()) {
+            if (element.isJsonObject() && element.getAsJsonObject().has("variant")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Test
     void everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion() {
         List<String> unexplained = new ArrayList<>();
         Map<String, String> absentBlockCases = new java.util.TreeMap<>();
+        int skipped = 0;
         int compared = 0;
         int markers = 0;
         for (String name : new TreeSet<>(VERSION_1_PACKS.keySet())) {
             Path pack = VERSION_1_PACKS.get(name);
             Fixture fixture = new Fixture(name, pack);
             for (Path file : V1ToV2.jsonUnder(pack.resolve("palettes"))) {
+                // VER.017: the version 1 side of a palette naming a variant no longer compiles, because
+                // there is no variants registry to resolve it against. Skipped and counted, so the
+                // exclusion is a number this test asserts rather than a silence.
+                if (namesAVariant(file)) {
+                    skipped++;
+                    continue;
+                }
                 compared++;
                 Map<Character, String> differences = fixture.compare(file);
                 markers += fixture.compiledVersion1(file).getCharacters().size();
@@ -618,27 +666,30 @@ class V1ToV2Test {
         }
         assertEquals(List.of(), unexplained,
                 "a converted palette answered differently for a reason nothing here accounts for");
-        assertEquals(105, compared, "98 + 7 shipped version 1 palettes were compared; the bundled "
+        assertEquals(26, skipped, "24 ModernTweaks palettes and 2 Zombie Apocalypse Essentials ones "
+                + "name a variant, and VER.017 leaves their version 1 side uncompilable; if this "
+                + "number grows the comparison has quietly stopped covering something");
+        assertEquals(79, compared, "105 shipped version 1 palettes less the 26 above; the bundled "
                 + "pack's thirty are version 2 since Task 10 and are measured by the digest windows");
-        assertEquals(474, markers,
-                "and every marker of each of them, so the twelve exceptions below are twelve out of "
-                        + "this and not twelve out of however many the comparison happened to reach. "
+        assertEquals(299, markers,
+                "and every marker of each of them, so the one exception below is one out of "
+                        + "this and not one out of however many the comparison happened to reach. "
                         + "It used to stop at the first differing marker of a file, which hid four "
                         + "more; it counted 663 over three packs until the bundled pack's 189 became "
-                        + "version 2");
-        assertEquals(List.of(
-                        "urbexza/bricks_building.json '#'",
-                        "urbexza/default.json '/'", "urbexza/default.json ':'",
-                        "urbexza/default.json '='", "urbexza/default.json 'B'",
-                        "urbexza/default.json '_'", "urbexza/default.json 'u'",
-                        "urbexza/default.json 'v'", "urbexza/default.json 'w'",
-                        "urbexza/default.json 'x'", "urbexza/default.json 'y'",
-                        "urbexza/stone_building.json '#'"),
+                        + "version 2, and 474 until VER.017 put the 26 variant-naming palettes and "
+                        + "their 175 markers out of reach");
+        assertEquals(List.of("urbexza/stone_building.json '#'"),
                 List.copyOf(absentBlockCases.keySet()),
                 () -> "the only markers that may differ are the ones whose own weighted list names an "
                         + "immersive_weathering block this JVM does not have, which is "
                         + "anAbsentBlockRedistributesDifferentlyInTheTwoFormats' case; they are named "
-                        + "marker by marker so a fourth cannot join them quietly: " + absentBlockCases);
+                        + "marker by marker so a second cannot join them quietly: " + absentBlockCases);
+
+        // Eleven of the twelve went out of reach with VER.017, not out of existence: one marker of
+        // bricks_building.json and ten of default.json, both of which name a variant and are now
+        // skipped whole. They are the reason the skip is counted above rather than left implicit -
+        // a comparison that loses eleven of its twelve known exceptions has lost coverage, and the
+        // only honest way to say so is a number that moves when it does.
     }
 
     /**
@@ -693,8 +744,11 @@ class V1ToV2Test {
         // assertion about a document only this file has: Modern Tweaks' own 'T'.
         Path modernTweaks = PACKS.get("urbexmt").resolve("palettes/common.json");
         Fixture mt = new Fixture("urbexmt", PACKS.get("urbexmt"));
-        assertEquals(mt.socketSlots(mt.compiledVersion1(modernTweaks), 'T'),
-                mt.socketSlots(mt.compiledVersion2(modernTweaks), 'T'));
+        // Minus its variant-naming markers, which VER.017 puts out of version 1's reach. 'T' is a
+        // socket and names none, so the assertion below is untouched by the removal.
+        String common = withoutVariantEntries(read(modernTweaks));
+        assertEquals(mt.socketSlots(mt.compiledVersion1(common, modernTweaks.toString()), 'T'),
+                mt.socketSlots(mt.compiledVersion2(common, modernTweaks.toString()), 'T'));
     }
 
     /**
@@ -800,8 +854,11 @@ class V1ToV2Test {
         Path file = pack.resolve("palettes/bricks_building.json");
         Fixture fixture = new Fixture("urbexza", pack);
 
-        CompiledPalette version2 = fixture.compiledVersion2(file);
-        CompiledPalette version1 = fixture.compiledVersion1(file);
+        // Minus '}', its one variant-naming marker (VER.017). 'X' is what this test is about, and it
+        // names a block directly.
+        String document = withoutVariantEntries(read(file));
+        CompiledPalette version2 = fixture.compiledVersion2(document, file.toString());
+        CompiledPalette version1 = fixture.compiledVersion1(document, file.toString());
         for (char marker : new TreeSet<>(version1.getCharacters())) {
             BlockState from = version1.getRepresentative(marker);
             if (from == null) {
@@ -824,27 +881,23 @@ class V1ToV2Test {
     /**
      * One pack, compiled both ways.
      *
-     * <p>Holds what the two compilers need that the palette file does not carry: the {@code variants}
-     * index a version 1 {@code variant} resolves against, the {@code definitions} index its converted
-     * {@code $ref} resolves against, and the set of {@code conditions} ids a {@code pool} is checked
-     * for. All three are read off the pack itself, so adding a palette to a pack needs no edit here.</p>
+     * <p>Holds what the two compilers need that the palette file does not carry: the {@code definitions}
+     * index a converted {@code $ref} resolves against, and the set of {@code conditions} ids a
+     * {@code pool} is checked for. Both are read off the pack itself, so adding a palette to a pack needs
+     * no edit here.</p>
+     *
+     * <p>It held a third thing until {@code VER.017}: the {@code variants} index a version 1
+     * {@code variant} resolved against. There is no such index now, so the version 1 side of a palette
+     * naming one cannot be compiled at all and those palettes are excluded from the comparison - counted
+     * where they are excluded, never dropped quietly.</p>
      */
     private static final class Fixture {
 
-        private final AssetIndex<Variant> variants;
         private final DefinitionIndex definitions;
         private final TraitContext traits;
         private final Exclusion.Presence presence;
 
         Fixture(String namespace, Path pack) {
-            Map<Identifier, Variant> compiled = new LinkedHashMap<>();
-            for (Path file : V1ToV2.jsonUnder(pack.resolve("variants"))) {
-                Identifier id = idOf(namespace, pack.resolve("variants"), file);
-                compiled.put(id, new Variant(id, BuiltInRegistries.BLOCK,
-                        List.of(decode(VariantDefinition.CODEC, read(file), file))));
-            }
-            this.variants = new AssetIndex<>("variants", compiled);
-
             Map<Identifier, DefinitionAssetDefinition> byId = new LinkedHashMap<>();
             for (Path file : V1ToV2.jsonUnder(pack.resolve("variants"))) {
                 byId.put(idOf(namespace, pack.resolve("variants"), file),
@@ -874,8 +927,9 @@ class V1ToV2Test {
          *
          * <p>Only weighted lists, because a single {@code block} naming an absent id is air in version 1
          * ({@code Tools.stringToState}) and air in version 2 ({@code MODEL.042}) and nothing is
-         * redistributed either way. A {@code variant} is followed into the pack's own variants
-         * directory, since a marker naming one inherits that list's absent blocks.</p>
+         * redistributed either way. A {@code variant} used to be followed into the pack's own
+         * {@code variants} directory; {@code VER.017} removed that registry and the sweep skips those
+         * palettes outright, so there is nothing left to follow.</p>
          */
         Set<Character> markersNamingAnAbsentBlock(Path pack, Path file) {
             Set<Character> markers = new java.util.LinkedHashSet<>();
@@ -885,15 +939,9 @@ class V1ToV2Test {
             }
             for (JsonElement element : palette.getAsJsonArray()) {
                 JsonObject entry = element.getAsJsonObject();
-                boolean absent = namesAnAbsentBlock(entry);
-                if (!absent && entry.has("variant")) {
-                    Path variant = pack.resolve("variants").resolve(
-                            entry.get("variant").getAsString().split(":", 2)[1] + ".json");
-                    absent = Files.exists(variant)
-                            && namesAnAbsentBlock(JsonParser.parseString(read(variant))
-                                    .getAsJsonObject());
-                }
-                if (absent) {
+                // No variant branch: a palette naming one is skipped by the sweep above (VER.017),
+                // so it never reaches this excuse and a branch for it would be unreachable.
+                if (namesAnAbsentBlock(entry)) {
                     markers.add(entry.get("char").getAsString().charAt(0));
                 }
             }
@@ -1030,7 +1078,7 @@ class V1ToV2Test {
          * to be stated here to keep being compared. {@code where} is what a diagnostic names.</p>
          */
         CompiledPalette compiledVersion1(String document, String where) {
-            return new CompiledPalette(new Palette(UNDER_TEST, BuiltInRegistries.BLOCK, variants,
+            return new CompiledPalette(new Palette(UNDER_TEST, BuiltInRegistries.BLOCK,
                     List.of(decode(PaletteDefinition.CODEC, document, Path.of(where)))));
         }
 

@@ -274,14 +274,14 @@ class ImportsTest {
      * <p>
      * Both halves, and the second is the one that changed. This asserted that {@code variants} was still
      * registered beside it, because {@code VER.004} promised version 1 would not change and version 1
-     * palettes reached their weighted lists through {@code variants}. {@code VER.033} retired that
-     * promise: {@code variants} is removed, and a version 1 palette naming one now fails by name rather
-     * than painting air. Asserted as an absence rather than deleted, because a registry is re-added by
+     * palettes reached their weighted lists through {@code variants}. {@code VER.017} removed the
+     * registry, and narrowed that promise to the keys it is actually kept for: a version 1 palette
+     * naming a variant now fails by name rather than painting air. Asserted as an absence rather than deleted, because a registry is re-added by
      * one line and nothing else in the suite would notice.
      */
     @Test
     @Rule("REF.010")
-    @Rule("VER.033")
+    @Rule("VER.017")
     void theDefinitionsRegistryIsRegisteredAndVariantsIsNot() {
         assertEquals(Identifier.fromNamespaceAndPath("urbex", "definitions"),
                 CustomRegistries.DEFINITIONS_REGISTRY_KEY.identifier());
@@ -290,7 +290,7 @@ class ImportsTest {
                 "a pointer's 'definitions' prefix and the registry key must be the same id");
         assertTrue(TestRegistries.keys().stream()
                         .noneMatch(key -> key.identifier().getPath().equals("variants")),
-                () -> "the variants registry is removed (VER.033), and these are registered: "
+                () -> "the variants registry is removed (VER.017), and these are registered: "
                         + TestRegistries.keys());
     }
 

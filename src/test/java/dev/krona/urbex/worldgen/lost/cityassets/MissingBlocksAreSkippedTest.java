@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
@@ -46,27 +45,11 @@ class MissingBlocksAreSkippedTest {
 
     private static final String ABSENT = "somemod:no_such_block";
     private static final Identifier PALETTE_ID = Identifier.fromNamespaceAndPath("urbex", "test_palette");
-    private static final Identifier VARIANT_ID = Identifier.fromNamespaceAndPath("urbex", "test_variant");
 
     @BeforeAll
     static void bootstrap() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
-    }
-
-    @Test
-    void aVariantKeepsTheBlocksThisGameHas() {
-        Variant variant = new Variant(VARIANT_ID, BuiltInRegistries.BLOCK, List.of(variantOf(
-                new BlockEntry(3, "minecraft:mossy_cobblestone"),
-                new BlockEntry(1, ABSENT),
-                new BlockEntry(2, "minecraft:stone"))));
-
-        assertEquals(List.of(
-                        Pair.of(3, Blocks.MOSSY_COBBLESTONE.defaultBlockState()),
-                        Pair.of(2, Blocks.STONE.defaultBlockState())),
-                variant.getBlocks(),
-                "the absent entry is gone and the survivors keep their authored weights - the "
-                        + "draw is over their total, so they have absorbed its share");
     }
 
     @Test
@@ -105,21 +88,6 @@ class MissingBlocksAreSkippedTest {
         assertSame(Blocks.AIR.defaultBlockState(), entry.blocks());
     }
 
-    /** A variant whose every block is absent reaches the palette as an empty list, not as a crash. */
-    @Test
-    void aVariantWithNothingLeftReachesThePaletteAsAir() {
-        Variant emptied = new Variant(VARIANT_ID, BuiltInRegistries.BLOCK,
-                List.of(variantOf(new BlockEntry(1, ABSENT))));
-        assertTrue(emptied.getBlocks().isEmpty());
-
-        AssetIndex<Variant> variants = new AssetIndex<>("urbex:variants",
-                Map.of(Identifier.fromNamespaceAndPath("urbex", "gone"), emptied));
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, variants, List.of(paletteOf(
-                namingVariant('v', "urbex:gone"))));
-
-        assertSame(Blocks.AIR.defaultBlockState(), palette.getPalette().get('v').blocks());
-    }
-
     /**
      * A single {@code block} has no list to fall back on, so it is air — as it always was, except
      * that the property-carrying form used to throw instead.
@@ -152,10 +120,6 @@ class MissingBlocksAreSkippedTest {
         return (Pair<Integer, BlockState>[]) entry.blocks();
     }
 
-    private static VariantDefinition variantOf(BlockEntry... blocks) {
-        return new VariantDefinition(Optional.empty(), Optional.of(new Mergeable<>(true, List.of(blocks))));
-    }
-
     private static PaletteDefinition paletteOf(PaletteEntry... entries) {
         return new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries)));
     }
@@ -178,9 +142,4 @@ class MissingBlocksAreSkippedTest {
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
-    private static PaletteEntry namingVariant(char marker, String variant) {
-        return new PaletteEntry(Character.toString(marker), Optional.empty(),
-                Optional.of(variant), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-    }
 }

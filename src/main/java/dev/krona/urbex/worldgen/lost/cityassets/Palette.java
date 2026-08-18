@@ -369,7 +369,8 @@ public class Palette {
     }
 
     /**
-     * A version 1 entry naming {@code variant} is refused, because the {@code variants} registry is gone.
+     * {@code VER.017}: a version 1 entry naming {@code variant} is refused, because the {@code variants}
+     * registry is gone.
      * <p>
      * Refused here rather than dropped from {@link PaletteEntry}'s codec, for the reason
      * {@link #rejectRemovedLightSpellings} exists: a key a version 1 palette does not know is a key it
