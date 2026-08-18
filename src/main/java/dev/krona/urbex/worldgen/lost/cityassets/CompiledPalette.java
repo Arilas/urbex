@@ -396,6 +396,24 @@ public class CompiledPalette {
      * collapse to the last one compiled — and it gets that rather than nothing at all, which is what it
      * had before this method existed. The rule carries a {@code [NOT-YET-REACHED]} marker naming
      * issue #216, which is the per-position marker record that would fix it.</p>
+     *
+     * <p><b>An {@code into} that resolved to air records nothing, which is {@code TRAIT.012}.</b> That
+     * rule says an {@code into} "naming a block this game does not have leaves the marker undamaged, and
+     * the load succeeds" — and by {@code MODEL.042} an absent id resolves to air, so without this the
+     * mapping said the marker damages into <em>nothing</em>. The damage pass would then delete the
+     * block, which is the claim version 1 refused to make in so many words: {@code Palette.compile}
+     * skips an unresolvable {@code damaged} because "air would say 'damaging this block deletes it',
+     * which is a claim the author did not make (issue #91)". Zombie Apocalypse Essentials has seven
+     * markers naming {@code immersive_weathering:exposed_iron_bars}, and on a vanilla install every one
+     * of them was deleting the block it damaged.</p>
+     *
+     * <p><b>What this cannot distinguish, said plainly.</b> A file writing {@code "into":
+     * "minecraft:air"} deliberately is the same compiled state as an absent id, because MODEL.042 has
+     * already turned one into the other, and telling them apart needs the block string — which lives in
+     * the resolved node and not in the compiled slot. Version 1 <em>could</em> tell them apart and
+     * honoured the deliberate one. No file in the three measured packs writes it: the eight distinct
+     * {@code damaged} values across 335 uses are all real blocks or absent mod blocks, none is air. If
+     * one is ever wanted, the discriminator belongs where the string still exists, not here.</p>
      */
     private void recordDamage(CompiledEntry entry) {
         for (int slot = 0; slot < entry.slotCount(); slot++) {
@@ -405,7 +423,7 @@ public class CompiledPalette {
                 continue;
             }
             CompiledEntry into = damaged.satellite(Damaged.INTO);
-            if (into != null && into.slotCount() > 0) {
+            if (into != null && into.slotCount() > 0 && !into.slot(0).state().isAir()) {
                 damagedToBlock.put(resolved.state(), into.slot(0).state());
             }
         }

@@ -23,7 +23,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (33):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.032`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (32):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `CHAR.020`, `CHAR.021`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.041`
 
 **Rules marked `[NO-FIXTURE]` (15), which must each be covered by a citing test:**
 
@@ -45,7 +45,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.007` | a part and its ancestor, each with an inline palette |
 | `VER.013` | a palette and a conditions asset |
 
-**Tests:** 211 of 314 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 213 of 314 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -112,7 +112,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.009` | `MUST` |  | `accept` | `NodeResolverTest.aSatellitesNodeIsResolvedAndIsStillNotAnAlternativeOfItsOwner` |
 | `TRAIT.010` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
 | `TRAIT.011` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms`, `V1ToV2Test.damagedConvertsToItsVersion2SpellingEvenThoughTheDamagePassCannotYetKeyItByMarker` |
-| `TRAIT.012` | `ACCEPT` |  | `accept` | — |
+| `TRAIT.012` | `ACCEPT` |  | `accept` | `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt` |
 | `TRAIT.020` | `MUST` |  |  | `TraitTest.theConditionsRegistryTheTraitsNameIsTheOneTheModRegisters` |
 | `TRAIT.021` | `REJECT` | `DIAG.021` | `reject=DIAG.021` | — |
 | `TRAIT.022` | `MUST` |  |  | `TraitTest.aTraitsReferenceIsCheckedThroughItsOwnDeclaration` |
@@ -262,15 +262,15 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.040` | `MUST` |  |  | `ApportionTest.aWeightedNodeCompilesToExactlyOneHundredAndTwentyEightSlots`, `V2SocketsTest.candidateWeightsAreTheApportionedSlotCountsAndNotTheAuthoredWeights` |
 | `WEIGHT.041` | `MUST` |  |  | `ApportionTest.twoMarkersPlaceTheirMinorityChoicesAtDifferentOffsets` |
 | `WEIGHT.042` | `INVARIANT` |  |  | `ApportionTest.selectionIsAddressedSoResolutionOrderCannotChangeIt`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
-| `WEIGHT.043` | `MUST` |  | *n/a* | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `LightPoolTest.compileRejectsACandidateTheApportionmentLeavesNoSlotForNamingIt`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
+| `WEIGHT.043` | `MUST` |  | *n/a* | `ApportionTest.aSocketPlacementListIsSelectedByTheSameRulesAtTheSamePosition`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `OptionalLightPlacerTest.anEarlierOpportunityCannotChangeWhichCandidateALaterOneTakes` |
 | `WEIGHT.050` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
 | `WEIGHT.051` | `MUST` |  |  | `ApportionTest.aNestedNodeContributesItsOwnDistributionScaledByItsShareOfItsParent` |
 | `WEIGHT.052` | `MUST` |  |  | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint`, `CompiledV2PaletteTest.aShareNoDecimalCanHoldIsPrintedAsTheRationalItIs` |
 | `WEIGHT.053` | `INVARIANT` |  |  | `ApportionTest.aNestedTreesDistributionEqualsItsFlattenedEquivalentsToWithinOneSlot` |
 | `WEIGHT.060` | `MUST` |  |  | `ApportionTest.slotsGoByLargestRemainderWithTiesToTheLowestIndexAndNoneLeftOver` |
 | `WEIGHT.061` | `INVARIANT` |  |  | `ApportionTest.slotsGoByLargestRemainderWithTiesToTheLowestIndexAndNoneLeftOver` |
-| `WEIGHT.062` | `MUST` |  |  | `ApportionTest.aChoiceRoundingBelowOneSlotStillGetsOneAndTheDeficitComesFromTheLargest` |
-| `WEIGHT.063` | `REJECT` | `DIAG.044` | *n/a* | `ApportionTest.moreAlternativesThanSlotsIsRefusedBecauseEveryOneOfThemIsOwedASlot`, `ApportionTest.apportioningNoSharesOrMoreThanThereAreSlotsIsACallersMistakeAndSaysSo` |
+| `WEIGHT.062` | `MUST` |  |  | `ApportionTest.aChoiceRoundingBelowOneSlotStillGetsOneAndTheDeficitComesFromTheLargest`, `LightPoolTest.aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears` |
+| `WEIGHT.063` | `REJECT` | `DIAG.044` | *n/a* | `ApportionTest.moreAlternativesThanSlotsIsRefusedBecauseEveryOneOfThemIsOwedASlot`, `ApportionTest.apportioningNoSharesOrMoreThanThereAreSlotsIsACallersMistakeAndSaysSo`, `LightPoolTest.aVersion1SocketWithMoreCandidatesThanSlotsStillLoads` |
 | `WEIGHT.064` | `MUST` |  |  | `ApportionTest.shufflingAListsDeclarationOrderDoesNotChangeItsDistribution` |
 
 ### `palette/06-characters.md`
@@ -391,7 +391,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.001` | `MUST` |  |  | `VersionDispatchTest.aFileWithNoVersionIsReadAsVersionOne` |
 | `VER.002` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `VersionDispatchTest.versionTwoSelectsTheVersionTwoRulesInFull` |
 | `VER.003` | `MUST` |  |  | `VersionDispatchTest.aVersionTwoDocumentIsNeverHandedToTheVersionOneCodec` |
-| `VER.004` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt` |
+| `VER.004` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsStillIs`, `VersionDispatchTest.versionOneStillIgnoresAnUnknownKeyRatherThanRefusingIt`, `LightPoolTest.aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears`, `LightPoolTest.aVersion1SocketWithMoreCandidatesThanSlotsStillLoads` |
 | `VER.005` | `REJECT` | `DIAG.038` | *n/a* | `RegistryChainResolutionTest.aPaletteChainMayNotCrossFormatVersions` |
 | `VER.006` | `ACCEPT` |  | *n/a* | `PaletteCharacterCheckTest.aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays` |
 | `VER.007` | `REJECT` | `DIAG.065` | *n/a* | `VersionDispatchTest.inlinePalettesAlongOneOwnersChainAreAllOfOneVersionInEitherDirection` |
@@ -402,12 +402,12 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.011` | `REJECT` | `DIAG.061` | `reject=DIAG.061` | `PaletteV2DecodeTest.aDeletedVersionOneKeyIsRefusedSayingWhatToWriteInstead` |
 | `VER.012` | `MUST NOT` |  |  | `PaletteV2DecodeTest.noRetiredKeyIsSilentlyAcceptedOrSilentlyIgnored` |
 | `VER.020` | `MUST` |  |  | — |
-| `VER.021` | `MUST` |  |  | `V1ToV2Test.everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats` |
-| `VER.022` | `MUST` |  |  | `V1ToV2Test.aKeyVersion1NeverReadIsNamedAndRefusedRatherThanGuessedAt` |
+| `VER.021` | `MUST` |  |  | `V1ToV2Test.everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats`, `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt` |
+| `VER.022` | `MUST` |  |  | `V1ToV2Test.aKeyVersion1NeverReadIsNamedAndRefusedRatherThanGuessedAt`, `V1ToV2Test.aWeightedReplacementOnASocketIsRefusedRatherThanQuietlyCollapsed`, `V1ToV2Test.aMergeableBlocksObjectConvertsWhenItReplacesAndIsNamedWhenItAppends`, `V1ToV2Test.aKeyNoVersion1VariantHasIsRefusedRatherThanAccepted` |
 | `VER.023` | `MUST` |  |  | `V1ToV2Test.convertingAVersion2FileReturnsItByteForByteUnchanged` |
 | `VER.030` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined` |
 | `VER.031` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined` |
-| `VER.032` | `MUST` |  |  | — |
+| `VER.032` | `MUST` |  |  | `V1ToV2Test.everyDeclinedOpportunityStatesTheRuleItWasCountedBy` |
 | `VER.040` | `MUST` |  |  | `VersionDispatchTest.theVersionMechanismIsRegistryAgnostic` |
 | `VER.041` | `MUST` |  |  | — |
 | `VER.016` | `RETIRED` |  |  | — |

@@ -199,11 +199,17 @@ The retired set, and what each becomes:
 > > ([WEIGHT.030](05-weights.md#4-absent-blocks) has always been version 1's leniency too), while
 > > version 2 drops it and divides its share among the survivors in proportion to theirs. Given the slot
 > > counts §2's table emits, `32, 32, 1000` with the middle block absent is `32, 96` in version 1 and
-> > `43, 85` in version 2. Three of the 135 shipped palettes reach this — all in Zombie Apocalypse
-> > Essentials, all naming `immersive_weathering` blocks — and on the installation that pack is written
-> > for they do not. This is a real behavioural difference between the formats rather than a defect in
-> > the converter, and it is written here so the next reader finds it in the rule rather than in a
-> > chunk.
+> > `43, 85` in version 2. Twelve markers of the 663 in the 135 shipped palettes reach this — all in
+> > Zombie Apocalypse Essentials, all naming `immersive_weathering` blocks — and on the installation
+> > that pack is written for they do not. This is a real behavioural difference between the formats
+> > rather than a defect in the converter, and it is written here so the next reader finds it in the
+> > rule rather than in a chunk.
+
+> > **The exception is per marker, and the granularity is load-bearing.** Stated per *file* it excuses
+> > every marker of a palette because one of them names an absent block, which is a blanket pass over
+> > 40 markers to cover one. It was written that way first, and the nine additional instances it was
+> > hiding — and one unrelated defect, [TRAIT.012](01-traits.md#41-urbexdamaged)'s — surfaced the moment
+> > it was tightened.
 
 > > **Why a `light_socket` used to be an exception and is not** — [WEIGHT.043](05-weights.md#5-selection)
 > > was stated and unimplemented: version 1 drew a socket candidate on a sequential ticket below the

@@ -8,6 +8,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -71,6 +72,16 @@ public final class V1ToV2 {
             "blocks", "damaged", "mob", "loot", "torch", "light", "lightSource", "tag");
 
     private static final Set<String> BLOCKS_KEYS = Set.of("random", "block");
+
+    /**
+     * {@code VariantDefinition}'s codec, which is all a version 1 {@code variants} asset may carry.
+     *
+     * <p>This named {@code append} until a review looked it up. No version 1 registry has such a key:
+     * appending is opted into by {@code "replace": false} <em>inside</em> the list
+     * ({@code Mergeable}), so the tool was accepting a key that means nothing and would have dropped
+     * it silently — which is precisely the failure {@code VER.022} exists to stop.</p>
+     */
+    private static final Set<String> VARIANT_KEYS = Set.of("extends", "blocks");
 
     private static final Set<String> LIGHT_SOURCE_KEYS =
             Set.of("floor", "wall", "ceiling", "free", "unlit", "unlitBlocks");
@@ -217,14 +228,66 @@ public final class V1ToV2 {
         // REF.019: a definitions asset declares "version": 2. An absent version is refused there
         // rather than read as version 1, because the registry has no version 1 form.
         out.addProperty("version", 2);
-        unreadKeys(v1, Set.of("extends", "blocks", "append"), findings, asset, "", "a variant");
+        unreadKeys(v1, VARIANT_KEYS, findings, asset, "", "a variant");
         if (v1.has("extends")) {
             out.add("extends", v1.get("extends"));
         }
         if (v1.has("blocks")) {
-            weighted(v1.getAsJsonArray("blocks"), out, findings, asset, "");
+            JsonArray blocks = mergeableList(v1.get("blocks"), findings, asset, "", "blocks");
+            if (blocks != null) {
+                weighted(blocks, out, findings, asset, "");
+            }
         }
-        return new Converted(write(out), findings);
+        String json = write(out);
+        checkDefinitionDecodes(json, findings, asset);
+        return new Converted(json, findings);
+    }
+
+    /**
+     * A version 1 {@code Mergeable} list, which is a bare array or an object opting into appending.
+     *
+     * <p>{@code Mergeable} accepts {@code {"replace": false, "values": [ … ]}} beside the bare array,
+     * mirroring vanilla tag files, and a variant's {@code blocks} is one. Reading it as an array is what
+     * this tool did until a review reproduced the {@code ClassCastException} — from a legal version 1
+     * file, naming nothing.</p>
+     *
+     * <p>The two forms translate differently, and only one of them translates at all. {@code replace}
+     * defaults to true, and a replacing list is a list: it is read out of {@code values} and converted
+     * like any other. An <em>appending</em> one says "add these to whatever my ancestor declared", which
+     * version 2 spells as a {@code $spread} of {@code $super} into the inherited
+     * {@code choices} — and the emitted weights would have to be apportioned over the combined list,
+     * which this tool cannot see. {@code VER.022} is exactly that case: name it, and stop.</p>
+     *
+     * @return the list to convert, or null when a finding was raised instead
+     */
+    private static JsonArray mergeableList(JsonElement written, List<Finding> findings, String asset,
+                                           String marker, String key) {
+        if (written.isJsonArray()) {
+            return written.getAsJsonArray();
+        }
+        if (!written.isJsonObject()) {
+            findings.add(new Finding(Severity.BLOCKER, "VER.022", asset, marker,
+                    "'" + key + "' is neither a list nor a '{\"replace\": …, \"values\": […]}' "
+                            + "object, so nothing here can read it."));
+            return null;
+        }
+        JsonObject object = written.getAsJsonObject();
+        unreadKeys(object, Set.of("replace", "values"), findings, asset, marker, "a mergeable list");
+        if (object.has("replace") && !object.get("replace").getAsBoolean()) {
+            findings.add(new Finding(Severity.BLOCKER, "VER.022", asset, marker,
+                    "'" + key + "' declares \"replace\": false, which appends to the list this asset's "
+                            + "'extends' ancestor declared. Version 2 spells that '$spread' of "
+                            + "'$super', and the weights of the combined list are not the weights of "
+                            + "this one - so this conversion will not guess at them. Write the whole "
+                            + "list here, or convert the chain by hand."));
+            return null;
+        }
+        if (!object.has("values")) {
+            findings.add(new Finding(Severity.BLOCKER, "VER.022", asset, marker,
+                    "'" + key + "' is an object with no 'values', which version 1 refuses at decode."));
+            return null;
+        }
+        return object.getAsJsonArray("values");
     }
 
     /** {@code VER.003}: the version is read off the raw document, before anything decodes it. */
@@ -480,14 +543,19 @@ public final class V1ToV2 {
         if (settings.has("unlit")) {
             light.addProperty("unlit", settings.get("unlit").getAsString());
         } else {
-            JsonObject unlit = new JsonObject();
-            weighted(settings.getAsJsonArray("unlitBlocks"), unlit, findings, asset, marker);
-            light.add("unlit", unlit);
-            findings.add(new Finding(Severity.WARNING, "VER.021", asset, marker,
+            // A blocker, not a warning, and the severity is the whole point. Version 1 draws a
+            // socket's own replacement per position (LightSource.unlitAt over a BlockChoice.Weighted);
+            // version 2 gives a socket one replacement state, its first alternative
+            // (V2Sockets.unlitOf), because LightPool.Candidate holds one and the placer writes it at a
+            // position the palette never addressed. Emitting the weighted list anyway is a guess about
+            // which of the two the author wanted, and VER.022 says exit non-zero rather than guess -
+            // exiting 0 on a pack whose generation this tool knows it changed is the silence the whole
+            // format version exists to remove. No shipped socket declares one.
+            findings.add(new Finding(Severity.BLOCKER, "VER.022", asset, marker,
                     "gives a light_socket a weighted 'unlitBlocks'. Version 1 draws that replacement "
-                            + "per position; version 2 gives a socket one replacement state, its "
-                            + "first alternative (V2Sockets.unlitOf). Name a single block to keep the "
-                            + "behaviour. No shipped socket declares one."));
+                            + "per position and version 2 gives a socket a single replacement state, "
+                            + "so no translation of this keeps the world it generates. Name one block "
+                            + "under 'unlit', or move the weighted replacement onto each candidate."));
         }
         traits.add("urbex:light", light);
         node.add("traits", traits);
@@ -660,6 +728,22 @@ public final class V1ToV2 {
                                 + "converter rather than in the pack: " + error.message())));
     }
 
+    /**
+     * Decodes a converted definitions asset, for the reason {@link #checkOutputDecodes} gives.
+     *
+     * <p>It went unchecked while palettes were checked, which is the asymmetry a review found: a
+     * definitions asset goes through a different codec with its own file-level key set
+     * ({@code REF.014}, {@code REF.018}, {@code REF.019}), so nothing a palette's check runs proves
+     * anything about one.</p>
+     */
+    private static void checkDefinitionDecodes(String json, List<Finding> findings, String asset) {
+        DefinitionAssetDefinition.CODEC
+                .parse(com.mojang.serialization.JsonOps.INSTANCE, JsonParser.parseString(json))
+                .ifError(error -> findings.add(new Finding(Severity.BLOCKER, "VER.008", asset, "",
+                        "the converted definitions asset does not decode, which is a defect in this "
+                                + "converter rather than in the pack: " + error.message())));
+    }
+
     private static String write(JsonObject document) {
         return GSON.toJson(document) + "\n";
     }
@@ -687,7 +771,18 @@ public final class V1ToV2 {
     public record Survey(Map<String, Integer> damagedValues, int inlineEntries, int distinctInline,
                          int rotationFamilies, int markersInFamilies) {
 
-        /** The report {@code VER.031} owes, one line per opportunity, with its measured size. */
+        /**
+         * The report {@code VER.031} owes, one line per opportunity: its measured size, and — by
+         * {@code VER.032} — the rule that size was counted by.
+         *
+         * <p><b>The counting rule is printed, not left in this file's javadoc.</b> That is
+         * {@code VER.032} obeyed by the tool that occasioned it. The rule exists because
+         * {@code 09-migration.md} carried "152 markers in 54 families" from a research pass whose
+         * grouping was never written down and which no reading of "differing only by a directional
+         * property" reproduces; a report that repeated that phrasing and kept its own definition in Java
+         * would leave the next reader exactly where that figure left this one. Each line therefore says
+         * <em>counted as</em>, in terms a reader can re-run against the files.</p>
+         */
         public List<String> describe() {
             List<String> lines = new ArrayList<>();
             int damagedUses = damagedValues.values().stream().mapToInt(Integer::intValue).sum();
@@ -696,16 +791,22 @@ public final class V1ToV2 {
                     + damagedValues.entrySet().stream()
                             .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                             .limit(3).map(e -> e.getKey() + " x" + e.getValue()).toList()
-                    + " — one partial definition in $defs would replace every one of them (REF.020).");
+                    + ". Counted as: every 'damaged' value written on any palette entry in this pack,"
+                    + " registered or inline, grouped by the exact string."
+                    + " One partial definition in $defs would replace every one of them (REF.020).");
             lines.add("declined VER.030 inline palette entries: " + inlineEntries + " written in "
                     + "parts and buildings, " + distinctInline + " of them distinct, so "
                     + (inlineEntries - distinctInline) + " are repetitions of an entry already "
-                    + "written elsewhere. A shared palette, or one definition per repeated entry, "
-                    + "would replace them.");
+                    + "written elsewhere. Counted as: every element of a 'palette' list outside the "
+                    + "palettes registry, distinct by the entry's whole JSON text with its keys in "
+                    + "file order. A shared palette, or one definition per repeated entry, would "
+                    + "replace them.");
             lines.add("declined VER.030 rotation families: " + markersInFamilies + " markers in "
-                    + rotationFamilies + " families differing only by a directional property. "
-                    + "TRAIT.071 makes a node rotatable by default, so one marker plus the part's "
-                    + "own rotation may be all of them.");
+                    + rotationFamilies + " families. Counted as: within one file, palette entries "
+                    + "grouped by their whole JSON text minus the 'char' key and with the value of "
+                    + "every property in " + DIRECTIONAL_PROPERTIES + " erased, keeping the groups "
+                    + "holding more than one marker. TRAIT.071 makes a node rotatable by default, so "
+                    + "one marker plus the part's own rotation may be all of them.");
             return lines;
         }
     }
@@ -773,8 +874,11 @@ public final class V1ToV2 {
     }
 
     /** The block properties a part's own rotation and mirroring already move, by {@code TRAIT.070}. */
+    private static final List<String> DIRECTIONAL_PROPERTIES = List.of(
+            "facing", "axis", "rotation", "shape", "half", "hanging", "face", "orientation");
+
     private static final java.util.regex.Pattern DIRECTIONAL = java.util.regex.Pattern.compile(
-            "\\b(facing|axis|rotation|shape|half|hanging|face|orientation)=[a-z_0-9]+");
+            "\\b(" + String.join("|", DIRECTIONAL_PROPERTIES) + ")=[a-z_0-9]+");
 
     /**
      * Groups an entry with the others in its file that differ from it only by a directional property.

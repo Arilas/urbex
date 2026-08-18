@@ -170,6 +170,22 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.012** · `ACCEPT` — An `into` naming a block this game does not have leaves the marker
 > undamaged, and the load succeeds.
 
+> > **Undamaged, and specifically not damaged into air.** [MODEL.042](00-model.md#41-block) resolves an
+> > absent id to air, so a satellite that simply carries its resolved state through says the marker
+> > damages into *nothing* — and the damage pass then deletes the block. Version 1 refuses that in so
+> > many words: it skips an unresolvable `damaged` because "air would say 'damaging this block deletes
+> > it', which is a claim the author did not make". This rule was written and then read as satisfied by
+> > MODEL.042 alone; it was not, and seven markers of Zombie Apocalypse Essentials naming
+> > `immersive_weathering:exposed_iron_bars` were deleting the blocks they damaged on any install
+> > without that mod.
+
+> > **What no compiled form can tell apart.** A file writing `"into": "minecraft:air"` deliberately is
+> > the same compiled state as an absent id, because MODEL.042 has already turned one into the other, so
+> > a check made after compilation honours neither. Version 1 could tell them apart and honoured the
+> > deliberate one. No file in the three measured packs writes it — the eight distinct `damaged` values
+> > across 335 uses are all real or absent mod blocks. If one is ever wanted, the discriminator belongs
+> > where the block string still exists, before the state is resolved.
+
 ```json fixture:TRAIT.012 accept
 {
   "version": 2,

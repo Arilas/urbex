@@ -1,5 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.format.palette.Apportion;
+import dev.krona.urbex.format.palette.Fraction;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
@@ -59,34 +61,36 @@ public final class LightPool {
     /**
      * One placement list's candidates, expanded to one slot index per slot.
      *
-     * <p>Through {@link CompiledPalette#distributeSlots}, which is the function a weighted marker and a
-     * weighted unlit replacement already use, rather than a second apportionment beside them —
-     * {@code docs/format/README.md} §1 is entirely about what a second copy of a rule costs.</p>
+     * <p>Through {@link Apportion#slots}, which is the function a {@code weighted} node's own choices go
+     * through — {@code WEIGHT.060} to {@code WEIGHT.062}, largest remainder with ties to declaration
+     * order and every alternative guaranteed a slot. {@code WEIGHT.043} says "selected by the same
+     * rules", and this is what the same rules are; a second apportionment beside it is the drift
+     * {@code docs/format/README.md} §1 is entirely about.</p>
      *
      * <p><b>It is the identity on a version 2 pool, which is what makes conversion lossless.</b> A
      * version 2 socket arrives with its placement list already apportioned to 128 slots and
-     * {@code V2Sockets} counting them back into weights, so those weights total 128 and
-     * {@code distributeSlots} hands them straight back. A version 1 pool arrives with the weights the
-     * file wrote, which in every shipped socket total ten or fewer, so it takes the same
-     * largest-remainder branch version 2's {@code Apportion} takes and reaches the same numbers: the
-     * bundled pack's {@code 6, 3, 1} floor list becomes {@code 77, 38, 13} either way. The two formats
-     * therefore place the same light at the same position, which is the whole of {@code VER.021} for a
-     * socket and was false before this.</p>
+     * {@code V2Sockets} counting them back into weights, so those shares are exact 128ths and come back
+     * unchanged. A version 1 pool arrives with the weights the file wrote, and reaches the same numbers:
+     * the bundled pack's {@code 6, 3, 1} floor list becomes {@code 77, 38, 13} either way, and its
+     * {@code 8, 2} wall list {@code 102, 26}. The two formats therefore place the same light at the same
+     * position, which is the whole of {@code VER.021} for a socket and was false before this.</p>
      *
-     * <p>The one input on which the two branches disagree is a version 1 pool whose authored weights
-     * total more than 128: {@code distributeSlots} clips there rather than scaling down, so a candidate
-     * past the boundary would never win. No socket in the measured corpus is near it — the largest total
-     * is ten — and no converted file can produce one.</p>
+     * <p><b>Why not {@code CompiledPalette.distributeSlots}, which this used first.</b> That function
+     * reads a version 1 weight as an absolute slot count and <em>clips</em> a list totalling more than
+     * 128, so {@code [1000, 1]} became {@code [128, 0]} and the second candidate could never be placed.
+     * A version 1 socket weight was never a slot count — it was a ticket share, and {@code [1000, 1]}
+     * placed its second candidate one time in a thousand. Clipping silently deleted it, and the guard
+     * added to notice that refused the world instead, which is
+     * {@link dev.krona.urbex.format.palette.V1ToV2 VER.004}'s "version 1 does not become stricter"
+     * broken retroactively on packs that load today. {@code Apportion} gives it one slot of 128 by
+     * {@code WEIGHT.062} — rarer than it was, because a socket has 128 slots and not 1001, and present,
+     * which is the property that matters.</p>
      */
     private static int[] slotsOf(List<Candidate> group) {
         if (group.isEmpty()) {
             return new int[0];
         }
-        int[] weights = new int[group.size()];
-        for (int i = 0; i < group.size(); i++) {
-            weights[i] = group.get(i).weight();
-        }
-        int[] perCandidate = CompiledPalette.distributeSlots(weights, CompiledPalette.SLOTS);
+        int[] perCandidate = apportion(group);
         int[] owner = new int[CompiledPalette.SLOTS];
         int slot = 0;
         for (int i = 0; i < perCandidate.length; i++) {
@@ -94,7 +98,49 @@ public final class LightPool {
                 owner[slot++] = i;
             }
         }
+        // Only reachable through the WEIGHT.062-less branch below, where the slots past the budget
+        // belong to nobody. Candidate 0 is the file's first, which is what a socket falls back to
+        // everywhere else it has to name one (LightPool.representative).
+        while (slot < owner.length) {
+            owner[slot++] = 0;
+        }
         return owner;
+    }
+
+    /**
+     * How many of the 128 slots each candidate takes.
+     *
+     * <p>The long branch is {@code WEIGHT.063}'s condition arriving in a registry that has no rule
+     * against it. {@code Apportion.slots} has a precondition of at most one share per slot, because past
+     * that {@code WEIGHT.062} cannot be satisfied — version 2 refuses such a node at load with
+     * {@code DIAG.044}, and version 1 has no such rule and must not grow one ({@code VER.004}). So a
+     * placement list of more than 128 candidates is apportioned without the every-candidate-gets-one
+     * guarantee rather than refused: the ones past the budget get no slot, which is what a ticket share
+     * below 1/128 amounted to anyway. The largest authored list in the measured corpus holds four.</p>
+     */
+    private static int[] apportion(List<Candidate> group) {
+        long total = 0;
+        for (Candidate candidate : group) {
+            total += candidate.weight();
+        }
+        List<Fraction> shares = new ArrayList<>(group.size());
+        for (Candidate candidate : group) {
+            shares.add(Fraction.of(candidate.weight(), total));
+        }
+        if (group.size() <= CompiledPalette.SLOTS) {
+            return Apportion.slots(shares, CompiledPalette.SLOTS);
+        }
+        int[] slots = new int[group.size()];
+        int assigned = 0;
+        for (int i = 0; i < group.size(); i++) {
+            slots[i] = (int) (group.get(i).weight() * (long) CompiledPalette.SLOTS / total);
+            assigned += slots[i];
+        }
+        for (int i = 0; i < slots.length && assigned < CompiledPalette.SLOTS; i++) {
+            slots[i]++;
+            assigned++;
+        }
+        return slots;
     }
 
     /**
@@ -205,7 +251,6 @@ public final class LightPool {
                                      Map<Placement, List<Candidate>> candidates,
                                      boolean[] dropped) {
         List<Candidate> compiled = new ArrayList<>(entries.size());
-        List<String> written = new ArrayList<>(entries.size());
         for (int candidateIndex = 0; candidateIndex < entries.size(); candidateIndex++) {
             LightSourceSettings.Entry entry = entries.get(candidateIndex);
             if (entry.weight() <= 0) {
@@ -253,46 +298,8 @@ public final class LightPool {
                 }
             }
             compiled.add(new Candidate(entry.weight(), state, unlit));
-            written.add(entry.block());
         }
-        requireEveryCandidateGetsASlot(paletteId, marker, placement, compiled, written);
         candidates.put(placement, List.copyOf(compiled));
-    }
-
-    /**
-     * Refuses a placement list one of whose candidates the apportionment gives no slot at all.
-     *
-     * <p>This replaces an overflow guard, and it refuses strictly more. The old check summed the
-     * authored weights with {@code Math.addExact} and reported the one input that broke it - a list
-     * totalling more than {@code Integer.MAX_VALUE} - while {@code [1000, 1]} passed and placed the
-     * second candidate one time in a thousand. {@code WEIGHT.043}'s apportionment sums into a
-     * {@code long}, so the overflow is gone by construction; what is left is the condition that
-     * actually matters, which is that {@code distributeSlots} clips a list totalling more than 128 and
-     * hands nothing to whatever is past the boundary. A candidate with no slot can never be drawn, and
-     * a file naming a light that can never appear is the silence version 2 refuses with
-     * {@code WEIGHT.002} and version 1 should not keep.</p>
-     *
-     * <p>Unreachable for every shipped socket: the largest authored total in the measured corpus is
-     * ten, so every candidate is scaled up rather than clipped.</p>
-     */
-    private static void requireEveryCandidateGetsASlot(Identifier paletteId, char marker,
-                                                       Placement placement, List<Candidate> compiled,
-                                                       List<String> written) {
-        if (compiled.isEmpty()) {
-            return;
-        }
-        int[] weights = new int[compiled.size()];
-        for (int i = 0; i < compiled.size(); i++) {
-            weights[i] = compiled.get(i).weight();
-        }
-        int[] slots = CompiledPalette.distributeSlots(weights, CompiledPalette.SLOTS);
-        for (int i = 0; i < slots.length; i++) {
-            if (slots[i] == 0) {
-                throw invalidCandidate(paletteId, marker, placement, i, written.get(i),
-                        "the weights before it already fill all " + CompiledPalette.SLOTS
-                                + " slots, so it could never be placed", null);
-            }
-        }
     }
 
     private static void validatePlacement(Identifier paletteId, char marker, Placement placement,

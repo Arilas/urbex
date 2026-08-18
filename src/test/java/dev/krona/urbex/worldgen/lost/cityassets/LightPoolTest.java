@@ -17,6 +17,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -295,31 +298,69 @@ class LightPoolTest {
     }
 
     /**
-     * The successor to an overflow guard, refusing strictly more than it did.
+     * {@code VER.004}: version 1 does not become stricter, and this is the case that proved it can.
      *
-     * <p>The check this replaces summed the authored weights with {@code Math.addExact} and reported
-     * only a list totalling more than {@code Integer.MAX_VALUE}. {@code WEIGHT.043}'s apportionment
-     * sums into a {@code long}, so that input no longer overflows anything — but it still gives the
-     * second candidate none of the 128 slots, and a light that can never be placed is what the message
-     * has to name. The same input is used, so the case that used to be about arithmetic is now about
-     * the thing the arithmetic was standing in for.</p>
+     * <p>{@code WEIGHT.043} first materialised a placement list with
+     * {@code CompiledPalette.distributeSlots}, which reads a version 1 weight as an absolute slot count
+     * and clips a list totalling more than 128. A socket weight was never a slot count — it was a ticket
+     * share — so {@code [1000, 1]} became {@code [128, 0]} and a candidate that had been placed one time
+     * in a thousand could never be placed at all. A guard added to notice that refused the world
+     * instead, which is the same rule broken the other way: a pack that loads today must keep
+     * loading.</p>
+     *
+     * <p>{@code Apportion.slots} is what both readings were reaching for. {@code WEIGHT.062} gives the
+     * second candidate one slot of 128 — rarer than one in a thousand, because a socket has 128 slots,
+     * and present, which is the property a pack author can see.</p>
      */
-    @Rule("WEIGHT.043")
+    @Rule("VER.004")
+    @Rule("WEIGHT.062")
     @Test
-    void compileRejectsACandidateTheApportionmentLeavesNoSlotForNamingIt() {
+    void aVersion1SocketWeightedFarBelowItsSiblingStillLoadsAndStillAppears() {
         LightSourceSettings settings = new LightSourceSettings(
                 List.of(
-                        new LightSourceSettings.Entry(Integer.MAX_VALUE, "minecraft:torch"),
+                        new LightSourceSettings.Entry(1000, "minecraft:torch"),
                         new LightSourceSettings.Entry(1, "minecraft:soul_torch")),
                 List.of(), List.of(), List.of(), null, null);
 
-        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings));
-        assertTrue(error.getMessage().contains("urbex:test_lights"));
-        assertTrue(error.getMessage().contains("L"));
-        assertTrue(error.getMessage().contains("floor"));
-        assertTrue(error.getMessage().contains("minecraft:soul_torch"));
-        assertTrue(error.getMessage().contains("could never be placed"), error.getMessage());
+        LightPool pool = LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings);
+
+        assertEquals(2, pool.allCandidates().size(), "neither candidate was refused or dropped");
+        Set<Block> winners = new LinkedHashSet<>();
+        for (int x = 0; x < 64; x++) {
+            for (int z = 0; z < 64; z++) {
+                winners.add(pool.weightedOrder(LightPool.Placement.FLOOR, 1L, x, 64, z)
+                        .getFirst().state().getBlock());
+            }
+        }
+        assertEquals(Set.of(Blocks.TORCH, Blocks.SOUL_TORCH), winners,
+                "and the rare one still wins somewhere: WEIGHT.062 owes it a slot, where clipping the "
+                        + "list to 128 absolute counts owed it nothing");
+    }
+
+    /**
+     * The same rule at the size the specification cannot satisfy it at, which version 1 may still load.
+     *
+     * <p>{@code Apportion.slots} has a precondition of at most one share per slot, because past that
+     * {@code WEIGHT.062} is unsatisfiable; version 2 refuses such a node at load with {@code DIAG.044}.
+     * Version 1 has no such rule, so a 200-candidate placement list has to keep loading rather than
+     * throw a precondition out of a world load with no asset in it.</p>
+     */
+    @Rule("VER.004")
+    @Rule("WEIGHT.063")
+    @Test
+    void aVersion1SocketWithMoreCandidatesThanSlotsStillLoads() {
+        List<LightSourceSettings.Entry> floor = new ArrayList<>();
+        for (int i = 0; i < 200; i++) {
+            floor.add(new LightSourceSettings.Entry(1, "minecraft:torch"));
+        }
+        LightSourceSettings settings =
+                new LightSourceSettings(floor, List.of(), List.of(), List.of(), null, null);
+
+        LightPool pool = LightPool.compile(BuiltInRegistries.BLOCK, PALETTE_ID, 'L', settings);
+
+        assertEquals(200, pool.allCandidates().size());
+        assertEquals(Blocks.TORCH, pool.weightedOrder(LightPool.Placement.FLOOR, 1L, 0, 64, 0)
+                .getFirst().state().getBlock(), "and it still places something");
     }
 
     @Test

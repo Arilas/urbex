@@ -375,6 +375,16 @@ They are near-neighbours and behave completely differently. This table is normat
 > > depended on whether the floor beneath it had been rejected first. That is precisely what "draws from
 > > no sequential stream" forbids, one position rather than one chunk over.
 
+> > **A version 1 socket weight is a ticket share and not a slot count, which decides *which*
+> > apportionment.** [WEIGHT.060](#7-rounding) to [WEIGHT.062](#7-rounding) is the one this rule means,
+> > and it is not the function version 1's `blocks` list uses: that one reads a weight as an absolute
+> > count and *clips* a list totalling more than 128, so `[1000, 1]` becomes `[128, 0]` and a candidate
+> > version 1 placed one time in a thousand can never be placed. Refusing such a list instead is the
+> > same mistake with a diagnostic on it, and both break
+> > [VER.004](09-migration.md#1-versioning) — "version 1 does not become stricter" — retroactively, on
+> > packs that load today. WEIGHT.062 gives that candidate one slot of 128: rarer than it was, because a
+> > socket has 128 slots and not 1001, and present, which is the property a pack author can see.
+
 > > **The marker is not in the address, and WEIGHT.041 does not need it to be.** That rule exists so two
 > > weighted markers at one block do not share a draw. A socket *is* the marker at its position and no
 > > second socket can occupy it, so the address is the block under the lighting purpose — which is the
