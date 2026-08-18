@@ -348,13 +348,12 @@ any more and which no addon pack references either. Deleting them is a decision 
 conversion, and it is not free — they are the only bundled files the key-name half of
 `ShippedBlockRefs` walks, so removing them leaves that half covering nothing.
 
-What keeps version 1 alive is `VER.001`, and the packs it was written for. All four Urbex addon packs
-are version 1 throughout: Modern Tweaks (98 palettes, 58 variants, 245 inline entries across 60 parts
-and buildings, 79 of them naming a variant), Zombie Apocalypse Essentials (7 palettes, 6,527 inline
-entries), Chaos (119,527 inline entries and no palette registry at all) and Modern City (84 palettes).
-So `VER.004`'s promise that version 1 does not change is now load-bearing for other people's packs and
-not for this one — which is the state `VER.001` describes, and the state in which removing version 1
-means converting those four first.
+What keeps version 1 alive is `VER.001`, and the two packs it was written for. Both are version 1
+throughout: Modern Tweaks (98 palettes, 58 variants, 245 inline entries across 60 parts and buildings,
+79 of them naming a variant) and Zombie Apocalypse Essentials (7 palettes, 6,527 inline entries). So
+`VER.004`'s promise that version 1 does not change is now load-bearing for other people's packs and not
+for this one — which is the state `VER.001` describes, and the state in which removing version 1 means
+converting those two first.
 
 **Not every fixture runs.** `FormatFixtureTest` runs every fixture whose outcome decoding alone
 decides. One is listed in that class instead: `MODEL.062#1`, whose rule is decided where a style's

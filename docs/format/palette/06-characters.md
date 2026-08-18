@@ -18,9 +18,15 @@ Measured over the shipped packs:
 | Zombie Apocalypse Essentials | 244 | 162 |
 
 Zombie Apocalypse Essentials sweeps contiguously through the Greek, Coptic and Cyrillic blocks,
-because `/exportpart` assigns markers by walking codepoints in sequence. That sweep includes eight
-codepoints Unicode has never assigned — U+0378, U+0379, U+0380, U+0381, U+0382, U+0383, U+038B and
-U+03A2.
+because `/exportpart` assigns markers by walking codepoints in sequence. That sweep includes **nine**
+codepoints Unicode has never assigned — U+0378, U+0379, U+0380, U+0381, U+0382, U+0383, U+038B, U+038D
+and U+03A2 — across 41 files and 320 uses.
+
+This read "eight" and omitted U+038D until the converter was run over that pack's inline palettes and
+named nine. The list is every codepoint in U+0370–U+03FF whose general category is `Cn`, which is a
+thing a reader can check in one line rather than a list to trust; stated that way here because
+[VER.032](09-migration.md#5-what-the-converter-cannot-do) makes an unreproducible count a claim, and a
+hand-typed list of codepoints is exactly the shape that loses one.
 
 Two costs follow. Unassigned codepoints are unstable under editors and normalisation, and every one of
 those 162 markers misses the ASCII fast path used to resolve a marker to a block, falling back to a
