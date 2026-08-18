@@ -289,6 +289,12 @@ class AssetCompilerTest {
      * compiled" is only evidence if the palette could not have compiled without the registry. This one
      * could not: {@code 'R'} is nothing but a {@code $ref} into {@code urbex:rubble}, so an empty index
      * refuses the asset by name and {@code diagnostics} is non-empty.</p>
+     *
+     * <p><b>What this does not cover.</b> The access built below registers exactly one
+     * {@code definitions} asset and the palette carries exactly one {@code $ref}, so this proves the
+     * seam is wired at all - <em>total</em> unwiring - and not that every entry in a larger registry is
+     * reachable. A {@code V2Palettes.definitions} that indexed only the first entry of the registry
+     * would pass this test unchanged, because there is only one entry to index.</p>
      */
     @Test
     void aRegisteredVersion2PaletteCompilesThroughTheWorldsDefinitionsRegistry() {

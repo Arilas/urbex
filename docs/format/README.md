@@ -252,7 +252,7 @@ nothing at all watches the production seams no rule is written about. Both have 
 and only ever by hand, by someone breaking the code and looking at what stayed green: three `LOAD`
 guards that could not fail, a guard whose regex matched an overload that no longer exists, a javadoc
 claiming to cover a seam it never touched, and an entire compile path — `AssetCompiler` through
-`V2Palettes` to a version 2 palette — that no test reached while the suite reported 1,251 passes. Making
+`V2Palettes` to a version 2 palette — that no test reached while the suite reported 1,250 passes. Making
 that mechanical is [issue #217](https://github.com/Arilas/urbex/issues/217), and it is the highest-value
 open item against this specification's tooling.
 

@@ -15,25 +15,20 @@ import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
 import dev.krona.urbex.worldgen.lost.cityassets.Style;
 import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
+import dev.krona.urbex.setup.TestRegistries;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -42,6 +37,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -74,28 +70,52 @@ class DatapackGuideExamplesTest {
     private static final Path GUIDE = Path.of("docs/datapacks.md");
 
     /**
-     * The thirteen registries, by the directory name the guide (and a datapack) spells them with.
+     * Every registry {@link TestRegistries} knows about, by the directory name the guide (and a
+     * datapack) spells it with.
+     * <p>
+     * Derived from {@link TestRegistries#keys()} and {@link TestRegistries#valueTypesByFieldName()}
+     * rather than listed by hand: {@code TestRegistries}'s own javadoc records that three other test
+     * files each carried a 13-entry hand-written copy of this list and all three were wrong the same
+     * way, omitting {@code definitions}. A fourth copy here would be the same mistake with better odds,
+     * not a different class of mistake. Both {@code TestRegistries} methods walk
+     * {@code CustomRegistries}'s declared {@code *_REGISTRY_KEY} fields in the same order, so the
+     * {@code i}-th key and the {@code i}-th value type name the same registry; {@link #codecFor} reads
+     * that type's own {@code CODEC} field, which is the codec {@code CustomRegistries.init} registers
+     * it under.
      * <p>
      * A method rather than a static field: touching any {@code *Definition.CODEC} initialises Minecraft's
      * built-in registries, and a static field would do that during class initialisation, before
      * {@link #bootstrap()} has run.
      */
     private static Map<String, Codec<?>> codecs() {
-        return Map.ofEntries(
-            Map.entry("worldstyles", WorldStyleDefinition.CODEC),
-            Map.entry("citystyles", CityStyleDefinition.CODEC),
-            Map.entry("buildings", BuildingDefinition.CODEC),
-            Map.entry("parts", BuildingPartDefinition.CODEC),
-            Map.entry("palettes", PaletteDefinition.CODEC),
-            Map.entry("styles", StyleDefinition.CODEC),
-            Map.entry("multibuildings", MultiBuildingDefinition.CODEC),
-            Map.entry("scattered", ScatteredDefinition.CODEC),
-            Map.entry("conditions", ConditionDefinition.CODEC),
-            Map.entry("variants", VariantDefinition.CODEC),
-            Map.entry("stuff", StuffSettingsDefinition.CODEC),
-            Map.entry("predefinedcities", PredefinedCityDefinition.CODEC),
-            Map.entry("presets", PresetDefinition.CODEC));
+        List<ResourceKey<? extends Registry<?>>> keys = TestRegistries.keys();
+        List<Class<?>> valueTypes = new ArrayList<>(TestRegistries.valueTypesByFieldName().values());
+        Map<String, Codec<?>> codecs = new LinkedHashMap<>();
+        for (int i = 0; i < keys.size(); i++) {
+            codecs.put(keys.get(i).identifier().getPath(), codecFor(valueTypes.get(i)));
+        }
+        return codecs;
     }
+
+    /** The {@code CODEC} field a registry's value type declares - the same one it is registered under. */
+    private static Codec<?> codecFor(Class<?> valueType) {
+        try {
+            return (Codec<?>) valueType.getField("CODEC").get(null);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not read " + valueType.getName() + ".CODEC", e);
+        }
+    }
+
+    /**
+     * Registries the guide is not expected to have an example for.
+     * <p>
+     * {@code definitions} is the version 2 tier ({@code CustomRegistries.DEFINITIONS_REGISTRY_KEY}'s
+     * own javadoc), and {@code docs/format/README.md} §9 records "The authoring guide has no version 2
+     * content" as a known hole rather than an oversight this test should catch on its own: the guide
+     * does not mention {@code $defs}, {@code $ref}, {@code traits}, or this registry at all. Listing it
+     * here keeps that hole visible in the check instead of making it disappear from one.
+     */
+    private static final Set<String> KNOWN_MISSING_EXAMPLES = Set.of("definitions");
 
     @BeforeAll
     static void bootstrap() {
@@ -135,6 +155,7 @@ class DatapackGuideExamplesTest {
 
         Set<String> uncovered = new java.util.TreeSet<>(codecs.keySet());
         uncovered.removeAll(covered);
+        uncovered.removeAll(KNOWN_MISSING_EXAMPLES);
         if (!uncovered.isEmpty()) {
             // The guide promises a working example of every registry; without this the promise
             // quietly lapses the next time one is added.
