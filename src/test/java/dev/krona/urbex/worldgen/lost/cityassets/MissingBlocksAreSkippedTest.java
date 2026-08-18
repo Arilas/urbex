@@ -71,7 +71,7 @@ class MissingBlocksAreSkippedTest {
 
     @Test
     void aWeightedPaletteEntryKeepsTheBlocksThisGameHas() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 weighted('r', new BlockEntry(1, ABSENT), new BlockEntry(1, "minecraft:gravel")))));
 
         Pair<Integer, BlockState>[] blocks = weightedBlocksOf(palette, 'r');
@@ -85,7 +85,7 @@ class MissingBlocksAreSkippedTest {
      */
     @Test
     void aPropertyCarryingEntryFromAMissingModIsSkippedRatherThanThrowing() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 weighted('r', new BlockEntry(1, ABSENT + "[facing=north]"),
                         new BlockEntry(1, "minecraft:gravel")))));
 
@@ -96,7 +96,7 @@ class MissingBlocksAreSkippedTest {
 
     @Test
     void aCharacterLeftWithNothingGeneratesAsAir() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 weighted('r', new BlockEntry(1, ABSENT), new BlockEntry(1, "othermod:also_absent")))));
 
         Palette.PE entry = palette.getPalette().get('r');
@@ -126,7 +126,7 @@ class MissingBlocksAreSkippedTest {
      */
     @Test
     void aSingleBlockThatIsAbsentIsAir() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 single('x', ABSENT), single('y', ABSENT + "[facing=north]"))));
 
         assertSame(Blocks.AIR.defaultBlockState(), palette.getPalette().get('x').blocks());
@@ -139,7 +139,7 @@ class MissingBlocksAreSkippedTest {
      */
     @Test
     void anAbsentDamagedBlockLeavesNoMapping() {
-        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteOf(
+        Palette palette = new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteOf(
                 damaged('S', "minecraft:stone", ABSENT))));
 
         assertTrue(palette.getDamaged().isEmpty());

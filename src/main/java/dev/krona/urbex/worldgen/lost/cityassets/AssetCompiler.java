@@ -42,7 +42,6 @@ import java.util.function.Predicate;
  * written about. The order below is the dependency order:</p>
  *
  * <ul>
- *   <li><b>variants</b> first: palettes resolve a {@code variant} entry against them.</li>
  *   <li><b>palettes</b> before <b>styles</b>, <b>parts</b> and <b>buildings</b>: a style's
  *       {@code randompalettes}, and a part's or building's {@code refpalette}, name one.</li>
  *   <li><b>citystyles</b> before <b>predefinedcities</b>: a predefined city names a city style.</li>
@@ -109,8 +108,6 @@ public final class AssetCompiler {
         // to pick a registry for itself, from a static server reference that may or may not have
         // been populated by the time it ran (issues #60, #128).
         HolderLookup<Block> blockLookup = access.lookupOrThrow(Registries.BLOCK);
-        AssetIndex<Variant> variants = AssetStage.compileAll(access,
-                CustomRegistries.VARIANTS_REGISTRY_KEY, (id, chain) -> new Variant(id, blockLookup, chain), diagnostics);
         // Conditions before palettes, which is new in this task and is a dependency rather than a
         // preference. A version 2 palette's urbex:loot and urbex:spawner traits name a conditions asset
         // and TRAIT.021/TRAIT.031 refuse one that is not loaded, so the compiler has to be handed the
@@ -121,14 +118,14 @@ public final class AssetCompiler {
         V2Palettes.Context v2Context = V2Palettes.context(access, blockLookup, conditions);
         AssetIndex<Palette> palettes = AssetStage.compileAll(access,
                 CustomRegistries.PALETTE_REGISTRY_KEY,
-                (id, chain) -> V2Palettes.compile(id, blockLookup, variants, chain, v2Context),
+                (id, chain) -> V2Palettes.compile(id, blockLookup, chain, v2Context),
                 diagnostics);
         AssetIndex<Style> styles = AssetStage.compileAll(access,
                 CustomRegistries.STYLE_REGISTRY_KEY, (id, chain) -> new Style(id, palettes, chain), diagnostics);
         AssetIndex<BuildingPart> parts = AssetStage.compileAll(access,
-                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(id, blockLookup, variants, palettes, chain, v2Context), diagnostics);
+                CustomRegistries.PART_REGISTRY_KEY, (id, chain) -> new BuildingPart(id, blockLookup, palettes, chain, v2Context), diagnostics);
         AssetIndex<Building> buildings = AssetStage.compileAll(access,
-                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(id, blockLookup, variants, palettes, chain, v2Context), diagnostics);
+                CustomRegistries.BUILDING_REGISTRY_KEY, (id, chain) -> new Building(id, blockLookup, palettes, chain, v2Context), diagnostics);
         AssetIndex<MultiBuilding> multiBuildings = AssetStage.compileAll(access,
                 CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, (id, chain) -> new MultiBuilding(id, chain), diagnostics);
         AssetIndex<ScatteredBuilding> scattered = AssetStage.compileAll(access,
@@ -150,7 +147,7 @@ public final class AssetCompiler {
         AssetIndex<StuffObject> stuff = AssetStage.compileAll(access,
                 CustomRegistries.STUFF_REGISTRY_KEY, (id, chain) -> new StuffObject(id, chain), diagnostics);
 
-        AssetSnapshot snapshot = new AssetSnapshot(variants, palettes, conditions, styles, parts,
+        AssetSnapshot snapshot = new AssetSnapshot(palettes, conditions, styles, parts,
                 buildings, multiBuildings, scattered, worldStyles, cityStyles, predefinedCities,
                 stuff, groupStuffByTag(stuff.all()),
                 PredefinedIndex.build(predefinedCities, multiBuildings));

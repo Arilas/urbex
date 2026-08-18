@@ -54,7 +54,7 @@ public final class TestRegistries {
      * constant cannot drift from the class it counts, and a fifteenth registry fails every test that
      * builds an access rather than being quietly left out of one.
      */
-    public static final int COUNT = 14;
+    public static final int COUNT = 13;
 
     private TestRegistries() {
     }

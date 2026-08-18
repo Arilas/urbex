@@ -79,7 +79,7 @@ class PaletteVariantResolutionTest {
     @Test
     void aVariantEntryWithNoVariantIndexFailsNamingWhatItWanted() {
         IllegalStateException failure = assertThrows(IllegalStateException.class,
-                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, null, List.of(paletteNamingVariant())));
+                () -> new Palette(PALETTE_ID, BuiltInRegistries.BLOCK, List.of(paletteNamingVariant())));
 
         assertTrue(failure.getMessage().contains("urbex:rubble"), failure.getMessage());
         assertTrue(failure.getMessage().contains("variant-palette"), failure.getMessage());

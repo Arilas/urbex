@@ -70,9 +70,9 @@ public class Building {
      * For callers with no version 2 compiler context - tests, and anything that provably carries no
      * inline version 2 palette. {@link AssetCompiler} uses the overload below.
      */
-    public Building(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public Building(Identifier id, HolderLookup<Block> blockLookup,
                         AssetIndex<Palette> palettes, List<BuildingDefinition> chainRootFirst) {
-        this(id, blockLookup, variants, palettes, chainRootFirst, null);
+        this(id, blockLookup, palettes, chainRootFirst, null);
     }
 
     /**
@@ -82,7 +82,7 @@ public class Building {
      *           palette would decode and then fail to compile - which is exactly the state
      *           {@code VER.015} existed to describe and which its retirement was supposed to end.
      */
-    public Building(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public Building(Identifier id, HolderLookup<Block> blockLookup,
                         AssetIndex<Palette> palettes, List<BuildingDefinition> chainRootFirst,
                         @Nullable V2Palettes.Context v2) {
         name = id;
@@ -145,7 +145,7 @@ public class Building {
         Resolved.require(anyParts ? partRefs : null, name, "parts");
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(blockLookup, variants, name, inlinePalettes, v2); // @todo get the full palette instead
+            localPalette = Palette.inline(blockLookup, name, inlinePalettes, v2); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
             // Resolved here, not on the first chunk that asks. The lazy version cached the answer on

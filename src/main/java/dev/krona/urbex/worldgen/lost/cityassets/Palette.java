@@ -69,16 +69,12 @@ public class Palette {
     /**
      * @param blockLookup the block registry every block string in this palette resolves against,
      *                    handed down by the compiler from the world being loaded.
-     * @param variants    the compiled variants this palette's {@code variant} entries resolve
-     *                    against. May be null only for a palette that provably names none; one that
-     *                    does then fails naming itself and the variant rather than reaching for a
-     *                    static server (issue #60) or compiling one on the spot (issue #128).
      */
-    public Palette(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public Palette(Identifier id, HolderLookup<Block> blockLookup,
                    List<PaletteDefinition> chainRootFirst) {
         name = id;
         v2 = null;
-        compile(blockLookup, variants, mergeByCharacter(chainRootFirst, name));
+        compile(blockLookup, mergeByCharacter(chainRootFirst, name));
     }
 
     public Palette(String name) {
@@ -137,9 +133,9 @@ public class Palette {
      *                       for the synthetic palette name
      * @param chainRootFirst the inline blocks along the owner's chain, root first
      */
-    public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public static Palette inline(HolderLookup<Block> blockLookup,
                                  Identifier owner, List<PaletteAssetDefinition> chainRootFirst) {
-        return inline(blockLookup, variants, owner, chainRootFirst, null);
+        return inline(blockLookup, owner, chainRootFirst, null);
     }
 
     /**
@@ -147,7 +143,7 @@ public class Palette {
      *           inline version 2 palette fails naming itself rather than being read as a palette with
      *           no markers
      */
-    public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public static Palette inline(HolderLookup<Block> blockLookup,
                                  Identifier owner, List<PaletteAssetDefinition> chainRootFirst,
                                  @Nullable V2Palettes.Context v2) {
         for (PaletteAssetDefinition re : chainRootFirst) {
@@ -170,7 +166,7 @@ public class Palette {
         List<PaletteDefinition> version1 = new ArrayList<>(chainRootFirst.size());
         chainRootFirst.forEach(link -> version1.add((PaletteDefinition) link));
         Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(blockLookup, variants, mergeByCharacter(version1, owner));
+        palette.compile(blockLookup, mergeByCharacter(version1, owner));
         return palette;
     }
 
@@ -263,8 +259,7 @@ public class Palette {
         return palette;
     }
 
-    private void compile(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                         Collection<PaletteEntry> entries) {
+    private void compile(HolderLookup<Block> blockLookup, Collection<PaletteEntry> entries) {
         for (PaletteEntry entry : entries) {
             Character c = entry.getChr().charAt(0);
             // Null when the damaged block is absent from this game, so the mapping is simply not
@@ -273,6 +268,7 @@ public class Palette {
             BlockState dmg = entry.getDamaged() == null ? null
                     : Tools.resolveState(entry.getDamaged(), blockLookup, name);
             rejectRemovedLightSpellings(entry, c);
+            rejectRemovedVariant(entry, c);
             LightSourceSettings settings = entry.getLightSource();
             // Also null when every candidate in the pool named an absent block; see
             // LightPool.compile. An authored-empty pool is still a load error, and an in-place
@@ -295,28 +291,6 @@ public class Palette {
                 if (dmg != null) {
                     damaged.put(state, dmg);
                 }
-            } else if (entry.getVariant() != null) {
-                String variantName = entry.getVariant();
-                // The compiled variants of this palette's own world, handed in by the compiler.
-                // This used to ask ServerAccess.getServer().getLevel(OVERWORLD), which resolved every
-                // dimension's variants against the overworld and threw from a worldgen worker when
-                // the static server reference was not populated yet (issue #60); then it asked a
-                // static registry that compiled on demand (issue #128). Now the variant it needs was
-                // compiled before this palette was.
-                if (variants == null) {
-                    throw new IllegalStateException("Palette '" + name + "' entry '" + c
-                            + "' names variant '" + variantName + "', but this palette was compiled "
-                            + "without a variant index to resolve it against");
-                }
-                Variant variant = variants.getOrThrow(variantName);
-                List<Pair<Integer, BlockState>> blocks = variant.getBlocks();
-                for (Pair<Integer, BlockState> pair : blocks) {
-                    resolved.add(pair.getRight());
-                    if (dmg != null) {
-                        damaged.put(pair.getRight(), dmg);
-                    }
-                }
-                addMappingViaState(c, blocks, info);
             } else if (entry.getFrompalette() != null) {
                 String value = entry.getFrompalette();
                 palette.put(c, new PE(value, info));
@@ -391,6 +365,35 @@ public class Palette {
                     + "'light', which was renamed. Write the same object under \"lightSource\", and "
                     + "add \"unlit\" to it if this marker should leave something behind when the "
                     + "light is off.");
+        }
+    }
+
+    /**
+     * A version 1 entry naming {@code variant} is refused, because the {@code variants} registry is gone.
+     * <p>
+     * Refused here rather than dropped from {@link PaletteEntry}'s codec, for the reason
+     * {@link #rejectRemovedLightSpellings} exists: a key a version 1 palette does not know is a key it
+     * silently ignores, so dropping {@code variant} would load the pack, paint every marker that used
+     * one as air, and say nothing. {@code VER.012} is the rule - a retired key is never silently
+     * accepted and never silently ignored - and this is the third key to be held decodable purely so
+     * that it can fail by name.
+     * <p>
+     * Refused at compile rather than at decode because {@code RetiredKeys} is a pre-pass over a
+     * document's <em>top level</em>, and {@code variant} is a key of a palette entry. That is the same
+     * reason {@code torch} and {@code light} are refused here and not there.
+     * <p>
+     * The message names the replacement rather than only the removal: what the {@code variants} registry
+     * became is the {@code definitions} registry, reached with {@code $ref}, which is version 2's
+     * spelling and not version 1's - so the remedy is a conversion, and it names the tool that does it.
+     */
+    private void rejectRemovedVariant(PaletteEntry entry, char c) {
+        if (entry.getVariant() != null) {
+            throw new IllegalArgumentException("Palette '" + name + "' entry '" + c + "' declares "
+                    + "'variant': \"" + entry.getVariant() + "\", and the 'variants' registry no "
+                    + "longer exists. It became the 'definitions' registry, which is reached with "
+                    + "\"$ref\" from a format version 2 palette. Convert this pack with the "
+                    + "'convertPalettes' task: it rewrites every variants asset as a definitions "
+                    + "asset and every 'variant' as a '$ref'.");
         }
     }
 

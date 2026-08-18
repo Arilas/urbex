@@ -319,7 +319,7 @@ class VersionDispatchTest {
                 """);
 
         IllegalStateException upgrading = assertThrows(IllegalStateException.class,
-                () -> Palette.inline(BuiltInRegistries.BLOCK, null, owner,
+                () -> Palette.inline(BuiltInRegistries.BLOCK, owner,
                         List.of(version1, version2)));
         assertTrue(Diag.DIAG_065.matches(upgrading.getMessage()), upgrading.getMessage());
         assertTrue(upgrading.getMessage().contains(owner.toString()),
@@ -327,11 +327,11 @@ class VersionDispatchTest {
                         + upgrading.getMessage());
 
         IllegalStateException downgrading = assertThrows(IllegalStateException.class,
-                () -> Palette.inline(BuiltInRegistries.BLOCK, null, owner,
+                () -> Palette.inline(BuiltInRegistries.BLOCK, owner,
                         List.of(version2, version1)));
         assertTrue(Diag.DIAG_065.matches(downgrading.getMessage()), downgrading.getMessage());
 
-        assertDoesNotThrow(() -> Palette.inline(BuiltInRegistries.BLOCK, null, owner,
+        assertDoesNotThrow(() -> Palette.inline(BuiltInRegistries.BLOCK, owner,
                         List.of(version1, version1)),
                 "a chain of one version is what the rule permits, and is the common case");
     }

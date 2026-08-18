@@ -30,17 +30,16 @@ public class CustomRegistries {
 
     public static final ResourceKey<Registry<MultiBuildingDefinition>> MULTIBUILDINGS_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "multibuildings"));
 
-    public static final ResourceKey<Registry<VariantDefinition>> VARIANTS_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "variants"));
-
     /**
      * The palette format version 2 tier of shared nodes: {@code data/<namespace>/urbex/definitions/}
      * ({@code REF.010}).
      * <p>
-     * What {@code variants} becomes ({@code 09-migration.md} §2), and not what replaces it. The
-     * {@code variants} registry above stays registered, unchanged and still consulted, because every
-     * shipped pack is version 1 and {@code VER.004} says version 1 does not change. A version 2 palette
-     * reaches this registry with {@code $ref} and never reaches {@code variants}; a version 1 palette
-     * reaches {@code variants} with {@code variant} and cannot see this one.
+     * What {@code variants} became ({@code 09-migration.md} §2), and now what replaced it: the
+     * {@code variants} registry is gone. It was kept registered while version 1 was what every shipped
+     * pack was written in, so that a version 2 palette reached this registry with {@code $ref} while a
+     * version 1 palette reached {@code variants} with {@code variant} and could not see this one. The
+     * bundled pack writes neither now, and a version 1 palette still naming {@code variant} fails by
+     * name in {@code Palette.rejectRemovedVariant} rather than painting air.
      */
     public static final ResourceKey<Registry<DefinitionAssetDefinition>> DEFINITIONS_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "definitions"));
 
@@ -65,7 +64,6 @@ public class CustomRegistries {
         DynamicRegistries.register(CONDITIONS_REGISTRY_KEY, ConditionDefinition.CODEC);
         DynamicRegistries.register(CITYSTYLES_REGISTRY_KEY, CityStyleDefinition.CODEC);
         DynamicRegistries.register(MULTIBUILDINGS_REGISTRY_KEY, MultiBuildingDefinition.CODEC);
-        DynamicRegistries.register(VARIANTS_REGISTRY_KEY, VariantDefinition.CODEC);
         DynamicRegistries.register(DEFINITIONS_REGISTRY_KEY, DefinitionAssetDefinition.CODEC);
         DynamicRegistries.register(WORLDSTYLES_REGISTRY_KEY, WorldStyleDefinition.CODEC);
         DynamicRegistries.register(PREDEFINEDCITIES_REGISTRY_KEY, PredefinedCityDefinition.CODEC);
