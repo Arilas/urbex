@@ -456,6 +456,49 @@ class TraitTest {
     }
 
     /**
+     * {@code TRAIT.041} on a {@code tag} node: one message, naming the tag the file wrote.
+     * <p>
+     * <b>This is the ninth appearance of the gated defect,</b> and the fixture beside it in
+     * {@code 01-traits.md} is what pins it. {@code CompiledV2Palette.prepare} used to expand tags before
+     * validating traits, and expansion copies the tag node's traits onto every member with their
+     * provenance intact - so each member read as its own declaration. The palette below produced
+     * <em>four</em> {@code DIAG.022} messages instead of one: three addressed {@code choice 0},
+     * {@code choice 1} and {@code choice 2}, at positions the author's file has no array for, and
+     * {@code #minecraft:planks} named in none of them. That is
+     * {@link TraitContext#writtenBlocks}'s {@code Source.Tag} branch being unreachable, and that
+     * method's javadoc is where the rule it serves is written down.
+     * <p>
+     * Asserted by counting as well as by content, because the content assertion alone passed on the old
+     * order too - one of the four messages did say {@code has no block entity}.
+     */
+    @Test
+    @Rule("TRAIT.041")
+    void blockEntityNbtOnATagIsRefusedOnceAndNamesTheTagRatherThanItsMembers() {
+        TraitContext planks = TraitContext.withConditions(BuiltInRegistries.BLOCK, Set.of())
+                .withTags(tag -> Identifier.parse("minecraft:planks").equals(tag)
+                        ? List.of("minecraft:oak_planks", "minecraft:spruce_planks",
+                                "minecraft:birch_planks")
+                        : List.of());
+        Diagnostics diagnostics = new Diagnostics();
+        assertTrue(CompiledV2Palette.compile(resolve("""
+                { "version": 2, "palette": { "T": { "kind": "tag", "tag": "#minecraft:planks",
+                    "traits": { "urbex:block_entity": { "nbt": { "Items": [] } } } } } }
+                """), installed(), planks, Diagnostics.DECODING_LOCATION, diagnostics).isEmpty(),
+                "expected the compile to refuse the palette");
+
+        List<Diagnostics.Entry> refusals = diagnostics.all().stream()
+                .filter(entry -> entry.diag() == Diag.DIAG_022)
+                .toList();
+        assertEquals(1, refusals.size(),
+                () -> "TRAIT.041 is one question about one node: " + diagnostics.all());
+        String message = refusals.get(0).message();
+        assertTrue(message.contains("#minecraft:planks"),
+                () -> "the message names the tag as the file wrote it: " + message);
+        assertFalse(message.contains("choice "),
+                () -> "and addresses no array the author's file does not have: " + message);
+    }
+
+    /**
      * {@code TRAIT.042}: the four keys the loader supplies are dropped, and the drop is reported.
      * <p>
      * <b>The catalogue's second {@code WARN}, and the three assertions that class asks for.</b>

@@ -102,8 +102,23 @@ public final class SpecDocuments {
     /** A rule definition line, e.g. {@code > **REF.032** · `REJECT` (`DIAG.032`) `[NO-FIXTURE: ...]`}. */
     private static final Pattern RULE = Pattern.compile(
             "^>\\s*\\*\\*([A-Z]+\\.\\d{3})\\*\\*\\s*·\\s*`([A-Z ]+)`"
-                    + "(?:\\s*\\(`(DIAG\\.\\d{3})`\\))?"
-                    + "(?:\\s*`\\[NO-FIXTURE: ([^\\]]+)\\]`)?");
+                    + "(?:\\s*\\(`(DIAG\\.\\d{3})`\\))?");
+
+    /**
+     * {@code README.md} §4.3's marker, read off the rule line rather than anchored to it.
+     * <p>
+     * Its own pattern, and {@link #NOT_YET_REACHED} beside it, because a rule line may carry either
+     * marker, both, or neither, in whichever order reads best - and expressing that as trailing optional
+     * groups on {@link #RULE} means the second marker is silently unparsed whenever it is written first.
+     * That is exactly how {@code [NOT-YET-REACHED]} came to be a convention with no tooling: it was never
+     * in the pattern at all, so {@code TRAIT.011} parsed as an ordinary {@code MUST} and the index listed
+     * two citing tests for a rule the specification declares unreached.
+     */
+    private static final Pattern NO_FIXTURE = Pattern.compile("`\\[NO-FIXTURE: ([^\\]]+)\\]`");
+
+    /** {@code README.md} §3.3's third status marker, e.g. {@code `[NOT-YET-REACHED: issue #216]`}. */
+    private static final Pattern NOT_YET_REACHED =
+            Pattern.compile("`\\[NOT-YET-REACHED: ([^\\]]+)\\]`");
 
     /**
      * A tombstone line ({@code README.md} §3.4), e.g.
@@ -214,9 +229,14 @@ public final class SpecDocuments {
                 if (ruleMatch.lookingAt()) {
                     String id = ruleMatch.group(1);
                     if (!id.startsWith(RESERVED_AREA + ".")) {
+                        Matcher noFixture = NO_FIXTURE.matcher(line);
+                        Matcher notYetReached = NOT_YET_REACHED.matcher(line);
                         SpecRule rule = new SpecRule(id, file, ruleMatch.group(2).trim(),
                                 Optional.ofNullable(ruleMatch.group(3)),
-                                Optional.ofNullable(ruleMatch.group(4)), lineNumber);
+                                noFixture.find() ? Optional.of(noFixture.group(1)) : Optional.empty(),
+                                notYetReached.find()
+                                        ? Optional.of(notYetReached.group(1)) : Optional.empty(),
+                                lineNumber);
                         if (!rules.containsKey(id)) {
                             order.add(id);
                         }
@@ -232,7 +252,7 @@ public final class SpecDocuments {
                     if (!id.startsWith(RESERVED_AREA + ".") && !rules.containsKey(id)) {
                         order.add(id);
                         rules.put(id, new SpecRule(id, file, TOMBSTONE_CLASS, Optional.empty(),
-                                Optional.empty(), lineNumber));
+                                Optional.empty(), Optional.empty(), lineNumber));
                     }
                 }
 
@@ -242,7 +262,7 @@ public final class SpecDocuments {
                     if (!rules.containsKey(id)) {
                         order.add(id);
                         rules.put(id, new SpecRule(id, file, CATALOGUE_ROW_CLASS, Optional.empty(),
-                                Optional.empty(), lineNumber));
+                                Optional.empty(), Optional.empty(), lineNumber));
                     }
                     diagnostics.put(id, diagRow.group(3).trim());
                 }
@@ -429,8 +449,12 @@ public final class SpecDocuments {
      * runs a single test (working directory: sometimes the project root, sometimes the module root,
      * depending on the IDE) - this makes both cases find the same files instead of one of them
      * silently reading nothing.
+     * <p>
+     * Public because it is not only this package that asks the tree a question: {@code LOAD.031}'s guard
+     * in {@code CompiledV2PaletteTest} enumerates the compiler's classes from {@code src/main/java}, and
+     * a second copy of this walk would be a second answer to "where is the repository" to drift.
      */
-    static Path repoRoot() {
+    public static Path repoRoot() {
         Path dir = Path.of("").toAbsolutePath();
         while (dir != null) {
             if (Files.isDirectory(dir.resolve("docs/format"))) {
@@ -481,10 +505,14 @@ public final class SpecDocuments {
             Map<String, List<Fixture>> fixturesByRule, Map<String, List<String>> citingTests) {
         List<String> gaps = new ArrayList<>();
         List<String> noFixture = new ArrayList<>();
+        List<String> notYetReached = new ArrayList<>();
         for (String id : order) {
             SpecRule rule = rules.get(id);
             if (rule.noFixtureReason().isPresent()) {
                 noFixture.add(id);
+            }
+            if (rule.notYetReachedReason().isPresent()) {
+                notYetReached.add(id);
             }
             // README.md §5: "any rule has no citing test and no fixture" - every rule, not only the
             // four classes §4.2 rule 4 can discharge with a fixture alone. A [NO-FIXTURE] rule is
@@ -519,6 +547,19 @@ public final class SpecDocuments {
             out.append("| `").append(id).append("` | ").append(rules.get(id).noFixtureReason().orElseThrow())
                     .append(" |\n");
         }
+        // README.md §3.3's third status marker. Listed rather than left to the rule table alone,
+        // because the thing a reader needs to know about one of these is precisely what the table
+        // cannot show: the rule is current and its citing tests are real, and they cover the spelling
+        // of a situation no code path reaches yet. TRAIT.011 sat in that table with two citing tests
+        // beside it and nothing saying so.
+        out.append("\n**Rules marked `[NOT-YET-REACHED]` (").append(notYetReached.size())
+                .append("), whose citing tests can only cover the spelling until the issue named lands:**\n\n");
+        out.append("| Rule | Reason |\n|---|---|\n");
+        for (String id : notYetReached) {
+            out.append("| `").append(id).append("` | ")
+                    .append(rules.get(id).notYetReachedReason().orElseThrow()).append(" |\n");
+        }
+
         // Was a flat "none yet" until Task 2 wrote the first citing tests, at which point the index
         // was asserting something about itself that had stopped being true. A count is the version of
         // that sentence which cannot go stale.
@@ -555,11 +596,13 @@ public final class SpecDocuments {
                             : (NEEDS_FIXTURE.contains(rule.cls()) ? "*—*" : "");
                 }
                 String diagCell = rule.diag().map(d -> "`" + d + "`").orElse("");
+                String classCell = "`" + rule.cls() + "`"
+                        + (rule.notYetReachedReason().isPresent() ? " `[NOT-YET-REACHED]`" : "");
                 List<String> tests = citingTests.getOrDefault(id, List.of());
                 String testsCell = tests.isEmpty()
                         ? "—"
                         : tests.stream().map(t -> "`" + t + "`").collect(Collectors.joining(", "));
-                out.append("| `").append(id).append("` | `").append(rule.cls()).append("` | ")
+                out.append("| `").append(id).append("` | ").append(classCell).append(" | ")
                         .append(diagCell).append(" | ").append(fixturesCell).append(" | ")
                         .append(testsCell).append(" |\n");
             }
@@ -615,10 +658,11 @@ public final class SpecDocuments {
      * @param cls               its class (§3.2), or {@code "DIAG"} for a catalogue row
      * @param diag              the {@code DIAG} it cites, present only for a {@code REJECT} rule
      * @param noFixtureReason   the reason text inside {@code [NO-FIXTURE: ...]}, if marked (§4.3)
+     * @param notYetReachedReason the reason text inside {@code [NOT-YET-REACHED: ...]}, if marked (§3.3)
      * @param line              the 1-indexed line of its definition
      */
     public record SpecRule(String id, String file, String cls, Optional<String> diag,
-            Optional<String> noFixtureReason, int line) {
+            Optional<String> noFixtureReason, Optional<String> notYetReachedReason, int line) {
     }
 
     /** What a fixture's outcome tag (§4.1) declares about it. */

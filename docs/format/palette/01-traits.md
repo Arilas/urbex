@@ -332,6 +332,22 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 }
 ```
 
+> > **Why a tag is one node here and not one node per member** — a `tag` is a block source
+> > ([MODEL.050](00-model.md#43-tag)), so "none of whose resolved states" is asked of the tag's members
+> > together and the refusal names the tag. Asking it of each member after
+> > [MODEL.052](00-model.md#43-tag)'s expansion is the `any` this rule's `> Why` refuses, and it also
+> > addressed each refusal at a `choices` array the author's file does not have.
+
+```json fixture:TRAIT.041 reject=DIAG.022
+{
+  "version": 2,
+  "palette": {
+    "T": { "kind": "tag", "tag": "#minecraft:planks",
+           "traits": { "urbex:block_entity": { "nbt": { "Items": [] } } } }
+  }
+}
+```
+
 ```json fixture:TRAIT.043 accept
 {
   "version": 2,

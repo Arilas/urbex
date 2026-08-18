@@ -11,7 +11,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | Area | Rules | Fixtures |
 |---|---:|---:|
 | `MODEL` | 42 | 22 |
-| `TRAIT` | 46 | 19 |
+| `TRAIT` | 46 | 20 |
 | `REF` | 55 | 15 |
 | `MERGE` | 12 | 4 |
 | `WEIGHT` | 38 | 11 |
@@ -19,7 +19,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD` | 24 | 0 |
 | `DIAG` | 58 | 0 |
 | `VER` | 25 | 2 |
-| **total** | **314** | **77** |
+| **total** | **314** | **78** |
 
 ## Outstanding
 
@@ -45,7 +45,13 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.007` | a part and its ancestor, each with an inline palette |
 | `VER.013` | a palette and a conditions asset |
 
-**Tests:** 213 of 314 identifiers have at least one citing test; the rest show `—` below.
+**Rules marked `[NOT-YET-REACHED]` (1), whose citing tests can only cover the spelling until the issue named lands:**
+
+| Rule | Reason |
+|---|---|
+| `TRAIT.011` | issue #216 |
+
+**Tests:** 214 of 314 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -62,7 +68,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.010` | `MUST` |  |  | `PaletteSchemaTest.schemaNodePropertiesMatchRawNodeAnyKindKeys`, `PaletteV2DecodeTest.oneNodeTypeStandsInEveryPositionThatHoldsANode` |
 | `MODEL.011` | `DEFAULT` |  | `equiv=default-kind`, `equiv=default-kind` | `NodeResolverTest.aNodeWithNoKindTakesItsKindFromItsReferenceAndOnlyThenTheDefault` |
 | `MODEL.012` | `REJECT` | `DIAG.004` | `reject=DIAG.004` | — |
-| `MODEL.013` | `MUST` |  | `reject=DIAG.003` | `NodeResolverTest.aKeyOfAnotherKindIsRefusedOnceTheReferenceHasDecidedTheKind`, `NodeResolverTest.aDiagnosticNamingSeveralPlacementListsOrdersThemByPlacement`, `PaletteV2DecodeTest.aKindSpecificKeyIsRefusedOnAnotherKindNamingTheKey` |
+| `MODEL.013` | `REJECT` | `DIAG.003` | `reject=DIAG.003` | `NodeResolverTest.aKeyOfAnotherKindIsRefusedOnceTheReferenceHasDecidedTheKind`, `NodeResolverTest.aDiagnosticNamingSeveralPlacementListsOrdersThemByPlacement`, `PaletteV2DecodeTest.aKindSpecificKeyIsRefusedOnAnotherKindNamingTheKey` |
 | `MODEL.020` | `EQUIV` |  | `equiv=stone-brick-marker`, `equiv=stone-brick-marker` | `PaletteV2DecodeTest.aDecodedPaletteEncodesBackToADocumentThatDecodesToTheSameThing`, `PaletteV2DecodeTest.aStringNodeIsABlockAndNeverAReferenceHoweverMuchItLooksLikeOne`, `V1ToV2Test.aPlainBlockEntryBecomesTheStringShorthandAndTheCharDisappears` |
 | `MODEL.021` | `MUST NOT` |  |  | `PaletteV2DecodeTest.aStringNodeIsABlockAndNeverAReferenceHoweverMuchItLooksLikeOne` |
 | `MODEL.030` | `MUST` |  |  | — |
@@ -77,8 +83,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.045` | `REJECT` | `DIAG.007` | `reject=DIAG.007` | `NodeResolverTest.aWeightedNodeWhoseChoicesSpreadToNothingIsRefused` |
 | `MODEL.046` | `MUST` |  |  | `PaletteSchemaTest.schemaChoicePropertiesAddExactlyRawChoiceOwnKeysToTheNode`, `PaletteV2DecodeTest.aChoiceIsANodeWithASizeBesideIt` |
 | `MODEL.047` | `ACCEPT` |  | `accept` | — |
-| `MODEL.050` | `MUST` |  | `accept` | — |
-| `MODEL.051` | `MUST` |  | `reject=DIAG.012` | `PaletteV2DecodeTest.aTagWithoutItsLeadingHashIsRefused` |
+| `MODEL.050` | `MUST` |  | `accept` | `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag` |
+| `MODEL.051` | `REJECT` | `DIAG.012` | `reject=DIAG.012` | `PaletteV2DecodeTest.aTagWithoutItsLeadingHashIsRefused` |
 | `MODEL.052` | `MUST` |  |  | `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag` |
 | `MODEL.053` | `REJECT` | `DIAG.008` | `reject=DIAG.008` | — |
 | `MODEL.060` | `MUST` |  |  | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesDefineIsAnsweredHereAndLeavesNothingPending`, `PaletteCharacterCheckTest.aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays` |
@@ -111,7 +117,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.008` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole` |
 | `TRAIT.009` | `MUST` |  | `accept` | `NodeResolverTest.aSatellitesNodeIsResolvedAndIsStillNotAnAlternativeOfItsOwner` |
 | `TRAIT.010` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
-| `TRAIT.011` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms`, `V1ToV2Test.damagedConvertsToItsVersion2SpellingEvenThoughTheDamagePassCannotYetKeyItByMarker` |
+| `TRAIT.011` | `MUST` `[NOT-YET-REACHED]` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms`, `V1ToV2Test.damagedConvertsToItsVersion2SpellingEvenThoughTheDamagePassCannotYetKeyItByMarker` |
 | `TRAIT.012` | `ACCEPT` |  | `accept` | `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt` |
 | `TRAIT.020` | `MUST` |  |  | `TraitTest.theConditionsRegistryTheTraitsNameIsTheOneTheModRegisters` |
 | `TRAIT.021` | `REJECT` | `DIAG.021` | `reject=DIAG.021` | — |
@@ -120,7 +126,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.031` | `REJECT` | `DIAG.021` | `reject=DIAG.021` | — |
 | `TRAIT.032` | `MUST` |  |  | — |
 | `TRAIT.040` | `MUST` |  |  | — |
-| `TRAIT.041` | `REJECT` | `DIAG.022` | `reject=DIAG.022` | `TraitTest.blockEntityNbtOnABlockWithNoBlockEntityIsRefusedAndNamesTheBlock` |
+| `TRAIT.041` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `reject=DIAG.022` | `TraitTest.blockEntityNbtOnABlockWithNoBlockEntityIsRefusedAndNamesTheBlock`, `TraitTest.blockEntityNbtOnATagIsRefusedOnceAndNamesTheTagRatherThanItsMembers` |
 | `TRAIT.042` | `WARN` | `DIAG.026` |  | `TraitTest.theFourPositionalKeysAreDroppedAndTheDropIsReported` |
 | `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
 | `TRAIT.044` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `accept` | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `TraitPhaseTest.aBlockEntityBesideALightIsAcceptedWhenTheUnlitReplacementCanHoldTheNbtToo`, `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitPhaseTest.aBlockEntityWithNoSelectionTraitIsUnaffectedSoNothingThatCompilesTodayStopsCompiling`, `TraitPhaseTest.anAbsentReplacementIsAirAndAirIsRefusedBecauseAirHoldsNoBlockEntityEither` |
@@ -161,12 +167,12 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.011` | `MUST` |  |  | `PointerTest.aNameWithNoColonAndNoFragmentIsADefinitionOfThisFile` |
 | `REF.012` | `MUST NOT` |  |  | `NodeResolverTest.aNameResolvesInOneTierAndTheOtherIsNeverTried` |
 | `REF.013` | `REJECT` | `DIAG.030` | `reject=DIAG.030` | — |
-| `REF.014` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsOneNodeWithTheFileLevelKeysAroundIt`, `ImportsTest.aDefinitionsAssetRoundTripsThroughItsOwnCodec` |
+| `REF.014` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsOneNodeWithTheFileLevelKeysAroundIt`, `ImportsTest.aDefinitionsAssetRoundTripsThroughItsOwnCodec`, `PaletteSchemaTest.schemaDefinitionsAssetPropertiesMatchDefinitionAssetDefinitionFileLevelKeys` |
 | `REF.015` | `MUST NOT` |  |  | `ImportsTest.aDefinitionsAssetMayNotReferenceAnUnqualifiedName` |
 | `REF.016` | `MUST` |  |  | `NodeResolverTest.aQualifiedRefNamesADefinitionsAsset` |
 | `REF.017` | `MUST` |  |  | — |
-| `REF.018` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetCarriesImportsAndNotDefs` |
-| `REF.019` | `REJECT` | `DIAG.071` | *—* | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse` |
+| `REF.018` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetCarriesImportsAndNotDefs`, `PaletteSchemaTest.schemaDefinitionsAssetPropertiesMatchDefinitionAssetDefinitionFileLevelKeys` |
+| `REF.019` | `REJECT` | `DIAG.071` | *—* | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `PaletteSchemaTest.schemaDefinitionsAssetPropertiesMatchDefinitionAssetDefinitionFileLevelKeys` |
 | `REF.020` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 | `REF.021` | `MUST` |  |  | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 | `REF.022` | `REJECT` | `DIAG.074` | `reject=DIAG.074` | `TraitTest.anOperandOnATraitObjectIsRefusedWithARemedyAndASatelliteMayCarryOne` |
@@ -207,7 +213,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `REF.075` | `MUST` |  |  | — |
 | `REF.080` | `MUST` |  |  | `ImportsTest.anAliasResolvesToWhatTheSamePointerWrittenInFullResolvesTo` |
 | `REF.081` | `MUST` |  | `accept` | `ImportsTest.anAliasResolvesToWhatTheSamePointerWrittenInFullResolvesTo`, `PointerTest.anAliasIsSubstitutedTextuallyBeforeThePointerIsParsed` |
-| `REF.082` | `MUST` |  | `reject=DIAG.070` | `ImportsTest.superMayNotBeDeclaredAsAnImportOfAPaletteOrOfADefinitionsAsset`, `PaletteV2DecodeTest.superCannotBeDeclaredAsAnImport`, `PointerTest.superCannotBeShadowedByAnImport` |
+| `REF.082` | `REJECT` | `DIAG.070` | `reject=DIAG.070` | `ImportsTest.superMayNotBeDeclaredAsAnImportOfAPaletteOrOfADefinitionsAsset`, `PaletteV2DecodeTest.superCannotBeDeclaredAsAnImport`, `PointerTest.superCannotBeShadowedByAnImport` |
 | `REF.083` | `REJECT` | `DIAG.039` | `reject=DIAG.039` | `PointerTest.anUnknownAliasIsRefusedRatherThanReadAsALocalName` |
 | `REF.084` | `MUST NOT` |  |  | `PointerTest.aBareNameMayNotContainASlashOrBeginWithADollar` |
 | `REF.085` | `MUST` |  |  | `PointerTest.aDiagnosticAboutAnExpandedPointerShowsTheExpansionAndTheWrittenForm` |
@@ -301,7 +307,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.003` | `MUST` |  |  | `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
 | `LOAD.004` | `MUST` |  |  | `NodeResolverTest.everyFailureInOneNodeIsCollectedRatherThanTheFirst` |
 | `LOAD.010` | `MUST` |  |  | `V2SocketsTest.aSocketWhoseEveryCandidateNamesAnAbsentBlockNeverReachesThisMappingAtAll` |
-| `LOAD.011` | `INVARIANT` |  |  | `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
+| `LOAD.011` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingAGeneratedPaletteExposesCanReportADiagnostic` |
 | `LOAD.012` | `MUST` |  |  | `PaletteCharacterCheckTest.aVersion2AliasOnlySomeDrawsAnswerIsAWarningRatherThanARefusal` |
 | `LOAD.013` | `ACCEPT` |  | *n/a* | `PaletteCharacterCheckTest.aVersion2AliasAnsweredByAnotherGroupsPaletteIsReportedAsNeitherErrorNorWarning` |
 | `LOAD.014` | `INVARIANT` |  |  | — |
@@ -311,8 +317,8 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.023` | `MUST` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
 | `LOAD.024` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred` |
 | `LOAD.025` | `MUST` |  |  | — |
-| `LOAD.030` | `INVARIANT` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject` |
-| `LOAD.031` | `MUST NOT` |  |  | `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |
+| `LOAD.030` | `INVARIANT` |  |  | `CompiledV2PaletteTest.twoMarkersReferencingOneDefinitionShareOneCompiledRepresentation` |
+| `LOAD.031` | `MUST NOT` |  |  | `CompiledV2PaletteTest.compilationRetainsNoStaticStateThatOutlivesTheCompiledPalette` |
 | `LOAD.040` | `INVARIANT` |  |  | `CompiledV2PaletteTest.resolvingAMarkerAtAPositionAllocatesNothing` |
 | `LOAD.041` | `INVARIANT` |  |  | `CompiledV2PaletteTest.resolvingAMarkerAtAPositionAllocatesNothing` |
 | `LOAD.042` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred`, `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag`, `CompiledV2PaletteTest.theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards` |

@@ -192,7 +192,9 @@ other fifteen are the two limits worth knowing about: nine markers already carry
 converted variant and a node has one `$ref`, so the trait stays written out beside it unless the shared
 definition is respelled to carry both (`{ "$ref": "urbex:bricks", "traits": { … } }`, one asset per
 variant); and six are in inline palettes still written in version 1, which have no `$defs` and no `$ref`
-at all.
+at all. Those six are why version 1 cannot be removed —
+[issue #219](https://github.com/Arilas/urbex/issues/219) is the work of converting them, and until it
+lands `VER.004`'s promise is load-bearing for the shipped pack and not only for other people's.
 
 Stated with its arithmetic rather than as "replaces every one of them", which this pack disproved the
 first time anyone tried it. [VER.031](09-migration.md#5-what-the-converter-cannot-do) carries the same

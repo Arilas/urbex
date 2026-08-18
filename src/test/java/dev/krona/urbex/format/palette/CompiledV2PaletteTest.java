@@ -26,6 +26,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -107,13 +108,17 @@ class CompiledV2PaletteTest {
      * {@code LOAD.023}: trait sets are interned, so slots sharing one share the object.
      * <p>
      * Asserted with {@code assertSame}, which is what the rule says and what {@code assertEquals} would
-     * not: the point is one object for 128 slots, not 128 equal ones. Also across markers, because
-     * {@code LOAD.030} makes sharing structural rather than recovered afterwards - two markers whose
-     * traits are the same fact hold the same set.
+     * not: the point is one object for 128 slots, not 128 equal ones.
+     * <p>
+     * <b>This test used to cite {@code LOAD.030} as well, and could not have failed for it.</b>
+     * {@link #PALETTE} has no {@code $defs} and no {@code $ref}, so the cross-marker line below compares
+     * two traitless plain-string markers: it reduced to {@code assertSame(TraitSet.EMPTY,
+     * TraitSet.EMPTY)}, which is true of any implementation whatsoever. The citation moved to
+     * {@link #twoMarkersReferencingOneDefinitionShareOneCompiledRepresentation()}, which builds the
+     * situation the rule is about.
      */
     @Test
     @Rule("LOAD.023")
-    @Rule("LOAD.030")
     void traitSetsAreInternedSoSlotsSharingOneShareTheObject() {
         CompiledV2Palette palette = compiled();
         CompiledEntry weighted = palette.entry('#');
@@ -132,6 +137,66 @@ class CompiledV2PaletteTest {
         assertSame(TraitSet.EMPTY, palette.entry('X').slot(0).traits(),
                 "a slot with no traits is the one shared empty set");
         assertNotSame(palette.entry('e').slot(0).traits(), TraitSet.EMPTY);
+    }
+
+    /**
+     * {@code LOAD.030}: two markers that reference one definition share one compiled representation.
+     * <p>
+     * The rule's situation, built rather than approximated: a {@code $defs} entry carrying a trait whose
+     * satellite is itself a reference, two markers pointing at it, and two <em>different</em> blocks
+     * under them so that nothing about the sharing can be an accident of the markers being alike. What
+     * is asserted same is the whole chain the definition contributes - the interned {@link TraitSet},
+     * the {@link CompiledTrait} inside it, and the {@link CompiledEntry} its {@code into} satellite
+     * compiled to.
+     * <p>
+     * <b>The three negative assertions are the ones that make the positive ones mean something.</b> The
+     * shared set is asserted non-empty and not {@link TraitSet#EMPTY}, because a sharing assertion over
+     * the empty set is true of every implementation ever written; and {@code 'C'}, which writes an
+     * {@code urbex:damaged} of its own naming a different form, is asserted <em>not</em> to share, so
+     * the test distinguishes "shared because it is one definition" from "same object for everything".
+     * <p>
+     * "Established at compile time rather than recovered afterwards" is what {@code assertSame} on the
+     * satellite says that {@code assertEquals} would not: version 1's two static interning pools existed
+     * precisely to recover this identity after the fact, and {@code LOAD.031} is the other half of the
+     * same sentence.
+     */
+    @Test
+    @Rule("LOAD.030")
+    void twoMarkersReferencingOneDefinitionShareOneCompiledRepresentation() {
+        CompiledV2Palette palette = TraitTest.compile("""
+                { "version": 2,
+                  "$defs": {
+                    "rubble":     { "kind": "weighted", "choices": [
+                                      { "share": 0.5, "block": "minecraft:cobweb" },
+                                      { "rest": true, "block": "minecraft:iron_bars" } ] },
+                    "damageable": { "traits": { "urbex:damaged": { "into": { "$ref": "rubble" } } } } },
+                  "palette": {
+                    "A": { "$ref": "damageable", "block": "minecraft:stone_bricks" },
+                    "B": { "$ref": "damageable", "block": "minecraft:bricks" },
+                    "C": { "block": "minecraft:deepslate_bricks",
+                           "traits": { "urbex:damaged": { "into": "minecraft:cobweb" } } } } }
+                """, Set.of());
+
+        assertNotEquals(palette.entry('A').slot(0).state(), palette.entry('B').slot(0).state(),
+                "the two markers place different blocks, so nothing below is shared by looking alike");
+
+        TraitSet first = palette.entry('A').slot(0).traits();
+        TraitSet second = palette.entry('B').slot(0).traits();
+        assertFalse(first.isEmpty(), "the definition contributes a trait, so there is something to share");
+        assertNotSame(TraitSet.EMPTY, first, "and it is not the empty set, which shares trivially");
+        assertSame(first, second, "LOAD.030: one definition, one compiled representation");
+
+        CompiledTrait damagedA = first.get(DAMAGED).orElseThrow();
+        CompiledTrait damagedB = second.get(DAMAGED).orElseThrow();
+        assertSame(damagedA, damagedB, "the trait itself, not merely an equal copy");
+        assertNotNull(damagedA.satellite(Damaged.INTO), "the definition's satellite compiled");
+        assertSame(damagedA.satellite(Damaged.INTO), damagedB.satellite(Damaged.INTO),
+                "and the satellite it resolves through is the same compiled entry");
+
+        TraitSet own = palette.entry('C').slot(0).traits();
+        assertFalse(own.isEmpty());
+        assertNotSame(first, own,
+                "a marker writing its own damaged form shares nothing with the definition's");
     }
 
     /**
@@ -252,9 +317,15 @@ class CompiledV2PaletteTest {
      * compilation, and ten thousand resolutions later it has not moved. A tag node is in the palette on
      * purpose - {@code MODEL.052} says a tag is "expanded at load […] and never read during generation",
      * so a palette with no tag in it would prove nothing.
+     * <p>
+     * The last assertion is {@code MODEL.050}'s - "one block drawn uniformly from the tag's members" -
+     * and it was already here, cited by nothing. The annotation was the only thing missing, which is a
+     * reminder that {@code @Rule} is the whole binding: an assertion the index cannot see is an
+     * assertion the index reports as absent.
      */
     @Test
     @Rule("LOAD.042")
+    @Rule("MODEL.050")
     @Rule("MODEL.052")
     void resolvingAMarkerReadsNoTag() {
         int[] asked = {0};
@@ -337,16 +408,16 @@ class CompiledV2PaletteTest {
      * a static registry instead of the handed one would ask it here and the counter would not see it -
      * and {@code LOAD.042}'s block half beside {@code resolvingAMarkerReadsNoTag}'s tag half.
      * <p>
-     * Two compilations of one document produce equal answers with no state passed between them, which
-     * is {@code LOAD.031}: version 1 held "two static interning pools […] that nothing emptied, so every
-     * palette of every world loaded in a process lifetime stayed reachable through them". And
-     * {@code LOAD.011} is structural and is asserted as such - {@link CompiledV2Palette#at} takes no
-     * collector and returns no failure, so there is nowhere for a generation-time diagnostic to go.
+     * Two compilations of one document produce equal answers with no state passed between them, which is
+     * a necessary condition of {@code LOAD.031} and nowhere near a sufficient one - <b>a static interning
+     * pool satisfies it exactly</b>, which is the version 1 defect that rule forbids, so this test no
+     * longer cites it. {@link #compilationRetainsNoStaticStateThatOutlivesTheCompiledPalette()} is the
+     * one that can fail on a pool. {@code LOAD.011} moved out for the same reason: it was argued in this
+     * javadoc and asserted nowhere, and is now
+     * {@link #nothingAGeneratedPaletteExposesCanReportADiagnostic()}.
      */
     @Test
     @Rule("LOAD.003")
-    @Rule("LOAD.011")
-    @Rule("LOAD.031")
     @Rule("LOAD.042")
     void theCompilerReadsOnlyTheRegistryItWasHandedAndKeepsNothingAfterwards() {
         CountingBlocks blocks = new CountingBlocks(BuiltInRegistries.BLOCK);
@@ -373,6 +444,208 @@ class CompiledV2PaletteTest {
                     "two compilations of one document agree, so nothing was carried between them");
         }
         assertNotSame(first, second);
+    }
+
+    /**
+     * {@code LOAD.031}: compilation retains no state in a static field that outlives the compiled palette.
+     * <p>
+     * <b>Why this is not "two compilations agree".</b> That is what this rule used to be checked by, and
+     * a static interning pool - the exact thing version 1 held two of, and the exact thing this rule
+     * forbids - passes it: a pool makes two compilations agree <em>more</em> readily, not less, and the
+     * two palettes are still distinct objects. The guard has to look at the static fields themselves.
+     * <p>
+     * So it does. Every class of {@code format.palette} and {@code format.palette.traits}, nested classes
+     * included - {@code CompiledV2Palette.Compiler} among them, which is where the interning pool and the
+     * two memos actually live, as instance fields - is reflected over. Two things are asserted: that no
+     * static field is non-final (a mutable static is retained state by definition), and that no static
+     * {@link java.util.Collection}, {@link java.util.Map} or array changes size across eight compilations
+     * of eight distinct palettes. A pool that grew by one entry per palette moves a size and fails here.
+     * <p>
+     * <b>One compilation runs before the baseline is taken</b>, deliberately: a registry populated on
+     * first use is one-time initialisation and not retained per-palette state, and folding it into the
+     * baseline is what keeps this test measuring the thing the rule is about. And the scan asserts it
+     * found something - a walk that silently resolved no class, or found no static collection, would
+     * report "nothing grew" about nothing at all, which is the vacuity this whole fix wave is about.
+     */
+    @Test
+    @Rule("LOAD.031")
+    void compilationRetainsNoStaticStateThatOutlivesTheCompiledPalette() {
+        List<Class<?>> classes = compilationClasses();
+        assertTrue(classes.size() >= 20,
+                () -> "the class walk found only " + classes.size() + " classes; it is not scanning"
+                        + " the compiler at all");
+
+        List<String> nonFinal = new ArrayList<>();
+        for (Class<?> type : classes) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())
+                        && !java.lang.reflect.Modifier.isFinal(field.getModifiers())
+                        && !field.isSynthetic()) {
+                    nonFinal.add(type.getName() + "." + field.getName());
+                }
+            }
+        }
+        assertTrue(nonFinal.isEmpty(),
+                () -> "LOAD.031: a non-final static field is retained state: " + nonFinal);
+
+        compileEight(0);
+        java.util.Map<String, Integer> before = staticContainerSizes(classes);
+        assertFalse(before.isEmpty(),
+                "the scan found no static collection, map or array at all, so it could not have"
+                        + " noticed one growing");
+        compileEight(8);
+        assertEquals(before, staticContainerSizes(classes),
+                "LOAD.031: a static container grew while compiling, so compilation is retaining state"
+                        + " that outlives the palettes it built");
+    }
+
+    /**
+     * Eight palettes, compiled, no two alike and none alike any other round's.
+     * <p>
+     * {@code from} is what makes the second round different from the first, and it is not decoration: a
+     * pool keyed by value - which is what an interning pool is - does not grow when the same eight
+     * documents are compiled twice, so re-compiling one round would have measured nothing. Proven the
+     * hard way: the first version of this guard did exactly that, a deliberate leak was injected into
+     * {@code compile}, and the guard passed.
+     */
+    private static void compileEight(int from) {
+        for (int at = from; at < from + 8; at++) {
+            TraitTest.compile("{ \"version\": 2, \"$defs\": { \"d\": { \"traits\":"
+                    + " { \"urbex:damaged\": { \"into\": \"minecraft:cobweb\" } } } },"
+                    + " \"palette\": { \"" + (char) ('A' + at) + "\": { \"$ref\": \"d\","
+                    + " \"kind\": \"weighted\", \"choices\": ["
+                    + " { \"weight\": " + (at + 1) + ", \"block\": \"minecraft:stone_bricks\" },"
+                    + " { \"weight\": 3, \"block\": \"minecraft:bricks\" } ] } } }", Set.of());
+        }
+    }
+
+    /** {@code <class>.<field>} to the size of every static container the compiler's classes declare. */
+    private static java.util.Map<String, Integer> staticContainerSizes(List<Class<?>> classes) {
+        java.util.Map<String, Integer> sizes = new java.util.LinkedHashMap<>();
+        for (Class<?> type : classes) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (!java.lang.reflect.Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
+                    continue;
+                }
+                Object value;
+                try {
+                    field.setAccessible(true);
+                    value = field.get(null);
+                } catch (ReflectiveOperationException | RuntimeException unreadable) {
+                    continue;
+                }
+                String name = type.getName() + "." + field.getName();
+                if (value instanceof java.util.Collection<?> collection) {
+                    sizes.put(name, collection.size());
+                } else if (value instanceof java.util.Map<?, ?> map) {
+                    sizes.put(name, map.size());
+                } else if (value != null && value.getClass().isArray()) {
+                    sizes.put(name, java.lang.reflect.Array.getLength(value));
+                }
+            }
+        }
+        return sizes;
+    }
+
+    /**
+     * Every class of the two packages compilation is implemented in, nested classes included.
+     * <p>
+     * Read off the source tree rather than off a classpath scan: the test module has no classpath-scanner
+     * dependency, and {@code SpecDocuments} already establishes reading {@code src/} directly as this
+     * suite's way of asking a question about the whole tree. A file that does not resolve to a class is
+     * skipped rather than failing - a package-private helper compiled into another file's class would
+     * otherwise turn a widening of the walk into a failure about nothing.
+     */
+    private static List<Class<?>> compilationClasses() {
+        List<Class<?>> classes = new ArrayList<>();
+        for (String pkg : List.of("dev.krona.urbex.format.palette",
+                "dev.krona.urbex.format.palette.traits")) {
+            java.nio.file.Path dir = dev.krona.urbex.format.SpecDocuments.repoRoot()
+                    .resolve("src/main/java").resolve(pkg.replace('.', '/'));
+            if (!java.nio.file.Files.isDirectory(dir)) {
+                continue;
+            }
+            try (java.util.stream.Stream<java.nio.file.Path> listing = java.nio.file.Files.list(dir)) {
+                listing.filter(file -> file.toString().endsWith(".java")).sorted().forEach(file -> {
+                    String simple = file.getFileName().toString().replaceFirst("\\.java$", "");
+                    try {
+                        addWithNested(Class.forName(pkg + "." + simple), classes);
+                    } catch (ClassNotFoundException | LinkageError absent) {
+                        // Not a top-level type of its own file; nothing to scan.
+                    }
+                });
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        }
+        return classes;
+    }
+
+    private static void addWithNested(Class<?> type, List<Class<?>> into) {
+        into.add(type);
+        for (Class<?> nested : type.getDeclaredClasses()) {
+            addWithNested(nested, into);
+        }
+    }
+
+    /**
+     * {@code LOAD.011}: no compiled palette can raise a diagnostic during generation.
+     * <p>
+     * The rule is structural, and this asserts the structure instead of arguing it. Every public method
+     * of every type generation holds - the palette, its entries, a resolved slot, a trait set, a compiled
+     * trait, the marker index - is checked for a {@code Diagnostics}, a {@code Diag} or a
+     * {@code DataResult} anywhere in its parameters or its return type. There is nowhere for a generation-time diagnostic to go because
+     * there is no type in the surface that could carry one.
+     * <p>
+     * <b>The last assertion is what makes the rest a measurement.</b> An absence is only evidence when
+     * the detector is known to fire, so the detector is pointed at {@link CompiledV2Palette#compile} -
+     * which does take a collector, because it is load and not generation - and asserted to find it. A
+     * scan that had stopped seeing {@code Diagnostics} at all would pass every other line of this test
+     * and fail that one. The earlier version of this claim lived in a javadoc beside
+     * {@code assertNotNull(first.at(...))}, which is an argument in a comment.
+     */
+    @Test
+    @Rule("LOAD.011")
+    void nothingAGeneratedPaletteExposesCanReportADiagnostic() {
+        List<Class<?>> surface = List.of(CompiledV2Palette.class, CompiledEntry.class,
+                CompiledEntry.Resolved.class, TraitSet.class, CompiledTrait.class, MarkerIndex.class);
+        List<String> offenders = new ArrayList<>();
+        int scanned = 0;
+        for (Class<?> type : surface) {
+            for (java.lang.reflect.Method method : type.getMethods()) {
+                if (method.getDeclaringClass() == Object.class) {
+                    continue;
+                }
+                if (type == CompiledV2Palette.class && "compile".equals(method.getName())) {
+                    continue;
+                }
+                scanned++;
+                if (reports(method)) {
+                    offenders.add(type.getSimpleName() + "." + method.getName());
+                }
+            }
+        }
+        assertTrue(offenders.isEmpty(), () -> "LOAD.011: a compiled palette's surface can carry a"
+                + " diagnostic, so generation has somewhere to raise one: " + offenders);
+        int methods = scanned;
+        assertTrue(methods >= 20, () -> "only " + methods + " methods were scanned; the surface this"
+                + " asserts an absence over is not being read");
+
+        assertTrue(java.util.Arrays.stream(CompiledV2Palette.class.getMethods())
+                        .filter(method -> "compile".equals(method.getName()))
+                        .anyMatch(CompiledV2PaletteTest::reports),
+                "compile takes a collector, and the check above must be able to see one - otherwise"
+                        + " every absence it reports is an absence of looking");
+    }
+
+    /** Whether a diagnostic can pass through this method in either direction. */
+    private static boolean reports(java.lang.reflect.Method method) {
+        List<Class<?>> types = new ArrayList<>(List.of(method.getParameterTypes()));
+        types.add(method.getReturnType());
+        return types.stream().anyMatch(type -> type == dev.krona.urbex.format.Diagnostics.class
+                || type == dev.krona.urbex.format.Diag.class
+                || type == dev.krona.urbex.format.Diagnostics.Entry.class
+                || type == com.mojang.serialization.DataResult.class);
     }
 
     /**

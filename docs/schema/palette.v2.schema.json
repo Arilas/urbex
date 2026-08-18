@@ -2,56 +2,104 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Arilas/urbex/main/docs/schema/palette.v2.schema.json",
   "title": "Urbex palette (version 2)",
-  "description": "A version 2 palette asset (data/<namespace>/urbex/palettes/<name>.json) or a definitions asset, as MODEL.001 through MODEL.005 in docs/format/palette/00-model.md define it. The node model - MODEL.010's five positions a node appears in - is expressed as one recursive '$defs/node', referenced by every position a node can occupy: a marker's value, a '$defs' value, a 'choices' entry, a socket candidate, and a block-valued trait field. What this schema cannot check is anything that needs another document, a registry, or arithmetic across sibling choices - REF.013's dangling $ref, WEIGHT.014's share totals, TRAIT.021's pool lookup and the rest are refused by the loader, not here; see PaletteSchemaTest for exactly which REJECT fixtures this schema is expected to catch.",
+  "description": "A version 2 palette asset (data/<namespace>/urbex/palettes/<name>.json) or a definitions asset (data/<namespace>/urbex/definitions/<name>.json), as MODEL.001 through MODEL.005 and REF.014 through REF.019 in docs/format/palette/ define them. The two are alternatives at the top level - '$defs/paletteAsset' and '$defs/definitionsAsset' - because a definitions asset IS a node with three file-level keys around it, so its top-level key set is the node's and not the palette's; a single closed object over the palette's five keys described one of them and refused all thirteen of the other that ship. The node model - MODEL.010's five positions a node appears in - is expressed as one recursive '$defs/node', referenced by every position a node can occupy: a marker's value, a '$defs' value, a 'choices' entry, a socket candidate, a block-valued trait field, and a definitions asset's own document. What this schema cannot check is anything that needs another document, a registry, or arithmetic across sibling choices - REF.013's dangling $ref, WEIGHT.014's share totals, TRAIT.021's pool lookup and the rest are refused by the loader, not here; see PaletteSchemaTest for exactly which REJECT fixtures this schema is expected to catch.",
   "type": "object",
-  "properties": {
-    "version": {
-      "const": 2,
-      "description": "MODEL.002: a palette file with no 'version' is version 1, and any value other than 1 or 2 is refused. This schema describes the version 2 shape alone, so it fixes the value rather than leaving it an integer."
+  "anyOf": [
+    {
+      "$ref": "#/$defs/paletteAsset"
     },
-    "extends": {
-      "$ref": "#/$defs/qualifiedIdentifier",
-      "description": "MERGE.001: the one palette this file builds on, fully qualified."
-    },
-    "$imports": {
-      "type": "object",
-      "description": "REF.080: an alias name to a pointer prefix, expanded textually wherever '$<name>' is written.",
-      "additionalProperties": {
-        "type": "string"
-      },
-      "propertyNames": {
-        "not": {
-          "const": "super"
-        },
-        "description": "REF.082: '$super' is a built-in alias and may not be declared in '$imports'."
-      }
-    },
-    "$defs": {
-      "type": "object",
-      "description": "REF.001: a definition name to a node. REF.020, MODEL.082: a definition need not resolve to a block source, so this is the one position that stays partial - 'nodeOrBlock', not 'nodeOrBlockComplete'.",
-      "additionalProperties": {
-        "$ref": "#/$defs/nodeOrBlock"
-      },
-      "propertyNames": {
-        "minLength": 1
-      }
-    },
-    "palette": {
-      "type": "object",
-      "description": "MODEL.003: a marker to a node. Required somewhere in the 'extends' chain, not in every file - so this key is optional here. MODEL.081: a marker position must resolve to a block source, so this is 'nodeOrBlockComplete'.",
-      "additionalProperties": {
-        "$ref": "#/$defs/nodeOrBlockComplete"
-      },
-      "propertyNames": {
-        "minLength": 1
-      }
+    {
+      "$ref": "#/$defs/definitionsAsset"
     }
-  },
-  "required": [
-    "version"
   ],
-  "additionalProperties": false,
   "$defs": {
+    "paletteAsset": {
+      "type": "object",
+      "description": "MODEL.001: a palette asset - the five file-level keys 'version', 'extends', '$imports', '$defs' and 'palette', and no others. PaletteSchemaTest compares this branch's 'properties' against PaletteV2Definition.FILE_LEVEL_KEYS.",
+      "properties": {
+        "version": {
+          "const": 2,
+          "description": "MODEL.002: a palette file with no 'version' is version 1, and any value other than 1 or 2 is refused. This schema describes the version 2 shape alone, so it fixes the value rather than leaving it an integer."
+        },
+        "extends": {
+          "$ref": "#/$defs/qualifiedIdentifier",
+          "description": "MERGE.001: the one palette this file builds on, fully qualified."
+        },
+        "$imports": {
+          "type": "object",
+          "description": "REF.080: an alias name to a pointer prefix, expanded textually wherever '$<name>' is written.",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "not": {
+              "const": "super"
+            },
+            "description": "REF.082: '$super' is a built-in alias and may not be declared in '$imports'."
+          }
+        },
+        "$defs": {
+          "type": "object",
+          "description": "REF.001: a definition name to a node. REF.020, MODEL.082: a definition need not resolve to a block source, so this is the one position that stays partial - 'nodeOrBlock', not 'nodeOrBlockComplete'.",
+          "additionalProperties": {
+            "$ref": "#/$defs/nodeOrBlock"
+          },
+          "propertyNames": {
+            "minLength": 1
+          }
+        },
+        "palette": {
+          "type": "object",
+          "description": "MODEL.003: a marker to a node. Required somewhere in the 'extends' chain, not in every file - so this key is optional here. MODEL.081: a marker position must resolve to a block source, so this is 'nodeOrBlockComplete'.",
+          "additionalProperties": {
+            "$ref": "#/$defs/nodeOrBlockComplete"
+          },
+          "propertyNames": {
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "definitionsAsset": {
+      "type": "object",
+      "description": "REF.014: a definitions asset is a single node, with the same file-level keys 'version' and 'extends', and no 'palette'. REF.018 adds '$imports' and refuses '$defs': it is one node, so it has nothing to put names on. So the node's own keys are siblings of the file-level ones rather than nested under a field, which is why this composes '$defs/node' with allOf and closes the union with unevaluatedProperties - the same shape '$defs/choice' already uses, and the same shape DefinitionAssetDefinition.CODEC decodes. Partial rather than complete ('node', not 'completeNode'): REF.020 and MODEL.082 let a definition stay partial forever, and the bundled urbex:damageable is exactly that - a 'traits' block and no block source at all. REF.019 is why 'version' is required and fixed to 2: this registry has no version 1 form, so an absent 'version' is not one.",
+      "allOf": [
+        {
+          "$ref": "#/$defs/node"
+        }
+      ],
+      "properties": {
+        "version": {
+          "const": 2,
+          "description": "REF.019: a definitions asset declares \"version\": 2. An absent 'version' is refused with DIAG.071 rather than read as version 1."
+        },
+        "extends": {
+          "$ref": "#/$defs/qualifiedIdentifier",
+          "description": "MERGE.001: the one definitions asset this one builds on, fully qualified."
+        },
+        "$imports": {
+          "type": "object",
+          "description": "REF.080: an alias name to a pointer prefix, expanded textually wherever '$<name>' is written.",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "not": {
+              "const": "super"
+            },
+            "description": "REF.082: '$super' is a built-in alias and may not be declared in '$imports'."
+          }
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "unevaluatedProperties": false
+    },
     "qualifiedIdentifier": {
       "type": "string",
       "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$",

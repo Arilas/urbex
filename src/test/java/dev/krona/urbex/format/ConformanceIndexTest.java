@@ -200,6 +200,105 @@ class ConformanceIndexTest {
         assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
     }
 
+    /**
+     * The converse of the check above, and the one that would have caught the three rules it missed.
+     * <p>
+     * {@code README.md} §4.1: a {@code reject=<DIAG-ID>} fixture claims "the load fails, and the
+     * diagnostic identifier matches". That is a {@code REJECT} rule's claim, stated by the fixture - so
+     * a rule carrying one and classed anything else has said two different things about itself. Three
+     * did: {@code MODEL.013}, {@code MODEL.051} and {@code REF.082} were all {@code MUST} with a
+     * {@code reject=} fixture, which is why
+     * {@link #everyRejectOrWarnRuleCitesADefinedDiagnostic()} - which starts by filtering to
+     * {@code REJECT} and {@code WARN} - skipped all three and enforced "every rejection cites a DIAG"
+     * over 311 of 314 identifiers while reading as though it covered them all.
+     * <p>
+     * The diagnostic is compared too, not only the class. A rule that refuses with one {@code DIAG} and
+     * demonstrates the refusal with a fixture expecting another is a rule whose fixture proves something
+     * else, and nothing else in this suite reads both halves at once.
+     */
+    @Test
+    void everyRuleWithARejectFixtureIsClassRejectAndCitesThatFixturesDiagnostic() {
+        SpecDocuments spec = SpecDocuments.load();
+        List<String> failures = new ArrayList<>();
+        for (SpecDocuments.Fixture fixture : spec.fixtures()) {
+            if (fixture.outcome() != SpecDocuments.Outcome.REJECT) {
+                continue;
+            }
+            SpecDocuments.SpecRule rule = spec.rules().get(fixture.ruleId());
+            if (rule == null) {
+                continue;
+            }
+            if (!"REJECT".equals(rule.cls())) {
+                failures.add(fixture.file() + ":" + fixture.line() + ": " + rule.id()
+                        + " has a reject= fixture but is class " + rule.cls()
+                        + "; a fixture that says the load fails is a REJECT rule's claim");
+            } else if (!rule.diag().equals(fixture.diag())) {
+                failures.add(fixture.file() + ":" + fixture.line() + ": " + rule.id() + " refuses with "
+                        + rule.diag().orElse("no DIAG") + " and its fixture expects "
+                        + fixture.diag().orElseThrow());
+            }
+        }
+        assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
+    }
+
+    /**
+     * {@code README.md} §3.3's third status marker is parsed, is defined where it is used, and names an
+     * issue.
+     * <p>
+     * <b>It was a convention with no tooling</b> - the same defect Task 4 found and fixed for tombstones.
+     * {@code SpecDocuments}' rule pattern read {@code [NO-FIXTURE]} and not this, §3.3 defined two
+     * markers and not three, and {@code TRAIT.011} therefore parsed as an ordinary {@code MUST}: the
+     * index listed two citing tests beside a rule the specification declares unreached, with nothing
+     * anywhere saying what those tests were able to assert.
+     * <p>
+     * Three things are asserted, and the first is the one that makes the marker tooling rather than a
+     * string in a document: at least one rule carries it. A parse that had silently stopped matching
+     * would leave the other two assertions true of an empty list.
+     */
+    @Test
+    void everyNotYetReachedRuleIsParsedNamesAnIssueAndIsCoveredByACitingTest() {
+        SpecDocuments spec = SpecDocuments.load();
+        List<SpecDocuments.SpecRule> marked = spec.rules().values().stream()
+                .filter(rule -> rule.notYetReachedReason().isPresent())
+                .toList();
+        assertFalse(marked.isEmpty(),
+                "no rule parses as [NOT-YET-REACHED]; §3.3 defines the marker, so either the documents"
+                        + " stopped using it or SpecDocuments stopped reading it");
+
+        List<String> failures = new ArrayList<>();
+        for (SpecDocuments.SpecRule rule : marked) {
+            String reason = rule.notYetReachedReason().orElseThrow();
+            if (!Pattern.compile("issue #\\d+").matcher(reason).find()) {
+                failures.add(rule.file() + ": " + rule.id() + " is [NOT-YET-REACHED: " + reason
+                        + "], which names no issue; §3.3 says the reason names the issue that reaches it");
+            }
+            if (spec.citingTests().getOrDefault(rule.id(), List.of()).isEmpty()) {
+                failures.add(rule.file() + ": " + rule.id() + " is [NOT-YET-REACHED] and has no citing"
+                        + " test; the marker says what a test can assert, not that none is needed");
+            }
+        }
+        assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
+    }
+
+    /** §3.3's marker list and the markers the documents actually use are the same list. */
+    @Test
+    void theStatusMarkersTheDocumentsUseAreTheOnesTheReadmeDefines() throws IOException {
+        String readme = Files.readString(SpecDocuments.repoRoot().resolve("docs/format/README.md"));
+        String status = readme.substring(readme.indexOf("### 3.3 Status"),
+                readme.indexOf("### 3.4"));
+        Matcher stated = Pattern.compile("([A-Za-z]+) markers exist").matcher(status);
+        assertTrue(stated.find(), "§3.3 no longer states how many status markers there are");
+        Set<String> defined = new LinkedHashSet<>();
+        Matcher bullet = Pattern.compile("(?m)^- `\\[([A-Z-]+)").matcher(status);
+        while (bullet.find()) {
+            defined.add(bullet.group(1));
+        }
+        assertEquals(NUMBER_WORDS.indexOf(stated.group(1).toLowerCase(Locale.ROOT)), defined.size(),
+                () -> "§3.3 says '" + stated.group(1) + " markers' and defines " + defined);
+        assertTrue(defined.contains("NOT-YET-REACHED"),
+                () -> "§3.3 must define the marker TRAIT.011 carries: " + defined);
+    }
+
     @Test
     void everyFixtureCitesADefinedRule() {
         SpecDocuments spec = SpecDocuments.load();

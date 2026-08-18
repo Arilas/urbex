@@ -48,6 +48,12 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * the inline palettes of six parts and buildings and as its {@code variants} registry, and the
  * registries that are not palettes at all. Those spell a block {@code block} and {@code damaged} and
  * nothing else.</p>
+ *
+ * <p><b>The general form of that failure is open as
+ * <a href="https://github.com/Arilas/urbex/issues/220">issue #220</a>:</b> a walk that dispatches on a
+ * document's format silently stops covering an asset the moment that asset's format changes, and the
+ * only thing that noticed here was a reviewer disabling the version 2 branch by hand. The two guards
+ * over this walk are the local fix; nothing yet makes the general case fail on its own.</p>
  */
 final class ShippedBlockRefs {
 

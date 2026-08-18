@@ -9,6 +9,7 @@ import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.SpecDocuments;
+import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
 import dev.krona.urbex.format.palette.traits.BlockEntityNbt;
 import dev.krona.urbex.format.palette.traits.Damaged;
 import dev.krona.urbex.format.palette.traits.Light;
@@ -147,13 +148,39 @@ class PaletteSchemaTest {
     // Drift guards: every key set the schema declares, against the codec it describes.
     // ------------------------------------------------------------------------------------------
 
-    /** {@code MODEL.001}: the five file-level keys, and no others. */
+    /**
+     * The top level is the two documents this schema says it describes, and nothing else.
+     * <p>
+     * <b>It used to be one closed object over the palette's five keys</b>, while the {@code description}
+     * beside it said "a version 2 palette asset […] or a definitions asset". Measured rather than
+     * argued: 30 of 30 shipped palettes validated and 13 of 13 shipped definitions assets were refused,
+     * every one of them by {@code additionalProperties} on the node keys a definitions asset carries at
+     * its top level ({@code REF.014}). {@link #everyShippedAssetValidatesAgainstTheSchema()} is the
+     * check whose absence let that stand for a whole task.
+     */
+    @Test
+    void theTopLevelIsExactlyTheTwoDocumentShapesTheSchemaClaimsToDescribe() throws IOException {
+        JsonNode schema = readSchemaNode();
+        JsonNode alternatives = schema.get("anyOf");
+        assertTrue(alternatives != null && alternatives.isArray(),
+                "expected the top level to be an 'anyOf' over the two document shapes");
+        List<String> branches = new ArrayList<>();
+        alternatives.forEach(branch -> branches.add(branch.path("$ref").asText()));
+        assertEquals(List.of("#/$defs/paletteAsset", "#/$defs/definitionsAsset"), branches,
+                "the top level should name exactly the palette and definitions branches");
+        assertTrue(schema.get("properties") == null && schema.get("additionalProperties") == null,
+                "the two shapes' key sets live in their own branches, not half at the top level");
+    }
+
+    /** {@code MODEL.001}: the five file-level keys of a palette asset, and no others. */
     @Rule("MODEL.001")
     @Test
     void schemaFileLevelPropertiesMatchPaletteV2DefinitionFileLevelKeys() throws IOException {
-        JsonNode schema = readSchemaNode();
+        JsonNode schema = readSchemaNode().at("/$defs/paletteAsset");
+        assertFalse(schema.isMissingNode(), "expected a '$defs/paletteAsset' schema");
         assertEquals(PaletteV2Definition.FILE_LEVEL_KEYS, propertyNames(schema),
-                "top-level schema properties should exactly match PaletteV2Definition.FILE_LEVEL_KEYS");
+                "'$defs/paletteAsset' properties should exactly match"
+                        + " PaletteV2Definition.FILE_LEVEL_KEYS");
         JsonNode additionalProperties = schema.get("additionalProperties");
         assertTrue(additionalProperties != null && additionalProperties.isBoolean()
                         && !additionalProperties.asBoolean(),
@@ -163,6 +190,112 @@ class PaletteSchemaTest {
                         && StreamSupport.stream(required.spliterator(), false)
                                 .anyMatch(node -> "version".equals(node.asText())),
                 "expected 'version' to be required at the file level");
+    }
+
+    /**
+     * {@code REF.014}, {@code REF.018}, {@code REF.019}: a definitions asset's file-level keys, drift-
+     * guarded against {@link DefinitionAssetDefinition#FILE_LEVEL_KEYS} exactly as the palette's are
+     * against {@link PaletteV2Definition#FILE_LEVEL_KEYS}.
+     * <p>
+     * The codec constant had no schema and no guard, which is why the branch above could describe one
+     * document and be tested against the other. The rest of the key universe is the node's, so this also
+     * asserts what makes it so - the branch composes {@code $defs/node} rather than restating it, and
+     * closes the union with {@code unevaluatedProperties} so that {@code REF.018}'s refusal of
+     * {@code $defs} needs nothing said about {@code $defs}.
+     */
+    @Rule("REF.014")
+    @Rule("REF.018")
+    @Rule("REF.019")
+    @Test
+    void schemaDefinitionsAssetPropertiesMatchDefinitionAssetDefinitionFileLevelKeys()
+            throws IOException {
+        JsonNode schema = readSchemaNode().at("/$defs/definitionsAsset");
+        assertFalse(schema.isMissingNode(), "expected a '$defs/definitionsAsset' schema");
+        assertEquals(Set.copyOf(DefinitionAssetDefinition.FILE_LEVEL_KEYS), propertyNames(schema),
+                "'$defs/definitionsAsset' properties should exactly match"
+                        + " DefinitionAssetDefinition.FILE_LEVEL_KEYS");
+
+        JsonNode composed = schema.get("allOf");
+        assertTrue(composed != null && composed.isArray() && composed.size() == 1
+                        && "#/$defs/node".equals(composed.get(0).path("$ref").asText()),
+                "a definitions asset is a node with three keys around it, so its schema should compose"
+                        + " '$defs/node' rather than restate it: " + composed);
+        JsonNode unevaluated = schema.get("unevaluatedProperties");
+        assertTrue(unevaluated != null && unevaluated.isBoolean() && !unevaluated.asBoolean(),
+                "expected '$defs/definitionsAsset' to declare \"unevaluatedProperties\": false, which is"
+                        + " what refuses '$defs' (REF.018) and 'palette' (REF.014) without naming them");
+        assertEquals(2, schema.at("/properties/version/const").asInt(),
+                "REF.019: a definitions asset declares version 2 and there is no other version of it");
+    }
+
+    /**
+     * Every asset the mod ships, validated against the schema that claims to describe it.
+     * <p>
+     * <b>This is the test whose absence is the whole of the defect above.</b> Both key sets were
+     * drift-guarded against their codecs, every fixture in the specification was run, and nothing ever
+     * pointed the schema at the pack - so a schema that refused all thirteen shipped definitions assets
+     * passed a suite of 84 assertions written specifically about it.
+     * <p>
+     * The counts are asserted, not just the validations: a walk that found no file would otherwise
+     * report a clean run over nothing, which is the same vacuity one directory over. A palette that is
+     * not version 2 is skipped rather than failed - {@code VER.004} keeps version 1 loadable and this
+     * schema describes version 2 - and the skipped count is asserted zero today, so the day a version 1
+     * palette reappears in the pack this test says so rather than quietly covering one fewer file.
+     */
+    @TestFactory
+    Stream<DynamicTest> everyShippedAssetValidatesAgainstTheSchema() throws IOException {
+        JsonSchema schema = loadSchema();
+        List<Path> assets = shippedAssets();
+        List<DynamicTest> tests = new ArrayList<>();
+        int[] palettes = {0};
+        int[] definitions = {0};
+        int[] skipped = {0};
+
+        for (Path asset : assets) {
+            JsonNode document = toJackson(Files.readString(asset));
+            boolean definitionsAsset = asset.getParent().getFileName().toString().equals("definitions");
+            if (!definitionsAsset && document.path("version").asInt(1) != 2) {
+                skipped[0]++;
+                continue;
+            }
+            if (definitionsAsset) {
+                definitions[0]++;
+            } else {
+                palettes[0]++;
+            }
+            String name = SpecDocuments.repoRoot().relativize(asset).toString();
+            tests.add(DynamicTest.dynamicTest(name, () -> {
+                Set<ValidationMessage> messages =
+                        schema.validate(workAroundHashMarkerBug(document));
+                assertTrue(messages.isEmpty(),
+                        () -> name + ": the shipped asset does not validate: " + messages);
+            }));
+        }
+
+        tests.add(DynamicTest.dynamicTest("the walk found the pack", () -> {
+            assertTrue(palettes[0] >= 30, () -> "expected the bundled palettes, found " + palettes[0]);
+            assertTrue(definitions[0] >= 13,
+                    () -> "expected the bundled definitions assets, found " + definitions[0]);
+            assertEquals(0, skipped[0],
+                    "no bundled palette is version 1 any more; a skipped one is a file this test"
+                            + " silently stopped covering");
+        }));
+        return tests.stream();
+    }
+
+    /** Every {@code palettes/} and {@code definitions/} asset under {@code src/main/resources/data}. */
+    private static List<Path> shippedAssets() throws IOException {
+        Path data = SpecDocuments.repoRoot().resolve("src/main/resources/data");
+        try (Stream<Path> walk = Files.walk(data)) {
+            return walk.filter(path -> path.toString().endsWith(".json"))
+                    .filter(path -> {
+                        Path parent = path.getParent();
+                        String dir = parent == null ? "" : parent.getFileName().toString();
+                        return dir.equals("palettes") || dir.equals("definitions");
+                    })
+                    .sorted()
+                    .toList();
+        }
     }
 
     /**
@@ -360,7 +493,9 @@ class PaletteSchemaTest {
     /**
      * Works around a blind spot in {@code com.networknt:json-schema-validator} 1.5.6: an object key that
      * is literally {@code "#"} makes it report every validation of that subtree as passing, whatever the
-     * schema says.
+     * schema says. Filed upstream and tracked as
+     * <a href="https://github.com/Arilas/urbex/issues/218">issue #218</a>; this method is the workaround
+     * that issue is about, and it goes when the library version that fixes it lands.
      * <p>
      * Reproduced directly: {@code {"palette":{"#":{"kind":"weighted","choices":[]}}}} validates cleanly
      * against this schema, and the same document with any other marker in {@code "#"}'s place correctly

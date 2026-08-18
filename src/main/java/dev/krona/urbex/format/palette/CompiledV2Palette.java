@@ -318,10 +318,29 @@ public final class CompiledV2Palette {
         }
 
         /**
-         * Stages 4 to 6 over one marker: sizes, exclusion, tag expansion, then trait validation.
+         * Stages 4 and 5 over one marker: sizes, exclusion, trait validation, then tag expansion.
          * <p>
          * Returns the node the entry is built from, which is not the node stage 3 produced:
          * alternatives have gone, and every {@code tag} has become the weighted list of its members.
+         * <p>
+         * <b>Trait validation runs before expansion, and it used to run after.</b> Neither position is
+         * fixed by {@code LOAD.001}'s table - trait validation is not one of its eight stages - but the
+         * order decides what a diagnostic says, and after expansion it said something nobody wrote.
+         * A {@code tag} node's traits are copied onto every member the tag expands to, with their
+         * provenance intact, so each member reads as a declaration: {@code {"kind":"tag","tag":
+         * "#minecraft:wool","traits":{"urbex:block_entity":{…}}}} produced four {@code DIAG.022}
+         * messages, three of them addressed {@code choice 0}/{@code 1}/{@code 2} at positions the
+         * author's file has no array for, and none of them naming {@code #minecraft:wool}. That is the
+         * unreachable branch of {@link TraitContext#writtenBlocks}'s {@code Source.Tag} case, and its
+         * javadoc is where the rule it serves is written down: a diagnostic derived from a value is
+         * only true if the value is the one the file wrote.
+         * <p>
+         * The rules themselves read the same way round or better. {@code TRAIT.041} is "a node
+         * <em>none</em> of whose resolved states has a block entity", and its {@code > Why none rather
+         * than any} calls refusing a list because one member cannot hold the NBT "the over-rejection
+         * {@code ACCEPT} exists as a class to prevent" - which is exactly what asking each expanded
+         * member separately did. {@link TraitContext#statesOf} answers a {@code tag} with every member
+         * it has, so the "none" is asked of the whole tag here, once, at the marker.
          */
         private Optional<ResolvedNode> prepare(ResolvedNode node, PointerResolver.Site site) {
             if (!Apportion.checkSizes(node, site, diagnostics)) {
@@ -331,11 +350,10 @@ public final class CompiledV2Palette {
             if (pruned.isEmpty()) {
                 return Optional.empty();
             }
-            Optional<ResolvedNode> expanded = expandTags(pruned.get(), site);
-            if (expanded.isEmpty()) {
+            if (!validateTraits(pruned.get(), site)) {
                 return Optional.empty();
             }
-            return validateTraits(expanded.get(), site) ? expanded : Optional.empty();
+            return expandTags(pruned.get(), site);
         }
 
         /**
@@ -724,11 +742,17 @@ public final class CompiledV2Palette {
         /**
          * Whether this node <em>is</em> a slot rather than a list slots are drawn from.
          * <p>
-         * By the time trait validation runs, a {@code tag} has become a weighted list and every leaf is
-         * a {@code block} or an {@code alias}. An alias counts, and contributes nothing: by
-         * {@code MODEL.064} its target is answered by the merge a part is generated with, so
-         * {@code TraitContext.statesOf} returns nothing for it and every check reads an unanswerable
-         * question as "do not refuse".
+         * Trait validation runs before expansion ({@link #prepare}), so a {@code tag} reaches here as a
+         * {@code tag} and counts as a slot: it names one block source, and {@link TraitContext#statesOf}
+         * answers it with every member the epoch has. That is the reading {@code DIAG.023}'s own text
+         * asks for - "none of the blocks it resolves to emit light" - and it is the same "none" that
+         * {@code TRAIT.041} states. A weighted node and a socket are the two that are not slots, because
+         * they are what slots are drawn <em>from</em>; {@link #validateTraits} recurses into their
+         * alternatives, and each alternative is asked on its own.
+         * <p>
+         * An alias counts, and contributes nothing: by {@code MODEL.064} its target is answered by the
+         * merge a part is generated with, so {@code TraitContext.statesOf} returns nothing for it and
+         * every check reads an unanswerable question as "do not refuse".
          */
         private static boolean isSlot(ResolvedNode node) {
             return !(node.source() instanceof ResolvedNode.Source.Weighted)
@@ -748,9 +772,10 @@ public final class CompiledV2Palette {
          * codec, a DFU type error - and they count as fatal. Folding only {@link Diagnostics#all()}
          * would let a trait refuse a compile and contribute no text: {@code hasFatal} would be true,
          * {@code run} would return empty, and the outer collector would hold nothing, so every caller's
-         * {@code asError().orElseThrow()} would throw instead of reporting. No trait calls
-         * {@code nested} today; the point is that one could, and this is the method where that class of
-         * silence has already bitten once.
+         * {@code asError().orElseThrow()} would throw instead of reporting. No trait's
+         * {@link TraitType#validateValue} calls {@code nested} today - {@link Trait#parse} does, twice,
+         * but that is decoding and never reaches this collector; the point is that a validator could,
+         * and this is the method where that class of silence has already bitten once.
          */
         private void report(Diagnostics from) {
             from.all().forEach(entry -> {

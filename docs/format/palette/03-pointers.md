@@ -246,8 +246,8 @@ it. `$imports` names prefixes once.
 > > `t` instead of naming the misspelt import. Reporting an unknown alias as one is worth more than
 > > aliasing an arbitrary prefix.
 
-> **REF.082** · `MUST` — `$super` is a built-in alias, available in every file, and may not be
-> declared in `$imports`.
+> **REF.082** · `REJECT` (`DIAG.070`) — `$super` is a built-in alias, available in every file, and an
+> `$imports` entry declaring it is refused.
 
 > > **Why** — `$super` was already an alias in everything but name: a token standing for a pointer
 > > prefix, usable with a fragment after it. Making imports the general mechanism and `$super` its one

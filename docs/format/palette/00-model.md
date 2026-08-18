@@ -90,8 +90,8 @@ node ::= {
 
 > **MODEL.012** · `REJECT` (`DIAG.004`) — A `kind` outside the five defined values is refused.
 
-> **MODEL.013** · `MUST` — `kind` selects exactly one block source. The kind-specific keys of one
-> kind are not accepted on another, and are caught by MODEL.004.
+> **MODEL.013** · `REJECT` (`DIAG.003`) — `kind` selects exactly one block source, so a kind-specific
+> key of one kind written on another is refused as the unknown key MODEL.004 makes it.
 
 > > **Why** — version 1 allowed `block`, `blocks`, `variant`, `frompalette` and a socket
 > > `lightSource` on one entry. They were mutually exclusive but nothing said so: an `if`/`else if`
@@ -265,8 +265,8 @@ same structure by two spellings. A named weighted node in the
 > **MODEL.050** · `MUST` — A `tag` node places one block drawn uniformly from the block tag named
 > by its required `tag` field.
 
-> **MODEL.051** · `MUST` — `tag` names a block tag with a leading `#` and a namespace:
-> `#minecraft:planks`.
+> **MODEL.051** · `REJECT` (`DIAG.012`) — A `tag` that does not name a block tag with a leading `#`
+> and a namespace is refused; the accepted spelling is `#minecraft:planks`.
 
 > **MODEL.052** · `MUST` — A tag is expanded at load, against the tag epoch the palette is compiled
 > under, and never read during generation.

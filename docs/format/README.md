@@ -129,12 +129,23 @@ statement and belongs in the specification, not in a comment.
 
 ### 3.3 Status
 
-A rule with no status marker is normative and current. Two markers exist:
+A rule with no status marker is normative and current. Three markers exist:
 
 - `[PROPOSED]` — written, not yet implemented. Tests may exist and be `@Disabled` with the rule id
   as the reason. A release may not ship with a `[PROPOSED]` rule in a document not itself marked
   `[DRAFT]`.
 - `[DEPRECATED → X.NNN]` — still enforced, superseded by another rule, scheduled for removal.
+- `[NOT-YET-REACHED: <issue>]` — normative, current, and implemented as far as it can be, but no code
+  path reaches the situation it describes yet, so a citing test can cover how the rule is *written*
+  and not what it *does*. The reason names the issue that will reach it:
+
+      > **DEMO.011** · `MUST` `[NOT-YET-REACHED: issue #216]` — …
+
+  It is not `[PROPOSED]`, which is a rule nothing implements; a release may ship with one. A rule
+  carrying it still needs a citing test, on the same terms as any other rule — and the marker is what
+  keeps that test from reading as coverage it is not. `SpecDocuments` parses it, and the
+  [conformance index](palette/conformance.md) lists every rule that carries it beside the rule table,
+  because the table shows citing tests and cannot show what they were able to assert.
 
 ### 3.4 Tombstones
 
@@ -230,6 +241,15 @@ drift-guard the preset schema already uses, applied to the rule set. It addition
 - any rule has no citing test and no fixture (an unenforced claim)
 - any test cites a rule identifier that does not exist (a stale test)
 - any `REJECT` rule cites a `DIAG` that no rule produces
+- any rule carrying a `reject=` fixture is not class `REJECT`, or cites a different `DIAG` than that
+  fixture expects (the converse of the line above, and the one that catches a misclassified rule
+  before the line above skips it)
+
+**What the index cannot see is whether a citing test could fail.** A `@Rule` annotation binds a test
+to a rule; nothing checks that the test's assertions are reachable, so an assertion that reduces to
+`assertSame(EMPTY, EMPTY)` counts here exactly as a real one does. Four such guards have been found in
+this specification's tests so far, each by hand. Making that mechanical — mutation over the rules a
+test claims to cover — is [issue #217](https://github.com/Arilas/urbex/issues/217).
 
 ### 5.1 How a test cites a rule
 
@@ -292,48 +312,69 @@ renumbered — the permanence guarantee in §3.1 begins when the document leaves
 
 Recorded here rather than discovered later. Each of these is a known hole, not an oversight.
 
-**A version 2 palette generates, and three things about it are not finished.** The pipeline has a
-production caller as of `VER.015`'s retirement: a registered or inline version 2 palette is compiled at
-world load through all of [LOAD.001](palette/07-compilation.md#1-the-pipeline), merges with version 1
-palettes into one lookup, and places blocks. What is not finished:
+**A version 2 palette generates, the bundled pack is written in version 2, and one thing is not
+finished.** The pipeline has a production caller as of `VER.015`'s retirement: a registered or inline
+version 2 palette is compiled at world load through all of
+[LOAD.001](palette/07-compilation.md#1-the-pipeline), merges with version 1 palettes into one lookup,
+and places blocks. All 30 bundled palettes and all 13 bundled `definitions` assets declare
+`"version": 2`; `V2Palettes` builds the `definitions` index off the world being loaded and 14 of the
+30 palettes point through it, so [REF.043](palette/02-references.md) and
+[REF.045](palette/03-pointers.md#1-pointers) resolve against real assets rather than being refused by
+name. What is not finished:
 
 - **[TRAIT.011](palette/01-traits.md#41-urbexdamaged) is not reached.** The damage pass has no marker to
   key on, so a version 2 palette's damage mapping collapses exactly as version 1's does. The rule carries
-  a `[NOT-YET-REACHED]` marker naming the issue that fixes it.
-- **A pointer into another asset does not resolve at load.**
-  [REF.043](palette/02-references.md) and [REF.045](palette/03-pointers.md#1-pointers) let a pointer name
-  another palette or a `definitions` asset; the compiler is handed an empty definitions index, so such a
-  pointer is refused by name rather than resolved. That registry is the next task's.
-- **The bundled pack is still version 1.** Nothing that ships is written in version 2, so the evidence
-  that any of this works against real data is the test pack rather than the shipped one.
+  §3.3's `[NOT-YET-REACHED]` marker naming the issue that fixes it, and the
+  [conformance index](palette/conformance.md) lists it separately from the rules whose citing tests
+  cover what they do.
 
-The [conformance index](palette/conformance.md) is the list of which rules remain unenforced.
+**The authoring guide has no version 2 content.** [`docs/datapacks.md`](../datapacks.md) is the
+task-shaped guide §7's table points at, and it describes the version 1 palette throughout — `blocks`,
+the `variants` registry, a `variant` behind a character. It mentions neither `$defs` nor `$ref` nor
+`traits` nor the `definitions` registry, and it does not say that the bundled pack it uses as its
+worked example is now written in a format it does not document. §7 says a conflict between the guide
+and the specification is a bug in the guide; this is a whole registry of them.
+
+**Version 1 cannot be removed, and the shipped pack is why.** Six files — three parts and three
+buildings — carry inline palettes still written in version 1, and the `variants` registry they use is
+version 1 with no version 2 form of its own. So `VER.004`'s promise that version 1 does not change is
+load-bearing for this pack and not only for other people's, and every version 1 code path it names is
+reachable from the bundled data. Converting those six is
+[issue #219](https://github.com/Arilas/urbex/issues/219).
 
 **Not every fixture runs.** `FormatFixtureTest` runs every fixture whose outcome decoding alone
-decides; the rest are listed in that class, each naming the task it waits for, and the list is checked
-so that a fixture cannot fall out of coverage or stay listed after it becomes runnable.
+decides. One is listed in that class instead: `MODEL.062#1`, whose rule is decided where a style's
+palette groups are merged rather than against one document, so a one-document harness has no outcome
+to assert — the rule is covered by three citing tests instead. The list is checked, so a fixture
+cannot fall out of coverage or stay listed after it becomes runnable.
 
-**Four `[NO-FIXTURE]` rules have no citing test yet.** The rest gained one as the stages landed; the
-four that remain need a style with several palette groups, a part file's slice rows, or a command
-invocation, and `ConformanceIndexTest` carries the enumerated exemptions until they do.
+**Two `[NO-FIXTURE]` rules have no citing test yet.** Of the 15 rules carrying the marker, 13 gained
+one as the stages landed; `CHAR.011` needs a part file's slice rows and `CHAR.022` needs a
+marker-assigning command, and `ConformanceIndexTest` carries those two as enumerated exemptions until
+they do. That field fails the moment either gains a test, so it cannot outlive the work.
 
 **The design record does not exist.** §2 forbids these documents from holding discussion,
-alternatives considered and measurements, on the grounds that a design record holds them. That record
-has not been written, so the rejected alternatives currently survive only in `> Why` blocks — which
-is the right place for the reason but the wrong place for the argument.
+alternatives considered and measurements, on the grounds that a design record holds them. There is no
+palette v2 record under `docs/superpowers/specs/`, so the rejected alternatives currently survive only
+in `> Why` blocks — which is the right place for the reason but the wrong place for the argument.
 
 **`LOAD` has no fixtures, by construction.** Every rule in it is `MUST` or `INVARIANT`, so §4.2's
 completeness check does not reach it. The compilation guarantees — including every performance
 invariant — are therefore the least externally-checked part of the specification, and the easiest to
-let rot.
+let rot. Three of its citing tests have already been found asserting something that could not fail;
+that they were found by hand rather than by tooling is §5's own hole, and
+[issue #217](https://github.com/Arilas/urbex/issues/217).
 
-**Two behaviours are `[PROPOSED]`, not specified**: `urbex:oriented`, which would derive a facing
-from a block's surroundings, and the `$super` alias's interaction with a future kind that introduces
-a list this document does not define.
+**One behaviour is `[PROPOSED]`, not specified**: `urbex:oriented`, which would derive a facing from a
+block's surroundings. The `$super` alias's interaction with a future kind that introduces a list this
+document does not define is noted where it would arise ([REF.040](palette/03-pointers.md#1-pointers),
+[WEIGHT.001](palette/05-weights.md#1-one-spelling-of-size)) and is not written as a rule at all, which
+is the weaker of the two states and is deliberate: there is no such kind to specify against.
 
-**Registries other than `palettes` have no version 2.** `VER.040` and `VER.041` say how one adopts
-this pattern; nothing has. `conditions`, `variants`, `styles` and the rest remain version 1 only,
-which `VER.013` makes safe but does not make finished.
+**Registries other than `palettes` and `definitions` have no version 2.** `VER.040` and `VER.041` say
+how one adopts this pattern; `definitions` is the only registry that has, and it is a special case —
+`REF.019` gives it no version 1 form to coexist with. `conditions`, `variants`, `styles`, `parts`,
+`buildings` and the rest remain version 1 only, which `VER.013` makes safe but does not make finished.
 
 **The Python generator was scaffolding, and is gone.** `docs/format/conformance.py` produced
 `palette/conformance.md` before there was a Java tree to parse these documents in. `SpecDocuments`
