@@ -3,6 +3,8 @@ package dev.krona.urbex.data;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.krona.urbex.format.palette.TraitType;
+import dev.krona.urbex.format.palette.Traits;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -30,6 +33,36 @@ class DatapackReferenceIntegrityTest {
     private static final Path ROOT = Path.of("src/main/resources/data/urbex/urbex");
     private static final Path ASSETS_ROOT = Path.of("src/main/resources/assets/urbex");
 
+    /**
+     * Which trait field names an asset, and in which registry - read off the traits themselves.
+     *
+     * <p>{@code TRAIT.090} makes a trait declare its own reference fields
+     * ({@code TraitType.references()}) precisely so that "reference validation reads that declaration"
+     * rather than carrying a list beside it, and {@code TRAIT.022}'s {@code > Why} measures what the
+     * list cost in version 1: "version 1 recorded which string fields were asset references in a
+     * different place from the fields themselves". A hardcoded {@code List.of("urbex:loot",
+     * "urbex:spawner")} here would be correct today and silent the day an eighth trait names a pool -
+     * which is the same "a guessed key list is how a guard goes quietly out of date" that
+     * {@link ShippedBlockRefs} exists to stop.</p>
+     *
+     * <p>The registry's own path is the directory it loads from ({@code urbex:conditions} lives in
+     * {@code conditions/}), which is what {@link #ref} takes.</p>
+     */
+    private static final Map<String, Map<String, String>> TRAIT_REFERENCES = traitReferences();
+
+    private static Map<String, Map<String, String>> traitReferences() {
+        Map<String, Map<String, String>> byTrait = new LinkedHashMap<>();
+        for (TraitType<?> trait : Traits.all()) {
+            Map<String, String> fields = new LinkedHashMap<>();
+            trait.references().forEach(target ->
+                    fields.put(target.field(), target.registry().identifier().getPath()));
+            if (!fields.isEmpty()) {
+                byTrait.put(trait.id().toString(), fields);
+            }
+        }
+        return Map.copyOf(byTrait);
+    }
+
     private Path root = ROOT;
     private Path assetsRoot = ASSETS_ROOT;
     /** target category (directory under ROOT) -> collected [sourceFile, reference] pairs */
@@ -42,6 +75,24 @@ class DatapackReferenceIntegrityTest {
         }
         assertTrue(problems.isEmpty(),
                 () -> problems.size() + " bad datapack references:\n" + String.join("\n", problems));
+    }
+
+    /**
+     * The derivation in {@link #TRAIT_REFERENCES} is pinned, because an empty one disables silently.
+     *
+     * <p>Asserted <em>about</em> the registry rather than used <em>as</em> the registry: the walk reads
+     * {@code TraitType.references()}, so an eighth trait naming a pool is checked the day it is
+     * registered, and this fails then to say so out loud rather than because anything depends on the
+     * list. A refactor that made the derivation yield nothing would otherwise leave every trait
+     * reference in the pack unchecked and every test still green.</p>
+     */
+    @Test
+    void theTraitReferenceFieldsAreReadOffTheTraitsThemselves() {
+        assertEquals(Map.of(
+                        "urbex:loot", Map.of("pool", "conditions"),
+                        "urbex:spawner", Map.of("pool", "conditions")),
+                TRAIT_REFERENCES,
+                "TRAIT.090 says a trait declares its own reference fields; these are the ones that do");
     }
 
     /** The optional nested edge is a city-style reference under the same static validation as its base. */
@@ -227,12 +278,12 @@ class DatapackReferenceIntegrityTest {
             definitionRef(src, node.get("$ref"));
             JsonObject traits = asObject(node.get("traits"));
             if (traits != null) {
-                for (String trait : List.of("urbex:loot", "urbex:spawner")) {
+                TRAIT_REFERENCES.forEach((trait, fields) -> {
                     JsonObject payload = asObject(traits.get(trait));
                     if (payload != null) {
-                        ref(src, payload.get("pool"), "conditions");
+                        fields.forEach((field, category) -> ref(src, payload.get(field), category));
                     }
-                }
+                });
             }
             for (Map.Entry<String, JsonElement> e : node.entrySet()) {
                 if (e.getKey().equals("palette") && e.getValue().isJsonArray()) {

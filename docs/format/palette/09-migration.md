@@ -251,8 +251,14 @@ The retired set, and what each becomes:
 > > `{ "$ref": "urbex:damageable" }` against one partial definition in the `definitions` registry — the
 > > registry tier rather than `$defs`, because [REF.011](02-references.md#2-where-a-name-resolves)'s
 > > table puts a definition used by more than one file there and these were used by fourteen. Nine
-> > stayed written out, because their markers already carry a `$ref` into a converted variant and a node
-> > has one. The tool now counts **6** there, which are version 1's spelling surviving in the inline
+> > stayed written out, and there are three ways to spell those and not two: their markers already carry
+> > a `$ref` into a converted variant and a node has one `$ref`, so the trait can stay written out beside
+> > it, or move onto the variant's own definition — which changes what that shared definition means for
+> > every later user of it — or move onto a **second** definitions asset per variant that carries both
+> > the `$ref` and the trait, which is the only one of the three that both shares the trait and leaves
+> > the variant alone. The third was measured and generates identically; it was declined because six new
+> > registry assets to remove nine inline trait blocks is not a saving, and that is a judgement rather
+> > than a constraint. The tool now counts **6** there, which are version 1's spelling surviving in the inline
 > > palettes of six parts and buildings; the reference packs are untouched and Modern Tweaks still
 > > reports 257 uses of 7 distinct values. Restated here rather than left at sixty because
 > > [VER.032](#5-what-the-converter-cannot-do) makes a figure nobody can reproduce a claim, and the

@@ -110,6 +110,14 @@ class V1ToV2Test {
      * now, and a version 2 file has no version 1 side for a before-and-after to have. Neither reference
      * pack has a {@code free} list, so without this the four-candidate case would go uncompared —
      * which is the coverage this document exists to keep, not a fixture invented to make a point.</p>
+     *
+     * <p><b>It is a hand transcription and nothing can detect it drifting.</b> Its original is gone
+     * from the working tree; the only copy is in git at {@code 2ada507f}, and no test diffs against
+     * history. So an edit here that silently changed a weight would change what this test compares
+     * without failing anything — which is a limit of carrying a fixture whose source no longer exists,
+     * not one this file can close. What still holds it honest is the assertions below: the version 1
+     * side must produce {@code 6, 3, 1, 8, 2, 8, 2} and {@code 6, 2, 1, 1}, which is the document read
+     * back, and Modern Tweaks' own shipped socket is compared beside it.</p>
      */
     private static final String BUNDLED_SOCKETS_IN_VERSION_1 = """
             {

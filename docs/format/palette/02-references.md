@@ -184,8 +184,19 @@ A partial definition is how a trait is shared without a second mechanism for sha
 }
 ```
 
-In the shipped Urbex palettes `damaged` has exactly one distinct value across all sixty uses. A
-single `rubble` definition replaces every one of them.
+In the shipped Urbex palettes `damaged` had exactly one distinct value across all sixty uses, and a
+single partial definition replaces most of them. It is written as one now — `urbex:damageable`, in the
+`definitions` registry rather than in one file's `$defs`, because §2's tier table puts a definition used
+by more than one file there and these were used by fourteen — and **45 of the 60** point at it. The
+other fifteen are the two limits worth knowing about: nine markers already carry a `$ref` into a
+converted variant and a node has one `$ref`, so the trait stays written out beside it unless the shared
+definition is respelled to carry both (`{ "$ref": "urbex:bricks", "traits": { … } }`, one asset per
+variant); and six are in inline palettes still written in version 1, which have no `$defs` and no `$ref`
+at all.
+
+Stated with its arithmetic rather than as "replaces every one of them", which this pack disproved the
+first time anyone tried it. [VER.031](09-migration.md#5-what-the-converter-cannot-do) carries the same
+figures from the migration side.
 
 ## 5. Resolution order and cycles
 
