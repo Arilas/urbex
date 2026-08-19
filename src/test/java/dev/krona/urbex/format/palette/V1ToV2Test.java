@@ -79,23 +79,27 @@ class V1ToV2Test {
     /**
      * The three packs {@code VER.021} names, as pack roots: the directory holding {@code palettes/}.
      *
-     * <p><b>Modern Tweaks is read from a frozen snapshot, not from its live pack.</b> That pack is
+     * <p><b>Both addon packs are read from frozen snapshots, not from their live packs.</b> Both are
      * written in version 2 now, and a version 2 palette has no version 1 form to compile beside — so
-     * pointing at it would not have failed, it would have silently emptied the corpus this whole class
-     * measures. {@code reference/v1-snapshot/urbex} is that pack exactly as it stood before conversion,
-     * kept in its own repository and never edited to follow it.
+     * pointing at either would not have failed, it would have silently emptied the corpus this whole
+     * class measures. {@code reference/v1-snapshot/urbex} in each repository is that pack exactly as it
+     * stood before conversion, kept beside the pack it came from and never edited to follow it.
+     *
+     * <p>Zombie Apocalypse Essentials' snapshot is taken <em>after</em> its unassigned-codepoint markers
+     * were reassigned, so it is a valid version 1 pack rather than merely the last one. The 41 files
+     * that carried those markers were what stopped it converting at all.
      *
      * <p>The property here is about the <em>converter</em>, not about what any pack ships today, so the
      * corpus must not shrink every time a pack migrates. Left pointing at the live pack, the sweep in
      * {@link #everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion} would have fallen from 79
-     * palettes to five — Zombie Apocalypse Essentials' seven less the two that name a variant — and
-     * every count in this class would have been re-pinned downwards to match, which is how a guard
-     * stops guarding while every assertion in it still passes.</p>
+     * palettes to five, and then from five to none when this pack converted too — with every count in
+     * this class re-pinned downwards to match each time, which is how a guard stops guarding while
+     * every assertion in it still passes.</p>
      */
     private static final Map<String, Path> PACKS = Map.of(
             "urbex", Path.of("src/main/resources/data/urbex/urbex"),
             "urbexmt", Path.of("../Urbex-ModernTweaks/reference/v1-snapshot/urbex"),
-            "urbexza", Path.of("../Urbex-Zombie-Apocalypse-Essentials/pack/data/urbexza/urbex"));
+            "urbexza", Path.of("../Urbex-Zombie-Apocalypse-Essentials/reference/v1-snapshot/urbex"));
 
     /**
      * The two of them still written in version 1, which is what a before-and-after can be run over.
@@ -477,10 +481,15 @@ class V1ToV2Test {
                     () -> file + " grew a $defs, and VER.030 forbids inventing one");
         }
 
-        assertEquals(5285, V1ToV2.survey(PACKS.get("urbexza")).inlineEntries()
+        assertEquals(5276, V1ToV2.survey(PACKS.get("urbexza")).inlineEntries()
                         - V1ToV2.survey(PACKS.get("urbexza")).distinctInline(),
                 "VER.031's other number: 6,527 inline entries in Zombie Apocalypse Essentials of "
-                        + "which 1,242 are distinct");
+                        + "which 1,251 are distinct. It was 1,242 until that pack's markers on "
+                        + "unassigned codepoints were reassigned: an entry is distinct by its whole "
+                        + "JSON text, the marker included, and nine markers that had been one "
+                        + "codepoint each across 41 files became a per-file choice. The total is "
+                        + "unchanged, which is the check that the reassignment moved markers and "
+                        + "not entries.");
     }
 
     /**

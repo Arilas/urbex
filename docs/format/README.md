@@ -355,11 +355,17 @@ those twelve assets and nothing else, so it now covers no bundled file at all. I
 rather than deleted — the branch still reads the registries that are not palettes, none of which spells
 a block today, and an assertion of zero fails the moment one does.
 
-Both of those rules are retired. Modern Tweaks converted — 98 palettes, 58 variants and 60 inline
-palettes, with the shipped tool and no blockers — and `VER.018` then removed version 1 from the loader
-outright. Zombie Apocalypse Essentials has not converted and cannot yet: 41 of its 79 inline palettes
-name markers on unassigned codepoints, which its exporter produced and only its exporter can fix
-(`CHAR.021`'s `> Why`). It is the one pack this removal breaks, knowingly.
+Both of those rules are retired, and no pack is left waiting on them. Modern Tweaks converted — 98
+palettes, 58 variants, 60 inline palettes — and `VER.018` then removed version 1 from the loader
+outright. Zombie Apocalypse Essentials converted after it: the 41 inline palettes that could not be
+translated were the ones naming markers on unassigned codepoints, and reassigning those 1,111 marker
+occurrences was a `sed` over its own data rather than anything this format could do for it. Nothing can
+produce such a marker again — `CHAR.020`'s alphabet is what `/exportpart` draws from now.
+
+Each pack keeps a frozen `reference/v1-snapshot/`, and those two snapshots are the whole version 1
+corpus `VER.021` is verified against. That is deliberate: the property is about the converter, not
+about what any pack ships today, so the corpus must not shrink each time a pack migrates. Pointed at
+the live packs it would now be empty, and empty would not have failed.
 
 What survives of version 1 is the compile path, and only in the sense that the converter needs it:
 `VER.021` is verified by compiling every shipped version 1 palette both ways and comparing marker by
