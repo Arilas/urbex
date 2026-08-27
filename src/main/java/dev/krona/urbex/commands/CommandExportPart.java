@@ -17,10 +17,11 @@ import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
+import dev.krona.urbex.format.palette.MarkerAlphabet;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
+import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
-import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -86,16 +87,6 @@ public class CommandExportPart implements Command<CommandSourceStack> {
 
         List<List<String>> slices = new ArrayList<>();
         Set<Character> usedCharacters = new HashSet<>(palette.getCharacters());
-        StringBuilder chars = new StringBuilder("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:'<>,.?/`~");
-
-        // Add various unicode characters
-        for (int i = 0x0370; i < 0x0400; i++) {
-            chars.append((char) i);
-        }
-        for (int i = 0x0400; i < 0x0500; i++) {
-            chars.append((char) i);
-        }
-        String possibleChars = chars.toString();
 
         for (int y = 0 ; y < part.getSliceCount() ; y++) {
             List<String> yslice = new ArrayList<>();
@@ -109,16 +100,11 @@ public class CommandExportPart implements Command<CommandSourceStack> {
                         c = unknowns.get(state);
                     }
                     if (c == null) {
-                        // New state!
-                        // Find a character that is not yet used
-                        for (int i = 0 ; i < possibleChars.length() ; i++) {
-                            char cc = possibleChars.charAt(i);
-                            if (!usedCharacters.contains(cc)) {
-                                c = cc;
-                                break;
-                            }
-                        }
-
+                        // New state. CHAR.020: drawn from the assignment alphabet, never from a
+                        // codepoint range - the range this used to walk is how nine unassigned
+                        // codepoints reached a shipped pack. CHAR.022: exhausting it throws, naming
+                        // the limit, rather than continuing past the end.
+                        c = MarkerAlphabet.next(usedCharacters);
                         unknowns.put(state, c);
                         usedCharacters.add(c);
                     }
@@ -133,15 +119,9 @@ public class CommandExportPart implements Command<CommandSourceStack> {
         JsonObject root = new JsonObject();
 
         if (!unknowns.isEmpty()) {
-            List<PaletteEntry> entries = new ArrayList<>();
-            for (Map.Entry<BlockState, Character> entry : unknowns.entrySet()) {
-                entries.add(PaletteEntry.block(entry.getValue(), Tools.stateToString(entry.getKey())));
-            }
-            PaletteDefinition paletteDefinition = new PaletteDefinition(Optional.empty(), Optional.of(entries));
-            DataResult<JsonElement> result = PaletteDefinition.CODEC.encodeStart(JsonOps.INSTANCE, paletteDefinition);
             root.add("__comment__", new JsonPrimitive("'missingpalette' represents all blockstates that it couldn't find in the palette. These have to be put in a palette. " +
                     "'exportedpart' is the actual exported part"));
-            root.add("missingpalette", result.result().get());
+            root.add("missingpalette", missingPalette(unknowns));
         } else {
             root.add("__comment__", new JsonPrimitive("'exportedpart' is the actual exported part"));
         }
@@ -167,4 +147,49 @@ public class CommandExportPart implements Command<CommandSourceStack> {
 
         return Command.SINGLE_SUCCESS;
     }
+
+    /**
+     * The {@code missingpalette} block, in palette format version 2.
+     *
+     * <p>Emitted as a version 2 document because version 1 is being removed and an exporter that writes
+     * a format the loader is about to refuse is a trap with a delay on it. It is the one place Urbex
+     * <em>writes</em> a palette rather than reading one, so it is also the first thing that has to move.
+     *
+     * <p>Markers are sorted, and by the alphabet's own order rather than by codepoint: exporting the
+     * same part twice produces the same file, and the entries come out in the order the markers were
+     * handed out. {@code unknowns} is a {@link HashMap} keyed by blockstate, so without this the block
+     * order would follow a hash and two exports of one part would differ for no reason a reader could
+     * see.
+     *
+     * <p>{@code MODEL.020}'s string shorthand, because every entry here is a bare blockstate and
+     * nothing else - which is also what the converter emits for the same shape.
+     */
+    private static JsonObject missingPalette(Map<BlockState, Character> unknowns) {
+        Map<Character, String> byMarker = new HashMap<>();
+        unknowns.forEach((state, marker) -> byMarker.put(marker, Tools.stateToString(state)));
+
+        JsonObject palette = new JsonObject();
+        for (char marker : MarkerAlphabet.markers()) {
+            String block = byMarker.get(marker);
+            if (block != null) {
+                palette.addProperty(Character.toString(marker), block);
+            }
+        }
+
+        JsonObject document = new JsonObject();
+        document.addProperty("version", PaletteV2Definition.FORMAT_VERSION);
+        document.add("palette", palette);
+
+        // A self-check, not a formality: this file exists to be pasted into a datapack, and an
+        // exporter that writes something the loader refuses fails at the one moment nobody is
+        // watching - in someone else's pack, hours later. Cheap here, since it is one small document.
+        DataResult<PaletteAssetDefinition> decoded =
+                PaletteAssetDefinition.CODEC.parse(JsonOps.INSTANCE, document);
+        if (decoded.error().isPresent()) {
+            throw new IllegalStateException("/exportpart produced a palette Urbex will not load: "
+                    + decoded.error().orElseThrow().message());
+        }
+        return document;
+    }
+
 }

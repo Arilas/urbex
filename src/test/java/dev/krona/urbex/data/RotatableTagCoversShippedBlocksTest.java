@@ -19,14 +19,12 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,13 +47,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>
  * Tag references inside the tag are expanded from the vanilla data on the classpath, so the test
  * checks what the game will actually resolve, not the literal file contents.
+ * <p>
+ * <b>Which strings this asks about is {@link ShippedBlockRefs}, shared with
+ * {@link ShippedBlockIdsResolveTest} rather than copied.</b> It used to be a copy, keyed on version 1's
+ * {@code block} and {@code damaged}, and converting the bundled pack to version 2 disabled it: a marker
+ * written as {@code "k": "minecraft:rail[shape=north_south]"} has no {@code block} key, so the walk
+ * found 200 refs where it had found 333, and seventy distinct block states - every {@code rail},
+ * {@code powered_rail}, {@code ladder}, {@code lever}, {@code iron_trapdoor}, {@code iron_door},
+ * {@code barrel}, {@code oak_fence} and most stairs - stopped being asked about at all. It kept
+ * passing, because the tag was complete; the next palette entry for a directional block would have
+ * shipped issue #117 again with nothing to catch it.
  */
 class RotatableTagCoversShippedBlocksTest {
 
-    private static final Path DATA_ROOT = Path.of("src/main/resources/data");
     private static final Path ROTATABLE = Path.of("src/main/resources/data/urbex/tags/block/rotatable.json");
-
-    private record Ref(String value, String file) {}
 
     @BeforeAll
     static void bootstrap() {
@@ -68,17 +73,11 @@ class RotatableTagCoversShippedBlocksTest {
         Set<Identifier> rotatable = expand(ROTATABLE, Files.readString(ROTATABLE), new LinkedHashSet<>());
         assertFalse(rotatable.isEmpty(), "the rotatable tag expanded to nothing");
 
-        List<Ref> refs = new ArrayList<>();
-        try (Stream<Path> files = Files.walk(DATA_ROOT)) {
-            for (Path file : files.filter(p -> p.toString().endsWith(".json")).toList()) {
-                collectBlockRefs(JsonParser.parseString(Files.readString(file)),
-                        value -> refs.add(new Ref(value, file.toString())));
-            }
-        }
+        List<ShippedBlockRefs.Ref> refs = ShippedBlockRefs.under(ShippedBlockRefs.DATA_ROOT);
         assertFalse(refs.isEmpty(), "found no block ids at all - the walk or the key names are wrong");
 
         Set<String> problems = new TreeSet<>();
-        for (Ref ref : refs) {
+        for (ShippedBlockRefs.Ref ref : refs) {
             BlockState state = Tools.stringToState(ref.value(), BuiltInRegistries.BLOCK, ref.file());
             boolean turns = state.rotate(Rotation.CLOCKWISE_90) != state
                     || state.mirror(Mirror.FRONT_BACK) != state;
@@ -90,6 +89,31 @@ class RotatableTagCoversShippedBlocksTest {
         assertTrue(problems.isEmpty(), () -> problems.size() + " shipped block(s) change under "
                 + "rotation but are not in urbex:rotatable, so rotated parts place them facing the "
                 + "way the unrotated part was authored:\n" + String.join("\n", problems));
+
+        // And the walk reached the spelling this test lost when it kept its own copy of it. A complete
+        // tag makes a disabled guard indistinguishable from a working one on the assertion above -
+        // every block it examined was in the tag either way - so what has to be asserted is that it
+        // examines the markers version 2's string shorthand hid. rails.json is the sharpest instance:
+        // twelve markers, every one written as a bare string with no 'block' key, and every one a rail
+        // that turns under rotation. A walk keyed on version 1's names finds none of them, and finds a
+        // rotation-sensitive block elsewhere in palettes/ anyway - oilrig's redstone wall torch still
+        // has a 'block' key - so a weaker assertion than "this file, all twelve" passes on the bug.
+        List<String> rails = refs.stream()
+                .filter(ref -> ref.file().endsWith("rails.json"))
+                .map(ShippedBlockRefs.Ref::value)
+                .toList();
+        assertEquals(12, rails.size(),
+                () -> "palettes/rails.json writes twelve markers, all as bare strings, and the walk saw "
+                        + rails.size() + " of them. A walk keyed on version 1's 'block' and 'damaged' "
+                        + "sees zero: it finds 200 block strings across the pack where the shared walk "
+                        + "finds 337, with every rail, ladder, lever, iron_trapdoor, iron_door, barrel "
+                        + "and oak_fence invisible");
+        rails.forEach(value -> {
+            BlockState state = Tools.stringToState(value, BuiltInRegistries.BLOCK, "palettes/rails.json");
+            assertTrue(state.rotate(Rotation.CLOCKWISE_90) != state,
+                    () -> "and every one of them turns, which is why this file is the instance to "
+                            + "assert on: " + value);
+        });
     }
 
     @Test
@@ -131,22 +155,5 @@ class RotatableTagCoversShippedBlocksTest {
             }
         }
         return ids;
-    }
-
-    /** Feeds every {@code block} / {@code damaged} string value, at any depth, to {@code sink}. */
-    private static void collectBlockRefs(JsonElement element, Consumer<String> sink) {
-        if (element.isJsonObject()) {
-            element.getAsJsonObject().entrySet().forEach(entry -> {
-                boolean isBlockRef = ("block".equals(entry.getKey()) || "damaged".equals(entry.getKey()))
-                        && entry.getValue().isJsonPrimitive();
-                if (isBlockRef) {
-                    sink.accept(entry.getValue().getAsString());
-                } else {
-                    collectBlockRefs(entry.getValue(), sink);
-                }
-            });
-        } else if (element.isJsonArray()) {
-            element.getAsJsonArray().forEach(child -> collectBlockRefs(child, sink));
-        }
     }
 }

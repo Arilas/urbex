@@ -1,110 +1,79 @@
 {
-  "palette": [
-    {
-      "char": "R",
-      "block": "minecraft:cyan_terracotta",
-      "damaged": "minecraft:iron_bars"
+  "version": 2,
+  "palette": {
+    "R": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:cyan_terracotta"
     },
-    {
-      "char": ";",
+    ";": {
+      "$ref": "urbex:damageable",
       "block": "minecraft:furnace",
-      "damaged": "minecraft:iron_bars",
-      "tag": {
-        "Items": [
-          {
-            "Slot": 0,
-            "id": "minecraft:coal",
-            "Count": 10
+      "traits": {
+        "urbex:block_entity": {
+          "nbt": {
+            "Items": [
+              {
+                "Slot": 0,
+                "id": "minecraft:coal",
+                "Count": 10
+              }
+            ]
           }
-        ]
+        }
       }
     },
-    {
-      "char": "Q",
-      "block": "minecraft:quartz_block",
-      "damaged": "minecraft:iron_bars"
+    "Q": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:quartz_block"
     },
-    {
-      "char": "u",
-      "block": "minecraft:smooth_stone_slab[type=double]",
-      "damaged": "minecraft:iron_bars"
+    "u": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:smooth_stone_slab[type=double]"
     },
-    {
-      "char": "S",
-      "block": "minecraft:smooth_stone_slab[type=double]",
-      "damaged": "minecraft:iron_bars"
+    "S": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:smooth_stone_slab[type=double]"
     },
-    {
-      "char": "b",
-      "block": "minecraft:structure_void"
+    "b": "minecraft:structure_void",
+    "B": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:bricks"
     },
-    {
-      "char": "B",
-      "block": "minecraft:bricks",
-      "damaged": "minecraft:iron_bars"
+    "v": {
+      "$ref": "urbex:stonebrick",
+      "traits": {
+        "urbex:damaged": {
+          "into": "minecraft:iron_bars"
+        }
+      }
     },
-    {
-      "char": "v",
-      "variant": "urbex:stonebrick",
-      "damaged": "minecraft:iron_bars"
+    "y": {
+      "$ref": "urbex:stonebrick",
+      "traits": {
+        "urbex:damaged": {
+          "into": "minecraft:iron_bars"
+        }
+      }
     },
-    {
-      "char": "y",
-      "variant": "urbex:stonebrick",
-      "damaged": "minecraft:iron_bars"
+    "x": {
+      "$ref": "urbex:stonebrick",
+      "traits": {
+        "urbex:damaged": {
+          "into": "minecraft:iron_bars"
+        }
+      }
     },
-    {
-      "char": "x",
-      "variant": "urbex:stonebrick",
-      "damaged": "minecraft:iron_bars"
-    },
-    {
-      "char": "_",
-      "block": "minecraft:smooth_stone_slab[type=bottom]"
-    },
-    {
-      "char": "=",
-      "block": "minecraft:smooth_stone_slab[type=bottom]"
-    },
-    {
-      "char": "w",
-      "block": "minecraft:cobblestone_wall"
-    },
-    {
-      "char": ":",
-      "block": "minecraft:iron_bars"
-    },
-    {
-      "char": "A",
-      "block": "minecraft:stone_brick_stairs[facing=west,half=bottom,shape=straight]"
-    },
-    {
-      "char": "t",
-      "block": "minecraft:stone_brick_stairs[facing=east,half=bottom,shape=straight]"
-    },
-    {
-      "char": "z",
-      "block": "minecraft:stone_brick_stairs[facing=north,half=bottom,shape=straight]"
-    },
-    {
-      "char": "c",
-      "block": "minecraft:stone_brick_stairs[facing=south,half=bottom,shape=straight]"
-    },
-    {
-      "char": "d",
-      "block": "minecraft:stone_brick_stairs[facing=north,half=top,shape=straight]"
-    },
-    {
-      "char": "(",
-      "block": "minecraft:quartz_stairs[facing=north,half=bottom,shape=straight]"
-    },
-    {
-      "char": ")",
-      "block": "minecraft:quartz_stairs[facing=south,half=bottom,shape=straight]"
-    },
-    {
-      "char": "/",
-      "block": "minecraft:stone_stairs[facing=west,half=bottom,shape=straight]"
-    }
-  ]
+    "_": "minecraft:smooth_stone_slab[type=bottom]",
+    "=": "minecraft:smooth_stone_slab[type=bottom]",
+    "w": "minecraft:cobblestone_wall",
+    ":": "minecraft:iron_bars",
+    "A": "minecraft:stone_brick_stairs[facing=west,half=bottom,shape=straight]",
+    "t": "minecraft:stone_brick_stairs[facing=east,half=bottom,shape=straight]",
+    "z": "minecraft:stone_brick_stairs[facing=north,half=bottom,shape=straight]",
+    "c": "minecraft:stone_brick_stairs[facing=south,half=bottom,shape=straight]",
+    "d": "minecraft:stone_brick_stairs[facing=north,half=top,shape=straight]",
+    "(": "minecraft:quartz_stairs[facing=north,half=bottom,shape=straight]",
+    ")": "minecraft:quartz_stairs[facing=south,half=bottom,shape=straight]",
+    "/": "minecraft:stone_stairs[facing=west,half=bottom,shape=straight]"
+  }
 }

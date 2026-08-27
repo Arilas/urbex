@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.format.Diag;
 import net.minecraft.resources.Identifier;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -116,6 +117,66 @@ final class PaletteCharacterCheck {
      */
     @Nullable
     private static Map<Character, List<String>> namedFields;
+
+    /**
+     * {@code MODEL.062} and {@code LOAD.013}: every version 2 {@code alias} in this style's palettes,
+     * answered against the merge a part is generated with.
+     *
+     * <p>{@code MODEL.062} refuses "an {@code alias} whose target is defined by no palette of the merge a
+     * part is generated with" and says outright that it "is decided there, and not against one palette's
+     * {@code extends} chain". This is that stage. The two answers are the same two the character check
+     * draws, for the same reason and with the same witnesses:</p>
+     *
+     * <ul>
+     *   <li><b>No draw answers it</b> — the target is missing even when every choice of every group is
+     *       merged at once, so no selection can resolve the alias. {@code DIAG.009}, a load error.</li>
+     *   <li><b>Some draw does not</b> — present in that everything-merge, missing from a witness, so a
+     *       failing selection provably exists. A warning, by {@code LOAD.012}'s second half.</li>
+     *   <li><b>Every draw answers it</b> — {@code LOAD.013}, reported as neither.</li>
+     * </ul>
+     *
+     * <p><b>The third answer is the one with a measured price.</b> {@code LOAD.013}'s {@code > Why}
+     * records it: "The first implementation of this check produced 45 warnings about a pack that was
+     * correct, which is a check nobody reads." {@code urbex:glass_side_variant_glass} maps {@code '@'} to
+     * {@code 'a'} and declares nothing else at all, so a check that asked one palette at a time would
+     * report the shipped idiom as broken. Nothing here asks one palette anything — every question goes to
+     * a merge that a real selection is a subset of.</p>
+     */
+    static void checkAliases(Style style, AssetDiagnostics diagnostics) {
+        List<List<Pair<Float, Palette>>> groups = style.paletteChoices();
+        CompiledPalette everything = merge(groups.stream().flatMap(List::stream)
+                .map(Pair::getRight).toList(), null, null);
+        Map<Character, Character> aliases = everything.aliasTargets();
+        if (aliases.isEmpty()) {
+            return;
+        }
+
+        List<CompiledPalette> witnesses = null;
+        for (Map.Entry<Character, Character> alias : aliases.entrySet()) {
+            // DIAG.009 verbatim from the catalogue, one per alias. Hand-writing the sentence here
+            // would make Diag.matches false for the very row MODEL.062 cites, and would put a test
+            // in the position of asserting a literal - which is the one thing every task in this
+            // stack has been held to. The <asset> slot names the style and the marker, which is
+            // 08-errors.md section 2's shape for a diagnostic about a marker of a named asset.
+            String location = "'" + style.getName() + "' marker '" + alias.getKey() + "'";
+            if (!everything.isDefined(alias.getValue())) {
+                diagnostics.record("urbex:styles", style.getId(),
+                        Diag.DIAG_009.message(location, alias.getValue()));
+                continue;
+            }
+            if (witnesses == null) {
+                witnesses = witnesses(groups, null, null);
+            }
+            if (hasFailingSelection(alias.getValue(), witnesses)) {
+                // LOAD.012's second half: present in the everything-merge, missing from a witness, so
+                // some draw fails. A warning rather than DIAG.009, because the pack generates
+                // correctly for the draws that do define it.
+                diagnostics.warn("urbex:styles", style.getId(), "aliases '" + alias.getKey()
+                        + "' to '" + alias.getValue() + "', which only some 'randompalettes' choices "
+                        + "define, so whether it resolves depends on the draw");
+            }
+        }
+    }
 
     private static void check(String registry, Identifier asset, SortedSet<Character> used, Style style,
                               @Nullable Palette building, @Nullable Palette local, String verb,

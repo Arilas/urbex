@@ -1,12 +1,10 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
 import dev.krona.urbex.worldgen.lost.cityassets.OptionalLightPlacer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -62,12 +60,12 @@ final class DeferredLightPlacer {
             LightPool pool = source.pool();
             Optional<OptionalLightPlacer.Attempt> attempt = Optional.empty();
             if (pool != null) {
-                // Both passes draw from one stream at one address, so the candidate a marker would
-                // light is the candidate whose replacement stands there while it is dark. Raising
-                // lighting density lights the fixture already in place rather than moving it.
-                RandomSource random = Rng.atPos(seed, marker.getX(), marker.getY(), marker.getZ(),
-                        Rng.Purpose.LIGHTING_VARIANT);
-                attempt = OptionalLightPlacer.select(pool, random,
+                // WEIGHT.043: the pool is addressed by the marker's own position, not drawn from a
+                // stream seeded at it - so both passes read one slot at one address, and the candidate
+                // a marker would light is the candidate whose replacement stands there while it is
+                // dark. Raising lighting density lights the fixture already in place rather than
+                // moving it, and how many other markers this chunk planned first cannot change it.
+                attempt = OptionalLightPlacer.select(pool, seed, marker,
                         (placement, supportDirection) -> supportDirection == null
                                 || (belongsTo(ownerChunkX, ownerChunkZ, marker.relative(supportDirection))
                                 && anchorSupport.isPresent(marker, supportDirection, snapshotStateAt)),

@@ -1,0 +1,36 @@
+{
+  "blocks": [
+    {
+      "random": 16,
+      "block": "minecraft:tuff"
+    },
+    {
+      "random": 16,
+      "block": "minecraft:tuff_slab[type=bottom]"
+    },
+    {
+      "random": 16,
+      "block": "minecraft:tuff_stairs[facing=east,half=bottom]"
+    },
+    {
+      "random": 16,
+      "block": "minecraft:polished_tuff_slab[type=bottom]"
+    },
+    {
+      "random": 16,
+      "block": "minecraft:polished_tuff_stairs[facing=east,half=bottom]"
+    },
+    {
+      "random": 16,
+      "block": "minecraft:tuff_brick_slab[type=bottom]"
+    },
+    {
+      "random": 16,
+      "block": "minecraft:tuff_brick_stairs[facing=east,half=bottom]"
+    },
+    {
+      "random": 1000,
+      "block": "minecraft:tuff_bricks"
+    }
+  ]
+}

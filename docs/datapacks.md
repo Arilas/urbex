@@ -22,6 +22,24 @@ resolved even though no file wrote it:
 Numbers and enums still default — `multisettings`, the preset format's field-level optionality, and
 so on are untouched by rule 2. The rule is about *references*, not about every field.
 
+## Migrating palettes to version 2
+
+Registered and inline palettes must declare `"version": 2`. Version 1 and unversioned palettes no
+longer load, and the `variants` registry has been replaced by `definitions`, referenced with `$ref`.
+The [palette migration specification](format/palette/09-migration.md) lists the field translations
+and constructs the converter refuses to guess at.
+
+Convert registered palettes and variants into a separate output directory:
+
+```sh
+./gradlew convertPalettes -PurbexPackIn=<pack-root> -PurbexPackOut=<output-root>
+```
+
+The input root is the directory `data/<namespace>/urbex`, containing `palettes/` and, for an old pack,
+`variants/`. The converter writes `palettes/` and `definitions/`; it does not rewrite inline palettes
+inside parts or buildings, or copy the rest of the pack. Convert those inline palettes separately,
+review the reported diagnostics, and only then replace the corresponding files in your pack.
+
 ## Where files go
 
 ```
@@ -38,19 +56,19 @@ string every other file uses to name it. Directory names are the registry names 
 | `citystyles` | What a city is made of: street materials and street parts, plus weighted selectors for buildings, parks, bridges, fountains, stairs | `streetblocks.parts` (all eight) |
 | `buildings` | An ordered stack of parts, with floor and cellar limits | `filler`, `parts` |
 | `parts` | A block of geometry, up to 16×16, written as character slices | `xsize`, `zsize`, `slices` |
-| `palettes` | What each character in a slice means: a block, a variant, loot, a mob, a light | `palette` |
+| `palettes` | What each character in a slice means: a typed node with references and traits | `version: 2`, `palette` |
 | `styles` | Groups of palettes a building can be painted from | `randompalettes` |
 | `multibuildings` | A grid of buildings spanning several chunks | `dimx`, `dimz`, `buildings` |
 | `scattered` | A building placed outside cities, and how it sits on the terrain | `terrainheight`, `terrainfix` |
 | `conditions` | A weighted, conditional set of values — loot tables, mob ids | `values` |
-| `variants` | A weighted set of blockstates behind one palette character | `blocks` |
+| `definitions` | A shared palette node, such as a weighted set of blocks or a trait-bearing block | `version: 2`, a complete node after inheritance |
 | `stuff` | A small decoration pass: cobwebs, chains, rubble | `column`, `mincount`, `maxcount`, `attempts`, `inbuilding` |
 | `predefinedcities` | A city pinned to fixed chunk coordinates | `dimension`, `chunkx`, `chunkz`, `radius` — `citystyle` is optional |
 | `presets` | Per-dimension worldgen tuning — see [`docs/presets.md`](presets.md) | *(nothing)* |
 
-Every one of them accepts `extends`, and every one of them merges by the same rules. That
-uniformity is deliberate: you should never have to look up whether *this* asset type supports
-extension.
+Every registry accepts `extends`. Palettes and definitions use the
+[palette format's node and trait merge rules](format/palette/04-merging.md); the other registries use
+the field merge rules below.
 
 Three of them — `presets`, `worldstyles` and `citystyles` — also accept an optional `name`. See
 [Display names](#display-names) below.
@@ -346,7 +364,7 @@ is wrong but at least unique, instead of borrowing a label that belongs to somet
 ### When each asset is resolved
 
 In **eleven** registries the check above runs on every registered asset, whether or not anything
-selects it. Loading a world resolves all of `variants`, `palettes`, `conditions`, `styles`, `parts`,
+selects it. Loading a world resolves all of `definitions`, `palettes`, `conditions`, `styles`, `parts`,
 `buildings`, `multibuildings`, `scattered`, `worldstyles`, `predefinedcities` and `stuff` up front in
 `AssetCompiler`, so a broken file in your pack fails the world even for a player who never picks your
 world style. That is the intended trade: a load error naming the file beats an exception from a
@@ -477,11 +495,15 @@ thirty leaves the other twenty-eight exactly as they were:
 <!-- example: palettes -->
 ```json
 {
+  "version": 2,
   "extends": "urbex:bricks_standard",
-  "palette": [
-    { "char": "#", "variant": "urbexmt:concrete" },
-    { "char": "X", "block": "minecraft:cracked_stone_bricks", "damaged": "minecraft:iron_bars" }
-  ]
+  "palette": {
+    "#": { "$ref": "urbexmt:concrete" },
+    "X": {
+      "block": "minecraft:cracked_stone_bricks",
+      "traits": { "urbex:damaged": { "into": "minecraft:iron_bars" } }
+    }
+  }
 }
 ```
 
@@ -489,8 +511,8 @@ thirty leaves the other twenty-eight exactly as they were:
 two of them and keeps `$` and `}` untouched. Replacing wholesale would have silently dropped
 everything the child did not restate; appending would have registered `#` twice.
 
-An overridden entry takes its `damaged` mapping with it, so a character you repaint does not keep
-its ancestor's rubble block.
+An overridden marker takes its traits with it, so a character you repaint does not keep its
+ancestor's `urbex:damaged`. Traits belong to the node, not to the character.
 
 ## Palettes, `refpalette`, and inline palettes
 
@@ -513,21 +535,24 @@ nothing can resolve the link, and silently ignoring a key the format accepted is
 datapack ends up meaning something other than what it says:
 
 ```
-The inline palette in 'urbexmt:tower' declares extends 'urbex:common', but an inline palette is not
-a registry entry and nothing can resolve that. Use 'refpalette' to build on a registered palette, or
-put 'extends' on 'urbexmt:tower' itself.
+'urbexmt:tower': the inline palette declares 'extends' 'urbex:common', but an inline palette is not
+a registry entry and nothing can resolve that. Use 'refpalette', or put 'extends' on 'urbexmt:tower'
+itself.
 ```
 
 Those two suggestions are the whole answer. To share a palette, register it and name it with
 `refpalette`; to build on one asset's palette, put `extends` on the asset.
 
 
-## Lighting: `lightSource`
+## Lighting: the `urbex:light` trait
 
-A light is a property you state about a block, not a separate kind of palette entry. Any entry can
-carry `lightSource`, and doing so puts that entry under the preset's `lightingDensity`: the roll
-happens once per marker position, and the marker writes either its light or the **replacement** the
-entry names. Nothing is ever filtered out of the output.
+A light is a property you state about a block, not a separate kind of palette entry. Any node can
+carry the `urbex:light` trait, and doing so puts that marker under the preset's `lightingDensity`:
+the roll happens once per marker position, and the marker writes either its light or the
+**replacement** the trait names. Nothing is ever filtered out of the output.
+
+A whole pool of candidates for Urbex to pick and orient is a different thing, and it is a *kind* of
+node rather than a trait: `"kind": "light_socket"`. The two are below in that order.
 
 This is what makes the setting reach a pack's real lighting. A pack that authors its street lamps as
 ordinary lantern entries — which is how most packs author them — used to have every one of them
@@ -538,54 +563,66 @@ placed unconditionally, so moving the slider changed nothing visible.
 <!-- example: palettes -->
 ```json
 {
-  "palette": [
-    { "char": "e", "block": "minecraft:lantern[hanging=false]", "lightSource": true }
-  ]
+  "version": 2,
+  "palette": {
+    "e": {
+      "block": "minecraft:lantern[hanging=false]",
+      "traits": { "urbex:light": {} }
+    }
+  }
 }
 ```
 
 <!-- example: palettes -->
 ```json
 {
-  "palette": [
-    {
-      "char": "E",
+  "version": 2,
+  "palette": {
+    "E": {
       "block": "minecraft:lantern[hanging=true]",
-      "lightSource": { "unlit": "minecraft:iron_chain[axis=y]" }
+      "traits": { "urbex:light": { "unlit": "minecraft:iron_chain[axis=y]" } }
     }
-  ]
+  }
 }
 ```
 
-The entry's own `block`, `blocks`, `variant` or `frompalette` is the lit block, written exactly where
-and as you wrote it — no support search, no reorientation. When the roll rejects it, `unlit` is
-written instead; `unlitBlocks` takes a weighted list in the same shape as `blocks`. Name neither and
-the replacement is air, which is what an unlit marker has always left behind.
+The node the marker resolves to is the lit block, written exactly where and as you wrote it — no
+support search, no reorientation. When the roll rejects it, the trait's `unlit` is written instead,
+and `unlit` is a node like any other, so a weighted list goes there directly. Name none and the
+replacement is air, which is what an unlit marker has always left behind.
 
-`"lightSource": true` is shorthand for `{}`. `"lightSource": false` is a load error: omitting the
-field is how you say "not a light", and a field that can be present and mean nothing is how a pack
-ends up meaning something other than what its author read.
+An empty `urbex:light` trait — `{}` — is a marker that is a light and leaves nothing behind. There is
+no way to write "not a light" other than by omitting the trait, which is deliberate: a field that can
+be present and mean nothing is how a pack ends up meaning something other than what its author read.
 
 ### A socket: let Urbex pick and orient one
 
 <!-- example: palettes -->
 ```json
 {
-  "palette": [
-    {
-      "char": "T",
-      "lightSource": {
-        "floor": [
-          { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
-          { "weight": 3, "block": "minecraft:torch", "unlit": "minecraft:candle[candles=1,lit=false]" }
-        ],
-        "wall":    [ { "weight": 8, "block": "minecraft:wall_torch[facing=north]" } ],
-        "ceiling": [ { "weight": 8, "block": "minecraft:lantern[hanging=true]",
-                       "unlit": "minecraft:iron_chain[axis=y]" } ],
-        "free":    [ { "weight": 1, "block": "minecraft:sea_lantern" } ]
-      }
+  "version": 2,
+  "palette": {
+    "T": {
+      "kind": "light_socket",
+      "floor": [
+        { "weight": 6, "block": "minecraft:lantern[hanging=false]" },
+        {
+          "weight": 3,
+          "block": "minecraft:torch",
+          "traits": { "urbex:light": { "unlit": "minecraft:candle[candles=1,lit=false]" } }
+        }
+      ],
+      "wall":    [ { "weight": 8, "block": "minecraft:wall_torch[facing=north]" } ],
+      "ceiling": [
+        {
+          "weight": 8,
+          "block": "minecraft:lantern[hanging=true]",
+          "traits": { "urbex:light": { "unlit": "minecraft:iron_chain[axis=y]" } }
+        }
+      ],
+      "free":    [ { "weight": 1, "block": "minecraft:sea_lantern" } ]
     }
-  ]
+  }
 }
 ```
 
@@ -595,10 +632,10 @@ opportunities are tried in one fixed order — floor, then west, east, north and
 ceiling, then `free`, which needs no anchor at all. The chosen candidate is oriented toward its
 support, so one `wall_torch[facing=north]` covers all four walls.
 
-A candidate's `unlit` is its own, because an unlit torch on a wall and an unlit torch on a floor are
-two different blocks — one replacement for the whole socket could be right for at most one of its
-placements. A candidate that names none falls back to the source's `unlit`, then to air. An `unlit`
-that emits light is a load error.
+A candidate's `urbex:light` is its own, because an unlit torch on a wall and an unlit torch on a floor
+are two different blocks — one replacement for the whole socket could be right for at most one of its
+placements. A candidate that declares none inherits the socket's, by the ordinary trait inheritance
+every alternative gets, and then falls back to air. An `unlit` that emits light is a load error.
 
 Both passes draw from one stream at one position, so the fixture a marker would light is the fixture
 standing there while it is dark: raising `lightingDensity` lights the candle that was already on that
@@ -633,9 +670,9 @@ every setting, whatever the pack said.
 up across a park spanning several chunks rather than restarting at each seam, and nothing is placed
 on the border ring, where a lamp would sit half in the street.
 
-The character goes through the same path as a marker in a part: give it `lightSource` and the park
-lamps obey `lightingDensity` like every other light, leaving their `unlit` replacement behind when
-the roll rejects them. Name a plain block instead and it is simply always placed. A `lamp` character
+The character goes through the same path as a marker in a part: give it the `urbex:light` trait and
+the park lamps obey `lightingDensity` like every other light, leaving their `unlit` replacement behind
+when the roll rejects them. Name a plain block instead and it is simply always placed. A `lamp` character
 the palette does not map is a load-time error rather than a park that is dark for no visible reason.
 
 ## Parts: geometry inherited, paint overridden
@@ -813,23 +850,29 @@ highway tunnel. If you do not want a component, you still have to give it a part
 Nearly everything wrong in a datapack refuses to load and names itself. These two do not, and
 between them they account for most of the time you will spend wondering why a change did nothing.
 
-### A misspelled key is ignored
+### A misspelled key is ignored — except in palettes
 
 The codecs read the keys they know and **silently ignore every other key in the object**. So
-`"styl"` for `"style"`, `"maxfloor"` for `"maxfloors"`, `"varient"` for `"variant"` all load
-cleanly and do nothing at all. Nothing is logged, nothing fails, and the asset simply behaves as
-though you had not written the line.
+`"styl"` for `"style"` or `"maxfloor"` for `"maxfloors"` loads cleanly and does nothing at all.
+Nothing is logged, nothing fails, and the asset simply behaves as though you had not written the
+line.
 
 This is why the field names in this guide are worth copying exactly, and why a change that appears
 to have no effect is worth spell-checking before it is worth debugging. It also cuts the other way,
 usefully: a `"_comment"` key — or any other `_`-prefixed note — is ignored everywhere, so you can
 annotate files freely.
 
-`presets` are the one exception. Their codec checks its keys and logs one `WARN` naming the bad
-key and the section it was in, which is the behaviour [`docs/presets.md`](presets.md) documents.
-The other twelve registries have no such check.
+**Palettes and `definitions` are the exception, and the reason is measured.** A version 2 palette
+refuses a key it does not define, naming the key and what it is a key of. It refuses because three
+shipped palettes once wrote `damaged` inside a `blocks[]` element, where nothing read it, for the
+lifetime of the pack — the entries were damageable in the author's head and plain stone in the world,
+and no message ever said so. A format whose worst failure is silent is a format that has to refuse.
 
-**Two keys are the exception to the exception, in all thirteen registries: `inherit` and
+`presets` are the older exception. Their codec checks its keys and logs one `WARN` naming the bad
+key and the section it was in, which is the behaviour [`docs/presets.md`](presets.md) documents.
+The remaining registries have no such check.
+
+**Two keys are refused everywhere, in all thirteen registries: `inherit` and
 `parent`.** Urbex's inheritance key is `extends` and only `extends`; the other two were deleted, not
 aliased. Because they would otherwise be ignored like any other unknown key, a file using one would
 load as a chain root with no inheritance at all — either quietly generating without what it meant to
@@ -862,7 +905,7 @@ decoration invisible without anyone noticing.
 Three details about that warning:
 
 - It names the **owning asset id**, not the file it came from, and that owner is always the
-  `palettes` or `variants` entry the string was written in — never the asset you noticed was
+  `palettes` or `definitions` entry the string was written in — never the asset you noticed was
   broken. In the example above the missing chains belong to a `stuff` entry called `urbex:chains`,
   but the id in the warning is `urbex:common`, the palette that maps the character it places.
 - For a palette written inline in a part or building, the id is the synthetic
@@ -885,16 +928,17 @@ Three details about that warning:
 | `'urbexmt:x' declares no 'streetblocks.largeparts.connector', ...` | The primary-road family was partly declared | Declare all eight components, or none at all and inherit `parts` |
 | `Part 'urbexmt:tower' declares no slices, and neither does anything it extends` | A part with no geometry anywhere in its chain | Add `slices`, or `extends` a part that has them |
 | `Part 'urbexmt:tower' declares xsize 8 and zsize 16 but its slices are 16 wide (...)` | A size was redeclared without the matching slices | Declare both together, or neither |
-| `The inline palette in 'urbexmt:tower' declares extends '...'` | `extends` inside an inline `palette` block | Use `refpalette`, or put `extends` on the owning asset |
-| `Illegal palette urbex:x!` | A palette entry names no `block`, `variant`, `blocks` or `frompalette` | Give the character something to resolve to |
-| `Palette 'urbex:x' entry 'T' declares 'lightSource' but names nothing to place. Give the entry a block, blocks, variant or frompalette to light, or give the light source at least one candidate in floor, wall, ceiling, or free.` | A `lightSource` with neither a block of its own nor any candidate | Do one or the other |
-| `Palette 'urbex:x' entry 'L' declares 'lightSource', but none of the blocks it resolves to emit any light. Either name candidates under floor/wall/ceiling/free, or drop 'lightSource' from this entry.` | A light source on a block that is not a light | Drop `lightSource`, or name candidates |
-| `Palette 'urbex:x' entry 'T' declares 'torch', which no longer exists. Write "lightSource" instead: either "lightSource": true to make this entry's own block an optional light, or a "lightSource" object with floor/wall/ceiling/free candidates to let Urbex pick and orient one.` | The removed `torch` boolean | Follow the message; see the lighting section above |
-| `Palette 'urbex:x' entry 'T' declares 'light', which was renamed. Write the same object under "lightSource", and add "unlit" to it if this marker should leave something behind when the light is off.` | The removed `light` object | Rename the key |
-| `Invalid light candidate in palette 'urbex:x', marker 'T', placement 'wall', candidate #1 'minecraft:glowstone': an unlit replacement must emit no light` | A candidate's `unlit` is itself a light | Name a dark block, or omit `unlit` |
-| `Palette marker 'ab' must be exactly one character, but is 2 characters long` | A `char`, `filler` or `rubble` that is not one character | Write one character. `""` used to throw with no file named, and `"ab"` quietly meant `"a"` |
+| `'urbexmt:tower': the inline palette declares 'extends' '...'` | `extends` inside an inline `palette` block | Use `refpalette`, or put `extends` on the owning asset |
+| `urbex:x: is written in palette format version 1, which Urbex no longer loads.` | A palette with no `version`, or `"version": 1` | Run `./gradlew convertPalettes`, or write `"version": 2` and the version 2 keys |
+| `Palette marker 'ab' must be exactly one character, but is 2 characters long` | A `filler` or `rubble` that is not one character | Write one character. `""` used to throw with no file named, and `"ab"` quietly meant `"a"` |
 | `Style 'urbexmt:downtown' declares a 'randompalettes' group whose factors total 0.0; no palette could ever be drawn from it. At least one palette in each group needs a factor above zero.` | Every palette in one group has a factor of zero or less | Give at least one of them a positive factor |
 | `Stuff 'urbexmt:downtown' resolves to mincount 5 above maxcount 2; no count could be drawn between them` | The two came from different links of the chain and contradict | Declare them together, or fix the one that is wrong |
+
+**Palette messages are not in this table.** A version 2 palette's refusals are numbered and carry
+their own catalogue: every one of them, with the rule that owes it and the exact wording, is in
+[`docs/format/palette/08-errors.md`](format/palette/08-errors.md). A table here would be a second copy
+of it, and the copy is the one that goes stale — this section used to quote five version 1 messages
+that no pack can produce any more.
 | `Value 5000 outside of range [0:4095]` on a stuff `mincount` or `maxcount`, or `[1:4096]` on `attempts` | Above what the decoration's RNG slot address can hold — two attempts would silently share one stream and draw the same position | Keep counts under 4096. Vanilla data is three orders of magnitude below it |
 | `'urbexmt:x' declares no 'inbuilding', and neither does anything it extends` | A `stuff` entry that never says whether it goes inside buildings or outside | Declare it. It used to be optional, and an entry without it matched no chunk at all and placed nothing, silently |
 | `Can't find 'urbexmt:p' in urbex:parts!` | A highway or railway part id resolves to nothing | Check the id; this one throws rather than degrading |
@@ -965,26 +1009,32 @@ A **palette**, redefining two characters of a registered one:
 <!-- example: palettes -->
 ```json
 {
+  "version": 2,
   "extends": "urbex:bricks_standard",
-  "palette": [
-    { "char": "#", "variant": "urbexmt:concrete" },
-    { "char": "}", "variant": "urbexmt:concrete_rubble" }
-  ]
+  "palette": {
+    "#": { "$ref": "urbexmt:concrete" },
+    "}": { "$ref": "urbexmt:concrete_rubble" }
+  }
 }
 ```
 
-A **variant** — the weighted blockstates one palette character can land on:
+A **definition** — the weighted blockstates one palette character can land on:
 
-<!-- example: variants -->
+<!-- example: definitions -->
 ```json
 {
-  "blocks": [
-    { "random": 1000, "block": "minecraft:smooth_stone" },
-    { "random": 40, "block": "minecraft:cracked_stone_bricks" },
-    { "random": 10, "block": "minecraft:mossy_stone_bricks" }
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    { "weight": 78, "block": "minecraft:smooth_stone" },
+    { "weight": 40, "block": "minecraft:cracked_stone_bricks" },
+    { "weight": 10, "block": "minecraft:mossy_stone_bricks" }
   ]
 }
 ```
+
+These examples use palette format version 2, as do the registered and inline palettes throughout
+this guide. A definition can contain any supported node kind, not only a weighted list.
 
 A **part**, repainted from an existing one:
 

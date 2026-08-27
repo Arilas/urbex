@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "traits": {
+    "urbex:damaged": {
+      "into": "minecraft:iron_bars"
+    }
+  }
+}

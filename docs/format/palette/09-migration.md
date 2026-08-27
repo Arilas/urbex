@@ -1,0 +1,360 @@
+# 07 · Versioning and migration
+
+`[DRAFT]` · Area `VER` · Palette format version 2
+
+How a version 2 palette coexists with a version 1 one, and what every version 1 spelling becomes.
+
+---
+
+## 1. Versioning
+
+> **VER.018** · `REJECT` (`DIAG.066`) — A palette file declaring `"version": 1`, or declaring no
+> `version` at all, is refused. The diagnostic names the converter.
+
+> > **Why** — version 1 is removed from the loader. It was kept while the packs that needed it were
+> > version 1; the bundled pack converted, Modern Tweaks converted, and what remains is one pack whose
+> > exporter has to be fixed before it can (`CHAR.021`'s `> Why`). Keeping a second palette model alive
+> > for it would keep a second node model, a second merge and a second compile stage alive with it.
+
+> > **Why an absent `version` is this and not `DIAG.001`** — an absent one reaches the dispatcher as 1,
+> > by the default [VER.001](#tombstones) used to set, so the two arrive at the same place. They are not
+> > the same message: a file declaring version 9 wrote a number this Urbex does not know, and a file
+> > declaring nothing wrote a format this Urbex removed. Only the second has a conversion as its remedy,
+> > and `DIAG.001` quoting "version 1" at a file whose author never typed a `version` would be a message
+> > about a key that is not there.
+
+> **VER.002** · `MUST` — `"version": 2` selects this specification in full. There is no partial
+> adoption and no per-key opt-in.
+
+> **VER.003** · `MUST` — Version selection happens before decoding, by inspecting the raw document,
+> so a version 2 file is never first decoded by the version 1 codec.
+
+> **VER.017** · `MUST NOT` — The `variants` registry is removed. A version 1 palette entry naming
+> `variant` is refused where the palette is compiled, and the refusal names the `definitions` registry,
+> `$ref`, and the converter that rewrites both.
+
+> > **Why** — `variants` had one reader, the version 1 `variant` key, and one successor, the
+> > `definitions` registry ([REF.010](02-references.md#2-where-a-name-resolves)) — which does everything
+> > it did and, being a node, everything it could not: any of the five kinds, and traits. Two registries
+> > meaning one thing is the duplication this format exists to remove, and keeping the dead one until
+> > version 1 goes would keep an entire registry, its codec and its compile stage alive for a key no
+> > bundled file writes.
+
+> > **Why it is refused and not dropped** — a version 1 palette ignores a key it does not know
+> > ([VER.004](#1-versioning)), so deleting `variant` from the entry codec would load the pack, paint
+> > every marker that used one as air, and say nothing. The key is therefore held decodable purely so
+> > that it can fail by name, which is [VER.012](#3-retired-keys)'s rule and the third time it has been
+> > applied — `torch` and `light` are the other two, and the measured cost of not doing it is in
+> > VER.012's own `> Why`.
+
+> > **Why it is `MUST NOT` and not `REJECT`** — a `REJECT` owes a `DIAG`, and this refusal has none. It
+> > is refused where a palette is compiled, not where a document is
+> > decoded, because `variant` is a key of a palette *entry* and the retired-key pre-pass reads a
+> > document's top level. That is exactly where and why `torch` and `light` are refused, and this rule
+> > follows them rather than inventing a second mechanism. [DIAG.900](08-errors.md#1-what-a-diagnostic-must-contain)
+> > makes the catalogue a statement about an asset being loaded; bringing all three of these refusals
+> > into it is a coherent thing to want and is one piece of work, not three.
+
+> **VER.006** · `ACCEPT` `[NO-FIXTURE: a style and two palettes]` — A style's `randompalettes` may draw a version 1 palette and a version 2
+> palette into the same merge.
+
+> > **Why** — that composition operates on compiled palettes, not on `extends`, so it needs no
+> > correspondence between the two formats. Forbidding it as well would mean a pack could only
+> > migrate every palette at once — and the packs this has to work for hold 30 and 98 palette files.
+
+> **VER.013** · `ACCEPT` `[NO-FIXTURE: a palette and a conditions asset]` — VER.005 governs `extends` between palettes and nothing else. A version 2
+> palette references `conditions`, `variants`, block tags and every other registry exactly as a
+> version 1 palette does, whatever version those assets are written in.
+
+> > **Why** — otherwise adopting version 2 for one palette would require adopting it for every
+> > registry that palette touches, at once, across every pack. The palette registry is the first to
+> > be specified this way precisely so the others can follow one at a time.
+
+## 2. What every version 1 construct becomes
+
+This table is the converter's specification, not a compatibility promise. Nothing loads both
+formats at once; see VER.005.
+
+> **VER.008** · `MUST` — The translation is total. Every version 1 palette has exactly one version 2
+> form, and the tool in §4 produces it.
+
+| Version 1 | Version 2 | Notes |
+|---|---|---|
+| `[{ "char": "X", … }]` | `{ "X": { … } }` | `palette` becomes an object; `char` disappears |
+| `"block": "<id>"` | `"<id>"` or `{ "block": "<id>" }` | [MODEL.020](00-model.md#21-string-shorthand) |
+| `"blocks": [{ "random": n, "block": b }]` | `{ "kind": "weighted", "choices": [{ "weight": n, "block": b }] }` | `random` → `weight` |
+| trailing weight ≥ what remains | `"weight": <what remained>` | its clipped value, restated as a size — not a `rest`; see below |
+| the other weights of such a list | `"weight": <slots it received>` | v1 weights were slot counts, so the converter emits the counts it computed |
+| `"variant": "<id>"` | `{ "$ref": "<id>" }` | the `variants` registry becomes `definitions` |
+| `"frompalette": "c"` | `{ "kind": "alias", "of": "c" }` | only the first character was read before |
+| `"damaged": "<id>"` | `"traits": { "urbex:damaged": { "into": "<id>" } }` | |
+| `"mob": "<id>"` | `"traits": { "urbex:spawner": { "pool": "<id>" } }` | |
+| `"loot": "<id>"` | `"traits": { "urbex:loot": { "pool": "<id>" } }` | |
+| `"tag": { … }` | `"traits": { "urbex:block_entity": { "nbt": { … } } }` | |
+| `"lightSource": true` | `"traits": { "urbex:light": {} }` | |
+| `"lightSource": { "unlit": b }` | `"traits": { "urbex:light": { "unlit": b } }` | |
+| `"lightSource": { "unlitBlocks": [ … ] }` | `"traits": { "urbex:light": { "unlit": { "kind": "weighted", … } } }` | one field, not two |
+| `"lightSource": { "floor": [ … ], … }` | `{ "kind": "light_socket", "floor": [ … ] }` | |
+| candidate `"unlit"` | candidate `"traits": { "urbex:light": { "unlit": … } }` | [TRAIT.055](01-traits.md#45-urbexlight) |
+| a socket's own `"unlit"` | the socket's `"traits": { "urbex:light": { "unlit": … } }` | inherited by every candidate that declares none, by [TRAIT.005](01-traits.md#2-inheritance) and [TRAIT.006](01-traits.md#2-inheritance) |
+| membership of the `rotatable` tag | absent `urbex:rotatable`, which defaults true | [TRAIT.071](01-traits.md#47-urbexrotatable) |
+
+**Why the trailing sentinel is a `weight` and not a `rest`.** The row above it makes every other choice
+of such a list a `weight`, and [WEIGHT.013](05-weights.md#2-share-weight-and-rest) refuses a `rest` in a
+list that also carries one — so the two rows together used to specify a file version 2 rejects. `rest`
+is the spelling for a list stated in *shares*, which no version 1 list is. The shipped workstation list
+is the worked example: version 1 wrote `25, 20, 7, 6, 5, 2, 1000` and apportioned
+`25, 20, 7, 6, 5, 2, 63`, which is exactly [WEIGHT.011](05-weights.md#2-share-weight-and-rest)'s own
+`accept` fixture for it, sentinel and all.
+
+**Why a socket's own `unlit` needs no mechanism.** Version 1 carried "this candidate names no
+replacement, so use the socket's" forward to placement time (`LightSource.unlitFor`). In version 2 a
+candidate is an [alternative](00-model.md#3-alternatives-and-satellites), so it inherits the socket's
+traits, and one declaring its own `urbex:light` replaces the inherited one whole — which is the same two
+branches, performed by inheritance before anything looks at a candidate. This row is the socket-level
+half of the `candidate "unlit"` row above it, and both are [TRAIT.055](01-traits.md#45-urbexlight)'s
+`> Why this needs no mechanism of its own` read from the migration side.
+
+> **VER.009** · `MUST` — A version 1 entry declaring more than one block source translates to the
+> source the version 1 ladder would have selected, and the converter emits a warning naming the keys
+> it dropped.
+
+> > **Why** — the ladder took `block`, then `variant`, then `frompalette`, then `blocks`, then a
+> > socket, in that order, silently. The translation must preserve behaviour, but the author should
+> > learn that the file said something it never meant.
+
+> > **Why this warning cites no `DIAG`, and what it would take to** — the converter is not a loader.
+> > [DIAG.900](08-errors.md#1-what-a-diagnostic-must-contain) makes a diagnostic a statement about an
+> > asset being loaded, DIAG.903 collects them into one load report, and DIAG.904 sorts them by whether
+> > they refuse the *world* — none of which is true of a tool reading version 1 files and writing
+> > version 2 ones. So this warning and [VER.022](#4-the-migration-tool)'s refusals cite the rule that
+> > owes them instead. Bringing them into the catalogue is a coherent thing to want, and it starts here
+> > rather than in the enum: these two rules would gain `(DIAG.0NN)` citations from the free numbers in
+> > the versioning range, and only then would the rows exist for anything to raise. Stated so the next
+> > reader does not re-derive it from the house convention and conclude the converter forgot.
+
+## 3. Retired keys
+
+> **VER.010** · `REJECT` (`DIAG.060`) — A version 2 palette using a version 1 key that version 2
+> renamed is refused, and the diagnostic names the replacement.
+
+> **VER.011** · `REJECT` (`DIAG.061`) — A version 2 palette using a key that was deleted rather than
+> renamed is refused, and the diagnostic says what to do instead.
+
+> **VER.012** · `MUST NOT` — A retired key is never silently accepted as an alias for its
+> replacement, and never silently ignored.
+
+> > **Why** — this is the project's existing doctrine and the reason it exists is measured. `torch`
+> > and `light` were kept decodable purely so they could fail by name: dropped from the codec they
+> > would have become unknown keys, which a version 1 palette ignores, and the pack would have kept
+> > placing a permanent torch while its author believed the lighting setting applied to it.
+
+```json fixture:VER.011 reject=DIAG.061
+{ "version": 2, "palette": { "X": { "block": "minecraft:lantern", "torch": true } } }
+```
+
+```json fixture:VER.010 reject=DIAG.060
+{
+  "version": 2,
+  "palette": {
+    "#": { "kind": "weighted", "choices": [ { "random": 4, "block": "minecraft:stone_bricks" } ] }
+  }
+}
+```
+
+The retired set, and what each becomes:
+
+| Key | Status | Replacement |
+|---|---|---|
+| `char` | deleted | the marker is the object key |
+| `random` | renamed | `weight` — [WEIGHT.001](05-weights.md#1-one-spelling-of-size) |
+| `blocks` | renamed | `choices`, under `"kind": "weighted"` |
+| `variant` | deleted | `$ref` into `definitions` |
+| `frompalette` | renamed | `"kind": "alias"`, `of` |
+| `damaged`, `mob`, `loot`, `tag` | deleted | traits — [01](01-traits.md) |
+| `lightSource` | deleted | `"kind": "light_socket"` or `urbex:light` |
+| `unlitBlocks` | deleted | `unlit`, which is now a node |
+| `inherit`, `parent` | deleted in v1 already | `extends` |
+| `torch`, `light` | deleted in v1 already | `urbex:light` |
+
+## 4. The migration tool
+
+> **VER.020** · `MUST` — A converter ships before the format does, translating a version 1 palette
+> file to its version 2 form by the table in §2.
+
+> > **Why** — both addon packs are generated by Python importers today. A conversion that has to be
+> > done by hand is a conversion that competes with the importer for maintenance, and loses.
+
+> **VER.021** · `MUST` — The converter is verified by generation: for every shipped palette in
+> every bundled and reference pack, a world generated from the converted pack is identical to one
+> generated from the original, at the same seed, **on an installation where every block the pack names
+> resolves**.
+
+> > **Why** — VER.006 used to carry this, as an equality of compiled forms. With the two formats
+> > independent there is no such equality to assert, and the property that actually matters to a
+> > pack author was never the compiled form anyway — it was that their city still looks the same.
+
+> > **Why the installation is quantified, and what is outside it** — because without it the rule has no
+> > truth value, and the two answers differ. The formats redistribute an *absent* block differently, and
+> > neither is wrong: version 1 drops the choice and apportions the survivors' authored weights
+> > ([WEIGHT.030](05-weights.md#4-absent-blocks) has always been version 1's leniency too), while
+> > version 2 drops it and divides its share among the survivors in proportion to theirs. Given the slot
+> > counts §2's table emits, `32, 32, 1000` with the middle block absent is `32, 96` in version 1 and
+> > `43, 85` in version 2. Twelve markers of the 663 in the 135 shipped palettes reach this — all in
+> > Zombie Apocalypse Essentials, all naming `immersive_weathering` blocks — and on the installation
+> > that pack is written for they do not. This is a real behavioural difference between the formats
+> > rather than a defect in the converter, and it is written here so the next reader finds it in the
+> > rule rather than in a chunk.
+
+> > **The exception is per marker, and the granularity is load-bearing.** Stated per *file* it excuses
+> > every marker of a palette because one of them names an absent block, which is a blanket pass over
+> > 40 markers to cover one. It was written that way first, and the nine additional instances it was
+> > hiding — and one unrelated defect, [TRAIT.012](01-traits.md#41-urbexdamaged)'s — surfaced the moment
+> > it was tightened.
+
+> > **Why a `light_socket` used to be an exception and is not** — [WEIGHT.043](05-weights.md#5-selection)
+> > was stated and unimplemented: version 1 drew a socket candidate on a sequential ticket below the
+> > authored total and version 2 apportions the list to 128 slots, so a converted socket relit the city
+> > and nothing the converter wrote could avoid it. Implementing WEIGHT.043 removed the exception
+> > instead of recording one — the two formats now read the same slot at the same position — which is
+> > why this rule needs no clause about sockets and needed one before.
+
+> **VER.022** · `MUST` — The converter names, per file, every construct it could not translate
+> without a decision, and exits non-zero rather than guessing.
+
+> > **Its refusals cite no `DIAG`**, for the reason [VER.009](#2-what-every-version-1-construct-becomes)
+> > records: the converter is not a loader, and this catalogue is about assets being loaded. That note
+> > also says what bringing it into the catalogue would take, and that it starts with a citation on this
+> > rule rather than with a row in the enum.
+
+> **VER.023** · `MUST` — The converter is idempotent: converting a version 2 file returns it
+> unchanged.
+
+## 5. What the converter cannot do
+
+> **VER.030** · `MUST` — The converter produces a correct version 2 file, not an idiomatic one. It
+> does not invent definitions, extract shared traits, or collapse near-duplicate files.
+
+> > **Why** — those are the changes that make version 2 worth adopting, and every one of them is a
+> > judgement about intent. A tool that guessed at them would produce a file whose author did not
+> > write it and cannot maintain it.
+
+> **VER.031** · `MUST` — The converter reports the opportunities it declined to take: repeated
+> `damaged` values, weighted lists repeated across files, and markers whose definitions are equal.
+
+> > **Why** — the measured targets are worth naming. In the bundled pack `damaged` had one distinct
+> > value across sixty uses; Zombie Apocalypse Essentials carries 6,527 inline entries of which 1,242
+> > are distinct; Modern Tweaks has 39 NBT-carrying markers holding 12 distinct blobs, and 149 markers
+> > in 48 families differing only by a directional property, by VER.032's rule.
+
+> > **The first of those has been taken, and the number the tool prints moved with it.** Converting the
+> > bundled pack was the occasion to act on what this rule reports, so 45 of the 60 became
+> > `{ "$ref": "urbex:damageable" }` against one partial definition in the `definitions` registry — the
+> > registry tier rather than `$defs`, because [REF.011](02-references.md#2-where-a-name-resolves)'s
+> > table puts a definition used by more than one file there and these were used by fourteen. Nine
+> > stayed written out, and there are three ways to spell those and not two: their markers already carry
+> > a `$ref` into a converted variant and a node has one `$ref`, so the trait can stay written out beside
+> > it, or move onto the variant's own definition — which changes what that shared definition means for
+> > every later user of it — or move onto a **second** definitions asset per variant that carries both
+> > the `$ref` and the trait, which is the only one of the three that both shares the trait and leaves
+> > the variant alone. The third was measured and generates identically; it was declined because six new
+> > registry assets to remove nine inline trait blocks is not a saving, and that is a judgement rather
+> > than a constraint. The tool now counts **0** there. It counted 6 until
+> > [issue #219](https://github.com/Arilas/urbex/issues/219) closed: those were version 1's spelling
+> > surviving in the inline palettes of six parts and buildings, and converting those six owners left the
+> > bundled pack writing no `damaged` at all. The reference packs are untouched and Modern Tweaks still
+> > reports 257 uses of 7 distinct values, which is what keeps this rule measured on a live pack rather
+> > than only on a historical one. Restated here rather than left at sixty because
+> > [VER.032](#5-what-the-converter-cannot-do) makes a figure nobody can reproduce a claim, and the
+> > figure a reader can reproduce is whatever the pack currently says.
+
+> **VER.032** · `MUST` — Each reported opportunity states the rule by which it was counted, because a
+> count nobody can reproduce is a claim rather than a measurement.
+
+> > **Why, and what it corrects** — the first two figures above are reproduced by the converter to the
+> > digit. The third is not the one this document originally carried. It read "152 markers in 54
+> > families", from a research pass whose grouping was never written down, and no reading of "differing
+> > only by a directional property" recovers it: a search over every subset of `facing`, `axis`,
+> > `rotation`, `shape`, `half`, `hanging`, `type`, `face` and `orientation`, under both per-file and
+> > per-pack grouping, produced no combination giving that pair. The figure is replaced by the one with
+> > a method behind it. A family is now defined — one file, one entry minus its marker, with every
+> > directional property value erased, counted where more than one marker lands together — and the tool
+> > prints what that definition measures.
+
+## 6. Adopting this pattern in another registry
+
+> **VER.040** · `MUST` — A registry adopting version 2 follows VER.001 through VER.004 unchanged: a
+> file with no `version` is version 1, `"version": 2` is total, selection precedes decoding, and
+> version 1 does not become stricter.
+
+> **VER.041** · `MUST` — Each registry's rules live in their own area under `docs/format/`, with
+> their own identifier space, and reuse the `MODEL`, `TRAIT`, `REF` and `WEIGHT` rules of this
+> document by reference rather than by restatement.
+
+> > **Why** — the node model is not palette-specific. A `stuff` matcher, a condition's values and a
+> > variant's blocks are all "a weighted choice among block sources with metadata", and specifying
+> > each one separately is how the format grew four spellings of one idea in the first place.
+
+## Tombstones
+
+> **VER.005** — *retired.* Required every link of one `extends` chain to declare the same format
+> version, refusing a mixed chain with `DIAG.038`. Retired by [VER.018](#1-versioning): one format
+> loads, so a chain cannot mix two. Its diagnostic `DIAG.038` is retired with it, with its own
+> tombstone, and [MERGE.010](04-merging.md#tombstones) — which stated the same constraint once, on the
+> merging side — goes with them. No replacement identifier.
+
+> **VER.007** — *retired.* Required the palettes written inline along one part's or building's
+> `extends` chain to be of one format version, refusing a mixed stack with `DIAG.065`. Same reason as
+> VER.005 and the same fate; it was `VER.005`'s constraint arriving through the owner's chain rather
+> than the palette's, and it outlived the mixture it was about by one commit. Its diagnostic `DIAG.065`
+> is retired with it, with its own tombstone; `Palette.requireOneVersion` is deleted and the test citing
+> VER.007 with it. No replacement identifier.
+
+> **VER.001** — *retired.* Made a palette file with no `version` a version 1 palette, read by the
+> version 1 rules unchanged, so that every existing pack kept loading with no edit. Superseded by
+> [VER.018](#1-versioning), which refuses it: the loader has no version 1 rules to read it by. The
+> default it set survives as an implementation detail of the dispatcher — an absent `version` still
+> arrives as 1 — and that is exactly why `DIAG.066` exists rather than `DIAG.001`. Its promise was kept
+> for as long as the packs it was made to were version 1; the last of them is
+> [tracked in `CHAR.021`](06-characters.md#4-assignment), and it is an exporter defect rather than a
+> format one. No replacement identifier for the permission; VER.018 is the refusal.
+
+> **VER.004** — *retired.* Said version 1 does not become stricter, and was narrowed by
+> [VER.017](#1-versioning) to say it does not become stricter *about keys it does not know*. Retired
+> whole by [VER.018](#1-versioning), which does not make version 1 stricter but stops loading it: a
+> promise about how a format treats an unknown key has no subject once the format is not read. Cited by
+> three tests, which move to VER.018 or are deleted with the branch they exercised. No replacement
+> identifier.
+
+> **VER.016** — *retired in draft.* Refused any of the four operands — `$ref`, `$only`, `$without`,
+> `$spread` — written anywhere inside a `traits` value, at any depth, while a trait payload was opaque
+> and nothing could say which of a trait's fields hold nodes. Superseded by
+> [TRAIT.009](01-traits.md#3-block-valued-fields) together with
+> [TRAIT.090](01-traits.md#5-defining-a-trait): a registered trait now declares its block-valued
+> fields, so a satellite is a node the loader resolves like any other and an operand inside one is no
+> longer unresolved. Its diagnostic `DIAG.064` is retired with it, with its own tombstone; the tests
+> citing VER.016 were deleted. The half of it that was never transitional —
+> [REF.022](02-references.md#4-partial-definitions), an operand on the trait *object* — is refused by
+> that rule with `DIAG.074`, which is narrower and carries the remedy this one could not: put the
+> reference on a block-valued field, or share the whole trait with a partial definition. No replacement
+> identifier.
+
+> **VER.015** — *retired in draft.* Refused a version 2 palette where it was compiled — a registry entry
+> and a palette written inline in a part or building alike — while the loader could decode one and not
+> use it: "between the two the loader holds an entry it can read and cannot use", where dropping it gave
+> the pack a palette with no markers and casting it gave a `ClassCastException` from a worker thread
+> naming no file. Version 2 palettes compile now, through all eight stages of
+> [LOAD.001](07-compilation.md#1-the-pipeline), so [VER.002](#1-versioning) — "`"version": 2` selects this
+> specification in full" — is simply true and there is nothing left to refuse. It was the only rule of
+> §1.1, and that section is deleted with it. Its diagnostic `DIAG.063` is retired with it, with its own
+> tombstone; the test citing VER.015 was deleted. **No replacement identifier, but one consequence:**
+> [VER.007](#1-versioning) was stated and unenforced *because* this rule covered it, and is now a
+> `REJECT` of its own with `DIAG.065`.
+
+> **VER.014** — *retired in draft.* Refused a palette written inline in a part or building that
+> declared a `version` other than 1, while nothing could read one: the version 1 codec ignores keys it
+> does not know, so an inline version 2 palette would have loaded with none of the markers its author
+> wrote. Superseded by [MERGE.011](04-merging.md#1-extends), which reads an inline palette by the
+> version it declares — the same dispatcher a registered palette goes through — so there is nothing
+> left to refuse. Its diagnostic `DIAG.062` is retired with it, with its own tombstone; tests citing
+> VER.014 were deleted. No replacement identifier: the behaviour is not moved, it is gone.

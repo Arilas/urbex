@@ -97,7 +97,7 @@ public class ChunkPlan {
     private volatile ChunkPlan zmin = null;   // @todo remove
     private volatile ChunkPlan zmax = null;   // @todo remove
     private volatile DamageArea damageArea = null;
-    private Palette palette = null;             // written once, in the constructor
+    private List<Palette> palette = null;       // written once, in the constructor
     private volatile CompiledPalette compiledPalette = null;
     private volatile WorldStyle chunkWorldStyle = null;
 

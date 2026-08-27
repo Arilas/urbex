@@ -30,7 +30,7 @@ public class BuildingPartDefinition implements Extendable {
                     Codec.INT.optionalFieldOf("zsize").forGetter(l -> Optional.ofNullable(l.zSize)),
                     Codec.list(Codec.list(Codec.STRING)).optionalFieldOf("slices").forGetter(BuildingPartDefinition::createSlices),
                     Codec.STRING.optionalFieldOf("refpalette").forGetter(l -> Optional.ofNullable(l.refPaletteName)),
-                    PaletteDefinition.CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
+                    PaletteAssetDefinition.INLINE_CODEC.optionalFieldOf("palette").forGetter(l -> Optional.ofNullable(l.localPalette)),
                     Mergeable.codec(PartMeta.CODEC).optionalFieldOf("meta").forGetter(l -> Optional.ofNullable(l.metadata))
             ).apply(instance, BuildingPartDefinition::new));
 
@@ -48,14 +48,14 @@ public class BuildingPartDefinition implements Extendable {
     private final Integer xSize;
     private final Integer zSize;
 
-    private PaletteDefinition localPalette = null;
+    private PaletteAssetDefinition localPalette = null;
     private final String refPaletteName;
 
     private final Mergeable<PartMeta> metadata;
 
     public BuildingPartDefinition(Optional<Identifier> extendsId, Optional<Integer> xSize, Optional<Integer> zSize,
                           Optional<List<List<String>>> slices, Optional<String> refpalette,
-                          Optional<PaletteDefinition> locpalette, Optional<Mergeable<PartMeta>> metadata) {
+                          Optional<PaletteAssetDefinition> locpalette, Optional<Mergeable<PartMeta>> metadata) {
         this.extendsId = extendsId;
         this.slices = slices.map(BuildingPartDefinition::flatten).orElse(null);
         this.xSize = xSize.orElse(null);
@@ -119,7 +119,7 @@ public class BuildingPartDefinition implements Extendable {
         return zSize;
     }
 
-    public PaletteDefinition getLocalPalette() {
+    public PaletteAssetDefinition getLocalPalette() {
         return localPalette;
     }
 

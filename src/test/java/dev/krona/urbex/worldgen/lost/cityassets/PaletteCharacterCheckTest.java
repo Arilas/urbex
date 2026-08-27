@@ -1,7 +1,9 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
@@ -13,6 +15,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -24,6 +27,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -144,7 +148,7 @@ class PaletteCharacterCheckTest {
         AssetDiagnostics diagnostics = new AssetDiagnostics();
         Style style = style(group(palette("base", entry('a', "minecraft:stone"))));
 
-        PaletteCharacterCheck.check(partWithPalette("tower", "ab", entry('b', "minecraft:glass")),
+        PaletteCharacterCheck.check(partWithPalette("tower", "ab", "b", "minecraft:glass"),
                 usage(style), diagnostics);
 
         assertTrue(diagnostics.isEmpty(), () -> diagnostics.format(""));
@@ -204,24 +208,279 @@ class PaletteCharacterCheckTest {
         return buildPart(path, slice, Optional.empty());
     }
 
-    private static BuildingPart partWithPalette(String path, String slice, PaletteEntry... entries) {
-        return buildPart(path, slice, Optional.of(
-                new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries)))));
+    /**
+     * A part whose inline palette defines the given markers, written as the version 2 document a part
+     * carries since {@code VER.018}.
+     */
+    private static BuildingPart partWithPalette(String path, String slice, String... markerAndBlock) {
+        StringBuilder json = new StringBuilder("{\"version\":2,\"palette\":{");
+        for (int i = 0; i < markerAndBlock.length; i += 2) {
+            if (i > 0) {
+                json.append(',');
+            }
+            json.append('"').append(markerAndBlock[i]).append("\":\"")
+                    .append(markerAndBlock[i + 1]).append('"');
+        }
+        return buildPart(path, slice,
+                Optional.of(TestV2Context.inline(json.append("}}").toString())));
     }
 
     /**
      * A 1x1 part one level tall per character, so the slice string is exactly the character list
      * under test - any length, rather than the two the shape of this fixture used to fix it at.
      */
-    private static BuildingPart buildPart(String path, String slice, Optional<PaletteDefinition> local) {
+    private static BuildingPart buildPart(String path, String slice,
+                                          Optional<PaletteAssetDefinition> local) {
         Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
         List<List<String>> levels = new ArrayList<>(slice.length());
         for (char c : slice.toCharArray()) {
             levels.add(List.of(String.valueOf(c)));
         }
-        return new BuildingPart(id, BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"),
+        return new BuildingPart(id, BuiltInRegistries.BLOCK, AssetIndex.empty("urbex:palettes"),
                 List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(1), Optional.of(1),
-                        Optional.of(levels), Optional.empty(), local, Optional.empty())));
+                        Optional.of(levels), Optional.empty(), local, Optional.empty())),
+                TestV2Context.empty());
+    }
+
+    // ---- MODEL.062 at LOAD.013's stage --------------------------------------------------------
+
+    @Rule("MODEL.062")
+    @Test
+    void aVersion2AliasNoDrawCanAnswerIsALoadError() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Style style = style(group(v2Palette("only_alias",
+                "{ \"version\": 2, \"palette\": { \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")));
+
+        PaletteCharacterCheck.checkAliases(style, diagnostics);
+
+        assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
+        assertTrue(diagnostics.hasFatal(), "no selection can resolve it, so the world must not load");
+        String message = diagnostics.problems().getFirst().message();
+        assertTrue(dev.krona.urbex.format.Diag.DIAG_009.matches(message),
+                () -> "MODEL.062 cites DIAG.009, so the message is the catalogue's: " + message);
+        assertTrue(message.contains("'@'") && message.contains("'a'"),
+                () -> "and it names the alias and its target: " + message);
+    }
+
+    @Rule("LOAD.013")
+    @Rule("MODEL.064")
+    @Test
+    void aVersion2AliasAnsweredByAnotherGroupsPaletteIsReportedAsNeitherErrorNorWarning() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        // The shipped idiom, in version 2: urbex:glass_side_variant_glass maps '@' to 'a' and declares
+        // nothing else at all, and the marker it names comes from a different randompalettes group.
+        // LOAD.013 is explicit that this is reported as neither, and the first implementation of the
+        // version 1 check reported 45 of these about a pack that generates correctly.
+        Style style = style(
+                group(v2Palette("side_glass",
+                        "{ \"version\": 2, \"palette\": { \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")),
+                group(palette("wall_a", entry('a', "minecraft:stone")),
+                        palette("wall_b", entry('a', "minecraft:stone_bricks"))));
+
+        PaletteCharacterCheck.checkAliases(style, diagnostics);
+
+        assertEquals(0, diagnostics.size(),
+                () -> "every draw of every group defines 'a', so LOAD.013 says report nothing: "
+                        + diagnostics.format(""));
+    }
+
+    @Rule("LOAD.012")
+    @Test
+    void aVersion2AliasOnlySomeDrawsAnswerIsAWarningRatherThanARefusal() {
+        AssetDiagnostics diagnostics = new AssetDiagnostics();
+        Style style = style(
+                group(v2Palette("side_glass",
+                        "{ \"version\": 2, \"palette\": { \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")),
+                group(palette("wall_a", entry('a', "minecraft:stone")),
+                        palette("wall_none", entry('b', "minecraft:stone_bricks"))));
+
+        PaletteCharacterCheck.checkAliases(style, diagnostics);
+
+        assertEquals(1, diagnostics.size(), () -> diagnostics.format(""));
+        assertFalse(diagnostics.hasFatal(),
+                "some draws work, so a pack that ships this generates correctly most of the time and "
+                        + "refusing it would be this check inventing a rule");
+    }
+
+    @Rule("VER.006")
+    @Rule("MODEL.060")
+    @Test
+    void aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays() {
+        // VER.006: "a style's randompalettes may draw a version 1 palette and a version 2 palette into
+        // the same merge", because that composition "operates on compiled palettes, not on extends, so
+        // it needs no correspondence between the two formats".
+        Palette version2 = PALETTES.get(Identifier.parse(v2Palette("mixed_v2",
+                "{ \"version\": 2, \"palette\": {"
+                        + " \"x\": \"minecraft:deepslate_bricks\","
+                        + " \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")));
+        Palette version1 = PALETTES.get(Identifier.parse(
+                palette("mixed_v1", entry('a', "minecraft:stone"))));
+
+        CompiledPalette merged = new CompiledPalette(version1, version2);
+
+        assertTrue(merged.isDefined('a'), "the version 1 palette's marker survives the merge");
+        assertTrue(merged.isDefined('x'), "and so does the version 2 palette's");
+        assertTrue(merged.isDefined('@'),
+                "and a version 2 alias is answered by a marker only the version 1 palette defines, "
+                        + "which is MODEL.064's 'markers contributed by palettes this file never "
+                        + "mentions' arriving across a format boundary");
+        assertEquals(BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:stone"))
+                        .defaultBlockState(),
+                merged.getAt('@', 1L, 0, 0, 0),
+                "and it resolves to what its target resolves to, by MODEL.060");
+    }
+
+    @Test
+    void aLaterVersion2AliasOverridesAnEarlierConcreteMarker() {
+        Palette alias = compiledV2Palette("override_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """);
+        List<Palette> bases = List.of(
+                compiledV2Palette("override_v2_base", """
+                        { "version": 2, "palette": {
+                          "a": "minecraft:stone", "b": "minecraft:bricks"
+                        } }
+                        """),
+                PALETTES.get(Identifier.parse(palette("override_v1_base",
+                        entry('a', "minecraft:stone"), entry('b', "minecraft:bricks")))));
+
+        for (Palette base : bases) {
+            for (CompiledPalette merged : List.of(new CompiledPalette(base, alias),
+                    new CompiledPalette(new CompiledPalette(base), alias))) {
+                assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+                assertEquals(Blocks.BRICKS.defaultBlockState(),
+                        merged.placedAt('a', 1L, 0, 64, 0).state());
+                assertEquals(Map.of('a', 'b'), merged.aliasTargets());
+            }
+        }
+    }
+
+    @Test
+    void aLaterConcreteMarkerDiscardsAnEarlierPendingAlias() {
+        Palette alias = compiledV2Palette("superseded_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "z" } } }
+                """);
+        List<Palette> overrides = List.of(
+                compiledV2Palette("concrete_v2_override", """
+                        { "version": 2, "palette": { "a": "minecraft:bricks" } }
+                        """),
+                PALETTES.get(Identifier.parse(palette("concrete_v1_override",
+                        entry('a', "minecraft:bricks")))));
+
+        for (Palette override : overrides) {
+            CompiledPalette merged = new CompiledPalette(alias, override);
+            assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+            assertTrue(merged.aliasTargets().isEmpty(),
+                    "the superseded alias must not produce a missing-target diagnostic");
+        }
+    }
+
+    @Test
+    void anUnresolvedAliasOverrideClearsBothAsciiAndNonAsciiLookups() {
+        Palette base = compiledV2Palette("undefined_override_base", """
+                { "version": 2, "palette": {
+                  "a": "minecraft:stone", "Ω": "minecraft:bricks"
+                } }
+                """);
+        Palette aliases = compiledV2Palette("undefined_overrides", """
+                { "version": 2, "palette": {
+                  "a": { "kind": "alias", "of": "z" },
+                  "Ω": { "kind": "alias", "of": "z" }
+                } }
+                """);
+
+        for (CompiledPalette merged : List.of(new CompiledPalette(base, aliases),
+                new CompiledPalette(new CompiledPalette(base), aliases))) {
+            for (char marker : new char[]{'a', 'Ω'}) {
+                assertFalse(merged.isDefined(marker));
+                assertFalse(merged.getCharacters().contains(marker));
+                assertNull(merged.getAt(marker, 1L, 0, 64, 0));
+                assertNull(merged.placedAt(marker, 1L, 0, 64, 0));
+            }
+        }
+    }
+
+    @Test
+    void aLaterAliasDefinitionChoosesTheFinalTarget() {
+        Palette first = compiledV2Palette("first_alias_target", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """);
+        Palette last = compiledV2Palette("last_alias_target", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "c" } } }
+                """);
+        Palette targets = compiledV2Palette("alias_targets", """
+                { "version": 2, "palette": {
+                  "b": "minecraft:stone", "c": "minecraft:bricks"
+                } }
+                """);
+
+        CompiledPalette merged = new CompiledPalette(first, last, targets);
+
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+        assertEquals(Map.of('a', 'c'), merged.aliasTargets());
+    }
+
+    @Test
+    void aPendingBaseAliasCanResolveFromAPartLocalPalette() {
+        CompiledPalette base = new CompiledPalette(compiledV2Palette("base_pending_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """));
+        Palette local = compiledV2Palette("local_alias_target", """
+                { "version": 2, "palette": { "b": "minecraft:bricks" } }
+                """);
+
+        CompiledPalette merged = new PaletteCache().with(base, local);
+
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.placedAt('a', 1L, 0, 64, 0).state());
+        assertEquals(Map.of('a', 'b'), merged.aliasTargets());
+        assertFalse(base.isDefined('a'), "resolving a part must not mutate its shared base");
+    }
+
+    @Test
+    void aResolvedBaseAliasFollowsAPartLocalTargetOverrideWithoutChangingTheBase() {
+        Palette alias = compiledV2Palette("base_resolved_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """);
+        Palette target = compiledV2Palette("base_resolved_target", """
+                { "version": 2, "palette": { "b": "minecraft:stone" } }
+                """);
+        CompiledPalette base = new CompiledPalette(alias, target);
+        Palette local = compiledV2Palette("local_target_override", """
+                { "version": 2, "palette": { "b": "minecraft:bricks" } }
+                """);
+
+        CompiledPalette merged = new PaletteCache().with(base, local);
+
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.placedAt('a', 1L, 0, 64, 0).state());
+        assertEquals(Blocks.STONE.defaultBlockState(), base.getAt('a', 1L, 0, 64, 0),
+                "the shared base palette must keep its own resolved alias");
+    }
+
+    private static Palette compiledV2Palette(String path, String json) {
+        return PALETTES.get(Identifier.parse(v2Palette(path, json)));
+    }
+
+    /** Registers a version 2 palette from its JSON and returns its id. */
+    private static String v2Palette(String path, String json) {
+        Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
+        dev.krona.urbex.format.Diagnostics diagnostics = new dev.krona.urbex.format.Diagnostics();
+        dev.krona.urbex.format.palette.PaletteV2Definition file =
+                dev.krona.urbex.format.palette.PaletteV2Definition.CODEC
+                        .parse(com.mojang.serialization.JsonOps.INSTANCE,
+                                com.google.gson.JsonParser.parseString(json))
+                        .result().orElseThrow();
+        PALETTES.put(id, Palette.version2(id,
+                dev.krona.urbex.format.palette.NodeResolver.resolve(file, diagnostics)
+                        .flatMap(resolved -> dev.krona.urbex.format.palette.CompiledV2Palette.compile(
+                                resolved,
+                                dev.krona.urbex.format.palette.Exclusion.installed(
+                                        BuiltInRegistries.BLOCK, java.util.Set.of("urbex", "minecraft")),
+                                dev.krona.urbex.format.palette.TraitContext.of(BuiltInRegistries.BLOCK),
+                                dev.krona.urbex.format.Diagnostics.DECODING_LOCATION, diagnostics))
+                        .orElseThrow()));
+        return id.toString();
     }
 
     @SafeVarargs
@@ -248,7 +507,7 @@ class PaletteCharacterCheckTest {
     /** Registers a palette and returns its id, so {@link #group} can name it. */
     private static String palette(String path, PaletteEntry... entries) {
         Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
-        PALETTES.put(id, new Palette(id, BuiltInRegistries.BLOCK, null,
+        PALETTES.put(id, new Palette(id, BuiltInRegistries.BLOCK,
                 List.of(new PaletteDefinition(Optional.empty(), Optional.of(List.of(entries))))));
         return id.toString();
     }

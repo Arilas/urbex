@@ -15,25 +15,20 @@ import dev.krona.urbex.worldgen.lost.cityassets.Resolved;
 import dev.krona.urbex.worldgen.lost.cityassets.Style;
 import dev.krona.urbex.worldgen.lost.cityassets.StuffObject;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
+import dev.krona.urbex.setup.TestRegistries;
 import net.minecraft.SharedConstants;
+import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -42,6 +37,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -74,28 +70,52 @@ class DatapackGuideExamplesTest {
     private static final Path GUIDE = Path.of("docs/datapacks.md");
 
     /**
-     * The thirteen registries, by the directory name the guide (and a datapack) spells them with.
+     * Every registry {@link TestRegistries} knows about, by the directory name the guide (and a
+     * datapack) spells it with.
+     * <p>
+     * Derived from {@link TestRegistries#keys()} and {@link TestRegistries#valueTypesByFieldName()}
+     * rather than listed by hand: {@code TestRegistries}'s own javadoc records that three other test
+     * files each carried a 13-entry hand-written copy of this list and all three were wrong the same
+     * way, omitting {@code definitions}. A fourth copy here would be the same mistake with better odds,
+     * not a different class of mistake. Both {@code TestRegistries} methods walk
+     * {@code CustomRegistries}'s declared {@code *_REGISTRY_KEY} fields in the same order, so the
+     * {@code i}-th key and the {@code i}-th value type name the same registry; {@link #codecFor} reads
+     * that type's own {@code CODEC} field, which is the codec {@code CustomRegistries.init} registers
+     * it under.
      * <p>
      * A method rather than a static field: touching any {@code *Definition.CODEC} initialises Minecraft's
      * built-in registries, and a static field would do that during class initialisation, before
      * {@link #bootstrap()} has run.
      */
     private static Map<String, Codec<?>> codecs() {
-        return Map.ofEntries(
-            Map.entry("worldstyles", WorldStyleDefinition.CODEC),
-            Map.entry("citystyles", CityStyleDefinition.CODEC),
-            Map.entry("buildings", BuildingDefinition.CODEC),
-            Map.entry("parts", BuildingPartDefinition.CODEC),
-            Map.entry("palettes", PaletteDefinition.CODEC),
-            Map.entry("styles", StyleDefinition.CODEC),
-            Map.entry("multibuildings", MultiBuildingDefinition.CODEC),
-            Map.entry("scattered", ScatteredDefinition.CODEC),
-            Map.entry("conditions", ConditionDefinition.CODEC),
-            Map.entry("variants", VariantDefinition.CODEC),
-            Map.entry("stuff", StuffSettingsDefinition.CODEC),
-            Map.entry("predefinedcities", PredefinedCityDefinition.CODEC),
-            Map.entry("presets", PresetDefinition.CODEC));
+        List<ResourceKey<? extends Registry<?>>> keys = TestRegistries.keys();
+        List<Class<?>> valueTypes = new ArrayList<>(TestRegistries.valueTypesByFieldName().values());
+        Map<String, Codec<?>> codecs = new LinkedHashMap<>();
+        for (int i = 0; i < keys.size(); i++) {
+            codecs.put(keys.get(i).identifier().getPath(), codecFor(valueTypes.get(i)));
+        }
+        return codecs;
     }
+
+    /** The {@code CODEC} field a registry's value type declares - the same one it is registered under. */
+    private static Codec<?> codecFor(Class<?> valueType) {
+        try {
+            return (Codec<?>) valueType.getField("CODEC").get(null);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("could not read " + valueType.getName() + ".CODEC", e);
+        }
+    }
+
+    /**
+     * Registries the guide is not expected to have an example for.
+     * <p>
+     * {@code definitions} is the version 2 tier ({@code CustomRegistries.DEFINITIONS_REGISTRY_KEY}'s
+     * own javadoc), and {@code docs/format/README.md} §9 records "The authoring guide has no version 2
+     * content" as a known hole rather than an oversight this test should catch on its own: the guide
+     * does not mention {@code $defs}, {@code $ref}, {@code traits}, or this registry at all. Listing it
+     * here keeps that hole visible in the check instead of making it disappear from one.
+     */
+    private static final Set<String> KNOWN_MISSING_EXAMPLES = Set.of("definitions");
 
     @BeforeAll
     static void bootstrap() {
@@ -135,6 +155,7 @@ class DatapackGuideExamplesTest {
 
         Set<String> uncovered = new java.util.TreeSet<>(codecs.keySet());
         uncovered.removeAll(covered);
+        uncovered.removeAll(KNOWN_MISSING_EXAMPLES);
         if (!uncovered.isEmpty()) {
             // The guide promises a working example of every registry; without this the promise
             // quietly lapses the next time one is added.
@@ -191,39 +212,23 @@ class DatapackGuideExamplesTest {
         expect(guide, missing, () -> Resolved.require(null, downtown, "streetblocks.parts.stair"));
 
         // A part with no geometry, and a part whose redeclared size contradicts inherited slices.
-        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
-        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, null, NO_PALETTES, List.of(
+        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, NO_PALETTES, List.of(namedPart(tower, null, null, null))));
+        expect(guide, missing, () -> new BuildingPart(tower, BuiltInRegistries.BLOCK, NO_PALETTES, List.of(
                 namedPart(Identifier.fromNamespaceAndPath("urbexmt", "tower_base"), 16, 16,
                         List.of(List.of("x".repeat(256)))),
                 namedPart(tower, 8, null, null))));
 
         // 'extends' inside an inline palette block.
-        expect(guide, missing, () -> Palette.inline(BuiltInRegistries.BLOCK, null, tower, List.of(new PaletteDefinition(
+        expect(guide, missing, () -> Palette.inline(BuiltInRegistries.BLOCK, tower, List.of(new PaletteDefinition(
                 Optional.of(Identifier.fromNamespaceAndPath("urbex", "common")), Optional.empty()))));
 
         // A palette entry that resolves to nothing at all.
-        PaletteEntry empty = new PaletteEntry("#", Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
-        expect(guide, missing, () -> new Palette(Identifier.fromNamespaceAndPath("urbex", "x"), BuiltInRegistries.BLOCK, null, List.of(
-                new PaletteDefinition(Optional.empty(), Optional.of(List.of(empty))))));
-
-        // The four ways a 'lightSource' can be wrong, and the two removed spellings it replaced.
-        // Every one of them names the palette and the character, so a pack author who has copied a
-        // light onto the wrong entry is told which entry.
-        Identifier x = Identifier.fromNamespaceAndPath("urbex", "x");
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","lightSource":true}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"L","block":"minecraft:stone","lightSource":true}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","block":"minecraft:torch","torch":true}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","light":{"floor":[{"weight":1,"block":"minecraft:torch"}]}}]}"""));
-        expect(guide, missing, () -> compilePalette(x, """
-                {"palette":[{"char":"T","lightSource":{"wall":[
-                  {"weight":1,"block":"minecraft:wall_torch[facing=north]","unlit":"minecraft:glowstone"}
-                ]}}]}"""));
+        // The version 1 palette messages this used to check are gone from the guide, and had to be:
+        // VER.018 stopped loading version 1, so none of them can reach a pack author any more. A guide
+        // that still quoted them would be teaching the reader to recognise failures they will never
+        // see. Version 2's refusals are numbered and live in their own catalogue - 08-errors.md, which
+        // DiagCatalogueTest checks against the enum word by word - so the guide points there instead of
+        // keeping a second copy that goes stale. This is the copy that went stale.
 
         // A 'randompalettes' group nothing could ever be drawn from, and a stuff entry whose two
         // count bounds contradict. Both are checked at the chain fold rather than per field.
@@ -260,7 +265,7 @@ class DatapackGuideExamplesTest {
                 .parse(JsonOps.INSTANCE, JsonParser.parseString(json))
                 .result()
                 .orElseThrow(() -> new AssertionError("fixture does not decode: " + json));
-        return new Palette(id, BuiltInRegistries.BLOCK, null, List.of(definition));
+        return new Palette(id, BuiltInRegistries.BLOCK, List.of(definition));
     }
 
     /** A stuff entry declaring everything required, with the two count bounds the caller names. */

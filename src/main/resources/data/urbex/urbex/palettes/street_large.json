@@ -1,12 +1,7 @@
 {
-  "palette": [
-    {
-      "char": "l",
-      "block": "minecraft:smooth_stone_slab[type=double]"
-    },
-    {
-      "char": "q",
-      "block": "minecraft:smooth_quartz"
-    }
-  ]
+  "version": 2,
+  "palette": {
+    "l": "minecraft:smooth_stone_slab[type=double]",
+    "q": "minecraft:smooth_quartz"
+  }
 }

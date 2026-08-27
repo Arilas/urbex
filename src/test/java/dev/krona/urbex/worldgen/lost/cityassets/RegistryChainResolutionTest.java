@@ -1,15 +1,21 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import com.google.gson.JsonParser;
+import com.mojang.serialization.JsonOps;
+import dev.krona.urbex.format.Diag;
+import dev.krona.urbex.format.Rule;
+import dev.krona.urbex.format.palette.PaletteV2Definition;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.CityStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.MultiBuildingDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PredefinedCityDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.ScatteredDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StuffSettingsDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.VariantDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleEdge;
@@ -17,6 +23,7 @@ import dev.krona.urbex.worldgen.lost.regassets.data.CityStyleSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
+import dev.krona.urbex.worldgen.lost.regassets.data.PaletteEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.PaletteSelector;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import dev.krona.urbex.worldgen.lost.regassets.data.PredefinedBuilding;
@@ -43,6 +50,8 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Two-entry-chain coverage for the registries where a wrong fold is silent rather than loud.
@@ -236,24 +245,6 @@ class RegistryChainResolutionTest {
                 "{\"replace\": false} keeps the inherited values");
     }
 
-    // ------------------------------------------------------------- variants
-
-    @Test
-    void variantBlocksReplaceByDefaultAndAppendWhenTheChildOptsIn() {
-        VariantDefinition parent = variant("stones", true,
-                new BlockEntry(1, "minecraft:stone"), new BlockEntry(2, "minecraft:andesite"));
-
-        Variant replaced = new Variant(TestAssetId.ANY, BuiltInRegistries.BLOCK, List.of(parent,
-                variant("stones_deep", true, new BlockEntry(3, "minecraft:deepslate"))));
-        assertEquals(List.of("minecraft:deepslate"), blockIdsOf(replaced), "a bare array replaces");
-        assertEquals(List.of(3), replaced.getBlocks().stream().map(org.apache.commons.lang3.tuple.Pair::getLeft).toList());
-
-        Variant appended = new Variant(TestAssetId.ANY, BuiltInRegistries.BLOCK, List.of(parent,
-                variant("stones_deep", false, new BlockEntry(3, "minecraft:deepslate"))));
-        assertEquals(List.of("minecraft:stone", "minecraft:andesite", "minecraft:deepslate"),
-                blockIdsOf(appended), "{\"replace\": false} keeps the inherited blocks, in order");
-    }
-
     // --------------------------------------------------------------- styles
 
     @Test
@@ -375,7 +366,7 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildInheritsTheFillerAndPartsItDoesNotDeclare() {
-        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, PALETTES, List.of(
                 building("library").filler("#").parts("urbex:library_floor").minFloors(2).build(),
                 building("library_burnt").rubble("R").build()));
 
@@ -388,13 +379,13 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedPrefersLonelyBackToZero() {
-        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").prefersLonely(0.0f).build()));
 
         assertEquals(0.0f, resolved.getPrefersLonely(),
                 "0.0 is a value a file can mean, not a marker for 'undeclared'");
-        assertEquals(0.8f, new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        assertEquals(0.8f, new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").prefersLonely(0.8f).build(),
                 building("tower_row").build())).getPrefersLonely(),
                 "omitting it still inherits");
@@ -402,13 +393,16 @@ class RegistryChainResolutionTest {
 
     @Test
     void buildingChildCanSetAnInheritedFloorLimitBackToTheLevelDefault() {
-        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, null, PALETTES, List.of(
+        Building resolved = new Building(TestAssetId.ANY, BuiltInRegistries.BLOCK, PALETTES, List.of(
                 building("tower").filler("#").parts("urbex:tower_floor").minFloors(4).build(),
                 building("tower_short").minFloors(-1).build()));
 
         assertEquals(-1, resolved.getMinFloors(),
                 "-1 means 'take the level's limit', which a child must be able to ask for");
     }
+
+    // ------------------------------------------------- palettes across versions
+
 
     // -------------------------------------------------------------- helpers
 
@@ -501,12 +495,6 @@ class RegistryChainResolutionTest {
         }
     }
 
-    private static List<String> blockIdsOf(Variant variant) {
-        return variant.getBlocks().stream()
-                .map(pair -> BuiltInRegistries.BLOCK.getKey(pair.getRight().getBlock()).toString())
-                .toList();
-    }
-
     /**
      * The distinct values a condition can hand back. {@code Condition} exposes only a weighted
      * draw, so this sweeps a fixed random sequence; the sequence is seeded, so the result is a
@@ -547,10 +535,6 @@ class RegistryChainResolutionTest {
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()))
                 .toList();
         return new ConditionDefinition(Optional.empty(), Optional.of(new Mergeable<>(replace, parts)));
-    }
-
-    private static VariantDefinition variant(String path, boolean replace, BlockEntry... blocks) {
-        return new VariantDefinition(Optional.empty(), Optional.of(new Mergeable<>(replace, List.of(blocks))));
     }
 
     private static StuffBuilder stuff(String path) {

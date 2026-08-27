@@ -1,0 +1,355 @@
+{
+  "palette": [
+    {
+      "char": "1",
+      "block": "minecraft:spawner",
+      "mob": "urbex:easymobs"
+    },
+    {
+      "char": "4",
+      "block": "minecraft:spawner",
+      "mob": "urbex:hardmobs"
+    },
+    {
+      "char": "T",
+      "lightSource": {
+        "floor": [
+          {
+            "weight": 6,
+            "block": "minecraft:lantern[hanging=false]"
+          },
+          {
+            "weight": 3,
+            "block": "minecraft:torch",
+            "unlit": "minecraft:candle[candles=1,lit=false]"
+          }
+        ],
+        "wall": [
+          {
+            "weight": 8,
+            "block": "minecraft:wall_torch[facing=north]"
+          }
+        ],
+        "ceiling": [
+          {
+            "weight": 8,
+            "block": "minecraft:lantern[hanging=true]",
+            "unlit": "minecraft:iron_chain[axis=y]"
+          }
+        ]
+      }
+    },
+    {
+      "char": "h",
+      "block": "minecraft:glowstone",
+      "lightSource": {
+        "unlitBlocks": [
+          {
+            "random": 10,
+            "block": "minecraft:cracked_stone_bricks"
+          },
+          {
+            "random": 9,
+            "block": "minecraft:mossy_stone_bricks"
+          },
+          {
+            "random": 2000,
+            "block": "minecraft:stone_bricks"
+          }
+        ]
+      }
+    },
+    {
+      "char": "g",
+      "block": "minecraft:redstone_torch[lit=true]"
+    },
+    {
+      "char": "9",
+      "blocks": [
+        {
+          "random": 32,
+          "block": "minecraft:cyan_terracotta"
+        },
+        {
+          "random": 32,
+          "block": "minecraft:gray_terracotta"
+        },
+        {
+          "random": 32,
+          "block": "minecraft:cyan_concrete"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:gray_concrete"
+        }
+      ]
+    },
+    {
+      "char": "Y",
+      "block": "minecraft:white_stained_glass"
+    },
+    {
+      "char": "Z",
+      "blocks": [
+        {
+          "random": 32,
+          "block": "minecraft:light_gray_stained_glass"
+        },
+        {
+          "random": 32,
+          "block": "minecraft:gray_stained_glass"
+        },
+        {
+          "random": 32,
+          "block": "minecraft:blue_stained_glass"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:light_blue_stained_glass"
+        }
+      ]
+    },
+    {
+      "char": "p",
+      "blocks": [
+        {
+          "random": 30,
+          "block": "minecraft:poppy"
+        },
+        {
+          "random": 30,
+          "block": "minecraft:dandelion"
+        },
+        {
+          "random": 15,
+          "block": "minecraft:oak_sapling[stage=1]"
+        },
+        {
+          "random": 15,
+          "block": "minecraft:spruce_sapling[stage=1]"
+        },
+        {
+          "random": 15,
+          "block": "minecraft:birch_sapling[stage=1]"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:acacia_sapling[stage=1]"
+        }
+      ],
+      "damaged": "minecraft:dead_bush"
+    },
+    {
+      "char": "K",
+      "blocks": [
+        {
+          "random": 64,
+          "block": "minecraft:poppy"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:dandelion"
+        }
+      ],
+      "damaged": "minecraft:dead_bush"
+    },
+    {
+      "char": "!",
+      "blocks": [
+        {
+          "random": 15,
+          "block": "minecraft:diamond_block"
+        },
+        {
+          "random": 20,
+          "block": "minecraft:gold_block"
+        },
+        {
+          "random": 15,
+          "block": "minecraft:emerald_block"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:iron_block"
+        }
+      ]
+    },
+    {
+      "char": "F",
+      "blocks": [
+        {
+          "random": 25,
+          "block": "minecraft:furnace[facing=north]"
+        },
+        {
+          "random": 20,
+          "block": "minecraft:crafting_table"
+        },
+        {
+          "random": 7,
+          "block": "minecraft:brewing_stand"
+        },
+        {
+          "random": 6,
+          "block": "minecraft:anvil[facing=north]"
+        },
+        {
+          "random": 5,
+          "block": "minecraft:cauldron"
+        },
+        {
+          "random": 2,
+          "block": "minecraft:enchanting_table"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:cobweb"
+        }
+      ]
+    },
+    {
+      "char": "%",
+      "blocks": [
+        {
+          "random": 40,
+          "block": "minecraft:cobweb"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:air"
+        }
+      ]
+    },
+    {
+      "char": "\\",
+      "block": "minecraft:cobweb"
+    },
+    {
+      "char": "{",
+      "block": "minecraft:iron_chain"
+    },
+    {
+      "char": "l",
+      "block": "minecraft:ladder[facing=north]"
+    },
+    {
+      "char": "-",
+      "block": "minecraft:oak_pressure_plate"
+    },
+    {
+      "char": ".",
+      "block": "minecraft:oak_fence"
+    },
+    {
+      "char": "L",
+      "block": "minecraft:bookshelf",
+      "damaged": "minecraft:oak_fence"
+    },
+    {
+      "char": "W",
+      "block": "minecraft:water"
+    },
+    {
+      "char": "C",
+      "block": "minecraft:chest[facing=north]",
+      "loot": "urbex:chestloot"
+    },
+    {
+      "char": "G",
+      "block": "minecraft:grass_block"
+    },
+    {
+      "char": "D",
+      "block": "minecraft:dirt"
+    },
+    {
+      "char": " ",
+      "block": "minecraft:air"
+    },
+    {
+      "char": "~",
+      "block": "minecraft:structure_void"
+    },
+    {
+      "char": "/",
+      "variant": "urbexmt:stone_stairs_bottom_west",
+      "damaged": "minecraft:cobblestone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "(",
+      "block": "minecraft:quartz_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]",
+      "damaged": "minecraft:quartz_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": ")",
+      "block": "minecraft:quartz_stairs[facing=south,half=bottom,shape=straight,waterlogged=false]",
+      "damaged": "minecraft:quartz_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "[",
+      "block": "minecraft:quartz_stairs[facing=east,half=bottom,shape=straight,waterlogged=false]",
+      "damaged": "minecraft:quartz_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "]",
+      "block": "minecraft:quartz_stairs[facing=west,half=bottom,shape=straight,waterlogged=false]",
+      "damaged": "minecraft:quartz_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "2",
+      "block": "minecraft:quartz_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "|",
+      "block": "minecraft:potted_dead_bush"
+    },
+    {
+      "char": "i",
+      "variant": "urbexmt:azalea_leaves"
+    },
+    {
+      "char": "j",
+      "block": "minecraft:quartz_pillar[axis=y]",
+      "damaged": "minecraft:iron_bars"
+    },
+    {
+      "char": "f",
+      "block": "minecraft:quartz_bricks",
+      "damaged": "minecraft:iron_bars"
+    },
+    {
+      "char": "^",
+      "blocks": [
+        {
+          "random": 32,
+          "block": "minecraft:candle[candles=1,lit=false,waterlogged=false]"
+        },
+        {
+          "random": 32,
+          "block": "minecraft:candle[candles=2,lit=false,waterlogged=false]"
+        },
+        {
+          "random": 32,
+          "block": "minecraft:candle[candles=3,lit=false,waterlogged=false]"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:candle[candles=4,lit=false,waterlogged=false]"
+        }
+      ]
+    },
+    {
+      "char": "≈",
+      "variant": "urbexmt:coral_dry"
+    },
+    {
+      "char": "≡",
+      "variant": "urbexmt:seabed"
+    },
+    {
+      "char": "§",
+      "block": "minecraft:chiseled_stone_bricks",
+      "damaged": "minecraft:iron_bars"
+    }
+  ]
+}

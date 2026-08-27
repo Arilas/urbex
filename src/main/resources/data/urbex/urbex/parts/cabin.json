@@ -2,44 +2,18 @@
   "xsize": 16,
   "zsize": 16,
   "palette": {
-    "palette": [
-      {
-        "char": "D",
-        "block": "minecraft:iron_door[half=lower]"
-      },
-      {
-        "char": "d",
-        "block": "minecraft:iron_door[half=upper]"
-      },
-      {
-        "char": "P",
-        "block": "minecraft:quartz_block"
-      },
-      {
-        "char": "B",
-        "block": "minecraft:barrel[facing=north]"
-      },
-      {
-        "char": "c",
-        "block": "minecraft:exposed_copper"
-      },
-      {
-        "char": "1",
-        "block": "minecraft:exposed_cut_copper_stairs[facing=north]"
-      },
-      {
-        "char": "2",
-        "block": "minecraft:exposed_cut_copper_stairs[facing=west]"
-      },
-      {
-        "char": "3",
-        "block": "minecraft:exposed_cut_copper_stairs[facing=south]"
-      },
-      {
-        "char": "4",
-        "block": "minecraft:exposed_cut_copper_stairs[facing=east]"
-      }
-    ]
+    "version": 2,
+    "palette": {
+      "D": "minecraft:iron_door[half=lower]",
+      "d": "minecraft:iron_door[half=upper]",
+      "P": "minecraft:quartz_block",
+      "B": "minecraft:barrel[facing=north]",
+      "c": "minecraft:exposed_copper",
+      "1": "minecraft:exposed_cut_copper_stairs[facing=north]",
+      "2": "minecraft:exposed_cut_copper_stairs[facing=west]",
+      "3": "minecraft:exposed_cut_copper_stairs[facing=south]",
+      "4": "minecraft:exposed_cut_copper_stairs[facing=east]"
+    }
   },
   "slices": [
     [

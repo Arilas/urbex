@@ -1,16 +1,8 @@
 {
-  "palette": [
-    {
-      "char": "+",
-      "block": "minecraft:glass"
-    },
-    {
-      "char": "`",
-      "block": "minecraft:glass_pane"
-    },
-    {
-      "char": "a",
-      "block": "minecraft:glass"
-    }
-  ]
+  "version": 2,
+  "palette": {
+    "+": "minecraft:glass",
+    "`": "minecraft:glass_pane",
+    "a": "minecraft:glass"
+  }
 }

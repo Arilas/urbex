@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 32,
+      "block": "minecraft:cracked_stone_bricks"
+    },
+    {
+      "weight": 32,
+      "block": "minecraft:stone_bricks"
+    },
+    {
+      "weight": 64,
+      "block": "minecraft:stone"
+    }
+  ]
+}

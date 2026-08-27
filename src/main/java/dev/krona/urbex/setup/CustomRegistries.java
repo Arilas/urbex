@@ -12,7 +12,13 @@ public class CustomRegistries {
 
     public static final ResourceKey<Registry<BuildingDefinition>> BUILDING_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "buildings"));
 
-    public static final ResourceKey<Registry<PaletteDefinition>> PALETTE_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "palettes"));
+    /**
+     * The one registry whose entries may be written in either format version. Its value type is
+     * {@link PaletteAssetDefinition}, not {@link dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition},
+     * because the codec registered below has to be the version dispatcher - {@code VER.003} requires the
+     * version to be read before the document is decoded, and a registry takes one codec.
+     */
+    public static final ResourceKey<Registry<PaletteAssetDefinition>> PALETTE_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "palettes"));
 
     public static final ResourceKey<Registry<BuildingPartDefinition>> PART_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "parts"));
 
@@ -24,7 +30,18 @@ public class CustomRegistries {
 
     public static final ResourceKey<Registry<MultiBuildingDefinition>> MULTIBUILDINGS_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "multibuildings"));
 
-    public static final ResourceKey<Registry<VariantDefinition>> VARIANTS_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "variants"));
+    /**
+     * The palette format version 2 tier of shared nodes: {@code data/<namespace>/urbex/definitions/}
+     * ({@code REF.010}).
+     * <p>
+     * What {@code variants} became ({@code 09-migration.md} §2), and now what replaced it: the
+     * {@code variants} registry is gone. It was kept registered while version 1 was what every shipped
+     * pack was written in, so that a version 2 palette reached this registry with {@code $ref} while a
+     * version 1 palette reached {@code variants} with {@code variant} and could not see this one. The
+     * bundled pack writes neither now, and a version 1 palette still naming {@code variant} fails by
+     * name in {@code Palette.rejectRemovedVariant} rather than painting air.
+     */
+    public static final ResourceKey<Registry<DefinitionAssetDefinition>> DEFINITIONS_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "definitions"));
 
     public static final ResourceKey<Registry<WorldStyleDefinition>> WORLDSTYLES_REGISTRY_KEY = ResourceKey.createRegistryKey(Identifier.fromNamespaceAndPath(Urbex.MODID, "worldstyles"));
 
@@ -41,13 +58,13 @@ public class CustomRegistries {
         // (not synced to clients), matching the NeoForge DataPackRegistryEvent behavior
         // (no network codec was provided there either).
         DynamicRegistries.register(BUILDING_REGISTRY_KEY, BuildingDefinition.CODEC);
-        DynamicRegistries.register(PALETTE_REGISTRY_KEY, PaletteDefinition.CODEC);
+        DynamicRegistries.register(PALETTE_REGISTRY_KEY, PaletteAssetDefinition.CODEC);
         DynamicRegistries.register(PART_REGISTRY_KEY, BuildingPartDefinition.CODEC);
         DynamicRegistries.register(STYLE_REGISTRY_KEY, StyleDefinition.CODEC);
         DynamicRegistries.register(CONDITIONS_REGISTRY_KEY, ConditionDefinition.CODEC);
         DynamicRegistries.register(CITYSTYLES_REGISTRY_KEY, CityStyleDefinition.CODEC);
         DynamicRegistries.register(MULTIBUILDINGS_REGISTRY_KEY, MultiBuildingDefinition.CODEC);
-        DynamicRegistries.register(VARIANTS_REGISTRY_KEY, VariantDefinition.CODEC);
+        DynamicRegistries.register(DEFINITIONS_REGISTRY_KEY, DefinitionAssetDefinition.CODEC);
         DynamicRegistries.register(WORLDSTYLES_REGISTRY_KEY, WorldStyleDefinition.CODEC);
         DynamicRegistries.register(PREDEFINEDCITIES_REGISTRY_KEY, PredefinedCityDefinition.CODEC);
         DynamicRegistries.register(SCATTERED_REGISTRY_KEY, ScatteredDefinition.CODEC);

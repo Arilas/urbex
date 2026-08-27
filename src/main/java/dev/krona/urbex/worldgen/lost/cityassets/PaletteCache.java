@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.varia.GenerationMetrics;
 
 import javax.annotation.Nullable;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,8 +35,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class PaletteCache {
 
-    /** {@code style -> compiled}, the root of every chain. */
-    private final Map<Palette, CompiledPalette> roots = new ConcurrentHashMap<>();
+    /**
+     * {@code draw -> compiled}, the root of every chain.
+     *
+     * <p>Keyed on the <em>list</em> a style drew rather than on one flattened palette, which is what
+     * {@code VER.006} requires: a draw may hold a version 1 and a version 2 palette, and there is no
+     * single {@code Palette} that is both. {@link CompiledPalette} merges compiled markers, so the draw
+     * is the thing that identifies the merge. Bounded by what the pack declares exactly as before - the
+     * number of distinct draws is the product of the group sizes, not a function of how far a player
+     * walks.</p>
+     */
+    private final Map<List<Palette>, CompiledPalette> roots = new ConcurrentHashMap<>();
     /** {@code (base, overlay) -> compiled}, one step of the chain. */
     private final Map<Overlay, CompiledPalette> overlays = new ConcurrentHashMap<>();
 
@@ -48,8 +58,8 @@ public final class PaletteCache {
     private final GenerationMetrics.CacheStats stats =
             GenerationMetrics.enabled() ? GenerationMetrics.cache("palettes", this::size) : null;
 
-    /** The palette compiled from {@code root} alone. */
-    public CompiledPalette of(Palette root) {
+    /** The palette compiled from one style's draw. */
+    public CompiledPalette of(List<Palette> root) {
         // get / compute-outside / putIfAbsent, like every other cache here: compiling inside a
         // ConcurrentHashMap bin lock stalls every other worldgen thread whose key shares the bin,
         // and racing threads compile equal palettes because the inputs are immutable.
@@ -63,7 +73,7 @@ public final class PaletteCache {
         if (stats != null) {
             stats.miss();
         }
-        CompiledPalette compiled = new CompiledPalette(root);
+        CompiledPalette compiled = new CompiledPalette(root.toArray(new Palette[0]));
         CompiledPalette raced = roots.putIfAbsent(root, compiled);
         if (raced != null && stats != null) {
             stats.raced();

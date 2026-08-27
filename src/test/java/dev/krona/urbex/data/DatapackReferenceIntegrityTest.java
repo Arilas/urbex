@@ -3,6 +3,8 @@ package dev.krona.urbex.data;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import dev.krona.urbex.format.palette.TraitType;
+import dev.krona.urbex.format.palette.Traits;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -10,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -30,6 +33,36 @@ class DatapackReferenceIntegrityTest {
     private static final Path ROOT = Path.of("src/main/resources/data/urbex/urbex");
     private static final Path ASSETS_ROOT = Path.of("src/main/resources/assets/urbex");
 
+    /**
+     * Which trait field names an asset, and in which registry - read off the traits themselves.
+     *
+     * <p>{@code TRAIT.090} makes a trait declare its own reference fields
+     * ({@code TraitType.references()}) precisely so that "reference validation reads that declaration"
+     * rather than carrying a list beside it, and {@code TRAIT.022}'s {@code > Why} measures what the
+     * list cost in version 1: "version 1 recorded which string fields were asset references in a
+     * different place from the fields themselves". A hardcoded {@code List.of("urbex:loot",
+     * "urbex:spawner")} here would be correct today and silent the day an eighth trait names a pool -
+     * which is the same "a guessed key list is how a guard goes quietly out of date" that
+     * {@link ShippedBlockRefs} exists to stop.</p>
+     *
+     * <p>The registry's own path is the directory it loads from ({@code urbex:conditions} lives in
+     * {@code conditions/}), which is what {@link #ref} takes.</p>
+     */
+    private static final Map<String, Map<String, String>> TRAIT_REFERENCES = traitReferences();
+
+    private static Map<String, Map<String, String>> traitReferences() {
+        Map<String, Map<String, String>> byTrait = new LinkedHashMap<>();
+        for (TraitType<?> trait : Traits.all()) {
+            Map<String, String> fields = new LinkedHashMap<>();
+            trait.references().forEach(target ->
+                    fields.put(target.field(), target.registry().identifier().getPath()));
+            if (!fields.isEmpty()) {
+                byTrait.put(trait.id().toString(), fields);
+            }
+        }
+        return Map.copyOf(byTrait);
+    }
+
     private Path root = ROOT;
     private Path assetsRoot = ASSETS_ROOT;
     /** target category (directory under ROOT) -> collected [sourceFile, reference] pairs */
@@ -42,6 +75,24 @@ class DatapackReferenceIntegrityTest {
         }
         assertTrue(problems.isEmpty(),
                 () -> problems.size() + " bad datapack references:\n" + String.join("\n", problems));
+    }
+
+    /**
+     * The derivation in {@link #TRAIT_REFERENCES} is pinned, because an empty one disables silently.
+     *
+     * <p>Asserted <em>about</em> the registry rather than used <em>as</em> the registry: the walk reads
+     * {@code TraitType.references()}, so an eighth trait naming a pool is checked the day it is
+     * registered, and this fails then to say so out loud rather than because anything depends on the
+     * list. A refactor that made the derivation yield nothing would otherwise leave every trait
+     * reference in the pack unchecked and every test still green.</p>
+     */
+    @Test
+    void theTraitReferenceFieldsAreReadOffTheTraitsThemselves() {
+        assertEquals(Map.of(
+                        "urbex:loot", Map.of("pool", "conditions"),
+                        "urbex:spawner", Map.of("pool", "conditions")),
+                TRAIT_REFERENCES,
+                "TRAIT.090 says a trait declares its own reference fields; these are the ones that do");
     }
 
     /** The optional nested edge is a city-style reference under the same static validation as its base. */
@@ -196,19 +247,45 @@ class DatapackReferenceIntegrityTest {
                 iconRef(src, d.get("icon"));
             }
             case "palettes", "variants" -> { /* only palette-entry refs, handled below */ }
+            // A definitions asset is one node (REF.014), so everything it can reference - a $ref into
+            // this registry, a trait naming a conditions pool - is a node reference, and the walk
+            // below is the one that reads those. It has no keys of its own beyond "extends", which is
+            // checked unconditionally above.
+            case "definitions" -> { /* only node refs, handled below */ }
             default -> problems.add(file + ": category '" + category
                     + "' has no reference checks; add a case to this switch");
         }
         walkPaletteEntries(src, d);
     }
 
-    /** Any "palette" array anywhere: entries may reference variants ("variant") and conditions ("loot"/"mob"). */
+    /**
+     * Every reference a palette entry can make, in either format, at any depth.
+     *
+     * <p>Version 1 writes them as keys on an entry of a {@code palette} <em>array</em>:
+     * {@code variant} into the variants registry and {@code loot}/{@code mob} into conditions. Version
+     * 2 writes the same three as {@code $ref} into the definitions registry and as the {@code pool} of
+     * {@code urbex:loot} and {@code urbex:spawner}, on a node that may sit inside {@code $defs}, a
+     * choice, a placement list or another trait's satellite — so those two are matched wherever they
+     * appear rather than only on an entry, which is also what covers an inline palette in either
+     * format without a second walk.</p>
+     */
     private void walkPaletteEntries(String src, JsonElement el) {
         if (el == null) {
             return;
         }
         if (el.isJsonObject()) {
-            for (Map.Entry<String, JsonElement> e : el.getAsJsonObject().entrySet()) {
+            JsonObject node = el.getAsJsonObject();
+            definitionRef(src, node.get("$ref"));
+            JsonObject traits = asObject(node.get("traits"));
+            if (traits != null) {
+                TRAIT_REFERENCES.forEach((trait, fields) -> {
+                    JsonObject payload = asObject(traits.get(trait));
+                    if (payload != null) {
+                        fields.forEach((field, category) -> ref(src, payload.get(field), category));
+                    }
+                });
+            }
+            for (Map.Entry<String, JsonElement> e : node.entrySet()) {
                 if (e.getKey().equals("palette") && e.getValue().isJsonArray()) {
                     forEachObject(e.getValue(), entry -> {
                         ref(src, entry.get("variant"), "variants");
@@ -224,6 +301,29 @@ class DatapackReferenceIntegrityTest {
                 walkPaletteEntries(src, e);
             }
         }
+    }
+
+    /**
+     * A version 2 {@code $ref}, checked only when it names the definitions registry.
+     *
+     * <p>{@code REF.012}: a name resolves in exactly one tier and the colon decides which. A name
+     * without one is this file's own {@code $defs} and there is no file for it to resolve to; a name
+     * starting with {@code $} is an import alias or {@code $super} ({@code REF.040}), which this test
+     * cannot expand. Both are left to the loader, which refuses them by name with {@code DIAG.030}.
+     * A fragment addresses a path inside the asset ({@code REF.005}); the asset is what has to
+     * exist.</p>
+     */
+    private void definitionRef(String src, JsonElement el) {
+        if (el == null || !el.isJsonPrimitive()) {
+            return;
+        }
+        String name = el.getAsString();
+        if (name.startsWith("$") || name.indexOf(':') < 0) {
+            return;
+        }
+        int fragment = name.indexOf('#');
+        ref(src, new com.google.gson.JsonPrimitive(fragment < 0 ? name : name.substring(0, fragment)),
+                "definitions");
     }
 
     private void ref(String src, JsonElement el, String targetCategory) {

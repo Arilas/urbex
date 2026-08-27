@@ -61,18 +61,51 @@ public final class SiteSpawnClaims {
     }
 
     /**
-     * The chunk-centre position a claimed site offers for {@code level}'s spawn, at the height its
-     * ground floor sits, or {@code null} if nothing claimed one or nothing was found.
+     * How many candidate chunks may be handed to the caller's test before the search gives up.
      *
-     * <p>The Y is where the plan says the floor is, not where a block is. Finding somewhere to
-     * actually stand from there is {@code SpawnPlacement}'s job - it already owns that check, and it
-     * is the only step here that reads a block and so forces a chunk to generate.</p>
+     * <p>This is the only cost that is not hash arithmetic. Testing a chunk reads blocks in it,
+     * which forces it to generate, so the bound is on chunks generated during world load rather
+     * than on chunks considered - the field test below runs over tens of thousands either way.</p>
+     *
+     * <p>Eight, because the first candidate is the one nearest the origin and the rest are its
+     * neighbours: a site where eight consecutive chunks all have nowhere to stand in them is one
+     * where the next eight will not either, and the honest answer is to leave the world's spawn
+     * alone rather than to generate a hundred chunks discovering it.</p>
+     */
+    private static final int MAX_TESTED_CHUNKS = 8;
+
+    /**
+     * Turns an anchor into somewhere a player can actually stand, or {@code null} if that chunk has
+     * nowhere.
+     *
+     * <p>The only step in this file that reads a block. It belongs to the caller because the caller
+     * already owns that check for the dimension's own spawn rules, and because it is what decides
+     * how many chunks this search causes to generate.</p>
+     */
+    @FunctionalInterface
+    public interface AnchorTest {
+
+        /** @param anchor a chunk's centre, at the Y the plan puts its ground floor */
+        @Nullable
+        BlockPos standingSpotAt(BlockPos anchor);
+    }
+
+    /**
+     * The spawn a claimed site offers for {@code level}, or {@code null} if nothing claimed one or
+     * nothing usable was found.
+     *
+     * <p>The Y an anchor carries is where the plan says the floor is, not where a block is, so a
+     * candidate is only a spawn once {@code test} has found somewhere to stand in it. The two run in
+     * one loop rather than one after the other, and that is the whole point of this signature: the
+     * chunk nearest the origin is as likely as any other to be a park with a fountain in the middle
+     * of it, and a search that returned only that one left the world on its own surface spawn
+     * whenever it did.</p>
      *
      * <p>First claim wins. Two mods both asking to own a world's spawn is a modpack conflict rather
      * than something to resolve by a rule, so it is logged and the first is used.</p>
      */
     @Nullable
-    public static Anchor findAnchor(ServerLevel level) {
+    public static Spawn findSpawn(ServerLevel level, AnchorTest test) {
         if (CLAIMS.isEmpty()) {
             return null;
         }
@@ -85,11 +118,12 @@ public final class SiteSpawnClaims {
         Claim claim = CLAIMS.get(0);
         SiteSpec spec = claim.factory().specFor(level);
         PlanningContext planning = SiteRuntimes.planningFor(session.sites().site(level, spec, assets));
-        Anchor found = search(spec, claim.where(), planning);
+        Spawn found = search(spec, claim.where(), planning, test);
         if (found == null) {
             Urbex.getLogger().warn(
-                    "Urbex site '{}' claimed the spawn of '{}', but no {} chunk was found within {} "
-                            + "chunks of the origin. The world keeps the spawn it would have had.",
+                    "Urbex site '{}' claimed the spawn of '{}', but no {} chunk within {} chunks of "
+                            + "the origin had anywhere to stand in it. The world keeps the spawn it "
+                            + "would have had.",
                     spec.id(), level.dimension().identifier(), claim.where(), SEARCH_RADIUS_CHUNKS);
         }
         return found;
@@ -98,10 +132,10 @@ public final class SiteSpawnClaims {
     /**
      * Where a claimed spawn wants to be.
      *
-     * @param pos  the chunk's centre, at the Y the plan puts its ground floor
+     * @param pos  the block a player should be standing on top of, as the caller's test found it
      * @param site the site that offered it, so a log line can name who moved the spawn
      */
-    public record Anchor(BlockPos pos, Identifier site) {}
+    public record Spawn(BlockPos pos, Identifier site) {}
 
     private static void warnIfContested() {
         if (CLAIMS.size() > 1) {
@@ -111,11 +145,16 @@ public final class SiteSpawnClaims {
     }
 
     /**
-     * Spirals out from the origin chunk, asking the caller's field first and the plan only where it
-     * says yes.
+     * Spirals out from the origin chunk, asking the caller's field first, the plan only where it
+     * says yes, and the caller's test only where the plan does too.
+     *
+     * <p>Three filters in cost order, and the third is the one with a budget: the field is
+     * arithmetic, a plan is planning, and the test reads blocks and so generates a chunk.</p>
      */
     @Nullable
-    private static Anchor search(SiteSpec spec, SiteSpawn where, PlanningContext planning) {
+    private static Spawn search(SiteSpec spec, SiteSpawn where, PlanningContext planning,
+                                AnchorTest test) {
+        int tested = 0;
         for (int ring = 0; ring <= SEARCH_RADIUS_CHUNKS; ring++) {
             for (int cx = -ring; cx <= ring; cx++) {
                 for (int cz = -ring; cz <= ring; cz++) {
@@ -130,9 +169,17 @@ public final class SiteSpawnClaims {
                     if (!matches(plan, where)) {
                         continue;
                     }
-                    return new Anchor(
-                            new BlockPos((cx << 4) + 8, plan.getCityGroundLevel(), (cz << 4) + 8),
-                            spec.id());
+                    BlockPos anchor = new BlockPos((cx << 4) + 8, plan.getCityGroundLevel(),
+                            (cz << 4) + 8);
+                    BlockPos spot = test.standingSpotAt(anchor);
+                    if (spot != null) {
+                        return new Spawn(spot, spec.id());
+                    }
+                    Urbex.getLogger().debug("Urbex site '{}' passed over chunk {},{}: nothing to "
+                            + "stand on in it.", spec.id(), cx, cz);
+                    if (++tested >= MAX_TESTED_CHUNKS) {
+                        return null;
+                    }
                 }
             }
         }

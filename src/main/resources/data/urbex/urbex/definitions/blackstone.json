@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 32,
+      "block": "minecraft:polished_blackstone_bricks"
+    },
+    {
+      "weight": 32,
+      "block": "minecraft:cracked_polished_blackstone_bricks"
+    },
+    {
+      "weight": 64,
+      "block": "minecraft:polished_blackstone"
+    }
+  ]
+}

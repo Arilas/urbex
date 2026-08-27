@@ -1,7 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
-import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.Mergeable;
 import dev.krona.urbex.worldgen.lost.regassets.data.PartRef;
 import net.minecraft.core.HolderLookup;
@@ -66,13 +66,30 @@ public class Building {
      * ancestor that set something else. The defaults the fields start at are this class's own
      * documented fallbacks - {@code -1} for "take the level's limit" - not markers for "undeclared".
      */
-    public Building(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    /**
+     * For callers with no version 2 compiler context - tests, and anything that provably carries no
+     * inline version 2 palette. {@link AssetCompiler} uses the overload below.
+     */
+    public Building(Identifier id, HolderLookup<Block> blockLookup,
                         AssetIndex<Palette> palettes, List<BuildingDefinition> chainRootFirst) {
+        this(id, blockLookup, palettes, chainRootFirst, null);
+    }
+
+    /**
+     * @param v2 the registries a version 2 inline palette compiles against ({@code LOAD.003}), threaded
+     *           from {@link AssetCompiler}. {@code MERGE.011} lets an inline palette declare version 2
+     *           and {@code VER.002} makes that selection total, so without this an inline version 2
+     *           palette would decode and then fail to compile - which is exactly the state
+     *           {@code VER.015} existed to describe and which its retirement was supposed to end.
+     */
+    public Building(Identifier id, HolderLookup<Block> blockLookup,
+                        AssetIndex<Palette> palettes, List<BuildingDefinition> chainRootFirst,
+                        @Nullable V2Palettes.Context v2) {
         name = id;
         List<PartRef> partRefs = new ArrayList<>();
         boolean anyParts = false;
         List<PartRef> partRefs2 = new ArrayList<>();
-        List<PaletteDefinition> inlinePalettes = new ArrayList<>();
+        List<PaletteAssetDefinition> inlinePalettes = new ArrayList<>();
         String refPalette = null;
         Character filler = null;
         for (BuildingDefinition object : chainRootFirst) {
@@ -128,7 +145,7 @@ public class Building {
         Resolved.require(anyParts ? partRefs : null, name, "parts");
 
         if (!inlinePalettes.isEmpty()) {
-            localPalette = Palette.inline(blockLookup, variants, name, inlinePalettes); // @todo get the full palette instead
+            localPalette = Palette.inline(blockLookup, name, inlinePalettes, v2); // @todo get the full palette instead
         } else if (refPalette != null) {
             refPaletteName = refPalette;
             // Resolved here, not on the first chunk that asks. The lazy version cached the answer on

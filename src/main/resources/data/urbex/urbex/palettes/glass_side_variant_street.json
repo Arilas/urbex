@@ -1,9 +1,9 @@
 {
-  "palette": [
-    {
-      "char": "@",
-      "block": "minecraft:smooth_stone_slab[type=double]",
-      "damaged": "minecraft:iron_bars"
+  "version": 2,
+  "palette": {
+    "@": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:smooth_stone_slab[type=double]"
     }
-  ]
+  }
 }

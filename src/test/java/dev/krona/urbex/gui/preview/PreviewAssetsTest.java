@@ -1,21 +1,16 @@
 package dev.krona.urbex.gui.preview;
 
-import com.mojang.serialization.Lifecycle;
 import dev.krona.urbex.setup.CustomRegistries;
+import dev.krona.urbex.setup.TestRegistries;
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import net.minecraft.SharedConstants;
-import net.minecraft.core.MappedRegistry;
-import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -81,25 +76,13 @@ class PreviewAssetsTest {
         assertSame(0, empty.totalAssets(), "the null-registry fallback compiles nothing");
     }
 
-    /** An access with every Urbex registry present and empty, which is all this cache needs. */
+    /**
+     * An access with every Urbex registry present and empty, which is all this cache needs.
+     * <p>
+     * "Every" is now derived rather than listed: the list this held named 13 of the 14 and left out
+     * {@code definitions}, under a javadoc saying exactly this sentence.
+     */
     private static RegistryAccess registries() {
-        List<Registry<?>> all = new ArrayList<>();
-        all.add(BuiltInRegistries.BLOCK);
-        for (ResourceKey<? extends Registry<?>> key : List.of(
-                CustomRegistries.VARIANTS_REGISTRY_KEY, CustomRegistries.PALETTE_REGISTRY_KEY,
-                CustomRegistries.CONDITIONS_REGISTRY_KEY, CustomRegistries.STYLE_REGISTRY_KEY,
-                CustomRegistries.PART_REGISTRY_KEY, CustomRegistries.BUILDING_REGISTRY_KEY,
-                CustomRegistries.MULTIBUILDINGS_REGISTRY_KEY, CustomRegistries.SCATTERED_REGISTRY_KEY,
-                CustomRegistries.WORLDSTYLES_REGISTRY_KEY, CustomRegistries.CITYSTYLES_REGISTRY_KEY,
-                CustomRegistries.PREDEFINEDCITIES_REGISTRY_KEY, CustomRegistries.STUFF_REGISTRY_KEY,
-                CustomRegistries.PRESET_REGISTRY_KEY)) {
-            all.add(empty(key));
-        }
-        return new RegistryAccess.ImmutableRegistryAccess(all).freeze();
-    }
-
-    @SuppressWarnings("unchecked")
-    private static <T> Registry<T> empty(ResourceKey<? extends Registry<?>> key) {
-        return new MappedRegistry<T>((ResourceKey<Registry<T>>) key, Lifecycle.stable()).freeze();
+        return TestRegistries.with();
     }
 }

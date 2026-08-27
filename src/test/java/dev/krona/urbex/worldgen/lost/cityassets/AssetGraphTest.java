@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.worldgen.lost.regassets.ConditionDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.StyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.ConditionPart;
@@ -325,7 +326,7 @@ class AssetGraphTest {
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
-            buildings.put(id, new Building(id, BuiltInRegistries.BLOCK, null,
+            buildings.put(id, new Building(id, BuiltInRegistries.BLOCK,
                     AssetIndex.empty("urbex:palettes"), List.of(new BuildingDefinition(
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.of('#'), Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
@@ -349,7 +350,7 @@ class AssetGraphTest {
                     Optional.of(Either.right(belowPart)), Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.empty());
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
-            buildings.put(id, new Building(id, BuiltInRegistries.BLOCK, null,
+            buildings.put(id, new Building(id, BuiltInRegistries.BLOCK,
                     AssetIndex.empty("urbex:palettes"), List.of(new BuildingDefinition(
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.of('#'), Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
@@ -366,7 +367,7 @@ class AssetGraphTest {
         Fixture part(String path, int xSize, int zSize, char marker) {
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
             List<List<String>> slices = List.of(List.of(Character.toString(marker).repeat(xSize * zSize)));
-            extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK, null,
+            extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK,
                     AssetIndex.empty("urbex:palettes"), List.of(new BuildingPartDefinition(
                     Optional.empty(), Optional.of(xSize), Optional.of(zSize), Optional.of(slices),
                     Optional.empty(), Optional.empty(), Optional.empty()))));
@@ -376,10 +377,11 @@ class AssetGraphTest {
         Fixture partWithPalette(String path, int xSize, int zSize, char marker, char paletteMarker) {
             Identifier id = Identifier.fromNamespaceAndPath("urbex", path);
             List<List<String>> slices = List.of(List.of(Character.toString(marker).repeat(xSize * zSize)));
-            extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK, null, AssetIndex.empty("urbex:palettes"),
+            extraParts.put(id, new BuildingPart(id, BuiltInRegistries.BLOCK, AssetIndex.empty("urbex:palettes"),
                     List.of(new BuildingPartDefinition(Optional.empty(), Optional.of(xSize), Optional.of(zSize),
                             Optional.of(slices), Optional.empty(),
-                            Optional.of(singleMarkerPaletteDefinition(paletteMarker)), Optional.empty()))));
+                            Optional.of(singleMarkerInlinePalette(paletteMarker)), Optional.empty())),
+                    TestV2Context.empty()));
             return this;
         }
 
@@ -466,7 +468,7 @@ class AssetGraphTest {
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                     Optional.empty(), Optional.empty());
-            Palette palette = new Palette(paletteId, BuiltInRegistries.BLOCK, null,
+            Palette palette = new Palette(paletteId, BuiltInRegistries.BLOCK,
                     List.of(new PaletteDefinition(Optional.empty(), Optional.of(List.of(marker, filler)))));
             Identifier styleId = Identifier.fromNamespaceAndPath("urbex", "style_loot");
             styles.put(styleId, new Style(styleId,
@@ -494,8 +496,18 @@ class AssetGraphTest {
         }
 
         private static Palette singleMarkerPalette(String path, char marker) {
-            return new Palette(Identifier.fromNamespaceAndPath("urbex", path), BuiltInRegistries.BLOCK, null,
+            return new Palette(Identifier.fromNamespaceAndPath("urbex", path), BuiltInRegistries.BLOCK,
                     List.of(singleMarkerPaletteDefinition(marker)));
+        }
+
+        /**
+         * The same one-marker palette as a version 2 inline document, which is the only kind a part
+         * carries since {@code VER.018}. The registered-palette fixture beside it stays version 1: it
+         * feeds {@code new Palette(...)} directly, which is the converter's side of the house.
+         */
+        private static PaletteAssetDefinition singleMarkerInlinePalette(char marker) {
+            return TestV2Context.inline("{\"version\":2,\"palette\":{\""
+                    + marker + "\":\"minecraft:stone\"}}");
         }
 
         private static PaletteDefinition singleMarkerPaletteDefinition(char marker) {
@@ -526,13 +538,13 @@ class AssetGraphTest {
             Map<Identifier, BuildingPart> parts = new HashMap<>();
             // A part is a leaf for the walk, so this one exists only so that "resolves" and "does
             // not resolve" are both reachable states. One block, so it satisfies checkGeometry.
-            parts.put(PRESENT_PART, new BuildingPart(PRESENT_PART, BuiltInRegistries.BLOCK, null,
+            parts.put(PRESENT_PART, new BuildingPart(PRESENT_PART, BuiltInRegistries.BLOCK,
                     AssetIndex.empty("urbex:palettes"), List.of(new BuildingPartDefinition(
                     Optional.empty(), Optional.of(1), Optional.of(1),
                     Optional.of(List.of(List.of("a"))), Optional.empty(), Optional.empty(),
                     Optional.empty()))));
             parts.putAll(extraParts);
-            return new AssetSnapshot(empty.variants(), empty.palettes(),
+            return new AssetSnapshot(empty.palettes(),
                     new AssetIndex<>("urbex:conditions", conditions),
                     new AssetIndex<>("urbex:styles", styles), new AssetIndex<>("urbex:parts", parts),
                     new AssetIndex<>("urbex:buildings", buildings),

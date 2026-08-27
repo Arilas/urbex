@@ -209,6 +209,12 @@ public final class AssetGraph {
         Style palette = assets.styles().get(style.getStyle());
         if (palette != null) {
             PaletteCharacterCheck.checkCityStyle(style, palette, diagnostics);
+            // Once per style rather than once per city style that names it: MODEL.062 is a property of
+            // the style's own randompalettes, and two city styles sharing a style would otherwise
+            // report one alias twice - which is the noise LOAD.013's > Why measures at 45 warnings.
+            if (first("style-aliases", palette.getId())) {
+                PaletteCharacterCheck.checkAliases(palette, diagnostics);
+            }
             for (List<Pair<Float, Palette>> group : palette.paletteChoices()) {
                 for (Pair<Float, Palette> choice : group) {
                     walkPalette(choice.getRight());

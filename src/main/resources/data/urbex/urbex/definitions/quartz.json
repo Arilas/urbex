@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "kind": "weighted",
+  "choices": [
+    {
+      "weight": 10,
+      "block": "minecraft:quartz_bricks"
+    },
+    {
+      "weight": 118,
+      "block": "minecraft:smooth_quartz"
+    }
+  ]
+}

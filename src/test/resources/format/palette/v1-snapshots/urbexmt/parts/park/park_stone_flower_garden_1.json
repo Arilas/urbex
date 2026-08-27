@@ -1,0 +1,81 @@
+{
+  "xsize": 16,
+  "zsize": 16,
+  "palette": {
+    "palette": [
+      {
+        "char": "r",
+        "variant": "urbexmt:common_small_flowers"
+      },
+      {
+        "char": "o",
+        "variant": "urbexmt:stone_brick_slab_bottom"
+      },
+      {
+        "char": "D",
+        "variant": "urbexmt:garden_soil"
+      },
+      {
+        "char": "x",
+        "variant": "urbexmt:stonebrick",
+        "damaged": "minecraft:iron_bars"
+      }
+    ]
+  },
+  "slices": [
+    [
+      "                ",
+      "                ",
+      "  xxxx    xxxx  ",
+      "  xDDx    xDDx  ",
+      "  xDx_    _xDx  ",
+      "  xx_      _xx  ",
+      "                ",
+      "       rr       ",
+      "       rr       ",
+      "                ",
+      "  xx_      _xx  ",
+      "  xDx_    _xDx  ",
+      "  xDDx    xDDx  ",
+      "  xxxx    xxxx  ",
+      "                ",
+      "                "
+    ],
+    [
+      "                ",
+      "                ",
+      "  e          e  ",
+      "   rr      rr   ",
+      "   r        r   ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "   r        r   ",
+      "   rr      rr   ",
+      "  e          e  ",
+      "                ",
+      "                "
+    ],
+    [
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ]
+  ]
+}

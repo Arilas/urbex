@@ -1,0 +1,23 @@
+{
+  "values": [
+    {
+      "factor": 1,
+      "value": "urbexmt:chests/town_office_supplies",
+      "inpart": [
+        "urbexmt:town/town01_in_office_1",
+        "urbexmt:town/town10_in_office_1",
+        "urbexmt:town/town11_in_office_1"
+      ]
+    },
+    {
+      "factor": 1,
+      "value": "urbexmt:chests/town_valuables",
+      "inpart": [
+        "urbexmt:town/town01_in_executive_office_1",
+        "urbexmt:town/town01_in_vault_1",
+        "urbexmt:town/town10_in_executive_office_1",
+        "urbexmt:town/town10_in_vault_1"
+      ]
+    }
+  ]
+}

@@ -1,19 +1,17 @@
 {
-  "palette": [
-    {
-      "char": "X",
-      "block": "minecraft:orange_terracotta",
-      "damaged": "minecraft:iron_bars"
+  "version": 2,
+  "palette": {
+    "X": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:orange_terracotta"
     },
-    {
-      "char": "$",
-      "block": "minecraft:red_sandstone_slab[type=double]",
-      "damaged": "minecraft:iron_bars"
+    "$": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:red_sandstone_slab[type=double]"
     },
-    {
-      "char": "#",
-      "block": "minecraft:orange_terracotta",
-      "damaged": "minecraft:iron_bars"
+    "#": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:orange_terracotta"
     }
-  ]
+  }
 }

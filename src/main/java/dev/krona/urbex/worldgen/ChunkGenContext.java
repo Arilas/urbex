@@ -141,9 +141,25 @@ public final class ChunkGenContext {
         return p.getAt(c, seed, driver.getX(), driver.getY(), driver.getZ());
     }
 
+    /** {@link #placedAt}, at the driver's current position. */
+    public CompiledPalette.Placed placedHere(CompiledPalette p, char c) {
+        return p.placedAt(c, seed, driver.getX(), driver.getY(), driver.getZ());
+    }
+
     /** Resolve a weighted palette character at a chunk-local position. */
     public net.minecraft.world.level.block.state.BlockState paletteAt(CompiledPalette p, char c, int x, int y, int z) {
         return p.getAt(c, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
+    }
+
+    /**
+     * What {@code c} places here and everything that applies to it, in one lookup.
+     * <p>
+     * {@link #paletteAt}'s answer plus the marker's metadata, which {@code LOAD.022} requires be the
+     * same lookup rather than two. This is what {@code Parts.generatePart} uses; {@code paletteAt}
+     * remains for the passes that only want a state.
+     */
+    public CompiledPalette.Placed placedAt(CompiledPalette p, char c, int x, int y, int z) {
+        return p.placedAt(c, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
     }
 
     /**

@@ -388,14 +388,19 @@ public final class Decorations {
                 int y = height + 1;
                 driver.current(x, y, z);
                 BlockPos pos = driver.getCurrentCopy();
-                BlockState lit = ctx.paletteAt(compiledPalette, lamp, x, y, z);
+                // One lookup, which LOAD.022 requires and which is the only way a version 2 marker
+                // answers at all: its traits are per slot, so getInfo has nothing to return for one
+                // and this pass used to lose a version 2 park lamp's urbex:light entirely - placing
+                // it permanently lit, and writing a socket's representative instead of deferring.
+                CompiledPalette.Placed placed = ctx.placedAt(compiledPalette, lamp, x, y, z);
+                BlockState lit = placed == null ? null : placed.state();
                 if (lit == null) {
                     // A style naming a character its palette does not map is a datapack error, and
                     // one that would otherwise show up as a park that is dark for no visible reason.
                     throw new RuntimeException("Park lamp character '" + lamp + "' is not in the "
                             + "palette for city style '" + info.getCityStyle().getName() + "'");
                 }
-                Palette.Info paletteInfo = compiledPalette.getInfo(lamp);
+                Palette.Info paletteInfo = placed.info();
                 BlockState b = (paletteInfo != null && paletteInfo.lightSource() != null)
                         ? Parts.handleLightSource(ctx, feature, paletteInfo.lightSource(), lit, pos)
                         : lit;

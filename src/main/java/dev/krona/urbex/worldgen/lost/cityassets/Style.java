@@ -8,8 +8,6 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.util.RandomSource;
 
 public class Style {
@@ -17,9 +15,6 @@ public class Style {
     private final Identifier name;
 
     private final List<List<Pair<Float, Palette>>> randomPaletteChoices = new ArrayList<>();
-
-    /** One merged palette per set of choices; see {@link #compose}. */
-    private final Map<List<Palette>, Palette> composed = new ConcurrentHashMap<>();
 
     /**
      * Builds a fully resolved style from its {@code extends} chain, root first: a declared
@@ -96,7 +91,22 @@ public class Style {
         return randomPaletteChoices;
     }
 
-    public Palette getRandomPalette(RandomSource random) {
+    /**
+     * One palette per {@code randompalettes} group, drawn by weight.
+     *
+     * <p><b>The draw, not a merge of it.</b> This used to flatten the chosen palettes into a synthetic
+     * {@code Palette("__random__")} with {@link Palette#merge}, which copies one palette's maps into
+     * another - and a version 2 palette has no such maps to copy, only a compiled form. {@code VER.006}
+     * lets a draw hold both formats ("a style's {@code randompalettes} may draw a version 1 palette and
+     * a version 2 palette into the same merge") precisely because that composition "operates on compiled
+     * palettes, not on {@code extends}", so the merge belongs to {@link CompiledPalette} and this
+     * returns the list it merges.</p>
+     *
+     * <p>The list is what {@link PaletteCache} keys on, so it is immutable and its order is the group
+     * order - which is load-bearing, because a later palette of the draw overrides an earlier one's
+     * markers.</p>
+     */
+    public List<Palette> getRandomPalette(RandomSource random) {
         List<Palette> chosen = new ArrayList<>(randomPaletteChoices.size());
         for (List<Pair<Float, Palette>> pairs : randomPaletteChoices) {
             float totalweight = 0;
@@ -120,35 +130,7 @@ public class Style {
             }
             chosen.add(chosenPair.getRight());
         }
-        return compose(List.copyOf(chosen));
+        return List.copyOf(chosen);
     }
 
-    /**
-     * The merged palette for one set of choices, built once per set.
-     *
-     * <p>This used to build a fresh {@code Palette("__random__")} on every call - one per chunk -
-     * which is why memoizing anything downstream of it did nothing: the compiled-palette cache keyed
-     * on this object and every chunk handed it a new one, so 1028 lookups hit 13 times. Keyed on the
-     * chosen palettes it is bounded by what the style declares (issue #53).</p>
-     *
-     * <p>Safe to share because nothing writes to the result: {@code getRandomPalette} is the only
-     * caller of {@code Palette.merge} outside asset compilation, and {@code ChunkPlan.palette} is
-     * written once and only read.</p>
-     *
-     * <p>get / compute-outside / putIfAbsent, not {@code computeIfAbsent}: merging inside a
-     * {@code ConcurrentHashMap} bin lock stalls every other worldgen thread whose key shares the
-     * bin, and racing threads merge equal palettes from immutable inputs.</p>
-     */
-    private Palette compose(List<Palette> chosen) {
-        Palette existing = composed.get(chosen);
-        if (existing != null) {
-            return existing;
-        }
-        Palette palette = new Palette("__random__");
-        for (Palette part : chosen) {
-            palette.merge(part);
-        }
-        Palette raced = composed.putIfAbsent(chosen, palette);
-        return raced != null ? raced : palette;
-    }
 }

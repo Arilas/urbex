@@ -427,7 +427,7 @@ class CityStyleScopeTest {
                 new AssetIndex<>("urbex:predefinedcities", citiesById);
         AssetIndex<MultiBuilding> multiIndex = AssetIndex.empty("urbex:multibuildings");
         AssetSnapshot empty = AssetSnapshot.empty();
-        AssetSnapshot assets = new AssetSnapshot(empty.variants(), empty.palettes(), empty.conditions(),
+        AssetSnapshot assets = new AssetSnapshot(empty.palettes(), empty.conditions(),
                 empty.styles(), empty.parts(), empty.buildings(), multiIndex, empty.scattered(),
                 empty.worldStyles(), new AssetIndex<>("urbex:citystyles", styles), cityIndex,
                 empty.stuff(), empty.stuffByTag(), PredefinedIndex.build(cityIndex, multiIndex));

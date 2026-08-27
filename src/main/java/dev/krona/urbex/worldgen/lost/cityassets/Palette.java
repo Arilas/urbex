@@ -1,7 +1,10 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.Urbex;
+import dev.krona.urbex.format.palette.CompiledV2Palette;
+import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.varia.Tools;
+import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.BlockEntry;
 import dev.krona.urbex.worldgen.lost.regassets.data.LightSourceSettings;
@@ -32,6 +35,28 @@ public class Palette {
     private final Map<BlockState, BlockState> damaged = new HashMap<>();
 
     /**
+     * The version 2 form, or null for a version 1 palette.
+     *
+     * <p><b>One asset type for both formats, which is not the same as one model for both.</b> The
+     * {@code palettes} registry has one value type and one {@link AssetIndex}, and every consumer -
+     * {@link Style}, {@link BuildingPart}, {@link AssetGraph} - names {@code Palette}. Giving version 2
+     * its own asset type would mean a second index, a second selector in every style, and a second
+     * branch at every one of those consumers, which is what {@code VER.006} forbids being necessary:
+     * a style's {@code randompalettes} may draw a version 1 and a version 2 palette into one merge, so
+     * they have to be drawable from one list.</p>
+     *
+     * <p>What is <em>not</em> shared is the model. When this field is set, {@link #palette} and
+     * {@link #damaged} are empty and stay empty: a version 2 palette is compiled by
+     * {@code CompiledV2Palette}, all eight stages of {@code LOAD.001}, and none of version 1's
+     * per-entry compilation runs. {@link CompiledPalette} is where the two meet, and it meets them as
+     * compiled markers rather than as a common node model - which is
+     * {@code PaletteAssetDefinition}'s "no common node model, no shared merge, and nothing here invites
+     * one" held one layer further in.</p>
+     */
+    @Nullable
+    private final CompiledV2Palette v2;
+
+    /**
      * Builds a fully resolved palette from its {@code extends} chain, root first.
      * <p>
      * A palette is a keyed collection, so the chain merges <em>by character</em> rather than by
@@ -44,19 +69,40 @@ public class Palette {
     /**
      * @param blockLookup the block registry every block string in this palette resolves against,
      *                    handed down by the compiler from the world being loaded.
-     * @param variants    the compiled variants this palette's {@code variant} entries resolve
-     *                    against. May be null only for a palette that provably names none; one that
-     *                    does then fails naming itself and the variant rather than reaching for a
-     *                    static server (issue #60) or compiling one on the spot (issue #128).
      */
-    public Palette(Identifier id, HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
+    public Palette(Identifier id, HolderLookup<Block> blockLookup,
                    List<PaletteDefinition> chainRootFirst) {
         name = id;
-        compile(blockLookup, variants, mergeByCharacter(chainRootFirst, name));
+        v2 = null;
+        compile(blockLookup, mergeByCharacter(chainRootFirst, name));
     }
 
     public Palette(String name) {
         this.name = Identifier.fromNamespaceAndPath(Urbex.MODID, name);
+        this.v2 = null;
+    }
+
+    private Palette(Identifier id, CompiledV2Palette compiled) {
+        this.name = id;
+        this.v2 = compiled;
+    }
+
+    /**
+     * A registered palette written in format version 2, already compiled.
+     *
+     * <p>The compilation happened before this: {@code CompiledV2Palette.compile} runs stages 4 to 8 of
+     * {@code LOAD.001} and refuses the palette by name if anything is wrong, which is {@code LOAD.004}
+     * and {@code LOAD.010}. By the time one of these exists, every question generation can ask it has
+     * an answer - {@code LOAD.011} - so this constructor cannot fail and does not validate.</p>
+     */
+    public static Palette version2(Identifier id, CompiledV2Palette compiled) {
+        return new Palette(id, compiled);
+    }
+
+    /** The compiled version 2 form, or null for a version 1 palette. */
+    @Nullable
+    public CompiledV2Palette v2() {
+        return v2;
     }
 
     /**
@@ -68,28 +114,52 @@ public class Palette {
      * markers keeps the rest of its ancestor's. Replacing wholesale here would reproduce, one level
      * down, the very failure {@link #mergeByCharacter} exists to prevent.
      *
+     * <p>{@code MERGE.009} is the first check below and {@code DIAG.031} is its message. The version 1
+     * codec accepts {@code extends} wherever a {@link PaletteDefinition} is embedded, and an inline
+     * palette is not a registry entry, so nothing can resolve it; silently dropping a key the codec
+     * accepted is how a datapack quietly means something other than what it says. A version <em>2</em>
+     * inline palette is refused for the same rule one stage earlier, by
+     * {@link PaletteAssetDefinition#INLINE_CODEC}, so this loop is version 1's half of it - see that
+     * field for why the two halves fire at different times.</p>
+     *
+     * <p>{@code VER.007} is the second: the inline palettes stacked along one owner's {@code extends}
+     * chain are all of one format version. That rule was stated and unenforced while {@code VER.015}
+     * refused every inline version 2 palette outright - no mixed stack survived long enough to be
+     * merged - and enforcing it is what that rule's retirement made this method owe. {@code DIAG.065}
+     * is its message, naming both links and both versions.</p>
+     *
      * @param blockLookup    the block registry the inline entries resolve against
      * @param owner          the part or building the block is written in, for error messages and
      *                       for the synthetic palette name
      * @param chainRootFirst the inline blocks along the owner's chain, root first
      */
-    public static Palette inline(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                                 Identifier owner, List<PaletteDefinition> chainRootFirst) {
-        for (PaletteDefinition re : chainRootFirst) {
-            // The codec accepts 'extends' wherever a PaletteDefinition is embedded, but an inline block is
-            // not a registry entry, so nothing can resolve it. Rejecting is the honest option:
-            // silently dropping a key the codec accepted is how a datapack quietly means something
-            // other than what it says.
+    public static Palette inline(HolderLookup<Block> blockLookup,
+                                 Identifier owner, List<PaletteAssetDefinition> chainRootFirst) {
+        return inline(blockLookup, owner, chainRootFirst, null);
+    }
+
+    /**
+     * @param v2 the version 2 compiler's context, or null for a caller that has none - in which case an
+     *           inline version 2 palette fails naming itself rather than being read as a palette with
+     *           no markers
+     */
+    public static Palette inline(HolderLookup<Block> blockLookup,
+                                 Identifier owner, List<PaletteAssetDefinition> chainRootFirst,
+                                 @Nullable V2Palettes.Context v2) {
+        for (PaletteAssetDefinition re : chainRootFirst) {
             if (re.getExtends().isPresent()) {
-                throw new IllegalStateException("The inline palette in '" + owner + "' declares "
-                        + "extends '" + re.getExtends().get() + "', but an inline palette is not a "
-                        + "registry entry and nothing can resolve that. Use 'refpalette' to build "
-                        + "on a registered palette, or put 'extends' on '" + owner + "' itself.");
+                throw new IllegalStateException(Diag.DIAG_031.message("'" + owner + "'",
+                        "'" + re.getExtends().orElseThrow() + "'", "'" + owner + "'"));
             }
         }
-        Palette palette = new Palette("__local__" + owner.getPath());
-        palette.compile(blockLookup, variants, mergeByCharacter(chainRootFirst, owner));
-        return palette;
+        if (v2 == null) {
+            throw new IllegalStateException("'" + owner + "' carries an inline palette, and this "
+                    + "caller compiles without the registries version 2 needs; compile it through "
+                    + "AssetCompiler");
+        }
+        return version2(Identifier.fromNamespaceAndPath(Urbex.MODID,
+                        "__local__" + owner.getPath()),
+                V2Palettes.compileV2(owner, "'" + owner + "'", chainRootFirst, v2));
     }
 
     /**
@@ -119,7 +189,24 @@ public class Palette {
         return merged.values();
     }
 
+    /**
+     * Version 1's in-place merge, which a version 2 palette does not take part in.
+     *
+     * <p>{@code Style.getRandomPalette} used this to flatten a draw into one {@code Palette} before
+     * compiling it. That cannot express a cross-version draw ({@code VER.006}) - there is nothing to
+     * copy a {@code CompiledV2Palette} into - so composition moved up to {@link CompiledPalette}, which
+     * merges compiled markers rather than authored entries. This remains for version 1's own callers.</p>
+     *
+     * @throws IllegalStateException if either side is a version 2 palette, rather than silently
+     *         producing a palette with none of its markers
+     */
     public void merge(Palette other) {
+        if (v2 != null || other.v2 != null) {
+            throw new IllegalStateException("Palette '" + name + "' cannot merge '" + other.name
+                    + "' in place: a version 2 palette is composed as compiled markers, by "
+                    + "CompiledPalette, and copying its maps here would produce a palette with no "
+                    + "markers at all");
+        }
         palette.putAll(other.palette);
         damaged.putAll(other.damaged);
     }
@@ -141,8 +228,7 @@ public class Palette {
         return palette;
     }
 
-    private void compile(HolderLookup<Block> blockLookup, @Nullable AssetIndex<Variant> variants,
-                         Collection<PaletteEntry> entries) {
+    private void compile(HolderLookup<Block> blockLookup, Collection<PaletteEntry> entries) {
         for (PaletteEntry entry : entries) {
             Character c = entry.getChr().charAt(0);
             // Null when the damaged block is absent from this game, so the mapping is simply not
@@ -151,6 +237,7 @@ public class Palette {
             BlockState dmg = entry.getDamaged() == null ? null
                     : Tools.resolveState(entry.getDamaged(), blockLookup, name);
             rejectRemovedLightSpellings(entry, c);
+            rejectRemovedVariant(entry, c);
             LightSourceSettings settings = entry.getLightSource();
             // Also null when every candidate in the pool named an absent block; see
             // LightPool.compile. An authored-empty pool is still a load error, and an in-place
@@ -159,7 +246,7 @@ public class Palette {
                     : LightPool.compile(blockLookup, name, c, settings);
             LightSource lightSource = settings == null ? null
                     : new LightSource(light, compileUnlit(blockLookup, settings, c));
-            Info info = new Info(entry.getMob(), entry.getLoot(), lightSource, entry.getTag());
+            Info info = Info.of(entry.getMob(), entry.getLoot(), lightSource, entry.getTag());
             // What the character resolves to, for the in-place emission check below. Empty for a
             // socket, which has no block of its own, and for 'frompalette', whose target is only
             // known once CompiledPalette has resolved the character it names.
@@ -173,28 +260,6 @@ public class Palette {
                 if (dmg != null) {
                     damaged.put(state, dmg);
                 }
-            } else if (entry.getVariant() != null) {
-                String variantName = entry.getVariant();
-                // The compiled variants of this palette's own world, handed in by the compiler.
-                // This used to ask ServerAccess.getServer().getLevel(OVERWORLD), which resolved every
-                // dimension's variants against the overworld and threw from a worldgen worker when
-                // the static server reference was not populated yet (issue #60); then it asked a
-                // static registry that compiled on demand (issue #128). Now the variant it needs was
-                // compiled before this palette was.
-                if (variants == null) {
-                    throw new IllegalStateException("Palette '" + name + "' entry '" + c
-                            + "' names variant '" + variantName + "', but this palette was compiled "
-                            + "without a variant index to resolve it against");
-                }
-                Variant variant = variants.getOrThrow(variantName);
-                List<Pair<Integer, BlockState>> blocks = variant.getBlocks();
-                for (Pair<Integer, BlockState> pair : blocks) {
-                    resolved.add(pair.getRight());
-                    if (dmg != null) {
-                        damaged.put(pair.getRight(), dmg);
-                    }
-                }
-                addMappingViaState(c, blocks, info);
             } else if (entry.getFrompalette() != null) {
                 String value = entry.getFrompalette();
                 palette.put(c, new PE(value, info));
@@ -273,6 +338,36 @@ public class Palette {
     }
 
     /**
+     * {@code VER.017}: a version 1 entry naming {@code variant} is refused, because the {@code variants}
+     * registry is gone.
+     * <p>
+     * Refused here rather than dropped from {@link PaletteEntry}'s codec, for the reason
+     * {@link #rejectRemovedLightSpellings} exists: a key a version 1 palette does not know is a key it
+     * silently ignores, so dropping {@code variant} would load the pack, paint every marker that used
+     * one as air, and say nothing. {@code VER.012} is the rule - a retired key is never silently
+     * accepted and never silently ignored - and this is the third key to be held decodable purely so
+     * that it can fail by name.
+     * <p>
+     * Refused at compile rather than at decode because {@code RetiredKeys} is a pre-pass over a
+     * document's <em>top level</em>, and {@code variant} is a key of a palette entry. That is the same
+     * reason {@code torch} and {@code light} are refused here and not there.
+     * <p>
+     * The message names the replacement rather than only the removal: what the {@code variants} registry
+     * became is the {@code definitions} registry, reached with {@code $ref}, which is version 2's
+     * spelling and not version 1's - so the remedy is a conversion, and it names the tool that does it.
+     */
+    private void rejectRemovedVariant(PaletteEntry entry, char c) {
+        if (entry.getVariant() != null) {
+            throw new IllegalArgumentException("Palette '" + name + "' entry '" + c + "' declares "
+                    + "'variant': \"" + entry.getVariant() + "\", and the 'variants' registry no "
+                    + "longer exists. It became the 'definitions' registry, which is reached with "
+                    + "\"$ref\" from a format version 2 palette. Convert this pack with the "
+                    + "'convertPalettes' task: it rewrites every variants asset as a definitions "
+                    + "asset and every 'variant' as a '$ref'.");
+        }
+    }
+
+    /**
      * A {@code lightSource} on an entry whose blocks emit nothing is a load error.
      * <p>
      * There is no reading of it that works: the entry would roll lighting density and then place the
@@ -345,7 +440,48 @@ public class Palette {
         return this;
     }
 
-    public record Info(String mobId, String loot, LightSource lightSource, CompoundTag tag) {
+    /**
+     * What a marker carries beyond its block: version 1's four metadata fields, plus the ordered list
+     * of the traits they amount to.
+     *
+     * @param applied the traits this marker actually applies, in {@link MarkerTrait} order. Computed
+     *                once, at compile time, because {@code Parts.generatePart} walks it for every block
+     *                of every part that has one and building it there would allocate at a position.
+     */
+    public record Info(String mobId, String loot, LightSource lightSource, CompoundTag tag,
+                       List<MarkerTrait> applied) {
+
+        /**
+         * The traits these four fields amount to, in {@link MarkerTrait} order - which is
+         * {@code TRAIT.095}'s phase order, selection before decoration.
+         * <p>
+         * The emptiness guards on {@code loot} and {@code mobId} are version 1's, kept exactly: the
+         * {@code else if} chain this replaces tested {@code != null && !isEmpty()} for both and bare
+         * {@code != null} for the other two, so a marker declaring {@code "loot": ""} was special enough
+         * to skip the block's other handling and not special enough to be given loot. That is not a
+         * behaviour worth preserving on its merits; it is preserved because {@link #isSpecial} still
+         * answers the same way and changing what an empty string means is a separate decision from
+         * fixing the chain.
+         */
+        public static Info of(String mobId, String loot, LightSource lightSource, CompoundTag tag) {
+            List<MarkerTrait> applied = new ArrayList<>(4);
+            // TRAIT.095's phase order: selection first, then the decorators. A decorator queued before
+            // the light would attach its data to the lit block that the light then replaces.
+            if (lightSource != null) {
+                applied.add(MarkerTrait.LIGHT);
+            }
+            if (loot != null && !loot.isEmpty()) {
+                applied.add(MarkerTrait.LOOT);
+            }
+            if (mobId != null && !mobId.isEmpty()) {
+                applied.add(MarkerTrait.SPAWNER);
+            }
+            if (tag != null) {
+                applied.add(MarkerTrait.BLOCK_ENTITY);
+            }
+            return new Info(mobId, loot, lightSource, tag, List.copyOf(applied));
+        }
+
         public boolean isSpecial() {
             return mobId != null || loot != null || lightSource != null || tag != null;
         }

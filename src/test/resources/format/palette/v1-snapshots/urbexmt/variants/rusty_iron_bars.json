@@ -1,0 +1,20 @@
+{
+  "blocks": [
+    {
+      "random": 8,
+      "block": "minecraft:copper_bars"
+    },
+    {
+      "random": 48,
+      "block": "minecraft:exposed_copper_bars"
+    },
+    {
+      "random": 8,
+      "block": "minecraft:weathered_copper_bars"
+    },
+    {
+      "random": 1000,
+      "block": "minecraft:iron_bars"
+    }
+  ]
+}

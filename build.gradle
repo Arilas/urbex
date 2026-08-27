@@ -615,21 +615,96 @@ dependencies {
 }
 
 test {
-    useJUnitPlatform()
-    // Two tests read files under docs/ - DatapackGuideExamplesTest decodes every JSON example in
-    // docs/datapacks.md and checks the error messages it quotes, PresetSchemaTest drift-guards
-    // docs/schema/preset.schema.json against the section codecs - and docs/ is on no classpath, so
+    // The public regression corpus is checked in. The All Rights Reserved addon is exercised only
+    // by privateCorpusTest with an explicitly supplied local snapshot, never downloaded by CI.
+    useJUnitPlatform {
+        excludeTags 'private-corpus'
+    }
+    // Three concerns read files under docs/ - DatapackGuideExamplesTest decodes every JSON example
+    // in docs/datapacks.md and checks the error messages it quotes, PresetSchemaTest drift-guards
+    // docs/schema/preset.schema.json against the section codecs, and ConformanceIndexTest /
+    // FixtureWellFormednessTest parse every rule, fixture and diagnostic under docs/format/ and
+    // drift-guard the checked-in conformance.md against them - and docs/ is on no classpath, so
     // without declaring these Gradle leaves :test UP-TO-DATE after a documentation-only edit. That is
-    // exactly the edit those two exist to catch. Listed file by file rather than as fileTree('docs'):
+    // exactly the edit those tests exist to catch. Listed file by file rather than as fileTree('docs'):
     // nothing reads docs/presets.md - its prose is unasserted, only the schema beside it is checked -
     // and the specs and plans under docs/superpowers/ change with every task, so a whole-directory
-    // input would cost a full suite run per plan edit.
-    inputs.files(files('docs/datapacks.md'), fileTree('docs/schema'))
+    // input would cost a full suite run per plan edit. docs/format is the exception: every file in it
+    // is read by SpecDocuments, so it is declared as a whole tree rather than file by file.
+    inputs.files(files('docs/datapacks.md'), fileTree('docs/schema'), fileTree('docs/format'))
             .withPropertyName('docsReadByTests')
             .withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {
         events "passed", "skipped", "failed"
     }
+}
+
+// Reuse the same compiled tests, but run only the explicitly tagged full-corpus assertions. Keeping
+// this separate from check/build makes an ordinary checkout self-contained without pretending the
+// public corpus covers the private addon. No path is inferred from sibling repositories.
+def privateCorpusPath = providers.gradleProperty('urbexPrivateCorpus').filter { !it.isBlank() }
+def privateCorpusDirectory = privateCorpusPath.map { layout.projectDirectory.dir(it).asFile }
+
+tasks.register('privateCorpusTest', Test) {
+    description = 'Verifies the full palette converter corpus using an explicitly supplied private v1 snapshot.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = tasks.named('test', Test).flatMap { it.javaLauncher }
+    shouldRunAfter tasks.named('test')
+    useJUnitPlatform {
+        includeTags 'private-corpus'
+    }
+    failOnNoDiscoveredTests = true
+
+    // Optional here allows the action below to name the missing -P argument clearly. A supplied
+    // directory is a real tracked input: edits to external JSON must invalidate an earlier result.
+    inputs.dir(privateCorpusDirectory).optional()
+            .withPropertyName('privatePaletteCorpus')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty 'urbex.privateCorpus', privateCorpusDirectory.map { it.absolutePath }.getOrElse('')
+    outputs.doNotCacheIf('Private corpus reports must not enter a shared build cache') { true }
+
+    doFirst {
+        if (!privateCorpusPath.isPresent()) {
+            throw new GradleException('privateCorpusTest requires -PurbexPrivateCorpus=<path-to-v1-snapshot/urbex>; the private corpus is never downloaded or skipped.')
+        }
+        def root = privateCorpusDirectory.get()
+        ['palettes', 'variants', 'conditions', 'parts'].each { directory ->
+            if (!new File(root, directory).isDirectory()) {
+                throw new GradleException("Private version 1 corpus is missing ${new File(root, directory)}; supply the frozen snapshot, not the live pack.")
+            }
+        }
+    }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+}
+
+tasks.register('regenerateConformance', JavaExec) {
+    description = 'Rewrites docs/format/palette/conformance.md from the specification documents.'
+    group = 'documentation'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.krona.urbex.format.SpecDocuments'
+    args 'write'
+}
+
+// VER.020: the converter ships before the format does. Run against the bundled pack by default,
+// writing into build/ rather than over src/ - Task 10 is where the bundled pack itself is converted,
+// and a task whose default is an in-place rewrite of tracked files is one nobody can run to look.
+// -PurbexPackIn and -PurbexPackOut point it at an addon pack:
+//   ./gradlew convertPalettes -PurbexPackIn=../Urbex-Zombie-Apocalypse-Essentials/pack/data/urbexza/urbex \
+//                             -PurbexPackOut=/tmp/mt/urbex
+// A pack root is the directory holding palettes/ and variants/, i.e. data/<namespace>/urbex. Exits
+// non-zero when VER.022 finds a construct it will not guess at, so it is usable as a gate.
+tasks.register('convertPalettes', JavaExec) {
+    description = 'Converts a version 1 palette pack to version 2 (VER.020).'
+    group = 'documentation'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'dev.krona.urbex.format.palette.V1ToV2'
+    args project.findProperty('urbexPackIn') ?: 'src/main/resources/data/urbex/urbex',
+            project.findProperty('urbexPackOut')
+                    ?: layout.buildDirectory.dir('converted-pack/urbex').get().asFile.path
 }
 
 jar {

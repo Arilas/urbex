@@ -95,12 +95,18 @@ public class Parts {
                     int len = vs.length;
                     for (int y = 0; y < len; y++) {
                         char c = vs[y];
-                        BlockState b = ctx.paletteAt(compiledPalette, c, rx, oy + y, rz);
-                        if (b == null) {
+                        // One lookup for the state and what the marker carries, which LOAD.022 makes an
+                        // INVARIANT: "Resolving a marker to a state and to its traits is one lookup, not
+                        // two". It used to be paletteAt followed by getInfo, two lookups into two maps,
+                        // and a version 2 marker cannot answer the second at all - its traits are per
+                        // slot (LOAD.021), so there is no per-marker Info to fetch. One call path here,
+                        // whichever format the palette that defined this marker was written in.
+                        CompiledPalette.Placed placed = ctx.placedAt(compiledPalette, c, rx, oy + y, rz);
+                        if (placed == null) {
                             throw new RuntimeException("Could not find entry '" + c + "' in the palette for part '" + part.getName() + "'!");
                         }
-
-                        Palette.Info inf = compiledPalette.getInfo(c);
+                        BlockState b = placed.state();
+                        Palette.Info inf = placed.info();
 
                         if (transform != Transform.ROTATE_NONE) {
                             b = transformBlockState(feature, ctx.tags, info, transform, b);
@@ -129,16 +135,38 @@ public class Parts {
                                         break;
                                 }
                             } else if (inf != null) {
-                                if (inf.lightSource() != null) {
-                                    b = handleLightSource(ctx, feature, inf.lightSource(), b, driver.getCurrentCopy());
-                                } else if (inf.loot() != null && !inf.loot().isEmpty()) {
-                                    handleLoot(ctx, feature, info, part, b, inf);
-                                } else if (inf.mobId() != null && !inf.mobId().isEmpty()) {
-                                    // ctx.region, not feature.provider.getWorld(): these write block entity
-                                    // NBT into a chunk, which only the generating region has.
-                                    b = handleSpawner(ctx, feature, info, part, oy, ctx.region, rx, rz, y, b, inf);
-                                } else if (inf.tag() != null) {
-                                    b = handleBlockEntity(ctx, feature, info, oy, ctx.region, rx, rz, y, b, inf);
+                                // A loop over what the marker carries, not a chain over four fields.
+                                // The chain applied the first trait it found and dropped the rest, so
+                                // a marker declaring both a light and a mob placed the light and lost
+                                // the spawner - silently, on every block it wrote. Traits compose
+                                // (TRAIT.004), and a list the palette computed once is what makes
+                                // composing them free here. The order is TRAIT.095's phases -
+                                // selection, then decoration - so the light chooses the block before
+                                // anything attaches data to it; see MarkerTrait for what reversing
+                                // them breaks.
+                                // Indexed, not enhanced-for: this runs for every block carrying
+                                // metadata and an enhanced-for allocates an iterator per position -
+                                // in a loop whose whole reason for taking a precomputed list is that
+                                // it must not allocate here.
+                                List<MarkerTrait> traits = inf.applied();
+                                CompoundTag spawnerNbt = null;
+                                for (int t = 0; t < traits.size(); t++) {
+                                    switch (traits.get(t)) {
+                                        case LOOT -> handleLoot(ctx, feature, info, part, b, inf);
+                                        // ctx.region, not feature.provider.getWorld(): these write block
+                                        // entity NBT into a chunk, which only the generating region has.
+                                        case SPAWNER -> {
+                                            spawnerNbt = handleSpawner(ctx, feature, info, part, oy,
+                                                    ctx.region, rx, rz, y, inf);
+                                            if (spawnerNbt == null) {
+                                                b = feature.air;
+                                            }
+                                        }
+                                        case BLOCK_ENTITY -> b = handleBlockEntity(ctx, feature, info,
+                                                oy, ctx.region, rx, rz, y, b, inf, spawnerNbt);
+                                        case LIGHT -> b = handleLightSource(ctx, feature,
+                                                inf.lightSource(), b, driver.getCurrentCopy());
+                                    }
                                 }
                             } else if (ctx.tags.needsPoiUpdate(b)) {
                                 // If this block has POI data we need to delay setting it
@@ -236,19 +264,14 @@ public class Parts {
         return null;
     }
 
-    private static BlockState handleBlockEntity(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
+    private static BlockState handleBlockEntity(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf, CompoundTag spawnerNbt) {
         BlockPos pos = info.getRelativePos(rx, oy + y, rz);
         BlockEntityType type = getTypeForBlock(feature, b);
         if (type == null) {
             ModSetup.getLogger().warn("Error getting type for block: " + b.getBlock());
             return b;
         }
-        CompoundTag tag = inf.tag().copy();
-        tag.putInt("x", pos.getX());
-        tag.putInt("y", pos.getY());
-        tag.putInt("z", pos.getZ());
-        tag.putString("id", BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type).toString());
-        world.getChunk(pos).setBlockEntityNbt(tag);
+        queueBlockEntityNbt(world.getChunk(pos), pos, type, inf.tag(), spawnerNbt);
         if (b.getBlock() == Blocks.COMMAND_BLOCK) {
             ctx.addPostTodo(pos, inWorld -> {
                 ((ServerChunkCache) inWorld.getLevel().getChunkSource()).blockChanged(pos);
@@ -256,6 +279,22 @@ public class Parts {
             });
         }
         return b;
+    }
+
+    private static void queueBlockEntityNbt(ChunkAccess chunk, BlockPos pos, BlockEntityType<?> type,
+                                            CompoundTag authored, CompoundTag spawnerNbt) {
+        String typeId = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type).toString();
+        // Only this marker's compatible spawner data composes. Reading the chunk's queue here
+        // would inherit stale NBT from earlier parts. The later block_entity decorator gives
+        // explicitly authored fields precedence, without changing either input tag.
+        CompoundTag tag = spawnerNbt != null && typeId.equals(spawnerNbt.getStringOr("id", ""))
+                ? spawnerNbt.copy().merge(authored)
+                : authored.copy();
+        tag.putInt("x", pos.getX());
+        tag.putInt("y", pos.getY());
+        tag.putInt("z", pos.getZ());
+        tag.putString("id", typeId);
+        chunk.setBlockEntityNbt(tag);
     }
 
     /**
@@ -287,7 +326,8 @@ public class Parts {
         }
     }
 
-    private static BlockState handleSpawner(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf) {
+    /** The queued data for an admitted spawner; null means policy replaces its block with air. */
+    private static CompoundTag handleSpawner(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, Palette.Info inf) {
         // Hoisted above the admission check, which is now addressed by position - the marker's
         // world coordinate is what decides whether this one keeps its spawner.
         BlockPos pos = info.getRelativePos(rx, oy + y, rz);
@@ -309,10 +349,9 @@ public class Parts {
             tag.put("SpawnData", SpawnData.CODEC.encodeStart(NbtOps.INSTANCE, data).result().orElseThrow(() -> new IllegalStateException("Invalid SpawnData")));
 
             world.getChunk(pos).setBlockEntityNbt(tag);
-        } else {
-            b = feature.air;
+            return tag;
         }
-        return b;
+        return null;
     }
 
     private static void handleLoot(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part,

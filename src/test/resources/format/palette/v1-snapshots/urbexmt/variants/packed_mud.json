@@ -1,0 +1,12 @@
+{
+  "blocks": [
+    {
+      "random": 70,
+      "block": "minecraft:packed_mud"
+    },
+    {
+      "random": 1000,
+      "block": "minecraft:mud_bricks"
+    }
+  ]
+}

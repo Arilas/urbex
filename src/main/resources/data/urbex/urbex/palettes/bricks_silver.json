@@ -1,24 +1,21 @@
 {
-  "palette": [
-    {
-      "char": "X",
-      "block": "minecraft:light_gray_terracotta",
-      "damaged": "minecraft:iron_bars"
+  "version": 2,
+  "palette": {
+    "X": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:light_gray_terracotta"
     },
-    {
-      "char": "$",
-      "block": "minecraft:brown_terracotta",
-      "damaged": "minecraft:iron_bars"
+    "$": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:brown_terracotta"
     },
-    {
-      "char": "#",
-      "block": "minecraft:light_gray_terracotta",
-      "damaged": "minecraft:iron_bars"
+    "#": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:light_gray_terracotta"
     },
-    {
-      "char": "}",
-      "block": "minecraft:light_gray_terracotta",
-      "damaged": "minecraft:iron_bars"
+    "}": {
+      "$ref": "urbex:damageable",
+      "block": "minecraft:light_gray_terracotta"
     }
-  ]
+  }
 }

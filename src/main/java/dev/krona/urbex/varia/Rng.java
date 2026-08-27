@@ -134,6 +134,47 @@ public final class Rng {
         return Hash.index(hashPos(worldSeed, x, y, z, purpose), bound);
     }
 
+    /** Keys the world seed by a palette marker. Odd, so distinct markers give distinct keys. */
+    private static final long MARKER_KEY = 0x9E3779B97F4A7C15L;
+
+    /**
+     * Which slot of a weighted palette marker a block position takes - {@code WEIGHT.040} to
+     * {@code WEIGHT.042}, in one function so that the two palette formats cannot address it differently.
+     * <p>
+     * {@code WEIGHT.043} - a {@code light_socket}'s placement list, "selected by the same rules,
+     * addressed by the same position" - is {@code LightPool.weightedOrder} and not this method, and the
+     * difference is {@code WEIGHT.041}: a socket has no marker in its address, because it is placed from
+     * a queue that carries a position and a pool rather than a character. It reaches the same 128 slots
+     * through {@link #indexAtPos} under {@code Purpose.LIGHTING_VARIANT}. This javadoc claimed all four
+     * rules while a socket still drew a sequential ticket, which is the kind of claim
+     * {@code docs/format/README.md} §1 exists to stop being made in only one place.
+     * <p>
+     * {@code WEIGHT.040}: "Which slot a position takes is a pure function of the world seed, the marker,
+     * and the block position." {@code WEIGHT.042}: it draws from no sequential stream, so the result at a
+     * position does not depend on how many other positions the chunk resolved first. Both are properties
+     * of {@link #indexAtPos}, and this adds the third.
+     * <p>
+     * <b>{@code WEIGHT.041}: the marker is part of the address.</b> Keyed into the seed rather than into
+     * {@code x}, {@code y} or {@code z} so that the address stays the block itself - perturbing a
+     * coordinate would alias two markers at neighbouring blocks onto one draw - and not into a
+     * {@link Purpose}, which cannot carry it because markers are datapack-defined. Without it every
+     * weighted marker resolves to the same index at a given block, so a mossy-cobble wall and a
+     * cracked-brick floor put their minority variants at identical offsets: one spatial pattern shared by
+     * the whole palette instead of one per marker.
+     * <p>
+     * The multiplier is odd, so distinct markers always give distinct keys and no two can share a stream.
+     * It moved here from {@code CompiledPalette} when version 2 needed the same addressing: version 1
+     * takes a {@code char} and version 2 a codepoint ({@code CHAR.002}), and for every marker version 1
+     * can express the two are the same number - which is what makes "exactly as version 1 does" a
+     * statement a test can check rather than a claim about two copies of an expression.
+     *
+     * @param marker    the marker's codepoint
+     * @param slotCount how many slots the marker compiled to; 128 in both formats
+     */
+    public static int paletteSlotAt(long worldSeed, int marker, int x, int y, int z, int slotCount) {
+        return indexAtPos(worldSeed ^ (marker * MARKER_KEY), x, y, z, Purpose.PALETTE, slotCount);
+    }
+
     /** A value in {@code [0, 1)} addressed by a block position, without allocating a stream. */
     public static float floatAtPos(long worldSeed, int x, int y, int z, Purpose purpose) {
         return Hash.unit(hashPos(worldSeed, x, y, z, purpose));

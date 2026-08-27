@@ -1,0 +1,117 @@
+{
+  "palette": [
+    {
+      "char": "S",
+      "blocks": [
+        {
+          "random": 40,
+          "block": "minecraft:polished_granite"
+        },
+        {
+          "random": 40,
+          "block": "minecraft:granite"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:bricks"
+        }
+      ],
+      "damaged": "minecraft:iron_bars"
+    },
+    {
+      "char": "A",
+      "blocks": [
+        {
+          "random": 32,
+          "block": "minecraft:polished_andesite"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:smooth_stone_slab[type=double]"
+        }
+      ],
+      "damaged": "minecraft:iron_bars"
+    },
+    {
+      "char": "a",
+      "blocks": [
+        {
+          "random": 40,
+          "block": "minecraft:stone_brick_wall"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:andesite_wall"
+        }
+      ],
+      "damaged": "minecraft:iron_bars"
+    },
+    {
+      "char": "P",
+      "blocks": [
+        {
+          "random": 32,
+          "block": "minecraft:exposed_lightning_rod[facing=down,powered=false,waterlogged=false]"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:lightning_rod[facing=down,powered=false,waterlogged=false]"
+        }
+      ],
+      "damaged": "minecraft:exposed_copper_bars"
+    },
+    {
+      "char": "Q",
+      "blocks": [
+        {
+          "random": 32,
+          "block": "minecraft:exposed_lightning_rod[facing=up,powered=false,waterlogged=false]"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:lightning_rod[facing=up,powered=false,waterlogged=false]"
+        }
+      ],
+      "damaged": "minecraft:exposed_copper_bars"
+    },
+    {
+      "char": "j",
+      "block": "minecraft:composter[level=8]"
+    },
+    {
+      "char": "k",
+      "variant": "urbexmt:stone_brick_stairs_bottom_east",
+      "damaged": "minecraft:cobblestone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "m",
+      "variant": "urbexmt:stone_brick_stairs_bottom_south",
+      "damaged": "minecraft:cobblestone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "n",
+      "variant": "urbexmt:stone_brick_stairs_bottom_north",
+      "damaged": "minecraft:cobblestone_slab[type=bottom,waterlogged=false]"
+    },
+    {
+      "char": "o",
+      "block": "minecraft:spruce_trapdoor[facing=north,half=bottom,open=true,powered=false,waterlogged=false]"
+    },
+    {
+      "char": "s",
+      "block": "minecraft:spruce_trapdoor[facing=east,half=bottom,open=true,powered=false,waterlogged=false]"
+    },
+    {
+      "char": "q",
+      "block": "minecraft:spruce_trapdoor[facing=west,half=bottom,open=true,powered=false,waterlogged=false]"
+    },
+    {
+      "char": "r",
+      "block": "minecraft:cauldron"
+    },
+    {
+      "char": "H",
+      "block": "minecraft:spruce_trapdoor[facing=south,half=bottom,open=true,powered=false,waterlogged=false]"
+    }
+  ]
+}

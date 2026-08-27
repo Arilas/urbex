@@ -1,0 +1,24 @@
+{
+  "values": [
+    {
+      "factor": 20,
+      "value": "urbexmt:chests/factory_barrel_metal"
+    },
+    {
+      "factor": 20,
+      "value": "urbexmt:chests/factory_barrel_fuel"
+    },
+    {
+      "factor": 20,
+      "value": "urbexmt:chests/factory_barrel_raw_ores"
+    },
+    {
+      "factor": 5,
+      "value": "urbexmt:chests/factory_barrel_valuables"
+    },
+    {
+      "factor": 15,
+      "value": "urbexmt:chests/factory_maintenance_kit"
+    }
+  ]
+}
