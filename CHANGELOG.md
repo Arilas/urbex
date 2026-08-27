@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- **Breaking: palettes now require format version 2.** Registered and inline palettes must declare
+  `"version": 2`; version 1 and unversioned palettes no longer load. The `variants` registry is
+  replaced by `definitions`, referenced with `$ref`. Typed nodes, shared definitions, exact weighted
+  selection, and composable traits now drive palette generation. All bundled palettes are migrated.
+  - Run `./gradlew convertPalettes -PurbexPackIn=<pack-root> -PurbexPackOut=<output-root>` to convert
+    registered palettes and variants. The pack root is `data/<namespace>/urbex`; inline palettes in
+    parts and buildings require separate conversion. Review the converter's diagnostics before
+    replacing files. See [the migration guide](docs/format/palette/09-migration.md).
+  - `/urbex exportpart` writes version 2 and selects markers from the supported alphabet.
+  - The palette schema and executable format specification cover decoding, references, inheritance,
+    traits, conversion, and generation integration.
+
 - `parkblocks.lamp` and `parkblocks.lampspacing`: a city style can now stand lamps on its
   park sections. Park surfaces are generated rather than assembled from parts, so no datapack
   could put a light on one and no lighting density could change it - parks were the one place in

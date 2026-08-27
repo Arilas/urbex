@@ -1,0 +1,30 @@
+{
+  "values": [
+    {
+      "factor": 1,
+      "value": "urbexmt:chests/shopping_food_basic",
+      "inpart": [
+        "urbexmt:shopping/shopping01_3p_in_bar_1a",
+        "urbexmt:shopping/shopping01_3p_in_bar_1b",
+        "urbexmt:shopping/shopping01_3p_in_bar_1c"
+      ]
+    },
+    {
+      "factor": 1,
+      "value": "urbexmt:chests/shopping_valuables",
+      "inpart": [
+        "urbexmt:shopping/shopping11_2p_in_cashier",
+        "urbexmt:shopping/shopping01_0_in_info_desk_alt"
+      ]
+    },
+    {
+      "factor": 1,
+      "value": "urbexmt:chests/shopping_vending_machine",
+      "inpart": [
+        "urbexmt:shopping/shopping11_2p_in_vending_machine",
+        "urbexmt:shopping/shopping01_2_in_vending_machine",
+        "urbexmt:shopping/shopping_open01_2_in_vending_machines"
+      ]
+    }
+  ]
+}

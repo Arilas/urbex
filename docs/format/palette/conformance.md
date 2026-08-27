@@ -115,7 +115,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.009` | `MUST` |  | `accept` | `NodeResolverTest.aSatellitesNodeIsResolvedAndIsStillNotAnAlternativeOfItsOwner` |
 | `TRAIT.010` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
 | `TRAIT.011` | `MUST` `[NOT-YET-REACHED]` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms`, `V1ToV2Test.damagedConvertsToItsVersion2SpellingEvenThoughTheDamagePassCannotYetKeyItByMarker` |
-| `TRAIT.012` | `ACCEPT` |  | `accept` | `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt` |
+| `TRAIT.012` | `ACCEPT` |  | `accept` | `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt`, `V1ToV2Test.anUnavailableDamageTargetAlsoStaysUndamagedInThePublicSuite` |
 | `TRAIT.020` | `MUST` |  |  | `TraitTest.theConditionsRegistryTheTraitsNameIsTheOneTheModRegisters` |
 | `TRAIT.021` | `REJECT` | `DIAG.021` | `reject=DIAG.021` | — |
 | `TRAIT.022` | `MUST` |  |  | `TraitTest.aTraitsReferenceIsCheckedThroughItsOwnDeclaration` |
@@ -245,7 +245,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `WEIGHT.010` | `MUST` |  | `accept` | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint` |
 | `WEIGHT.011` | `MUST` |  | `accept` | `ApportionTest.aWeightAddedToASpreadListOfWeightsTakesItsPartOfTheCombinedTotal`, `V1ToV2Test.aTrailingSentinelBecomesItsClippedValueRestatedAsASize` |
 | `WEIGHT.012` | `MUST` |  |  | `ApportionTest.theArithmeticIsExactRatherThanFloatingPoint` |
-| `WEIGHT.013` | `REJECT` | `DIAG.041` | `reject=DIAG.041` | `ApportionTest.moreThanOneRestOrARestBesideAWeightIsRefusedOnTheExpandedList`, `V1ToV2Test.noConvertedListEverCarriesARestBesideAWeight` |
+| `WEIGHT.013` | `REJECT` | `DIAG.041` | `reject=DIAG.041` | `ApportionTest.moreThanOneRestOrARestBesideAWeightIsRefusedOnTheExpandedList`, `V1ToV2Test.noConvertedListEverCarriesARestBesideAWeight`, `V1ToV2Test.noConvertedListInTheFullCorpusCarriesARestBesideAWeight` |
 | `WEIGHT.014` | `REJECT` | `DIAG.045` | `reject=DIAG.045` | `ApportionTest.sharesMustLeaveARemainderWhenSomethingTakesItAndMustTotalOneWhenNothingDoes` |
 | `WEIGHT.015` | `INVARIANT` |  |  | `ApportionTest.shufflingAListsDeclarationOrderDoesNotChangeItsDistribution` |
 | `WEIGHT.016` | `MUST` |  |  | `ApportionTest.aWeightAddedToASpreadListOfWeightsTakesItsPartOfTheCombinedTotal` |
@@ -398,17 +398,17 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.017` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsIsNot`, `VariantKeyRefusedTest.aVersion1EntryNamingAVariantIsRefusedAndTheMessageNamesItsReplacement`, `VariantKeyRefusedTest.anEntryNamingBothAVariantAndALiveKeyIsStillRefused` |
 | `VER.006` | `ACCEPT` |  | *n/a* | `PaletteCharacterCheckTest.aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays` |
 | `VER.013` | `ACCEPT` |  | *n/a* | `TraitTest.aTraitsReferenceIsCheckedThroughItsOwnDeclaration` |
-| `VER.008` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind`, `V1ToV2Test.aPlainBlockEntryBecomesTheStringShorthandAndTheCharDisappears`, `V1ToV2Test.aWeightedListBecomesChoicesAndRandomBecomesWeight`, `V1ToV2Test.aTrailingSentinelBecomesItsClippedValueRestatedAsASize`, `V1ToV2Test.everyVersion1MetadataFieldBecomesItsTrait`, `V1ToV2Test.frompaletteBecomesAnAliasOnTheOneCharacterVersion1Read`, `V1ToV2Test.aVariantBecomesARefAndTheVariantsRegistryBecomesDefinitions`, `V1ToV2Test.aLightSourceIsAKindWhenItSelectsTheBlockAndATraitWhenItDoesNot`, `V1ToV2Test.everyShippedPaletteAndVariantHasAVersion2FormAndTheConverterProducesIt` |
+| `VER.008` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind`, `V1ToV2Test.aPlainBlockEntryBecomesTheStringShorthandAndTheCharDisappears`, `V1ToV2Test.aWeightedListBecomesChoicesAndRandomBecomesWeight`, `V1ToV2Test.aTrailingSentinelBecomesItsClippedValueRestatedAsASize`, `V1ToV2Test.everyVersion1MetadataFieldBecomesItsTrait`, `V1ToV2Test.frompaletteBecomesAnAliasOnTheOneCharacterVersion1Read`, `V1ToV2Test.aVariantBecomesARefAndTheVariantsRegistryBecomesDefinitions`, `V1ToV2Test.aLightSourceIsAKindWhenItSelectsTheBlockAndATraitWhenItDoesNot`, `V1ToV2Test.everyPublicPaletteAndVariantHasAVersion2FormAndTheConverterProducesIt`, `V1ToV2Test.everyShippedPaletteAndVariantHasAVersion2FormAndTheConverterProducesIt` |
 | `VER.009` | `MUST` |  |  | `V1ToV2Test.anEntryWithTwoBlockSourcesTakesTheLadderSChoiceAndNamesWhatItDropped` |
 | `VER.010` | `REJECT` | `DIAG.060` | `reject=DIAG.060` | `PaletteV2DecodeTest.aRenamedVersionOneKeyIsRefusedNamingTheKeyThatReplacedIt` |
 | `VER.011` | `REJECT` | `DIAG.061` | `reject=DIAG.061` | `PaletteV2DecodeTest.aDeletedVersionOneKeyIsRefusedSayingWhatToWriteInstead` |
 | `VER.012` | `MUST NOT` |  |  | `PaletteV2DecodeTest.noRetiredKeyIsSilentlyAcceptedOrSilentlyIgnored` |
 | `VER.020` | `MUST` |  |  | — |
-| `VER.021` | `MUST` |  |  | `V1ToV2Test.getAsJsonObject`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats`, `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt` |
+| `VER.021` | `MUST` |  |  | `V1ToV2Test.getAsJsonObject`, `V1ToV2Test.aLightSocketNowReachesThePlacerIdenticallyFromEitherFormat`, `V1ToV2Test.aConvertedVariantCompilesAgainstTheDefinitionsRegistryAndIsRefusedWithoutIt`, `V1ToV2Test.anAbsentBlockRedistributesDifferentlyInTheTwoFormats`, `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt`, `V1ToV2Test.anUnavailableDamageTargetAlsoStaysUndamagedInThePublicSuite` |
 | `VER.022` | `MUST` |  |  | `V1ToV2Test.aKeyVersion1NeverReadIsNamedAndRefusedRatherThanGuessedAt`, `V1ToV2Test.aWeightedReplacementOnASocketIsRefusedRatherThanQuietlyCollapsed`, `V1ToV2Test.aMergeableBlocksObjectConvertsWhenItReplacesAndIsNamedWhenItAppends`, `V1ToV2Test.aKeyNoVersion1VariantHasIsRefusedRatherThanAccepted` |
-| `VER.023` | `MUST` |  |  | `V1ToV2Test.convertingAVersion2FileReturnsItByteForByteUnchanged` |
-| `VER.030` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined` |
-| `VER.031` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined` |
+| `VER.023` | `MUST` |  |  | `V1ToV2Test.convertingAVersion2FileReturnsItByteForByteUnchanged`, `V1ToV2Test.convertingTheFullCorpusTwiceIsIdempotent` |
+| `VER.030` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined`, `V1ToV2Test.theFullCorpusSurveyRetainsItsOriginalCounts` |
+| `VER.031` | `MUST` |  |  | `V1ToV2Test.theConverterInventsNoDefinitionAndReportsTheOnesItDeclined`, `V1ToV2Test.theFullCorpusSurveyRetainsItsOriginalCounts` |
 | `VER.032` | `MUST` |  |  | `V1ToV2Test.everyDeclinedOpportunityStatesTheRuleItWasCountedBy` |
 | `VER.040` | `MUST` |  |  | `VersionDispatchTest.theVersionMechanismIsRegistryAgnostic` |
 | `VER.041` | `MUST` |  |  | — |
@@ -419,4 +419,3 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.016` | `RETIRED` |  |  | — |
 | `VER.015` | `RETIRED` |  |  | — |
 | `VER.014` | `RETIRED` |  |  | — |
-

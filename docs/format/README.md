@@ -363,9 +363,16 @@ occurrences was a `sed` over its own data rather than anything this format could
 produce such a marker again — `CHAR.020`'s alphabet is what `/exportpart` draws from now.
 
 Each pack keeps a frozen `reference/v1-snapshot/`, and those two snapshots are the whole version 1
-corpus `VER.021` is verified against. That is deliberate: the property is about the converter, not
-about what any pack ships today, so the corpus must not shrink each time a pack migrates. Pointed at
-the live packs it would now be empty, and empty would not have failed.
+corpus `VER.021` is verified against. The MIT-licensed ModernTweaks fixtures are also checked into
+`src/test/resources/format/palette/v1-snapshots/` with attribution so the public suite works in a
+fresh checkout. Zombie Apocalypse Essentials cannot be redistributed; its snapshot stays private and
+is checked separately with
+`./gradlew privateCorpusTest -PurbexPrivateCorpus=/path/to/reference/v1-snapshot/urbex`.
+That task requires the snapshot and retains the complete three-pack counts. Public CI covers only
+the bundled assets and the redistributable corpus, not the private pack.
+
+The property is about the converter, not about what any pack ships today, so neither corpus shrinks
+when a pack migrates. Pointed at the live packs it would now be empty, and empty would not have failed.
 
 What survives of version 1 is the compile path, and only in the sense that the converter needs it:
 `VER.021` is verified by compiling every shipped version 1 palette both ways and comparing marker by

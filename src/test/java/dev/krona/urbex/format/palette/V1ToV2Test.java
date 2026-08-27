@@ -24,6 +24,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -64,8 +65,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * of a palette — {@code Parts.generatePart}, the damage pass, the decoration pass — reads those answers
  * and nothing else, so two palettes agreeing on all of them place the same blocks in the same chunks at
  * the same seed. That is short of driving a world, and the gap is named rather than papered over: the
- * whole-world run is {@code runDigestCheck} against a converted <em>bundled</em> pack, which is Task 10,
- * and this test is what stands guard over all three packs meanwhile.</p>
+ * whole-world run is {@code runDigestCheck} against the converted <em>bundled</em> pack. The public
+ * tests compare the MIT-licensed snapshot; the explicit {@code privateCorpusTest} run retains the
+ * complete three-pack corpus without redistributing the private addon.</p>
  *
  * <p>What it cannot see is asserted beside it rather than left implicit. A socket resolves to its
  * representative and defers the rest to {@code OptionalLightPlacer}, so
@@ -77,47 +79,48 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class V1ToV2Test {
 
     /**
-     * The three packs {@code VER.021} names, as pack roots: the directory holding {@code palettes/}.
+     * The public corpus: the bundled pack and an MIT-licensed, frozen Modern Tweaks snapshot.
      *
-     * <p><b>Both addon packs are read from frozen snapshots, not from their live packs.</b> Both are
-     * written in version 2 now, and a version 2 palette has no version 1 form to compile beside — so
-     * pointing at either would not have failed, it would have silently emptied the corpus this whole
-     * class measures. {@code reference/v1-snapshot/urbex} in each repository is that pack exactly as it
-     * stood before conversion, kept beside the pack it came from and never edited to follow it.
+     * <p>The snapshot is checked in under test resources so a fresh checkout runs the converter's
+     * regression tests without sibling repositories. Its README records the source commits, retained
+     * files and license. It is never edited to follow the live pack, which now writes version 2 and
+     * therefore has no version 1 form to compare. The public sweep pins its own counts independently
+     * of the full corpus.</p>
      *
-     * <p>Zombie Apocalypse Essentials' snapshot is taken <em>after</em> its unassigned-codepoint markers
-     * were reassigned, so it is a valid version 1 pack rather than merely the last one. The 41 files
-     * that carried those markers were what stopped it converting at all.
-     *
-     * <p>The property here is about the <em>converter</em>, not about what any pack ships today, so the
-     * corpus must not shrink every time a pack migrates. Left pointing at the live pack, the sweep in
-     * {@link #everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion} would have fallen from 79
-     * palettes to five, and then from five to none when this pack converted too — with every count in
-     * this class re-pinned downwards to match each time, which is how a guard stops guarding while
-     * every assertion in it still passes.</p>
+     * <p>Zombie Apocalypse Essentials is All Rights Reserved and must not be redistributed here.
+     * Tests tagged {@code private-corpus} retain the original three-pack assertions and accept its
+     * frozen snapshot explicitly through {@code privateCorpusTest}; see {@link #fullCorpus()}.
+     * Neither a missing private pack nor a changed corpus is silently skipped.</p>
      */
     private static final Map<String, Path> PACKS = Map.of(
             "urbex", Path.of("src/main/resources/data/urbex/urbex"),
-            "urbexmt", Path.of("../Urbex-ModernTweaks/reference/v1-snapshot/urbex"),
-            "urbexza", Path.of("../Urbex-Zombie-Apocalypse-Essentials/reference/v1-snapshot/urbex"));
+            "urbexmt", Path.of("src/test/resources/format/palette/v1-snapshots/urbexmt"));
 
     /**
-     * The two of them still written in version 1, which is what a before-and-after can be run over.
+     * The full corpus, available only to an explicit private integration run.
      *
-     * <p>The bundled pack left this set in Task 10 and its evidence moved with it: a version 2 file has
-     * no version 1 form to compile beside, and the property {@code VER.021} actually asks for — "a world
-     * generated from the converted pack is identical to one generated from the original" — is now
-     * measured the way the rule words it, by {@code runDigestCheck} and its five sibling windows over
-     * the shipped pack itself. That is a stronger measurement than this one and not a weaker: it drives
-     * chunks rather than asking a palette what it would have answered.</p>
-     *
-     * <p>Named as its own constant rather than by deleting the bundled entry from {@link #PACKS},
-     * because the converter is still run over all three — {@code VER.023} makes converting a version 2
-     * file return it unchanged, and the survey in §5 reads whatever the pack is.</p>
+     * <p>The private snapshot must be the version 1 pack after its unassigned-codepoint markers were
+     * reassigned. Its live version 2 pack is not a substitute: the exact counts below will fail.
+     * The bundled pack remains in the conversion/idempotence corpus, but only the two snapshots have
+     * a version 1 side to compile. Worldgen digests cover the bundled pack's generation.</p>
      */
-    private static final Map<String, Path> VERSION_1_PACKS = Map.of(
-            "urbexmt", PACKS.get("urbexmt"),
-            "urbexza", PACKS.get("urbexza"));
+    private static Map<String, Path> fullCorpus() {
+        String supplied = System.getProperty("urbex.privateCorpus");
+        if (supplied == null || supplied.isBlank()) {
+            throw new IllegalStateException("The private corpus is required: run ./gradlew "
+                    + "privateCorpusTest -PurbexPrivateCorpus=<path-to-v1-snapshot/urbex>");
+        }
+        Path root = Path.of(supplied).toAbsolutePath().normalize();
+        for (String directory : List.of("palettes", "variants", "conditions", "parts")) {
+            if (!Files.isDirectory(root.resolve(directory))) {
+                throw new IllegalStateException("Private version 1 corpus is missing "
+                        + root.resolve(directory) + "; supply the frozen snapshot, not the live pack");
+            }
+        }
+        Map<String, Path> packs = new LinkedHashMap<>(PACKS);
+        packs.put("urbexza", root);
+        return Map.copyOf(packs);
+    }
 
     private static final long SEED = 20260817L;
 
@@ -179,12 +182,12 @@ class V1ToV2Test {
     private static final Identifier UNDER_TEST =
             Identifier.fromNamespaceAndPath("urbex", "under_test");
 
-    /** Every {@code conditions} id any of the three packs registers; see {@link Fixture}. */
-    private static final Set<Identifier> CONDITIONS = conditions();
+    /** Public condition ids; private tests add the explicitly supplied pack's ids in their fixture. */
+    private static final Set<Identifier> CONDITIONS = conditions(PACKS);
 
-    private static Set<Identifier> conditions() {
+    private static Set<Identifier> conditions(Map<String, Path> packs) {
         Set<Identifier> ids = new java.util.LinkedHashSet<>();
-        PACKS.forEach((namespace, pack) -> {
+        packs.forEach((namespace, pack) -> {
             for (Path file : V1ToV2.jsonUnder(pack.resolve("conditions"))) {
                 ids.add(Fixture.idOf(namespace, pack.resolve("conditions"), file));
             }
@@ -254,14 +257,28 @@ class V1ToV2Test {
     @Rule("WEIGHT.013")
     @Test
     void noConvertedListEverCarriesARestBesideAWeight() {
-        for (Path pack : PACKS.values()) {
+        assertNoConvertedListCarriesRest(PACKS, 128);
+    }
+
+    @Rule("WEIGHT.013")
+    @Tag("private-corpus")
+    @Test
+    void noConvertedListInTheFullCorpusCarriesARestBesideAWeight() {
+        assertNoConvertedListCarriesRest(fullCorpus(), 135);
+    }
+
+    private static void assertNoConvertedListCarriesRest(Map<String, Path> packs, int expectedFiles) {
+        int files = 0;
+        for (Path pack : packs.values()) {
             for (Path file : V1ToV2.jsonUnder(pack.resolve("palettes"))) {
+                files++;
                 assertFalse(V1ToV2.paletteFile(read(file), file.toString()).json().contains("\"rest\""),
                         () -> file + " emitted a 'rest', which WEIGHT.013 refuses in a list that also "
                                 + "carries a 'weight' - and every other choice of a converted list is "
                                 + "a weight");
             }
         }
+        assertEquals(expectedFiles, files, "the no-rest check must visit its complete corpus");
     }
 
     @Rule("WEIGHT.002")
@@ -376,13 +393,27 @@ class V1ToV2Test {
         String v2 = "{ \"version\": 2, \"palette\": { \"X\": \"minecraft:stone\" } }";
         assertEquals(v2, V1ToV2.paletteFile(v2, "test").json());
 
-        for (Path pack : PACKS.values()) {
+        assertConversionIsIdempotent(PACKS, 128);
+    }
+
+    @Rule("VER.023")
+    @Tag("private-corpus")
+    @Test
+    void convertingTheFullCorpusTwiceIsIdempotent() {
+        assertConversionIsIdempotent(fullCorpus(), 135);
+    }
+
+    private static void assertConversionIsIdempotent(Map<String, Path> packs, int expectedFiles) {
+        int files = 0;
+        for (Path pack : packs.values()) {
             for (Path file : V1ToV2.jsonUnder(pack.resolve("palettes"))) {
+                files++;
                 String once = V1ToV2.paletteFile(read(file), file.toString()).json();
                 assertEquals(once, V1ToV2.paletteFile(once, file.toString()).json(),
                         () -> "converting " + file + " twice moved it the second time");
             }
         }
+        assertEquals(expectedFiles, files, "idempotence must be measured over the complete corpus");
     }
 
     /**
@@ -427,10 +458,21 @@ class V1ToV2Test {
 
     @Rule("VER.008")
     @Test
+    void everyPublicPaletteAndVariantHasAVersion2FormAndTheConverterProducesIt() {
+        assertEveryAssetConverts(PACKS, 186);
+    }
+
+    @Rule("VER.008")
+    @Tag("private-corpus")
+    @Test
     void everyShippedPaletteAndVariantHasAVersion2FormAndTheConverterProducesIt() {
+        assertEveryAssetConverts(fullCorpus(), 204);
+    }
+
+    private static void assertEveryAssetConverts(Map<String, Path> packs, int expectedFiles) {
         List<String> blocked = new ArrayList<>();
         int files = 0;
-        for (Path pack : PACKS.values()) {
+        for (Path pack : packs.values()) {
             for (Path file : V1ToV2.jsonUnder(pack.resolve("palettes"))) {
                 files++;
                 if (V1ToV2.paletteFile(read(file), file.toString()).blocked()) {
@@ -445,10 +487,9 @@ class V1ToV2Test {
             }
         }
         assertEquals(List.of(), blocked, "the translation is total");
-        assertEquals(204, files,
-                "30 + 98 + 7 palettes and 58 + 11 variants; the bundled pack's twelve went with the "
-                        + "registry (VER.017). If a pack gained a file this number moves and the claim "
-                        + "above is about a corpus nobody counted");
+        assertEquals(expectedFiles, files,
+                "186 public assets (30 + 98 palettes and 58 variants), or 204 with the private "
+                        + "pack's 7 palettes and 11 variants; a changed corpus must fail its count");
     }
 
     // ---- §5, what it will not do ---------------------------------------------------------------
@@ -457,6 +498,21 @@ class V1ToV2Test {
     @Rule("VER.031")
     @Test
     void theConverterInventsNoDefinitionAndReportsTheOnesItDeclined() {
+        assertPublicSurvey();
+    }
+
+    @Test
+    void thePublicSnapshotContainsExactlyTheInputsRecordedInItsReadme() {
+        Path snapshot = PACKS.get("urbexmt");
+        Map.of("palettes", 98, "variants", 58, "conditions", 5, "parts", 60)
+                .forEach((directory, expected) -> assertEquals(expected.intValue(),
+                        V1ToV2.jsonUnder(snapshot.resolve(directory)).size(),
+                        () -> "the frozen public snapshot's " + directory + " corpus changed"));
+        assertEquals(221, V1ToV2.jsonUnder(snapshot).size(),
+                "the public snapshot contains no unrecorded registry inputs");
+    }
+
+    private static void assertPublicSurvey() {
         V1ToV2.Survey survey = V1ToV2.survey(PACKS.get("urbex"));
 
         // VER.031's first number was the bundled pack's sixty uses of one value, and it is the one
@@ -471,7 +527,10 @@ class V1ToV2Test {
 
         // Still measured where it has not been acted on, so the rule keeps a live instance rather than
         // only a historical one.
-        Map<String, Integer> modernTweaks = V1ToV2.survey(PACKS.get("urbexmt")).damagedValues();
+        V1ToV2.Survey publicSurvey = V1ToV2.survey(PACKS.get("urbexmt"));
+        assertEquals(245, publicSurvey.inlineEntries(), "the public snapshot's inline entries");
+        assertEquals(168, publicSurvey.distinctInline(), "the public snapshot's distinct inline entries");
+        Map<String, Integer> modernTweaks = publicSurvey.damagedValues();
         assertEquals(7, modernTweaks.size(), () -> "seven distinct 'damaged' values: " + modernTweaks);
         assertEquals(257, modernTweaks.values().stream().mapToInt(Integer::intValue).sum(),
                 "across 257 uses");
@@ -480,9 +539,19 @@ class V1ToV2Test {
             assertFalse(V1ToV2.paletteFile(read(file), file.toString()).json().contains("$defs"),
                     () -> file + " grew a $defs, and VER.030 forbids inventing one");
         }
+    }
 
-        assertEquals(5276, V1ToV2.survey(PACKS.get("urbexza")).inlineEntries()
-                        - V1ToV2.survey(PACKS.get("urbexza")).distinctInline(),
+    @Rule("VER.030")
+    @Rule("VER.031")
+    @Tag("private-corpus")
+    @Test
+    void theFullCorpusSurveyRetainsItsOriginalCounts() {
+        assertPublicSurvey();
+        V1ToV2.Survey privateSurvey = V1ToV2.survey(fullCorpus().get("urbexza"));
+        assertEquals(6527, privateSurvey.inlineEntries(), "the original private inline-entry count");
+        assertEquals(1251, privateSurvey.distinctInline(),
+                "the distinct entries after the private pack's marker reassignment");
+        assertEquals(5276, privateSurvey.inlineEntries() - privateSurvey.distinctInline(),
                 "VER.031's other number: 6,527 inline entries in Zombie Apocalypse Essentials of "
                         + "which 1,251 are distinct. It was 1,242 until that pack's markers on "
                         + "unassigned codepoints were reassigned: an entry is distinct by its whole "
@@ -654,15 +723,55 @@ class V1ToV2Test {
     }
 
     @Test
+    void everyPublicVersion1PaletteResolvesIdenticallyBeforeAndAfterConversion() {
+        CorpusComparison comparison = compareCorpus(Map.of("urbexmt", PACKS.get("urbexmt")), PACKS);
+        assertEquals(24, comparison.skipped(), "Modern Tweaks palettes naming a retired variant");
+        assertEquals(74, comparison.compared(), "98 public version 1 palettes minus those 24");
+        assertEquals(267, comparison.markers(),
+                "269 authored markers minus two aliases whose targets are supplied by other palettes");
+        assertEquals(Map.of(), comparison.absentBlockCases(),
+                "the public corpus has no missing-block redistribution exceptions");
+    }
+
+    @Tag("private-corpus")
+    @Test
     void everyShippedPaletteResolvesIdenticallyBeforeAndAfterConversion() {
+        Map<String, Path> packs = fullCorpus();
+        CorpusComparison comparison = compareCorpus(Map.of(
+                "urbexmt", packs.get("urbexmt"), "urbexza", packs.get("urbexza")), packs);
+        assertEquals(26, comparison.skipped(), "24 ModernTweaks palettes and 2 Zombie Apocalypse "
+                + "Essentials ones name a variant, and VER.017 leaves their version 1 side "
+                + "uncompilable; a growing count must not silently reduce coverage");
+        assertEquals(79, comparison.compared(), "105 shipped version 1 palettes less the 26 above; "
+                + "the bundled pack is version 2 and is measured by the digest windows");
+        assertEquals(299, comparison.markers(),
+                "every compiled marker: 267 in Modern Tweaks plus 32 in the private snapshot");
+        assertEquals(List.of("urbexza/stone_building.json '#'"),
+                List.copyOf(comparison.absentBlockCases().keySet()),
+                () -> "the only markers that may differ are the ones whose own weighted list names "
+                        + "an immersive_weathering block this JVM does not have; they are named "
+                        + "marker by marker so a second cannot join them quietly: "
+                        + comparison.absentBlockCases());
+
+        // Eleven other missing-block exceptions are in the 26 palettes skipped for naming variants,
+        // not gone: one in bricks_building.json and ten in default.json. Keep the skipped count pinned.
+    }
+
+    private record CorpusComparison(int skipped, int compared, int markers,
+                                    Map<String, String> absentBlockCases) {}
+
+    /** Both public and private runs use the same compiler comparison and missing-block exception. */
+    private static CorpusComparison compareCorpus(Map<String, Path> version1Packs,
+                                                   Map<String, Path> allPacks) {
         List<String> unexplained = new ArrayList<>();
         Map<String, String> absentBlockCases = new java.util.TreeMap<>();
+        Set<Identifier> conditionIds = conditions(allPacks);
         int skipped = 0;
         int compared = 0;
         int markers = 0;
-        for (String name : new TreeSet<>(VERSION_1_PACKS.keySet())) {
-            Path pack = VERSION_1_PACKS.get(name);
-            Fixture fixture = new Fixture(name, pack);
+        for (String name : new TreeSet<>(version1Packs.keySet())) {
+            Path pack = version1Packs.get(name);
+            Fixture fixture = new Fixture(name, pack, conditionIds);
             for (Path file : V1ToV2.jsonUnder(pack.resolve("palettes"))) {
                 // VER.017: the version 1 side of a palette naming a variant no longer compiles, because
                 // there is no variants registry to resolve it against. Skipped and counted, so the
@@ -690,30 +799,7 @@ class V1ToV2Test {
         }
         assertEquals(List.of(), unexplained,
                 "a converted palette answered differently for a reason nothing here accounts for");
-        assertEquals(26, skipped, "24 ModernTweaks palettes and 2 Zombie Apocalypse Essentials ones "
-                + "name a variant, and VER.017 leaves their version 1 side uncompilable; if this "
-                + "number grows the comparison has quietly stopped covering something");
-        assertEquals(79, compared, "105 shipped version 1 palettes less the 26 above; the bundled "
-                + "pack's thirty are version 2 since Task 10 and are measured by the digest windows");
-        assertEquals(299, markers,
-                "and every marker of each of them, so the one exception below is one out of "
-                        + "this and not one out of however many the comparison happened to reach. "
-                        + "It used to stop at the first differing marker of a file, which hid four "
-                        + "more; it counted 663 over three packs until the bundled pack's 189 became "
-                        + "version 2, and 474 until VER.017 put the 26 variant-naming palettes and "
-                        + "their 175 markers out of reach");
-        assertEquals(List.of("urbexza/stone_building.json '#'"),
-                List.copyOf(absentBlockCases.keySet()),
-                () -> "the only markers that may differ are the ones whose own weighted list names an "
-                        + "immersive_weathering block this JVM does not have, which is "
-                        + "anAbsentBlockRedistributesDifferentlyInTheTwoFormats' case; they are named "
-                        + "marker by marker so a second cannot join them quietly: " + absentBlockCases);
-
-        // Eleven of the twelve went out of reach with VER.017, not out of existence: one marker of
-        // bricks_building.json and ten of default.json, both of which name a variant and are now
-        // skipped whole. They are the reason the skip is counted above rather than left implicit -
-        // a comparison that loses eleven of its twelve known exceptions has lost coverage, and the
-        // only honest way to say so is a number that moves when it does.
+        return new CorpusComparison(skipped, compared, markers, absentBlockCases);
     }
 
     /**
@@ -872,11 +958,13 @@ class V1ToV2Test {
      */
     @Rule("TRAIT.012")
     @Rule("VER.021")
+    @Tag("private-corpus")
     @Test
     void aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt() {
-        Path pack = PACKS.get("urbexza");
+        Map<String, Path> packs = fullCorpus();
+        Path pack = packs.get("urbexza");
         Path file = pack.resolve("palettes/bricks_building.json");
-        Fixture fixture = new Fixture("urbexza", pack);
+        Fixture fixture = new Fixture("urbexza", pack, conditions(packs));
 
         // Minus '}', its one variant-naming marker (VER.017). 'X' is what this test is about, and it
         // names a block directly.
@@ -898,6 +986,25 @@ class V1ToV2Test {
                         + "it has no damaged form at all - exactly as version 1 records none");
         assertNull(version1.canBeDamagedToIronBars(version1.getRepresentative('X')),
                 "and version 1 agrees, which is the point");
+    }
+
+    /** The missing damage target regression also runs without the private pack's data. */
+    @Rule("TRAIT.012")
+    @Rule("VER.021")
+    @Test
+    void anUnavailableDamageTargetAlsoStaysUndamagedInThePublicSuite() {
+        String document = """
+                { "palette": [ { "char": "X", "block": "minecraft:stone_bricks",
+                                  "damaged": "nosuchmod:nosuchblock" } ] }
+                """;
+        Fixture fixture = new Fixture("urbex", PACKS.get("urbex"));
+        CompiledPalette before = fixture.compiledVersion1(document, "missing-damage-target");
+        CompiledPalette after = fixture.compiledVersion2(document, "missing-damage-target");
+        assertEquals(Blocks.STONE_BRICKS.defaultBlockState(), before.getRepresentative('X'));
+        assertEquals(before.getRepresentative('X'), after.getRepresentative('X'));
+        assertNull(before.canBeDamagedToIronBars(before.getRepresentative('X')));
+        assertNull(after.canBeDamagedToIronBars(after.getRepresentative('X')),
+                "an absent target must not turn damage into deletion");
     }
 
     // ---- The harness --------------------------------------------------------------------------
@@ -922,6 +1029,10 @@ class V1ToV2Test {
         private final Exclusion.Presence presence;
 
         Fixture(String namespace, Path pack) {
+            this(namespace, pack, CONDITIONS);
+        }
+
+        Fixture(String namespace, Path pack, Set<Identifier> conditionIds) {
             Map<Identifier, DefinitionAssetDefinition> byId = new LinkedHashMap<>();
             for (Path file : V1ToV2.jsonUnder(pack.resolve("variants"))) {
                 byId.put(idOf(namespace, pack.resolve("variants"), file),
@@ -934,7 +1045,7 @@ class V1ToV2Test {
             // and its palettes name urbex:chestloot, which is Urbex's own asset. A per-pack set
             // refuses ModernTweaks' common.json for naming a condition that is loaded in every
             // installation it will ever run in.
-            this.traits = TraitContext.withConditions(BuiltInRegistries.BLOCK, CONDITIONS);
+            this.traits = TraitContext.withConditions(BuiltInRegistries.BLOCK, conditionIds);
             this.presence = Exclusion.installed(BuiltInRegistries.BLOCK,
                     Set.copyOf(List.of("urbex", "minecraft", namespace)));
         }

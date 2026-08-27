@@ -1,0 +1,12 @@
+{
+  "blocks": [
+    {
+      "random": 12,
+      "block": "minecraft:tuff"
+    },
+    {
+      "random": 1000,
+      "block": "minecraft:tuff_bricks"
+    }
+  ]
+}

@@ -115,7 +115,7 @@ public class CompiledPalette {
      *
      * <p>{@code MODEL.064}: an alias "is answered by the merged palette the part is generated with -
      * including markers contributed by palettes this file never mentions". So it cannot be answered as
-     * each palette is added, only once they all have been, which is what {@link #resolvePendingAliases}
+     * each palette is added, only once they all have been, which is what {@link #resolveAliases}
      * does. An alias still unanswered after that is {@code MODEL.062}'s refusal, raised where the merge
      * is validated rather than here - {@code LOAD.013}, and generation is not a place to raise it.</p>
      */
@@ -125,6 +125,10 @@ public class CompiledPalette {
         other.palette.forEach(this::define);
         this.damagedToBlock.putAll(other.damagedToBlock);
         this.information.putAll(other.information);
+        this.pendingAliases.putAll(other.pendingAliases);
+        // A local palette may supply a missing target or replace an existing one. Keep the alias
+        // definitions, but resolve them again against this merge without changing the shared base.
+        pendingAliases.keySet().forEach(marker -> undefine((char) marker.codepoint()));
         addPalettes(palettes);
         finish();
     }
@@ -135,6 +139,21 @@ public class CompiledPalette {
         if (c < ascii.length) {
             ascii[c] = entry;
         }
+    }
+
+    /** An authored entry replaces any earlier pending alias for the same marker. */
+    private void override(char c, Entry entry) {
+        pendingAliases.remove(new Marker(c));
+        define(c, entry);
+    }
+
+    /** Removes the old answer everywhere before a later alias chooses a new one. */
+    private void undefine(char c) {
+        palette.remove(c);
+        if (c < ascii.length) {
+            ascii[c] = null;
+        }
+        information.remove(c);
     }
 
     /** What {@code c} resolves to, or null. */
@@ -239,7 +258,7 @@ public class CompiledPalette {
                 for (Map.Entry<Character, Palette.PE> entry : p.getPalette().entrySet()) {
                     Palette.PE pe = entry.getValue();
                     if (pe.blocks() instanceof BlockState state) {
-                        define(entry.getKey(), new Entry.Simple(state));
+                        override(entry.getKey(), new Entry.Simple(state));
                     } else if (pe.blocks() instanceof Pair[]) {
                         Pair<Integer, BlockState>[] r = (Pair<Integer, BlockState>[]) pe.blocks();
                         int[] weights = new int[r.length];
@@ -259,7 +278,7 @@ public class CompiledPalette {
                                 randomBlocks[idx++] = r[i].getRight();
                             }
                         }
-                        define(entry.getKey(), new Entry.Weighted(randomBlocks));
+                        override(entry.getKey(), new Entry.Weighted(randomBlocks));
                     } else if (pe.blocks() == null) {
                         throw new RuntimeException("Invalid palette entry for '" + entry.getKey() + "'!");
                     } else if (!(pe.blocks() instanceof String)) {
@@ -345,13 +364,16 @@ public class CompiledPalette {
         for (Marker marker : compiled.markers()) {
             char c = (char) marker.codepoint();
             CompiledEntry entry = compiled.entry(marker.codepoint());
-            define(c, new Entry.V2(entry, slotsOf(entry)));
+            override(c, new Entry.V2(entry, slotsOf(entry)));
             information.remove(c);
         }
         // The aliases this palette could not answer are answered by the merge, once every palette of it
         // has contributed - MODEL.064. Recorded now and resolved in the pass below, so that an alias
         // pointing forward at a palette merged later reads the same as one pointing backward.
-        compiled.pendingAliases().forEach(pendingAliases::put);
+        compiled.pendingAliases().forEach((marker, pending) -> {
+            undefine((char) marker.codepoint());
+            pendingAliases.put(marker, pending);
+        });
     }
 
     /**

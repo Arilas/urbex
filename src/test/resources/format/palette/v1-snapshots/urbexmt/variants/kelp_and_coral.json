@@ -1,0 +1,28 @@
+{
+  "blocks": [
+    {
+      "random": 10,
+      "block": "minecraft:tube_coral[waterlogged=true]"
+    },
+    {
+      "random": 10,
+      "block": "minecraft:brain_coral[waterlogged=true]"
+    },
+    {
+      "random": 10,
+      "block": "minecraft:bubble_coral[waterlogged=true]"
+    },
+    {
+      "random": 10,
+      "block": "minecraft:fire_coral[waterlogged=true]"
+    },
+    {
+      "random": 10,
+      "block": "minecraft:horn_coral[waterlogged=true]"
+    },
+    {
+      "random": 1000,
+      "block": "minecraft:kelp"
+    }
+  ]
+}

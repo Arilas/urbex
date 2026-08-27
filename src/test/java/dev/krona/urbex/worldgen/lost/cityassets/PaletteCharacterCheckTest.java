@@ -15,6 +15,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.block.Blocks;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -26,6 +27,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -326,6 +328,138 @@ class PaletteCharacterCheckTest {
                         .defaultBlockState(),
                 merged.getAt('@', 1L, 0, 0, 0),
                 "and it resolves to what its target resolves to, by MODEL.060");
+    }
+
+    @Test
+    void aLaterVersion2AliasOverridesAnEarlierConcreteMarker() {
+        Palette alias = compiledV2Palette("override_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """);
+        List<Palette> bases = List.of(
+                compiledV2Palette("override_v2_base", """
+                        { "version": 2, "palette": {
+                          "a": "minecraft:stone", "b": "minecraft:bricks"
+                        } }
+                        """),
+                PALETTES.get(Identifier.parse(palette("override_v1_base",
+                        entry('a', "minecraft:stone"), entry('b', "minecraft:bricks")))));
+
+        for (Palette base : bases) {
+            for (CompiledPalette merged : List.of(new CompiledPalette(base, alias),
+                    new CompiledPalette(new CompiledPalette(base), alias))) {
+                assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+                assertEquals(Blocks.BRICKS.defaultBlockState(),
+                        merged.placedAt('a', 1L, 0, 64, 0).state());
+                assertEquals(Map.of('a', 'b'), merged.aliasTargets());
+            }
+        }
+    }
+
+    @Test
+    void aLaterConcreteMarkerDiscardsAnEarlierPendingAlias() {
+        Palette alias = compiledV2Palette("superseded_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "z" } } }
+                """);
+        List<Palette> overrides = List.of(
+                compiledV2Palette("concrete_v2_override", """
+                        { "version": 2, "palette": { "a": "minecraft:bricks" } }
+                        """),
+                PALETTES.get(Identifier.parse(palette("concrete_v1_override",
+                        entry('a', "minecraft:bricks")))));
+
+        for (Palette override : overrides) {
+            CompiledPalette merged = new CompiledPalette(alias, override);
+            assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+            assertTrue(merged.aliasTargets().isEmpty(),
+                    "the superseded alias must not produce a missing-target diagnostic");
+        }
+    }
+
+    @Test
+    void anUnresolvedAliasOverrideClearsBothAsciiAndNonAsciiLookups() {
+        Palette base = compiledV2Palette("undefined_override_base", """
+                { "version": 2, "palette": {
+                  "a": "minecraft:stone", "Ω": "minecraft:bricks"
+                } }
+                """);
+        Palette aliases = compiledV2Palette("undefined_overrides", """
+                { "version": 2, "palette": {
+                  "a": { "kind": "alias", "of": "z" },
+                  "Ω": { "kind": "alias", "of": "z" }
+                } }
+                """);
+
+        for (CompiledPalette merged : List.of(new CompiledPalette(base, aliases),
+                new CompiledPalette(new CompiledPalette(base), aliases))) {
+            for (char marker : new char[]{'a', 'Ω'}) {
+                assertFalse(merged.isDefined(marker));
+                assertFalse(merged.getCharacters().contains(marker));
+                assertNull(merged.getAt(marker, 1L, 0, 64, 0));
+                assertNull(merged.placedAt(marker, 1L, 0, 64, 0));
+            }
+        }
+    }
+
+    @Test
+    void aLaterAliasDefinitionChoosesTheFinalTarget() {
+        Palette first = compiledV2Palette("first_alias_target", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """);
+        Palette last = compiledV2Palette("last_alias_target", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "c" } } }
+                """);
+        Palette targets = compiledV2Palette("alias_targets", """
+                { "version": 2, "palette": {
+                  "b": "minecraft:stone", "c": "minecraft:bricks"
+                } }
+                """);
+
+        CompiledPalette merged = new CompiledPalette(first, last, targets);
+
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+        assertEquals(Map.of('a', 'c'), merged.aliasTargets());
+    }
+
+    @Test
+    void aPendingBaseAliasCanResolveFromAPartLocalPalette() {
+        CompiledPalette base = new CompiledPalette(compiledV2Palette("base_pending_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """));
+        Palette local = compiledV2Palette("local_alias_target", """
+                { "version": 2, "palette": { "b": "minecraft:bricks" } }
+                """);
+
+        CompiledPalette merged = new PaletteCache().with(base, local);
+
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.placedAt('a', 1L, 0, 64, 0).state());
+        assertEquals(Map.of('a', 'b'), merged.aliasTargets());
+        assertFalse(base.isDefined('a'), "resolving a part must not mutate its shared base");
+    }
+
+    @Test
+    void aResolvedBaseAliasFollowsAPartLocalTargetOverrideWithoutChangingTheBase() {
+        Palette alias = compiledV2Palette("base_resolved_alias", """
+                { "version": 2, "palette": { "a": { "kind": "alias", "of": "b" } } }
+                """);
+        Palette target = compiledV2Palette("base_resolved_target", """
+                { "version": 2, "palette": { "b": "minecraft:stone" } }
+                """);
+        CompiledPalette base = new CompiledPalette(alias, target);
+        Palette local = compiledV2Palette("local_target_override", """
+                { "version": 2, "palette": { "b": "minecraft:bricks" } }
+                """);
+
+        CompiledPalette merged = new PaletteCache().with(base, local);
+
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.getAt('a', 1L, 0, 64, 0));
+        assertEquals(Blocks.BRICKS.defaultBlockState(), merged.placedAt('a', 1L, 0, 64, 0).state());
+        assertEquals(Blocks.STONE.defaultBlockState(), base.getAt('a', 1L, 0, 64, 0),
+                "the shared base palette must keep its own resolved alias");
+    }
+
+    private static Palette compiledV2Palette(String path, String json) {
+        return PALETTES.get(Identifier.parse(v2Palette(path, json)));
     }
 
     /** Registers a version 2 palette from its JSON and returns its id. */

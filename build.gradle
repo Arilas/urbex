@@ -615,7 +615,11 @@ dependencies {
 }
 
 test {
-    useJUnitPlatform()
+    // The public regression corpus is checked in. The All Rights Reserved addon is exercised only
+    // by privateCorpusTest with an explicitly supplied local snapshot, never downloaded by CI.
+    useJUnitPlatform {
+        excludeTags 'private-corpus'
+    }
     // Three concerns read files under docs/ - DatapackGuideExamplesTest decodes every JSON example
     // in docs/datapacks.md and checks the error messages it quotes, PresetSchemaTest drift-guards
     // docs/schema/preset.schema.json against the section codecs, and ConformanceIndexTest /
@@ -632,6 +636,48 @@ test {
             .withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {
         events "passed", "skipped", "failed"
+    }
+}
+
+// Reuse the same compiled tests, but run only the explicitly tagged full-corpus assertions. Keeping
+// this separate from check/build makes an ordinary checkout self-contained without pretending the
+// public corpus covers the private addon. No path is inferred from sibling repositories.
+def privateCorpusPath = providers.gradleProperty('urbexPrivateCorpus').filter { !it.isBlank() }
+def privateCorpusDirectory = privateCorpusPath.map { layout.projectDirectory.dir(it).asFile }
+
+tasks.register('privateCorpusTest', Test) {
+    description = 'Verifies the full palette converter corpus using an explicitly supplied private v1 snapshot.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    javaLauncher = tasks.named('test', Test).flatMap { it.javaLauncher }
+    shouldRunAfter tasks.named('test')
+    useJUnitPlatform {
+        includeTags 'private-corpus'
+    }
+    failOnNoDiscoveredTests = true
+
+    // Optional here allows the action below to name the missing -P argument clearly. A supplied
+    // directory is a real tracked input: edits to external JSON must invalidate an earlier result.
+    inputs.dir(privateCorpusDirectory).optional()
+            .withPropertyName('privatePaletteCorpus')
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty 'urbex.privateCorpus', privateCorpusDirectory.map { it.absolutePath }.getOrElse('')
+    outputs.doNotCacheIf('Private corpus reports must not enter a shared build cache') { true }
+
+    doFirst {
+        if (!privateCorpusPath.isPresent()) {
+            throw new GradleException('privateCorpusTest requires -PurbexPrivateCorpus=<path-to-v1-snapshot/urbex>; the private corpus is never downloaded or skipped.')
+        }
+        def root = privateCorpusDirectory.get()
+        ['palettes', 'variants', 'conditions', 'parts'].each { directory ->
+            if (!new File(root, directory).isDirectory()) {
+                throw new GradleException("Private version 1 corpus is missing ${new File(root, directory)}; supply the frozen snapshot, not the live pack.")
+            }
+        }
+    }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
     }
 }
 

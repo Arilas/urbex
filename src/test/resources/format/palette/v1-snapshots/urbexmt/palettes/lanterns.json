@@ -1,0 +1,18 @@
+{
+  "palette": [
+    {
+      "char": "E",
+      "block": "minecraft:lantern[hanging=true]",
+      "damaged": "minecraft:iron_bars",
+      "lightSource": {
+        "unlit": "minecraft:iron_chain[axis=y]"
+      }
+    },
+    {
+      "char": "e",
+      "block": "minecraft:lantern[hanging=false]",
+      "damaged": "minecraft:iron_bars",
+      "lightSource": true
+    }
+  ]
+}

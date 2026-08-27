@@ -22,6 +22,24 @@ resolved even though no file wrote it:
 Numbers and enums still default — `multisettings`, the preset format's field-level optionality, and
 so on are untouched by rule 2. The rule is about *references*, not about every field.
 
+## Migrating palettes to version 2
+
+Registered and inline palettes must declare `"version": 2`. Version 1 and unversioned palettes no
+longer load, and the `variants` registry has been replaced by `definitions`, referenced with `$ref`.
+The [palette migration specification](format/palette/09-migration.md) lists the field translations
+and constructs the converter refuses to guess at.
+
+Convert registered palettes and variants into a separate output directory:
+
+```sh
+./gradlew convertPalettes -PurbexPackIn=<pack-root> -PurbexPackOut=<output-root>
+```
+
+The input root is the directory `data/<namespace>/urbex`, containing `palettes/` and, for an old pack,
+`variants/`. The converter writes `palettes/` and `definitions/`; it does not rewrite inline palettes
+inside parts or buildings, or copy the rest of the pack. Convert those inline palettes separately,
+review the reported diagnostics, and only then replace the corresponding files in your pack.
+
 ## Where files go
 
 ```
@@ -38,19 +56,19 @@ string every other file uses to name it. Directory names are the registry names 
 | `citystyles` | What a city is made of: street materials and street parts, plus weighted selectors for buildings, parks, bridges, fountains, stairs | `streetblocks.parts` (all eight) |
 | `buildings` | An ordered stack of parts, with floor and cellar limits | `filler`, `parts` |
 | `parts` | A block of geometry, up to 16×16, written as character slices | `xsize`, `zsize`, `slices` |
-| `palettes` | What each character in a slice means: a block, a variant, loot, a mob, a light | `palette` |
+| `palettes` | What each character in a slice means: a typed node with references and traits | `version: 2`, `palette` |
 | `styles` | Groups of palettes a building can be painted from | `randompalettes` |
 | `multibuildings` | A grid of buildings spanning several chunks | `dimx`, `dimz`, `buildings` |
 | `scattered` | A building placed outside cities, and how it sits on the terrain | `terrainheight`, `terrainfix` |
 | `conditions` | A weighted, conditional set of values — loot tables, mob ids | `values` |
-| `variants` | A weighted set of blockstates behind one palette character | `blocks` |
+| `definitions` | A shared palette node, such as a weighted set of blocks or a trait-bearing block | `version: 2`, a complete node after inheritance |
 | `stuff` | A small decoration pass: cobwebs, chains, rubble | `column`, `mincount`, `maxcount`, `attempts`, `inbuilding` |
 | `predefinedcities` | A city pinned to fixed chunk coordinates | `dimension`, `chunkx`, `chunkz`, `radius` — `citystyle` is optional |
 | `presets` | Per-dimension worldgen tuning — see [`docs/presets.md`](presets.md) | *(nothing)* |
 
-Every one of them accepts `extends`, and every one of them merges by the same rules. That
-uniformity is deliberate: you should never have to look up whether *this* asset type supports
-extension.
+Every registry accepts `extends`. Palettes and definitions use the
+[palette format's node and trait merge rules](format/palette/04-merging.md); the other registries use
+the field merge rules below.
 
 Three of them — `presets`, `worldstyles` and `citystyles` — also accept an optional `name`. See
 [Display names](#display-names) below.
@@ -346,7 +364,7 @@ is wrong but at least unique, instead of borrowing a label that belongs to somet
 ### When each asset is resolved
 
 In **eleven** registries the check above runs on every registered asset, whether or not anything
-selects it. Loading a world resolves all of `variants`, `palettes`, `conditions`, `styles`, `parts`,
+selects it. Loading a world resolves all of `definitions`, `palettes`, `conditions`, `styles`, `parts`,
 `buildings`, `multibuildings`, `scattered`, `worldstyles`, `predefinedcities` and `stuff` up front in
 `AssetCompiler`, so a broken file in your pack fails the world even for a player who never picks your
 world style. That is the intended trade: a load error naming the file beats an exception from a
@@ -1015,10 +1033,8 @@ A **definition** — the weighted blockstates one palette character can land on:
 }
 ```
 
-> These two examples are written in palette format version 2. The rest of this guide is not, and that
-> is a known defect rather than a style: see `docs/format/README.md` §9. They are converted because
-> the `variants` registry they used no longer exists (`VER.017`), so the version 1 forms they carried
-> were not merely dated — they named a registry nothing would load.
+These examples use palette format version 2, as do the registered and inline palettes throughout
+this guide. A definition can contain any supported node kind, not only a weighted list.
 
 A **part**, repainted from an existing one:
 

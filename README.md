@@ -109,13 +109,22 @@ preset format specifically.
 
 Requires JDK 25. The jar lands in `build/libs/`.
 
+The standard suite includes the bundled assets and a licensed, frozen ModernTweaks conversion
+corpus. It needs no sibling repositories. An additional converter check uses a private reference
+pack that cannot be redistributed:
+
+    ./gradlew privateCorpusTest -PurbexPrivateCorpus=/path/to/reference/v1-snapshot/urbex
+
+This separate task requires the supplied snapshot and retains the complete three-pack conversion
+counts; it is not part of public CI. Do not add the private pack to this repository.
+
 ## Releasing
 
 Tags name the mod version, without the Minecraft prefix `gradle.properties` carries: `v0.1.0` for
 `version=26.2-0.1.0`. CI refuses a tag that says anything else.
 
 1. Bump `version` in `gradle.properties`, move the `CHANGELOG.md` entries under a heading for it.
-2. Push the tag. The tagged commit builds like any other — full suite, both worldgen digest
+2. Push the tag. The tagged commit builds like any other — public test suite, all nine worldgen digest
    checks — and only then does the release job run, so a release is never built from an unverified
    run.
 3. That job leaves a **draft** GitHub release with the jar attached. Write the notes from

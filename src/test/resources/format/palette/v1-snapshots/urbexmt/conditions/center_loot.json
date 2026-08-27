@@ -1,0 +1,21 @@
+{
+  "values": [
+    {
+      "factor": 1,
+      "value": "urbexmt:chests/center_basic_components",
+      "inpart": [
+        "urbexmt:center/center10_in_computer_desks_2",
+        "urbexmt:center/center00_in_storage_1"
+      ]
+    },
+    {
+      "factor": 1,
+      "value": "urbexmt:chests/center_advanced_components",
+      "inpart": [
+        "urbexmt:center/center10_in_cleanroom_1",
+        "urbexmt:center/center10_in_breaker_room",
+        "urbexmt:center/center00_in_storage_1"
+      ]
+    }
+  ]
+}

@@ -486,7 +486,7 @@ public final class SpecDocuments {
         renderOutstanding(out, ruleSet.order, rules, fixturesByRule, ruleSet.citingTests);
         renderRules(out, ruleSet.files, ruleSet.order, rules, fixturesByRule, ruleSet.citingTests);
 
-        return out.toString();
+        return out.toString().stripTrailing() + "\n";
     }
 
     private static void renderTotals(StringBuilder out, Map<String, SpecRule> rules, List<Fixture> fixtures) {
