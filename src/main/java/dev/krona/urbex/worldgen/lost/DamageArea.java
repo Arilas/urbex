@@ -98,28 +98,36 @@ public class DamageArea {
         return applyDamage(seed, b, tags, x, y, z, damage, damaged, provider.shape().seaLevel(), liquidChar);
     }
 
+    /** Damage selection can change marker ownership even when it leaves the block state unchanged. */
+    public enum Decision { KEEP, REPLACE, DESTROY }
+
+    /** The allocation-free decision shared by state-only callers and the metadata-aware pass. */
+    public static Decision decide(long seed, BlockState block, TagSnapshot tags, int x, int y, int z,
+                                   float damage, boolean hasReplacement) {
+        if (tags.isNotBreakable(block)) {
+            return Decision.KEEP;
+        }
+        if (tags.isEasyBreakable(block)) {
+            damage *= 2.5f;
+        }
+        if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {
+            if (damage < BLOCK_DAMAGE_CHANCE && hasReplacement
+                    && Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
+                return Decision.REPLACE;
+            }
+            return Decision.DESTROY;
+        }
+        return Decision.KEEP;
+    }
+
     /** One post-placement damage decision, independent of how the explosion field was planned. */
     public static BlockState applyDamage(long seed, BlockState b, TagSnapshot tags, int x, int y, int z,
                                         float damage, BlockState damaged, int waterlevel, BlockState liquidChar) {
-        if (tags.isNotBreakable(b)) {
-            return b;
-        }
-
-        if (tags.isEasyBreakable(b)) {
-            damage *= 2.5f;    // As if this block gets double the damage
-        }
-        if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {
-            if (damage < BLOCK_DAMAGE_CHANCE && damaged != null) {
-                if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
-                    b = damaged;
-                } else {
-                    b = y <= waterlevel ? liquidChar : Blocks.AIR.defaultBlockState();
-                }
-            } else {
-                b = y <= waterlevel ? liquidChar : Blocks.AIR.defaultBlockState();
-            }
-        }
-        return b;
+        return switch (decide(seed, b, tags, x, y, z, damage, damaged != null)) {
+            case KEEP -> b;
+            case REPLACE -> damaged;
+            case DESTROY -> y <= waterlevel ? liquidChar : Blocks.AIR.defaultBlockState();
+        };
     }
 
     private boolean intersectsWith(BlockPos center, int radius) {

@@ -37,17 +37,20 @@ public class Corridors {
                         b = air;
                     }
                     driver.current(x, height, z);
-                    driver.add(ctx.paletteHere(palette, corridorRoofBlock)).add(b).add(air).add(air);
+                    driver.add(ctx.selectedHere(palette, corridorRoofBlock)).add(b).add(air).add(air);
 
                     if ((xRail && x == 7 && (z == 8 || z == 9)) || (zRail && z == 7 && (x == 8 || x == 9))) {
-                        driver.add(ctx.paletteHere(palette, corridorGlassBlock));
+                        driver.add(ctx.selectedHere(palette, corridorGlassBlock));
                         BlockPos pos = driver.getCurrentCopy();
                         Character glowstoneChar = info.getCityStyle().getGlowstoneBlock();
-                        BlockState glowstone = glowstoneChar == null ? Blocks.GLOWSTONE.defaultBlockState() : ctx.paletteHere(palette, glowstoneChar);
-                        driver.add(glowstone);
+                        if (glowstoneChar == null) {
+                            driver.add(Blocks.GLOWSTONE.defaultBlockState());
+                        } else {
+                            driver.add(ctx.selectedHere(palette, glowstoneChar));
+                        }
                         CityGenerator.updateNeeded(ctx, pos, Block.UPDATE_CLIENTS);
                     } else {
-                        BlockState roof = ctx.paletteHere(palette, corridorRoofBlock);
+                        CompiledPalette.Placed roof = ctx.selectedHere(palette, corridorRoofBlock);
                         driver.add(roof).add(roof);
                     }
                 } else {

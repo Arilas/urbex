@@ -11,6 +11,7 @@ import dev.krona.urbex.worldgen.lost.RailChunkType;
 import dev.krona.urbex.worldgen.lost.Railway;
 import dev.krona.urbex.worldgen.lost.Transform;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.regassets.data.RailwayParts;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -143,7 +144,7 @@ public class Railways {
         }
 
         Character railMainBlock = info.getCityStyle().getRailMainBlock();
-        BlockState rail = ctx.paletteAt(info.getCompiledPalette(), railMainBlock, 0, height, 0);
+        CompiledPalette.Placed rail = ctx.selectedAt(info.getCompiledPalette(), railMainBlock, 0, height, 0);
         if (rail == null) {
             throw new RuntimeException("Cannot find rail block '" + railMainBlock + "' for type '" + type + "'!");
         }

@@ -100,8 +100,12 @@ final class V2Sockets {
             counts.computeIfAbsent(list.slot(slot), resolved -> new int[1])[0]++;
         }
         List<LightPool.Candidate> candidates = new ArrayList<>(counts.size());
-        counts.forEach((resolved, count) -> candidates.add(new LightPool.Candidate(
-                count[0], resolved.state(), unlitOf(resolved.traits()))));
+        counts.forEach((resolved, count) -> {
+            CompiledTrait light = resolved.traits().traits().get(Light.TYPE.id());
+            candidates.add(new LightPool.Candidate(count[0], resolved.state(), unlitOf(resolved.traits()),
+                    CompiledPalette.placedOf(resolved),
+                    light == null ? null : PlacementChoice.of(light.satellite(Light.UNLIT))));
+        });
         return List.copyOf(candidates);
     }
 
@@ -133,10 +137,8 @@ final class V2Sockets {
             return null;
         }
         CompiledEntry unlit = light.satellite(Light.UNLIT);
-        // A representative rather than a per-position draw: LightPool.Candidate holds one state, and a
-        // socket's replacement is written by the placer at a position it chose, not at a position the
-        // palette addressed. A weighted unlit therefore contributes its first alternative here; the
-        // per-position form is TRAIT.050's in-place light, which keeps its BlockChoice.
+        // Compatibility representative for state-only consumers. Generation retains the full
+        // placement choice alongside it and selects the replacement at the actual marker position.
         return unlit == null || unlit.slotCount() == 0 ? null : unlit.slot(0).state();
     }
 

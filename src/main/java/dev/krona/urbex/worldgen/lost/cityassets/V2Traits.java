@@ -89,7 +89,8 @@ final class V2Traits {
             // declare its own - see V2Sockets.unlitOf. This one is the fallback for a candidate the
             // placer rejects entirely, which is what LightSource.unlit is for on version 1's side.
             return new LightSource(V2Sockets.poolOf(socket),
-                    light == null ? BlockChoice.AIR : replacement(light));
+                    light == null ? BlockChoice.AIR : replacement(light),
+                    light == null ? null : PlacementChoice.of(light.satellite(Light.UNLIT)));
         }
         return light == null ? null : new LightSource(null, replacement(light));
     }

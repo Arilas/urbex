@@ -74,34 +74,72 @@ public class CompiledPalette {
     }
 
     /**
-     * What a marker places at a position: the state, and everything that applies to it.
-     *
-     * <p><b>One object, built at merge time, because {@code LOAD.022} is an {@code INVARIANT}</b> -
-     * "Resolving a marker to a state and to its traits is one lookup, not two". Version 1 asked
-     * {@code getAt} and then {@code getInfo}, two lookups into two maps; version 2 was built around
-     * {@code CompiledEntry.Resolved}, which is this shape one layer in. Generation indexes an array of
-     * these and allocates nothing, which is {@code LOAD.040}.</p>
-     *
-     * @param state the block state to write
-     * @param info  what the marker carries beyond its block, or null when it carries nothing. Null is
-     *              load-bearing: {@code Parts} takes a different branch for a marker with no metadata
-     * @param rotatable whether this slot follows its part's mirror and rotation
-     * @param damaged this slot's own damaged form; null means the marker has no damage replacement
-     * @param optional the density selection for optional blocks or in-place lights, when present
+     * One precompiled marker slot, including its complete replacement trees. Transformation views
+     * are built alongside the slot, so primary, optional and damaged choices return existing objects
+     * at generation time. A satellite keeps its own rotation policy and damage traits.
      */
-    public record Placed(BlockState state, @Nullable Palette.Info info, boolean rotatable,
-                         @Nullable CompiledEntry damaged, @Nullable OptionalSelection optional) {
+    public static final class Placed {
+        private final BlockState state;
+        private final Palette.Info info;
+        private final boolean rotatable;
+        private final CompiledEntry damaged;
+        private final Placed[] damageSlots;
+        private final OptionalSelection optional;
+        private final Transform transform;
+        private final Placed[] transforms;
+
         public Placed(BlockState state, @Nullable Palette.Info info) {
             this(state, info, true, null, null);
         }
 
-        public Placed(BlockState state, @Nullable Palette.Info info, boolean rotatable, @Nullable CompiledEntry damaged) {
+        public Placed(BlockState state, @Nullable Palette.Info info, boolean rotatable,
+                      @Nullable CompiledEntry damaged) {
             this(state, info, rotatable, damaged, null);
         }
 
-        /** Selection precedes transformation and decoration, including a replacement's own selection. */
+        public Placed(BlockState state, @Nullable Palette.Info info, boolean rotatable,
+                      @Nullable CompiledEntry damaged, @Nullable OptionalSelection optional) {
+            this.state = state;
+            this.info = info;
+            this.rotatable = rotatable;
+            this.damaged = damaged;
+            this.damageSlots = damaged == null || damaged.slotCount() == 0 ? null : slotsOf(damaged);
+            this.optional = optional;
+            this.transform = Transform.ROTATE_NONE;
+            Transform[] choices = Transform.values();
+            this.transforms = new Placed[choices.length];
+            for (Transform choice : choices) {
+                transforms[choice.ordinal()] = choice == Transform.ROTATE_NONE ? this : new Placed(this, choice);
+            }
+        }
+
+        private Placed(Placed original, Transform transform) {
+            this.state = original.rotatable
+                    ? original.state.mirror(transform.getMcMirror()).rotate(transform.getMcRotation()) : original.state;
+            this.info = original.info;
+            this.rotatable = original.rotatable;
+            this.damaged = original.damaged;
+            this.damageSlots = original.damageSlots;
+            this.optional = original.optional;
+            this.transform = transform;
+            this.transforms = original.transforms;
+        }
+
+        public BlockState state() { return state; }
+        @Nullable public Palette.Info info() { return info; }
+        public boolean rotatable() { return rotatable; }
+        @Nullable public CompiledEntry damaged() { return damaged; }
+        @Nullable public OptionalSelection optional() { return optional; }
+        public boolean hasDamage() { return damageSlots != null; }
+
+        /** An absolute part transform, applied once and independently to each selected satellite. */
+        public Placed transformed(Transform transform) {
+            return transforms[transform.ordinal()];
+        }
+
+        /** Selection precedes transformation, including each replacement's own selection. */
         public Placed selectOptional(Preset preset, long seed, int x, int y, int z) {
-            Placed selected = this;
+            Placed selected = transformed(Transform.ROTATE_NONE);
             while (selected.optional != null) {
                 Placed next = selected.optional.select(selected, preset, seed, x, y, z);
                 if (next == selected) {
@@ -109,30 +147,36 @@ public class CompiledPalette {
                 }
                 selected = next;
             }
-            return selected;
+            return selected.transformed(transform);
         }
 
-        /** The selected marker's own damaged form, addressed independently of the damage rolls. */
+        /** The complete damaged result, with nested selection and its own traits still attached. */
+        @Nullable
+        public Placed damagedPlacementAt(Preset preset, long seed, int x, int y, int z) {
+            Placed selected = damageSlotAt(seed, x, y, z);
+            if (selected == null) {
+                return null;
+            }
+            selected = selected.selectOptional(preset, seed, x, y, z).transformed(transform);
+            return selected.state.isAir() ? null : selected;
+        }
+
+        @Nullable
+        private Placed damageSlotAt(long seed, int x, int y, int z) {
+            return damageSlots == null ? null : damageSlots[damageSlots.length == 1 ? 0
+                    : Rng.indexAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_REPLACEMENT, damageSlots.length)];
+        }
+
+        /** State projection for compiler/converter checks that do not execute profile selection. */
         @Nullable
         public BlockState damagedAt(long seed, int x, int y, int z) {
-            return damagedAt(seed, x, y, z, Transform.ROTATE_NONE);
+            return damagedAt(seed, x, y, z, transform);
         }
 
-        /** A satellite keeps its own rotation policy; it does not inherit the marker's opt-out. */
         @Nullable
         public BlockState damagedAt(long seed, int x, int y, int z, Transform transform) {
-            if (damaged == null) {
-                return null;
-            }
-            CompiledEntry.Resolved resolved = damaged.slot(damaged.slotCount() == 1 ? 0
-                    : Rng.indexAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_REPLACEMENT, damaged.slotCount()));
-            BlockState state = resolved.state();
-            // MODEL.042 turns unavailable blocks into air; TRAIT.012 gives those no damaged form.
-            if (state.isAir()) {
-                return null;
-            }
-            return resolved.traits().rotatable() && transform != Transform.ROTATE_NONE
-                    ? state.mirror(transform.getMcMirror()).rotate(transform.getMcRotation()) : state;
+            Placed selected = damageSlotAt(seed, x, y, z);
+            return selected == null || selected.state.isAir() ? null : selected.transformed(transform).state;
         }
     }
 
@@ -430,8 +474,18 @@ public class CompiledPalette {
      * which is exactly what version 1 does with a socket marker, and for the same reason: a character
      * the palette does not map throws from the driver on the first part that uses it.</p>
      */
-    private static Placed[] slotsOf(CompiledEntry entry) {
+    public static Placed[] slotsOf(CompiledEntry entry) {
         return slotsOf(entry, Map.of());
+    }
+
+    /** One compiled alternative, retaining its complete selection and damage payload. */
+    public static Placed placedOf(CompiledEntry.Resolved resolved) {
+        return placedOf(resolved.state(), resolved.traits());
+    }
+
+    private static Placed placedOf(BlockState state, TraitSet traits) {
+        return new Placed(state, V2Traits.infoOf(traits, null), traits.rotatable(),
+                damageOf(traits), selectionOf(traits, true));
     }
 
     private static Placed[] slotsOf(CompiledEntry entry, Map<Identifier, CompiledTrait> decorators) {
@@ -458,8 +512,7 @@ public class CompiledPalette {
                     combined.putAll(traits.traits());
                     traits = TraitSet.of(combined);
                 }
-                return new Placed(from.state(), V2Traits.infoOf(traits, null), traits.rotatable(),
-                        damageOf(traits), selectionOf(traits, true));
+                return placedOf(from.state(), traits);
             });
         }
         return slots;
@@ -503,9 +556,8 @@ public class CompiledPalette {
     }
 
     /**
-     * Compatibility fallback for procedural passes that still write only a block state. Part
-     * placement carries its own damage source in {@link Placed}; it never consults this map.
-     * Procedural material placement still needs migration before TRAIT.011 is fully reached (#216).
+     * Legacy compiler/converter state projection. Generation tracks full Placed values per position
+     * and never reads this map; marker identity must not be recovered from a block state.
      */
     private void recordDamage(CompiledEntry entry) {
         for (int slot = 0; slot < entry.slotCount(); slot++) {

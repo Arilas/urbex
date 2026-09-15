@@ -250,20 +250,19 @@ class ConformanceIndexTest {
      * index listed two citing tests beside a rule the specification declares unreached, with nothing
      * anywhere saying what those tests were able to assert.
      * <p>
-     * Three things are asserted, and the first is the one that makes the marker tooling rather than a
-     * string in a document: at least one rule carries it. A parse that had silently stopped matching
-     * would leave the other two assertions true of an empty list.
+     * Explicit marked and unmarked examples keep the parser exercised even when no current rule is
+     * unfinished. Any markers still present must name an issue and have a citing test.
      */
     @Test
     void everyNotYetReachedRuleIsParsedNamesAnIssueAndIsCoveredByACitingTest() {
+        assertEquals("issue #999", SpecDocuments.notYetReachedReason(
+                "> **TRAIT.999** · `MUST` `[NOT-YET-REACHED: issue #999]` — example").orElseThrow());
+        assertTrue(SpecDocuments.notYetReachedReason(
+                "> **TRAIT.999** · `MUST` — completed example").isEmpty());
         SpecDocuments spec = SpecDocuments.load();
         List<SpecDocuments.SpecRule> marked = spec.rules().values().stream()
                 .filter(rule -> rule.notYetReachedReason().isPresent())
                 .toList();
-        assertFalse(marked.isEmpty(),
-                "no rule parses as [NOT-YET-REACHED]; §3.3 defines the marker, so either the documents"
-                        + " stopped using it or SpecDocuments stopped reading it");
-
         List<String> failures = new ArrayList<>();
         for (SpecDocuments.SpecRule rule : marked) {
             String reason = rule.notYetReachedReason().orElseThrow();

@@ -131,39 +131,28 @@ public final class ChunkGenContext {
         levelTasks.add(pos, task);
     }
 
-    /**
-     * Resolve a weighted palette character at the block the driver is about to write.
-     * <p>
-     * Valid only where {@code driver.current} already points at the destination - inside a
-     * {@code block()} or {@code add()} chain. Where it does not, use {@link #paletteAt}.
-     */
-    public net.minecraft.world.level.block.state.BlockState paletteHere(CompiledPalette p, char c) {
-        CompiledPalette.Placed placed = placedHere(p, c);
-        return placed == null ? null
-                : placed.selectOptional(profile, seed, driver.getX(), driver.getY(), driver.getZ()).state();
-    }
-
-    /** {@link #placedAt}, at the driver's current position. */
-    public CompiledPalette.Placed placedHere(CompiledPalette p, char c) {
-        return p.placedAt(c, seed, driver.getX(), driver.getY(), driver.getZ());
-    }
-
-    /** Resolve a weighted palette character at a chunk-local position. */
-    public net.minecraft.world.level.block.state.BlockState paletteAt(CompiledPalette p, char c, int x, int y, int z) {
-        CompiledPalette.Placed placed = placedAt(p, c, x, y, z);
+    /** Resolve all selection traits at the driver's current destination, retaining the full slot. */
+    public CompiledPalette.Placed selectedHere(CompiledPalette palette, char marker) {
+        CompiledPalette.Placed placed = placedHere(palette, marker);
         return placed == null ? null : placed.selectOptional(profile, seed,
-                (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z).state();
+                driver.getX(), driver.getY(), driver.getZ());
     }
 
-    /**
-     * What {@code c} places here and everything that applies to it, in one lookup.
-     * <p>
-     * {@link #paletteAt}'s answer plus the marker's metadata, which {@code LOAD.022} requires be the
-     * same lookup rather than two. This is what {@code Parts.generatePart} uses; {@code paletteAt}
-     * remains for the passes that only want a state.
-     */
-    public CompiledPalette.Placed placedAt(CompiledPalette p, char c, int x, int y, int z) {
-        return p.placedAt(c, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
+    /** Resolve all selection traits at a chunk-local position, retaining the full slot. */
+    public CompiledPalette.Placed selectedAt(CompiledPalette palette, char marker, int x, int y, int z) {
+        CompiledPalette.Placed placed = placedAt(palette, marker, x, y, z);
+        return placed == null ? null : placed.selectOptional(profile, seed,
+                (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
+    }
+
+    /** Raw slot selection, before optional/light density, at the driver's current position. */
+    public CompiledPalette.Placed placedHere(CompiledPalette palette, char marker) {
+        return palette.placedAt(marker, seed, driver.getX(), driver.getY(), driver.getZ());
+    }
+
+    /** Raw slot selection at a chunk-local position, with all traits from that same slot. */
+    public CompiledPalette.Placed placedAt(CompiledPalette palette, char marker, int x, int y, int z) {
+        return palette.placedAt(marker, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
     }
 
     /**

@@ -33,6 +33,10 @@ public final class Decorations {
     private final NoiseGeneratorPerlin rubbleNoise;
     private final NoiseGeneratorPerlin leavesNoise;
     private final NoiseGeneratorPerlin ruinNoise;
+    private final CompiledPalette.Placed defaultIronbars =
+            new CompiledPalette.Placed(Blocks.IRON_BARS.defaultBlockState(), null);
+    private final CompiledPalette.Placed defaultGrass =
+            new CompiledPalette.Placed(Blocks.GRASS_BLOCK.defaultBlockState(), null);
 
     public Decorations(long seed) {
         this.rubbleNoise = new NoiseGeneratorPerlin(Rng.at(seed, 0, 0, Rng.Purpose.NOISE), 4);
@@ -146,9 +150,10 @@ public final class Decorations {
         int baseheight = (int) (info.getCityGroundLevel() + 1 + (info.ruinHeight * info.getNumFloors() * CityGenerator.FLOORHEIGHT));
 
         CompiledPalette palette = info.getCompiledPalette();
-        BlockState ironbarsState = Blocks.IRON_BARS.defaultBlockState();
+        BlockState ironbarsState = defaultIronbars.state();
         Character infobarsChar = info.getCityStyle().getIronbarsBlock();
-        Supplier<BlockState> ironbars = infobarsChar == null ? () -> ironbarsState : () -> ctx.paletteHere(palette, infobarsChar);
+        Supplier<CompiledPalette.Placed> ironbars = infobarsChar == null
+                ? () -> defaultIronbars : () -> ctx.selectedHere(palette, infobarsChar);
         Set<BlockState> infoBarSet = infobarsChar == null ? Collections.singleton(ironbarsState) : palette.getAll(infobarsChar);
         Predicate<BlockState> checkIronbars = infobarsChar == null ? s -> s == ironbarsState : infoBarSet::contains;
         Character rubbleBlock = info.getBuilding().getRubbleBlock();
@@ -171,12 +176,12 @@ public final class Decorations {
                 }
                 boolean doRubble = palette.isDefined(rubbleBlock);
                 while (height > 0) {
-                    BlockState damage = driver.damageHere(palette);
+                    CompiledPalette.Placed damage = driver.damageHere(ctx.profile, ctx.seed);
                     BlockState c = driver.getBlockDown();
 
                     if (doRubble && !checkIronbars.test(c) && c != feature.air && c != feature.liquid && rollHere(ctx, driver, Rng.Purpose.RUINS) < .2f) {      // @todo hardcoded random
                         doRubble = false;
-                        driver.add(ctx.paletteHere(palette, rubbleBlock));
+                        driver.add(ctx.selectedHere(palette, rubbleBlock));
                     } else if ((damage != null || checkIronbars.test(c)) && c != feature.air && c != feature.liquid && rollHere(ctx, driver, Rng.Purpose.RUINS_BARS) < .2f) {    // @todo hardcoded random
                         driver.add(ruinBarReplacement(damage, ironbars));
                     } else {
@@ -200,7 +205,8 @@ public final class Decorations {
     }
 
     /** A ruined marker keeps its authored material; a bar continuing from below uses the style default. */
-    static BlockState ruinBarReplacement(BlockState damaged, Supplier<BlockState> ironbars) {
+    static CompiledPalette.Placed ruinBarReplacement(CompiledPalette.Placed damaged,
+                                                    Supplier<CompiledPalette.Placed> ironbars) {
         return damaged != null ? damaged : ironbars.get();
     }
 
@@ -284,7 +290,7 @@ public final class Decorations {
     public void parkSection(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int height, boolean elevated) {
         ChunkDriver driver = ctx.driver;
         char street = ctx.street;
-        BlockState b;
+        CompiledPalette.Placed b;
         boolean el00 = info.getXmin().getZmin().isElevatedParkSection();
         boolean el10 = info.getZmin().isElevatedParkSection();
         boolean el20 = info.getXmax().getZmin().isElevatedParkSection();
@@ -296,14 +302,13 @@ public final class Decorations {
         CompiledPalette compiledPalette = info.getCompiledPalette();
 
         Character grassChar = info.getCityStyle().getGrassBlock();
-        BlockState grassBlock = Blocks.GRASS_BLOCK.defaultBlockState();
         boolean parkBorder = info.getCityStyle().getParkBorder() != null ? info.getCityStyle().getParkBorder() : info.profile.parkBorder();
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 // Resolved per column, at the block it will be written to.
-                BlockState grass = (grassChar == null)
-                        ? grassBlock
-                        : ctx.paletteAt(compiledPalette, grassChar, x, height, z);
+                CompiledPalette.Placed grass = (grassChar == null)
+                        ? defaultGrass
+                        : ctx.selectedAt(compiledPalette, grassChar, x, height, z);
                 if (x == 0 || x == 15 || z == 0 || z == 15) {
                     b = null;
                     if (elevated) {
@@ -341,10 +346,10 @@ public final class Decorations {
                             }
                         }
                         if (b == null) {
-                            b = parkBorder ? ctx.paletteAt(compiledPalette, street, x, height, z) : grass;
+                            b = parkBorder ? ctx.selectedAt(compiledPalette, street, x, height, z) : grass;
                         }
                     } else {
-                        b = parkBorder ? ctx.paletteAt(compiledPalette, street, x, height, z) : grass;
+                        b = parkBorder ? ctx.selectedAt(compiledPalette, street, x, height, z) : grass;
                     }
                 } else {
                     b = grass;
@@ -414,7 +419,7 @@ public final class Decorations {
                         ? Parts.handleLightSource(ctx, feature, paletteInfo.lightSource(), lit, pos)
                         : lit;
                 if (b != feature.air || placed != original) {
-                    driver.current(x, y, z).block(b, placed.damagedAt(ctx.seed, driver.getX(), y, driver.getZ()));
+                    driver.current(x, y, z).block(b, placed);
                 }
             }
         }

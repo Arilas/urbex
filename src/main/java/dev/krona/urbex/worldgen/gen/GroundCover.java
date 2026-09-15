@@ -26,21 +26,21 @@ import java.util.Set;
  */
 public final class GroundCover {
 
-    private final BlockState[] leaves = buildLeaves();
-    private final BlockState[] rubble = buildRubble();
+    private final CompiledPalette.Placed[] leaves = buildLeaves();
+    private final CompiledPalette.Placed[] rubble = buildRubble();
     private final Set<BlockState> defaultRubble = Set.of(
             Blocks.MOSSY_STONE_BRICKS.defaultBlockState(),
             Blocks.MOSSY_COBBLESTONE.defaultBlockState(),
             Blocks.MOSS_BLOCK.defaultBlockState());
 
     /**
-     * One leaf state for the block the driver is about to write. Addressed by that position, so
-     * how many leaves this chunk placed first cannot change which one this is.
+     * One selected leaf node for the block the driver is about to write, retaining its marker traits.
+     * Addressed by that position, so earlier leaves cannot change which one this is.
      */
-    public BlockState leafAt(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
+    public CompiledPalette.Placed leafAt(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
         Character leavesBlock = info.getCityStyle().getLeavesBlock();
         if (leavesBlock != null) {
-            return ctx.paletteHere(compiledPalette, leavesBlock);
+            return ctx.selectedHere(compiledPalette, leavesBlock);
         }
         return leaves[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
                 Rng.Purpose.LEAVES, leaves.length)];
@@ -60,21 +60,24 @@ public final class GroundCover {
      * the same reason as {@link #leafAt}. Nothing is regenerated here: {@code rubble} is
      * a final array built once in the constructor and never empty.
      */
-    public BlockState rubbleAt(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
+    public CompiledPalette.Placed rubbleAt(ChunkGenContext ctx, ChunkPlan info, CompiledPalette compiledPalette) {
         Character rubbleDirtBlock = info.getCityStyle().getRubbleDirtBlock();
         if (rubbleDirtBlock != null) {
-            return ctx.paletteHere(compiledPalette, rubbleDirtBlock);
+            return ctx.selectedHere(compiledPalette, rubbleDirtBlock);
         }
         return rubble[Rng.indexAtPos(ctx.seed, ctx.driver.getX(), ctx.driver.getY(), ctx.driver.getZ(),
                 Rng.Purpose.RUBBLE, rubble.length)];
     }
 
-    private static BlockState[] buildLeaves() {
-        BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-        BlockState leaves2 = Blocks.JUNGLE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-        BlockState leaves3 = Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+    private static CompiledPalette.Placed[] buildLeaves() {
+        CompiledPalette.Placed leaves = new CompiledPalette.Placed(
+                Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true), null);
+        CompiledPalette.Placed leaves2 = new CompiledPalette.Placed(
+                Blocks.JUNGLE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true), null);
+        CompiledPalette.Placed leaves3 = new CompiledPalette.Placed(
+                Blocks.SPRUCE_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true), null);
 
-        BlockState[] result = new BlockState[128];
+        CompiledPalette.Placed[] result = new CompiledPalette.Placed[128];
         int i = 0;
         while (i < 20) {
             result[i] = leaves2;
@@ -91,12 +94,12 @@ public final class GroundCover {
         return result;
     }
 
-    private static BlockState[] buildRubble() {
-        BlockState mBricks = Blocks.MOSSY_STONE_BRICKS.defaultBlockState();
-        BlockState mCobble = Blocks.MOSSY_COBBLESTONE.defaultBlockState();
-        BlockState moss = Blocks.MOSS_BLOCK.defaultBlockState();
+    private static CompiledPalette.Placed[] buildRubble() {
+        CompiledPalette.Placed mBricks = new CompiledPalette.Placed(Blocks.MOSSY_STONE_BRICKS.defaultBlockState(), null);
+        CompiledPalette.Placed mCobble = new CompiledPalette.Placed(Blocks.MOSSY_COBBLESTONE.defaultBlockState(), null);
+        CompiledPalette.Placed moss = new CompiledPalette.Placed(Blocks.MOSS_BLOCK.defaultBlockState(), null);
 
-        BlockState[] result = new BlockState[128];
+        CompiledPalette.Placed[] result = new CompiledPalette.Placed[128];
         int i = 0;
         while (i < 20) {
             result[i] = mBricks;

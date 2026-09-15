@@ -1,5 +1,7 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
 import dev.krona.urbex.varia.DensitySelector;
 import dev.krona.urbex.worldgen.lost.cityassets.BlockChoice;
 import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
@@ -65,7 +67,7 @@ class DeferredLightPlacerTest {
         BlockPos marker = pos(5, 70, 5);
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, lantern, true)),
+                OWNER_X, OWNER_Z, 19L, preset(), List.of(new LightTodoQueue.Todo(marker, lantern, true)),
                 candidate -> Blocks.AIR.defaultBlockState(),
                 (unusedMarker, supportDirection, stateAt) -> false,
                 (unusedMarker, attempt, stateAt) -> true);
@@ -80,7 +82,7 @@ class DeferredLightPlacerTest {
         BlockPos marker = pos(5, 70, 5);
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 19L, List.of(new LightTodoQueue.Todo(marker, bare, true)),
+                OWNER_X, OWNER_Z, 19L, preset(), List.of(new LightTodoQueue.Todo(marker, bare, true)),
                 candidate -> Blocks.AIR.defaultBlockState(),
                 (unusedMarker, supportDirection, stateAt) -> false,
                 (unusedMarker, attempt, stateAt) -> true);
@@ -103,7 +105,7 @@ class DeferredLightPlacerTest {
                 new LightTodoQueue.Todo(eastBorder, source(wall), true));
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 19L, todos,
+                OWNER_X, OWNER_Z, 19L, preset(), todos,
                 candidate -> surroundings.getOrDefault(candidate, Blocks.AIR.defaultBlockState()),
                 (marker, supportDirection, stateAt) -> {
                     BlockPos support = marker.relative(supportDirection);
@@ -130,7 +132,7 @@ class DeferredLightPlacerTest {
                 eastBorder.east(), Blocks.STONE.defaultBlockState());
 
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 19L,
+                OWNER_X, OWNER_Z, 19L, preset(),
                 List.of(new LightTodoQueue.Todo(westBorder, source(wall), true),
                         new LightTodoQueue.Todo(eastBorder, source(wall), true)),
                 candidate -> surroundings.getOrDefault(candidate, Blocks.AIR.defaultBlockState()),
@@ -157,12 +159,12 @@ class DeferredLightPlacerTest {
                 candidate.equals(freeMarker) ? Blocks.STONE.defaultBlockState() : Blocks.AIR.defaultBlockState();
 
         List<DeferredLightPlacer.Planned> forwardPlan = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 23L, forward, overwrittenMarkerState,
+                OWNER_X, OWNER_Z, 23L, preset(), forward, overwrittenMarkerState,
                 (marker, supportDirection, stateAt) ->
                         !stateAt.apply(marker.relative(supportDirection)).isAir(),
                 (marker, attempt, stateAt) -> true);
         List<DeferredLightPlacer.Planned> reversePlan = DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 23L, reverse, overwrittenMarkerState,
+                OWNER_X, OWNER_Z, 23L, preset(), reverse, overwrittenMarkerState,
                 (marker, supportDirection, stateAt) ->
                         !stateAt.apply(marker.relative(supportDirection)).isAir(),
                 (marker, attempt, stateAt) -> true);
@@ -203,11 +205,17 @@ class DeferredLightPlacerTest {
             List<LightTodoQueue.Todo> todos,
             java.util.function.BiFunction<BlockPos, BlockState, BlockState> stateAt) {
         return DeferredLightPlacer.plan(
-                OWNER_X, OWNER_Z, 31L, todos,
+                OWNER_X, OWNER_Z, 31L, preset(), todos,
                 pos -> stateAt.apply(pos, Blocks.AIR.defaultBlockState()),
                 (marker, supportDirection, snapshot) ->
                         !snapshot.apply(marker.relative(supportDirection)).isAir(),
                 (marker, attempt, snapshot) -> true);
+    }
+
+    private static Preset preset() {
+        PresetDraft draft = new PresetDraft(PALETTE_ID);
+        draft.LIGHTING_DENSITY = 1;
+        return draft.resolve();
     }
 
     private static Map<BlockPos, BlockState> byPosition(List<DeferredLightPlacer.Planned> planned) {
