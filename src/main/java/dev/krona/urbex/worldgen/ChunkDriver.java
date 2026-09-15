@@ -15,8 +15,10 @@ import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import net.minecraft.world.level.ChunkPos;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -146,12 +148,46 @@ public class ChunkDriver {
     private static final int EXPECTED_WRITES_PER_CHUNK = 12288;
 
     /**
-     * Complete marker sources for this generation's remaining damage passes. Only sources with
-     * damage are stored; an absent entry means no damaged form. Survives mid-generation flushes
-     * and dies on publication. The block state is never used to reconstruct a marker.
+     * Surviving marker sources with damage or decorations. Survives mid-generation flushes and
+     * dies on publication. The block state is never used to reconstruct a marker.
      */
     private Long2ObjectOpenHashMap<CompiledPalette.Placed> markerDamage;
     private CompiledPalette.Placed writingPlacement;
+    private PlacementOrigin defaultOrigin;
+    private PlacementOrigin writingOrigin;
+    private Long2ObjectOpenHashMap<PlacementOrigin> markerOrigins;
+    // A shape-only update can touch vanilla terrain absent from the placement log. Such positions
+    // belong in the digest, but their existing block entity must survive finalization.
+    private LongOpenHashSet shapeOnlyWrites;
+    private boolean preservingShape;
+    private MaterialPolicy materialPolicy;
+    private int writeMinY;
+    private int writeMaxY;
+
+    @FunctionalInterface
+    public interface MaterialPolicy {
+        BlockState prepare(int x, int y, int z, BlockState actual,
+                           CompiledPalette.Placed material, PlacementOrigin origin);
+    }
+
+    @FunctionalInterface
+    public interface MaterialFinalizer {
+        void apply(ChunkAccess chunk, BlockPos pos, BlockState actual,
+                   CompiledPalette.Placed material, PlacementOrigin origin);
+    }
+
+    public void setDefaultOrigin(PlacementOrigin origin) {
+        defaultOrigin = origin;
+    }
+
+    public void setMaterialPolicy(MaterialPolicy policy) {
+        materialPolicy = policy;
+    }
+
+    private static boolean hasDecorations(CompiledPalette.Placed material) {
+        var info = material.info();
+        return info != null && (info.tag() != null || info.loot() != null || info.mobId() != null);
+    }
 
     private boolean published;
     private boolean loggedLateWrite;
@@ -163,14 +199,28 @@ public class ChunkDriver {
             return;
         }
         long packed = BlockPos.asLong(x, y, z);
-        if (writingPlacement != null && writingPlacement.hasDamage()) {
-            if (markerDamage == null) {
-                markerDamage = new Long2ObjectOpenHashMap<>();
+        if (preservingShape) {
+            if (written == null || !written.containsKey(packed)) {
+                if (shapeOnlyWrites == null) shapeOnlyWrites = new LongOpenHashSet();
+                shapeOnlyWrites.add(packed);
             }
-            markerDamage.put(packed, writingPlacement);
-        } else if (markerDamage != null) {
-            // Every accepted overwrite removes the previous marker, including bulk writes.
-            markerDamage.remove(packed);
+        } else {
+            if (shapeOnlyWrites != null) shapeOnlyWrites.remove(packed);
+            if (writingPlacement != null && (writingPlacement.hasDamage() || hasDecorations(writingPlacement))) {
+                if (markerDamage == null) markerDamage = new Long2ObjectOpenHashMap<>();
+                markerDamage.put(packed, writingPlacement);
+                if (writingOrigin != defaultOrigin) {
+                    if (markerOrigins == null) markerOrigins = new Long2ObjectOpenHashMap<>();
+                    markerOrigins.put(packed, writingOrigin);
+                } else if (markerOrigins != null) {
+                    markerOrigins.remove(packed);
+                }
+            } else {
+                // Every accepted replacement removes the previous marker, including same-state
+                // and bulk writes. Rejected writes never reach this observer.
+                if (markerDamage != null) markerDamage.remove(packed);
+                if (markerOrigins != null) markerOrigins.remove(packed);
+            }
         }
         if (written == null) {
             written = new Long2ObjectOpenHashMap<>(EXPECTED_WRITES_PER_CHUNK);
@@ -217,6 +267,10 @@ public class ChunkDriver {
         Long2ObjectOpenHashMap<BlockState> local = written;
         written = null;
         markerDamage = null;
+        markerOrigins = null;
+        shapeOnlyWrites = null;
+        defaultOrigin = null;
+        materialPolicy = null;
         published = true;
         if (!recordingWrites || local == null || local.isEmpty()) {
             return;
@@ -266,8 +320,20 @@ public class ChunkDriver {
      * the refusal lives there and not at the passes that write.</p>
      */
     public void setPrimer(LevelAccessor region, ChunkAccess primer, int writeMinY, int writeMaxY) {
+        written = null;
         markerDamage = null;
+        markerOrigins = null;
+        shapeOnlyWrites = null;
         writingPlacement = null;
+        writingOrigin = null;
+        defaultOrigin = null;
+        materialPolicy = null;
+        preservingShape = false;
+        published = false;
+        loggedLateWrite = false;
+        commitState = CommitState.BUFFERED;
+        this.writeMinY = Math.max(writeMinY, region.getMinY());
+        this.writeMaxY = Math.min(writeMaxY, region.getMaxY());
         this.region = region;
         this.seed = region instanceof WorldGenLevel level ? level.getSeed() : 0L;
         this.primer = primer;
@@ -335,6 +401,11 @@ public class ChunkDriver {
      *                give and are not being measured.
      */
     public void actuallyGenerate(ChunkAccess chunk, long ordinal) {
+        actuallyGenerate(chunk, ordinal, null);
+    }
+
+    /** Finalize only the last surviving material, after shaping and before publishing the chunk. */
+    public void actuallyGenerate(ChunkAccess chunk, long ordinal, MaterialFinalizer finalizer) {
         long mark = GenerationMetrics.mark();
         long alloc = GenerationMetrics.allocMark();
         correctionsPass(ordinal);
@@ -355,10 +426,36 @@ public class ChunkDriver {
                 Heightmap.Types.OCEAN_FLOOR, Heightmap.Types.WORLD_SURFACE));
         GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.HEIGHTMAP, mark, alloc);
 
+        finalizeMaterials(chunk, finalizer);
+
         mark = GenerationMetrics.mark();
         alloc = GenerationMetrics.allocMark();
         publishRecordedWrites();
         GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.PUBLISH, mark, alloc);
+    }
+
+    private void finalizeMaterials(ChunkAccess chunk, MaterialFinalizer finalizer) {
+        if (written != null) {
+            // A same-type replacement is still a new block entity. Copy the sparse position set
+            // because removeBlockEntity mutates it on both protochunks and live chunks.
+            for (BlockPos blockEntity : new ArrayList<>(chunk.getBlockEntitiesPos())) {
+                long packed = blockEntity.asLong();
+                if (written.containsKey(packed)
+                        && (shapeOnlyWrites == null || !shapeOnlyWrites.contains(packed))) {
+                    chunk.removeBlockEntity(blockEntity);
+                }
+            }
+        }
+        if (finalizer == null || markerDamage == null) return;
+        long[] positions = markerDamage.keySet().toLongArray();
+        PositionSort.sort(positions);
+        for (long packed : positions) {
+            CompiledPalette.Placed material = markerDamage.get(packed);
+            if (hasDecorations(material)) {
+                BlockPos position = BlockPos.of(packed);
+                finalizer.apply(chunk, position, chunk.getBlockState(position), material, originAt(packed));
+            }
+        }
     }
 
     /**
@@ -389,7 +486,7 @@ public class ChunkDriver {
             BlockState state = getBlock(pos);
             BlockState corrected = shaper.correct(state, x, y, z);
             if (corrected != null && corrected != state) {
-                setBlock(pos, corrected);
+                setShapedBlock(pos, corrected);
             }
         }
         GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.CORRECT_SHAPE, mark, alloc);
@@ -408,7 +505,7 @@ public class ChunkDriver {
 
         @Override
         public void set(BlockPos pos, BlockState state) {
-            setBlock(pos, state);
+            setShapedBlock(pos, state);
         }
 
         @Override
@@ -437,6 +534,16 @@ public class ChunkDriver {
 
     private void setBlock(BlockPos p, BlockState state) {
         buffer.set(p.getX(), p.getY(), p.getZ(), state);
+    }
+
+    private void setShapedBlock(BlockPos position, BlockState state) {
+        boolean previous = preservingShape;
+        preservingShape = getBlock(position).getBlock() == state.getBlock();
+        try {
+            setBlock(position, state);
+        } finally {
+            preservingShape = previous;
+        }
     }
 
     // This version of getBlock() is less optimal but it will work for different chunks
@@ -579,11 +686,28 @@ public class ChunkDriver {
 
     /** Bulk writes retain the selected material; only accepted positions receive its metadata. */
     public void setBlockRange(int x, int y, int z, int y2, CompiledPalette.Placed placed) {
-        writingPlacement = placed;
+        if (placed == null) return;
+        int bottom = Math.max(y, writeMinY);
+        int top = Math.min(y2 - 1, writeMaxY);
+        if (bottom > top) return;
+        int absoluteX = worldX(x);
+        int absoluteZ = worldZ(z);
+        if (materialPolicy != null && placed.info() != null && placed.info().mobId() != null) {
+            // Spawner admission has a positional density roll; a reused wall/fill material must
+            // still make that decision at every destination, without reselecting its primary slot.
+            for (int yy = bottom; yy <= top; yy++) {
+                writeMaterial(absoluteX, yy, absoluteZ, placed.state(), placed, defaultOrigin);
+            }
+            return;
+        }
+        BlockState actual = prepareMaterial(absoluteX, bottom, absoluteZ, placed.state(), placed, defaultOrigin);
+        writingPlacement = actual == placed.state() ? placed : null;
+        writingOrigin = defaultOrigin;
         try {
-            buffer.fill(worldX(x), worldZ(z), y, y2 - 1, placed == null ? null : placed.state());
+            buffer.fill(absoluteX, absoluteZ, bottom, top, actual);
         } finally {
             writingPlacement = null;
+            writingOrigin = null;
         }
     }
 
@@ -630,13 +754,34 @@ public class ChunkDriver {
 
     /** The actual state can be support-oriented or decorated while retaining its selected source. */
     public ChunkDriver block(BlockState state, CompiledPalette.Placed source) {
-        writingPlacement = source;
+        return block(state, source, defaultOrigin);
+    }
+
+    public ChunkDriver block(BlockState state, CompiledPalette.Placed source, PlacementOrigin origin) {
+        writeMaterial(getX(), getY(), getZ(), state, source, origin);
+        return this;
+    }
+
+    private BlockState prepareMaterial(int x, int y, int z, BlockState actual,
+                                       CompiledPalette.Placed source, PlacementOrigin origin) {
+        if (materialPolicy == null || source == null || actual == null
+                || actual.getBlock() instanceof StructureVoidBlock || y < writeMinY || y > writeMaxY) {
+            return actual;
+        }
+        return materialPolicy.prepare(x, y, z, actual, source, origin);
+    }
+
+    private void writeMaterial(int x, int y, int z, BlockState actual,
+                               CompiledPalette.Placed source, PlacementOrigin origin) {
+        BlockState prepared = prepareMaterial(x, y, z, actual, source, origin);
+        writingPlacement = prepared == actual ? source : null;
+        writingOrigin = origin;
         try {
-            cursor.write(state);
+            buffer.set(x, y, z, prepared);
         } finally {
             writingPlacement = null;
+            writingOrigin = null;
         }
-        return this;
     }
 
     public ChunkDriver add(CompiledPalette.Placed placed) {
@@ -649,6 +794,22 @@ public class ChunkDriver {
         block(state, source);
         cursor.up();
         return this;
+    }
+
+    public ChunkDriver add(BlockState state, CompiledPalette.Placed source, PlacementOrigin origin) {
+        block(state, source, origin);
+        cursor.up();
+        return this;
+    }
+
+    /** The logical owner of this position's surviving marker, including its originating part. */
+    public PlacementOrigin originHere() {
+        long packed = BlockPos.asLong(getX(), getY(), getZ());
+        return markerDamage == null || !markerDamage.containsKey(packed) ? null : originAt(packed);
+    }
+
+    private PlacementOrigin originAt(long packed) {
+        return markerOrigins != null && markerOrigins.containsKey(packed) ? markerOrigins.get(packed) : defaultOrigin;
     }
 
     /**

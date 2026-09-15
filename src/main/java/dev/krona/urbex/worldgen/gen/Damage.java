@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.gen;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.worldgen.TagSnapshot;
+import dev.krona.urbex.worldgen.PlacementOrigin;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.world.level.block.Blocks;
 import dev.krona.urbex.worldgen.ChunkDriver;
@@ -37,13 +38,14 @@ public class Damage {
                                          float damage, int waterlevel, BlockState liquid) {
         BlockState before = driver.getBlock();
         CompiledPalette.Placed target = driver.damageHere(preset, seed);
+        PlacementOrigin origin = driver.originHere();
         DamageArea.Decision decision = DamageArea.decide(seed, before, tags,
                 driver.getX(), driver.getY(), driver.getZ(), damage, target != null);
         return switch (decision) {
             case KEEP -> false;
             case REPLACE -> {
-                driver.block(target);
-                yield target.state() != before;
+                driver.block(target.state(), target, origin);
+                yield driver.getBlock() != before;
             }
             case DESTROY -> {
                 BlockState after = driver.getY() <= waterlevel ? liquid : Blocks.AIR.defaultBlockState();

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Block-entity NBT, loot and spawner data now follow the material that survives generation,
+  including damaged forms and deferred light candidates. Same-state replacements clear the
+  previous marker's data; loot no longer restores a block removed by damage. Part-specific
+  conditions keep their original building and part context through replacements.
+- Deferred unlit results inherit their outer marker's decorators, with explicitly authored
+  replacement decorators taking precedence. Impossible loot and spawner targets are rejected
+  during palette loading, including nested replacements and weighted alternatives.
 - **Breaking: retired TOML config migration is removed.** Urbex reads
   `config/urbex/urbex.json` and optional `<world>/serverconfig/urbex.json` overrides only.
   Old TOML files are left untouched. See [configuration and manual migration](docs/configuration.md).

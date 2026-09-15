@@ -1,58 +1,41 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.Urbex;
-import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.editor.EditModeData;
 import dev.krona.urbex.setup.Config;
-import dev.krona.urbex.setup.ModSetup;
-import dev.krona.urbex.varia.*;
-import dev.krona.urbex.worldgen.gen.*;
-import dev.krona.urbex.worldgen.lost.*;
-import dev.krona.urbex.worldgen.lost.cityassets.*;
-import dev.krona.urbex.worldgen.lost.regassets.data.ScatteredSettings;
-import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
-import java.util.*;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import dev.krona.urbex.varia.DensitySelector;
+import dev.krona.urbex.varia.Rng;
+import dev.krona.urbex.worldgen.lost.ChunkPlan;
+import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
+import dev.krona.urbex.worldgen.lost.cityassets.CityStyle;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import dev.krona.urbex.worldgen.lost.cityassets.IBuildingPart;
+import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
+import dev.krona.urbex.worldgen.lost.cityassets.Palette;
+import dev.krona.urbex.worldgen.lost.Transform;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerChunkCache;
-import net.minecraft.server.level.WorldGenRegion;
-import net.minecraft.tags.BiomeTags;
-import net.minecraft.tags.StructureTags;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.*;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.*;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.FlowerBlock;
+import net.minecraft.world.level.block.SaplingBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.levelgen.GenerationStep;
-import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
-import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
-import net.minecraft.world.level.levelgen.structure.Structure;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * Writing a building part's blocks into the chunk, and everything they carry with them.
+ * Writes a building part's blocks, retaining its selected materials and placement origin.
  *
- * <p>The block-layout loop itself, plus the markers a palette entry can attach to a block: block
- * entities and their NBT, spawners, loot tables, and the deferred todos that need a real world
- * rather than a half-built chunk. Moved out of {@link CityGenerator} unchanged - same code, same
- * order, same RNG draws (issue #11).</p>
+ * <p>Light sockets and world-only tasks are queued here. Block-entity decorators run through
+ * {@link MarkerDecorations} once the final surviving material is known.</p>
  *
  * <p>In {@code worldgen} rather than {@code worldgen.gen}, unlike the other passes split out of the
  * generator. This one queues deferred work through {@code ChunkGenContext.addPostTodo} and
@@ -65,17 +48,11 @@ public class Parts {
     private Parts() {
     }
 
-    /**
-     * Which block entity type belongs to a block. Bounded by the block registry, so it needs no
-     * eviction policy; {@link Optional#empty()} stands for "asked, and there is none" so a miss is
-     * remembered as well as a hit (issue #132).
-     */
-    private static final Map<Block, Optional<BlockEntityType>> TYPE_CACHE = new ConcurrentHashMap<>();
-
     public static int generatePart(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part,
                              Transform transform,
                              int ox, int oy, int oz, CityGenerator.HardAirSetting airWaterLevel) {
         ChunkDriver driver = ctx.driver;
+        PlacementOrigin origin = new PlacementOrigin(info, part.getName());
         if (feature.profile.editMode()) {
             EditModeData.getData().addPartData(info.coord, oy, part.getName());
         }
@@ -131,38 +108,13 @@ public class Parts {
                                         break;
                                 }
                             } else if (inf != null) {
-                                // A loop over what the marker carries, not a chain over four fields.
-                                // The chain applied the first trait it found and dropped the rest, so
-                                // a marker declaring both a light and a mob placed the light and lost
-                                // the spawner - silently, on every block it wrote. Traits compose
-                                // (TRAIT.004), and a list the palette computed once is what makes
-                                // composing them free here. The order is TRAIT.095's phases -
-                                // selection, then decoration - so the light chooses the block before
-                                // anything attaches data to it; see MarkerTrait for what reversing
-                                // them breaks.
-                                // Indexed, not enhanced-for: this runs for every block carrying
-                                // metadata and an enhanced-for allocates an iterator per position -
-                                // in a loop whose whole reason for taking a precomputed list is that
-                                // it must not allocate here.
-                                List<MarkerTrait> traits = inf.applied();
-                                CompoundTag spawnerNbt = null;
-                                for (int t = 0; t < traits.size(); t++) {
-                                    switch (traits.get(t)) {
-                                        case LOOT -> handleLoot(ctx, feature, info, part, b, inf);
-                                        // ctx.region, not feature.provider.getWorld(): these write block
-                                        // entity NBT into a chunk, which only the generating region has.
-                                        case SPAWNER -> {
-                                            spawnerNbt = handleSpawner(ctx, feature, info, part, oy,
-                                                    ctx.region, rx, rz, y, inf);
-                                            if (spawnerNbt == null) {
-                                                b = feature.air;
-                                            }
-                                        }
-                                        case BLOCK_ENTITY -> b = handleBlockEntity(ctx, feature, info,
-                                                oy, ctx.region, rx, rz, y, b, inf, spawnerNbt);
-                                        case LIGHT -> b = handleLightSource(ctx, feature,
-                                                inf.lightSource(), b, driver.getCurrentCopy());
-                                    }
+                                // Socket geometry is deferred; NBT, loot and mobs belong to the
+                                // material that survives all writes and run during finalization.
+                                // Metadata-bearing blocks retain their real state: a POI dirt
+                                // placeholder would hide the block entity from that finalizer.
+                                if (inf.lightSource() != null) {
+                                    b = handleLightSource(ctx, feature, inf.lightSource(), b,
+                                            driver.getCurrentCopy(), origin);
                                 }
                             } else if (ctx.tags.needsPoiUpdate(b)) {
                                 // If this block has POI data we need to delay setting it
@@ -186,7 +138,7 @@ public class Parts {
                             if (b.getLightEmission() > 0) {
                                 CityGenerator.updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             }
-                            writeMarker(driver, placed, b, ctx.seed, transform);
+                            writeMarker(driver, placed, b, ctx.seed, transform, origin);
                         } else {
                             driver.incY();
                         }
@@ -205,6 +157,11 @@ public class Parts {
     static void writeMarker(ChunkDriver driver, CompiledPalette.Placed placed, BlockState state, long seed,
                             Transform transform) {
         driver.add(state, placed.transformed(transform));
+    }
+
+    static void writeMarker(ChunkDriver driver, CompiledPalette.Placed placed, BlockState state, long seed,
+                            Transform transform, PlacementOrigin origin) {
+        driver.add(state, placed.transformed(transform), origin);
     }
 
     /** Mirror first, then rotate, using this selected slot's compiled trait rather than a block tag. */
@@ -227,13 +184,19 @@ public class Parts {
      */
     public static BlockState handleLightSource(ChunkGenContext ctx, CityGenerator feature,
                                                LightSource source, BlockState lit, BlockPos pos) {
+        return handleLightSource(ctx, feature, source, lit, pos, ctx.proceduralOrigin);
+    }
+
+    public static BlockState handleLightSource(ChunkGenContext ctx, CityGenerator feature,
+                                               LightSource source, BlockState lit, BlockPos pos,
+                                               PlacementOrigin origin) {
         boolean on = DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity());
         if (source.isSocket()) {
             // Deferred either way. A socket has to see the finished chunk to find its support and
             // orient itself, and that is as true of an unlit wall torch as of a lit one - it is the
             // support search that decides whether this marker holds a floor fixture or a wall one.
             // So the marker holds air until placeOptionalLights runs, and the roll rides along.
-            ctx.addLightTodo(pos, source, on);
+            ctx.addLightTodo(pos, source, on, origin);
             return feature.air;
         }
         return on ? lit : source.unlitAt(ctx.seed, pos);
@@ -251,76 +214,21 @@ public class Parts {
         return feature.provider.caches().palettes.with(info.getCompiledPalette(), part.getLocalPalette());
     }
 
-    private static BlockEntityType getTypeForBlock(CityGenerator feature, BlockState state) {
-        // get / compute-outside / putIfAbsent, not computeIfAbsent: the registry walk used to
-        // run inside a ConcurrentHashMap bin lock, stalling every other worldgen thread whose
-        // block hashed into the same bin (issue #25). Racing threads compute the same answer.
-        Block block = state.getBlock();
-        Optional<BlockEntityType> existing = TYPE_CACHE.get(block);
-        if (existing != null) {
-            return existing.orElse(null);
-        }
-        for (BlockEntityType<?> type : BuiltInRegistries.BLOCK_ENTITY_TYPE) {
-            if (type.isValid(state)) {
-                Optional<BlockEntityType> raced = TYPE_CACHE.putIfAbsent(block, Optional.of(type));
-                return raced != null ? raced.orElse(null) : type;
-            }
-        }
-        // Remember the miss too. A palette entry carrying NBT for a block that is not a block
-        // entity is a datapack error, and the caller warns about it - but without this the registry
-        // walk ran again for every block placed from that entry, on a worldgen worker, for as long
-        // as the world was played. Optional rather than a sentinel type, because every real
-        // BlockEntityType is a value this map legitimately holds (issue #132).
-        TYPE_CACHE.putIfAbsent(block, Optional.empty());
-        return null;
-    }
-
-    private static BlockState handleBlockEntity(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b, Palette.Info inf, CompoundTag spawnerNbt) {
-        BlockPos pos = info.getRelativePos(rx, oy + y, rz);
-        BlockEntityType type = getTypeForBlock(feature, b);
-        if (type == null) {
-            ModSetup.getLogger().warn("Error getting type for block: " + b.getBlock());
-            return b;
-        }
-        queueBlockEntityNbt(world.getChunk(pos), pos, type, inf.tag(), spawnerNbt);
-        if (b.getBlock() == Blocks.COMMAND_BLOCK) {
-            ctx.addPostTodo(pos, inWorld -> {
-                ((ServerChunkCache) inWorld.getLevel().getChunkSource()).blockChanged(pos);
-                inWorld.scheduleTick(pos, b.getBlock(), 1);
-            });
-        }
-        return b;
-    }
-
     private static void queueBlockEntityNbt(ChunkAccess chunk, BlockPos pos, BlockEntityType<?> type,
                                             CompoundTag authored, CompoundTag spawnerNbt) {
         String typeId = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type).toString();
-        // Only this marker's compatible spawner data composes. Reading the chunk's queue here
-        // would inherit stale NBT from earlier parts. The later block_entity decorator gives
-        // explicitly authored fields precedence, without changing either input tag.
-        CompoundTag tag = spawnerNbt != null && typeId.equals(spawnerNbt.getStringOr("id", ""))
-                ? spawnerNbt.copy().merge(authored)
-                : authored.copy();
-        tag.putInt("x", pos.getX());
-        tag.putInt("y", pos.getY());
-        tag.putInt("z", pos.getZ());
-        tag.putString("id", typeId);
-        chunk.setBlockEntityNbt(tag);
+        CompoundTag compatible = spawnerNbt != null && typeId.equals(spawnerNbt.getStringOr("id", ""))
+                ? spawnerNbt : null;
+        MarkerDecorations.queueBlockEntityNbt(chunk, pos, type, authored, compatible);
     }
 
     /**
-     * Forget queued block entity data for blocks that a later pass has overwritten.
+     * Drop queued NBT whose type no longer fits the block after post-todos have run.
      *
-     * A spawner or a tagged block entity queues its NBT with setBlockEntityNbt the
-     * moment the part owning it is generated, but everything that runs afterwards —
-     * ruins above all, plus explosions, rubble, stuff and the post-todos — writes
-     * through the ChunkDriver or through setBlock, and neither of those touches that
-     * queue. ProtoChunk.setBlockState does not either; clearing it is ours to do.
-     *
-     * What is left is a spawner queued onto the feature.air that replaced it. Minecraft
-     * discovers this when the chunk is saved or promoted, logs "Invalid block entity"
-     * with a full stack trace, and throws the data away anyway — so dropping it here
-     * changes nothing about the world and removes the noise from the log.
+     * <p>The driver invalidates earlier block entities at overwritten positions and applies the
+     * surviving marker's decorators during finalization. Post-todos run afterwards and can still
+     * replace blocks directly in the world. This last compatibility check removes any resulting
+     * stale queue entries before Minecraft saves or promotes the chunk.</p>
      */
     public static void forgetBlockEntities(ChunkAccess chunk) {
         // getBlockEntitiesPos() hands back a copy, so removing while iterating is safe.
@@ -335,49 +243,6 @@ public class Parts {
                 chunk.removeBlockEntity(pos);
             }
         }
-    }
-
-    /** The queued data for an admitted spawner; null means policy replaces its block with air. */
-    private static CompoundTag handleSpawner(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part, int oy, WorldGenLevel world, int rx, int rz, int y, Palette.Info inf) {
-        // Hoisted above the admission check, which is now addressed by position - the marker's
-        // world coordinate is what decides whether this one keeps its spawner.
-        BlockPos pos = info.getRelativePos(rx, oy + y, rz);
-        if (SpecialMarkerPolicy.generateSpawner(ctx.seed, pos, info.profile)) {
-            String mobid = inf.mobId();
-            CompoundTag tag = new CompoundTag();
-            tag.putInt("x", pos.getX());
-            tag.putInt("y", pos.getY());
-            tag.putInt("z", pos.getZ());
-            tag.putString("id", "minecraft:mob_spawner");
-            // Keyed on the spawner's own position: which mob a spawner gets must not depend on
-            // how many spawners this chunk happened to place before it.
-            RandomSource spawnerRandom = Rng.atPos(feature.provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.SPAWNERS);
-            Identifier randomValue = getRandomSpawnerMob(world.getLevel(), spawnerRandom, feature.provider, info,
-                    new ChunkPlan.ConditionTodo(mobid, part.getName(), info), pos);
-            CompoundTag sd = new CompoundTag();
-            sd.putString("id", randomValue.toString());
-            SpawnData data = new SpawnData(sd, Optional.empty(), Optional.empty());
-            tag.put("SpawnData", SpawnData.CODEC.encodeStart(NbtOps.INSTANCE, data).result().orElseThrow(() -> new IllegalStateException("Invalid SpawnData")));
-
-            world.getChunk(pos).setBlockEntityNbt(tag);
-            return tag;
-        }
-        return null;
-    }
-
-    private static void handleLoot(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, IBuildingPart part,
-                            BlockState block, Palette.Info marker) {
-        BlockPos pos = ctx.driver.getCurrentCopy();
-        if (!SpecialMarkerPolicy.populateLoot(feature.provider.seed(), pos, info.profile)) {
-            return;
-        }
-        ctx.addPostTodo(pos, inWorld -> {
-            if (!inWorld.getBlockState(pos).isAir()) {
-                inWorld.setBlock(pos, block, Block.UPDATE_CLIENTS);
-                generateLoot(feature, info, inWorld, pos,
-                        new ChunkPlan.ConditionTodo(marker.loot(), part.getName(), info));
-            }
-        });
     }
 
     private static BlockState handleTodo(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int oy, WorldGenLevel world, int rx, int rz, int y, BlockState b) {
@@ -428,62 +293,19 @@ public class Parts {
     }
 
     public static Identifier getRandomSpawnerMob(Level world, RandomSource random, PlanningContext diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
-        String condition = todo.getCondition();
-        Condition cnd = diminfo.assets().conditions().getOrThrow(condition);
-        int level = (pos.getY() - diminfo.baseGroundLevel()) / CityGenerator.FLOORHEIGHT;
-        int floor = (pos.getY() - info.getCityGroundLevel()) / CityGenerator.FLOORHEIGHT;
-        String belowFloor = ConditionContext.NO_PART;
-        ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
-                todo.getPart(), belowFloor, todo.getBuilding(), info.coord) {
-            @Override
-            public Identifier getBiome() {
-                return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
-            }
-        };
-        String randomValue = cnd.getRandomValue(random, conditionContext);
-        if (randomValue == null) {
-            throw new RuntimeException("Condition '" + cnd.getName() + "' did not return a valid mob!");
-        }
-        return Identifier.parse(randomValue);
+        return MarkerDecorations.selectCondition(world, diminfo, info, todo, pos, random, "spawner");
     }
 
-
-    private static void generateLoot(CityGenerator feature, ChunkPlan info, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo condition) {
-        BlockEntity te = world.getBlockEntity(pos);
-        if (te instanceof RandomizableContainerBlockEntity) {
-            // Runs from a post-todo, after generation of this chunk has finished, so it cannot
-            // borrow the context's streams. The chest's own position addresses it instead.
-            RandomSource lootRandom = Rng.atPos(feature.provider.seed(), pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LOOT);
-            createLoot(info, lootRandom, world, pos, condition, feature.provider);
-        } else if (te == null) {
-            ModSetup.getLogger().error("Error setting loot at {},{},{}", pos.getX(), pos.getY(), pos.getZ());
-        }
-    }
-
-    public static void createLoot(ChunkPlan info, RandomSource random, LevelAccessor world, BlockPos pos, ChunkPlan.ConditionTodo todo, PlanningContext diminfo) {
-        BlockEntity tileentity = world.getBlockEntity(pos);
-        if (tileentity instanceof RandomizableContainerBlockEntity rcbe) {
-            if (todo != null) {
-                String lootTable = todo.getCondition();
-                int level = (pos.getY() - diminfo.baseGroundLevel()) / CityGenerator.FLOORHEIGHT;
-                int floor = (pos.getY() - info.getCityGroundLevel()) / CityGenerator.FLOORHEIGHT;
-                ConditionContext conditionContext = new ConditionContext(level, floor, info.cellars, info.getNumFloors(),
-                        todo.getPart(), ConditionContext.NO_PART, todo.getBuilding(), info.coord) {
-                    @Override
-                    public Identifier getBiome() {
-                        return world.getBiome(pos).unwrap().map(ResourceKey::identifier, biome -> world.registryAccess().lookupOrThrow(Registries.BIOME).getKey(biome));
-                    }
-                };
-                String randomValue = diminfo.assets().conditions().getOrThrow(lootTable).getRandomValue(random, conditionContext);
-//                ((LockableLootTileEntity) tileentity).setLootTable(Identifier.fromNamespaceAndPath(randomValue), random.nextLong());
-//                tileentity.markDirty();
-//                    Urbex.setup.getLogger().debug("createLootChest: loot=" + randomValue + " pos=" + pos.toString());
-//                }
-                rcbe.setLootTable(ResourceKey.create(Registries.LOOT_TABLE, Identifier.parse(randomValue)));
+    /** Compatibility helper for callers decorating an already-live container. */
+    public static void createLoot(ChunkPlan info, RandomSource random, LevelAccessor world, BlockPos pos,
+                                  ChunkPlan.ConditionTodo todo, PlanningContext diminfo) {
+        if (todo != null && world.getBlockEntity(pos) instanceof RandomizableContainerBlockEntity container) {
+            Identifier loot = MarkerDecorations.selectCondition(world, diminfo, info, todo, pos, random, "loot");
+            if (loot != null) {
+                container.setLootTable(ResourceKey.create(Registries.LOOT_TABLE, loot));
             }
         }
     }
-
 
     public static void setBlocksFromPalette(ChunkGenContext ctx, CityGenerator feature, int x, int y, int z, int y2, CompiledPalette palette, char character) {
         ChunkDriver driver = ctx.driver;

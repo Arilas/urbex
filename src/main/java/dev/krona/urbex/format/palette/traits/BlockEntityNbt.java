@@ -181,8 +181,10 @@ public final class BlockEntityNbt implements TraitType<BlockEntityNbt.Value> {
             }
             PointerResolver.Site through = site.through("'" + other.id() + "." + field.orElseThrow() + "'");
             // Test the replacement's states together, preserving TRAIT.043's mixed weighted case.
-            refuseIfNothingHoldsIt(replacement, context, through, diagnostics);
-            validateSelections(replacement, context, through, diagnostics, visited);
+            context.pruneForValidation(replacement, through).ifPresent(pruned -> {
+                refuseIfNothingHoldsIt(pruned, context, through, diagnostics);
+                validateSelections(pruned, context, through, diagnostics, visited);
+            });
         }
         // An alternative can add a selection even when the containing node has none. Its primary
         // block was already included in the group check above; only its selection descendants need

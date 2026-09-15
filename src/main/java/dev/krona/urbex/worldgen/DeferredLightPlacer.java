@@ -22,9 +22,14 @@ import java.util.function.Function;
 /** Plans one context's deferred lights without exposing later markers to earlier placements. */
 final class DeferredLightPlacer {
 
-    record Planned(BlockPos pos, BlockState state, @Nullable CompiledPalette.Placed material) {
+    record Planned(BlockPos pos, BlockState state, @Nullable CompiledPalette.Placed material,
+                   @Nullable PlacementOrigin origin) {
         Planned(BlockPos pos, BlockState state) {
-            this(pos, state, null);
+            this(pos, state, null, null);
+        }
+
+        Planned(BlockPos pos, BlockState state, @Nullable CompiledPalette.Placed material) {
+            this(pos, state, material, null);
         }
     }
 
@@ -87,7 +92,7 @@ final class DeferredLightPlacer {
                         todo.lit());
             }
             if (attempt.isPresent()) {
-                planned.add(new Planned(marker, attempt.get().state(), attempt.get().material()));
+                planned.add(new Planned(marker, attempt.get().state(), attempt.get().material(), todo.origin()));
             } else if (todo.lit()) {
                 // Nowhere to hang it: damaged surroundings, no sturdy face, or a pool with nothing
                 // left in it. The source's own replacement is the last answer, and air is skipped
@@ -96,7 +101,7 @@ final class DeferredLightPlacer {
                 CompiledPalette.Placed material = source.unlitPlacementAt(preset, seed, marker);
                 BlockState unlit = material == null ? source.unlitAt(seed, marker) : material.state();
                 if (!unlit.isAir()) {
-                    planned.add(new Planned(marker, unlit, material));
+                    planned.add(new Planned(marker, unlit, material, todo.origin()));
                 }
             }
         }

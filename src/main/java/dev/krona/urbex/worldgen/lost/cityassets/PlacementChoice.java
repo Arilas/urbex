@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 
 import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.format.palette.CompiledEntry;
+import dev.krona.urbex.format.palette.TraitSet;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.core.BlockPos;
 
@@ -19,6 +20,12 @@ public final class PlacementChoice {
     public static PlacementChoice of(@Nullable CompiledEntry entry) {
         return entry == null || entry.slotCount() == 0 ? null
                 : new PlacementChoice(CompiledPalette.slotsOf(entry));
+    }
+
+    @Nullable
+    public static PlacementChoice of(@Nullable CompiledEntry entry, TraitSet parentTraits) {
+        return entry == null || entry.slotCount() == 0 ? null
+                : new PlacementChoice(CompiledPalette.selectionSlotsOf(entry, parentTraits));
     }
 
     public CompiledPalette.Placed at(Preset preset, long seed, BlockPos pos) {
