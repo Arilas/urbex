@@ -67,4 +67,15 @@ class LightTodoQueueTest {
         assertThrows(IllegalArgumentException.class,
                 () -> queue.add(new BlockPos(64, 70, -31), null, true));
     }
+
+    @Test
+    void queuedPositionIsAnImmutableSnapshotOfTheAcceptedCursor() {
+        LightTodoQueue queue = new LightTodoQueue(3, -2);
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos(49, 70, -31);
+        queue.add(cursor, null, true);
+        cursor.set(50, 71, -30);
+
+        assertEquals(List.of(new LightTodoQueue.Todo(new BlockPos(49, 70, -31), null, true)),
+                queue.closeAndDrain());
+    }
 }

@@ -161,6 +161,8 @@ public class ChunkDriver {
     private LongOpenHashSet shapeOnlyWrites;
     private boolean preservingShape;
     private MaterialPolicy materialPolicy;
+    private LightTodoQueue lightTodo;
+    private LightTodoQueue.Todo writingSocket;
     private int writeMinY;
     private int writeMaxY;
 
@@ -184,6 +186,10 @@ public class ChunkDriver {
         materialPolicy = policy;
     }
 
+    void setLightTodoQueue(LightTodoQueue queue) {
+        lightTodo = queue;
+    }
+
     private static boolean hasDecorations(CompiledPalette.Placed material) {
         var info = material.info();
         return info != null && (info.tag() != null || info.loot() != null || info.mobId() != null);
@@ -205,6 +211,13 @@ public class ChunkDriver {
                 shapeOnlyWrites.add(packed);
             }
         } else {
+            if (lightTodo != null) {
+                if (writingSocket != null && writingPlacement != null && state.is(Blocks.AIR)) {
+                    lightTodo.add(writingSocket);
+                } else {
+                    lightTodo.remove(packed);
+                }
+            }
             if (shapeOnlyWrites != null) shapeOnlyWrites.remove(packed);
             if (writingPlacement != null && (writingPlacement.hasDamage() || hasDecorations(writingPlacement))) {
                 if (markerDamage == null) markerDamage = new Long2ObjectOpenHashMap<>();
@@ -271,6 +284,9 @@ public class ChunkDriver {
         shapeOnlyWrites = null;
         defaultOrigin = null;
         materialPolicy = null;
+        if (lightTodo != null) lightTodo.discard();
+        lightTodo = null;
+        writingSocket = null;
         published = true;
         if (!recordingWrites || local == null || local.isEmpty()) {
             return;
@@ -328,6 +344,9 @@ public class ChunkDriver {
         writingOrigin = null;
         defaultOrigin = null;
         materialPolicy = null;
+        if (lightTodo != null) lightTodo.discard();
+        lightTodo = null;
+        writingSocket = null;
         preservingShape = false;
         published = false;
         loggedLateWrite = false;
@@ -759,6 +778,30 @@ public class ChunkDriver {
 
     public ChunkDriver block(BlockState state, CompiledPalette.Placed source, PlacementOrigin origin) {
         writeMaterial(getX(), getY(), getZ(), state, source, origin);
+        return this;
+    }
+
+    /**
+     * Write and own a socket's placeholder as one operation. Admission happens in {@link #wrote},
+     * so clipped/rejected placeholders cannot leave queued work or affect an earlier owner.
+     */
+    ChunkDriver blockLightSocket(CompiledPalette.Placed source, boolean lit, PlacementOrigin origin) {
+        if (lightTodo == null) {
+            throw new IllegalStateException("No generation light queue is attached to this driver");
+        }
+        BlockPos position = getCurrentCopy();
+        // Reject a wrong-chunk request before ChunkBuffer can mask its local coordinates.
+        lightTodo.checkAdmission(position);
+        var light = source.info() == null ? null : source.info().lightSource();
+        if (light == null || !light.isSocket()) {
+            throw new IllegalArgumentException("A deferred placeholder requires a light socket material");
+        }
+        writingSocket = new LightTodoQueue.Todo(position, light, lit, origin);
+        try {
+            writeMaterial(getX(), getY(), getZ(), Blocks.AIR.defaultBlockState(), source, origin);
+        } finally {
+            writingSocket = null;
+        }
         return this;
     }
 

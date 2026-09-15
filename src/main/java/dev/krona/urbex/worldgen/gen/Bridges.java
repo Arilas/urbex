@@ -4,6 +4,7 @@ import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.Parts;
+import dev.krona.urbex.worldgen.PlacementOrigin;
 import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.Orientation;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
@@ -33,6 +34,7 @@ public class Bridges {
     private static void generateBridge(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, BuildingPart bt, Orientation orientation) {
         CompiledPalette compiledPalette = Parts.computePalette(feature, info, bt);
         ChunkDriver driver = ctx.driver;
+        PlacementOrigin origin = new PlacementOrigin(info, bt.getName());
         // The opportunistic bridge parts are authored one block above the street surface, as a deck
         // slung over a gap. A planned primary bridge is the road itself carried onward, so its deck
         // sits at the street surface and its markings line up with the road at either end.
@@ -56,7 +58,8 @@ public class Bridges {
                                     driver.getCurrentCopy());
                         }
                     }
-                    driver.add(b, placed);
+                    Parts.writeLightMarker(ctx, b, placed, origin);
+                    driver.incY();
                     l++;
                 }
             }

@@ -38,8 +38,8 @@ import net.minecraft.world.level.chunk.ChunkAccess;
  * {@link MarkerDecorations} once the final surviving material is known.</p>
  *
  * <p>In {@code worldgen} rather than {@code worldgen.gen}, unlike the other passes split out of the
- * generator. This one queues deferred work through {@code ChunkGenContext.addPostTodo} and
- * {@code addLightTodo}, which are package-private on purpose - issue #127 moved runtime callbacks
+ * generator. This one queues deferred work through {@code ChunkGenContext.addPostTodo} and the
+ * driver's accepted socket writes, which are package-private on purpose - issue #127 moved runtime callbacks
  * off the planning types precisely so that queueing them stayed inside this package. Making them
  * public to let this class sit next to its siblings would undo that.</p>
  */
@@ -85,8 +85,10 @@ public class Parts {
                         BlockState b = transformMarker(placed, transform);
                         Palette.Info inf = placed.info();
 
-                        // We don't replace the world where the part is empty (feature.air)
-                        if (b != feature.air || placed != original) {
+                        // Ordinary authored air is transparent; socket placeholders are writes,
+                        // even when a socket's representative candidate happens to be air.
+                        boolean socket = inf != null && inf.lightSource() != null && inf.lightSource().isSocket();
+                        if (b != feature.air || placed != original || socket) {
                             if (b == feature.liquid) {
                                 if (info.profile.avoidWater()) {
                                     b = feature.air;
@@ -114,7 +116,7 @@ public class Parts {
                                 // placeholder would hide the block entity from that finalizer.
                                 if (inf.lightSource() != null) {
                                     b = handleLightSource(ctx, feature, inf.lightSource(), b,
-                                            driver.getCurrentCopy(), origin);
+                                            driver.getCurrentCopy());
                                 }
                             } else if (ctx.tags.needsPoiUpdate(b)) {
                                 // If this block has POI data we need to delay setting it
@@ -138,7 +140,12 @@ public class Parts {
                             if (b.getLightEmission() > 0) {
                                 CityGenerator.updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             }
-                            writeMarker(driver, placed, b, ctx.seed, transform, origin);
+                            if (socket) {
+                                writeLightMarker(ctx, b, placed.transformed(transform), origin);
+                                driver.incY();
+                            } else {
+                                writeMarker(driver, placed, b, ctx.seed, transform, origin);
+                            }
                         } else {
                             driver.incY();
                         }
@@ -156,12 +163,17 @@ public class Parts {
 
     static void writeMarker(ChunkDriver driver, CompiledPalette.Placed placed, BlockState state, long seed,
                             Transform transform) {
-        driver.add(state, placed.transformed(transform));
+        writeMarker(driver, placed, state, seed, transform, null);
     }
 
     static void writeMarker(ChunkDriver driver, CompiledPalette.Placed placed, BlockState state, long seed,
                             Transform transform, PlacementOrigin origin) {
-        driver.add(state, placed.transformed(transform), origin);
+        CompiledPalette.Placed material = placed.transformed(transform);
+        if (origin == null) {
+            driver.add(state, material);
+        } else {
+            driver.add(state, material, origin);
+        }
     }
 
     /** Mirror first, then rotate, using this selected slot's compiled trait rather than a block tag. */
@@ -184,22 +196,26 @@ public class Parts {
      */
     public static BlockState handleLightSource(ChunkGenContext ctx, CityGenerator feature,
                                                LightSource source, BlockState lit, BlockPos pos) {
-        return handleLightSource(ctx, feature, source, lit, pos, ctx.proceduralOrigin);
-    }
-
-    public static BlockState handleLightSource(ChunkGenContext ctx, CityGenerator feature,
-                                               LightSource source, BlockState lit, BlockPos pos,
-                                               PlacementOrigin origin) {
-        boolean on = DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity());
         if (source.isSocket()) {
-            // Deferred either way. A socket has to see the finished chunk to find its support and
-            // orient itself, and that is as true of an unlit wall torch as of a lit one - it is the
-            // support search that decides whether this marker holds a floor fixture or a wall one.
-            // So the marker holds air until placeOptionalLights runs, and the roll rides along.
-            ctx.addLightTodo(pos, source, on, origin);
+            // Selection is pure. Admission is coupled to the accepted placeholder write below,
+            // so clipped or overwritten markers cannot leave work in the deferred queue.
             return feature.air;
         }
+        boolean on = DensitySelector.lighting(ctx.seed, pos, ctx.info.profile.lightingDensity());
         return on ? lit : source.unlitAt(ctx.seed, pos);
+    }
+
+    /** Writes at the current cursor without advancing, admitting only accepted socket placeholders. */
+    public static void writeLightMarker(ChunkGenContext ctx, BlockState actual,
+                                        CompiledPalette.Placed source, PlacementOrigin origin) {
+        Palette.Info info = source == null ? null : source.info();
+        if (info != null && info.lightSource() != null && info.lightSource().isSocket()) {
+            boolean lit = DensitySelector.lighting(ctx.seed, ctx.driver.getCurrentCopy(),
+                    ctx.info.profile.lightingDensity());
+            ctx.driver.blockLightSocket(source, lit, origin);
+        } else {
+            ctx.driver.block(actual, source, origin);
+        }
     }
 
     /**

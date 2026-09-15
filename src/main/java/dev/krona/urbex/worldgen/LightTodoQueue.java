@@ -1,13 +1,13 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import net.minecraft.core.BlockPos;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Deferred light markers owned by one chunk-generation context.
+ * Surviving deferred light placeholders owned by one chunk-generation context.
  *
  * <p>The context closes and drains this queue after its final marker-producing pass. The
  * synchronized boundary makes a racing enqueue linearizable: it either completes before close
@@ -17,6 +17,10 @@ import java.util.List;
 final class LightTodoQueue {
 
     record Todo(BlockPos pos, LightSource source, boolean lit, PlacementOrigin origin) {
+        Todo {
+            pos = pos.immutable();
+        }
+
         Todo(BlockPos pos, LightSource source, boolean lit) {
             this(pos, source, lit, null);
         }
@@ -24,7 +28,7 @@ final class LightTodoQueue {
 
     private final int ownerChunkX;
     private final int ownerChunkZ;
-    private final List<Todo> pending = new ArrayList<>();
+    private final Long2ObjectLinkedOpenHashMap<Todo> pending = new Long2ObjectLinkedOpenHashMap<>();
     private boolean closed;
 
     LightTodoQueue(int ownerChunkX, int ownerChunkZ) {
@@ -37,6 +41,10 @@ final class LightTodoQueue {
     }
 
     synchronized void add(BlockPos pos, LightSource source, boolean lit, PlacementOrigin origin) {
+        add(new Todo(pos, source, lit, origin));
+    }
+
+    synchronized void checkAdmission(BlockPos pos) {
         if (closed) {
             throw new IllegalStateException("Cannot admit a light marker after the generation queue was drained");
         }
@@ -44,7 +52,23 @@ final class LightTodoQueue {
             throw new IllegalArgumentException("Light marker " + pos + " does not belong to owner chunk "
                     + ownerChunkX + "," + ownerChunkZ);
         }
-        pending.add(new Todo(pos, source, lit, origin));
+    }
+
+    /** Called only for an accepted placeholder write; the final accepted source owns the position. */
+    synchronized void add(Todo todo) {
+        checkAdmission(todo.pos());
+        pending.put(todo.pos().asLong(), todo);
+    }
+
+    /** Ordinary writes continue after drain, when there are no queued placeholders to cancel. */
+    synchronized void remove(long position) {
+        pending.remove(position);
+    }
+
+    /** Discard unfinished work when the owning driver is reset or published. */
+    synchronized void discard() {
+        pending.clear();
+        closed = true;
     }
 
     synchronized List<Todo> closeAndDrain() {
@@ -52,7 +76,7 @@ final class LightTodoQueue {
             throw new IllegalStateException("Generation light queue was already drained");
         }
         closed = true;
-        List<Todo> snapshot = List.copyOf(pending);
+        List<Todo> snapshot = List.copyOf(pending.values());
         pending.clear();
         return snapshot;
     }

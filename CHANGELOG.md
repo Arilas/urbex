@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Deferred socket lights now follow their last accepted placeholder write. Later solid or air
+  writes cancel the old socket, and a replacement socket keeps its own source and originating part.
+  Park sockets explicitly place their placeholder before deferred placement.
 - Block-entity NBT, loot and spawner data now follow the material that survives generation,
   including damaged forms and deferred light candidates. Same-state replacements clear the
   previous marker's data; loot no longer restores a block removed by damage. Part-specific

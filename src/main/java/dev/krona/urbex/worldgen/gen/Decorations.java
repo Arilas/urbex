@@ -425,8 +425,11 @@ public final class Decorations {
                 BlockState b = (paletteInfo != null && paletteInfo.lightSource() != null)
                         ? Parts.handleLightSource(ctx, feature, paletteInfo.lightSource(), lit, pos)
                         : lit;
-                if (b != feature.air || placed != original) {
-                    driver.current(x, y, z).block(b, placed);
+                boolean socket = paletteInfo != null && paletteInfo.lightSource() != null
+                        && paletteInfo.lightSource().isSocket();
+                if (b != feature.air || placed != original || socket) {
+                    driver.current(x, y, z);
+                    Parts.writeLightMarker(ctx, b, placed, ctx.proceduralOrigin);
                 }
             }
         }
