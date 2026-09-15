@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Generation's post-placement update now preserves finalized block-entity NBT, loot and spawner
+  data. It retains point-of-interest refresh and requested post-processing without rewriting the
+  block. Lighting still initializes through the normal chunk-generation pipeline.
 - Deferred socket lights now follow their last accepted placeholder write. Later solid or air
   writes cancel the old socket, and a replacement socket keeps its own source and originating part.
   Park sockets explicitly place their placeholder before deferred placement.
@@ -81,8 +84,8 @@
     fails to load with a message naming the entry and what to write instead — dropping them from
     the codec would make them unknown keys, which a palette silently ignores, and the pack would
     keep placing a permanent torch while its author believed the setting still applied.
-  - The `urbex:lights` block tag is gone. Its one job was deciding whether placing a state has to
-    tell the client to relight, and the state answers that itself with `getLightEmission() > 0` —
+  - The `urbex:lights` block tag is gone. Its one job was deciding whether placing a state schedules
+    the generation post-placement update, and the state answers that with `getLightEmission() > 0` —
     no tag expansion, no per-state set lookup on the placement path, and right for modded emitters
     no bundled tag could enumerate. That check also used to sit in an `else if` chain a palette
     entry with metadata short-circuited, so a light placed from an entry carrying a light source, a

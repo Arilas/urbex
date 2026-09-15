@@ -115,6 +115,10 @@ public final class ChunkGenContext {
         return postTodo.closeAndDrain();
     }
 
+    WriteWindow writeWindow() {
+        return window;
+    }
+
     private java.util.Set<String> warnedMarkerConditions;
 
     /** At most one warning per condition/origin/effect during this generation, discarded with it. */

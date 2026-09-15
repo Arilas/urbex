@@ -13,8 +13,9 @@ import javax.annotation.Nullable;
  * <ul>
  *   <li>{@link ChunkBuffer}, which every driver write passes through, so a pass that believes it may
  *       build to the sky writes nothing above the window whatever it believes.</li>
- *   <li>{@link ChunkGenContext}'s three deferred queues, which <em>bypass</em> the driver - they
- *       hand a callback to the world to run later - so the buffer never sees them.</li>
+ *   <li>{@link ChunkGenContext}'s post-generation and server-thread queues, whose callbacks
+ *       <em>bypass</em> the driver. Deferred socket placeholders use the driver's accepted-write
+ *       path, so the buffer checks their window directly.</li>
  * </ul>
  *
  * <p>A value rather than two ints on the context, because the intersection rule below is the kind of
