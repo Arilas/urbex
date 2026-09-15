@@ -152,11 +152,7 @@ public record PreviewContext(PlanningContext planning, PreviewTerrain terrain) {
                                 noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
                                 noParts(), noParts(), noParts(), noParts())))),
                 Optional.of(new Mergeable<>(true, Collections.emptyList())),
-                Optional.empty(),
-                // No 'rotatable': the preview places no parts, so nothing is ever rotated, and
-                // naming a tag here would be a claim about a datapack this path has not loaded.
-                Optional.empty()
-        );
+                Optional.empty());
     }
 
     /** One wiring component, declared as empty: the preview places no parts. */

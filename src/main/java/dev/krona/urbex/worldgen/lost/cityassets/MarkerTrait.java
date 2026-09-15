@@ -9,12 +9,12 @@ package dev.krona.urbex.worldgen.lost.cityassets;
  * light and lost the spawner. Nothing in the bundled pack carries two - which is why the defect survived
  * - but the format has always permitted it and {@code TRAIT.004} states outright that traits compose.</p>
  *
- * <h2>Only the four that write at a position</h2>
+ * <h2>The four represented by Palette.Info</h2>
  *
- * <p>{@code 01-traits.md} §4 defines seven traits. Three are not here because they are not applied where
- * a block is written: {@code urbex:damaged} is read by the damage pass off the palette's state mapping,
- * {@code urbex:optional} rolls a density in the decoration pass, and {@code urbex:rotatable} is asked by
- * the part transform.</p>
+ * <p>{@code 01-traits.md} §4 defines seven traits. The other three travel on
+ * {@link CompiledPalette.Placed}: optional selection precedes the part transform, and the marker's
+ * damage satellite is retained for the later damage pass. Version 2 in-place light selection also
+ * runs before transformation; {@link #LIGHT} then handles accepted lights and deferred sockets.</p>
  *
  * <h2>The order is {@code TRAIT.095}'s phase order, and it is not negotiable</h2>
  *

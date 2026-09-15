@@ -11,6 +11,7 @@ import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.Versioned;
 import dev.krona.urbex.worldgen.lost.cityassets.Palette;
 import dev.krona.urbex.worldgen.lost.regassets.BuildingPartDefinition;
+import dev.krona.urbex.worldgen.lost.regassets.BuildingDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteAssetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.PaletteDefinition;
 import net.minecraft.SharedConstants;
@@ -195,6 +196,33 @@ class VersionDispatchTest {
                 """));
         assertEquals(Map.of("mat", "urbex:common#/$defs"), inline.imports());
         assertEquals(Set.of("wall"), inline.defs().keySet());
+    }
+
+    @Test
+    @Rule("MERGE.011")
+    @Rule("VER.018")
+    void partsAndBuildingsDispatchInlinePalettesByTheirOwnDeclaredVersion() {
+        for (Codec<?> ownerCodec : List.of(BuildingPartDefinition.CODEC, BuildingDefinition.CODEC)) {
+            for (String version : List.of("", "\"version\": 1,", "\"version\": 2,")) {
+                String document = "{ \"palette\": { " + version
+                        + " \"palette\": { \"X\": \"minecraft:stone_bricks\" } } }";
+                DataResult<?> result = ownerCodec.parse(JsonOps.INSTANCE,
+                        JsonParser.parseString(document));
+                if (!version.contains("2")) {
+                    String message = result.error().orElseThrow(() -> new AssertionError(
+                            "an inline palette must declare version 2: " + document)).message();
+                    assertTrue(Diag.DIAG_066.matches(message), message);
+                    continue;
+                }
+                Object owner = result.getOrThrow();
+                PaletteAssetDefinition palette = owner instanceof BuildingPartDefinition part
+                        ? part.getLocalPalette() : ((BuildingDefinition) owner).getLocalPalette();
+                PaletteV2Definition v2 = assertInstanceOf(PaletteV2Definition.class, palette);
+                assertEquals(RawNode.ofBlock("minecraft:stone_bricks"),
+                        v2.palette().orElseThrow().get(new Marker('X')),
+                        "the owner's inline field must preserve the v2 marker");
+            }
+        }
     }
 
     /**

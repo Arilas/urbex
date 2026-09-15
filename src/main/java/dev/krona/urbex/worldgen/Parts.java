@@ -38,8 +38,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
-import net.minecraft.world.level.block.state.properties.RailShape;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.GenerationStep;
@@ -105,15 +103,13 @@ public class Parts {
                         if (placed == null) {
                             throw new RuntimeException("Could not find entry '" + c + "' in the palette for part '" + part.getName() + "'!");
                         }
-                        BlockState b = placed.state();
+                        CompiledPalette.Placed original = placed;
+                        placed = placed.selectOptional(ctx.profile, ctx.seed, driver.getX(), driver.getY(), driver.getZ());
+                        BlockState b = transformMarker(placed, transform);
                         Palette.Info inf = placed.info();
 
-                        if (transform != Transform.ROTATE_NONE) {
-                            b = transformBlockState(feature, ctx.tags, info, transform, b);
-                        }
-
                         // We don't replace the world where the part is empty (feature.air)
-                        if (b != feature.air) {
+                        if (b != feature.air || placed != original) {
                             if (b == feature.liquid) {
                                 if (info.profile.avoidWater()) {
                                     b = feature.air;
@@ -190,7 +186,7 @@ public class Parts {
                             if (b.getLightEmission() > 0) {
                                 CityGenerator.updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             }
-                            driver.add(b);
+                            writeMarker(driver, placed, b, ctx.seed, transform);
                         } else {
                             driver.incY();
                         }
@@ -199,6 +195,23 @@ public class Parts {
             }
         }
         return oy + part.getSliceCount();
+    }
+
+    /** Final part-placement seam: keep the selected slot's damage form with the accepted write. */
+    static void writeMarker(ChunkDriver driver, CompiledPalette.Placed placed, BlockState state, long seed) {
+        writeMarker(driver, placed, state, seed, Transform.ROTATE_NONE);
+    }
+
+    static void writeMarker(ChunkDriver driver, CompiledPalette.Placed placed, BlockState state, long seed,
+                            Transform transform) {
+        driver.add(state, placed.damagedAt(seed, driver.getX(), driver.getY(), driver.getZ(), transform));
+    }
+
+    /** Mirror first, then rotate, using this selected slot's compiled trait rather than a block tag. */
+    static BlockState transformMarker(CompiledPalette.Placed placed, Transform transform) {
+        BlockState state = placed.state();
+        return placed.rotatable() && transform != Transform.ROTATE_NONE
+                ? state.mirror(transform.getMcMirror()).rotate(transform.getMcRotation()) : state;
     }
 
     /**
@@ -415,43 +428,6 @@ public class Parts {
         }
         return b;
     }
-
-    /**
-     * Applies a part's transform to one block state, using the {@code rotatable} tag of the world
-     * style governing this chunk.
-     * <p>
-     * The tag used to be resolved once and cached on the generator, because the world style could
-     * not change under a running generator. It can now: two cities in one world can come from
-     * different packs whose {@code rotatable} tags differ, so the tag has to follow the chunk.
-     * {@link ChunkPlan#worldStyle()} memoises it per chunk, so this stays a field read in the hot
-     * path rather than a neighbourhood walk. A world style that declares no {@code rotatable}
-     * resolves {@code urbex:rotatable}, as before.
-     * <p>
-     * Membership is answered by the chunk's own {@link TagSnapshot} rather than by a live registry
-     * read, so every block of every part in this chunk sees one tag epoch even if a {@code /reload}
-     * lands halfway through it (issue #128).
-     */
-    private static BlockState transformBlockState(CityGenerator feature, TagSnapshot tags, ChunkPlan info, Transform transform, BlockState b) {
-        if (tags.isRotatable(info.worldStyle().getRotatableTag(), b)) {
-            // Vanilla structure order: mirror first, then rotate. The mirror used to be
-            // approximated with a 180/90 rotation, which turned mirrored stairs/doors/logs
-            // the wrong way (issue #45).
-            b = b.mirror(transform.getMcMirror()).rotate(transform.getMcRotation());
-        } else if (feature.getRailStates().contains(b)) {
-            EnumProperty<RailShape> shapeProperty;
-            if (b.getBlock() == Blocks.RAIL) {
-                shapeProperty = RailBlock.SHAPE;
-            } else if (b.getBlock() == Blocks.POWERED_RAIL) {
-                shapeProperty = PoweredRailBlock.SHAPE;
-            } else {
-                throw new RuntimeException("Error with rail!");
-            }
-            RailShape shape = b.getValue(shapeProperty);
-            b = b.setValue(shapeProperty, transform.transform(shape));
-        }
-        return b;
-    }
-
 
     public static Identifier getRandomSpawnerMob(Level world, RandomSource random, PlanningContext diminfo, ChunkPlan info, ChunkPlan.ConditionTodo todo, BlockPos pos) {
         String condition = todo.getCondition();

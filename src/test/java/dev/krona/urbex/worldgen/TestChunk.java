@@ -36,7 +36,11 @@ final class TestChunk {
     }
 
     static ProtoChunk emptyChunk() {
-        return new ProtoChunk(new ChunkPos(0, 0), UpgradeData.EMPTY, HEIGHT, containerFactory(), null);
+        return emptyChunk(new ChunkPos(0, 0));
+    }
+
+    static ProtoChunk emptyChunk(ChunkPos pos) {
+        return new ProtoChunk(pos, UpgradeData.EMPTY, HEIGHT, containerFactory(), null);
     }
 
     static LevelAccessor levelFor(ProtoChunk chunk) {

@@ -24,14 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  *
  * <h2>Why this is one walk and not one per test</h2>
  *
- * <p>Two tests ask this same question for different reasons — {@link ShippedBlockIdsResolveTest} asks
- * whether each id names a block this Minecraft version has, and {@link RotatableTagCoversShippedBlocksTest}
- * asks whether each one that turns under rotation is in {@code urbex:rotatable} — and until the pack
- * became version 2 they had a copy each of the same fifteen-line search for the key names {@code block}
- * and {@code damaged}. Converting the pack made both copies cover a fraction of it, and only one copy
- * was fixed: the rotatable guard went on passing while seventy distinct block states, every {@code rail}
- * and {@code ladder} and {@code lever} among them, had become invisible to it. That is the specific
- * failure a second copy causes, so there is one walk now and both tests read it.</p>
+ * <p>{@link ShippedBlockIdsResolveTest} uses this format-aware walk to check every authored block id.
+ * It was originally shared with the legacy rotation-tag coverage test: two copies of a key-name walk
+ * had diverged during the v2 migration and silently skipped block strings. The rotation tag is gone,
+ * but keeping enumeration here still separates corpus traversal from the assertions that use it.</p>
  *
  * <h2>Why a version 2 document is not searched by key</h2>
  *
@@ -44,8 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * choices, placement lists and trait satellites because those rules needed it to, and a seventh
  * block-valued spelling would arrive here without an edit.</p>
  *
- * <p>What is still searched by key is everything else: version 1 files, which the pack now ships only
- * as its {@code variants} registry, and the registries that are not palettes at all. Those spell a
+ * <p>What is still searched by key is everything else: legacy fixtures and the registries that are
+ * not palettes at all. Those spell a
  * block {@code block} and {@code damaged} and nothing else.</p>
  *
  * <p>The branch is recorded per block string rather than per file, because a part or building writes

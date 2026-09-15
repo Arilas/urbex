@@ -13,7 +13,7 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * Where the configuration is kept, and how it gets there from an older format.
+ * Reads and writes Urbex's JSON configuration files.
  *
  * <p>Storage only. Nothing here decides anything, publishes anything or is read by generation - it
  * turns files into an {@link UrbexConfig} and back. {@code Config} used to do this alongside global
@@ -34,14 +34,16 @@ public final class ConfigRepository {
     }
 
     /**
-     * Reads {@code <config>/urbex/urbex.json}, migrating the legacy {@code common.toml} on first run,
-     * and writes the file back in full.
+     * Reads {@code <config>/urbex/urbex.json} and writes a valid config back in full.
      *
      * <p>The write-back is not incidental: it is how every available option becomes visible to
      * whoever is editing the file, so it goes through {@link UrbexConfig#toFullJson} and names every
      * key whatever its value. The ordinary encoding omits any key that still holds its default,
      * which for a fresh install is all of them - so this used to write {@code {}} while claiming to
      * be "the full, normalized file".</p>
+     *
+     * <p>An unreadable or invalid existing file is preserved so the player can repair it. Only a
+     * missing file is created from defaults; falling back at runtime must not erase settings.</p>
      *
      * @return the parsed config, or {@link UrbexConfig#DEFAULT} if there is no file or it does not
      *         parse
@@ -50,22 +52,17 @@ public final class ConfigRepository {
         Path dir = configDir.resolve("urbex");
         Path file = dir.resolve("urbex.json");
         UrbexConfig config = UrbexConfig.DEFAULT;
-        JsonObject json = null;
-        if (Files.exists(file)) {
-            json = readJson(file);
-        } else {
-            Path legacy = dir.resolve("common.toml");
-            if (Files.exists(legacy)) {
-                json = readLegacyToml(legacy);
-                Urbex.getLogger().info("Migrating legacy config {} to {}", legacy, file);
+        if (!Files.notExists(file)) {
+            JsonObject json = readJson(file);
+            if (json == null) {
+                return config;
             }
-        }
-        if (json != null) {
             Optional<UrbexConfig> parsed = UrbexConfig.fromJson(json);
             if (parsed.isPresent()) {
                 config = parsed.get();
             } else {
                 Urbex.getLogger().error("Invalid config in {} - using defaults. Fix or delete the file.", file);
+                return config;
             }
         }
         write(file, dir, UrbexConfig.toFullJson(config));
@@ -73,29 +70,19 @@ public final class ConfigRepository {
     }
 
     /**
-     * Applies {@code <world>/serverconfig/urbex.json} (or the legacy {@code urbex-server.toml}) over
-     * {@code global}.
+     * Applies {@code <world>/serverconfig/urbex.json} over {@code global}.
      *
      * <p>The merge is per-key and happens at the JSON level, so a world file carries only what it
-     * changes. Unlike the global file this one is not written back when it already exists: it is the
+     * changes. Unlike the global file this one is never written back: it is the
      * player's own list of differences, and normalizing it would fill it with every key they did not
-     * ask to change. A migrated legacy file <em>is</em> written, because otherwise the migration
-     * would run again on every start.</p>
+     * ask to change.</p>
      */
     public static UrbexConfig applyWorldOverrides(UrbexConfig global, Path worldRoot) {
-        Path dir = worldRoot.resolve("serverconfig");
-        Path file = dir.resolve("urbex.json");
-        JsonObject overrides = null;
-        if (Files.exists(file)) {
-            overrides = readJson(file);
-        } else {
-            Path legacy = dir.resolve("urbex-server.toml");
-            if (Files.exists(legacy)) {
-                overrides = readLegacyToml(legacy);
-                Urbex.getLogger().info("Migrating legacy world config {} to {}", legacy, file);
-                write(file, dir, overrides);
-            }
+        Path file = worldRoot.resolve("serverconfig").resolve("urbex.json");
+        if (Files.notExists(file)) {
+            return global;
         }
+        JsonObject overrides = readJson(file);
         if (overrides == null || overrides.isEmpty()) {
             return global;
         }
@@ -110,9 +97,6 @@ public final class ConfigRepository {
     }
 
     private static void write(Path file, Path dir, JsonObject json) {
-        if (json == null) {
-            return;
-        }
         try {
             Files.createDirectories(dir);
             Files.writeString(file, GSON.toJson(json));
@@ -125,15 +109,6 @@ public final class ConfigRepository {
         try (Reader reader = Files.newBufferedReader(file)) {
             return JsonParser.parseReader(reader).getAsJsonObject();
         } catch (Exception e) {
-            Urbex.getLogger().error("Could not read {}", file, e);
-            return null;
-        }
-    }
-
-    private static JsonObject readLegacyToml(Path file) {
-        try {
-            return LegacyToml.toJson(Files.readAllLines(file));
-        } catch (IOException e) {
             Urbex.getLogger().error("Could not read {}", file, e);
             return null;
         }

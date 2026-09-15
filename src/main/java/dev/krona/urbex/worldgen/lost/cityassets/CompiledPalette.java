@@ -1,11 +1,18 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.format.palette.CompiledEntry;
+import dev.krona.urbex.worldgen.lost.Transform;
 import dev.krona.urbex.format.palette.CompiledTrait;
 import dev.krona.urbex.format.palette.traits.Damaged;
 import dev.krona.urbex.format.palette.CompiledV2Palette;
 import dev.krona.urbex.format.palette.Marker;
 import dev.krona.urbex.format.palette.TraitSet;
+import dev.krona.urbex.format.palette.TraitType;
+import dev.krona.urbex.format.palette.traits.OptionalTrait;
+import dev.krona.urbex.format.palette.traits.Light;
+import dev.krona.urbex.format.palette.traits.Rotatable;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.Blocks;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.util.RandomSource;
@@ -78,8 +85,56 @@ public class CompiledPalette {
      * @param state the block state to write
      * @param info  what the marker carries beyond its block, or null when it carries nothing. Null is
      *              load-bearing: {@code Parts} takes a different branch for a marker with no metadata
+     * @param rotatable whether this slot follows its part's mirror and rotation
+     * @param damaged this slot's own damaged form; null means the marker has no damage replacement
+     * @param optional the density selection for optional blocks or in-place lights, when present
      */
-    public record Placed(BlockState state, @Nullable Palette.Info info) {}
+    public record Placed(BlockState state, @Nullable Palette.Info info, boolean rotatable,
+                         @Nullable CompiledEntry damaged, @Nullable OptionalSelection optional) {
+        public Placed(BlockState state, @Nullable Palette.Info info) {
+            this(state, info, true, null, null);
+        }
+
+        public Placed(BlockState state, @Nullable Palette.Info info, boolean rotatable, @Nullable CompiledEntry damaged) {
+            this(state, info, rotatable, damaged, null);
+        }
+
+        /** Selection precedes transformation and decoration, including a replacement's own selection. */
+        public Placed selectOptional(Preset preset, long seed, int x, int y, int z) {
+            Placed selected = this;
+            while (selected.optional != null) {
+                Placed next = selected.optional.select(selected, preset, seed, x, y, z);
+                if (next == selected) {
+                    break;
+                }
+                selected = next;
+            }
+            return selected;
+        }
+
+        /** The selected marker's own damaged form, addressed independently of the damage rolls. */
+        @Nullable
+        public BlockState damagedAt(long seed, int x, int y, int z) {
+            return damagedAt(seed, x, y, z, Transform.ROTATE_NONE);
+        }
+
+        /** A satellite keeps its own rotation policy; it does not inherit the marker's opt-out. */
+        @Nullable
+        public BlockState damagedAt(long seed, int x, int y, int z, Transform transform) {
+            if (damaged == null) {
+                return null;
+            }
+            CompiledEntry.Resolved resolved = damaged.slot(damaged.slotCount() == 1 ? 0
+                    : Rng.indexAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_REPLACEMENT, damaged.slotCount()));
+            BlockState state = resolved.state();
+            // MODEL.042 turns unavailable blocks into air; TRAIT.012 gives those no damaged form.
+            if (state.isAir()) {
+                return null;
+            }
+            return resolved.traits().rotatable() && transform != Transform.ROTATE_NONE
+                    ? state.mirror(transform.getMcMirror()).rotate(transform.getMcRotation()) : state;
+        }
+    }
 
     /** How many slots a weighted entry expands to. A palette weight is a count out of this. */
     public static final int SLOTS = 128;
@@ -167,15 +222,6 @@ public class CompiledPalette {
         finish();
     }
 
-    /**
-     * Distributes {@code slotCount} slots over the entries proportionally to their weights
-     * (largest-remainder rounding, remainder ties to the lowest index).
-     * <p>
-     * Weights used to be absolute slot counts out of 128: a pack whose weights summed below 128
-     * crashed at generation time and one summing above 128 was silently truncated (issue #58).
-     * Weights that already sum to exactly {@code slotCount} come back verbatim, so packs authored
-     * against the old contract generate identically.
-     */
     /**
      * How many of {@code slotCount} slots each weighted palette entry gets.
      * <p>
@@ -385,6 +431,10 @@ public class CompiledPalette {
      * the palette does not map throws from the driver on the first part that uses it.</p>
      */
     private static Placed[] slotsOf(CompiledEntry entry) {
+        return slotsOf(entry, Map.of());
+    }
+
+    private static Placed[] slotsOf(CompiledEntry entry, Map<Identifier, CompiledTrait> decorators) {
         if (entry.isSocket()) {
             // The socket's own traits, not an empty set: TRAIT.055's socket-level unlit lives there,
             // and so does any decoration trait written on the socket node.
@@ -392,7 +442,8 @@ public class CompiledPalette {
             LightSource source = info == null ? null : info.lightSource();
             BlockState representative = source == null || source.pool() == null
                     ? Blocks.AIR.defaultBlockState() : source.pool().representative();
-            return new Placed[]{new Placed(representative, info)};
+            return new Placed[]{new Placed(representative, info, entry.ownTraits().rotatable(),
+                    damageOf(entry.ownTraits()), optionalOf(entry.ownTraits()))};
         }
         Placed[] slots = new Placed[entry.slotCount()];
         // One Placed per distinct compiled slot, so LOAD.023's interning reaches this view too: a
@@ -400,42 +451,61 @@ public class CompiledPalette {
         Map<CompiledEntry.Resolved, Placed> perAlternative = new HashMap<>();
         for (int slot = 0; slot < slots.length; slot++) {
             CompiledEntry.Resolved resolved = entry.slot(slot);
-            slots[slot] = perAlternative.computeIfAbsent(resolved,
-                    from -> new Placed(from.state(), V2Traits.infoOf(from.traits(), null)));
+            slots[slot] = perAlternative.computeIfAbsent(resolved, from -> {
+                TraitSet traits = from.traits();
+                if (!decorators.isEmpty()) {
+                    Map<Identifier, CompiledTrait> combined = new LinkedHashMap<>(decorators);
+                    combined.putAll(traits.traits());
+                    traits = TraitSet.of(combined);
+                }
+                return new Placed(from.state(), V2Traits.infoOf(traits, null), traits.rotatable(),
+                        damageOf(traits), selectionOf(traits, true));
+            });
         }
         return slots;
     }
 
+    @Nullable
+    private static OptionalSelection optionalOf(TraitSet traits) {
+        return selectionOf(traits, false);
+    }
+
+    @Nullable
+    private static OptionalSelection selectionOf(TraitSet traits, boolean includeLight) {
+        CompiledTrait selection = traits.traits().get(OptionalTrait.TYPE.id());
+        if (selection == null && includeLight) {
+            selection = traits.traits().get(Light.TYPE.id());
+        }
+        if (selection == null) {
+            return null;
+        }
+        // TRAIT.096 applies the marker's decorators to the selected block. The satellite keeps
+        // its own selection, transformation and damage traits (TRAIT.007), and its own decorators
+        // replace a same-id outer decorator. All combinations are built before worker use.
+        Map<Identifier, CompiledTrait> decorators = new LinkedHashMap<>();
+        traits.traits().forEach((id, trait) -> {
+            if (trait.type().phase() == TraitType.Phase.DECORATION
+                    && trait.type() != Damaged.TYPE && trait.type() != Rotatable.TYPE) {
+                decorators.put(id, trait);
+            }
+        });
+        boolean light = selection.type() == Light.TYPE;
+        return new OptionalSelection(light ? "lightingDensity" : ((OptionalTrait.Value) selection.value()).density(),
+                slotsOf(selection.satellite(light ? Light.UNLIT : OptionalTrait.REPLACEMENT), decorators));
+    }
+
+    /** The satellite's materialised slots, retained per marker rather than collapsed by state. */
+    @Nullable
+    private static CompiledEntry damageOf(TraitSet traits) {
+        CompiledTrait trait = traits.traits().get(Damaged.TYPE.id());
+        CompiledEntry into = trait == null ? null : trait.satellite(Damaged.INTO);
+        return into == null || into.slotCount() == 0 ? null : into;
+    }
+
     /**
-     * A version 2 marker's {@code urbex:damaged} satellites, in the state-keyed map the damage pass has.
-     *
-     * <p><b>This is {@code TRAIT.011} not being reached, and it is deliberate rather than overlooked.</b>
-     * That rule keys the mapping by the marker carrying the trait, and the compiled palette does exactly
-     * that — a marker's {@code urbex:damaged} is a satellite of its own entry, per slot. The damage pass
-     * cannot consume it: {@code DamageArea} and {@code Decorations} read blocks back out of the chunk,
-     * where the marker is gone and is not recoverable, which is why version 1 keyed its map by state in
-     * the first place. So a version 2 palette gets version 1's fidelity here — two markers on one block
-     * collapse to the last one compiled — and it gets that rather than nothing at all, which is what it
-     * had before this method existed. The rule carries a {@code [NOT-YET-REACHED]} marker naming
-     * issue #216, which is the per-position marker record that would fix it.</p>
-     *
-     * <p><b>An {@code into} that resolved to air records nothing, which is {@code TRAIT.012}.</b> That
-     * rule says an {@code into} "naming a block this game does not have leaves the marker undamaged, and
-     * the load succeeds" — and by {@code MODEL.042} an absent id resolves to air, so without this the
-     * mapping said the marker damages into <em>nothing</em>. The damage pass would then delete the
-     * block, which is the claim version 1 refused to make in so many words: {@code Palette.compile}
-     * skips an unresolvable {@code damaged} because "air would say 'damaging this block deletes it',
-     * which is a claim the author did not make (issue #91)". Zombie Apocalypse Essentials has seven
-     * markers naming {@code immersive_weathering:exposed_iron_bars}, and on a vanilla install every one
-     * of them was deleting the block it damaged.</p>
-     *
-     * <p><b>What this cannot distinguish, said plainly.</b> A file writing {@code "into":
-     * "minecraft:air"} deliberately is the same compiled state as an absent id, because MODEL.042 has
-     * already turned one into the other, and telling them apart needs the block string — which lives in
-     * the resolved node and not in the compiled slot. Version 1 <em>could</em> tell them apart and
-     * honoured the deliberate one. No file in the three measured packs writes it: the eight distinct
-     * {@code damaged} values across 335 uses are all real blocks or absent mod blocks, none is air. If
-     * one is ever wanted, the discriminator belongs where the string still exists, not here.</p>
+     * Compatibility fallback for procedural passes that still write only a block state. Part
+     * placement carries its own damage source in {@link Placed}; it never consults this map.
+     * Procedural material placement still needs migration before TRAIT.011 is fully reached (#216).
      */
     private void recordDamage(CompiledEntry entry) {
         for (int slot = 0; slot < entry.slotCount(); slot++) {
@@ -465,14 +535,14 @@ public class CompiledPalette {
         resolveAliases();
         palette.forEach((c, entry) -> {
             Placed[] slots = switch (entry) {
-                case Entry.Simple simple -> new Placed[]{new Placed(simple.state(), information.get(c))};
+                case Entry.Simple simple -> new Placed[]{new Placed(simple.state(), information.get(c), true, legacyDamage(simple.state()))};
                 case Entry.Weighted weighted -> {
                     Palette.Info info = information.get(c);
                     Placed[] built = new Placed[weighted.slots().length];
                     Map<BlockState, Placed> perState = new HashMap<>();
                     for (int slot = 0; slot < built.length; slot++) {
                         BlockState state = weighted.slots()[slot];
-                        built[slot] = perState.computeIfAbsent(state, s -> new Placed(s, info));
+                        built[slot] = perState.computeIfAbsent(state, s -> new Placed(s, info, true, legacyDamage(s)));
                     }
                     yield built;
                 }
@@ -486,15 +556,21 @@ public class CompiledPalette {
         });
     }
 
+    @Nullable
+    private CompiledEntry legacyDamage(BlockState state) {
+        BlockState damaged = damagedToBlock.get(state);
+        return damaged == null ? null : CompiledEntry.of(new CompiledEntry.Resolved[]{
+                new CompiledEntry.Resolved(damaged, TraitSet.EMPTY)});
+    }
+
     /**
      * Answers every version 2 {@code alias} against the finished merge ({@code MODEL.060},
      * {@code MODEL.064}).
      *
-     * <p>This is the cross-version half, and it is the reason composition happens here rather than in
-     * {@link Style}. Under {@code VER.006} a draw may hold both formats, so a version 2 {@code alias}
-     * may name a marker only a version 1 palette defines - and version 1's own {@code frompalette} loop
-     * below may name one only a version 2 palette defines. Neither is decidable by either palette
-     * alone, which is exactly what {@code MODEL.064} says: the merge answers it.</p>
+     * <p>Composition happens here because an alias can name a marker contributed by a different
+     * palette in the style's draw ({@code MODEL.064}). Runtime loaders accept only version 2.
+     * The legacy target cases remain for converter-equivalence and internal tests; the retired
+     * {@code VER.006} rule no longer permits mixed versions in a loaded datapack.</p>
      *
      * <p>Iterated to a fixed point, like the {@code frompalette} loop it runs beside, so an alias whose
      * target is itself an alias resolves whichever order the two were merged in. An alias still
@@ -542,13 +618,13 @@ public class CompiledPalette {
         }
         Palette.Info info = V2Traits.infoOf(own, null);
         Placed[] slots = switch (target) {
-            case Entry.Simple simple -> new Placed[]{new Placed(simple.state(), info)};
+            case Entry.Simple simple -> new Placed[]{new Placed(simple.state(), info, own.rotatable(), damageOf(own), optionalOf(own))};
             case Entry.Weighted weighted -> {
                 Placed[] built = new Placed[weighted.slots().length];
                 Map<BlockState, Placed> perState = new HashMap<>();
                 for (int slot = 0; slot < built.length; slot++) {
                     BlockState state = weighted.slots()[slot];
-                    built[slot] = perState.computeIfAbsent(state, s -> new Placed(s, info));
+                    built[slot] = perState.computeIfAbsent(state, s -> new Placed(s, info, own.rotatable(), damageOf(own), optionalOf(own)));
                 }
                 yield built;
             }
@@ -558,7 +634,7 @@ public class CompiledPalette {
                 // replace what the intermediate alias contributed. TRAIT.006 read down the chain.
                 Placed[] built = new Placed[derived.slots().length];
                 for (int slot = 0; slot < built.length; slot++) {
-                    built[slot] = new Placed(derived.slots()[slot].state(), info);
+                    built[slot] = new Placed(derived.slots()[slot].state(), info, own.rotatable(), damageOf(own), optionalOf(own));
                 }
                 yield built;
             }
@@ -620,7 +696,7 @@ public class CompiledPalette {
             // One slot is one state whatever the position, which is the whole of what this asks.
             // MODEL.011's > Why is why it is common: "84% of markers in the shipped corpus are one
             // block with no metadata", and a version 2 block node compiles to exactly one slot.
-            case Entry.V2 v2 -> v2.slots().length == 1;
+            case Entry.V2 v2 -> v2.slots().length == 1 && v2.slots()[0].optional() == null;
         };
     }
 

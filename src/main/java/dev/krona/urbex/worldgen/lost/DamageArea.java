@@ -7,7 +7,6 @@ import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.PlanningContext;
 import dev.krona.urbex.worldgen.TagSnapshot;
-import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
@@ -30,14 +29,11 @@ public class DamageArea {
     private final int minSectionY;
     private final int maxSectionY;
 
-    private final BlockState air;
-
     public DamageArea(int chunkX, int chunkZ, PlanningContext provider, ChunkPlan info) {
         this.seed = provider.seed();
         this.profile = info.profile;
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
-        this.air = Blocks.AIR.defaultBlockState();
         chunkBox = new AABB(chunkX << 4, provider.shape().minY(), chunkZ << 4, (chunkX << 4) + 15, provider.shape().maxBuildHeight(), (chunkZ << 4) + 15);
         this.minSectionY = provider.shape().minSection();
         this.maxSectionY = provider.shape().maxSection();
@@ -98,7 +94,13 @@ public class DamageArea {
      * the chunk's {@link ChunkPlan} and outlives any one generation, so a tag epoch stored here
      * would be the wrong one for every chunk after the next {@code /reload} (issue #128).
      */
-    public BlockState damageBlock(BlockState b, PlanningContext provider, TagSnapshot tags, int x, int y, int z, float damage, CompiledPalette palette, BlockState liquidChar) {
+    public BlockState damageBlock(BlockState b, PlanningContext provider, TagSnapshot tags, int x, int y, int z, float damage, BlockState damaged, BlockState liquidChar) {
+        return applyDamage(seed, b, tags, x, y, z, damage, damaged, provider.shape().seaLevel(), liquidChar);
+    }
+
+    /** One post-placement damage decision, independent of how the explosion field was planned. */
+    public static BlockState applyDamage(long seed, BlockState b, TagSnapshot tags, int x, int y, int z,
+                                        float damage, BlockState damaged, int waterlevel, BlockState liquidChar) {
         if (tags.isNotBreakable(b)) {
             return b;
         }
@@ -107,16 +109,14 @@ public class DamageArea {
             damage *= 2.5f;    // As if this block gets double the damage
         }
         if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE) <= damage) {
-            BlockState damaged = palette.canBeDamagedToIronBars(b);
-            int waterlevel = provider.shape().seaLevel();//profile.groundLevel() - profile.WATERLEVEL_OFFSET;
             if (damage < BLOCK_DAMAGE_CHANCE && damaged != null) {
                 if (Rng.floatAtPos(seed, x, y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
                     b = damaged;
                 } else {
-                    b = y <= waterlevel ? liquidChar : air;
+                    b = y <= waterlevel ? liquidChar : Blocks.AIR.defaultBlockState();
                 }
             } else {
-                b = y <= waterlevel ? liquidChar : air;
+                b = y <= waterlevel ? liquidChar : Blocks.AIR.defaultBlockState();
             }
         }
         return b;

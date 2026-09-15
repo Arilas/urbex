@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class StyleDisplayNameTest {
 
-    /** {@code WorldStyle}'s rotatable fallback resolves a {@code TagKey}, which needs the registries. */
+    /** The declaration codecs and block-backed test fixtures need Minecraft's registries. */
     @BeforeAll
     static void bootstrap() {
         SharedConstants.tryDetectVersion();
@@ -46,7 +46,7 @@ class StyleDisplayNameTest {
                 Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null)))),
-                Optional.empty(), Optional.empty());
+                Optional.empty());
     }
 
     private static CityStyleDefinition cityStyle(Optional<String> name) {

@@ -35,23 +35,14 @@ public class Palette {
     private final Map<BlockState, BlockState> damaged = new HashMap<>();
 
     /**
-     * The version 2 form, or null for a version 1 palette.
+     * The compiled runtime form. Null is retained only for legacy converter-equivalence and
+     * internal test palettes; runtime loaders require version 2.
      *
-     * <p><b>One asset type for both formats, which is not the same as one model for both.</b> The
-     * {@code palettes} registry has one value type and one {@link AssetIndex}, and every consumer -
-     * {@link Style}, {@link BuildingPart}, {@link AssetGraph} - names {@code Palette}. Giving version 2
-     * its own asset type would mean a second index, a second selector in every style, and a second
-     * branch at every one of those consumers, which is what {@code VER.006} forbids being necessary:
-     * a style's {@code randompalettes} may draw a version 1 and a version 2 palette into one merge, so
-     * they have to be drawable from one list.</p>
-     *
-     * <p>What is <em>not</em> shared is the model. When this field is set, {@link #palette} and
+     * <p>When this field is set, {@link #palette} and
      * {@link #damaged} are empty and stay empty: a version 2 palette is compiled by
      * {@code CompiledV2Palette}, all eight stages of {@code LOAD.001}, and none of version 1's
-     * per-entry compilation runs. {@link CompiledPalette} is where the two meet, and it meets them as
-     * compiled markers rather than as a common node model - which is
-     * {@code PaletteAssetDefinition}'s "no common node model, no shared merge, and nothing here invites
-     * one" held one layer further in.</p>
+     * per-entry compilation runs. {@link CompiledPalette} combines compiled markers for a style's
+     * draw without translating them into the legacy node model.</p>
      */
     @Nullable
     private final CompiledV2Palette v2;

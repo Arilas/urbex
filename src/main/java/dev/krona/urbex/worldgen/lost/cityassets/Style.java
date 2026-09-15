@@ -94,13 +94,9 @@ public class Style {
     /**
      * One palette per {@code randompalettes} group, drawn by weight.
      *
-     * <p><b>The draw, not a merge of it.</b> This used to flatten the chosen palettes into a synthetic
-     * {@code Palette("__random__")} with {@link Palette#merge}, which copies one palette's maps into
-     * another - and a version 2 palette has no such maps to copy, only a compiled form. {@code VER.006}
-     * lets a draw hold both formats ("a style's {@code randompalettes} may draw a version 1 palette and
-     * a version 2 palette into the same merge") precisely because that composition "operates on compiled
-     * palettes, not on {@code extends}", so the merge belongs to {@link CompiledPalette} and this
-     * returns the list it merges.</p>
+     * <p>Returns the chosen palettes for {@link CompiledPalette} to merge. Runtime palettes carry
+     * compiled version 2 entries, so flattening their legacy maps with {@link Palette#merge} would
+     * discard those entries. Version 1 loading and mixed-version draws are retired.</p>
      *
      * <p>The list is what {@link PaletteCache} keys on, so it is immutable and its order is the group
      * order - which is load-bearing, because a later palette of the draw overrides an earlier one's

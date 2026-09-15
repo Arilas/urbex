@@ -3,10 +3,11 @@ package dev.krona.urbex.format.palette;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonParser;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.InputFormat;
+import com.networknt.schema.SpecificationVersion;
+import com.networknt.schema.Error;
 import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.SpecDocuments;
 import dev.krona.urbex.worldgen.lost.regassets.DefinitionAssetDefinition;
@@ -109,6 +110,7 @@ class PaletteSchemaTest {
             "REF.082#1",    // '$imports' declaring the reserved alias 'super'
             "REF.022#1",    // an operand ('$ref') written on a trait value instead of 'into'
             "TRAIT.064#1",  // 'urbex:light' and 'urbex:optional' on one node
+            "TRAIT.066#1",  // an unknown preset decoration density
             "VER.010#1",    // a renamed version 1 key ('random') - unknown to this schema either way
             "VER.011#1",    // a deleted version 1 key ('torch') - unknown to this schema either way
             "WEIGHT.002#1", // a 'weight' of zero
@@ -120,9 +122,9 @@ class PaletteSchemaTest {
         return mapper.readTree(SCHEMA_PATH.toFile());
     }
 
-    private static JsonSchema loadSchema() throws IOException {
-        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
-        return factory.getSchema(Files.readString(SCHEMA_PATH));
+    private static Schema loadSchema() throws IOException {
+        SchemaRegistry registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
+        return registry.getSchema(Files.readString(SCHEMA_PATH), InputFormat.JSON);
     }
 
     private static Set<String> propertyNames(JsonNode objectNode) {
@@ -244,7 +246,7 @@ class PaletteSchemaTest {
      */
     @TestFactory
     Stream<DynamicTest> everyShippedAssetValidatesAgainstTheSchema() throws IOException {
-        JsonSchema schema = loadSchema();
+        Schema schema = loadSchema();
         List<Path> assets = shippedAssets();
         List<DynamicTest> tests = new ArrayList<>();
         int[] palettes = {0};
@@ -265,8 +267,8 @@ class PaletteSchemaTest {
             }
             String name = SpecDocuments.repoRoot().relativize(asset).toString();
             tests.add(DynamicTest.dynamicTest(name, () -> {
-                Set<ValidationMessage> messages =
-                        schema.validate(workAroundHashMarkerBug(document));
+                List<Error> messages =
+                        schema.validate(document);
                 assertTrue(messages.isEmpty(),
                         () -> name + ": the shipped asset does not validate: " + messages);
             }));
@@ -446,7 +448,7 @@ class PaletteSchemaTest {
      */
     @TestFactory
     Stream<DynamicTest> everySpecificationFixtureValidatesAsTheShapeLevelExpects() throws IOException {
-        JsonSchema schema = loadSchema();
+        Schema schema = loadSchema();
         List<SpecDocuments.Fixture> fixtures = SpecDocuments.load().fixtures();
         Map<String, Integer> seen = new LinkedHashMap<>();
         List<DynamicTest> tests = new ArrayList<>();
@@ -470,10 +472,10 @@ class PaletteSchemaTest {
         return tests.stream();
     }
 
-    private static void assertValidates(JsonSchema schema, SpecDocuments.Fixture fixture, String address,
+    private static void assertValidates(Schema schema, SpecDocuments.Fixture fixture, String address,
                                         boolean expectValid) {
-        JsonNode document = workAroundHashMarkerBug(toJackson(fixture.json()));
-        Set<ValidationMessage> messages = schema.validate(document);
+        JsonNode document = toJackson(fixture.json());
+        List<Error> messages = schema.validate(document);
         if (expectValid) {
             assertTrue(messages.isEmpty(), () -> address + " (" + fixture.file() + ":" + fixture.line()
                     + "): expected the schema to accept this fixture, but it reported: " + messages);
@@ -488,57 +490,6 @@ class PaletteSchemaTest {
     private static boolean isPartFixture(String json) {
         JsonNode node = toJackson(json);
         return node.isObject() && node.has("slices");
-    }
-
-    /**
-     * Works around a blind spot in {@code com.networknt:json-schema-validator} 1.5.6: an object key that
-     * is literally {@code "#"} makes it report every validation of that subtree as passing, whatever the
-     * schema says. Filed upstream and tracked as
-     * <a href="https://github.com/Arilas/urbex/issues/218">issue #218</a>; this method is the workaround
-     * that issue is about, and it goes when the library version that fixes it lands.
-     * <p>
-     * Reproduced directly: {@code {"palette":{"#":{"kind":"weighted","choices":[]}}}} validates cleanly
-     * against this schema, and the same document with any other marker in {@code "#"}'s place correctly
-     * reports {@code MODEL.045}'s violation. This is not an edge case this test can shrug off - {@code #}
-     * is the single most common marker in the shipped corpus, and it is what {@code MODEL.013}'s,
-     * {@code MODEL.045}'s, {@code VER.010}'s, {@code WEIGHT.002}'s and {@code WEIGHT.013}'s own fixtures
-     * use, five of {@link #SHAPE_LEVEL_REJECTIONS}' seventeen. Renaming the key before validation, to a
-     * marker no sibling in the same object already uses, tests the fixture's actual content instead of
-     * the library's blind spot: nothing about any of those five rules depends on which character names
-     * the marker being checked.
-     */
-    private static JsonNode workAroundHashMarkerBug(JsonNode document) {
-        if (!document.isObject()) {
-            return document;
-        }
-        com.fasterxml.jackson.databind.node.ObjectNode root = ((com.fasterxml.jackson.databind.node.ObjectNode) document).deepCopy();
-        renameHashKey(root, "palette");
-        renameHashKey(root, "$defs");
-        return root;
-    }
-
-    private static void renameHashKey(com.fasterxml.jackson.databind.node.ObjectNode root, String field) {
-        JsonNode container = root.get(field);
-        if (container == null || !container.isObject()) {
-            return;
-        }
-        com.fasterxml.jackson.databind.node.ObjectNode object = (com.fasterxml.jackson.databind.node.ObjectNode) container;
-        if (!object.has("#")) {
-            return;
-        }
-        String replacement = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".chars().mapToObj(c -> String.valueOf((char) c))
-                .filter(candidate -> !object.has(candidate))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "every single-letter replacement for '#' is already a sibling key in " + object));
-        com.fasterxml.jackson.databind.node.ObjectNode renamed =
-                com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
-        java.util.Iterator<Map.Entry<String, JsonNode>> fields = object.fields();
-        while (fields.hasNext()) {
-            Map.Entry<String, JsonNode> entry = fields.next();
-            renamed.set("#".equals(entry.getKey()) ? replacement : entry.getKey(), entry.getValue());
-        }
-        root.set(field, renamed);
     }
 
     /**
@@ -594,14 +545,12 @@ class PaletteSchemaTest {
      * completeness ({@code MODEL.081}'s own) does it through a {@code $ref} to an incomplete
      * <em>referenced</em> node, which this schema correctly does not attempt (it is REF.021's territory,
      * listed in {@link #SHAPE_LEVEL_REJECTIONS}'s javadoc). This test is what stands in for that missing
-     * fixture: eleven shapes, each run through {@link #workAroundHashMarkerBug} the same way
-     * {@link #everySpecificationFixtureValidatesAsTheShapeLevelExpects()} does, so a constraint that only
-     * held up on an unrenamed marker could not pass here unnoticed.
+     * fixture: each shape is validated without rewriting the input document.
      */
     @Rule("MODEL.081")
     @Test
     void aMarkerPositionRequiresItsKindsOwnKeyUnlessAReferenceMightSupplyIt() throws IOException {
-        JsonSchema schema = loadSchema();
+        Schema schema = loadSchema();
         Map<String, Boolean> cases = new LinkedHashMap<>();
 
         // Incomplete at a marker, nothing to defer to: refused.
@@ -631,8 +580,8 @@ class PaletteSchemaTest {
         List<String> failures = new ArrayList<>();
         for (Map.Entry<String, Boolean> testCase : cases.entrySet()) {
             boolean expectValid = testCase.getValue();
-            Set<ValidationMessage> messages =
-                    schema.validate(workAroundHashMarkerBug(toJackson(testCase.getKey())));
+            List<Error> messages =
+                    schema.validate(toJackson(testCase.getKey()));
             boolean actuallyValid = messages.isEmpty();
             if (actuallyValid != expectValid) {
                 failures.add(testCase.getKey() + ": expected " + (expectValid ? "valid" : "refused")
@@ -642,22 +591,30 @@ class PaletteSchemaTest {
         assertTrue(failures.isEmpty(), () -> String.join("\n", failures));
     }
 
-    /**
-     * The reviewer's own caution on this fix: {@link #workAroundHashMarkerBug} only renames a key, and
-     * must never end up papering over a real defect along the way it touches. Proven directly rather than
-     * assumed - an incomplete {@code weighted} node under marker {@code "#"} is still refused after the
-     * rename, through the same path every fixture in
-     * {@link #everySpecificationFixtureValidatesAsTheShapeLevelExpects()} runs.
-     */
+    /** Issue #218: validate original hash-prefixed keys, including nested definitions and nodes. */
     @Rule("MODEL.081")
     @Test
-    void theHashMarkerWorkaroundDoesNotHideAnIncompleteNode() throws IOException {
-        JsonSchema schema = loadSchema();
-        JsonNode document = workAroundHashMarkerBug(
-                toJackson("{\"version\":2,\"palette\":{\"#\":{\"kind\":\"weighted\"}}}"));
-        Set<ValidationMessage> messages = schema.validate(document);
-        assertFalse(messages.isEmpty(),
-                "expected an incomplete 'weighted' node under marker '#' to be refused after the rename,"
-                        + " not silently accepted");
+    void hashPrefixedKeysCannotBypassSchemaValidation() throws IOException {
+        Schema schema = loadSchema();
+        for (String key : List.of("#", "#named", "A")) {
+            for (String field : List.of("palette", "$defs")) {
+                for (String invalid : List.of(
+                        "{\"kind\":\"weighted\",\"choices\":[]}",
+                        "{\"block\":\"minecraft:stone\",\"#typo\":true}",
+                        "{\"block\":\"minecraft:stone\",\"traits\":{\"urbex:damaged\":{\"into\":\"minecraft:bricks\",\"#typo\":true}}}")) {
+                    JsonNode document = toJackson("{\"version\":2,\"" + field + "\":{\""
+                            + key + "\":" + invalid + "}}");
+                    assertFalse(schema.validate(document).isEmpty(),
+                            () -> "schema must reject the unmodified document: " + document);
+                }
+                JsonNode valid = toJackson("{\"version\":2,\"" + field + "\":{\""
+                        + key + "\":\"minecraft:stone\"}}");
+                assertTrue(schema.validate(valid).isEmpty(),
+                        () -> "a valid hash-prefixed key must still be accepted: " + valid);
+            }
+        }
+        assertFalse(schema.validate(toJackson(
+                "{\"version\":2,\"palette\":{\"#\":{\"kind\":\"weighted\"}}}")).isEmpty(),
+                "an incomplete weighted marker must be rejected without renaming '#'");
     }
 }

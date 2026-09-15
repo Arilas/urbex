@@ -161,7 +161,7 @@ class TraitPhaseTest {
                       "block": "minecraft:lantern",
                       "traits": {
                         "urbex:light":    { "unlit": "minecraft:air" },
-                        "urbex:optional": { "density": "stuff" }
+                        "urbex:optional": { "density": "lightingDensity" }
                       }
                     }
                   }
@@ -191,6 +191,92 @@ class TraitPhaseTest {
                 }
                 """, Set.of(Identifier.parse("urbex:easymobs"))),
                 "traits of different phases compose; only same-phase conflicts are refused");
+    }
+
+    @Rule("TRAIT.044")
+    @Rule("TRAIT.096")
+    @Test
+    void nestedOptionalAndLightResultsMustHoldTheInheritedBlockEntityData() {
+        for (String replacement : new String[]{
+                """
+                { "block": "minecraft:barrel", "traits": { "urbex:optional": {
+                  "density": "lootDensity", "replacement": "minecraft:air" } } }
+                """,
+                """
+                { "block": "minecraft:campfire", "traits": {
+                  "urbex:light": { "unlit": "minecraft:air" } } }
+                """}) {
+            String message = compileRefusal(nbtOverOptional(replacement));
+            assertTrue(Diag.DIAG_022.matches(message), message);
+            assertTrue(message.contains("minecraft:air"), message);
+            assertTrue(message.contains("urbex:optional.replacement"), message);
+        }
+    }
+
+    @Rule("TRAIT.044")
+    @Test
+    void selectionAddedByAWeightedAlternativeStillReceivesTheOuterNbt() {
+        String message = compileRefusal(nbtOverOptional("""
+                { "kind": "weighted", "choices": [
+                  { "weight": 1, "block": "minecraft:barrel" },
+                  { "weight": 1, "block": "minecraft:chest", "traits": { "urbex:optional": {
+                    "density": "lootDensity", "replacement": "minecraft:air" } } } ] }
+                """));
+        assertTrue(Diag.DIAG_022.matches(message), message);
+        assertTrue(message.contains("choice 1"), message);
+        assertTrue(message.contains("minecraft:air"), message);
+    }
+
+    @Rule("TRAIT.043")
+    @Rule("TRAIT.044")
+    @Test
+    void nestedSelectionsPreserveMixedAndUnavailableReplacementAcceptance() {
+        for (String replacement : new String[]{
+                """
+                { "kind": "weighted", "choices": [
+                  { "weight": 1, "block": "minecraft:barrel" },
+                  { "weight": 1, "block": "minecraft:stone" } ] }
+                """,
+                "\"missing:unavailable\""}) {
+            assertTrue(compiles(nbtOverOptional("""
+                    { "block": "minecraft:barrel", "traits": { "urbex:optional": {
+                      "density": "lootDensity", "replacement": %s } } }
+                    """.formatted(replacement))), replacement);
+        }
+    }
+
+    @Rule("TRAIT.006")
+    @Rule("TRAIT.044")
+    @Test
+    void replacementNbtOverridesAreValidatedByTheirOwnDeclaration() {
+        String replacement = """
+                { "block": "minecraft:barrel", "traits": {
+                  "urbex:block_entity": { "nbt": { "Items": [], "Custom": 1 } },
+                  "urbex:optional": { "density": "lootDensity", "replacement": "%s" } } }
+                """;
+        assertTrue(compiles(nbtOverOptional(replacement.formatted("minecraft:chest"))));
+        String message = compileRefusal(nbtOverOptional(replacement.formatted("minecraft:air")));
+        assertTrue(Diag.DIAG_022.matches(message), message);
+        assertTrue(message.contains("minecraft:air"), message);
+    }
+
+    @Rule("TRAIT.007")
+    @Test
+    void damageSatellitesDoNotInheritTheMarkersBlockEntityDecorator() {
+        assertTrue(compiles("""
+                { "version": 2, "palette": { "C": { "block": "minecraft:chest", "traits": {
+                  "urbex:block_entity": { "nbt": { "Items": [] } },
+                  "urbex:damaged": { "into": { "block": "minecraft:stone", "traits": {
+                    "urbex:optional": { "density": "lootDensity" } } } } } } } }
+                """));
+    }
+
+    private static String nbtOverOptional(String replacement) {
+        return """
+                { "version": 2, "palette": { "C": { "block": "minecraft:chest", "traits": {
+                  "urbex:block_entity": { "nbt": { "Items": [] } },
+                  "urbex:optional": { "density": "lightingDensity", "replacement": %s } } } } }
+                """.formatted(replacement);
     }
 
     private static String compileRefusal(String json) {

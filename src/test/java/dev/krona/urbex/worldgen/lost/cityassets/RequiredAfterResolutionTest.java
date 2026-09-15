@@ -322,7 +322,7 @@ class RequiredAfterResolutionTest {
         return new WorldStyleDefinition(Optional.empty(), Optional.empty(), outsideStyle,
                 Optional.empty(), Optional.empty(), scattered,
                 Optional.of(TestWiring.partSelector()),
-                cityStyles, Optional.empty(), Optional.empty());
+                cityStyles, Optional.empty());
     }
 
     private static StuffBuilder stuff() {

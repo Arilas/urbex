@@ -99,9 +99,14 @@ in.
 Early. See `docs/superpowers/specs/` for the design and `docs/superpowers/plans/` for what is
 being built now.
 
-Writing a datapack: `docs/datapacks.md` is the authoring guide for all thirteen asset registries —
-where files go, how `extends` works, and what a pack must declare. `docs/presets.md` covers the
-preset format specifically.
+Documentation:
+
+- [Datapack authoring](docs/datapacks.md): asset registries, inheritance and required wiring.
+- [Datapack presets](docs/presets.md): generation settings.
+- [Configuration](docs/configuration.md): JSON settings, world overrides and retired TOML files.
+- [Migrating from Lost Cities](docs/migrating-from-lost-cities.md): porting assets and converting
+  older Urbex palettes to Palette v2.
+- [Stabilization audit](docs/stabilization.md): verified issues and the next work to prioritize.
 
 ## Building
 

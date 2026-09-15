@@ -12,9 +12,6 @@ public class UrbexTags {
     public static final Identifier FOLIAGE = Identifier.fromNamespaceAndPath(Urbex.MODID, "foliage");
     public static final TagKey<Block> FOLIAGE_TAG = TagKey.create(Registries.BLOCK, FOLIAGE);
 
-    public static final Identifier ROTATABLE = Identifier.fromNamespaceAndPath(Urbex.MODID, "rotatable");
-    public static final TagKey<Block> ROTATABLE_TAG = TagKey.create(Registries.BLOCK, ROTATABLE);
-
     public static final Identifier EASY_BREAKABLE = Identifier.fromNamespaceAndPath(Urbex.MODID, "easybreakable");
     public static final TagKey<Block> EASY_BREAKABLE_TAG = TagKey.create(Registries.BLOCK, EASY_BREAKABLE);
 

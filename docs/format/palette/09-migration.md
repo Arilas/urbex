@@ -1,8 +1,9 @@
-# 07 · Versioning and migration
+# 09 · Versioning and migration
 
 `[DRAFT]` · Area `VER` · Palette format version 2
 
-How a version 2 palette coexists with a version 1 one, and what every version 1 spelling becomes.
+What the loader accepts now, and how the converter translates version 1 palettes.
+For a pack author's workflow, see [Migrating from Lost Cities](../../migrating-from-lost-cities.md).
 
 ---
 
@@ -55,16 +56,10 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 > > makes the catalogue a statement about an asset being loaded; bringing all three of these refusals
 > > into it is a coherent thing to want and is one piece of work, not three.
 
-> **VER.006** · `ACCEPT` `[NO-FIXTURE: a style and two palettes]` — A style's `randompalettes` may draw a version 1 palette and a version 2
-> palette into the same merge.
-
-> > **Why** — that composition operates on compiled palettes, not on `extends`, so it needs no
-> > correspondence between the two formats. Forbidding it as well would mean a pack could only
-> > migrate every palette at once — and the packs this has to work for hold 30 and 98 palette files.
-
-> **VER.013** · `ACCEPT` `[NO-FIXTURE: a palette and a conditions asset]` — VER.005 governs `extends` between palettes and nothing else. A version 2
-> palette references `conditions`, `variants`, block tags and every other registry exactly as a
-> version 1 palette does, whatever version those assets are written in.
+> **VER.013** · `ACCEPT` `[NO-FIXTURE: a palette and a conditions asset]` — A version 2 palette may
+> reference `conditions`, block tags and other supported registries in their own formats. Those assets
+> do not have to adopt palette format version 2. The removed `variants` registry is replaced by
+> `definitions`, as specified by VER.017.
 
 > > **Why** — otherwise adopting version 2 for one palette would require adopting it for every
 > > registry that palette touches, at once, across every pack. The palette registry is the first to
@@ -73,7 +68,7 @@ How a version 2 palette coexists with a version 1 one, and what every version 1 
 ## 2. What every version 1 construct becomes
 
 This table is the converter's specification, not a compatibility promise. Nothing loads both
-formats at once; see VER.005.
+formats at once; see VER.018.
 
 > **VER.008** · `MUST` — The translation is total. Every version 1 palette has exactly one version 2
 > form, and the tool in §4 produces it.
@@ -296,6 +291,11 @@ The retired set, and what each becomes:
 > > each one separately is how the format grew four spellings of one idea in the first place.
 
 ## Tombstones
+
+> **VER.006** — *retired.* Allowed a style to draw version 1 and version 2 palettes into the same
+> compiled merge while packs migrated incrementally. VER.018 now refuses version 1 before a style can
+> load it, so the permission has no runtime subject. Converter tests may still use the legacy compiler
+> directly; that does not restore datapack support. No replacement identifier.
 
 > **VER.005** — *retired.* Required every link of one `extends` chain to declare the same format
 > version, refusing a mixed chain with `DIAG.038`. Retired by [VER.018](#1-versioning): one format

@@ -48,6 +48,9 @@ public class Bridges {
                     // One lookup (LOAD.022). getInfo answers null for every version 2 marker, so
                     // asking it here lost a version 2 bridge light silently.
                     CompiledPalette.Placed placed = ctx.placedHere(compiledPalette, c);
+                    if (placed != null) {
+                        placed = placed.selectOptional(ctx.profile, ctx.seed, driver.getX(), driver.getY(), driver.getZ());
+                    }
                     BlockState b = placed == null ? null : placed.state();
                     Palette.Info inf = placed == null ? null : placed.info();
                     if (inf != null) {

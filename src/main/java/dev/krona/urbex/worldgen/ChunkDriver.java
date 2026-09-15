@@ -2,6 +2,7 @@ package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.GenerationMetrics;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.WorldGenLevel;
@@ -143,6 +144,15 @@ public class ChunkDriver {
      */
     private static final int EXPECTED_WRITES_PER_CHUNK = 12288;
 
+    /**
+     * Marker damage metadata for this generation only. Air means an authoritative absence of a
+     * damaged form; a missing entry falls back to procedural placement's state-only palette map.
+     * Allocated only for marker writes, survives mid-generation flushes, and dies on publication.
+     */
+    private Long2ObjectOpenHashMap<BlockState> markerDamage;
+    private boolean writingMarker;
+    private BlockState writingDamage;
+
     private boolean published;
     private boolean loggedLateWrite;
 
@@ -151,6 +161,16 @@ public class ChunkDriver {
         if (published) {
             recordLateWrite(x, y, z, state);
             return;
+        }
+        long packed = BlockPos.asLong(x, y, z);
+        if (writingMarker) {
+            if (markerDamage == null) {
+                markerDamage = new Long2ObjectOpenHashMap<>();
+            }
+            markerDamage.put(packed, writingDamage == null ? Blocks.AIR.defaultBlockState() : writingDamage);
+        } else if (markerDamage != null) {
+            // Every accepted overwrite removes the previous marker, including bulk writes.
+            markerDamage.remove(packed);
         }
         if (written == null) {
             written = new Long2ObjectOpenHashMap<>(EXPECTED_WRITES_PER_CHUNK);
@@ -196,6 +216,7 @@ public class ChunkDriver {
     private void publishRecordedWrites() {
         Long2ObjectOpenHashMap<BlockState> local = written;
         written = null;
+        markerDamage = null;
         published = true;
         if (!recordingWrites || local == null || local.isEmpty()) {
             return;
@@ -245,6 +266,9 @@ public class ChunkDriver {
      * the refusal lives there and not at the passes that write.</p>
      */
     public void setPrimer(LevelAccessor region, ChunkAccess primer, int writeMinY, int writeMaxY) {
+        markerDamage = null;
+        writingMarker = false;
+        writingDamage = null;
         this.region = region;
         this.seed = region instanceof WorldGenLevel level ? level.getSeed() : 0L;
         this.primer = primer;
@@ -588,6 +612,35 @@ public class ChunkDriver {
     public ChunkDriver block(BlockState c) {
         cursor.write(c);
         return this;
+    }
+
+    /** A marker placement: its damage metadata is recorded only if the buffer accepts the write. */
+    public ChunkDriver block(BlockState state, BlockState damaged) {
+        writingMarker = true;
+        writingDamage = damaged;
+        try {
+            cursor.write(state);
+        } finally {
+            writingMarker = false;
+            writingDamage = null;
+        }
+        return this;
+    }
+
+    public ChunkDriver add(BlockState state, BlockState damaged) {
+        block(state, damaged);
+        cursor.up();
+        return this;
+    }
+
+    /** The damage form belonging to the marker that last wrote this position. */
+    public BlockState damageHere(CompiledPalette fallback) {
+        BlockState damaged = markerDamage == null ? null
+                : markerDamage.get(BlockPos.asLong(getX(), getY(), getZ()));
+        if (damaged != null) {
+            return damaged.isAir() ? null : damaged;
+        }
+        return fallback.canBeDamagedToIronBars(getBlock());
     }
 
     public ChunkDriver add(BlockState state) {

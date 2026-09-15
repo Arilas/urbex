@@ -52,7 +52,7 @@ string every other file uses to name it. Directory names are the registry names 
 
 | Registry | What one file is | Required after the chain resolves |
 |---|---|---|
-| `worldstyles` | The top of the tree: which city styles apply in which biomes, the highway and railway wiring, what gets scattered outside cities, and which blocks rotate with their part | `outsidestyle`, `citystyles`, `parts.highways` (all six), `parts.railways` (all sixteen) — `rotatable` is optional |
+| `worldstyles` | The top of the tree: which city styles apply in which biomes, the highway and railway wiring, and what gets scattered outside cities | `outsidestyle`, `citystyles`, `parts.highways` (all six), `parts.railways` (all sixteen) |
 | `citystyles` | What a city is made of: street materials and street parts, plus weighted selectors for buildings, parks, bridges, fountains, stairs | `streetblocks.parts` (all eight) |
 | `buildings` | An ordered stack of parts, with floor and cellar limits | `filler`, `parts` |
 | `parts` | A block of geometry, up to 16×16, written as character slices | `xsize`, `zsize`, `slices` |
@@ -113,7 +113,7 @@ all have the same scope:
 | Block | Under a mix |
 |---|---|
 | `citystyles` | **Per city.** Each city centre draws a world style and keeps it, so a city built from your pack is entirely yours. |
-| `outsidestyle`, `rotatable` | **Per chunk**, from the nearest city — a chunk on your city's edge takes your outside style and your rotatable tag. |
+| `outsidestyle` | **Per chunk**, from the nearest city — a chunk on your city's edge takes your outside style. |
 | `scattered` | **Per scatter area**, so your scattered structures appear alongside the other pack's. |
 | `multisettings` | Per multichunk area, except `areasize`, which defines the grid and so comes from the heaviest style. |
 | `parts.highways`, `parts.railways`, `settings`, `citybiomemultipliers` | **From the heaviest style only.** A highway runs for hundreds of chunks between cities; one that changed pack partway along its run would not join up. |
@@ -291,45 +291,34 @@ One consequence worth knowing: a value that is present but malformed is still a 
 an absence. `"maxfloors": "three"` fails the file; it does not read as "unset" and silently inherit
 an ancestor's number.
 
-### `rotatable`: which blocks turn with their part
+### Rotation: palette blocks follow their part
 
-A part placed at a rotation only turns the blocks named by a block tag; everything else keeps the
-facing its palette entry authored. That tag is `urbex:rotatable` unless the world style names
-another:
+Palette v2 blocks follow the part's rotation and mirror by default. Set `urbex:rotatable` to `false`
+on a node to keep its authored block facing. The choice belongs to that node, so two markers using
+the same block can rotate differently:
 
-<!-- example: worldstyles -->
-
-```json
-{
-  "outsidestyle": "urbex:outside",
-  "rotatable": "#mypack:rotatable"
-}
-```
-
-Written with the leading `#`, like every other tag reference, and fully qualified — `#rotatable` is
-a load error, not `minecraft:rotatable`. Like `outsidestyle`, it is a scalar: the last entry in the
-chain that declares one wins, and a chain declaring none resolves `urbex:rotatable`.
-
-**Declaring it replaces; it does not merge.** To keep Urbex's own set, name it from your own tag —
-this one is an ordinary Minecraft block tag at `data/mypack/tags/block/rotatable.json`, not a
-registry asset:
-
-<!-- example: none -->
+<!-- example: palettes -->
 
 ```json
 {
-  "values": [
-    "#urbex:rotatable",
-    "#minecraft:trapdoors",
-    "minecraft:ladder"
-  ]
+  "version": 2,
+  "palette": {
+    "R": "minecraft:furnace[facing=north]",
+    "F": {
+      "block": "minecraft:furnace[facing=north]",
+      "traits": { "urbex:rotatable": false }
+    }
+  }
 }
 ```
 
-The alternative is shipping `data/urbex/tags/block/rotatable.json`, which merges into
-`urbex:rotatable` itself and therefore changes **every** world style including `urbex:standard`,
-whether or not the player selected yours. That is why this field exists: a pack that needs banners
-or trapdoors to rotate should be able to say so without reaching into Urbex's namespace.
+`R` turns with its part; `F` stays facing north. Trait inheritance also lets a shared definition
+supply the opt-out. A block-valued satellite, such as `urbex:damaged.into`, has its own rotation
+trait and follows the satellite inheritance rules in the [trait specification](format/palette/01-traits.md).
+
+The old worldstyle `rotatable` key is rejected with migration guidance. Remove it and express any
+required opt-outs in the palette. Urbex no longer reads `urbex:rotatable` or custom rotation block
+tags; retaining such a tag file does not affect placement.
 
 ## Display names
 
@@ -880,7 +869,11 @@ inherit, or failing later with a message about a missing field that names neithe
 rejected outright, naming the key and its replacement. This matters mostly if you are converting a
 Lost Cities Modern Tweaks pack, where `inherit` *is* the key.
 
-One more key is rejected rather than ignored, in `scattered` only: **`rotatable`**. It was read and
+**`rotatable` is also refused on a world style.** Rotation now belongs to palette nodes and defaults
+to on; remove the worldstyle key and set `"urbex:rotatable": false` in a node's `traits` when its
+facing should stay fixed. See [Rotation](#rotation-palette-blocks-follow-their-part).
+
+In `scattered`, **`rotatable`** is refused for a different reason. It was read and
 then thrown away — a scattered building always generates unrotated — so a pack that set it got
 exactly the world it would have got without it. Remove the key; nothing replaces it yet.
 

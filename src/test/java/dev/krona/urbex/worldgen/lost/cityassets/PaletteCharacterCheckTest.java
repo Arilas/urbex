@@ -302,28 +302,25 @@ class PaletteCharacterCheckTest {
                         + "refusing it would be this check inventing a rule");
     }
 
-    @Rule("VER.006")
     @Rule("MODEL.060")
     @Test
-    void aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays() {
-        // VER.006: "a style's randompalettes may draw a version 1 palette and a version 2 palette into
-        // the same merge", because that composition "operates on compiled palettes, not on extends, so
-        // it needs no correspondence between the two formats".
+    void aVersionTwoAliasResolvesAMarkerContributedByAnotherVersionTwoPalette() {
         Palette version2 = PALETTES.get(Identifier.parse(v2Palette("mixed_v2",
                 "{ \"version\": 2, \"palette\": {"
                         + " \"x\": \"minecraft:deepslate_bricks\","
                         + " \"@\": { \"kind\": \"alias\", \"of\": \"a\" } } }")));
-        Palette version1 = PALETTES.get(Identifier.parse(
-                palette("mixed_v1", entry('a', "minecraft:stone"))));
+        Palette base = compiledV2Palette("alias_base", """
+                { "version": 2, "palette": { "a": "minecraft:stone" } }
+                """);
 
-        CompiledPalette merged = new CompiledPalette(version1, version2);
+        CompiledPalette merged = new CompiledPalette(base, version2);
 
-        assertTrue(merged.isDefined('a'), "the version 1 palette's marker survives the merge");
-        assertTrue(merged.isDefined('x'), "and so does the version 2 palette's");
+        assertTrue(merged.isDefined('a'), "the base palette's marker survives the merge");
+        assertTrue(merged.isDefined('x'), "and so does the second palette's");
         assertTrue(merged.isDefined('@'),
-                "and a version 2 alias is answered by a marker only the version 1 palette defines, "
+                "and an alias is answered by a marker only the other palette defines, "
                         + "which is MODEL.064's 'markers contributed by palettes this file never "
-                        + "mentions' arriving across a format boundary");
+                        + "mentions'");
         assertEquals(BuiltInRegistries.BLOCK.getValue(Identifier.parse("minecraft:stone"))
                         .defaultBlockState(),
                 merged.getAt('@', 1L, 0, 0, 0),

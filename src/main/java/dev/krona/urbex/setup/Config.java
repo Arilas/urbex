@@ -157,7 +157,7 @@ public class Config {
     /**
      * Loads the global config. Called once from mod init.
      * <p>
-     * Reading the file, migrating a legacy one and writing it back are {@link ConfigRepository}'s
+     * Reading and writing the JSON file are {@link ConfigRepository}'s
      * business; what happens here is publication - the two slots every other path reads (issue #130).
      */
     public static void loadGlobal(Path configDir) {

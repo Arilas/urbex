@@ -102,7 +102,7 @@
 
     "o": {
       "block": "minecraft:cobweb",
-      "traits": { "urbex:optional": { "density": "stuff",
+      "traits": { "urbex:optional": { "density": "lightingDensity",
                                       "replacement": "minecraft:air" } }
     },
 

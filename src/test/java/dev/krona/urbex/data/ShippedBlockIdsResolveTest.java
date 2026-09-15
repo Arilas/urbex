@@ -40,9 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The air fallback itself is left alone here; see the Task 5c report. This test is the guard that
  * does not depend on it.
  * <p>
- * Which strings count as block ids is {@link ShippedBlockRefs}, shared with
- * {@link RotatableTagCoversShippedBlocksTest} rather than copied into it - see that class for what the
- * copy cost.
+ * Which strings count as block ids is defined once by {@link ShippedBlockRefs}, whose traversal
+ * understands palette nodes and their block-valued satellites.
  */
 class ShippedBlockIdsResolveTest {
 
@@ -79,8 +78,7 @@ class ShippedBlockIdsResolveTest {
 
     /**
      * The bundled pack reaches this test through both of {@link ShippedBlockRefs}' walks, which is
-     * worth asserting because one of them silently covering nothing is exactly how this guard - and the
-     * rotatable one beside it - stops guarding.
+     * worth asserting because one of them silently covering nothing would leave this guard green.
      *
      * <p>The counts are the shape of the pack rather than a second copy of it: thirty version 2
      * palettes, thirteen definitions and the six parts and buildings whose inline palettes are now

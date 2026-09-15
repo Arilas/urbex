@@ -139,8 +139,8 @@ public final class WorldStyleField {
     }
 
     /**
-     * The style governing an ordinary chunk - its {@code outsidestyle}, its {@code rotatable} tag,
-     * the palette it builds outside a city.
+     * The style governing an ordinary chunk - its {@code outsidestyle} and the palette it builds
+     * outside a city.
      * <p>
      * The dominant nearby city centre's style, so a chunk on a city's edge looks like that city
      * rather than like a coin flip. No centre in range gives {@link #primary()}. A perlin-rarity

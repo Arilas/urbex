@@ -549,11 +549,9 @@ public final class SpecDocuments {
         }
         // README.md §3.3's third status marker. Listed rather than left to the rule table alone,
         // because the thing a reader needs to know about one of these is precisely what the table
-        // cannot show: the rule is current and its citing tests are real, and they cover the spelling
-        // of a situation no code path reaches yet. TRAIT.011 sat in that table with two citing tests
-        // beside it and nothing saying so.
+        // cannot show: citing tests may cover only part of a rule while other paths remain open.
         out.append("\n**Rules marked `[NOT-YET-REACHED]` (").append(notYetReached.size())
-                .append("), whose citing tests can only cover the spelling until the issue named lands:**\n\n");
+                .append("), whose remaining coverage gaps are tracked by the named issue:**\n\n");
         out.append("| Rule | Reason |\n|---|---|\n");
         for (String id : notYetReached) {
             out.append("| `").append(id).append("` | ")
