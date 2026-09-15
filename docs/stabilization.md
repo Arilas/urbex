@@ -127,10 +127,42 @@ surviving requests.
 Park sockets explicitly write their air placeholder through the driver. That accepted write admits
 the request, giving park lamps the same ownership and overwrite behavior as sockets in parts.
 Review also found [#231](https://github.com/Arilas/urbex/issues/231): the later `updateNeeded`
-callback toggles blocks through air and can erase the finalized decoration data. This P1 follow-up
-now takes precedence over alias validation. A support regression separately exposed
+callback toggled blocks through air and could erase the finalized decoration data. This became the
+fifth batch below. A support regression separately exposed
 [#232](https://github.com/Arilas/urbex/issues/232): final shaping can read unflushed support as air
-through the underlying region. Both are tracked separately from socket ownership.
+through the underlying region. Both findings are separate from socket ownership.
+
+### Fifth batch: preserve decorations through post-placement updates
+
+[#231](https://github.com/Arilas/urbex/issues/231) affected the callback that runs after marker
+decoration finalization. Toggling a block through air removed its block entity, and restoring its
+state could replace queued NBT with an empty pending tag. Even rewriting the same state through
+`WorldGenRegion` could overwrite that data.
+
+The callback now reads the surviving state and preserves its block-entity data without rewriting
+the block. It retains the previous point-of-interest remove/re-add refresh and marks the final
+state's requested position for generation post-processing, respecting the existing flags. A final
+air state skips those effects, so the callback cannot restore a removed light or container.
+Requests outside the owning chunk or allowed height window are skipped, including a shifted
+post-processing position; the callback never looks up a neighboring chunk to mark it.
+
+This callback serves generation before lighting initializes: Urbex's normal path runs during
+CARVERS, and its biome-feature integration runs during FEATURES. Vanilla initializes light sources
+and propagates lighting afterward, then delivers the completed chunk to clients. The callback is
+not a live-world update or relighting API; preserving its generation side effects does not require
+client notifications or another block write.
+
+The full build passes **1,407 tests**, including six new generation-update regressions. They run
+real marker finalization, the post-update handler, stale block-entity cleanup and Minecraft's NBT
+deserializer. Both pending tags and already instantiated entities retain their authored fields,
+loot table/seed and spawner data. A guarded real chunk rejects state, entity or NBT writes after
+finalization. Further cases cover final-air skips, replaced materials, actual post-processing
+requests, the known-shape flag and owner/window/height bounds. All nine server digest configurations
+pass with zero unsafe reads and retain the fourth batch's goldens.
+
+The next priority is [#232](https://github.com/Arilas/urbex/issues/232), a reproduced runtime support
+failure during final shaping. It takes precedence over the separate alias capability-validation
+gap in [#229](https://github.com/Arilas/urbex/issues/229).
 
 ### Remaining backlog
 
@@ -139,9 +171,8 @@ game session during this audit; historical performance percentages are not fresh
 
 | Priority | Issue | Current evidence and next action |
 | --- | --- | --- |
-| P1 | [#231](https://github.com/Arilas/urbex/issues/231): post-update decoration loss | Source and Minecraft bytecode confirm that the air/state notification toggle removes finalized block-entity data. Preserve data through the complete finalization and post-update sequence. |
-| P2 | [#229](https://github.com/Arilas/urbex/issues/229): alias capability validation | Early validators see no states for an alias; resolving and overlaying it does not revalidate its traits. Check concrete same-file and reachable cross-palette outcomes after alias resolution at load. |
 | P2 | [#232](https://github.com/Arilas/urbex/issues/232): buffered shape support | A real driver commit removed a wall torch against buffered stone; flushing support first preserves it. Let shape/survival queries see buffered owner-chunk states. |
+| P2 | [#229](https://github.com/Arilas/urbex/issues/229): alias capability validation | Early validators see no states for an alias; resolving and overlaying it does not revalidate its traits. Check concrete same-file and reachable cross-palette outcomes after alias resolution at load. |
 | P2 | [#194](https://github.com/Arilas/urbex/issues/194): short highway supports | Both loops in `gen/Highways` still stop after 40 blocks. Replace with one helper bounded by the world's minimum height, preserving water traversal, and test a deep drop. |
 | P2 | [#193](https://github.com/Arilas/urbex/issues/193): floating debris | `CityGenerator` still descends through air/fluids only and writes `h + 1` unconditionally. Define debris-specific support and destination rules, including the top-of-world case. |
 | P2 | [#195](https://github.com/Arilas/urbex/issues/195): misleading throughput | `DigestRunner` still times generation, hashing and coverage scans together. Separate generation time from verification and name the write-recording overhead. |
@@ -244,5 +275,5 @@ All other written states and dumped block-entity data match the baseline.
 
 Base and both rail configurations retain their existing goldens. Normal, shuffled, two-worker
 and forced-expiry avoidance runs agree on the corrected avoidance digest, with zero unsafe reads.
-The temporary trace code is removed. The block-update and buffered-support findings in #231/#232
-remain separate follow-ups; these checks do not claim to resolve those lifecycle gaps.
+The temporary trace code is removed. This fourth-batch verification covers socket ownership;
+post-update decoration loss (#231, fifth batch) and buffered shape support (#232) are separate fixes.

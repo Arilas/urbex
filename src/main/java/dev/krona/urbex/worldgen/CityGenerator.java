@@ -830,13 +830,8 @@ public class CityGenerator {
     }
 
     public static void updateNeeded(ChunkGenContext ctx, BlockPos pos, int flags) {
-        ctx.addPostTodo(pos, world -> {
-            BlockState state = world.getBlockState(pos);
-            if (!state.isAir()) {
-                world.setBlock(pos, Blocks.AIR.defaultBlockState(), flags);
-                world.setBlock(pos, state, flags);
-            }
-        });
+        ctx.addPostTodo(pos, world -> GenerationUpdates.apply(world, ctx.chunk, ctx.writeWindow(),
+                pos, flags, world.getLevel()::updatePOIOnBlockStateChange));
     }
 
 }

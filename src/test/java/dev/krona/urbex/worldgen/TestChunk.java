@@ -63,7 +63,7 @@ final class TestChunk {
                 });
     }
 
-    private static PalettedContainerFactory containerFactory() {
+    static PalettedContainerFactory containerFactory() {
         Holder<Biome> biome = dummyBiome();
         IdMapper<Holder<Biome>> biomeIds = new IdMapper<>();
         biomeIds.add(biome);

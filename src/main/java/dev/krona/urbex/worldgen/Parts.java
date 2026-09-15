@@ -131,12 +131,9 @@ public class Parts {
                             } else if (ctx.tags.needsTodo(b)) {
                                 b = handleTodo(ctx, feature, info, oy, ctx.region, rx, rz, y, b);
                             }
-                            // Asked of the state that is actually about to be written, not of a tag,
-                            // and after the branch that decided it rather than as one more arm of
-                            // the chain. As an arm it was unreachable for every block with palette
-                            // metadata, so a light placed from an entry carrying a light source, a
-                            // mob or a tag never told the client to relight around it - and
-                            // urbex:lights had to enumerate by hand what the state already knows.
+                            // Queue generation notifications for the actual placement, including
+                            // metadata-bearing emitters. The handler preserves final NBT; vanilla
+                            // initializes lighting after this generation stage.
                             if (b.getLightEmission() > 0) {
                                 CityGenerator.updateNeeded(ctx, driver.getCurrentCopy(), Block.UPDATE_CLIENTS);
                             }
