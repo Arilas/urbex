@@ -8,6 +8,7 @@ import dev.krona.urbex.worldgen.lost.ChunkPlan;
 import dev.krona.urbex.worldgen.lost.Highway;
 import dev.krona.urbex.worldgen.lost.Transform;
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.regassets.data.HighwayParts;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.state.BlockState;
@@ -85,7 +86,7 @@ public class Highways {
 
         Character support = part.getMetaChar(BuildingPart.META_SUPPORT);
         if (info.profile.highwaySupports() && support != null) {
-            BlockState sup = ctx.paletteAt(info.getCompiledPalette(), support, 0, highwayGroundLevel - 1, 0);
+            CompiledPalette.Placed sup = ctx.selectedAt(info.getCompiledPalette(), support, 0, highwayGroundLevel - 1, 0);
             if (sup == null) {
                 throw new RuntimeException("Cannot find support block '" + support + "' for highway part '" + part.getName() + "'!");
             }

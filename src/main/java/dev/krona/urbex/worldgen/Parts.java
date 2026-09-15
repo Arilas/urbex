@@ -204,14 +204,12 @@ public class Parts {
 
     static void writeMarker(ChunkDriver driver, CompiledPalette.Placed placed, BlockState state, long seed,
                             Transform transform) {
-        driver.add(state, placed.damagedAt(seed, driver.getX(), driver.getY(), driver.getZ(), transform));
+        driver.add(state, placed.transformed(transform));
     }
 
     /** Mirror first, then rotate, using this selected slot's compiled trait rather than a block tag. */
     static BlockState transformMarker(CompiledPalette.Placed placed, Transform transform) {
-        BlockState state = placed.state();
-        return placed.rotatable() && transform != Transform.ROTATE_NONE
-                ? state.mirror(transform.getMcMirror()).rotate(transform.getMcRotation()) : state;
+        return placed.transformed(transform).state();
     }
 
     /**
@@ -490,12 +488,12 @@ public class Parts {
     public static void setBlocksFromPalette(ChunkGenContext ctx, CityGenerator feature, int x, int y, int z, int y2, CompiledPalette palette, char character) {
         ChunkDriver driver = ctx.driver;
         if (palette.isSimple(character)) {
-            BlockState b = ctx.paletteAt(palette, character, x, y, z);
+            CompiledPalette.Placed b = ctx.selectedAt(palette, character, x, y, z);
             driver.setBlockRange(x, y, z, y2, b);
         } else {
             driver.current(x, y, z);
             while (y < y2) {
-                driver.add(ctx.paletteHere(palette, character));
+                driver.add(ctx.selectedHere(palette, character));
                 y++;
             }
         }

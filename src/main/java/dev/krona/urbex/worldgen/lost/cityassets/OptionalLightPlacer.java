@@ -26,7 +26,12 @@ public final class OptionalLightPlacer {
     }
 
     public record Attempt(BlockState state, LightPool.Placement placement,
-                          @Nullable Direction supportDirection) { }
+                          @Nullable Direction supportDirection,
+                          @Nullable CompiledPalette.Placed material) {
+        public Attempt(BlockState state, LightPool.Placement placement, @Nullable Direction supportDirection) {
+            this(state, placement, supportDirection, null);
+        }
+    }
 
     @FunctionalInterface
     public interface Survival {
@@ -44,7 +49,8 @@ public final class OptionalLightPlacer {
 
     public static Optional<Attempt> select(LightPool pool, long seed, BlockPos at,
                                            OpportunitySupport support, Survival survival) {
-        return select(pool, seed, at, support, survival, LightPool.Candidate::state, true);
+        return select(pool, seed, at, support, survival, LightPool.Candidate::state,
+                LightPool.Candidate::material, true);
     }
 
     /**
@@ -72,6 +78,15 @@ public final class OptionalLightPlacer {
                                            OpportunitySupport support, Survival survival,
                                            Function<LightPool.Candidate, BlockState> stateOf,
                                            boolean fallThrough) {
+        return select(pool, seed, at, support, survival, stateOf, candidate -> null, fallThrough);
+    }
+
+    /** The selected material follows its oriented state through survival checks and planning. */
+    public static Optional<Attempt> select(LightPool pool, long seed, BlockPos at,
+                                           OpportunitySupport support, Survival survival,
+                                           Function<LightPool.Candidate, BlockState> stateOf,
+                                           Function<LightPool.Candidate, CompiledPalette.Placed> materialOf,
+                                           boolean fallThrough) {
         for (Opportunity opportunity : OPPORTUNITIES) {
             if (!pool.hasCandidates(opportunity.placement())
                     || !support.isPresent(opportunity.placement(), opportunity.supportDirection())) {
@@ -79,12 +94,13 @@ public final class OptionalLightPlacer {
             }
             for (LightPool.Candidate candidate : pool.weightedOrder(opportunity.placement(), seed,
                     at.getX(), at.getY(), at.getZ())) {
-                BlockState chosen = stateOf.apply(candidate);
+                CompiledPalette.Placed material = materialOf.apply(candidate);
+                BlockState chosen = material == null ? stateOf.apply(candidate) : material.state();
                 if (chosen == null || chosen.isAir()) {
                     return Optional.empty();
                 }
                 BlockState state = orient(chosen, opportunity.supportDirection());
-                Attempt attempt = new Attempt(state, opportunity.placement(), opportunity.supportDirection());
+                Attempt attempt = new Attempt(state, opportunity.placement(), opportunity.supportDirection(), material);
                 if (survival.canPlace(attempt)) {
                     return Optional.of(attempt);
                 }

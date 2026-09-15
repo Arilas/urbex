@@ -9,7 +9,9 @@
   defaults. The current run still falls back to defaults and logs the problem.
 - Palette markers placed in parts retain their own damaged forms through generation, including
   local palette overrides and weighted choices. Ruins use the selected damaged form. Procedural
-  material writes still use the state-based fallback tracked in #216.
+  materials and deferred light candidates now retain their selected marker too; generation no longer
+  reconstructs damage from a block-state map. Nested damage selection and later damage passes retain
+  each replacement's own damage trait, including when a replacement has the same block state.
 - Part rotation now follows each Palette v2 slot's `urbex:rotatable` trait, including its default
   and opt-out, and damaged satellites follow their own rotation policy. The obsolete world-style
   rotation tag is retired; use the palette trait to control orientation.

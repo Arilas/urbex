@@ -15,8 +15,6 @@ import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.IBuildingPart;
 import dev.krona.urbex.worldgen.lost.regassets.data.StreetParts;
 import dev.krona.urbex.worldgen.lost.Direction;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Streets, their borders, and what joins them to the chunks next door.
@@ -80,7 +78,7 @@ public class Streets {
             boolean elevated = info.isElevatedParkSection();
             if (elevated) {
                 Character elevationBlock = info.getCityStyle().getParkElevationBlock();
-                BlockState elevation = ctx.paletteAt(info.getCompiledPalette(), elevationBlock, 0, height, 0);
+                CompiledPalette.Placed elevation = ctx.selectedAt(info.getCompiledPalette(), elevationBlock, 0, height, 0);
                 for (int x = 0; x < 16; ++x) {
                     driver.current(x, height, 0);
                     for (int z = 0; z < 16; ++z) {
@@ -202,7 +200,7 @@ public class Streets {
      */
     private static void fillMainStreetBlock(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, Character borderBlock, int offset) {
         ChunkDriver driver = ctx.driver;
-        BlockState border = ctx.paletteAt(info.getCompiledPalette(), borderBlock, 0, info.getCityGroundLevel() - offset, 0);
+        CompiledPalette.Placed border = ctx.selectedAt(info.getCompiledPalette(), borderBlock, 0, info.getCityGroundLevel() - offset, 0);
         for (int x = 0; x < 16; ++x) {
             for (int z = 0; z < 16; ++z) {
                 driver.setBlockRange(x, info.getCityGroundLevel() - (offset - 1), z, info.getCityGroundLevel(), feature.profile.getBaseBlock());
@@ -218,7 +216,7 @@ public class Streets {
         ChunkDriver driver = ctx.driver;
         Character borderBlock = info.getCityStyle().getBorderBlock();
         Character wallBlock = info.getCityStyle().getWallBlock();
-        BlockState wall = ctx.paletteAt(info.getCompiledPalette(), wallBlock, x, info.getCityGroundLevel() + 1, z);
+        CompiledPalette.Placed wall = ctx.selectedAt(info.getCompiledPalette(), wallBlock, x, info.getCityGroundLevel() + 1, z);
 
         if (info.profile.isFloating()) {
                 Parts.setBlocksFromPalette(ctx, feature, x, info.getCityGroundLevel() - 3, z, info.getCityGroundLevel() + 1, info.getCompiledPalette(), borderBlock);
@@ -250,7 +248,7 @@ public class Streets {
     /**
      * Generate a column of wall blocks (and stone below that in water)
      */
-    private static void generateBorderSupport(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, BlockState wall, int x, int z, int offset, ChunkHeightmap heightmap) {
+    private static void generateBorderSupport(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, CompiledPalette.Placed wall, int x, int z, int offset, ChunkHeightmap heightmap) {
         ChunkDriver driver = ctx.driver;
         int height = heightmap.getHeight();
         if (height > 1) {

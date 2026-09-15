@@ -1,5 +1,6 @@
 package dev.krona.urbex.worldgen.lost.cityassets;
 
+import dev.krona.urbex.config.Preset;
 import dev.krona.urbex.varia.Rng;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
@@ -18,7 +19,12 @@ import javax.annotation.Nullable;
  * light marker has always left behind. What changed is that <em>something</em> is always written,
  * so a pack can say "this lantern hangs from a chain" and keep the chain when the lantern is off.</p>
  */
-public record LightSource(@Nullable LightPool pool, BlockChoice unlit) {
+public record LightSource(@Nullable LightPool pool, BlockChoice unlit,
+                          @Nullable PlacementChoice unlitPlacements) {
+
+    public LightSource(@Nullable LightPool pool, BlockChoice unlit) {
+        this(pool, unlit, null);
+    }
 
     /** Whether this is placed by the deferred placer rather than written where the marker sits. */
     public boolean isSocket() {
@@ -27,7 +33,8 @@ public record LightSource(@Nullable LightPool pool, BlockChoice unlit) {
 
     /** The replacement for this marker, addressed at its own position. */
     public BlockState unlitAt(long seed, BlockPos pos) {
-        return unlit.at(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LIGHTING_UNLIT);
+        return unlitPlacements != null ? unlitPlacements.at(seed, pos).state()
+                : unlit.at(seed, pos.getX(), pos.getY(), pos.getZ(), Rng.Purpose.LIGHTING_UNLIT);
     }
 
     /**
@@ -35,6 +42,24 @@ public record LightSource(@Nullable LightPool pool, BlockChoice unlit) {
      * named, or this source's own when it named none.
      */
     public BlockState unlitFor(LightPool.Candidate candidate, long seed, BlockPos pos) {
+        if (candidate.unlitPlacements() != null) {
+            return candidate.unlitPlacements().at(seed, pos).state();
+        }
         return candidate.unlit() != null ? candidate.unlit() : unlitAt(seed, pos);
+    }
+
+    @Nullable
+    public CompiledPalette.Placed unlitPlacementAt(Preset preset, long seed, BlockPos pos) {
+        return unlitPlacements == null ? null : unlitPlacements.at(preset, seed, pos);
+    }
+
+    @Nullable
+    public CompiledPalette.Placed unlitPlacementFor(LightPool.Candidate candidate, Preset preset,
+                                                   long seed, BlockPos pos) {
+        if (candidate.unlitPlacements() != null) {
+            return candidate.unlitPlacements().at(preset, seed, pos);
+        }
+        // A legacy candidate's explicit replacement must not acquire the source's metadata.
+        return candidate.unlit() != null ? null : unlitPlacementAt(preset, seed, pos);
     }
 }

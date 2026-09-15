@@ -29,7 +29,14 @@ public final class LightPool {
      * socket's light is off. {@code unlit} is null when the candidate names none, in which case the
      * source's own replacement is used.
      */
-    public record Candidate(int weight, BlockState state, @Nullable BlockState unlit) { }
+    public record Candidate(int weight, BlockState state, @Nullable BlockState unlit,
+                            @Nullable CompiledPalette.Placed material,
+                            @Nullable PlacementChoice unlitPlacements) {
+        /** Legacy converter/test candidates have only states and carry no v2 marker metadata. */
+        public Candidate(int weight, BlockState state, @Nullable BlockState unlit) {
+            this(weight, state, unlit, null, null);
+        }
+    }
 
     private final Map<Placement, List<Candidate>> candidates;
     /**

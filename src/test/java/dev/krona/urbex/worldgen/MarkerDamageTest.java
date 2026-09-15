@@ -3,6 +3,9 @@ package dev.krona.urbex.worldgen;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.format.Diagnostics;
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.config.PresetDraft;
+import dev.krona.urbex.worldgen.gen.Damage;
 import dev.krona.urbex.format.Rule;
 import dev.krona.urbex.format.palette.CompiledV2Palette;
 import dev.krona.urbex.format.palette.Exclusion;
@@ -42,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MarkerDamageTest {
     private static final long SEED = 216;
     private static final int Y = 80;
+    private static Preset profile;
     private static final String PALETTE = """
             { "version": 2, "palette": {
               "X": { "block": "minecraft:stone", "traits": {
@@ -67,6 +71,7 @@ class MarkerDamageTest {
     static void bootstrap() {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
+        profile = profile(1, 1);
     }
 
     @Rule("TRAIT.010")
@@ -91,14 +96,13 @@ class MarkerDamageTest {
                 driver.current(x, Y, z);
                 BlockState target = (x & 1) == 0 ? Blocks.BRICKS.defaultBlockState()
                         : Blocks.COBWEB.defaultBlockState();
-                BlockState damaged = DamageArea.applyDamage(SEED, driver.getBlock(), tags, x, Y, z,
-                        .6f, driver.damageHere(palette), 63, Blocks.WATER.defaultBlockState());
+                Damage.applyAtCursor(driver, profile, SEED, tags, .6f, 63, Blocks.WATER.defaultBlockState());
+                BlockState damaged = driver.getBlock();
                 if (Rng.floatAtPos(SEED, x, Y, z, Rng.Purpose.DAMAGE) <= .6f
                         && Rng.floatAtPos(SEED, x, Y, z, Rng.Purpose.DAMAGE_VARIANT) < .7f) {
                     assertEquals(target, damaged, "the original marker, not the state map, owns this damage");
                     if ((x & 1) == 0) bricks++; else cobwebs++;
                 }
-                driver.block(damaged);
             }
         }
         assertTrue(bricks > 20 && cobwebs > 20, "both marker kinds must actually reach damage");
@@ -128,7 +132,7 @@ class MarkerDamageTest {
                 for (int z = 0; z < 16; z++) {
                     place(driver, palette, marker, x, z);
                     driver.current(x, Y, z);
-                    seen.add(driver.damageHere(palette));
+                    seen.add(damageState(driver));
                 }
             }
             assertEquals(Set.of(Blocks.BRICKS.defaultBlockState(), Blocks.COBWEB.defaultBlockState()), seen,
@@ -147,7 +151,7 @@ class MarkerDamageTest {
             place(driver, palette, 'X', 3, 4);
             place(driver, palette, marker, 3, 4);
             driver.current(3, Y, 4);
-            assertNull(driver.damageHere(palette), "the final marker has no damaged form");
+            assertNull(damageState(driver), "the final marker has no damaged form");
         }
     }
 
@@ -162,7 +166,7 @@ class MarkerDamageTest {
         ChunkDriver driver = driver(TestChunk.emptyChunk());
         place(driver, merged, 'X', 2, 3);
         driver.current(2, Y, 3);
-        assertEquals(Blocks.GOLD_BLOCK.defaultBlockState(), driver.damageHere(base));
+        assertEquals(Blocks.GOLD_BLOCK.defaultBlockState(), damageState(driver));
     }
 
     @Test
@@ -173,17 +177,17 @@ class MarkerDamageTest {
         for (int path = 0; path < 4; path++) {
             place(driver, palette, 'X', 3, 4);
             driver.current(3, Y, 4);
-            driver.block(Blocks.STRUCTURE_VOID.defaultBlockState(), Blocks.COBWEB.defaultBlockState());
+            driver.block(Blocks.STRUCTURE_VOID.defaultBlockState(), palette.placedAt('Y', SEED, 3, Y, 4));
             driver.block(null, null);
             driver.setBlockRange(3, Y, 4, Y + 1, Blocks.GOLD_BLOCK.defaultBlockState(), old -> false);
-            assertEquals(Blocks.BRICKS.defaultBlockState(), driver.damageHere(empty));
+            assertEquals(Blocks.BRICKS.defaultBlockState(), damageState(driver));
             switch (path) {
                 case 0 -> driver.block(Blocks.STONE.defaultBlockState());
                 case 1 -> driver.setBlock(3, Y, 4, Blocks.GOLD_BLOCK.defaultBlockState());
                 case 2 -> driver.setBlockRange(3, Y, 4, Y + 1, Blocks.GOLD_BLOCK.defaultBlockState());
                 case 3 -> driver.setBlockRange(3, Y, 4, Y + 1, Blocks.GOLD_BLOCK.defaultBlockState(), old -> true);
             }
-            assertNull(driver.damageHere(empty), "overwrite path " + path + " must erase the marker");
+            assertNull(damageState(driver), "overwrite path " + path + " must erase the marker");
         }
     }
 
@@ -194,8 +198,8 @@ class MarkerDamageTest {
         driver.setPrimer(TestChunk.levelFor(chunk), chunk, Y, Y);
         CompiledPalette palette = palette(PALETTE);
         place(driver, palette, 'X', 3, 4);
-        driver.current(3, Y + 1, 4).block(Blocks.STONE.defaultBlockState(), Blocks.COBWEB.defaultBlockState());
-        assertNull(driver.damageHere(new CompiledPalette()), "a rejected write carries no marker");
+        driver.current(3, Y + 1, 4).block(palette.placedAt('Y', SEED, 3, Y + 1, 4));
+        assertNull(damageState(driver), "a rejected write carries no marker");
         Field metadata = ChunkDriver.class.getDeclaredField("markerDamage");
         metadata.setAccessible(true);
         assertEquals(1, ((java.util.Map<?, ?>) metadata.get(driver)).size());
@@ -216,7 +220,7 @@ class MarkerDamageTest {
         driver.current(3, Y, 4);
         assertEquals(115, driver.getX());
         assertEquals(-172, driver.getZ());
-        assertEquals(target, driver.damageHere(new CompiledPalette()));
+        assertEquals(target, damageState(driver));
         assertEquals(Blocks.STONE.defaultBlockState(), chunk.getBlockState(new BlockPos(115, Y, -172)));
     }
 
@@ -229,6 +233,94 @@ class MarkerDamageTest {
         Field metadata = ChunkDriver.class.getDeclaredField("markerDamage");
         metadata.setAccessible(true);
         assertNull(metadata.get(driver));
+    }
+
+    @Rule("TRAIT.009")
+    @Rule("TRAIT.011")
+    @Test
+    void nestedDamageSelectionRetainsItsOwnTransformAndFurtherDamage() {
+        CompiledPalette palette = palette("""
+                { "version": 2, "palette": {
+                  "O": { "block": "minecraft:stone", "traits": { "urbex:damaged": { "into": {
+                    "block": "minecraft:oak_stairs[facing=north]", "traits": {
+                      "urbex:rotatable": false,
+                      "urbex:damaged": { "into": "minecraft:diamond_block" },
+                      "urbex:optional": { "density": "lightingDensity", "replacement": {
+                        "block": "minecraft:cobblestone_stairs[facing=north]", "traits": {
+                          "urbex:damaged": { "into": "minecraft:gold_block" } } } } } } } } },
+                  "A": { "block": "minecraft:stone", "traits": { "urbex:damaged": { "into": {
+                    "block": "minecraft:air", "traits": { "urbex:optional": {
+                      "density": "lootDensity", "replacement": "minecraft:gold_block" } } } } } }
+                } }
+                """);
+        ChunkDriver driver = driver(TestChunk.emptyChunk());
+        driver.current(3, Y, 4).block(palette.placedAt('O', SEED, 3, Y, 4).transformed(Transform.ROTATE_90));
+        CompiledPalette.Placed original = driver.damageHere(profile(1, 1), SEED);
+        CompiledPalette.Placed replacement = driver.damageHere(profile(0, 1), SEED);
+        assertEquals(Direction.NORTH, original.state().getValue(StairBlock.FACING), "satellite opts out");
+        assertEquals(Direction.EAST, replacement.state().getValue(StairBlock.FACING), "replacement owns its rotation");
+        assertEquals(Blocks.DIAMOND_BLOCK.defaultBlockState(), original.damagedPlacementAt(profile, SEED, 3, Y, 4).state());
+        driver.block(replacement); // The ruins pass can select this form before explosions run.
+        assertEquals(Blocks.GOLD_BLOCK.defaultBlockState(), damageState(driver), "next pass reads the replacement's trait");
+
+        driver.block(palette.placedAt('A', SEED, 3, Y, 4));
+        assertNull(driver.damageHere(profile(1, 1), SEED), "final air is no damaged form");
+        assertEquals(Blocks.GOLD_BLOCK.defaultBlockState(), driver.damageHere(profile(1, 0), SEED).state(),
+                "selection must run even when the damage satellite's authored primary state is air");
+    }
+
+    @Rule("TRAIT.011")
+    @Test
+    void sameStateDamageReplacementAdvancesOwnershipButUnchangedRollKeepsIt() {
+        CompiledPalette palette = palette("""
+                { "version": 2, "palette": { "S": { "block": "minecraft:stone", "traits": {
+                  "urbex:damaged": { "into": { "block": "minecraft:stone", "traits": {
+                    "urbex:damaged": { "into": "minecraft:gold_block" } } } } } } } }
+                """);
+        ChunkDriver driver = driver(TestChunk.emptyChunk());
+        TagSnapshot tags = TagSnapshot.capture();
+        int replaced = 0;
+        int kept = 0;
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                driver.current(x, Y, z).block(palette.placedAt('S', SEED, x, Y, z));
+                DamageArea.Decision decision = DamageArea.decide(SEED, driver.getBlock(), tags, x, Y, z, .6f, true);
+                boolean changed = Damage.applyAtCursor(driver, profile, SEED, tags, .6f, 63, Blocks.WATER.defaultBlockState());
+                switch (decision) {
+                    case KEEP -> {
+                        assertEquals(false, changed);
+                        assertEquals(Blocks.STONE.defaultBlockState(), damageState(driver));
+                        kept++;
+                    }
+                    case REPLACE -> {
+                        assertEquals(false, changed, "same-state damage does not inflate the damage counter");
+                        assertEquals(Blocks.STONE.defaultBlockState(), driver.getBlock());
+                        assertEquals(Blocks.GOLD_BLOCK.defaultBlockState(), damageState(driver));
+                        assertTrue(Damage.applyAtCursor(driver, profile, SEED, tags, .6f, 63, Blocks.WATER.defaultBlockState()));
+                        assertEquals(Blocks.GOLD_BLOCK.defaultBlockState(), driver.getBlock());
+                        assertNull(damageState(driver), "the final traitless target has no state fallback");
+                        replaced++;
+                    }
+                    case DESTROY -> {
+                        assertTrue(changed);
+                        assertNull(damageState(driver));
+                    }
+                }
+            }
+        }
+        assertTrue(replaced > 20 && kept > 20);
+    }
+
+    private static BlockState damageState(ChunkDriver driver) {
+        CompiledPalette.Placed damaged = driver.damageHere(profile, SEED);
+        return damaged == null ? null : damaged.state();
+    }
+
+    private static Preset profile(float lighting, float loot) {
+        PresetDraft draft = new PresetDraft(Identifier.parse("urbex:marker_damage_test"));
+        draft.LIGHTING_DENSITY = lighting;
+        draft.LOOT_DENSITY = loot;
+        return draft.resolve();
     }
 
     @Rule("TRAIT.007")
@@ -276,7 +368,7 @@ class MarkerDamageTest {
                         marker + " main state under " + transform);
                 driver.current(x, Y, 4);
                 BlockState result = DamageArea.applyDamage(SEED, driver.getBlock(), tags, x, Y, 4,
-                        .6f, driver.damageHere(palette), 63, Blocks.WATER.defaultBlockState());
+                        .6f, damageState(driver), 63, Blocks.WATER.defaultBlockState());
                 driver.block(result);
                 driver.flushToChunk(chunk);
                 Direction damageFacing = marker == 'C' || marker == 'D' ? Direction.NORTH : entry.getValue();
@@ -320,7 +412,7 @@ class MarkerDamageTest {
                 Parts.writeMarker(driver, damaged, Parts.transformMarker(damaged, Transform.ROTATE_90),
                         SEED, Transform.ROTATE_90);
                 driver.current(x, Y, z);
-                damageDirections.add(driver.damageHere(palette).getValue(StairBlock.FACING));
+                damageDirections.add(damageState(driver).getValue(StairBlock.FACING));
             }
         }
         assertEquals(Set.of(Direction.NORTH, Direction.EAST), mainDirections);

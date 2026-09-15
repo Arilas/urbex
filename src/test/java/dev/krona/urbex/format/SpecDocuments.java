@@ -120,6 +120,12 @@ public final class SpecDocuments {
     private static final Pattern NOT_YET_REACHED =
             Pattern.compile("`\\[NOT-YET-REACHED: ([^\\]]+)\\]`");
 
+    /** Status parsing remains testable when every current rule has reached its implementation. */
+    static Optional<String> notYetReachedReason(String line) {
+        Matcher marker = NOT_YET_REACHED.matcher(line);
+        return marker.find() ? Optional.of(marker.group(1)) : Optional.empty();
+    }
+
     /**
      * A tombstone line ({@code README.md} §3.4), e.g.
      * {@code > **VER.014** — *retired in draft.* …}. The em dash and the italicised {@code retired} are
@@ -230,12 +236,10 @@ public final class SpecDocuments {
                     String id = ruleMatch.group(1);
                     if (!id.startsWith(RESERVED_AREA + ".")) {
                         Matcher noFixture = NO_FIXTURE.matcher(line);
-                        Matcher notYetReached = NOT_YET_REACHED.matcher(line);
                         SpecRule rule = new SpecRule(id, file, ruleMatch.group(2).trim(),
                                 Optional.ofNullable(ruleMatch.group(3)),
                                 noFixture.find() ? Optional.of(noFixture.group(1)) : Optional.empty(),
-                                notYetReached.find()
-                                        ? Optional.of(notYetReached.group(1)) : Optional.empty(),
+                                notYetReachedReason(line),
                                 lineNumber);
                         if (!rules.containsKey(id)) {
                             order.add(id);

@@ -1,6 +1,7 @@
 package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.lost.cityassets.BuildingPart;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
@@ -24,7 +25,7 @@ public class Doors
 
     public static void generateDoors(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int height, int f) {
         BlockState air = Blocks.AIR.defaultBlockState();
-        BlockState filler = ctx.paletteAt(info.getCompiledPalette(), info.getBuilding().getFillerBlock(), 0, height, 0);
+        CompiledPalette.Placed filler = ctx.selectedAt(info.getCompiledPalette(), info.getBuilding().getFillerBlock(), 0, height, 0);
         ChunkDriver driver = ctx.driver;
 
         height--;       // Start generating doors one below for the filler

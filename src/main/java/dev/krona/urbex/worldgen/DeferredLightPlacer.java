@@ -1,5 +1,7 @@
 package dev.krona.urbex.worldgen;
 
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
 import dev.krona.urbex.worldgen.lost.cityassets.LightPool;
 import dev.krona.urbex.worldgen.lost.cityassets.LightSource;
 import dev.krona.urbex.worldgen.lost.cityassets.OptionalLightPlacer;
@@ -7,6 +9,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+
+import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,7 +22,11 @@ import java.util.function.Function;
 /** Plans one context's deferred lights without exposing later markers to earlier placements. */
 final class DeferredLightPlacer {
 
-    record Planned(BlockPos pos, BlockState state) { }
+    record Planned(BlockPos pos, BlockState state, @Nullable CompiledPalette.Placed material) {
+        Planned(BlockPos pos, BlockState state) {
+            this(pos, state, null);
+        }
+    }
 
     @FunctionalInterface
     interface AnchorSupport {
@@ -35,7 +43,7 @@ final class DeferredLightPlacer {
     private DeferredLightPlacer() {
     }
 
-    static List<Planned> plan(int ownerChunkX, int ownerChunkZ, long seed,
+    static List<Planned> plan(int ownerChunkX, int ownerChunkZ, long seed, Preset preset,
                               List<LightTodoQueue.Todo> todos,
                               Function<BlockPos, BlockState> stateAt,
                               AnchorSupport anchorSupport,
@@ -72,18 +80,23 @@ final class DeferredLightPlacer {
                         att -> survival.canPlace(marker, att, snapshotStateAt),
                         todo.lit() ? LightPool.Candidate::state
                                 : candidate -> source.unlitFor(candidate, seed, marker),
+                        todo.lit() ? candidate -> candidate.material() == null ? null
+                                : candidate.material().selectOptional(preset, seed,
+                                        marker.getX(), marker.getY(), marker.getZ())
+                                : candidate -> source.unlitPlacementFor(candidate, preset, seed, marker),
                         todo.lit());
             }
             if (attempt.isPresent()) {
-                planned.add(new Planned(marker, attempt.get().state()));
+                planned.add(new Planned(marker, attempt.get().state(), attempt.get().material()));
             } else if (todo.lit()) {
                 // Nowhere to hang it: damaged surroundings, no sturdy face, or a pool with nothing
                 // left in it. The source's own replacement is the last answer, and air is skipped
                 // rather than planned - the marker already holds air, and writing it again would put
                 // a driver write where there was none before.
-                BlockState unlit = source.unlitAt(seed, marker);
+                CompiledPalette.Placed material = source.unlitPlacementAt(preset, seed, marker);
+                BlockState unlit = material == null ? source.unlitAt(seed, marker) : material.state();
                 if (!unlit.isAir()) {
-                    planned.add(new Planned(marker, unlit));
+                    planned.add(new Planned(marker, unlit, material));
                 }
             }
         }

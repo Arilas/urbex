@@ -140,27 +140,27 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.010** · `MUST` — `urbex:damaged` states what this node's block becomes where the damage
 > pass applies. Its required field is `into`.
 
-> **TRAIT.011** · `MUST` `[NOT-YET-REACHED: issue #216]` — The mapping is keyed by the marker carrying
+> **TRAIT.011** · `MUST` — The mapping is keyed by the marker carrying
 > the trait, not by the block state it resolves to.
 
 > > **Why** — version 1 kept one `Map<BlockState, BlockState>` per palette, so two markers resolving
 > > to the same block shared one mapping and the last compiled won.
 
-> > **What now reaches it, and what remains** — part placement records the selected marker's damaged
-> > form per position in its chunk driver. The record survives intermediate flushes, is replaced with
-> > the next accepted write, and is released when generation finishes. Both the explosion pass and
-> > the ruins pass consume it; the latter places the authored target rather than treating every
-> > damaged form as a request for generic iron bars. `MarkerDamageTest` compiles two markers with the
-> > same state, writes through the production part-placement seam, runs the damage decision, and
-> > checks both distinct targets in a committed chunk. Traitless markers explicitly record no damage
-> > form, so another marker sharing their state cannot donate its trait.
-> > A damage satellite uses its own rotation policy, independently of its parent marker's opt-out.
+> > **Runtime ownership** — parts, procedural materials and deferred lights retain their selected
+> > marker in the chunk driver. Only accepted writes change that record; it survives intermediate
+> > flushes and is released when generation finishes. Literal and traitless overwrites clear it.
+> > There is no state-keyed runtime fallback, so another marker sharing a state cannot donate damage.
+> > A material sampled once for a wall or support keeps that primary choice, while its weighted
+> > damaged form is selected at each actual destination.
 > >
-> > Procedural material passes still resolve some style markers to a bare block state before filling
-> > walls, roofs, supports and other ranges. Those positions retain the historical state-keyed fallback
-> > and can still collapse two markers. The remaining work in [issue #216](https://github.com/Arilas/urbex/issues/216)
-> > is to carry marker metadata through those procedural placement APIs. This rule stays marked
-> > not-yet-reached until those paths also retain their own damaged forms.
+> > Ruins and explosions select the complete damaged result, including its own nested selection,
+> > independent rotation policy and further damage trait. A replacement with the same state still
+> > changes marker ownership when the damage roll selects it. Transform variants are precompiled;
+> > generation does not allocate a marker wrapper per write.
+> >
+> > `MarkerDamageTest`, `ProceduralMarkerDamageTest` and `DeferredMarkerDamageTest` cover these paths
+> > through real compilation, accepted writes, damage decisions and chunk commits. This completes
+> > the marker-identity work tracked in [issue #216](https://github.com/Arilas/urbex/issues/216).
 
 > **TRAIT.012** · `ACCEPT` — An `into` naming a block this game does not have leaves the marker
 > undamaged, and the load succeeds.
@@ -238,6 +238,10 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 ### 4.4 `urbex:block_entity`
 
 > **TRAIT.040** · `MUST` — `urbex:block_entity` supplies the NBT a block entity is initialised with.
+
+> > **Known runtime limitation** — part markers apply this decorator, but damaged replacements and
+> > deferred socket results can currently retain compiled NBT without applying it to the placed block.
+> > [Issue #226](https://github.com/Arilas/urbex/issues/226) tracks this missing decoration dispatch.
 > Its required field is `nbt`.
 
 > **TRAIT.041** · `REJECT` (`DIAG.022`) — `urbex:block_entity` on a node **none** of whose resolved
@@ -482,9 +486,10 @@ rotation and damage policy. The outer marker's decorators apply to the selected 
 explicitly written on the replacement overrides the same outer decorator. Rejecting a marker to air
 clears the position, including when a prior part or terrain left a block there.
 
-Deferred light sockets still use the existing lighting placement path. Selection traits nested
-inside a damage satellite are also not yet evaluated by the later damage pass; its satellite lookup
-currently retains the block choice and rotation policy.
+Deferred light sockets retain the chosen candidate or unlit replacement through support checks
+and planning, including weighted alternatives with the same state and different damage traits.
+Selection nested inside a damage satellite runs before its own rotation, and the resulting damage
+trait remains available to subsequent damage passes.
 
 ```json fixture:TRAIT.064 reject=DIAG.025
 {

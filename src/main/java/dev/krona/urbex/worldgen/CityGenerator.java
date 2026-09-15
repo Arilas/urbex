@@ -56,6 +56,7 @@ public class CityGenerator {
 
     private final BlockState base;
     public final BlockState liquid;
+    private final CompiledPalette.Placed defaultDebrisIronbars;
 
     // Built on first use and cached on this object, which is shared by the whole dimension. That was
     // safe only because generation held a lock on this feature. It is a pure function of two vanilla
@@ -92,6 +93,7 @@ public class CityGenerator {
         hardAir = Blocks.STRUCTURE_VOID.defaultBlockState();
         base = profile.getBaseBlock();
         liquid = profile.getLiquidBlock();
+        defaultDebrisIronbars = new CompiledPalette.Placed(Blocks.IRON_BARS.defaultBlockState(), null);
 
         railStates = new HashSet<>();
         addStates(Blocks.RAIL, railStates);
@@ -427,7 +429,7 @@ public class CityGenerator {
         LevelReader delegate = (LevelReader) driver.getRegion();
         LevelReader[] snapshotLevel = new LevelReader[1];
         List<DeferredLightPlacer.Planned> planned = DeferredLightPlacer.plan(
-                ctx.coord.chunkX(), ctx.coord.chunkZ(), ctx.seed, lights, driver::getBlockAt,
+                ctx.coord.chunkX(), ctx.coord.chunkZ(), ctx.seed, ctx.profile, lights, driver::getBlockAt,
                 (marker, supportDirection, stateAt) -> {
                     LevelReader level = snapshotLevel(snapshotLevel, delegate, stateAt);
                     BlockPos supportPos = marker.relative(supportDirection);
@@ -437,7 +439,7 @@ public class CityGenerator {
                 (marker, attempt, stateAt) -> attempt.state()
                         .canSurvive(snapshotLevel(snapshotLevel, delegate, stateAt), marker));
         for (DeferredLightPlacer.Planned light : planned) {
-            driver.currentAbsolute(light.pos()).block(light.state());
+            driver.currentAbsolute(light.pos()).block(light.state(), light.material());
             updateNeeded(ctx, light.pos(), Block.UPDATE_CLIENTS);
         }
     }
@@ -636,7 +638,6 @@ public class CityGenerator {
                 }
 
                 CompiledPalette palette = info.getCompiledPalette();
-                BlockState ironbarsState = Blocks.IRON_BARS.defaultBlockState();
                 Character infobarsChar = info.getCityStyle().getIronbarsBlock();
 
                 for (int i = 0; i < destroyedBlocks; i++) {
@@ -653,11 +654,12 @@ public class CityGenerator {
                             driver.decY();
                         }
                         // Fix for FLOATING // @todo!
-                        BlockState b;
+                        CompiledPalette.Placed b;
                         if (debrisRandom.nextInt(5) == 0) {
-                            b = infobarsChar == null ? ironbarsState : ctx.paletteAt(palette, infobarsChar, x, h + 1, z);
+                            b = infobarsChar == null ? defaultDebrisIronbars
+                                    : ctx.selectedAt(palette, infobarsChar, x, h + 1, z);
                         } else {
-                            b = ctx.paletteAt(adjacentPalette, rubbleBlock, x, h + 1, z);     // Filler from adjacent building
+                            b = ctx.selectedAt(adjacentPalette, rubbleBlock, x, h + 1, z);     // Filler from adjacent building
                         }
                         driver.current(x, h + 1, z).block(b);
                     }
@@ -775,7 +777,7 @@ public class CityGenerator {
                         Parts.setBlocksFromPalette(ctx, this, x, lowestLevel - 10, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
-                        BlockState filler = ctx.paletteAt(palette, fillerBlock, x, lowestLevel, z);
+                        CompiledPalette.Placed filler = ctx.selectedAt(palette, fillerBlock, x, lowestLevel, z);
                         driver.current(x, lowestLevel, z).block(filler); // There is nothing below so we fill this with the filler
                     }
 
@@ -797,7 +799,7 @@ public class CityGenerator {
                         Parts.setBlocksFromPalette(ctx, this, x, y, z, lowestLevel, palette, borderBlock);
                     }
                     if (driver.getBlock(x, lowestLevel, z) == air) {
-                        BlockState filler = ctx.paletteAt(palette, fillerBlock, x, lowestLevel, z);
+                        CompiledPalette.Placed filler = ctx.selectedAt(palette, fillerBlock, x, lowestLevel, z);
                         driver.current(x, lowestLevel, z).block(filler); // There is nothing below so we fill this with the filler
                     }
                     // That single filler block is not enough when the bottom of the building ends

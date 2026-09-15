@@ -16,14 +16,16 @@ The first batch fixes invalid-config data loss, per-part damage identity, rotati
 selection, nested block-entity validation and schema validation; removes TOML migration;
 strengthens coverage checks; and documents
 supported asset migration.
+It was merged in [PR #225](https://github.com/Arilas/urbex/pull/225), commit `f59eb60f`.
+The second batch completes marker-specific damage across procedural materials and deferred lights.
 Package moves and terrain redesign belong in separate changes so their effects can be reviewed.
 
 ### P1: addressed first
 
-| Item | Verification | Result in this branch |
+| Item | Verification | First-batch result |
 | --- | --- | --- |
 | [#222](https://github.com/Arilas/urbex/issues/222): invalid global JSON was overwritten | `ConfigRepository.loadGlobal` wrote defaults back after either a JSON parse failure or a codec rejection. This destroyed settings the owner could repair. | Preserve invalid/unreadable existing files; use defaults for the current run. Regression tests compare the original file contents after loading. |
-| [#216](https://github.com/Arilas/urbex/issues/216): marker-specific damage | `CompiledPalette` collapsed damage by block state; the post-placement passes no longer knew which part marker placed it. Ruins also discarded the retrieved target and wrote generic bars. | Part and park-lamp placement retain per-position damage metadata, including an explicit absence of a damaged form. Actual damage decisions and chunk writes are tested. **Keep open:** procedural material writes still use the state-based fallback. |
+| [#216](https://github.com/Arilas/urbex/issues/216): marker-specific damage | `CompiledPalette` collapsed damage by block state; the post-placement passes no longer knew which part marker placed it. Ruins also discarded the retrieved target and wrote generic bars. | Part and park-lamp placement retain per-position damage metadata, including an explicit absence of a damaged form. Actual damage decisions and chunk writes are tested. Procedural placement remained for the second batch below. |
 | [#218](https://github.com/Arilas/urbex/issues/218): schema validation skipped `#` | Reproduced directly with 1.5.6. Changing error path format did not fix it. The upstream defect skipped hash-prefixed keys in `additionalProperties`, so it was broader than one palette marker. | Upgrade the test dependency to 2.0.7, retain Jackson 2, remove key rewriting, and test original keys at marker, definition, node and trait-field positions. |
 | [#223](https://github.com/Arilas/urbex/issues/223): rotation trait ignored | `Parts` still used the legacy world-style block tag; the adapter discarded the compiled marker rotation policy. Compile-time tests did not exercise placement. | Apply the selected slot's default-on/opt-out policy in part placement; transform damaged satellites using their own policy. Remove obsolete rotation-tag scaffolding. |
 | [#224](https://github.com/Arilas/urbex/issues/224): optional trait ignored | No generation consumer used the optional trait. A marker still placed its primary block at density 0. Draft examples also named a nonexistent `stuff` density. | Carry the selection into placement before transformation and decoration, using actual preset density names, explicit unknown-name rejection and position-addressed replacement selection. |
@@ -39,9 +41,9 @@ This is a test-only dependency.
 
 | Issue | Verified state and action |
 | --- | --- |
-| [#220](https://github.com/Arilas/urbex/issues/220) | The v2 reference walker already existed, but did not measure its coverage. Added corpus counts by source category/reference kind and failing-reference fixtures for palettes, definitions, parts and buildings. P2, addressed in this branch. |
-| [#217](https://github.com/Arilas/urbex/issues/217) | No standing mutation harness existed. Added 16 independent, in-memory mutations that must compile and then fail the same coverage assertions used by the unmodified pack. P2, addressed in this branch. |
-| [#214](https://github.com/Arilas/urbex/issues/214) | Both owner codecs already dispatch inline v2 palettes correctly. Added explicit MERGE.011/MERGE.012 coverage for parts and buildings, including rejection of version 1 and unversioned inline palettes. Runtime premise was stale; acceptance coverage completed in this branch. |
+| [#220](https://github.com/Arilas/urbex/issues/220) | The v2 reference walker already existed, but did not measure its coverage. Added corpus counts by source category/reference kind and failing-reference fixtures for palettes, definitions, parts and buildings. P2, addressed in PR #225. |
+| [#217](https://github.com/Arilas/urbex/issues/217) | No standing mutation harness existed. Added 16 independent, in-memory mutations that must compile and then fail the same coverage assertions used by the unmodified pack. P2, addressed in PR #225. |
+| [#214](https://github.com/Arilas/urbex/issues/214) | Both owner codecs already dispatch inline v2 palettes correctly. Added explicit MERGE.011/MERGE.012 coverage for parts and buildings, including rejection of version 1 and unversioned inline palettes. Runtime premise was stale; acceptance coverage completed in PR #225. |
 | [#215](https://github.com/Arilas/urbex/issues/215) | Closed as already fixed on the starting revision: the converse conformance check exists and all three rules are REJECT. No duplicate implementation change was needed. |
 | [#213](https://github.com/Arilas/urbex/issues/213) | Closed: all ten tasks, bundled migration, removal of the variants registry and refusal of v1 loading are already on main. Separately tracked defects remain open. |
 
@@ -59,6 +61,29 @@ pack authors still need them. Some legacy compiler support remains under `src/ma
 converter-equivalence and internal tests. Move those dependencies into test support as a separate
 extraction; removing them blindly would remove the evidence used to verify conversion.
 
+### Second batch: complete marker-specific damage
+
+Procedural walls, supports, door frames, railways, vegetation and rubble now carry their selected palette
+material into the chunk driver. Deferred socket lights retain both lit and unlit choices, including
+weighted alternatives that resolve to the same block. The runtime state-keyed damage fallback is
+removed. Existing primary sampling positions, terrain loops and random-purpose addresses are preserved.
+
+The driver retains sparse metadata for accepted writes with damage traits. Literal and traitless
+overwrites clear it; intermediate flushes preserve it. Weighted damage targets and nested optional
+selection use each destination's coordinates, and precompiled transform views apply each satellite's
+own rotation policy. Ruins and explosions retain the selected replacement's own damage trait for
+later passes, even when the replacement has the same block state.
+
+`MarkerDamageTest`, `ProceduralMarkerDamageTest`, `DeferredMarkerDamageTest` and `RuinDamageTest`
+exercise compilation, procedural writes, deferred planning, accepted chunk commits and repeated
+damage. This completes the marker-identity acceptance condition in #216. Conformance checks also
+exercise status parsing with explicit examples, so they no longer require an unfinished rule to exist.
+
+The audit separately reproduced [#226](https://github.com/Arilas/urbex/issues/226): damaged replacements
+and deferred light candidates can retain authored block-entity NBT without dispatching its placement
+handler. A damaged chest and a socket campfire both compile cleanly and commit their block states but
+lose the authored NBT. This is P2 follow-up work on decoration effects, separate from damage identity.
+
 ### Remaining backlog
 
 These are source-verified findings. Terrain issues below have not been reproduced in an interactive
@@ -66,6 +91,7 @@ game session during this audit; historical performance percentages are not fresh
 
 | Priority | Issue | Current evidence and next action |
 | --- | --- | --- |
+| P2 | [#226](https://github.com/Arilas/urbex/issues/226): decoration effects on replacements | Reproduced missing block-entity NBT on damaged replacements and deferred socket candidates. Apply supported decoration handlers with the right generation context, or reject unsupported combinations during compilation. |
 | P2 | [#194](https://github.com/Arilas/urbex/issues/194): short highway supports | Both loops in `gen/Highways` still stop after 40 blocks. Replace with one helper bounded by the world's minimum height, preserving water traversal, and test a deep drop. |
 | P2 | [#193](https://github.com/Arilas/urbex/issues/193): floating debris | `CityGenerator` still descends through air/fluids only and writes `h + 1` unconditionally. Define debris-specific support and destination rules, including the top-of-world case. |
 | P2 | [#195](https://github.com/Arilas/urbex/issues/195): misleading throughput | `DigestRunner` still times generation, hashing and coverage scans together. Separate generation time from verification and name the write-recording overhead. |
@@ -86,14 +112,16 @@ game session during this audit; historical performance percentages are not fresh
 
 ## Verification
 
-`./gradlew regenerateConformance build` passes all **1,350 tests**, with no failures or skips,
+The first batch passed **1,350 tests**. The second batch's
+`./gradlew regenerateConformance build` passes all **1,359 tests**, with no failures or skips,
 and builds `build/libs/urbex-fabric-26.2-0.2.0.jar`. Conformance is regenerated from the actual rules
 and citing tests. The public
 converter fixtures are self-contained; `privateCorpusTest` needs an explicitly supplied private
 snapshot and is not part of this audit.
 
-All nine server digest configurations in `.github/workflows/build.yml` pass, with **zero unsafe
-reads** in every run. Feature-coverage gates remained enabled:
+All nine server digest configurations in `.github/workflows/build.yml` pass for both batches, with
+**zero unsafe reads** in every run. The second batch preserves every first-batch golden below.
+Feature-coverage gates remained enabled:
 
 | Configuration | Verified driver digest |
 | --- | --- |
@@ -107,10 +135,10 @@ The final nested block-entity validation change also received a repeated server 
 check. These checks exercise generated server output; they do not replace an interactive client
 playtest. No interactive client session or private corpus was used in this audit.
 
-### Explained golden changes
+### Explained first-batch golden changes
 
 The original commit was built in an independent checkout and reproduced both original avoidance
-digests. Per-position dumps from that checkout and this branch show exactly two changed states in
+digests. Per-position dumps from that checkout and PR #225 show exactly two changed states in
 each window, with no added or removed writes:
 
 | Position | Original state | Corrected state |

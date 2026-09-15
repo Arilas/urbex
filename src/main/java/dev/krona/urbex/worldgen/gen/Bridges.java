@@ -47,10 +47,7 @@ public class Bridges {
                     Character c = orientation == Orientation.X ? bt.getPaletteChar(x, l, z) : bt.getPaletteChar(z, l, x); // @todo general rotation system?
                     // One lookup (LOAD.022). getInfo answers null for every version 2 marker, so
                     // asking it here lost a version 2 bridge light silently.
-                    CompiledPalette.Placed placed = ctx.placedHere(compiledPalette, c);
-                    if (placed != null) {
-                        placed = placed.selectOptional(ctx.profile, ctx.seed, driver.getX(), driver.getY(), driver.getZ());
-                    }
+                    CompiledPalette.Placed placed = ctx.selectedHere(compiledPalette, c);
                     BlockState b = placed == null ? null : placed.state();
                     Palette.Info inf = placed == null ? null : placed.info();
                     if (inf != null) {
@@ -59,7 +56,7 @@ public class Bridges {
                                     driver.getCurrentCopy());
                         }
                     }
-                    driver.add(b);
+                    driver.add(b, placed);
                     l++;
                 }
             }
@@ -67,7 +64,7 @@ public class Bridges {
 
         Character support = bt.getMetaChar(BuildingPart.META_SUPPORT);
         if (info.profile.bridgeSupports() && support != null) {
-            BlockState sup = ctx.paletteAt(compiledPalette, support, 7, info.groundLevel, 7);
+            CompiledPalette.Placed sup = ctx.selectedAt(compiledPalette, support, 7, info.groundLevel, 7);
             // Everything below the deck is measured from the deck, not from the ground: the pillar
             // and the two side lips belong one block under whichever level the deck landed on. Read
             // off GROUNDLEVEL instead and a planned bridge, whose deck sits a block lower, would

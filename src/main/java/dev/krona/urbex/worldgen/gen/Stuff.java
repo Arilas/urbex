@@ -15,7 +15,6 @@ import dev.krona.urbex.worldgen.lost.regassets.data.BlockMatcher;
 import dev.krona.urbex.worldgen.lost.regassets.data.IdentifierMatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.Set;
@@ -177,7 +176,7 @@ public class Stuff {
                         if (ok) {
                             driver.current(x, y, z);
                             for (int k = 0; k < blocks.length(); k++) {
-                                BlockState block = ctx.paletteHere(palette, blocks.charAt(k));
+                                CompiledPalette.Placed block = ctx.selectedHere(palette, blocks.charAt(k));
                                 driver.add(block);
                             }
                             break;

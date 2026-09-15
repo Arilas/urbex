@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen;
 import dev.krona.urbex.Urbex;
 import dev.krona.urbex.varia.GenerationMetrics;
 import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import dev.krona.urbex.config.Preset;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.WorldGenLevel;
@@ -145,13 +146,12 @@ public class ChunkDriver {
     private static final int EXPECTED_WRITES_PER_CHUNK = 12288;
 
     /**
-     * Marker damage metadata for this generation only. Air means an authoritative absence of a
-     * damaged form; a missing entry falls back to procedural placement's state-only palette map.
-     * Allocated only for marker writes, survives mid-generation flushes, and dies on publication.
+     * Complete marker sources for this generation's remaining damage passes. Only sources with
+     * damage are stored; an absent entry means no damaged form. Survives mid-generation flushes
+     * and dies on publication. The block state is never used to reconstruct a marker.
      */
-    private Long2ObjectOpenHashMap<BlockState> markerDamage;
-    private boolean writingMarker;
-    private BlockState writingDamage;
+    private Long2ObjectOpenHashMap<CompiledPalette.Placed> markerDamage;
+    private CompiledPalette.Placed writingPlacement;
 
     private boolean published;
     private boolean loggedLateWrite;
@@ -163,11 +163,11 @@ public class ChunkDriver {
             return;
         }
         long packed = BlockPos.asLong(x, y, z);
-        if (writingMarker) {
+        if (writingPlacement != null && writingPlacement.hasDamage()) {
             if (markerDamage == null) {
                 markerDamage = new Long2ObjectOpenHashMap<>();
             }
-            markerDamage.put(packed, writingDamage == null ? Blocks.AIR.defaultBlockState() : writingDamage);
+            markerDamage.put(packed, writingPlacement);
         } else if (markerDamage != null) {
             // Every accepted overwrite removes the previous marker, including bulk writes.
             markerDamage.remove(packed);
@@ -267,8 +267,7 @@ public class ChunkDriver {
      */
     public void setPrimer(LevelAccessor region, ChunkAccess primer, int writeMinY, int writeMaxY) {
         markerDamage = null;
-        writingMarker = false;
-        writingDamage = null;
+        writingPlacement = null;
         this.region = region;
         this.seed = region instanceof WorldGenLevel level ? level.getSeed() : 0L;
         this.primer = primer;
@@ -578,6 +577,16 @@ public class ChunkDriver {
         buffer.fillWhere(worldX(x), worldZ(z), y, y2 - 1, state, test);
     }
 
+    /** Bulk writes retain the selected material; only accepted positions receive its metadata. */
+    public void setBlockRange(int x, int y, int z, int y2, CompiledPalette.Placed placed) {
+        writingPlacement = placed;
+        try {
+            buffer.fill(worldX(x), worldZ(z), y, y2 - 1, placed == null ? null : placed.state());
+        } finally {
+            writingPlacement = null;
+        }
+    }
+
     public void setBlockRangeToAir(int x, int y, int z, int y2) {
         buffer.fill(worldX(x), worldZ(z), y, y2 - 1, Blocks.AIR.defaultBlockState());
     }
@@ -614,33 +623,43 @@ public class ChunkDriver {
         return this;
     }
 
-    /** A marker placement: its damage metadata is recorded only if the buffer accepts the write. */
-    public ChunkDriver block(BlockState state, BlockState damaged) {
-        writingMarker = true;
-        writingDamage = damaged;
+    /** Write a selected material without losing its per-marker damage payload. */
+    public ChunkDriver block(CompiledPalette.Placed placed) {
+        return placed == null ? block((BlockState) null) : block(placed.state(), placed);
+    }
+
+    /** The actual state can be support-oriented or decorated while retaining its selected source. */
+    public ChunkDriver block(BlockState state, CompiledPalette.Placed source) {
+        writingPlacement = source;
         try {
             cursor.write(state);
         } finally {
-            writingMarker = false;
-            writingDamage = null;
+            writingPlacement = null;
         }
         return this;
     }
 
-    public ChunkDriver add(BlockState state, BlockState damaged) {
-        block(state, damaged);
+    public ChunkDriver add(CompiledPalette.Placed placed) {
+        block(placed);
         cursor.up();
         return this;
     }
 
-    /** The damage form belonging to the marker that last wrote this position. */
-    public BlockState damageHere(CompiledPalette fallback) {
-        BlockState damaged = markerDamage == null ? null
+    public ChunkDriver add(BlockState state, CompiledPalette.Placed source) {
+        block(state, source);
+        cursor.up();
+        return this;
+    }
+
+    /**
+     * This position's complete damage result, selected at its actual destination. Keeping the
+     * source until this query lets copied materials retain anchor selection while weighted and
+     * optional damage satellites use the position where damage is being applied.
+     */
+    public CompiledPalette.Placed damageHere(Preset preset, long damageSeed) {
+        CompiledPalette.Placed source = markerDamage == null ? null
                 : markerDamage.get(BlockPos.asLong(getX(), getY(), getZ()));
-        if (damaged != null) {
-            return damaged.isAir() ? null : damaged;
-        }
-        return fallback.canBeDamagedToIronBars(getBlock());
+        return source == null ? null : source.damagedPlacementAt(preset, damageSeed, getX(), getY(), getZ());
     }
 
     public ChunkDriver add(BlockState state) {

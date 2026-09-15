@@ -1,6 +1,10 @@
 package dev.krona.urbex.worldgen.gen;
 
 import dev.krona.urbex.worldgen.ChunkGenContext;
+import dev.krona.urbex.config.Preset;
+import dev.krona.urbex.worldgen.TagSnapshot;
+import dev.krona.urbex.worldgen.lost.cityassets.CompiledPalette;
+import net.minecraft.world.level.block.Blocks;
 import dev.krona.urbex.worldgen.ChunkDriver;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.lost.DamageArea;
@@ -22,6 +26,33 @@ import net.minecraft.world.level.block.state.BlockState;
 public class Damage {
 
     private Damage() {
+    }
+
+    /**
+     * Apply one explosion decision at the current position. Returning whether the state changed
+     * preserves the damage field's existing counters; selecting a same-state replacement still
+     * writes its own traits for any later pass.
+     */
+    public static boolean applyAtCursor(ChunkDriver driver, Preset preset, long seed, TagSnapshot tags,
+                                         float damage, int waterlevel, BlockState liquid) {
+        BlockState before = driver.getBlock();
+        CompiledPalette.Placed target = driver.damageHere(preset, seed);
+        DamageArea.Decision decision = DamageArea.decide(seed, before, tags,
+                driver.getX(), driver.getY(), driver.getZ(), damage, target != null);
+        return switch (decision) {
+            case KEEP -> false;
+            case REPLACE -> {
+                driver.block(target);
+                yield target.state() != before;
+            }
+            case DESTROY -> {
+                BlockState after = driver.getY() <= waterlevel ? liquid : Blocks.AIR.defaultBlockState();
+                if (after != before || target != null) {
+                    driver.block(after);
+                }
+                yield after != before;
+            }
+        };
     }
 
     public static void breakBlocks(ChunkGenContext ctx, CityGenerator feature, int chunkX, int chunkZ, ChunkPlan info) {
@@ -71,9 +102,8 @@ public class Damage {
                             if (d != feature.air || cury <= info.waterLevel) {
                                 float damage = collectedDamage[x][z];
                                 if (damage >= 0.001) {
-                                    BlockState newd = damageArea.damageBlock(d, feature.provider, ctx.tags, cx + x, cury, cz + z, damage, driver.damageHere(info.getCompiledPalette()), feature.liquid);
-                                    if (newd != d) {
-                                        driver.block(newd);
+                                    if (applyAtCursor(driver, ctx.profile, ctx.seed, ctx.tags, damage,
+                                            feature.provider.shape().seaLevel(), feature.liquid)) {
                                         cntDamaged++;
                                     }
                                 }
