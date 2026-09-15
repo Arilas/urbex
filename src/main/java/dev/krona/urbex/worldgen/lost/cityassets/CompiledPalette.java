@@ -535,6 +535,13 @@ public class CompiledPalette {
         // TRAIT.096 applies the marker's decorators to the selected block. The satellite keeps
         // its own selection, transformation and damage traits (TRAIT.007), and its own decorators
         // replace a same-id outer decorator. All combinations are built before worker use.
+        boolean light = selection.type() == Light.TYPE;
+        return new OptionalSelection(light ? "lightingDensity" : ((OptionalTrait.Value) selection.value()).density(),
+                selectionSlotsOf(selection.satellite(light ? Light.UNLIT : OptionalTrait.REPLACEMENT), traits));
+    }
+
+    /** Selection results inherit decorators, with each result's own declarations taking precedence. */
+    public static Placed[] selectionSlotsOf(CompiledEntry entry, TraitSet traits) {
         Map<Identifier, CompiledTrait> decorators = new LinkedHashMap<>();
         traits.traits().forEach((id, trait) -> {
             if (trait.type().phase() == TraitType.Phase.DECORATION
@@ -542,9 +549,7 @@ public class CompiledPalette {
                 decorators.put(id, trait);
             }
         });
-        boolean light = selection.type() == Light.TYPE;
-        return new OptionalSelection(light ? "lightingDensity" : ((OptionalTrait.Value) selection.value()).density(),
-                slotsOf(selection.satellite(light ? Light.UNLIT : OptionalTrait.REPLACEMENT), decorators));
+        return slotsOf(entry, decorators);
     }
 
     /** The satellite's materialised slots, retained per marker rather than collapsed by state. */

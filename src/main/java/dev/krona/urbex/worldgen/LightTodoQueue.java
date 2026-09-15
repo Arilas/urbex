@@ -16,7 +16,11 @@ import java.util.List;
  */
 final class LightTodoQueue {
 
-    record Todo(BlockPos pos, LightSource source, boolean lit) { }
+    record Todo(BlockPos pos, LightSource source, boolean lit, PlacementOrigin origin) {
+        Todo(BlockPos pos, LightSource source, boolean lit) {
+            this(pos, source, lit, null);
+        }
+    }
 
     private final int ownerChunkX;
     private final int ownerChunkZ;
@@ -29,6 +33,10 @@ final class LightTodoQueue {
     }
 
     synchronized void add(BlockPos pos, LightSource source, boolean lit) {
+        add(pos, source, lit, null);
+    }
+
+    synchronized void add(BlockPos pos, LightSource source, boolean lit, PlacementOrigin origin) {
         if (closed) {
             throw new IllegalStateException("Cannot admit a light marker after the generation queue was drained");
         }
@@ -36,7 +44,7 @@ final class LightTodoQueue {
             throw new IllegalArgumentException("Light marker " + pos + " does not belong to owner chunk "
                     + ownerChunkX + "," + ownerChunkZ);
         }
-        pending.add(new Todo(pos, source, lit));
+        pending.add(new Todo(pos, source, lit, origin));
     }
 
     synchronized List<Todo> closeAndDrain() {

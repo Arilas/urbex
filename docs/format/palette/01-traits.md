@@ -205,6 +205,30 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > > importer and its validator each kept a hand-written 48-name table. They drifted, and 35–55% of
 > > real references went unchecked in both without either failing.
 
+> **TRAIT.023** · `REJECT` (`DIAG.028`) — Every known block outcome carrying `urbex:loot` must
+> support generated loot. A known incompatible outcome is refused, including an inherited weighted
+> alternative, a tag member, a socket candidate or a selection replacement receiving this decorator.
+
+The supported target is a block whose block-entity factory creates a randomizable container. Merely
+having a block entity is insufficient: a campfire cannot hold generated loot. Put the trait on the
+supported alternatives when a weighted node mixes containers with other blocks. Missing cross-mod
+blocks remain accepted under [MODEL.042](00-model.md#41-block), and unresolved marker aliases are
+checked only as far as their available target information permits.
+
+Selection checks follow the effective leaf's nested replacements after `when` exclusion. An explicit
+replacement decorator overrides the inherited one and is validated at its own declaration. A damage
+satellite does not inherit this decorator; any decorator it declares is checked independently.
+
+```json fixture:TRAIT.023 reject=DIAG.028
+{
+  "version": 2,
+  "palette": {
+    "C": { "block": "minecraft:campfire",
+           "traits": { "urbex:loot": { "pool": "urbex:chestloot" } } }
+  }
+}
+```
+
 ```json fixture:TRAIT.021 reject=DIAG.021
 {
   "version": 2,
@@ -225,6 +249,25 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.032** · `MUST` — A node carrying `urbex:spawner` and rejected by spawner policy is written
 > as air.
 
+> **TRAIT.033** · `REJECT` (`DIAG.029`) — Every known block outcome carrying `urbex:spawner` must
+> support mob-spawner data. A known incompatible outcome is refused, with the same alternative,
+> selection, exclusion and unavailable-block behavior as [TRAIT.023](#42-urbexloot).
+
+The supported target is a block whose block-entity factory creates a mob spawner, including a
+compatible mod-provided subclass. Its actual block-entity type supplies the serialized type id.
+A chest or campfire has a block entity but cannot receive this decorator. Spawner policy remains a
+generation-time decision; validation does not reject a supported spawner because a preset disables it.
+
+```json fixture:TRAIT.033 reject=DIAG.029
+{
+  "version": 2,
+  "palette": {
+    "S": { "block": "minecraft:chest",
+           "traits": { "urbex:spawner": { "pool": "urbex:easymobs" } } }
+  }
+}
+```
+
 ```json fixture:TRAIT.031 reject=DIAG.021
 {
   "version": 2,
@@ -239,9 +282,13 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 
 > **TRAIT.040** · `MUST` — `urbex:block_entity` supplies the NBT a block entity is initialised with.
 
-> > **Known runtime limitation** — part markers apply this decorator, but damaged replacements and
-> > deferred socket results can currently retain compiled NBT without applying it to the placed block.
-> > [Issue #226](https://github.com/Arilas/urbex/issues/226) tracks this missing decoration dispatch.
+> > **Runtime ownership** — parts, procedural materials, damaged replacements and deferred socket
+> > results apply their surviving decorators after block shaping and before chunk publication.
+> > Accepted replacements clear the previous marker's data, even when they keep the same block state.
+> > Same-block shape corrections retain ownership. Generated loot and spawner fields compose with
+> > authored NBT, whose explicit fields take precedence; the actual type and coordinates stay
+> > loader-owned. This completes the decoration dispatch tracked in
+> > [issue #226](https://github.com/Arilas/urbex/issues/226).
 > Its required field is `nbt`.
 
 > **TRAIT.041** · `REJECT` (`DIAG.022`) — `urbex:block_entity` on a node **none** of whose resolved
@@ -276,7 +323,8 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > replacement none of whose resolved states has a block entity is refused.
 
 This check follows nested selection replacements that inherit the NBT, including selections inside
-weighted alternatives. The mixed-state allowance in TRAIT.043 still applies at each replacement.
+weighted alternatives, after load-time exclusion removes unavailable choices. The mixed-state
+allowance in TRAIT.043 still applies at each replacement.
 
 > > **Why** — by [TRAIT.096](#5-defining-a-trait) this `nbt` is written to whatever selection produced,
 > > so on a marker carrying `urbex:light` it is written to the unlit replacement on every position where

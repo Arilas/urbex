@@ -181,10 +181,10 @@ class TraitPhaseTest {
                   "version": 2,
                   "palette": {
                     "S": {
-                      "block": "minecraft:campfire",
+                      "block": "minecraft:spawner",
                       "traits": {
                         "urbex:spawner": { "pool": "urbex:easymobs" },
-                        "urbex:light": { "unlit": "minecraft:air" }
+                        "urbex:optional": { "density": "lootDensity", "replacement": "minecraft:spawner" }
                       }
                     }
                   }

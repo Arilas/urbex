@@ -241,7 +241,7 @@ public final class CompiledV2Palette {
         Compiler(Exclusion.Presence presence, TraitContext context, String asset,
                  Diagnostics diagnostics) {
             this.presence = presence;
-            this.context = context;
+            this.context = context.withPresence(presence);
             this.asset = asset;
             this.diagnostics = diagnostics;
         }

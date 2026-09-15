@@ -193,6 +193,14 @@ public enum Diag {
     DIAG_027("%s: 'urbex:optional' names unknown density '%s'."
             + " Use 'lightingDensity' or 'lootDensity' from the preset's decoration settings."),
 
+    /** {@code TRAIT.023}: args are the location and the authored block or tag. */
+    DIAG_028("%s: %s has a resolved block that cannot receive 'urbex:loot' data."
+            + " Remove the trait, or name a container that supports generated loot."),
+
+    /** {@code TRAIT.033}: args are the location and the authored block or tag. */
+    DIAG_029("%s: %s has a resolved block that cannot receive 'urbex:spawner' data."
+            + " Remove the trait, or name a supported mob-spawner block."),
+
     // ---- References and merging (030-039) ------------------------------------------------------
 
     /**

@@ -3,6 +3,7 @@ package dev.krona.urbex.format.palette.traits;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.format.Diagnostics;
+import dev.krona.urbex.format.Diag;
 import dev.krona.urbex.format.palette.PointerResolver;
 import dev.krona.urbex.format.palette.RawNode;
 import dev.krona.urbex.format.palette.ResolvedNode;
@@ -10,6 +11,7 @@ import dev.krona.urbex.format.palette.TraitContext;
 import dev.krona.urbex.format.palette.TraitType;
 import dev.krona.urbex.format.palette.TraitValue;
 import dev.krona.urbex.worldgen.lost.regassets.data.DataTools;
+import dev.krona.urbex.worldgen.lost.cityassets.MarkerCapabilities;
 import net.minecraft.resources.Identifier;
 
 import java.util.List;
@@ -89,5 +91,7 @@ public final class Spawner implements TraitType<Spawner.Value> {
     public void validate(Value value, ResolvedNode owner, TraitContext context,
                          PointerResolver.Site site, Diagnostics diagnostics) {
         // TRAIT.031 is the generic reference check reading references(); see Loot's class note.
+        DecoratorTargets.validate(owner, id(), MarkerCapabilities::supportsSpawner, Diag.DIAG_029,
+                context, site, diagnostics);
     }
 }

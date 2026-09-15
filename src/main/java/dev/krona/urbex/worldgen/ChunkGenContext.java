@@ -32,6 +32,8 @@ public final class ChunkGenContext {
     public final PlanningContext provider;
     public final Preset profile;
     public final ChunkPlan info;
+    /** Origin for materials generated directly, without an authored part. */
+    public final PlacementOrigin proceduralOrigin;
     public final CompiledPalette palette;
     public final char street;
     public final NoiseBuffers buffers;
@@ -80,21 +82,29 @@ public final class ChunkGenContext {
         this.provider = provider;
         this.profile = profile;
         this.info = info;
+        this.proceduralOrigin = new PlacementOrigin(info, null);
         this.palette = info.getCompiledPalette();
         this.street = info.getCityStyle().getStreetBlock();
         this.window = WriteWindow.of(provider.site(), region.getMinY(), region.getMaxY());
         this.driver = new ChunkDriver();
         this.driver.setPrimer(region, chunk, window.minY(), window.maxY());
+        this.driver.setDefaultOrigin(proceduralOrigin);
+        this.driver.setMaterialPolicy((x, y, z, state, material, origin) ->
+                MarkerDecorations.prepareState(this, x, y, z, state, material, origin));
         this.buffers = new NoiseBuffers();
         this.seed = provider.seed();
         this.lightTodo = new LightTodoQueue(coord.chunkX(), coord.chunkZ());
     }
 
     void addLightTodo(BlockPos pos, LightSource source, boolean lit) {
+        addLightTodo(pos, source, lit, proceduralOrigin);
+    }
+
+    void addLightTodo(BlockPos pos, LightSource source, boolean lit, PlacementOrigin origin) {
         if (!window.contains(pos)) {
             return;
         }
-        lightTodo.add(pos, source, lit);
+        lightTodo.add(pos, source, lit, origin);
     }
 
     List<LightTodoQueue.Todo> drainLightTodo() {
@@ -114,6 +124,22 @@ public final class ChunkGenContext {
 
     Map<BlockPos, Consumer<WorldGenLevel>> drainPostTodo() {
         return postTodo.closeAndDrain();
+    }
+
+    private java.util.Set<String> warnedMarkerConditions;
+
+    /** At most one warning per condition/origin/effect during this generation, discarded with it. */
+    void warnMarkerCondition(String effect, String pool, PlacementOrigin origin) {
+        if (warnedMarkerConditions == null) {
+            warnedMarkerConditions = new java.util.HashSet<>();
+        }
+        String building = origin.owner().hasBuilding ? origin.owner().getBuildingType()
+                : dev.krona.urbex.worldgen.lost.cityassets.ConditionContext.NO_PART;
+        if (warnedMarkerConditions.add(effect + ':' + pool + ':' + origin.part() + ':' + building)) {
+            dev.krona.urbex.setup.ModSetup.getLogger().warn(
+                    "Skipping {}: condition '{}' returned no valid value for part '{}' in building '{}'",
+                    effect, pool, origin.part(), building);
+        }
     }
 
     /**

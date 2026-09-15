@@ -82,7 +82,33 @@ exercise status parsing with explicit examples, so they no longer require an unf
 The audit separately reproduced [#226](https://github.com/Arilas/urbex/issues/226): damaged replacements
 and deferred light candidates can retain authored block-entity NBT without dispatching its placement
 handler. A damaged chest and a socket campfire both compile cleanly and commit their block states but
-lose the authored NBT. This is P2 follow-up work on decoration effects, separate from damage identity.
+lose the authored NBT. This became the third batch below, separate from damage identity.
+
+### Third batch: surviving material decorations
+
+The chunk driver now retains a material's decoration data and originating part until finalization.
+Only accepted writes replace that ownership, including writes that keep the same block state.
+Intermediate flushes retain it. Same-block shape corrections retain both authored ownership and
+untouched terrain's block-entity data; an actual replacement clears stale data, even if its block
+entity has the same type.
+
+`MarkerDecorations` applies the surviving material's NBT, loot and spawner data after block shaping
+and flushing, before publication. Spawner admission still runs before placement because it can
+replace the block with air. Loot initializes the final container without restoring an old block.
+Authored NBT overrides generated fields, and the loader supplies the actual type and coordinates.
+Damage replacements and deferred sockets retain their originating building and part for condition
+selection; genuine procedural materials use `NO_PART`. Unmatched conditions skip that effect with
+a warning deduplicated within the current generation.
+
+Deferred unlit choices now inherit outer decorators with explicit replacement overrides, matching
+ordinary optional selection. Damage satellites keep their own decorators. Load-time capability checks
+reject known blocks that cannot hold their declared loot or spawner data, including nested selection
+and weighted outcomes. Excluded alternatives are pruned before validation; unavailable cross-mod
+blocks keep the existing format behavior.
+
+The separate alias-validation gap in [#229](https://github.com/Arilas/urbex/issues/229) still permits
+incompatible decorators when the target is resolved after early trait validation. Supported aliases
+receive the shared runtime handling; validation of known incompatible merged outcomes is follow-up work.
 
 ### Remaining backlog
 
@@ -91,7 +117,8 @@ game session during this audit; historical performance percentages are not fresh
 
 | Priority | Issue | Current evidence and next action |
 | --- | --- | --- |
-| P2 | [#226](https://github.com/Arilas/urbex/issues/226): decoration effects on replacements | Reproduced missing block-entity NBT on damaged replacements and deferred socket candidates. Apply supported decoration handlers with the right generation context, or reject unsupported combinations during compilation. |
+| P2 | [#228](https://github.com/Arilas/urbex/issues/228): stale deferred sockets | Source inspection shows later writes do not cancel an earlier socket todo. Bind queue entries to accepted placeholder ownership and verify solid/air replacements, repeated sockets and rejected writes. This is separate from final decoration dispatch. |
+| P2 | [#229](https://github.com/Arilas/urbex/issues/229): alias capability validation | Early validators see no states for an alias; resolving and overlaying it does not revalidate its traits. Check concrete same-file and reachable cross-palette outcomes after alias resolution at load. |
 | P2 | [#194](https://github.com/Arilas/urbex/issues/194): short highway supports | Both loops in `gen/Highways` still stop after 40 blocks. Replace with one helper bounded by the world's minimum height, preserving water traversal, and test a deep drop. |
 | P2 | [#193](https://github.com/Arilas/urbex/issues/193): floating debris | `CityGenerator` still descends through air/fluids only and writes `h + 1` unconditionally. Define debris-specific support and destination rules, including the top-of-world case. |
 | P2 | [#195](https://github.com/Arilas/urbex/issues/195): misleading throughput | `DigestRunner` still times generation, hashing and coverage scans together. Separate generation time from verification and name the write-recording overhead. |
@@ -112,15 +139,15 @@ game session during this audit; historical performance percentages are not fresh
 
 ## Verification
 
-The first batch passed **1,350 tests**. The second batch's
-`./gradlew regenerateConformance build` passes all **1,359 tests**, with no failures or skips,
+The first batch passed **1,350 tests**, and the second passed **1,359**. The third batch's
+`./gradlew regenerateConformance build` passes all **1,390 tests**, with no failures or skips,
 and builds `build/libs/urbex-fabric-26.2-0.2.0.jar`. Conformance is regenerated from the actual rules
 and citing tests. The public
 converter fixtures are self-contained; `privateCorpusTest` needs an explicitly supplied private
 snapshot and is not part of this audit.
 
-All nine server digest configurations in `.github/workflows/build.yml` pass for both batches, with
-**zero unsafe reads** in every run. The second batch preserves every first-batch golden below.
+All nine server digest configurations in `.github/workflows/build.yml` pass for all three batches,
+with **zero unsafe reads** in every run. The second and third batches preserve every first-batch golden below.
 Feature-coverage gates remained enabled:
 
 | Configuration | Verified driver digest |
@@ -134,6 +161,12 @@ Feature-coverage gates remained enabled:
 The final nested block-entity validation change also received a repeated server load and avoidance
 check. These checks exercise generated server output; they do not replace an interactive client
 playtest. No interactive client session or private corpus was used in this audit.
+
+Third-batch regressions cover committed NBT from weighted sockets, inherited and explicit unlit
+decorators, repeated damage, surviving origin, write-window rejection and shape-only neighbor updates.
+The shared handler tests cover actual condition selection, mob SpawnData, density rejection, unmatched
+conditions, stale loot cancellation and Minecraft's container NBT deserialization. The digest records
+block states; these tests separately verify the decoration payloads it does not measure.
 
 ### Explained first-batch golden changes
 

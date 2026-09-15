@@ -1,5 +1,6 @@
 package dev.krona.urbex.format.palette;
 
+import dev.krona.urbex.format.Diagnostics;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
@@ -9,6 +10,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
+import javax.annotation.Nullable;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,16 +39,24 @@ import java.util.Set;
  */
 public record TraitContext(HolderLookup<Block> blocks,
                            Map<ResourceKey<? extends Registry<?>>, Set<Identifier>> assets,
-                           TagEpoch tags) {
+                           TagEpoch tags,
+                           @Nullable Exclusion.Presence presence) {
 
     public TraitContext(HolderLookup<Block> blocks,
                         Map<ResourceKey<? extends Registry<?>>, Set<Identifier>> assets,
                         TagEpoch tags) {
+        this(blocks, assets, tags, null);
+    }
+
+    public TraitContext(HolderLookup<Block> blocks,
+                        Map<ResourceKey<? extends Registry<?>>, Set<Identifier>> assets,
+                        TagEpoch tags, @Nullable Exclusion.Presence presence) {
         this.blocks = blocks;
         Map<ResourceKey<? extends Registry<?>>, Set<Identifier>> copy = new LinkedHashMap<>();
         assets.forEach((registry, ids) -> copy.put(registry, Set.copyOf(ids)));
         this.assets = Map.copyOf(copy);
         this.tags = tags;
+        this.presence = presence;
     }
 
     /**
@@ -204,7 +214,20 @@ public record TraitContext(HolderLookup<Block> blocks,
 
     /** The same context, reading tags from {@code epoch} instead of from the block registry. */
     public TraitContext withTags(TagEpoch epoch) {
-        return new TraitContext(blocks, assets, epoch);
+        return new TraitContext(blocks, assets, epoch, presence);
+    }
+
+    /** The compiler supplies the same exclusion context used when building replacement entries. */
+    public TraitContext withPresence(Exclusion.Presence installed) {
+        return new TraitContext(blocks, assets, tags, installed);
+    }
+
+    /** Selection decorators validate only replacement alternatives that survive load-time exclusion. */
+    public Optional<ResolvedNode> pruneForValidation(ResolvedNode node, PointerResolver.Site site) {
+        // The replacement's own prepare step reports exclusion diagnostics. This view is read only:
+        // reporting here too would duplicate warnings for each decorator following the same branch.
+        return presence == null ? Optional.of(node)
+                : Exclusion.prune(node, presence, site, new Diagnostics());
     }
 
     /**

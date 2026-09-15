@@ -312,7 +312,8 @@ public class CityGenerator {
 
         phaseNanos = GenerationMetrics.mark();
         phaseAlloc = GenerationMetrics.allocMark();
-        ctx.driver.actuallyGenerate(chunk, ordinal);
+        ctx.driver.actuallyGenerate(chunk, ordinal, (target, pos, state, material, origin) ->
+                MarkerDecorations.apply(ctx, target, pos, state, material, origin));
         GenerationMetrics.phase(ordinal, GenerationMetrics.Phase.COMMIT, phaseNanos, phaseAlloc);
 
         phaseNanos = GenerationMetrics.mark();
@@ -439,7 +440,7 @@ public class CityGenerator {
                 (marker, attempt, stateAt) -> attempt.state()
                         .canSurvive(snapshotLevel(snapshotLevel, delegate, stateAt), marker));
         for (DeferredLightPlacer.Planned light : planned) {
-            driver.currentAbsolute(light.pos()).block(light.state(), light.material());
+            driver.currentAbsolute(light.pos()).block(light.state(), light.material(), light.origin());
             updateNeeded(ctx, light.pos(), Block.UPDATE_CLIENTS);
         }
     }

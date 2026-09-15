@@ -3,6 +3,7 @@ package dev.krona.urbex.worldgen.gen;
 import dev.krona.urbex.varia.Rng;
 import dev.krona.urbex.varia.NoiseGeneratorPerlin;
 import dev.krona.urbex.worldgen.ChunkDriver;
+import dev.krona.urbex.worldgen.PlacementOrigin;
 import dev.krona.urbex.worldgen.ChunkGenContext;
 import dev.krona.urbex.worldgen.CityGenerator;
 import dev.krona.urbex.worldgen.Parts;
@@ -177,13 +178,19 @@ public final class Decorations {
                 boolean doRubble = palette.isDefined(rubbleBlock);
                 while (height > 0) {
                     CompiledPalette.Placed damage = driver.damageHere(ctx.profile, ctx.seed);
+                    PlacementOrigin damageOrigin = driver.originHere();
                     BlockState c = driver.getBlockDown();
 
                     if (doRubble && !checkIronbars.test(c) && c != feature.air && c != feature.liquid && rollHere(ctx, driver, Rng.Purpose.RUINS) < .2f) {      // @todo hardcoded random
                         doRubble = false;
                         driver.add(ctx.selectedHere(palette, rubbleBlock));
                     } else if ((damage != null || checkIronbars.test(c)) && c != feature.air && c != feature.liquid && rollHere(ctx, driver, Rng.Purpose.RUINS_BARS) < .2f) {    // @todo hardcoded random
-                        driver.add(ruinBarReplacement(damage, ironbars));
+                        CompiledPalette.Placed replacement = ruinBarReplacement(damage, ironbars);
+                        if (damage != null) {
+                            driver.add(replacement.state(), replacement, damageOrigin);
+                        } else {
+                            driver.add(replacement);
+                        }
                     } else {
                         if (vl > 0) {
                             c = driver.getBlockDown();

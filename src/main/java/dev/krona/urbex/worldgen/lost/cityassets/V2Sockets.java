@@ -104,7 +104,7 @@ final class V2Sockets {
             CompiledTrait light = resolved.traits().traits().get(Light.TYPE.id());
             candidates.add(new LightPool.Candidate(count[0], resolved.state(), unlitOf(resolved.traits()),
                     CompiledPalette.placedOf(resolved),
-                    light == null ? null : PlacementChoice.of(light.satellite(Light.UNLIT))));
+                    light == null ? null : PlacementChoice.of(light.satellite(Light.UNLIT), resolved.traits())));
         });
         return List.copyOf(candidates);
     }
