@@ -1,6 +1,5 @@
 package dev.krona.urbex.worldgen;
 
-import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,7 +37,7 @@ class TagEpochTest {
     }
 
     private static TagSnapshot snapshot() {
-        return TagSnapshot.capture(AssetSnapshot.empty());
+        return TagSnapshot.capture();
     }
 
     @Test

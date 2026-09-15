@@ -22,9 +22,9 @@ import org.apache.commons.lang3.tuple.Pair;
  * <p>{@code 09-migration.md} §2's table is this correspondence written down, read right to left: version
  * 1's {@code loot}, {@code mob}, {@code tag} and {@code lightSource} are {@code urbex:loot},
  * {@code urbex:spawner}, {@code urbex:block_entity} and {@code urbex:light}. Four of the seven traits;
- * the other three are applied by passes that do not go through {@code Parts} at all
- * ({@code TRAIT.095}'s phases — {@code urbex:rotatable} transforms, {@code urbex:optional} selects in
- * the decoration pass, {@code urbex:damaged} is a pass of its own).</p>
+ * the other three travel directly on {@link CompiledPalette.Placed}. Parts selects optional blocks
+ * before transforming them, then applies these decorators; damage retains the marker's satellite
+ * for the later damage pass.</p>
  *
  * <h2>Built once per distinct trait set, never at a position</h2>
  *

@@ -891,7 +891,8 @@
       "properties": {
         "density": {
           "type": "string",
-          "description": "TRAIT.061: names a density in the preset's decoration settings."
+          "enum": ["lightingDensity", "lootDensity"],
+          "description": "TRAIT.061: names lightingDensity or lootDensity in the preset's decoration settings."
         },
         "replacement": {
           "$ref": "#/$defs/satelliteNode"

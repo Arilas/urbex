@@ -138,7 +138,9 @@ public final class ChunkGenContext {
      * {@code block()} or {@code add()} chain. Where it does not, use {@link #paletteAt}.
      */
     public net.minecraft.world.level.block.state.BlockState paletteHere(CompiledPalette p, char c) {
-        return p.getAt(c, seed, driver.getX(), driver.getY(), driver.getZ());
+        CompiledPalette.Placed placed = placedHere(p, c);
+        return placed == null ? null
+                : placed.selectOptional(profile, seed, driver.getX(), driver.getY(), driver.getZ()).state();
     }
 
     /** {@link #placedAt}, at the driver's current position. */
@@ -148,7 +150,9 @@ public final class ChunkGenContext {
 
     /** Resolve a weighted palette character at a chunk-local position. */
     public net.minecraft.world.level.block.state.BlockState paletteAt(CompiledPalette p, char c, int x, int y, int z) {
-        return p.getAt(c, seed, (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z);
+        CompiledPalette.Placed placed = placedAt(p, c, x, y, z);
+        return placed == null ? null : placed.selectOptional(profile, seed,
+                (coord.chunkX() << 4) + x, y, (coord.chunkZ() << 4) + z).state();
     }
 
     /**

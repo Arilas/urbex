@@ -82,6 +82,7 @@ Identifiers are allocated in blocks so related diagnostics stay adjacent as the 
 
 | `DIAG.025` | [TRAIT.064](01-traits.md#46-urbexoptional) | *`<asset>` marker `'<m>'`: carries both `urbex:light` and `urbex:optional`. A marker rolls one density; `urbex:light` is the lighting one.* |
 | `DIAG.026` | [TRAIT.042](01-traits.md#44-urbexblock_entity) | *`<asset>` marker `'<m>'`: `urbex:block_entity` nbt declares `<keys>`, which the loader supplies and this drops. Remove them; the position and the type are not the file's to choose.* |
+| `DIAG.027` | [TRAIT.066](01-traits.md#46-urbexoptional) | *`<asset>` marker `'<m>'`: `urbex:optional` names unknown density `'<density>'`. Use `lightingDensity` or `lootDensity` from the preset's decoration settings.* |
 
 ### References and merging
 

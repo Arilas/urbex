@@ -102,7 +102,11 @@ public final class Rng {
         // density roll accepted, whose every placement opportunity then failed, draws a candidate
         // and falls through to its replacement. Derived from one hash they would be the same
         // address twice, tying which replacement appears to which candidate was tried.
-        LIGHTING_UNLIT
+        LIGHTING_UNLIT,
+        // Which satellite state a damaged marker becomes, independent of whether damage applies.
+        DAMAGE_REPLACEMENT,
+        // Optional non-light markers choose replacements independently of their admission roll.
+        OPTIONAL_REPLACEMENT
     }
 
     /**

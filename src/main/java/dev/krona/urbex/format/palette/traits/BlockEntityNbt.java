@@ -16,6 +16,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.LinkedHashSet;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -154,7 +156,18 @@ public final class BlockEntityNbt implements TraitType<BlockEntityNbt.Value> {
         // Asked through TraitType.replacementField rather than of 'unlit' and 'replacement' by name:
         // a mod's selection trait has to be reachable here without this class knowing what it is
         // called, which is the whole of what TRAIT.090's declarations buy.
-        for (ResolvedTrait other : owner.traits().values()) {
+        validateSelections(owner, context, site, diagnostics,
+                Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    /** Follow only selection results; damage satellites do not receive this decorator. */
+    private static void validateSelections(ResolvedNode node, TraitContext context,
+                                            PointerResolver.Site site, Diagnostics diagnostics,
+                                            Set<ResolvedNode> visited) {
+        if (!visited.add(node)) {
+            return;
+        }
+        for (ResolvedTrait other : node.traits().values()) {
             if (other.type().phase() != TraitType.Phase.SELECTION) {
                 continue;
             }
@@ -163,12 +176,43 @@ public final class BlockEntityNbt implements TraitType<BlockEntityNbt.Value> {
                 continue;
             }
             ResolvedNode replacement = other.satellites().get(field.orElseThrow());
-            if (replacement == null) {
+            if (replacement == null || visited.contains(replacement) || declaresNbt(replacement)) {
                 continue;
             }
-            refuseIfNothingHoldsIt(replacement, context,
-                    site.through("'" + other.id() + "." + field.orElseThrow() + "'"), diagnostics);
+            PointerResolver.Site through = site.through("'" + other.id() + "." + field.orElseThrow() + "'");
+            // Test the replacement's states together, preserving TRAIT.043's mixed weighted case.
+            refuseIfNothingHoldsIt(replacement, context, through, diagnostics);
+            validateSelections(replacement, context, through, diagnostics, visited);
         }
+        // An alternative can add a selection even when the containing node has none. Its primary
+        // block was already included in the group check above; only its selection descendants need
+        // another check. An explicit NBT override is validated by its own declaration instead.
+        switch (node.source()) {
+            case ResolvedNode.Source.Weighted weighted -> {
+                for (int index = 0; index < weighted.choices().size(); index++) {
+                    ResolvedNode alternative = weighted.choices().get(index).node();
+                    if (!declaresNbt(alternative)) {
+                        validateSelections(alternative, context, site.inside("choice " + index), diagnostics, visited);
+                    }
+                }
+            }
+            case ResolvedNode.Source.Socket socket -> socket.placements().forEach((placement, choices) -> {
+                for (int index = 0; index < choices.size(); index++) {
+                    ResolvedNode alternative = choices.get(index).node();
+                    if (!declaresNbt(alternative)) {
+                        validateSelections(alternative, context,
+                                site.inside("'" + placement.key() + "' candidate " + index), diagnostics, visited);
+                    }
+                }
+            });
+            default -> {
+            }
+        }
+    }
+
+    private static boolean declaresNbt(ResolvedNode node) {
+        ResolvedTrait nbt = node.traits().get(ID);
+        return nbt != null && !nbt.provenance().inherited();
     }
 
     /**

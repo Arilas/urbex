@@ -1,7 +1,6 @@
 package dev.krona.urbex.worldgen;
 
 import dev.krona.urbex.worldgen.lost.cityassets.AssetSnapshot;
-import dev.krona.urbex.worldgen.lost.cityassets.WorldStyle;
 import net.minecraft.core.DefaultedRegistry;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -12,9 +11,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -23,7 +20,7 @@ import java.util.Set;
  * <p>Block tags are the one piece of Urbex's compiled state that a {@code /reload} genuinely
  * changes. The thirteen asset registries are Fabric dynamic registries, loaded with the world and
  * frozen (issue #61), so an edited building or palette needs the world reopened whatever a reload
- * does - but {@code urbex:needspoi}, {@code urbex:foliage}, {@code urbex:rotatable} and the rest come
+ * does - but {@code urbex:needspoi}, {@code urbex:foliage} and the damage tags come
  * back with every one. That single difference used to cost a whole {@link DimensionRuntime} per
  * loaded level: {@code CityGenerator} expanded those tags into {@code BlockState} sets in its
  * constructor, so refreshing them meant rebuilding the generator, the road field, the world-style
@@ -55,55 +52,34 @@ public final class TagSnapshot {
     private final Set<Block> foliage;
     private final Set<Block> notBreakable;
     private final Set<Block> easyBreakable;
-    /**
-     * One entry per {@code rotatable} tag the loaded pack can name. Keyed rather than a single set
-     * because the tag is authored per world style: two cities in one world can come from packs whose
-     * {@code rotatable} tags differ, so the answer follows the chunk's style (issue #117).
-     */
-    private final Map<TagKey<Block>, Set<Block>> rotatable;
 
     private TagSnapshot(Set<BlockState> statesNeedingTodo,
                         Set<BlockState> statesNeedingPoiUpdate,
                         Set<Block> foliage,
                         Set<Block> notBreakable,
-                        Set<Block> easyBreakable,
-                        Map<TagKey<Block>, Set<Block>> rotatable) {
+                        Set<Block> easyBreakable) {
         this.statesNeedingTodo = Set.copyOf(statesNeedingTodo);
         this.statesNeedingPoiUpdate = Set.copyOf(statesNeedingPoiUpdate);
         this.foliage = Set.copyOf(foliage);
         this.notBreakable = Set.copyOf(notBreakable);
         this.easyBreakable = Set.copyOf(easyBreakable);
-        this.rotatable = Map.copyOf(rotatable);
     }
 
     /**
      * Expands every block tag this world's generation can ask about, from the block registry's
      * current tag bindings.
-     *
-     * <p>It takes the compiled assets because {@code rotatable} is authored, not fixed: which tags
-     * matter is a property of the loaded pack. Every world style in the snapshot contributes its
-     * tag, and {@code urbex:rotatable} is always expanded because that is what a style declaring
-     * none resolves to. So every tag {@link #isRotatable} can be handed is one this expanded, which
-     * is what makes a miss there a wiring bug rather than a datapack's problem.</p>
      */
-    public static TagSnapshot capture(AssetSnapshot assets) {
+    public static TagSnapshot capture() {
         Set<BlockState> needingTodo = new HashSet<>();
         addStates(SAPLINGS, needingTodo);
         addStates(BlockTags.SMALL_FLOWERS, needingTodo);
-
-        Map<TagKey<Block>, Set<Block>> rotatable = new HashMap<>();
-        rotatable.put(UrbexTags.ROTATABLE_TAG, blocksIn(UrbexTags.ROTATABLE_TAG));
-        for (WorldStyle style : assets.worldStyles().all()) {
-            rotatable.computeIfAbsent(style.getRotatableTag(), TagSnapshot::blocksIn);
-        }
 
         return new TagSnapshot(
                 needingTodo,
                 statesIn(UrbexTags.NEEDSPOI_TAG),
                 blocksIn(UrbexTags.FOLIAGE_TAG),
                 blocksIn(UrbexTags.NOT_BREAKABLE_TAG),
-                blocksIn(UrbexTags.EASY_BREAKABLE_TAG),
-                rotatable);
+                blocksIn(UrbexTags.EASY_BREAKABLE_TAG));
     }
 
     /** Whether {@code state} carries POI data, so its write has to be deferred past generation. */
@@ -129,27 +105,6 @@ public final class TagSnapshot {
     /** {@code urbex:easybreakable}: what an explosion damages as if it were hit twice as hard. */
     public boolean isEasyBreakable(BlockState state) {
         return easyBreakable.contains(state.getBlock());
-    }
-
-    /**
-     * Whether {@code state} rotates with the part it sits in, under the governing world style's
-     * {@code rotatable} tag.
-     *
-     * @throws IllegalStateException for a tag this snapshot did not expand. Reachable only from a
-     *                               {@link WorldStyle} that is not in the {@link AssetSnapshot} this
-     *                               was captured against - and since a world compiles its assets
-     *                               once and never swaps them, that is a wiring error in Urbex,
-     *                               not something a datapack can provoke. Loud rather than
-     *                               {@code false}: silently not rotating is issue #117 again, and
-     *                               that one took a ladder attached to nothing to notice.
-     */
-    public boolean isRotatable(TagKey<Block> tag, BlockState state) {
-        Set<Block> blocks = rotatable.get(tag);
-        if (blocks == null) {
-            throw new IllegalStateException("Block tag '" + tag.location() + "' was never expanded by this "
-                    + "tag snapshot; it belongs to a world style outside the compiled assets.");
-        }
-        return blocks.contains(state.getBlock());
     }
 
     private static Set<BlockState> statesIn(TagKey<Block> tag) {

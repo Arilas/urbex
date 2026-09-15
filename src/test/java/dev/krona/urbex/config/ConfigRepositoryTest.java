@@ -1,12 +1,14 @@
 package dev.krona.urbex.config;
 
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -14,9 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Storage and migration, tested without publishing anything.
+ * JSON storage, tested without publishing anything.
  * <p>
- * This is what the split is for. Reading a file, migrating an older format and merging a world's
+ * This is what the split is for. Reading a file and merging a world's
  * overrides used to be methods on {@code Config} that wrote to its static slots on the way through,
  * so a test of the file handling was a test of the whole process-wide configuration state - which is
  * why {@code ExperimentalMixGateTest} has to reset that state in a {@code @BeforeEach} and say so
@@ -53,24 +55,35 @@ class ConfigRepositoryTest {
         // Out of range for the codec's intRange(1, 100). A settings file nobody can parse is not a
         // reason a player cannot open their world - unlike a datapack, there is something sensible
         // to fall back to.
-        writeGlobal(configDir, "{\"heightSampleSize\": 9999}");
+        String invalid = "{\"heightSampleSize\": 9999, \"selectedPreset\": \"urbex:largecities\"}";
+        writeGlobal(configDir, invalid);
 
         assertEquals(UrbexConfig.DEFAULT, ConfigRepository.loadGlobal(configDir));
+        assertEquals(invalid, Files.readString(configDir.resolve("urbex").resolve("urbex.json")),
+                "using defaults for this run must not erase settings the player can repair");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{", "[]", "null", ""})
+    void anUnreadableJsonObjectIsPreserved(String invalid, @TempDir Path configDir) throws IOException {
+        writeGlobal(configDir, invalid);
+
+        assertEquals(UrbexConfig.DEFAULT, ConfigRepository.loadGlobal(configDir));
+        assertEquals(invalid, Files.readString(configDir.resolve("urbex").resolve("urbex.json")));
     }
 
     @Test
-    void aLegacyTomlIsMigratedOnFirstRun(@TempDir Path configDir) throws IOException {
+    void anObsoleteTomlDoesNotReplaceTheJsonDefaults(@TempDir Path configDir) throws IOException {
         Path dir = Files.createDirectories(configDir.resolve("urbex"));
-        Files.writeString(dir.resolve("common.toml"), String.join("\n", List.of(
-                "heightSampleSize = 9",
-                "avoidFlattening = false")));
+        String obsolete = "heightSampleSize = 9\navoidFlattening = false";
+        Files.writeString(dir.resolve("common.toml"), obsolete);
 
         UrbexConfig loaded = ConfigRepository.loadGlobal(configDir);
 
-        assertEquals(9, loaded.heightSampleSize());
-        assertFalse(loaded.avoidFlattening());
-        assertTrue(Files.exists(dir.resolve("urbex.json")),
-                "the migrated values are written as JSON, so the TOML is read once and never again");
+        assertEquals(UrbexConfig.DEFAULT, loaded);
+        assertTrue(Files.exists(dir.resolve("urbex.json")));
+        assertEquals(obsolete, Files.readString(dir.resolve("common.toml")),
+                "obsolete files are ignored, not deleted or rewritten");
     }
 
     // ------------------------------------------------------------------ world overrides
@@ -85,14 +98,17 @@ class ConfigRepositoryTest {
 
     @Test
     void aWorldOverridesOnlyTheKeysItNames(@TempDir Path worldRoot) throws IOException {
-        UrbexConfig global = ConfigRepository.applyWorldOverrides(UrbexConfig.DEFAULT, worldRoot);
-        writeWorld(worldRoot, "{\"selectedPreset\": \"urbex:largecities\"}");
+        UrbexConfig global = UrbexConfig.fromJson(JsonParser.parseString(
+                "{\"heightSampleSize\": 7, \"todoQueueSize\": 42}").getAsJsonObject()).orElseThrow();
+        writeWorld(worldRoot, "{\"selectedPreset\": \"urbex:largecities\", \"todoQueueSize\": 20}");
 
         UrbexConfig merged = ConfigRepository.applyWorldOverrides(global, worldRoot);
 
         assertEquals("urbex:largecities", merged.selectedPreset());
         assertEquals(global.heightSampleSize(), merged.heightSampleSize(),
                 "everything the world file does not mention comes from the global config");
+        assertEquals(UrbexConfig.DEFAULT.todoQueueSize(), merged.todoQueueSize(),
+                "an explicit world override can restore a key to its code default");
     }
 
     @Test
@@ -104,15 +120,16 @@ class ConfigRepositoryTest {
     }
 
     @Test
-    void aLegacyWorldTomlIsMigratedAndNotReadTwice(@TempDir Path worldRoot) throws IOException {
+    void anObsoleteWorldTomlDoesNotCreateOverrides(@TempDir Path worldRoot) throws IOException {
         Path dir = Files.createDirectories(worldRoot.resolve("serverconfig"));
-        Files.writeString(dir.resolve("urbex-server.toml"), "todoQueueSize = 42");
+        String obsolete = "todoQueueSize = 42";
+        Files.writeString(dir.resolve("urbex-server.toml"), obsolete);
 
         UrbexConfig merged = ConfigRepository.applyWorldOverrides(UrbexConfig.DEFAULT, worldRoot);
 
-        assertEquals(42, merged.todoQueueSize());
-        assertTrue(Files.exists(dir.resolve("urbex.json")),
-                "written on migration, or the migration would run again on every start");
+        assertSame(UrbexConfig.DEFAULT, merged);
+        assertFalse(Files.exists(dir.resolve("urbex.json")));
+        assertEquals(obsolete, Files.readString(dir.resolve("urbex-server.toml")));
     }
 
     /**

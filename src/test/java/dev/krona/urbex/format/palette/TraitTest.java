@@ -277,8 +277,8 @@ class TraitTest {
                         CustomRegistries.CONDITIONS_REGISTRY_KEY),
                 List.of(Identifier.parse("urbex:chestloot"))), Loot.TYPE.referenced(value));
 
-        // VER.013: a version 2 palette references the conditions registry exactly as a version 1
-        // palette does, and that registry is still version 1. The pool below is a real conditions
+        // VER.013: the conditions registry keeps its own format when palettes adopt version 2.
+        // The pool below is a real conditions
         // asset id and the compile accepts it; the one in TRAIT.021's fixture is not and is refused.
         assertTrue(compiles("""
                 { "version": 2, "palette": { "C": { "block": "minecraft:chest[facing=north]",
@@ -679,7 +679,7 @@ class TraitTest {
         String together = compileRefusal("""
                 { "version": 2, "palette": { "e": { "block": "minecraft:lantern", "traits": {
                     "urbex:light": { "unlit": "minecraft:air" },
-                    "urbex:optional": { "density": "stuff" } } } } }
+                    "urbex:optional": { "density": "lightingDensity" } } } } }
                 """);
         assertTrue(Diag.DIAG_025.matches(together), together);
 
@@ -687,7 +687,7 @@ class TraitTest {
                 { "version": 2, "palette": { "e": { "kind": "weighted",
                     "traits": { "urbex:light": { "unlit": "minecraft:air" } },
                     "choices": [ { "weight": 1, "block": "minecraft:lantern",
-                        "traits": { "urbex:optional": { "density": "stuff" } } } ] } } }
+                        "traits": { "urbex:optional": { "density": "lightingDensity" } } } ] } } }
                 """);
         assertTrue(Diag.DIAG_025.matches(inherited), inherited);
     }

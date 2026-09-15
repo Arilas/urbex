@@ -41,6 +41,11 @@ import java.util.Set;
  */
 public final class Rotatable implements TraitType<Rotatable.Value> {
 
+    @Override
+    public Phase phase() {
+        return Phase.TRANSFORMATION;
+    }
+
     /** The single registered instance. */
     public static final Rotatable TYPE = new Rotatable();
 

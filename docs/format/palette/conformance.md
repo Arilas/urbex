@@ -11,21 +11,21 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | Area | Rules | Fixtures |
 |---|---:|---:|
 | `MODEL` | 42 | 22 |
-| `TRAIT` | 46 | 20 |
+| `TRAIT` | 47 | 21 |
 | `REF` | 55 | 15 |
 | `MERGE` | 12 | 4 |
 | `WEIGHT` | 38 | 11 |
 | `CHAR` | 14 | 4 |
 | `LOAD` | 24 | 0 |
-| `DIAG` | 59 | 0 |
+| `DIAG` | 60 | 0 |
 | `VER` | 27 | 2 |
-| **total** | **317** | **78** |
+| **total** | **319** | **79** |
 
 ## Outstanding
 
-**Rules relying on the draft suspension of fixture-completeness (31):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.060`, `TRAIT.061`, `TRAIT.063`, `TRAIT.065`, `TRAIT.070`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `MERGE.011`, `CHAR.010`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.041`
+**Rules relying on the draft suspension of fixture-completeness (25):** `MODEL.030`, `MODEL.032`, `MODEL.040`, `MODEL.041`, `MODEL.074`, `MODEL.080`, `TRAIT.032`, `TRAIT.040`, `TRAIT.050`, `TRAIT.054`, `TRAIT.073`, `REF.001`, `REF.005`, `REF.017`, `REF.035`, `REF.074`, `REF.075`, `CHAR.010`, `LOAD.002`, `LOAD.014`, `LOAD.025`, `LOAD.044`, `DIAG.902`, `VER.020`, `VER.041`
 
-**Rules marked `[NO-FIXTURE]` (12), which must each be covered by a citing test:**
+**Rules marked `[NO-FIXTURE]` (11), which must each be covered by a citing test:**
 
 | Rule | Reason |
 |---|---|
@@ -39,16 +39,15 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `CHAR.011` | a part file, not a palette |
 | `CHAR.022` | a command invocation |
 | `LOAD.013` | a style with several palette groups |
-| `VER.006` | a style and two palettes |
 | `VER.013` | a palette and a conditions asset |
 
-**Rules marked `[NOT-YET-REACHED]` (1), whose citing tests can only cover the spelling until the issue named lands:**
+**Rules marked `[NOT-YET-REACHED]` (1), whose remaining coverage gaps are tracked by the named issue:**
 
 | Rule | Reason |
 |---|---|
 | `TRAIT.011` | issue #216 |
 
-**Tests:** 214 of 317 identifiers have at least one citing test; the rest show `—` below.
+**Tests:** 221 of 319 identifiers have at least one citing test; the rest show `—` below.
 `ConformanceIndexTest` will fail on any rule that still shows `—` once this document leaves draft.
 
 ## Rules
@@ -84,7 +83,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.051` | `REJECT` | `DIAG.012` | `reject=DIAG.012` | `PaletteV2DecodeTest.aTagWithoutItsLeadingHashIsRefused` |
 | `MODEL.052` | `MUST` |  |  | `CompiledV2PaletteTest.resolvingAMarkerReadsNoTag` |
 | `MODEL.053` | `REJECT` | `DIAG.008` | `reject=DIAG.008` | — |
-| `MODEL.060` | `MUST` |  |  | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesDefineIsAnsweredHereAndLeavesNothingPending`, `PaletteCharacterCheckTest.aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays` |
+| `MODEL.060` | `MUST` |  |  | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesDefineIsAnsweredHereAndLeavesNothingPending`, `PaletteCharacterCheckTest.aVersionTwoAliasResolvesAMarkerContributedByAnotherVersionTwoPalette` |
 | `MODEL.061` | `MUST` |  |  | `V1ToV2Test.frompaletteBecomesAnAliasOnTheOneCharacterVersion1Read` |
 | `MODEL.062` | `REJECT` | `DIAG.009` | `reject=DIAG.009` | `PendingAliasTest.anAliasNamingAMarkerThisPaletteDoesNotDefineIsCarriedOutRatherThanDropped`, `PendingAliasTest.aCycleOfAliasesWithinOnePaletteBecomesAPendingQuestionRatherThanRecursing`, `PaletteCharacterCheckTest.aVersion2AliasNoDrawCanAnswerIsALoadError` |
 | `MODEL.063` | `MUST` |  |  | `PendingAliasTest.aPendingAliasCarriesItsOwnTraitsSoTheMergeCanApplyThemOverWhateverItResolves`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
@@ -97,7 +96,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MODEL.075` | `MUST` |  |  | `V1ToV2Test.aLightSourceIsAKindWhenItSelectsTheBlockAndATraitWhenItDoesNot` |
 | `MODEL.076` | `MUST` |  |  | `ExclusionTest.aSocketsCandidatesAreExcludedTooAndAnEmptiedListLeavesTheMap`, `NodeResolverTest.aSocketPlacementListAcceptsASpread`, `PaletteV2DecodeTest.aPlacementListTakesWhenAndSpreadLikeAnyOtherList` |
 | `MODEL.080` | `MUST` |  |  | — |
-| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource`, `PaletteSchemaTest.aMarkerPositionRequiresItsKindsOwnKeyUnlessAReferenceMightSupplyIt`, `PaletteSchemaTest.theHashMarkerWorkaroundDoesNotHideAnIncompleteNode`, `TraitTest.aSatelliteThatResolvesToNoBlockIsRefusedWithARemedyItsAuthorCanFollow` |
+| `MODEL.081` | `REJECT` | `DIAG.011` | `reject=DIAG.011` | `NodeResolverTest.aMarkerResolvingToNoBlockSourceIsRefused`, `NodeResolverTest.aCompletenessDiagnosticNamesTheMarkerAndTheDefinitionItCameFrom`, `NodeResolverTest.aKindArrivingWithoutItsRequiredListIsRefusedByTheRuleThatOwnsThatList`, `NodeResolverTest.aCompletenessDiagnosticBlamesTheFilterWhenTheFilterDroppedTheSource`, `PaletteSchemaTest.aMarkerPositionRequiresItsKindsOwnKeyUnlessAReferenceMightSupplyIt`, `PaletteSchemaTest.hashPrefixedKeysCannotBypassSchemaValidation`, `TraitTest.aSatelliteThatResolvesToNoBlockIsRefusedWithARemedyItsAuthorCanFollow` |
 | `MODEL.082` | `ACCEPT` |  | `accept` | `NodeResolverTest.aDefinitionMayCarryOnlyTraits` |
 
 ### `palette/01-traits.md`
@@ -109,13 +108,13 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.003` | `REJECT` | `DIAG.020` | `reject=DIAG.020` | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
 | `TRAIT.004` | `MUST` |  | `accept` | `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration`, `MarkerTraitsComposeTest.aMarkerCarryingBothALightAndAMobAppliesBothRatherThanOnlyTheFirstOne`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem` |
 | `TRAIT.005` | `MUST` |  | `accept` | `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `CommonPaletteLightingTest.bothBundledSocketsNameTheirUnlitStandInRatherThanDefaultingIntoIt`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
-| `TRAIT.006` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole`, `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField`, `CommonPaletteLightingTest.bothBundledSocketsNameTheirUnlitStandInRatherThanDefaultingIntoIt` |
-| `TRAIT.007` | `MUST NOT` |  |  | `TraitTest.aSatelliteInheritsNothingSoAnUnlitReplacementIsNotItselfAnOptionalLight` |
+| `TRAIT.006` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole`, `TraitPhaseTest.replacementNbtOverridesAreValidatedByTheirOwnDeclaration`, `TraitTest.everyAlternativeInheritsItsParentsTraitsAndOnlyTheOneThatDeclaresALightHasOne`, `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField`, `CommonPaletteLightingTest.bothBundledSocketsNameTheirUnlitStandInRatherThanDefaultingIntoIt` |
+| `TRAIT.007` | `MUST NOT` |  |  | `TraitPhaseTest.damageSatellitesDoNotInheritTheMarkersBlockEntityDecorator`, `TraitTest.aSatelliteInheritsNothingSoAnUnlitReplacementIsNotItselfAnOptionalLight`, `MarkerDamageTest.mainAndDamageStatesFollowRotationAndMirrorWithIndependentOptOuts`, `OptionalMarkerSelectionTest.replacementsKeepOuterDecoratorsButNeverInheritRotationOrDamage` |
 | `TRAIT.008` | `MUST` |  |  | `NodeResolverTest.traitsBesideARefMergeByIdAndReplaceWhole` |
-| `TRAIT.009` | `MUST` |  | `accept` | `NodeResolverTest.aSatellitesNodeIsResolvedAndIsStillNotAnAlternativeOfItsOwner` |
-| `TRAIT.010` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
-| `TRAIT.011` | `MUST` `[NOT-YET-REACHED]` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms`, `V1ToV2Test.damagedConvertsToItsVersion2SpellingEvenThoughTheDamagePassCannotYetKeyItByMarker` |
-| `TRAIT.012` | `ACCEPT` |  | `accept` | `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt`, `V1ToV2Test.anUnavailableDamageTargetAlsoStaysUndamagedInThePublicSuite` |
+| `TRAIT.009` | `MUST` |  | `accept` | `NodeResolverTest.aSatellitesNodeIsResolvedAndIsStillNotAnAlternativeOfItsOwner`, `MarkerDamageTest.weightedMarkerSlotsAndWeightedDamageSatellitesRetainBothOutcomes`, `OptionalMarkerSelectionTest.nestedReplacementSelectionUsesTheReplacementDensity` |
+| `TRAIT.010` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms`, `MarkerDamageTest.twoMarkersSharingOneStateKeepTheirOwnDamageThroughPartPlacementAndTheDamagePass` |
+| `TRAIT.011` | `MUST` `[NOT-YET-REACHED]` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms`, `V1ToV2Test.damagedConvertsToItsVersion2Spelling`, `MarkerDamageTest.twoMarkersSharingOneStateKeepTheirOwnDamageThroughPartPlacementAndTheDamagePass` |
+| `TRAIT.012` | `ACCEPT` |  | `accept` | `V1ToV2Test.aDamagedIntoABlockThisGameLacksLeavesTheMarkerUndamagedRatherThanDeletingIt`, `V1ToV2Test.anUnavailableDamageTargetAlsoStaysUndamagedInThePublicSuite`, `MarkerDamageTest.aTraitlessOrUnavailableTargetMarkerSuppressesAnotherMarkersStateFallback` |
 | `TRAIT.020` | `MUST` |  |  | `TraitTest.theConditionsRegistryTheTraitsNameIsTheOneTheModRegisters` |
 | `TRAIT.021` | `REJECT` | `DIAG.021` | `reject=DIAG.021` | — |
 | `TRAIT.022` | `MUST` |  |  | `TraitTest.aTraitsReferenceIsCheckedThroughItsOwnDeclaration` |
@@ -125,29 +124,30 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `TRAIT.040` | `MUST` |  |  | — |
 | `TRAIT.041` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `reject=DIAG.022` | `TraitTest.blockEntityNbtOnABlockWithNoBlockEntityIsRefusedAndNamesTheBlock`, `TraitTest.blockEntityNbtOnATagIsRefusedOnceAndNamesTheTagRatherThanItsMembers` |
 | `TRAIT.042` | `WARN` | `DIAG.026` |  | `TraitTest.theFourPositionalKeysAreDroppedAndTheDropIsReported` |
-| `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
-| `TRAIT.044` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `accept` | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `TraitPhaseTest.aBlockEntityBesideALightIsAcceptedWhenTheUnlitReplacementCanHoldTheNbtToo`, `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitPhaseTest.aBlockEntityWithNoSelectionTraitIsUnaffectedSoNothingThatCompilesTodayStopsCompiling`, `TraitPhaseTest.anAbsentReplacementIsAirAndAirIsRefusedBecauseAirHoldsNoBlockEntityEither` |
+| `TRAIT.043` | `ACCEPT` |  | `accept` | `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitPhaseTest.nestedSelectionsPreserveMixedAndUnavailableReplacementAcceptance`, `TraitTest.aNodeWhereOnlySomeStatesHaveABlockEntityLoads` |
+| `TRAIT.044` | `REJECT` | `DIAG.022` | `reject=DIAG.022`, `accept` | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `TraitPhaseTest.aBlockEntityBesideALightIsAcceptedWhenTheUnlitReplacementCanHoldTheNbtToo`, `TraitPhaseTest.aWeightedReplacementIsRefusedOnlyWhenNoneOfItsAlternativesCanHoldTheNbt`, `TraitPhaseTest.aBlockEntityWithNoSelectionTraitIsUnaffectedSoNothingThatCompilesTodayStopsCompiling`, `TraitPhaseTest.anAbsentReplacementIsAirAndAirIsRefusedBecauseAirHoldsNoBlockEntityEither`, `TraitPhaseTest.nestedOptionalAndLightResultsMustHoldTheInheritedBlockEntityData`, `TraitPhaseTest.selectionAddedByAWeightedAlternativeStillReceivesTheOuterNbt`, `TraitPhaseTest.nestedSelectionsPreserveMixedAndUnavailableReplacementAcceptance`, `TraitPhaseTest.replacementNbtOverridesAreValidatedByTheirOwnDeclaration` |
 | `TRAIT.050` | `MUST` |  |  | — |
 | `TRAIT.051` | `DEFAULT` |  | `equiv=absent-unlit`, `equiv=absent-unlit` | `CommonPaletteLightingTest.theOilrigDeckLightsAreInPlaceSourcesThatLeaveTheirFixtureBehind`, `V2SocketsTest.aCandidateCarryingTheLightTraitWithNoUnlitGetsAirRatherThanTheSockets` |
 | `TRAIT.052` | `REJECT` | `DIAG.023` | `reject=DIAG.023` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight` |
 | `TRAIT.053` | `REJECT` | `DIAG.024` | `reject=DIAG.024` | `TraitTest.aLightThatCanNeverLookDifferentIsRefusedFromEitherEnd` |
 | `TRAIT.054` | `MUST` |  |  | — |
 | `TRAIT.055` | `MUST` |  |  | `TraitTest.aDeclaredTraitReplacesTheInheritedOneWholeAndNotFieldByField`, `CommonPaletteLightingTest.bothBundledSocketsNameTheirUnlitStandInRatherThanDefaultingIntoIt`, `V2SocketsTest.aCandidatesOwnUnlitWinsAndOneThatDeclaresNoneHasAlreadyInheritedTheSockets` |
-| `TRAIT.060` | `MUST` |  |  | — |
-| `TRAIT.061` | `MUST` |  |  | — |
-| `TRAIT.062` | `DEFAULT` |  | `equiv=absent-replacement`, `equiv=absent-replacement` | — |
-| `TRAIT.063` | `MUST` |  |  | — |
+| `TRAIT.060` | `MUST` |  |  | `OptionalMarkerSelectionTest.endpointsUseTheNamedPresetDensityEvenWithoutInfo` |
+| `TRAIT.061` | `MUST` |  |  | `OptionalMarkerSelectionTest.endpointsUseTheNamedPresetDensityEvenWithoutInfo` |
+| `TRAIT.066` | `REJECT` | `DIAG.027` | `reject=DIAG.027` | `OptionalMarkerSelectionTest.unknownDensityIsRejectedWithTheMarkerAndNamedDiagnostic` |
+| `TRAIT.062` | `DEFAULT` |  | `equiv=absent-replacement`, `equiv=absent-replacement` | `OptionalMarkerSelectionTest.rejectedDefaultAirClearsAnExistingSolidBlock` |
+| `TRAIT.063` | `MUST` |  |  | `OptionalMarkerSelectionTest.optionalAndInPlaceLightSelectIdenticalWeightedReplacementsBeforeRotation` |
 | `TRAIT.064` | `REJECT` | `DIAG.025` | `reject=DIAG.025` | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
-| `TRAIT.065` | `MUST` |  |  | — |
-| `TRAIT.070` | `MUST` |  |  | — |
-| `TRAIT.071` | `DEFAULT` |  | `accept` | `TraitTest.rotatableDefaultsToOnAndFalseIsMeaningful` |
+| `TRAIT.065` | `MUST` |  |  | `OptionalMarkerSelectionTest.optionalAndInPlaceLightSelectIdenticalWeightedReplacementsBeforeRotation` |
+| `TRAIT.070` | `MUST` |  |  | `MarkerDamageTest.mainAndDamageStatesFollowRotationAndMirrorWithIndependentOptOuts` |
+| `TRAIT.071` | `DEFAULT` |  | `accept` | `TraitTest.rotatableDefaultsToOnAndFalseIsMeaningful`, `MarkerDamageTest.mainAndDamageStatesFollowRotationAndMirrorWithIndependentOptOuts`, `MarkerDamageTest.rotationOptOutIsKeptPerSlotForBothTheMarkerAndItsDamageSatellite` |
 | `TRAIT.072` | `MUST` |  |  | `TraitTest.rotatableDefaultsToOnAndFalseIsMeaningful` |
 | `TRAIT.073` | `MUST` |  |  | — |
 | `TRAIT.090` | `MUST` |  |  | `PaletteSchemaTest.schemaTraitPropertiesMatchEachRegisteredTraitsKeySet`, `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.094` | `MUST` |  |  | `TraitTest.everyRegisteredTraitDeclaresItsFieldsAndItsReferencesAndTheDeclarationsAgree` |
 | `TRAIT.091` | `MUST` |  |  | `TraitTest.anUnregisteredTraitIsRefusedAndTheNamespaceClauseSaysWhichKindOfMistakeItWas` |
 | `TRAIT.095` | `MUST` |  |  | `TraitPhaseTest.twoSelectionTraitsOnOneNodeAreStillRefusedBecauseTheyAreOfOnePhase`, `TraitPhaseTest.aDecorationTraitBesideASelectionTraitIsNotRefusedForBeingBesideIt`, `V2PackGoldenTest.aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration`, `MarkerTraitsComposeTest.aMarkerCarryingAllFourTraitsAppliesAllFourInTheOrderTheSpecificationDefinesThem`, `MarkerTraitsComposeTest.selectionIsAppliedBeforeDecorationSoNbtIsQueuedAgainstTheBlockThatSurvives` |
-| `TRAIT.096` | `MUST` |  |  | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `MarkerTraitsComposeTest.selectionIsAppliedBeforeDecorationSoNbtIsQueuedAgainstTheBlockThatSurvives` |
+| `TRAIT.096` | `MUST` |  |  | `TraitPhaseTest.aBlockEntityBesideALightIsRefusedWhenTheUnlitReplacementCannotHoldItsNbt`, `TraitPhaseTest.nestedOptionalAndLightResultsMustHoldTheInheritedBlockEntityData`, `OptionalMarkerSelectionTest.replacementsKeepOuterDecoratorsButNeverInheritRotationOrDamage`, `MarkerTraitsComposeTest.selectionIsAppliedBeforeDecorationSoNbtIsQueuedAgainstTheBlockThatSurvives` |
 | `TRAIT.092` | `MUST NOT` |  |  | `TraitTest.carryingBothLightAndOptionalIsRefusedWhetherWrittenTogetherOrInherited` |
 | `TRAIT.093` | `MUST` |  |  | `TraitTest.twoMarkersOnOneBlockKeepTheirOwnDamagedForms` |
 
@@ -229,7 +229,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `MERGE.007` | `REJECT` | `DIAG.002` | `reject=DIAG.002` | `V2ChainTest.aPaletteIsRequiredSomewhereInTheChainAndNotInEveryFile` |
 | `MERGE.008` | `MUST` |  |  | `V2ChainTest.anOverriddenMarkerTakesItsTraitsWithIt` |
 | `MERGE.009` | `REJECT` | `DIAG.031` | `reject=DIAG.031` | `VersionDispatchTest.extendsInsideAnInlineVersionTwoPaletteIsRefused` |
-| `MERGE.011` | `MUST` |  |  | — |
+| `MERGE.011` | `MUST` |  |  | `VersionDispatchTest.partsAndBuildingsDispatchInlinePalettesByTheirOwnDeclaredVersion` |
 | `MERGE.012` | `ACCEPT` |  | *n/a* | `VersionDispatchTest.anInlinePaletteMayCarryImportsAndDefs` |
 | `MERGE.010` | `RETIRED` |  |  | — |
 
@@ -309,7 +309,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `LOAD.013` | `ACCEPT` |  | *n/a* | `PaletteCharacterCheckTest.aVersion2AliasAnsweredByAnotherGroupsPaletteIsReportedAsNeitherErrorNorWarning` |
 | `LOAD.014` | `INVARIANT` |  |  | — |
 | `LOAD.020` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
-| `LOAD.021` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight`, `V2PackGoldenTest.oneMarkersSlotsCarryDifferentTraitsFromEachOther` |
+| `LOAD.021` | `MUST` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot`, `TraitTest.aLightDeclaredOverAMixedListIsRefusedForTheSlotThatCannotLight`, `V2PackGoldenTest.oneMarkersSlotsCarryDifferentTraitsFromEachOther`, `MarkerDamageTest.weightedMarkerSlotsAndWeightedDamageSatellitesRetainBothOutcomes`, `MarkerDamageTest.rotationOptOutIsKeptPerSlotForBothTheMarkerAndItsDamageSatellite` |
 | `LOAD.022` | `INVARIANT` |  |  | `CompiledV2PaletteTest.oneLookupReturnsBothTheStateAndTheTraitsAndTheTraitsArePerSlot` |
 | `LOAD.023` | `MUST` |  |  | `CompiledV2PaletteTest.traitSetsAreInternedSoSlotsSharingOneShareTheObject`, `PendingAliasTest.theMergesOverlayIsTheSameOneAnInPaletteAliasGotAndSharesItsTraitSets` |
 | `LOAD.024` | `INVARIANT` |  |  | `CompiledV2PaletteTest.nothingOfTheRawTreeSurvivesAndASatelliteIsCompiledRatherThanDeferred` |
@@ -352,6 +352,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `DIAG.024` | `DIAG` |  |  | — |
 | `DIAG.025` | `DIAG` |  |  | — |
 | `DIAG.026` | `DIAG` |  |  | — |
+| `DIAG.027` | `DIAG` |  |  | — |
 | `DIAG.030` | `DIAG` |  |  | — |
 | `DIAG.031` | `DIAG` |  |  | — |
 | `DIAG.032` | `DIAG` |  |  | — |
@@ -392,11 +393,10 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 
 | Rule | Class | Diagnostic | Fixtures | Tests |
 |---|---|---|---|---|
-| `VER.018` | `REJECT` | `DIAG.066` | *—* | `VersionDispatchTest.aFileWithNoVersionAndAFileDeclaringVersionOneAreBothRefusedNamingTheConverter`, `VersionDispatchTest.aVersionThatNeverExistedIsStillTheOtherDiagnostic` |
+| `VER.018` | `REJECT` | `DIAG.066` | *—* | `VersionDispatchTest.aFileWithNoVersionAndAFileDeclaringVersionOneAreBothRefusedNamingTheConverter`, `VersionDispatchTest.aVersionThatNeverExistedIsStillTheOtherDiagnostic`, `VersionDispatchTest.partsAndBuildingsDispatchInlinePalettesByTheirOwnDeclaredVersion` |
 | `VER.002` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetDeclaresVersionTwoAndNothingElse`, `VersionDispatchTest.versionTwoSelectsTheVersionTwoRulesInFull`, `CommonPaletteLightingTest.everyBundledPaletteIsVersion2AndCompilesAgainstThePacksOwnDefinitions` |
 | `VER.003` | `MUST` |  |  | `VersionDispatchTest.aVersionTwoDocumentIsNeverHandedToTheVersionOneCodec` |
 | `VER.017` | `MUST NOT` |  |  | `ImportsTest.theDefinitionsRegistryIsRegisteredAndVariantsIsNot`, `VariantKeyRefusedTest.aVersion1EntryNamingAVariantIsRefusedAndTheMessageNamesItsReplacement`, `VariantKeyRefusedTest.anEntryNamingBothAVariantAndALiveKeyIsStillRefused` |
-| `VER.006` | `ACCEPT` |  | *n/a* | `PaletteCharacterCheckTest.aStyleMayDrawAVersion1AndAVersion2PaletteIntoOneMergeThatResolvesBothWays` |
 | `VER.013` | `ACCEPT` |  | *n/a* | `TraitTest.aTraitsReferenceIsCheckedThroughItsOwnDeclaration` |
 | `VER.008` | `MUST` |  |  | `ImportsTest.aDefinitionsAssetIsAVariantThatMayAlsoCarryTraitsAndAnyKind`, `V1ToV2Test.aPlainBlockEntryBecomesTheStringShorthandAndTheCharDisappears`, `V1ToV2Test.aWeightedListBecomesChoicesAndRandomBecomesWeight`, `V1ToV2Test.aTrailingSentinelBecomesItsClippedValueRestatedAsASize`, `V1ToV2Test.everyVersion1MetadataFieldBecomesItsTrait`, `V1ToV2Test.frompaletteBecomesAnAliasOnTheOneCharacterVersion1Read`, `V1ToV2Test.aVariantBecomesARefAndTheVariantsRegistryBecomesDefinitions`, `V1ToV2Test.aLightSourceIsAKindWhenItSelectsTheBlockAndATraitWhenItDoesNot`, `V1ToV2Test.everyPublicPaletteAndVariantHasAVersion2FormAndTheConverterProducesIt`, `V1ToV2Test.everyShippedPaletteAndVariantHasAVersion2FormAndTheConverterProducesIt` |
 | `VER.009` | `MUST` |  |  | `V1ToV2Test.anEntryWithTwoBlockSourcesTakesTheLadderSChoiceAndNamesWhatItDropped` |
@@ -412,6 +412,7 @@ Every rule in this specification, its class, its fixtures, and the tests that ci
 | `VER.032` | `MUST` |  |  | `V1ToV2Test.everyDeclinedOpportunityStatesTheRuleItWasCountedBy` |
 | `VER.040` | `MUST` |  |  | `VersionDispatchTest.theVersionMechanismIsRegistryAgnostic` |
 | `VER.041` | `MUST` |  |  | — |
+| `VER.006` | `RETIRED` |  |  | — |
 | `VER.005` | `RETIRED` |  |  | — |
 | `VER.007` | `RETIRED` |  |  | — |
 | `VER.001` | `RETIRED` |  |  | — |

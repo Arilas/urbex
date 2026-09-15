@@ -67,6 +67,7 @@ class DatapackReferenceIntegrityTest {
     private Path assetsRoot = ASSETS_ROOT;
     /** target category (directory under ROOT) -> collected [sourceFile, reference] pairs */
     private final List<String> problems = new ArrayList<>();
+    private final Map<String, Integer> paletteReferencesChecked = new LinkedHashMap<>();
 
     @Test
     void allDatapackReferencesAreNamespacedAndResolve() throws IOException {
@@ -75,6 +76,58 @@ class DatapackReferenceIntegrityTest {
         }
         assertTrue(problems.isEmpty(),
                 () -> problems.size() + " bad datapack references:\n" + String.join("\n", problems));
+        assertEquals(Map.of(
+                        "buildings.$ref", 6,
+                        "palettes.$ref", 54,
+                        "palettes.urbex:loot.pool", 1,
+                        "palettes.urbex:spawner.pool", 2),
+                paletteReferencesChecked,
+                "reference coverage changed; inspect the corpus before updating these counts. "
+                        + "A green integrity walk must not silently stop visiting a format or trait.");
+    }
+
+    /** A missing reference at each v2 nesting site must reach the real walk, not just its counter. */
+    @Test
+    void missingVersionTwoReferencesAreReportedAtEveryNestingSite(@TempDir Path temp)
+            throws IOException {
+        root = temp.resolve("data/urbex/urbex");
+        for (String category : List.of("palettes", "parts", "buildings", "definitions")) {
+            Path source = root.resolve(category + "/missing.json");
+            Files.createDirectories(source.getParent());
+            String palette = """
+                    { "version": 2,
+                      "$defs": { "shared": { "$ref": "urbex:missing_definition" } },
+                      "palette": {
+                        "C": { "block": "minecraft:chest", "traits": {
+                          "urbex:loot": { "pool": "urbex:missing_loot" } } },
+                        "S": { "kind": "weighted", "choices": [
+                          { "weight": 1, "block": "minecraft:spawner", "traits": {
+                            "urbex:spawner": { "pool": "urbex:missing_mob" } } } ] },
+                        "L": { "block": "minecraft:lantern", "traits": {
+                          "urbex:light": { "unlit": { "$ref": "urbex:missing_satellite" } } } }
+                      } }
+                    """;
+            Files.writeString(source, switch (category) {
+                case "parts", "buildings" -> "{ \"palette\": " + palette + " }";
+                case "definitions" -> """
+                        { "version": 2, "$ref": "urbex:missing_definition", "traits": {
+                          "urbex:loot": { "pool": "urbex:missing_loot" },
+                          "urbex:spawner": { "pool": "urbex:missing_mob" },
+                          "urbex:light": { "unlit": { "$ref": "urbex:missing_satellite" } }
+                        } }
+                        """;
+                default -> palette;
+            });
+            checkFile(source);
+            for (String name : List.of("missing_definition", "missing_loot", "missing_mob",
+                    "missing_satellite")) {
+                assertTrue(problems.stream().anyMatch(problem ->
+                                problem.startsWith(source + ":")
+                                        && problem.contains("\"urbex:" + name + "\" does not resolve")),
+                        () -> category + " did not check " + name + ": " + problems);
+            }
+        }
+        assertEquals(16, problems.size(), "four distinct references in each of four asset shapes");
     }
 
     /**
@@ -281,7 +334,13 @@ class DatapackReferenceIntegrityTest {
                 TRAIT_REFERENCES.forEach((trait, fields) -> {
                     JsonObject payload = asObject(traits.get(trait));
                     if (payload != null) {
-                        fields.forEach((field, category) -> ref(src, payload.get(field), category));
+                        fields.forEach((field, category) -> {
+                            JsonElement value = payload.get(field);
+                            if (value != null && value.isJsonPrimitive()) {
+                                countPaletteReference(src, trait + "." + field);
+                            }
+                            ref(src, value, category);
+                        });
                     }
                 });
             }
@@ -321,9 +380,15 @@ class DatapackReferenceIntegrityTest {
         if (name.startsWith("$") || name.indexOf(':') < 0) {
             return;
         }
+        countPaletteReference(src, "$ref");
         int fragment = name.indexOf('#');
         ref(src, new com.google.gson.JsonPrimitive(fragment < 0 ? name : name.substring(0, fragment)),
                 "definitions");
+    }
+
+    private void countPaletteReference(String src, String field) {
+        String category = root.relativize(Path.of(src)).getName(0).toString();
+        paletteReferencesChecked.merge(category + "." + field, 1, Integer::sum);
     }
 
     private void ref(String src, JsonElement el, String targetCategory) {

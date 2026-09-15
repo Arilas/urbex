@@ -1,5 +1,6 @@
 package dev.krona.urbex.format.palette;
 
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.mojang.serialization.JsonOps;
 import dev.krona.urbex.format.Diagnostics;
@@ -50,8 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>It does not prove that a version 2 pack produces a correct city.</b> Nothing here runs
  * {@code Parts.generatePart}, writes a chunk or drives a world — that is what
- * {@code runDigestCheck} does for version 1, and version 2 has no bundled pack to point such a run at
- * until the converter lands. So this is evidence about the palette, not about the world, and the honest
+ * {@code runDigestCheck} does for the bundled pack. This is evidence about the palette, not about the world, and the honest
  * reading of a passing run is "the pack compiles and answers every question the same way twice".</p>
  *
  * <h2>What the pack is for</h2>
@@ -117,8 +117,10 @@ class V2PackGoldenTest {
     @Rule("TRAIT.095")
     @Test
     void aMarkerCarryingTwoMetadataTraitsCarriesBothIntoGeneration() {
-        CompiledPalette merged = merged();
+        assertMetadataTraits(merged());
+    }
 
+    static void assertMetadataTraits(CompiledPalette merged) {
         CompiledPalette.Placed chest = merged.placedAt('C', 1L, 0, 64, 0);
         assertNotNull(chest.info());
         assertEquals(List.of(MarkerTrait.LOOT, MarkerTrait.BLOCK_ENTITY), chest.info().applied(),
@@ -139,7 +141,10 @@ class V2PackGoldenTest {
     @Rule("LOAD.021")
     @Test
     void oneMarkersSlotsCarryDifferentTraitsFromEachOther() {
-        CompiledPalette merged = merged();
+        assertPerSlotTraits(merged());
+    }
+
+    static void assertPerSlotTraits(CompiledPalette merged) {
         List<String> seen = new ArrayList<>();
         for (int x = 0; x < 256; x++) {
             CompiledPalette.Placed placed = merged.placedAt('m', 1L, x, 64, 0);
@@ -165,7 +170,12 @@ class V2PackGoldenTest {
     @Rule("LOAD.001")
     @Test
     void everyConstructThePackClaimsToExerciseIsInTheCompiledPalette() {
-        CompiledPalette merged = merged();
+        assertConstructs(compiled());
+    }
+
+    /** Also run against compiling mutations by {@link V2PackCoverageMutationTest}. */
+    static void assertConstructs(CompiledV2Palette compiled) {
+        CompiledPalette merged = merged(compiled);
 
         assertEquals(List.of('@', 'C', 'F', 'L', 'S', 'T', 'd', 'e', 'm', 'n', 'o', 'p', 's', 'w'),
                 merged.getCharacters().stream().sorted().toList(),
@@ -207,11 +217,11 @@ class V2PackGoldenTest {
                 merged.canBeDamagedToIronBars(merged.placedAt('d', 1L, 0, 64, 0).state()),
                 "'d' reaches a satellite through a $ref into $defs");
 
-        // The two traits that never cross the seam, so the digest cannot see them.
-        CompiledEntry optional = compiled().entry('o');
+        // This digest hashes the unselected slots; separately assert traits used at placement.
+        CompiledEntry optional = compiled.entry('o');
         assertTrue(optional.slot(0).traits().has(OptionalTrait.TYPE),
-                "'o' carries urbex:optional, which the decoration pass reads off the trait set");
-        assertFalse(compiled().entry('F').slot(0).traits().rotatable(),
+                "'o' carries urbex:optional, compiled into a selection before the part transform");
+        assertFalse(compiled.entry('F').slot(0).traits().rotatable(),
                 "'F' opts out of rotation with TRAIT.071's false, which the part transform reads");
     }
 
@@ -244,11 +254,10 @@ class V2PackGoldenTest {
      * and the golden would have pinned its absence. A digest that cannot see a construct is not evidence
      * about it, which is the whole reason this line exists.</p>
      *
-     * <p>{@code urbex:optional} and {@code urbex:rotatable} are not here and cannot be: neither reaches
-     * this side of the seam at all — the first is read by the decoration pass off the compiled trait set
-     * and the second by the part transform — so they are asserted directly in
+     * <p>{@code urbex:optional} and {@code urbex:rotatable} are not hashed by this state/Info digest.
+     * Their compiled presence is asserted directly in
      * {@link #everyConstructThePackClaimsToExerciseIsInTheCompiledPalette} instead, where a mutation
-     * does fail.</p>
+     * does fail. OptionalMarkerSelectionTest and MarkerDamageTest exercise their placement behavior.</p>
      */
     private static String damagedFor(CompiledPalette merged, char marker) {
         BlockState from = merged.getRepresentative(marker);
@@ -287,15 +296,23 @@ class V2PackGoldenTest {
      * stage no world reaches.</p>
      */
     private static CompiledPalette merged() {
+        return merged(compiled());
+    }
+
+    static CompiledPalette merged(CompiledV2Palette compiled) {
         return new CompiledPalette(Palette.version2(
-                Identifier.parse("urbex:every_kind_and_trait"), compiled()));
+                Identifier.parse("urbex:every_kind_and_trait"), compiled));
     }
 
     /** The compiled version 2 palette itself, for the traits that never cross the seam. */
     private static CompiledV2Palette compiled() {
+        return compiled(document());
+    }
+
+    static CompiledV2Palette compiled(JsonObject document) {
         Diagnostics diagnostics = new Diagnostics();
         PaletteV2Definition file = PaletteV2Definition.CODEC
-                .parse(JsonOps.INSTANCE, JsonParser.parseString(read()))
+                .parse(JsonOps.INSTANCE, document)
                 .getOrThrow(message -> new AssertionError("the pack did not decode: " + message));
         CompiledV2Palette compiled = NodeResolver.resolve(file, diagnostics)
                 .flatMap(resolved -> CompiledV2Palette.compile(resolved,
@@ -306,6 +323,10 @@ class V2PackGoldenTest {
                 .orElseThrow(() -> new AssertionError(
                         "the pack did not compile: " + diagnostics.asError().orElse("?")));
         return compiled;
+    }
+
+    static JsonObject document() {
+        return JsonParser.parseString(read()).getAsJsonObject();
     }
 
     private static String read() {

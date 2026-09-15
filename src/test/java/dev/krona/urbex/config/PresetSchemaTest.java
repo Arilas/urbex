@@ -2,10 +2,11 @@ package dev.krona.urbex.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.Schema;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.InputFormat;
+import com.networknt.schema.SpecificationVersion;
+import com.networknt.schema.Error;
 import dev.krona.urbex.worldgen.lost.regassets.PresetDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.BuildingSettings;
 import dev.krona.urbex.worldgen.lost.regassets.data.preset.CitySettings;
@@ -66,9 +67,9 @@ class PresetSchemaTest {
         return mapper.readTree(SCHEMA_PATH.toFile());
     }
 
-    private static JsonSchema loadSchema() throws IOException {
-        JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
-        return factory.getSchema(Files.readString(SCHEMA_PATH));
+    private static Schema loadSchema() throws IOException {
+        SchemaRegistry registry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
+        return registry.getSchema(Files.readString(SCHEMA_PATH), InputFormat.JSON);
     }
 
     private static Set<String> propertyNames(JsonNode objectNode) {
@@ -110,7 +111,7 @@ class PresetSchemaTest {
 
     @Test
     void everyShippedPresetValidatesAgainstSchema() throws IOException {
-        JsonSchema schema = loadSchema();
+        Schema schema = loadSchema();
         ObjectMapper mapper = new ObjectMapper();
         List<String> failures = new ArrayList<>();
 
@@ -122,7 +123,7 @@ class PresetSchemaTest {
 
         for (Path file : files) {
             JsonNode node = mapper.readTree(file.toFile());
-            Set<ValidationMessage> messages = schema.validate(node);
+            List<Error> messages = schema.validate(node);
             if (!messages.isEmpty()) {
                 failures.add(file + ": " + messages);
             }
@@ -141,7 +142,7 @@ class PresetSchemaTest {
      */
     @Test
     void schemaRequiresANamespaceOnEveryAssetReference() throws IOException {
-        JsonSchema schema = loadSchema();
+        Schema schema = loadSchema();
         ObjectMapper mapper = new ObjectMapper();
 
         Map<String, String> bare = new LinkedHashMap<>();
@@ -163,7 +164,7 @@ class PresetSchemaTest {
             }
         }
         for (Map.Entry<String, String> e : qualified.entrySet()) {
-            Set<ValidationMessage> messages = schema.validate(mapper.readTree(e.getValue()));
+            List<Error> messages = schema.validate(mapper.readTree(e.getValue()));
             if (!messages.isEmpty()) {
                 failures.add(e.getKey() + ": schema rejected a qualified reference: " + e.getValue() + " -> " + messages);
             }
@@ -173,17 +174,17 @@ class PresetSchemaTest {
 
     @Test
     void schemaRejectsUnknownKey() throws IOException {
-        JsonSchema schema = loadSchema();
+        Schema schema = loadSchema();
         ObjectMapper mapper = new ObjectMapper();
         JsonNode node = mapper.readTree("{\"cities\":{\"cityChanse\":1}}");
 
-        Set<ValidationMessage> messages = schema.validate(node);
+        List<Error> messages = schema.validate(node);
         assertFalse(messages.isEmpty(), "expected the typo'd key 'cityChanse' to fail validation");
     }
 
     @Test
     void schemaAcceptsCurrentCitiesAndRejectsBothRetiredProperties() throws IOException {
-        JsonSchema schema = loadSchema();
+        Schema schema = loadSchema();
         ObjectMapper mapper = new ObjectMapper();
 
         assertTrue(schema.validate(mapper.readTree("{\"cities\":{\"cityChance\":0.5}}" )).isEmpty(),
@@ -191,7 +192,7 @@ class PresetSchemaTest {
         for (Map.Entry<String, String> retired : Map.of(
                 "cityStyleThreshold", "0.4",
                 "cityStyleAlternative", "\"urbextest:alternative\"").entrySet()) {
-            Set<ValidationMessage> messages = schema.validate(
+            List<Error> messages = schema.validate(
                     mapper.readTree("{\"cities\":{\"" + retired.getKey() + "\":"
                             + retired.getValue() + "}}"));
             assertFalse(messages.isEmpty(),

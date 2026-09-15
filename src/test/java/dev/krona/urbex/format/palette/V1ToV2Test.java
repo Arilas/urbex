@@ -312,14 +312,12 @@ class V1ToV2Test {
     }
 
     /**
-     * {@code TRAIT.011} carries {@code [NOT-YET-REACHED: issue #216]} because the damage pass keys its
-     * map by block state and cannot see a marker. That is a statement about what generation does with
-     * the trait, not about how it is spelled, so the conversion emits the version 2 spelling regardless
-     * and the note records how far it gets.
+     * Conversion preserves the authored damage form. Runtime coverage of that form belongs in
+     * MarkerDamageTest; the procedural placement gap remains tracked by issue #216.
      */
     @Rule("TRAIT.011")
     @Test
-    void damagedConvertsToItsVersion2SpellingEvenThoughTheDamagePassCannotYetKeyItByMarker() {
+    void damagedConvertsToItsVersion2Spelling() {
         assertEquals("minecraft:iron_bars",
                 marker(convert("{\"palette\":[{\"char\":\"X\",\"block\":\"minecraft:stone_bricks\","
                         + "\"damaged\":\"minecraft:iron_bars\"}]}"), "X")

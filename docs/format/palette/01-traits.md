@@ -146,26 +146,21 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > > **Why** — version 1 kept one `Map<BlockState, BlockState>` per palette, so two markers resolving
 > > to the same block shared one mapping and the last compiled won.
 
-> > **Why it is stated and not yet reached, and exactly how far it gets** — the *compiled palette*
-> > satisfies this rule: a marker's `urbex:damaged` is a satellite of that marker's own entry, and two
-> > markers on one block keep their own damaged forms, which `TraitTest` pins. What cannot consume it is
-> > the *damage pass*. That pass runs over blocks it reads back out of the chunk, after the part that
-> > wrote them has finished (`DamageArea`, `Decorations`), and a marker is neither carried on a placed
-> > block nor recoverable from one — which is exactly why version 1 keyed its map by state. So the
-> > mapping is correct where it is built and collapses where it is used, and a version 2 palette
-> > generated today gets version 1's outcome.
+> > **What now reaches it, and what remains** — part placement records the selected marker's damaged
+> > form per position in its chunk driver. The record survives intermediate flushes, is replaced with
+> > the next accepted write, and is released when generation finishes. Both the explosion pass and
+> > the ruins pass consume it; the latter places the authored target rather than treating every
+> > damaged form as a request for generic iron bars. `MarkerDamageTest` compiles two markers with the
+> > same state, writes through the production part-placement seam, runs the damage decision, and
+> > checks both distinct targets in a committed chunk. Traitless markers explicitly record no damage
+> > form, so another marker sharing their state cannot donate its trait.
+> > A damage satellite uses its own rotation policy, independently of its parent marker's opt-out.
 > >
-> > Reaching it needs the marker recorded per position while the part is written, for the damage pass to
-> > read — a change to version 1 generation infrastructure with its own memory and lifetime decisions
-> > and its own goldens, which is [issue #216](https://github.com/Arilas/urbex/issues/216) and not the
-> > palette format's. The two alternatives were rejected on the record: damaging at write time moves the
-> > digest goldens for reasons unrelated to version 2, and keying by state permanently would mean
-> > amending this rule to match an implementation that does not fix the defect the `> Why` above says it
-> > exists to fix.
-> >
-> > Stated here rather than only in a plan, in the style [VER.015](09-migration.md#11-what-version-2-does-not-reach-yet)
-> > uses for version 2 compilation: a reader who finds the mapping collapsing two markers should find
-> > out why from the rule, not from a commit message.
+> > Procedural material passes still resolve some style markers to a bare block state before filling
+> > walls, roofs, supports and other ranges. Those positions retain the historical state-keyed fallback
+> > and can still collapse two markers. The remaining work in [issue #216](https://github.com/Arilas/urbex/issues/216)
+> > is to carry marker metadata through those procedural placement APIs. This rule stays marked
+> > not-yet-reached until those paths also retain their own damaged forms.
 
 > **TRAIT.012** · `ACCEPT` — An `into` naming a block this game does not have leaves the marker
 > undamaged, and the load succeeds.
@@ -275,6 +270,9 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.044** · `REJECT` (`DIAG.022`) — On a node that also carries a
 > [selection](#5-defining-a-trait) trait, TRAIT.041 is asked of that trait's replacement as well, and a
 > replacement none of whose resolved states has a block entity is refused.
+
+This check follows nested selection replacements that inherit the NBT, including selections inside
+weighted alternatives. The mixed-state allowance in TRAIT.043 still applies at each replacement.
 
 > > **Why** — by [TRAIT.096](#5-defining-a-trait) this `nbt` is written to whatever selection produced,
 > > so on a marker carrying `urbex:light` it is written to the unlit replacement on every position where
@@ -444,7 +442,17 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > density roll accepts it, and that its `replacement` satellite is written when the roll rejects it.
 
 > **TRAIT.061** · `MUST` — Its required field `density` names a density in the preset's decoration
-> settings.
+> settings: `lightingDensity` or `lootDensity`. The value is read from the active preset at placement.
+
+> **TRAIT.066** · `REJECT` (`DIAG.027`) — Any other density name is refused at compilation.
+
+> > Early draft examples used `stuff`, but no such decoration setting exists. Use an actual field
+> > name; an unknown density must not silently place every marker.
+
+```json fixture:TRAIT.066 reject=DIAG.027
+{ "version": 2, "palette": { "v": { "block": "minecraft:cobweb",
+    "traits": { "urbex:optional": { "density": "stuff" } } } } }
+```
 
 > **TRAIT.062** · `DEFAULT` — An absent `replacement` is air.
 
@@ -468,6 +476,16 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 > **TRAIT.065** · `MUST` — The roll is addressed by position, so a marker's outcome does not depend
 > on how many other markers the chunk resolved first.
 
+The placement implementation selects optional markers and in-place lights before their part's
+rotation and decorators. It compiles replacement slots once, including each replacement's own
+rotation and damage policy. The outer marker's decorators apply to the selected block; a decorator
+explicitly written on the replacement overrides the same outer decorator. Rejecting a marker to air
+clears the position, including when a prior part or terrain left a block there.
+
+Deferred light sockets still use the existing lighting placement path. Selection traits nested
+inside a damage satellite are also not yet evaluated by the later damage pass; its satellite lookup
+currently retains the block choice and rotation policy.
+
 ```json fixture:TRAIT.064 reject=DIAG.025
 {
   "version": 2,
@@ -476,7 +494,7 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
       "block": "minecraft:lantern",
       "traits": {
         "urbex:light":    { "unlit": "minecraft:air" },
-        "urbex:optional": { "density": "stuff" }
+        "urbex:optional": { "density": "lightingDensity" }
       }
     }
   }
@@ -485,12 +503,12 @@ Every block-valued field defined here is a satellite, and so is governed by TRAI
 
 ```json fixture:TRAIT.062 equiv=absent-replacement
 { "version": 2, "palette": { "v": { "block": "minecraft:cobweb",
-    "traits": { "urbex:optional": { "density": "stuff" } } } } }
+    "traits": { "urbex:optional": { "density": "lightingDensity" } } } } }
 ```
 
 ```json fixture:TRAIT.062 equiv=absent-replacement
 { "version": 2, "palette": { "v": { "block": "minecraft:cobweb",
-    "traits": { "urbex:optional": { "density": "stuff", "replacement": "minecraft:air" } } } } }
+    "traits": { "urbex:optional": { "density": "lightingDensity", "replacement": "minecraft:air" } } } } }
 ```
 
 ### 4.7 `urbex:rotatable`

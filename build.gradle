@@ -611,7 +611,8 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     // Validates docs/schema/preset.schema.json (draft 2020-12) against the shipped presets and
     // guards it against drifting from the section codecs' KEYS constants; see PresetSchemaTest.
-    testImplementation 'com.networknt:json-schema-validator:1.5.6'
+    // 2.x retains Jackson 2 and fixes skipped hash-prefixed properties (issue #218).
+    testImplementation 'com.networknt:json-schema-validator:2.0.7'
 }
 
 test {
@@ -631,7 +632,8 @@ test {
     // and the specs and plans under docs/superpowers/ change with every task, so a whole-directory
     // input would cost a full suite run per plan edit. docs/format is the exception: every file in it
     // is read by SpecDocuments, so it is declared as a whole tree rather than file by file.
-    inputs.files(files('docs/datapacks.md'), fileTree('docs/schema'), fileTree('docs/format'))
+    inputs.files(files('docs/datapacks.md', 'docs/migrating-from-lost-cities.md'),
+            fileTree('docs/schema'), fileTree('docs/format'))
             .withPropertyName('docsReadByTests')
             .withPathSensitivity(PathSensitivity.RELATIVE)
     testLogging {
@@ -689,9 +691,8 @@ tasks.register('regenerateConformance', JavaExec) {
     args 'write'
 }
 
-// VER.020: the converter ships before the format does. Run against the bundled pack by default,
-// writing into build/ rather than over src/ - Task 10 is where the bundled pack itself is converted,
-// and a task whose default is an in-place rewrite of tracked files is one nobody can run to look.
+// VER.020: retain the offline converter for older Urbex packs. The bundled pack is already v2;
+// the default copies its palettes unchanged into build/ and is not a complete datapack export.
 // -PurbexPackIn and -PurbexPackOut point it at an addon pack:
 //   ./gradlew convertPalettes -PurbexPackIn=../Urbex-Zombie-Apocalypse-Essentials/pack/data/urbexza/urbex \
 //                             -PurbexPackOut=/tmp/mt/urbex

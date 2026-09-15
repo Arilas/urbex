@@ -75,10 +75,8 @@ public final class GenerationSession {
     private final SiteRuntimes sites = new SiteRuntimes();
     /**
      * Everything this world compiled, or null until the first level load compiles it. One field
-     * rather than two, because the two halves are captured together and neither is usable without
-     * the other: the tag epoch is expanded <em>from</em> the assets, so a reader that could see one
-     * of them written and not the other would have an epoch that knows about no world style's
-     * {@code rotatable} tag.
+     * rather than two, because generation needs both the validated assets and the first tag epoch.
+     * Publishing them together prevents a reader from observing only half of that state.
      */
     @Nullable
     private volatile Compiled compiled;
@@ -207,9 +205,8 @@ public final class GenerationSession {
      * naming every problem at once rather than failing from a worldgen worker on the first chunk that
      * touches the broken file.</p>
      *
-     * <p>The first tag epoch is opened here too, rather than at session open, because
-     * {@link TagSnapshot#capture} needs the compiled world styles to know which {@code rotatable}
-     * tags to expand.</p>
+     * <p>The first tag epoch is opened alongside the validated asset snapshot, before generation
+     * can observe either. Later tag reloads replace that epoch without recompiling assets.</p>
      */
     private synchronized Compiled compileOnce(ServerLevel level) {
         Compiled known = compiled;
@@ -227,7 +224,7 @@ public final class GenerationSession {
                     diagnostics.size() + " Urbex asset problem(s) found while compiling this world:"));
         }
         diagnostics.throwIfAny();
-        Compiled world = new Compiled(assets, new TagEpoch(TagSnapshot.capture(assets)));
+        Compiled world = new Compiled(assets, new TagEpoch(TagSnapshot.capture()));
         compiled = world;
         return world;
     }
@@ -298,7 +295,7 @@ public final class GenerationSession {
         if (world == null) {
             return;
         }
-        world.tags().publish(TagSnapshot.capture(world.assets()));
+        world.tags().publish(TagSnapshot.capture());
     }
 
     /** Who this session belongs to, for a caller that has to close it without holding that server. */

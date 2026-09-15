@@ -4,11 +4,10 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dev.krona.urbex.worldgen.lost.regassets.data.*;
 import net.minecraft.resources.Identifier;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.level.block.Block;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
+import java.util.Map;
 
 /**
  * A world style.
@@ -30,12 +29,16 @@ public class WorldStyleDefinition implements Extendable {
                     ScatteredSettings.CODEC.optionalFieldOf("scattered").forGetter(l -> Optional.ofNullable(l.scatteredSettings)),
                     PartSelector.Decl.CODEC.optionalFieldOf("parts").forGetter(l -> Optional.ofNullable(l.partSelector)),
                     Mergeable.codec(CityStyleSelector.CODEC).optionalFieldOf("citystyles").forGetter(l -> Optional.ofNullable(l.cityStyleSelectors)),
-                    Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers)),
-                    DataTools.BLOCK_TAG_CODEC.optionalFieldOf("rotatable").forGetter(l -> Optional.ofNullable(l.rotatable))
+                    Mergeable.codec(CityBiomeMultiplier.CODEC).optionalFieldOf("citybiomemultipliers").forGetter(l -> Optional.ofNullable(l.cityBiomeMultipliers))
             ).apply(instance, WorldStyleDefinition::new));
 
     /** Retired-key rejection wraps every registry's codec; see {@link RetiredKeys}. */
-    public static final Codec<WorldStyleDefinition> CODEC = RetiredKeys.reject(RAW, "worldstyle");
+    public static final Codec<WorldStyleDefinition> CODEC = RetiredKeys.reject(
+            RetiredKeys.reject(RAW, Map.of("rotatable",
+                    "This worldstyle declares 'rotatable', which Palette v2 replaced with the "
+                            + "'urbex:rotatable' palette trait. Remove the worldstyle key; blocks "
+                            + "follow their part's rotation by default. Set 'urbex:rotatable': false "
+                            + "in a palette node's traits to keep its authored facing.")), "worldstyle");
 
     private final Optional<Identifier> extendsId;
     // The human-readable label the world-style picker shows instead of the id. Null means "not
@@ -50,10 +53,6 @@ public class WorldStyleDefinition implements Extendable {
     private final PartSelector.Decl partSelector;
     private final Mergeable<CityStyleSelector> cityStyleSelectors;
     private final Mergeable<CityBiomeMultiplier> cityBiomeMultipliers;
-    // Null means "not declared here", so the chain reads it from an ancestor. A chain that declares
-    // none at all falls back to urbex:rotatable in WorldStyle -- the behaviour every world style had
-    // before this field existed.
-    private final TagKey<Block> rotatable;
 
     public WorldStyleDefinition(Optional<Identifier> extendsId,
                         Optional<String> displayName,
@@ -63,8 +62,7 @@ public class WorldStyleDefinition implements Extendable {
                         Optional<ScatteredSettings> scatteredSettings,
                         Optional<PartSelector.Decl> partSelector,
                         Optional<Mergeable<CityStyleSelector>> cityStyleSelector,
-                        Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers,
-                        Optional<TagKey<Block>> rotatable) {
+                        Optional<Mergeable<CityBiomeMultiplier>> cityBiomeMultipliers) {
         this.extendsId = extendsId;
         this.displayName = displayName.orElse(null);
         this.outsideStyle = outsideStyle.orElse(null);
@@ -74,7 +72,6 @@ public class WorldStyleDefinition implements Extendable {
         this.partSelector = partSelector.orElse(null);
         this.cityStyleSelectors = cityStyleSelector.orElse(null);
         this.cityBiomeMultipliers = cityBiomeMultipliers.orElse(null);
-        this.rotatable = rotatable.orElse(null);
     }
 
     @Nullable
@@ -85,11 +82,6 @@ public class WorldStyleDefinition implements Extendable {
     @Nullable
     public String getOutsideStyle() {
         return outsideStyle;
-    }
-
-    @Nullable
-    public TagKey<Block> getRotatable() {
-        return rotatable;
     }
 
     @Nullable

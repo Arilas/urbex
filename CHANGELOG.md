@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+- **Breaking: retired TOML config migration is removed.** Urbex reads
+  `config/urbex/urbex.json` and optional `<world>/serverconfig/urbex.json` overrides only.
+  Old TOML files are left untouched. See [configuration and manual migration](docs/configuration.md).
+- Invalid global JSON configuration is preserved for repair instead of being overwritten with
+  defaults. The current run still falls back to defaults and logs the problem.
+- Palette markers placed in parts retain their own damaged forms through generation, including
+  local palette overrides and weighted choices. Ruins use the selected damaged form. Procedural
+  material writes still use the state-based fallback tracked in #216.
+- Part rotation now follows each Palette v2 slot's `urbex:rotatable` trait, including its default
+  and opt-out, and damaged satellites follow their own rotation policy. The obsolete world-style
+  rotation tag is retired; use the palette trait to control orientation.
+- `urbex:optional` now reaches placement: the named preset density selects the primary block or
+  its replacement before transformation and decoration. Unsupported density names are rejected.
+  In-place lights also select their unlit replacements before rotation, preserving each
+  replacement's own orientation policy.
+- Block-entity validation follows nested selection replacements, rejecting branches where
+  inherited NBT would silently disappear because no resolved state can hold it.
+- Schema validation now checks original hash-prefixed keys using the fixed validator, without
+  renaming palette markers. Reference checks assert their coverage counts, and mutation tests
+  verify that removing named Palette v2 constructs fails the pack's coverage assertions.
+- Added a practical [Lost Cities and Palette v1 migration guide](docs/migrating-from-lost-cities.md)
+  and retired documentation that still permitted loading mixed palette versions.
+
 - **Breaking: palettes now require format version 2.** Registered and inline palettes must declare
   `"version": 2`; version 1 and unversioned palettes no longer load. The `variants` registry is
   replaced by `definitions`, referenced with `$ref`. Typed nodes, shared definitions, exact weighted

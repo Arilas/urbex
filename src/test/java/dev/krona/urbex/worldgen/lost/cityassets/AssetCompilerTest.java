@@ -195,7 +195,7 @@ class AssetCompilerTest {
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(TestWiring.partSelector()),
                 Optional.of(new Mergeable<>(true, List.of(new CityStyleSelector(1.0f, "urbex:base", null,
                         Optional.of(new CityStyleEdge("urbex:edge", 0.4f)))))),
-                Optional.empty(), Optional.empty())));
+                Optional.empty())));
 
         Set<Identifier> reachable = AssetCompiler.reachableCityStyles(registries(),
                 new AssetIndex<>("urbex:worldstyles", Map.of(id("family_world"), worldStyle)));
@@ -371,7 +371,7 @@ class AssetCompilerTest {
                 new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                         Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(TestWiring.partSelector()),
                         Optional.of(new Mergeable<>(true, List.of(new CityStyleSelector(1.0f, "urbex:" + base,
-                                null, edge)))), Optional.empty(), Optional.empty()));
+                                null, edge)))), Optional.empty()));
     }
 
     private static StuffSettingsDefinition stuffTagged(String path, String tag) {

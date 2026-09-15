@@ -188,8 +188,7 @@ public class ChunkPlan {
      * produce half-and-half cities.
      * <p>
      * Memoised because a {@link ChunkPlan} is per-chunk and long-lived while the lookup behind
-     * it walks the city neighbourhood - and because {@code CityGenerator.transformBlockState} reads
-     * the rotatable tag off it for every block of every rotated part. Racy single-check like the
+     * it walks the city neighbourhood. Racy single-check like the
      * other lazy fields here: the value is a pure function of the coordinate, so a lost race just
      * recomputes it.
      */

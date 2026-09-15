@@ -260,6 +260,6 @@ class WiringRequiredTest {
     private static WorldStyleDefinition worldStyle(String name, PartSelector.Decl parts) {
         return new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.ofNullable(parts),
-                Optional.of(new Mergeable<>(true, List.of())), Optional.empty(), Optional.empty());
+                Optional.of(new Mergeable<>(true, List.of())), Optional.empty());
     }
 }

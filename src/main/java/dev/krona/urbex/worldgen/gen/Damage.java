@@ -71,7 +71,7 @@ public class Damage {
                             if (d != feature.air || cury <= info.waterLevel) {
                                 float damage = collectedDamage[x][z];
                                 if (damage >= 0.001) {
-                                    BlockState newd = damageArea.damageBlock(d, feature.provider, ctx.tags, cx + x, cury, cz + z, damage, info.getCompiledPalette(), feature.liquid);
+                                    BlockState newd = damageArea.damageBlock(d, feature.provider, ctx.tags, cx + x, cury, cz + z, damage, driver.damageHere(info.getCompiledPalette()), feature.liquid);
                                     if (newd != d) {
                                         driver.block(newd);
                                         cntDamaged++;

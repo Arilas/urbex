@@ -1,6 +1,7 @@
 package dev.krona.urbex.data;
 
 import dev.krona.urbex.worldgen.lost.cityassets.TestAssetId;
+import dev.krona.urbex.format.palette.V1ToV2;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -45,6 +46,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Every JSON example in {@code docs/datapacks.md} decodes through the codec of the registry it
@@ -163,6 +166,25 @@ class DatapackGuideExamplesTest {
         }
 
         assertTrue(problems.isEmpty(), () -> problems.size() + " problems:\n" + String.join("\n", problems));
+    }
+
+    /** The migration guide's before/after pair is the converter's actual output. */
+    @Test
+    void migrationGuideExampleMatchesTheConverter() throws IOException {
+        Path guide = Path.of("docs/migrating-from-lost-cities.md");
+        List<String> problems = new ArrayList<>();
+        List<Example> examples = examples(Files.readAllLines(guide), problems);
+        assertTrue(problems.isEmpty(), () -> guide + ": " + problems);
+        assertEquals(List.of("palette-v1", "palettes"),
+                examples.stream().map(Example::registry).toList(),
+                "the guide contains one conversion pair; cover additional examples explicitly");
+
+        V1ToV2.Converted converted = V1ToV2.paletteFile(examples.get(0).json, guide.toString());
+        assertFalse(converted.blocked(), () -> converted.findings().toString());
+        JsonElement expected = JsonParser.parseString(examples.get(1).json);
+        assertEquals(expected, JsonParser.parseString(converted.json()));
+        assertTrue(codecs().get("palettes").parse(JsonOps.INSTANCE, expected).isSuccess(),
+                "the documented output must also pass the registered palette codec");
     }
 
     /**

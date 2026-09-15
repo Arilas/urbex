@@ -189,6 +189,10 @@ public enum Diag {
     DIAG_026("%s: 'urbex:block_entity' nbt declares %s, which the loader supplies and this drops."
             + " Remove them; the position and the type are not the file's to choose."),
 
+    /** {@code TRAIT.066}: args are the location and the unknown density name. */
+    DIAG_027("%s: 'urbex:optional' names unknown density '%s'."
+            + " Use 'lightingDensity' or 'lootDensity' from the preset's decoration settings."),
+
     // ---- References and merging (030-039) ------------------------------------------------------
 
     /**

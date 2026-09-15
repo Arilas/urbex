@@ -64,7 +64,6 @@ public final class TestWorldStyles {
                                 noParts(), noParts(), noParts(), noParts(), noParts(), noParts(),
                                 noParts(), noParts(), noParts(), noParts())))),
                 Optional.of(new Mergeable<>(true, selectors)),
-                Optional.empty(),
                 Optional.empty());
         return new WorldStyle(Identifier.fromNamespaceAndPath("urbextest", path), List.of(declaration));
     }

@@ -3,15 +3,12 @@ package dev.krona.urbex.worldgen.lost.cityassets;
 import dev.krona.urbex.varia.ChunkCoord;
 import dev.krona.urbex.varia.Tools;
 import dev.krona.urbex.worldgen.PlanningContext;
-import dev.krona.urbex.worldgen.UrbexTags;
 import dev.krona.urbex.worldgen.lost.BiomeInfo;
 import dev.krona.urbex.worldgen.lost.regassets.WorldStyleDefinition;
 import dev.krona.urbex.worldgen.lost.regassets.data.*;
 import net.minecraft.core.Holder;
 import net.minecraft.resources.Identifier;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Block;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,7 +30,6 @@ public class WorldStyle {
     private final List<Pair<Predicate<Holder<Biome>>, Float>> cityBiomeMultiplier = new ArrayList<>();
     @Nonnull private final MultiSettings multiSettings;
     @Nonnull private final WorldSettings worldSettings;
-    @Nonnull private final TagKey<Block> rotatableTag;
 
     /**
      * Builds a fully resolved world style from its {@code extends} chain, root first: every
@@ -55,7 +51,6 @@ public class WorldStyle {
         PartSelector parts = null;
         MultiSettings multi = MultiSettings.DEFAULT;
         WorldSettings world = WorldSettings.DEFAULT;
-        TagKey<Block> rotatable = null;
         List<CityStyleSelector> selectors = new ArrayList<>();
         boolean anySelectors = false;
         List<CityBiomeMultiplier> multipliers = new ArrayList<>();
@@ -75,9 +70,6 @@ public class WorldStyle {
             if (object.getWorldSettings() != null) {
                 world = object.getWorldSettings();
             }
-            if (object.getRotatable() != null) {
-                rotatable = object.getRotatable();
-            }
             if (object.getCityStyleSelectors() != null) {
                 Mergeable.apply(selectors, object.getCityStyleSelectors());
                 anySelectors = true;
@@ -93,9 +85,6 @@ public class WorldStyle {
         this.partSelector = Resolved.require(parts, name, "parts").requireComplete(name);
         this.multiSettings = multi;
         this.worldSettings = world;
-        // Optional, unlike outsidestyle: a chain that declares none keeps the behaviour every world
-        // style had before the field existed, rather than being a load error.
-        this.rotatableTag = rotatable == null ? UrbexTags.ROTATABLE_TAG : rotatable;
         for (CityStyleSelector selector : selectors) {
             Predicate<Holder<Biome>> predicate = biomeHolder -> true;
             if (selector.biomeMatcher() != null) {
@@ -111,8 +100,7 @@ public class WorldStyle {
     /**
      * Folds a resolved chain's {@code name} declarations the same way every other scalar field is
      * folded - last declaring link wins - and fills the gap with {@code id} when nothing declared
-     * one. {@code name} is optional like {@code rotatable} rather than required like
-     * {@code outsidestyle}: a chain that names itself nowhere is labelled by its id, exactly as
+     * one. {@code name} is optional: a chain that names itself nowhere is labelled by its id, exactly as
      * every world style was before the field existed.
      * <p>
      * Static and taking the chain rather than reading instance state, because the world-style
@@ -149,16 +137,6 @@ public class WorldStyle {
 
     public String getOutsideStyle() {
         return outsideStyle;
-    }
-
-    /**
-     * The block tag deciding which blocks rotate with the part they sit in, rather than keeping the
-     * facing their palette entry authored. Never null: a world style that declares no
-     * {@code rotatable} anywhere in its chain resolves {@code urbex:rotatable}.
-     */
-    @Nonnull
-    public TagKey<Block> getRotatableTag() {
-        return rotatableTag;
     }
 
     /**

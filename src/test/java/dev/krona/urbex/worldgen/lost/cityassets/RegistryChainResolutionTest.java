@@ -329,10 +329,10 @@ class RegistryChainResolutionTest {
                 Optional.of(new Mergeable<>(true,
                         List.of(new CityStyleSelector(1.0f, "urbex:citystyle_common", null,
                                 Optional.of(new CityStyleEdge("urbex:citystyle_edge", 0.4f)))))),
-                Optional.empty(), Optional.empty());
+                Optional.empty());
         WorldStyleDefinition child = new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:bleak"),
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty());
 
         WorldStyle resolved = new WorldStyle(TestAssetId.ANY, List.of(parent, child));
 

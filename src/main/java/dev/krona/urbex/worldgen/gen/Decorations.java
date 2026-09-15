@@ -171,14 +171,14 @@ public final class Decorations {
                 }
                 boolean doRubble = palette.isDefined(rubbleBlock);
                 while (height > 0) {
-                    BlockState damage = palette.canBeDamagedToIronBars(driver.getBlock());
+                    BlockState damage = driver.damageHere(palette);
                     BlockState c = driver.getBlockDown();
 
                     if (doRubble && !checkIronbars.test(c) && c != feature.air && c != feature.liquid && rollHere(ctx, driver, Rng.Purpose.RUINS) < .2f) {      // @todo hardcoded random
                         doRubble = false;
                         driver.add(ctx.paletteHere(palette, rubbleBlock));
                     } else if ((damage != null || checkIronbars.test(c)) && c != feature.air && c != feature.liquid && rollHere(ctx, driver, Rng.Purpose.RUINS_BARS) < .2f) {    // @todo hardcoded random
-                        driver.add(ironbars.get());
+                        driver.add(ruinBarReplacement(damage, ironbars));
                     } else {
                         if (vl > 0) {
                             c = driver.getBlockDown();
@@ -197,6 +197,11 @@ public final class Decorations {
                 }
             }
         }
+    }
+
+    /** A ruined marker keeps its authored material; a bar continuing from below uses the style default. */
+    static BlockState ruinBarReplacement(BlockState damaged, Supplier<BlockState> ironbars) {
+        return damaged != null ? damaged : ironbars.get();
     }
 
     public void vegetation(ChunkGenContext ctx, CityGenerator feature, ChunkPlan info, int height) {
@@ -393,6 +398,10 @@ public final class Decorations {
                 // and this pass used to lose a version 2 park lamp's urbex:light entirely - placing
                 // it permanently lit, and writing a socket's representative instead of deferring.
                 CompiledPalette.Placed placed = ctx.placedAt(compiledPalette, lamp, x, y, z);
+                CompiledPalette.Placed original = placed;
+                if (placed != null) {
+                    placed = placed.selectOptional(ctx.profile, ctx.seed, pos.getX(), y, pos.getZ());
+                }
                 BlockState lit = placed == null ? null : placed.state();
                 if (lit == null) {
                     // A style naming a character its palette does not map is a datapack error, and
@@ -404,8 +413,8 @@ public final class Decorations {
                 BlockState b = (paletteInfo != null && paletteInfo.lightSource() != null)
                         ? Parts.handleLightSource(ctx, feature, paletteInfo.lightSource(), lit, pos)
                         : lit;
-                if (b != feature.air) {
-                    driver.current(x, y, z).block(b);
+                if (b != feature.air || placed != original) {
+                    driver.current(x, y, z).block(b, placed.damagedAt(ctx.seed, driver.getX(), y, driver.getZ()));
                 }
             }
         }

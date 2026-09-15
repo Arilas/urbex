@@ -413,7 +413,7 @@ class AssetGraphTest {
             WorldStyle worldStyle = new WorldStyle(Identifier.fromNamespaceAndPath("urbex", path),
                     List.of(new WorldStyleDefinition(Optional.empty(), Optional.empty(), Optional.of("urbex:outside"),
                             Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(worldRoadParts()),
-                            Optional.of(new Mergeable<>(true, List.of(selector))), Optional.empty(), Optional.empty())));
+                            Optional.of(new Mergeable<>(true, List.of(selector))), Optional.empty())));
             worldStyles.put(worldStyle.getId(), worldStyle);
             return this;
         }
