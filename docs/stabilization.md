@@ -110,6 +110,28 @@ The separate alias-validation gap in [#229](https://github.com/Arilas/urbex/issu
 incompatible decorators when the target is resolved after early trait validation. Supported aliases
 receive the shared runtime handling; validation of known incompatible merged outcomes is follow-up work.
 
+### Fourth batch: deferred socket ownership
+
+[#228](https://github.com/Arilas/urbex/issues/228) exposed a separate ownership gap: a queued socket
+could still place its light after a newer write replaced its position. Pending sockets now follow
+the last accepted socket placeholder at each position, retaining that socket's source, lighting
+choice and originating building and part. A later socket replaces the earlier request with its
+own source and origin.
+
+Any later accepted non-socket write clears the pending socket, including a solid block or an air
+write that leaves the placeholder's block state unchanged. Rejected writes, including null,
+structure void and writes outside the allowed height window, leave ownership intact. Same-block
+shape corrections and intermediate flushes also retain it. Deferred placement consumes only the
+surviving requests.
+
+Park sockets explicitly write their air placeholder through the driver. That accepted write admits
+the request, giving park lamps the same ownership and overwrite behavior as sockets in parts.
+Review also found [#231](https://github.com/Arilas/urbex/issues/231): the later `updateNeeded`
+callback toggles blocks through air and can erase the finalized decoration data. This P1 follow-up
+now takes precedence over alias validation. A support regression separately exposed
+[#232](https://github.com/Arilas/urbex/issues/232): final shaping can read unflushed support as air
+through the underlying region. Both are tracked separately from socket ownership.
+
 ### Remaining backlog
 
 These are source-verified findings. Terrain issues below have not been reproduced in an interactive
@@ -117,8 +139,9 @@ game session during this audit; historical performance percentages are not fresh
 
 | Priority | Issue | Current evidence and next action |
 | --- | --- | --- |
-| P2 | [#228](https://github.com/Arilas/urbex/issues/228): stale deferred sockets | Source inspection shows later writes do not cancel an earlier socket todo. Bind queue entries to accepted placeholder ownership and verify solid/air replacements, repeated sockets and rejected writes. This is separate from final decoration dispatch. |
+| P1 | [#231](https://github.com/Arilas/urbex/issues/231): post-update decoration loss | Source and Minecraft bytecode confirm that the air/state notification toggle removes finalized block-entity data. Preserve data through the complete finalization and post-update sequence. |
 | P2 | [#229](https://github.com/Arilas/urbex/issues/229): alias capability validation | Early validators see no states for an alias; resolving and overlaying it does not revalidate its traits. Check concrete same-file and reachable cross-palette outcomes after alias resolution at load. |
+| P2 | [#232](https://github.com/Arilas/urbex/issues/232): buffered shape support | A real driver commit removed a wall torch against buffered stone; flushing support first preserves it. Let shape/survival queries see buffered owner-chunk states. |
 | P2 | [#194](https://github.com/Arilas/urbex/issues/194): short highway supports | Both loops in `gen/Highways` still stop after 40 blocks. Replace with one helper bounded by the world's minimum height, preserving water traversal, and test a deep drop. |
 | P2 | [#193](https://github.com/Arilas/urbex/issues/193): floating debris | `CityGenerator` still descends through air/fluids only and writes `h + 1` unconditionally. Define debris-specific support and destination rules, including the top-of-world case. |
 | P2 | [#195](https://github.com/Arilas/urbex/issues/195): misleading throughput | `DigestRunner` still times generation, hashing and coverage scans together. Separate generation time from verification and name the write-recording overhead. |
@@ -140,7 +163,7 @@ game session during this audit; historical performance percentages are not fresh
 ## Verification
 
 The first batch passed **1,350 tests**, and the second passed **1,359**. The third batch's
-`./gradlew regenerateConformance build` passes all **1,390 tests**, with no failures or skips,
+`./gradlew regenerateConformance build` passed all **1,390 tests**, with no failures or skips,
 and builds `build/libs/urbex-fabric-26.2-0.2.0.jar`. Conformance is regenerated from the actual rules
 and citing tests. The public
 converter fixtures are self-contained; `privateCorpusTest` needs an explicitly supplied private
@@ -190,3 +213,36 @@ The standard avoidance window has 5,119,665 unchanged writes and two changed wri
 window has 5,118,649 unchanged writes and the same two changes. The reviewed golden updates are
 `7a8155f727a1d735` → `c1db48b62956eb59` and `54840fa48a550903` → `463fea98e213ef0f` respectively.
 The base, feature and rail goldens remain unchanged.
+
+### Fourth-batch verification and explained golden changes
+
+The socket-ownership build passes **1,401 tests**, with no failures or skips. Ten new lifecycle
+regressions compile real sockets, admit placeholders, replace them, plan the surviving lights and
+commit chunk blocks. They cover source/origin replacement, same-air writes, clipping, rejected
+policies, shape preservation, queue closure, intermediate flushes and ordering independence.
+Disabling cancellation makes the overwrite regression fail; restoring it passes the full suite.
+
+An independent checkout of `17cb4597` reproduced all three previous goldens below. Comparing
+complete per-position dumps with the fix found no added or removed writes:
+
+| Window | Unchanged writes | Changed states | Previous digest | Corrected digest |
+| --- | ---: | ---: | --- | --- |
+| Features | 4,571,766 | 8 | `b3c5ee9450c7e008` | `127848044faf8f6b` |
+| Avoidance | 5,119,664 | 3 | `c1db48b62956eb59` | `31b4f32b1473fdb9` |
+| Avoidance, other modes | 5,118,648 | 3 | `463fea98e213ef0f` | `93f77511d96a9eaf` |
+
+Temporary cancellation traces attribute seven feature changes to sockets in `urbex:park_plants`
+and `urbex:park_building` that later vegetation replaced. Six unlit candles and one lantern now
+leave the later oak/jungle leaves or moss block intact. The eighth change is the north connection
+of the adjacent cobblestone wall at `(1302, 73, 1470)`, recomputed against leaves at `(1302, 73, 1469)`.
+
+Both avoidance windows have the same three changes: the lantern at `(-146, 72, 30)` and unlit
+candle at `(-95, 78, -130)` now leave later oak leaves intact, and the wall at `(-96, 78, -130)`
+loses its east connection to the replaced fixture. Both canceled sockets came from
+`urbex:park_plants`. The procedural park-lamp path is not involved: no bundled city style enables it.
+All other written states and dumped block-entity data match the baseline.
+
+Base and both rail configurations retain their existing goldens. Normal, shuffled, two-worker
+and forced-expiry avoidance runs agree on the corrected avoidance digest, with zero unsafe reads.
+The temporary trace code is removed. The block-update and buffered-support findings in #231/#232
+remain separate follow-ups; these checks do not claim to resolve those lifecycle gaps.

@@ -536,6 +536,10 @@ clears the position, including when a prior part or terrain left a block there.
 
 Deferred light sockets retain the chosen candidate or unlit replacement through support checks
 and planning, including weighted alternatives with the same state and different damage traits.
+Only an accepted socket placeholder enters deferred planning. A later accepted write cancels it,
+even when that write also places air; a later socket at the same position replaces its source and
+originating part. Rejected writes and same-block shape corrections preserve the existing socket.
+Canceled positions keep their actual blocks in the support snapshot used by surviving sockets.
 Selection nested inside a damage satellite runs before its own rotation, and the resulting damage
 trait remains available to subsequent damage passes.
 
